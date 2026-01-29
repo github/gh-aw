@@ -474,30 +474,32 @@ Dependency updates and internal improvements to keep things running smoothly.
 
 **HOW TO CALL THE TOOL:**
 
-The `update_release` tool is an **MCP (Model Context Protocol) tool**, not a bash command or file operation. To call it:
+The `update_release` tool is an **MCP (Model Context Protocol) tool**, not a bash command or file operation.
 
-1. **Use the MCP tool call syntax** - The tool is registered as `update_release` (or `safeoutputs___update_release`)
-2. **DO NOT write JSON files manually** - Writing files like `/tmp/gh-aw/safeoutputs/update_release_001.json` will NOT work
-3. **DO NOT use bash to simulate tool calls** - The tool must be called through the MCP protocol
+**✅ CORRECT - Call the MCP tool directly:**
 
-**Example Tool Call:**
-
-```javascript
-update_release({
-  tag: "v0.37.26",
-  operation: "prepend",
-  body: "## 🌟 Release Highlights\n\n[Your complete markdown highlights here]"
-})
+```
+safeoutputs/update_release(
+  tag="v0.38.1",
+  operation="prepend",
+  body="## 🌟 Release Highlights\n\n[Your complete markdown highlights here]"
+)
 ```
 
+**❌ INCORRECT - DO NOT:**
+- Write JSON files manually (e.g., `/tmp/gh-aw/safeoutputs/update_release_001.json`)
+- Use bash to simulate tool calls
+- Create scripts that write to outputs.jsonl
+- Use any file operations - the MCP tool handles everything
+
 **Required Parameters:**
-- `tag` - Release tag from `${RELEASE_TAG}` environment variable (e.g., "v0.30.2")
+- `tag` - Release tag from `${RELEASE_TAG}` environment variable (e.g., "v0.38.1")
 - `operation` - Must be `"prepend"` to add before existing notes
 - `body` - Complete markdown content (include all formatting, emojis, links)
 
-**IMPORTANT**: This is a real tool call through MCP, NOT a bash command or file write operation. The tool will automatically write to the correct output file (`/opt/gh-aw/safeoutputs/outputs.jsonl`).
+**IMPORTANT**: The tool is accessed via the MCP gateway as `safeoutputs/update_release`. When you call this tool, the MCP server automatically writes to `/opt/gh-aw/safeoutputs/outputs.jsonl`.
 
-**WARNING**: If you don't call the `update_release` tool properly through MCP, the release notes will NOT be updated!
+**WARNING**: If you don't call the MCP tool properly, the release notes will NOT be updated!
 
 **Documentation Base URLs:**
 - User docs: `https://githubnext.github.io/gh-aw/`
