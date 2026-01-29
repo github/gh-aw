@@ -23,7 +23,7 @@ var (
 	codexTotalTokensPattern   = regexp.MustCompile(`total_tokens:\s*(\d+)`)
 )
 
-// CodexEngine represents the Codex agentic engine (experimental)
+// CodexEngine represents the Codex agentic engine
 type CodexEngine struct {
 	BaseEngine
 }
