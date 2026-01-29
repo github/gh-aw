@@ -559,6 +559,39 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	if result.UpdateProjects == nil && importedConfig.UpdateProjects != nil {
 		result.UpdateProjects = importedConfig.UpdateProjects
 	}
+	if result.CopyProjects == nil && importedConfig.CopyProjects != nil {
+		result.CopyProjects = importedConfig.CopyProjects
+	}
+	if result.CreateProjects == nil && importedConfig.CreateProjects != nil {
+		result.CreateProjects = importedConfig.CreateProjects
+	}
+	if result.CreateProjectStatusUpdates == nil && importedConfig.CreateProjectStatusUpdates != nil {
+		result.CreateProjectStatusUpdates = importedConfig.CreateProjectStatusUpdates
+	}
+	if result.UpdateDiscussions == nil && importedConfig.UpdateDiscussions != nil {
+		result.UpdateDiscussions = importedConfig.UpdateDiscussions
+	}
+	if result.LinkSubIssue == nil && importedConfig.LinkSubIssue != nil {
+		result.LinkSubIssue = importedConfig.LinkSubIssue
+	}
+	if result.HideComment == nil && importedConfig.HideComment != nil {
+		result.HideComment = importedConfig.HideComment
+	}
+	if result.DispatchWorkflow == nil && importedConfig.DispatchWorkflow != nil {
+		result.DispatchWorkflow = importedConfig.DispatchWorkflow
+	}
+	if result.AssignToUser == nil && importedConfig.AssignToUser != nil {
+		result.AssignToUser = importedConfig.AssignToUser
+	}
+	if result.AutofixCodeScanningAlert == nil && importedConfig.AutofixCodeScanningAlert != nil {
+		result.AutofixCodeScanningAlert = importedConfig.AutofixCodeScanningAlert
+	}
+	if result.MarkPullRequestAsReadyForReview == nil && importedConfig.MarkPullRequestAsReadyForReview != nil {
+		result.MarkPullRequestAsReadyForReview = importedConfig.MarkPullRequestAsReadyForReview
+	}
+	if result.MissingData == nil && importedConfig.MissingData != nil {
+		result.MissingData = importedConfig.MissingData
+	}
 	if result.MissingTool == nil && importedConfig.MissingTool != nil {
 		result.MissingTool = importedConfig.MissingTool
 	}

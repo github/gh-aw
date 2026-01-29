@@ -159,7 +159,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -371,6 +371,77 @@ jobs:
                 "type": "object"
               },
               "name": "update_project"
+            },
+            {
+              "description": "Report that data or information needed to complete the task is not available. Use this when you cannot accomplish what was requested because required data, context, or information is missing.",
+              "inputSchema": {
+                "additionalProperties": false,
+                "properties": {
+                  "alternatives": {
+                    "description": "Any workarounds, manual steps, or alternative approaches the user could take (max 256 characters).",
+                    "type": "string"
+                  },
+                  "context": {
+                    "description": "Additional context about the missing data or where it should come from (max 256 characters).",
+                    "type": "string"
+                  },
+                  "data_type": {
+                    "description": "Type or description of the missing data or information (max 128 characters). Be specific about what data is needed.",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "description": "Explanation of why this data is needed to complete the task (max 256 characters).",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "missing_data"
+            },
+            {
+              "description": "Create a status update on a GitHub Projects v2 board to communicate project progress. Use this when you need to provide stakeholder updates with status indicators, timeline information, and progress summaries. Status updates create a historical record of project progress tracked over time. Requires project URL, status indicator, dates, and markdown body describing progress/trends/findings.",
+              "inputSchema": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "description": "Status update body in markdown format describing progress, findings, trends, and next steps. Should provide stakeholders with clear understanding of project state.",
+                    "type": "string"
+                  },
+                  "project": {
+                    "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'). Project names or numbers alone are NOT accepted.",
+                    "pattern": "^https://github\\\\.com/(orgs|users)/[^/]+/projects/\\\\d+$",
+                    "type": "string"
+                  },
+                  "start_date": {
+                    "description": "Optional project start date in YYYY-MM-DD format (e.g., '2026-01-06').",
+                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$",
+                    "type": "string"
+                  },
+                  "status": {
+                    "description": "Status indicator for the project. Defaults to ON_TRACK. Values: ON_TRACK (progressing well), AT_RISK (has issues/blockers), OFF_TRACK (significantly behind), COMPLETE (finished), INACTIVE (paused/cancelled).",
+                    "enum": [
+                      "ON_TRACK",
+                      "AT_RISK",
+                      "OFF_TRACK",
+                      "COMPLETE",
+                      "INACTIVE"
+                    ],
+                    "type": "string"
+                  },
+                  "target_date": {
+                    "description": "Optional project target/end date in YYYY-MM-DD format (e.g., '2026-12-31').",
+                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "project",
+                  "body"
+                ],
+                "type": "object"
+              },
+              "name": "create_project_status_update"
             }
           ]
           EOF
@@ -406,6 +477,45 @@ jobs:
                   "type": "string",
                   "sanitize": true,
                   "maxLength": 128
+                }
+              }
+            },
+            "create_project_status_update": {
+              "defaultMax": 10,
+              "fields": {
+                "body": {
+                  "required": true,
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65536
+                },
+                "project": {
+                  "required": true,
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 512,
+                  "pattern": "^https://github\\.com/(orgs|users)/[^/]+/projects/\\d+",
+                  "patternError": "must be a full GitHub project URL (e.g., https://github.com/orgs/myorg/projects/42)"
+                },
+                "start_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "patternError": "must be in YYYY-MM-DD format"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "INACTIVE",
+                    "ON_TRACK",
+                    "AT_RISK",
+                    "OFF_TRACK",
+                    "COMPLETE"
+                  ]
+                },
+                "target_date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "patternError": "must be in YYYY-MM-DD format"
                 }
               }
             },
@@ -1253,7 +1363,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"update_project\":{\"github-token\":\"${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":100}}"
+          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"github-token\":\"${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":1},\"update_project\":{\"github-token\":\"${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\",\"max\":100}}"
           GH_AW_ASSIGN_COPILOT: "true"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
@@ -1269,7 +1379,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
           GH_AW_ASSIGN_COPILOT: "true"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
