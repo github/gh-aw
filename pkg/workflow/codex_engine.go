@@ -34,7 +34,7 @@ func NewCodexEngine() *CodexEngine {
 			id:                     "codex",
 			displayName:            "Codex",
 			description:            "Uses OpenAI Codex CLI with MCP server support",
-			experimental:           true,
+			experimental:           false,
 			supportsToolsAllowlist: true,
 			supportsHTTPTransport:  true,  // Codex now supports HTTP transport for remote MCP servers
 			supportsMaxTurns:       false, // Codex does not support max-turns feature
