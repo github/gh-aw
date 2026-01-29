@@ -9,10 +9,11 @@
 
 ## Executive Summary
 
-✅ **VALIDATION RESULT**: The specification accurately reflects the implementation in compiled `.lock.yml` files.
+✅ **VALIDATION RESULT**: The specification accurately reflects the implementation in compiled `.lock.yml` files and JavaScript implementation.
 
 All major security architecture claims in the specification have been verified against actual workflow implementations:
 - ✅ Job architecture (activation, agent, safe_outputs)
+- ✅ **Input sanitization** (markdown safety, URL filtering, HTML tag filtering, ANSI removal)
 - ✅ Permission management (read-only agent jobs, write permissions in safe output jobs)
 - ✅ Fork protection (repository ID validation)
 - ✅ Role-based access control (pre_activation with membership checks)
@@ -74,6 +75,78 @@ jobs:
 ```
 
 **Status**: ✅ **VERIFIED** - All three job types present with correct permission separation.
+
+---
+
+### 1a. Input Sanitization Implementation (Section 4.3 - IS-04 to IS-09)
+
+**Specification Claim**:
+> **IS-04 to IS-09**: The implementation MUST provide comprehensive input sanitization including:
+> - Markdown safety (@mentions, bot triggers)
+> - URL filtering (protocol sanitization, domain allowlisting)
+> - HTML/XML tag filtering (entity conversion)
+> - ANSI escape code removal
+> - Content limits enforcement
+
+**Implementation Validation** (`actions/setup/js/sanitize_content_core.cjs`):
+
+```javascript
+// Core sanitization functions verified in implementation:
+
+// ✅ IS-09: ANSI escape code and control character removal
+sanitized = sanitized.replace(/\x1b\[[0-9;]*[mGKH]/g, "");  // ANSI sequences
+sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");  // Control chars
+
+// ✅ IS-04: Mention neutralization
+sanitized = neutralizeAllMentions(sanitized);  // Wraps @mentions in backticks
+
+// ✅ IS-05: Bot trigger protection
+sanitized = neutralizeCommands(sanitized);  // Wraps /commands in backticks
+sanitized = neutralizeBotTriggers(sanitized);  // Wraps fixes #123 patterns
+
+// ✅ IS-06a: XML comment removal
+sanitized = removeXmlComments(sanitized);  // Removes <!-- comments -->
+
+// ✅ IS-06: HTML/XML tag conversion
+sanitized = convertXmlTags(sanitized);  // <tag> → &lt;tag&gt;
+
+// ✅ IS-07b: URL protocol sanitization
+sanitized = sanitizeUrlProtocols(sanitized);  // Removes javascript:, data:, file:
+
+// ✅ IS-07: URL domain filtering
+sanitized = sanitizeUrlDomains(sanitized, allowed);  // Redacts non-allowlisted URLs
+
+// ✅ IS-08: Content limits with truncation
+sanitized = applyTruncation(content, maxLength);  // 0.5MB / 65k lines
+```
+
+**Sanitization Features Verified**:
+
+| Feature | Requirement | Implementation Function | Status |
+|---------|-------------|------------------------|--------|
+| @Mention neutralization | IS-04 | `neutralizeAllMentions()` | ✅ Verified |
+| Bot trigger protection | IS-05 | `neutralizeCommands()`, `neutralizeBotTriggers()` | ✅ Verified |
+| HTML/XML tag filtering | IS-06 | `convertXmlTags()`, `removeXmlComments()` | ✅ Verified |
+| URL protocol filtering | IS-07b | `sanitizeUrlProtocols()` | ✅ Verified |
+| URL domain allowlisting | IS-07 | `sanitizeUrlDomains()` | ✅ Verified |
+| ANSI escape removal | IS-09 | Regex replacement | ✅ Verified |
+| Content limits | IS-08 | `applyTruncation()` | ✅ Verified |
+
+**Sanitization Pipeline Order** (as specified in IS-10):
+1. ✅ ANSI escape and control character removal
+2. ✅ @mention neutralization
+3. ✅ Bot trigger protection (commands and GitHub references)
+4. ✅ XML comment removal
+5. ✅ HTML/XML tag conversion
+6. ✅ URL protocol sanitization
+7. ✅ URL domain filtering
+8. ✅ Content truncation
+
+**Redacted Domain Logging**:
+- ✅ `getRedactedDomains()` - Collects redacted URLs for audit
+- ✅ `writeRedactedDomainsLog()` - Writes to `/tmp/gh-aw/redacted-urls.log`
+
+**Status**: ✅ **VERIFIED** - Comprehensive sanitization implementation covering markdown safety, URL filtering, HTML tag filtering, ANSI removal, and content limits. All specification requirements (IS-04 to IS-09) implemented in `sanitize_content_core.cjs`.
 
 ---
 
@@ -358,6 +431,7 @@ concurrency:
 | Section | Requirement | Status | Evidence Location |
 |---------|-------------|--------|-------------------|
 | **3.2** | Security Guarantees (SG-01 to SG-07) | ✅ Verified | Multiple implementations |
+| **4.3** | Input Sanitization (IS-04 to IS-09) | ✅ Verified | `sanitize_content_core.cjs` |
 | **5.2** | Job Architecture (OI-01) | ✅ Verified | `jobs:` section structure |
 | **5.4** | Output Validation (OI-06) | ✅ Verified | `safe_outputs.steps` |
 | **7.2** | Permission Defaults (PM-01, PM-02) | ✅ Verified | `permissions:` blocks |

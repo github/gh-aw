@@ -244,6 +244,14 @@ The security architecture protects against:
 
 The input sanitization layer protects against template injection and prompt injection by processing all untrusted input through a sanitization pipeline before delivery to AI agents.
 
+**Key Sanitization Features**:
+- **Markdown Safety**: Neutralizes @mentions, bot command patterns, and GitHub references
+- **URL Filtering**: Validates and redacts URLs against network allowlists, enforcing HTTPS-only policies
+- **HTML/XML Tag Filtering**: Converts tags to safe HTML entities to prevent injection attacks
+- **ANSI Escape Code Removal**: Strips terminal color codes and control characters
+- **Content Limits**: Enforces size and line count restrictions with truncation
+- **Protocol Sanitization**: Removes unsafe URL protocols (javascript:, data:, file:)
+
 ### 4.2 Sanitization Requirements
 
 **IS-01**: A conforming implementation MUST sanitize all content from untrusted sources including:
@@ -273,19 +281,44 @@ This prevents unintended notifications and bot trigger abuse.
 - Patterns like `fixes #123`, `/command`, `closes #456`
 - MUST be wrapped in backticks: `` `fixes #123` ``
 
-#### 4.3.3 XML/HTML Tag Conversion
+#### 4.3.3 HTML/XML Tag Filtering
 
-**IS-06**: The implementation MUST convert XML/HTML tags to safe formats:
+**IS-06**: The implementation MUST convert HTML/XML tags to safe HTML entities:
 - Open tags: `<tag>` → `&lt;tag&gt;`
 - Close tags: `</tag>` → `&lt;/tag&gt;`
 - Self-closing tags: `<tag/>` → `&lt;tag/&gt;`
+- Attribute tags: `<tag attr="value">` → `&lt;tag attr="value"&gt;`
 
-#### 4.3.4 URI Validation
+**IS-06a**: HTML entity conversion prevents:
+- XSS (Cross-Site Scripting) attacks via embedded JavaScript
+- HTML injection that could manipulate rendered content
+- XML External Entity (XXE) attacks in parsers
+- Malformed markup that could break sanitization
 
-**IS-07**: The implementation MUST validate and filter URIs:
-- Only HTTPS URIs SHOULD be allowed
-- URIs MUST match the network allowlist configuration
-- Non-compliant URIs MUST be replaced with `(redacted)`
+**IS-06b**: XML comment removal MUST:
+- Remove `<!-- comment -->` style comments
+- Prevent comment-based obfuscation of malicious content
+- Execute before tag conversion to ensure complete sanitization
+
+#### 4.3.4 URL Filtering and Validation
+
+**IS-07**: The implementation MUST validate and filter URLs:
+- Only HTTPS URLs SHOULD be allowed (HTTP URLs MAY be permitted for specific allowlisted domains)
+- URLs MUST match the network allowlist configuration
+- Non-compliant URLs MUST be replaced with `(redacted)`
+- Unsafe URL protocols MUST be removed: `javascript:`, `data:`, `file:`, `vbscript:`
+
+**IS-07a**: URL domain validation MUST:
+- Extract hostname from URLs
+- Compare against allowed domains from network configuration
+- Support wildcard matching (e.g., `*.github.com` matches `api.github.com`)
+- Log redacted domains for security audit
+
+**IS-07b**: Protocol sanitization MUST:
+- Strip `javascript:` pseudo-protocol to prevent XSS
+- Strip `data:` protocol to prevent data exfiltration
+- Strip `file:` protocol to prevent local file access
+- Preserve `https:` and allowlisted `http:` protocols only
 
 #### 4.3.5 Content Limits
 
@@ -296,20 +329,31 @@ This prevents unintended notifications and bot trigger abuse.
 
 #### 4.3.6 Control Character Removal
 
-**IS-09**: The implementation MUST remove control characters (ASCII 0-31 except newline, tab, carriage return).
+**IS-09**: The implementation MUST remove control characters:
+- ASCII control characters (0-31) except newline (10), tab (9), and carriage return (13)
+- ANSI escape sequences used for terminal colors and formatting (e.g., `\x1b[31m`, `\x1b[0m`)
+- Delete character (ASCII 127)
+
+**IS-09a**: ANSI escape code removal prevents:
+- Terminal injection attacks
+- Obfuscation of malicious content via hidden characters
+- Breaking of text processing pipelines
+- Confusion in logs and audit trails
 
 ### 4.4 Sanitization Pipeline
 
 **IS-10**: The sanitization pipeline MUST execute in the following order:
 
 1. Extract raw content from GitHub event context
-2. Apply mention neutralization (IS-04)
-3. Apply bot trigger protection (IS-05)
-4. Apply XML/HTML tag conversion (IS-06)
-5. Apply URI validation (IS-07)
-6. Apply content limits (IS-08)
-7. Apply control character removal (IS-09)
-8. Store result in sanitized output variable
+2. Remove ANSI escape sequences and control characters (IS-09)
+3. Apply mention neutralization (IS-04)
+4. Apply bot trigger protection (IS-05)
+5. Remove XML comments
+6. Convert HTML/XML tags to entities (IS-06)
+7. Sanitize URL protocols (remove unsafe protocols)
+8. Validate and filter URLs against allowlist (IS-07)
+9. Apply content size limits and truncation (IS-08)
+10. Store result in sanitized output variable
 
 ### 4.5 Bypass Prevention
 
@@ -1209,19 +1253,68 @@ This `fixes #123` and `closes #456`
 &lt;img src="x" onerror="alert('xss')"/&gt;
 ```
 
-#### Example 4: URI Validation
+#### Example 4: URL Filtering and Validation
 
 **Input** (with network allowlist: `defaults`, `github.com`):
 ```text
 Check https://github.com/example/repo
 Visit https://malicious.example.com
+Download javascript:alert('xss')
+See data:text/html,<script>alert('xss')</script>
 ```
 
 **Output**:
 ```text
 Check https://github.com/example/repo
 Visit (redacted)
+Download (redacted)
+See (redacted)
 ```
+
+**Explanation**:
+- `github.com` URL preserved (in allowlist)
+- `malicious.example.com` redacted (not in allowlist)
+- `javascript:` protocol stripped and URL redacted (unsafe protocol)
+- `data:` protocol stripped and URL redacted (unsafe protocol)
+
+#### Example 5: ANSI Escape Code Removal
+
+**Input**:
+```text
+\x1b[31mError: failed\x1b[0m
+\x1b[1;32mSuccess!\x1b[0m
+```
+
+**Output**:
+```text
+Error: failed
+Success!
+```
+
+**Explanation**: Terminal color codes (`\x1b[...m`) removed to prevent terminal injection.
+
+#### Example 6: Comprehensive Sanitization
+
+**Input** (markdown with multiple threats):
+```markdown
+Hey @admin, please run this: <script>alert(document.cookie)</script>
+Check out https://phishing.example.com/steal?data=\x1b[31msecret\x1b[0m
+This fixes #1 and /deploy to prod
+```
+
+**Output** (with allowlist: `defaults`, `github.com`):
+```markdown
+Hey `@admin`, please run this: &lt;script&gt;alert(document.cookie)&lt;/script&gt;
+Check out (redacted)
+This `fixes #1` and `/deploy` to prod
+```
+
+**Protections Applied**:
+1. @mention neutralized (prevents notification spam)
+2. HTML `<script>` tag converted to entities (prevents XSS)
+3. Non-allowlisted URL redacted (prevents phishing)
+4. ANSI escape codes removed (prevents terminal injection)
+5. Bot triggers neutralized (prevents unintended commands)
 
 ### Appendix C: Network Configuration Examples
 
