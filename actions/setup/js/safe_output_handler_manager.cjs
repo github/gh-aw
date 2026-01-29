@@ -801,6 +801,9 @@ async function main() {
     const agentOutput = loadAgentOutput();
     if (!agentOutput.success) {
       core.info("No agent output available - nothing to process");
+      // Set empty outputs for downstream steps
+      core.setOutput("temporary_id_map", "{}");
+      core.setOutput("processed_count", 0);
       return;
     }
 
@@ -811,6 +814,9 @@ async function main() {
 
     if (messageHandlers.size === 0) {
       core.info("No handlers loaded - nothing to process");
+      // Set empty outputs for downstream steps
+      core.setOutput("temporary_id_map", "{}");
+      core.setOutput("processed_count", 0);
       return;
     }
 
