@@ -220,6 +220,59 @@ jobs:
           path: test-result-integration-*.json
           retention-days: 14
 
+  canary_go:
+    runs-on: ubuntu-latest
+    needs: [test, integration]
+    if: always()  # Run even if some tests fail to report coverage
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: List all tests in codebase
+        run: |
+          set -euo pipefail
+          echo "Extracting all test function names from source files..."
+          ./scripts/list-all-tests.sh > all-tests.txt
+          echo "Found $(wc -l < all-tests.txt) tests in codebase"
+
+      - name: Download all test result artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          path: test-results
+          pattern: test-result-*
+          merge-multiple: false
+
+      - name: List downloaded artifacts
+        run: |
+          set -euo pipefail
+          echo "Downloaded test result artifacts:"
+          find test-results -type f -name "*.json" | sort
+          echo ""
+          echo "Total JSON files: $(find test-results -type f -name "*.json" | wc -l)"
+
+      - name: Extract executed tests from artifacts
+        run: |
+          set -euo pipefail
+          echo "Extracting test names from JSON artifacts..."
+          ./scripts/extract-executed-tests.sh test-results > executed-tests.txt
+          echo "Found $(wc -l < executed-tests.txt) executed tests"
+
+      - name: Compare test coverage
+        run: |
+          ./scripts/compare-test-coverage.sh all-tests.txt executed-tests.txt
+
+      - name: Upload test coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-coverage-analysis
+          path: |
+            all-tests.txt
+            executed-tests.txt
+          retention-days: 14
+
   update:
     runs-on: ubuntu-latest
     permissions:
