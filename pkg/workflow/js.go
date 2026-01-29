@@ -27,11 +27,13 @@ func getAssignToAgentScript() string           { return "" }
 func getCreateCodeScanningAlertScript() string { return "" }
 func getCreateDiscussionScript() string        { return "" }
 func getCreateIssueScript() string             { return "" }
-func getCreatePRReviewCommentScript() string   { return "" }
-func getNoOpScript() string                    { return "" }
-func getNotifyCommentErrorScript() string      { return "" }
-func getCreateProjectScript() string           { return "" }
-func getUploadAssetsScript() string            { return "" }
+
+//nolint:unused // Only used in integration tests
+func getCreatePRReviewCommentScript() string { return "" }
+func getNoOpScript() string                  { return "" }
+func getNotifyCommentErrorScript() string    { return "" }
+func getCreateProjectScript() string         { return "" }
+func getUploadAssetsScript() string          { return "" }
 
 // Public Get* functions return empty strings since embedded scripts were removed
 
