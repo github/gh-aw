@@ -19,7 +19,7 @@
 #   gh aw compile
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
-# Burns down open Dependabot PRs.
+# Burns down open open dependabot pull requests.
 #
 # Resolved workflow manifest:
 #   Imports:
@@ -1271,7 +1271,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           WORKFLOW_NAME: "Dependabot Burner"
-          WORKFLOW_DESCRIPTION: "Burns down open Dependabot PRs."
+          WORKFLOW_DESCRIPTION: "Burns down open open dependabot pull requests."
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
           script: |

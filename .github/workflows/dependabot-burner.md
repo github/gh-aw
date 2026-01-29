@@ -1,6 +1,6 @@
 ---
 name: Dependabot Burner
-description: Burns down open Dependabot PRs.
+description: Burns down open open dependabot pull requests.
 
 on:
   schedule: daily
