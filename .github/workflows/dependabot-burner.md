@@ -11,10 +11,7 @@ permissions:
   contents: read
   security-events: read
 tools:
-  github:
-    toolsets: [repos, issues, pull_requests]
 safe-outputs:
-  github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
   update-project:
     max: 100
   create-project-status-update:
