@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -226,6 +227,7 @@ func marshalSorted(data any) string {
 }
 
 // ComputeFrontmatterHashFromFile computes the frontmatter hash for a workflow file
+// including template expressions that reference env. or vars. from the markdown body
 func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string, error) {
 	frontmatterHashLog.Printf("Computing hash for file: %s", filePath)
 
@@ -244,6 +246,73 @@ func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string
 	// Get base directory for resolving imports
 	baseDir := filepath.Dir(filePath)
 
-	// Compute hash
-	return ComputeFrontmatterHash(result.Frontmatter, baseDir, cache)
+	// Extract relevant template expressions from markdown body
+	relevantExpressions := extractRelevantTemplateExpressions(result.Markdown)
+
+	// Compute hash including template expressions
+	return ComputeFrontmatterHashWithExpressions(result.Frontmatter, baseDir, cache, relevantExpressions)
+}
+
+// ComputeFrontmatterHashWithExpressions computes the hash including template expressions
+func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir string, cache *ImportCache, expressions []string) (string, error) {
+	frontmatterHashLog.Print("Computing frontmatter hash with template expressions")
+
+	// Process imports to get merged frontmatter
+	result, err := ProcessImportsFromFrontmatterWithManifest(frontmatter, baseDir, cache)
+	if err != nil {
+		return "", fmt.Errorf("failed to process imports: %w", err)
+	}
+
+	// Build the canonical frontmatter map
+	canonical := buildCanonicalFrontmatter(frontmatter, result)
+
+	// Add template expressions if present
+	if len(expressions) > 0 {
+		// Sort expressions for deterministic output
+		sortedExpressions := make([]string, len(expressions))
+		copy(sortedExpressions, expressions)
+		sort.Strings(sortedExpressions)
+		canonical["template-expressions"] = sortedExpressions
+	}
+
+	// Serialize to canonical JSON
+	canonicalJSON, err := marshalCanonicalJSON(canonical)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal canonical JSON: %w", err)
+	}
+
+	frontmatterHashLog.Printf("Canonical JSON length: %d bytes", len(canonicalJSON))
+
+	// Compute SHA-256 hash
+	hash := sha256.Sum256([]byte(canonicalJSON))
+	hashHex := hex.EncodeToString(hash[:])
+
+	frontmatterHashLog.Printf("Computed hash: %s", hashHex)
+	return hashHex, nil
+}
+
+// extractRelevantTemplateExpressions extracts template expressions from markdown
+// that reference env. or vars. contexts
+func extractRelevantTemplateExpressions(markdown string) []string {
+	var expressions []string
+
+	// Regex to match ${{ ... }} expressions
+	expressionRegex := regexp.MustCompile(`\$\{\{(.*?)\}\}`)
+	matches := expressionRegex.FindAllStringSubmatch(markdown, -1)
+
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+
+		content := strings.TrimSpace(match[1])
+
+		// Check if expression references env. or vars.
+		if strings.Contains(content, "env.") || strings.Contains(content, "vars.") {
+			// Store the full expression including ${{ }}
+			expressions = append(expressions, match[0])
+		}
+	}
+
+	return expressions
 }

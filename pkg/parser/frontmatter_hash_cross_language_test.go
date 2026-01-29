@@ -131,6 +131,75 @@ func TestHashWithRealWorkflow(t *testing.T) {
 	assert.Equal(t, hash, hash2, "Hash should be deterministic")
 }
 
+// TestHashWithTemplateExpressions tests hash computation including template expressions
+func TestHashWithTemplateExpressions(t *testing.T) {
+	tempDir := t.TempDir()
+	workflowFile := filepath.Join(tempDir, "test-with-expressions.md")
+
+	content := `---
+engine: copilot
+description: Test workflow with template expressions
+---
+
+# Test Workflow
+
+Use environment variable: ${{ env.MY_VAR }}
+Use config variable: ${{ vars.MY_CONFIG }}
+Use github context: ${{ github.repository }}
+`
+
+	err := os.WriteFile(workflowFile, []byte(content), 0644)
+	require.NoError(t, err, "Should write test file")
+
+	cache := NewImportCache("")
+
+	hash, err := ComputeFrontmatterHashFromFile(workflowFile, cache)
+	require.NoError(t, err, "Should compute hash with template expressions")
+	assert.Len(t, hash, 64, "Hash should be 64 characters")
+
+	// Verify that changing template expressions changes the hash
+	content2 := `---
+engine: copilot
+description: Test workflow with template expressions
+---
+
+# Test Workflow
+
+Use environment variable: ${{ env.MY_VAR }}
+Use config variable: ${{ vars.DIFFERENT_CONFIG }}
+Use github context: ${{ github.repository }}
+`
+
+	workflowFile2 := filepath.Join(tempDir, "test-with-different-expressions.md")
+	err = os.WriteFile(workflowFile2, []byte(content2), 0644)
+	require.NoError(t, err, "Should write second test file")
+
+	hash2, err := ComputeFrontmatterHashFromFile(workflowFile2, cache)
+	require.NoError(t, err, "Should compute hash for second file")
+	assert.NotEqual(t, hash, hash2, "Different template expressions should produce different hash")
+
+	// Verify that non-env/vars expressions don't affect hash
+	content3 := `---
+engine: copilot
+description: Test workflow with template expressions
+---
+
+# Test Workflow
+
+Use environment variable: ${{ env.MY_VAR }}
+Use config variable: ${{ vars.MY_CONFIG }}
+Use github context: ${{ github.repository_owner }}
+`
+
+	workflowFile3 := filepath.Join(tempDir, "test-with-github-expression.md")
+	err = os.WriteFile(workflowFile3, []byte(content3), 0644)
+	require.NoError(t, err, "Should write third test file")
+
+	hash3, err := ComputeFrontmatterHashFromFile(workflowFile3, cache)
+	require.NoError(t, err, "Should compute hash for third file")
+	assert.Equal(t, hash, hash3, "Non-env/vars github expressions should not affect hash")
+}
+
 // findRepoRoot finds the repository root directory
 func findRepoRoot(t *testing.T) string {
 	// Start from current directory and walk up to find .git
