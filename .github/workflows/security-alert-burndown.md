@@ -84,17 +84,25 @@ For each discovered item (up to 100 total per run):
 
 ### Step 4: Create parent issue and assign work
 
-After updating project items, you must **immediately perform all three safe-output calls below in sequence**. Do not proceed to Step 5 until all three calls are complete.
+After updating project items, **first complete the bundling analysis below, then immediately perform all three safe-output calls in sequence**. Do not proceed to Step 5 until all three calls are complete.
+
+#### Bundling Analysis (Do This First)
+
+Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
 
 #### Required Safe-Output Calls (All Three Required):
+
+After completing the bundling analysis, you must immediately perform these three safe-output calls in order:
 
 1. **Call `create_issue`** to create the parent tracking issue
 2. **Call `update_project`** to add the created issue to the project board  
 3. **Call `assign_to_agent`** to assign the created issue to Copilot
 
-#### Bundling Analysis (Do This First)
+#### Bundling Guidelines
 
-Before creating the issue, analyze the discovered PRs:
+#### Bundling Guidelines
+
+Analyze all discovered PRs following these rules:
 
 1. Review all discovered PRs
 2. Group by **runtime** (Node.js, Python, etc.) and **target dependency file**
