@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/campaign"
 	"github.com/githubnext/gh-aw/pkg/cli"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -44,13 +43,6 @@ func TestArgumentSyntaxConsistency(t *testing.T) {
 			expectedUse:    "add <workflow>...",
 			argsValidator:  "MinimumNArgs(1)",
 			shouldValidate: func(cmd *cobra.Command) error { return cmd.Args(cmd, []string{"test"}) },
-		},
-		{
-			name:           "campaign new requires campaign-id",
-			command:        findSubcommand(campaign.NewCommand(), "new"),
-			expectedUse:    "new <campaign-id>",
-			argsValidator:  "MaximumNArgs(1) with custom validation",
-			shouldValidate: nil, // Skip validation as it has custom error handling
 		},
 
 		// Commands with optional arguments (using square brackets [])
@@ -123,13 +115,6 @@ func TestArgumentSyntaxConsistency(t *testing.T) {
 			expectedUse:    "status [pattern]",
 			argsValidator:  "no validator (all optional)",
 			shouldValidate: func(cmd *cobra.Command) error { return nil },
-		},
-		{
-			name:           "campaign command has optional filter",
-			command:        campaign.NewCommand(),
-			expectedUse:    "campaign [filter]",
-			argsValidator:  "MaximumNArgs(1)",
-			shouldValidate: func(cmd *cobra.Command) error { return cmd.Args(cmd, []string{}) },
 		},
 	}
 
@@ -249,47 +234,6 @@ func TestPRSubcommandArgumentSyntax(t *testing.T) {
 	}
 }
 
-// TestCampaignSubcommandArgumentSyntax verifies campaign subcommands have consistent syntax
-func TestCampaignSubcommandArgumentSyntax(t *testing.T) {
-	campaignCmd := campaign.NewCommand()
-
-	tests := []struct {
-		name        string
-		subcommand  string
-		expectedUse string
-	}{
-		{
-			name:        "campaign status has optional filter",
-			subcommand:  "status",
-			expectedUse: "status [filter]",
-		},
-		{
-			name:        "campaign new requires campaign-id",
-			subcommand:  "new",
-			expectedUse: "new <campaign-id>",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Find the subcommand - setup step
-			foundCmd := findSubcommand(campaignCmd, tt.subcommand)
-			require.NotNil(t, foundCmd,
-				"Test requires campaign subcommand %q to exist in command list",
-				tt.subcommand)
-
-			use := foundCmd.Use
-			assert.Equal(t, tt.expectedUse, use,
-				"Campaign subcommand %q should have expected Use syntax", tt.subcommand)
-
-			// Validate the Use pattern format
-			assert.True(t, isValidUseSyntax(use),
-				"Campaign subcommand %q Use=%q should follow valid syntax pattern",
-				tt.subcommand, use)
-		})
-	}
-}
-
 // findSubcommand finds a subcommand by name in a command
 func findSubcommand(cmd *cobra.Command, name string) *cobra.Command {
 	for _, subcmd := range cmd.Commands() {
@@ -370,7 +314,6 @@ func TestArgumentNamingConventions(t *testing.T) {
 		cli.NewStatusCommand(),
 		cli.NewMCPCommand(),
 		cli.NewPRCommand(),
-		campaign.NewCommand(),
 	}
 
 	// Also collect subcommands
@@ -384,7 +327,6 @@ func TestArgumentNamingConventions(t *testing.T) {
 		"pattern":       "Filter/search commands should use 'pattern' or 'filter'",
 		"run-id":        "Audit command should use 'run-id' for clarity",
 		"workflow-spec": "Trial command should use 'workflow-spec' to indicate special format",
-		"campaign-id":   "Campaign new should use 'campaign-id' for clarity",
 		"pr-url":        "PR transfer should use 'pr-url' for clarity",
 		"server":        "MCP commands should use 'server' for MCP server names",
 	}
