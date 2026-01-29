@@ -30,6 +30,9 @@ safe-outputs:
 **Project URL (use for all project safe-output calls):**
 - `https://github.com/orgs/githubnext/projects/144`
 
+**Campaign ID (use for all project safe-output calls):**
+- `dependabot-burndown`
+
 This workflow discovers security alert work items in the githubnext/gh-aw repository and updates the project board with their status:
 
 - Dependabot-created PRs for JavaScript dependency updates
@@ -133,7 +136,7 @@ For each bundle, call `create_issue`:
 
 ```
 create_issue(
-  title="[campaign] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
+  title="[dependabot-burndown] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
   body="<use template below>"
 )
 ```
@@ -150,7 +153,7 @@ update_project(
   content_type="issue",
   content_number="<temporary_id_from_create_issue>",
   fields={
-    "campaign_id": "security-alert-burndown",
+    "campaign_id": "dependabot-burndown",
     "status": "Todo",
     "target_repo": "githubnext/gh-aw",
     "worker_workflow": "dependabot",
@@ -186,7 +189,7 @@ This issue tracks one Dependabot PR bundle discovered by the Security Alert Burn
 
 ## Agent Task
 1. Research each update for breaking changes and summarize risks.
-2. Create a single bundled PR (one runtime + one manifest).
+2. Create a single bundled PR (one runtime + one manifest) with title prefix "[dependabot-burndown]".
 3. Ensure CI passes; run relevant runtime tests.
 4. Add the research report to the bundled PR.
 5. Update this issue checklist as PRs are merged.
