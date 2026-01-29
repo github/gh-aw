@@ -296,3 +296,63 @@ This workflow tests the create-issue job generation.
 
 	// t.Logf("Generated workflow content:\n%s", lockContent)
 }
+
+func TestOutputIssueJobGenerationWithCopilotAssigneeAddsAssignmentStep(t *testing.T) {
+	// Create temporary directory for test files
+	tmpDir := testutil.TempDir(t, "output-issue-copilot-assignee")
+
+	testContent := `---
+on: push
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+engine: copilot
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  create-issue:
+    max: 1
+    assignees: copilot
+---
+
+# Test Output Issue Copilot Assignee
+
+This workflow tests that copilot assignment is wired in consolidated safe outputs mode.
+`
+
+	testFile := filepath.Join(tmpDir, "test-output-issue-copilot-assignee.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("Unexpected error compiling workflow: %v", err)
+	}
+
+	lockFile := filepath.Join(tmpDir, "test-output-issue-copilot-assignee.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read generated lock file: %v", err)
+	}
+
+	lockContent := string(content)
+
+	// Verify consolidated handler manager step exists
+	if !strings.Contains(lockContent, "id: process_safe_outputs") {
+		t.Error("Expected process_safe_outputs step in generated workflow")
+	}
+
+	// Verify copilot assignment step is present and wired to handler manager output
+	if !strings.Contains(lockContent, "name: Assign copilot to created issues") {
+		t.Error("Expected copilot assignment step in consolidated safe_outputs job")
+	}
+	if !strings.Contains(lockContent, "GH_AW_ISSUES_TO_ASSIGN_COPILOT") || !strings.Contains(lockContent, "steps.process_safe_outputs.outputs.issues_to_assign_copilot") {
+		t.Error("Expected assignment step to consume issues_to_assign_copilot from process_safe_outputs")
+	}
+	if !strings.Contains(lockContent, "assign_copilot_to_created_issues.cjs") {
+		t.Error("Expected assignment step to require assign_copilot_to_created_issues.cjs")
+	}
+}

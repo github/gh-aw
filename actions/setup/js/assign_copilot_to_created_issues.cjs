@@ -11,8 +11,10 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  */
 
 async function main() {
-  // Get the issues to assign from step output
-  const issuesToAssignStr = "${{ steps.create_issue.outputs.issues_to_assign_copilot }}";
+  // Prefer explicit env var (works in consolidated safe_outputs mode where the
+  // handler manager step is `process_safe_outputs`). Fall back to the legacy
+  // step output template for backwards compatibility.
+  const issuesToAssignStr = (process.env.GH_AW_ISSUES_TO_ASSIGN_COPILOT ?? "").trim() || "${{ steps.create_issue.outputs.issues_to_assign_copilot }}";
 
   // Check if the template string wasn't replaced (test environment) or is empty
   if (!issuesToAssignStr || issuesToAssignStr.trim() === "" || issuesToAssignStr.includes("${{")) {
