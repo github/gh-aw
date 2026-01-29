@@ -5,16 +5,17 @@ const fs = require("fs");
 const {
   computeFrontmatterHash,
   extractFrontmatterAndBody,
-  parseSimpleYAML,
+  extractImportsFromText,
   extractRelevantTemplateExpressions,
   marshalCanonicalJSON,
   marshalSorted,
   extractHashFromLockFile,
+  normalizeFrontmatterText,
 } = require("./frontmatter_hash_pure.cjs");
 
-describe("frontmatter_hash_pure", () => {
+describe("frontmatter_hash_pure (text-based)", () => {
   describe("extractFrontmatterAndBody", () => {
-    it("should extract frontmatter and body", () => {
+    it("should extract frontmatter text and body", () => {
       const content = `---
 engine: copilot
 description: Test workflow
@@ -25,143 +26,150 @@ description: Test workflow
 Test content here`;
 
       const result = extractFrontmatterAndBody(content);
-      expect(result.frontmatter).toEqual({
-        engine: "copilot",
-        description: "Test workflow",
-      });
+      expect(result.frontmatterText).toContain("engine: copilot");
+      expect(result.frontmatterText).toContain("description: Test workflow");
       expect(result.markdown).toContain("# Workflow Body");
     });
 
     it("should handle empty frontmatter", () => {
       const content = `# No frontmatter here`;
       const result = extractFrontmatterAndBody(content);
-      expect(result.frontmatter).toEqual({});
+      expect(result.frontmatterText).toBe("");
       expect(result.markdown).toBe(content);
+    });
+
+    it("should handle frontmatter with imports", () => {
+      const content = `---
+engine: copilot
+imports:
+  - shared/test.md
+  - shared/common.md
+---
+
+# Body`;
+      
+      const result = extractFrontmatterAndBody(content);
+      expect(result.frontmatterText).toContain("imports:");
+      expect(result.frontmatterText).toContain("- shared/test.md");
     });
   });
 
-  describe("parseSimpleYAML", () => {
-    it("should parse simple key-value pairs", () => {
-      const yaml = `engine: copilot
-description: Test workflow
-timeout-minutes: 30`;
-      
-      const result = parseSimpleYAML(yaml);
-      expect(result).toEqual({
-        engine: "copilot",
-        description: "Test workflow",
-        "timeout-minutes": 30,
-      });
-    });
-
-    it("should parse boolean values", () => {
-      const yaml = `enabled: true
-disabled: false`;
-      
-      const result = parseSimpleYAML(yaml);
-      expect(result).toEqual({
-        enabled: true,
-        disabled: false,
-      });
-    });
-
-    it("should parse arrays", () => {
-      const yaml = `labels:
-  - bug
-  - enhancement
-  - documentation`;
-      
-      const result = parseSimpleYAML(yaml);
-      expect(result.labels).toEqual(["bug", "enhancement", "documentation"]);
-    });
-
-    it("should ignore comments", () => {
-      const yaml = `# This is a comment
-engine: copilot
-# Another comment
+  describe("extractImportsFromText", () => {
+    it("should extract imports from frontmatter text", () => {
+      const frontmatterText = `engine: copilot
+imports:
+  - shared/test.md
+  - shared/common.md
 description: Test`;
       
-      const result = parseSimpleYAML(yaml);
-      expect(result).toEqual({
-        engine: "copilot",
-        description: "Test",
-      });
+      const result = extractImportsFromText(frontmatterText);
+      expect(result).toEqual(["shared/test.md", "shared/common.md"]);
+    });
+
+    it("should handle no imports", () => {
+      const frontmatterText = `engine: copilot
+description: Test`;
+      
+      const result = extractImportsFromText(frontmatterText);
+      expect(result).toEqual([]);
+    });
+
+    it("should handle imports with quotes", () => {
+      const frontmatterText = `imports:
+  - "shared/test.md"
+  - 'shared/common.md'`;
+      
+      const result = extractImportsFromText(frontmatterText);
+      expect(result).toEqual(["shared/test.md", "shared/common.md"]);
+    });
+
+    it("should stop at next top-level key", () => {
+      const frontmatterText = `imports:
+  - shared/test.md
+engine: copilot`;
+      
+      const result = extractImportsFromText(frontmatterText);
+      expect(result).toEqual(["shared/test.md"]);
     });
   });
 
   describe("extractRelevantTemplateExpressions", () => {
-    it("should extract env. expressions", () => {
-      const markdown = "Use ${{ env.MY_VAR }} in workflow";
-      const expressions = extractRelevantTemplateExpressions(markdown);
-      expect(expressions).toEqual(["${{ env.MY_VAR }}"]);
+    it("should extract env expressions", () => {
+      const markdown = "Use $" + "{{ env.MY_VAR }} here\nAnd also $" + "{{ env.OTHER }}";
+      
+      const result = extractRelevantTemplateExpressions(markdown);
+      expect(result).toEqual([
+        "$" + "{{ env.MY_VAR }}",
+        "$" + "{{ env.OTHER }}",
+      ]);
     });
 
-    it("should extract vars. expressions", () => {
-      const markdown = "Use ${{ vars.CONFIG }} in workflow";
-      const expressions = extractRelevantTemplateExpressions(markdown);
-      expect(expressions).toEqual(["${{ vars.CONFIG }}"]);
-    });
-
-    it("should extract both env and vars", () => {
-      const markdown = "Use ${{ env.VAR1 }} and ${{ vars.VAR2 }}";
-      const expressions = extractRelevantTemplateExpressions(markdown);
-      expect(expressions).toEqual(["${{ env.VAR1 }}", "${{ vars.VAR2 }}"]);
+    it("should extract vars expressions", () => {
+      const markdown = "Use $" + "{{ vars.CONFIG }} here";
+      
+      const result = extractRelevantTemplateExpressions(markdown);
+      expect(result).toEqual(["$" + "{{ vars.CONFIG }}"]);
     });
 
     it("should ignore non-env/vars expressions", () => {
-      const markdown = "Use ${{ github.repository }} and ${{ env.MY_VAR }}";
-      const expressions = extractRelevantTemplateExpressions(markdown);
-      expect(expressions).toEqual(["${{ env.MY_VAR }}"]);
+      const markdown = "Use $" + "{{ github.repository }} here\nBut include $" + "{{ env.TEST }}";
+      
+      const result = extractRelevantTemplateExpressions(markdown);
+      expect(result).toEqual(["$" + "{{ env.TEST }}"]);
     });
 
-    it("should remove duplicates and sort", () => {
-      const markdown = "${{ env.B }} and ${{ env.A }} and ${{ env.B }}";
-      const expressions = extractRelevantTemplateExpressions(markdown);
-      expect(expressions).toEqual(["${{ env.A }}", "${{ env.B }}"]);
-    });
-  });
-
-  describe("marshalSorted", () => {
-    it("should sort object keys", () => {
-      const data = { z: 1, a: 2, m: 3 };
-      const json = marshalSorted(data);
-      expect(json).toBe('{"a":2,"m":3,"z":1}');
-    });
-
-    it("should handle nested objects", () => {
-      const data = { b: { y: 1, x: 2 }, a: 3 };
-      const json = marshalSorted(data);
-      expect(json).toBe('{"a":3,"b":{"x":2,"y":1}}');
-    });
-
-    it("should handle arrays", () => {
-      const data = { arr: [3, 1, 2] };
-      const json = marshalSorted(data);
-      expect(json).toBe('{"arr":[3,1,2]}');
-    });
-
-    it("should handle null and undefined", () => {
-      expect(marshalSorted(null)).toBe("null");
-      expect(marshalSorted(undefined)).toBe("null");
-    });
-
-    it("should handle primitives", () => {
-      expect(marshalSorted("test")).toBe('"test"');
-      expect(marshalSorted(42)).toBe("42");
-      expect(marshalSorted(true)).toBe("true");
+    it("should deduplicate and sort expressions", () => {
+      const markdown = "$" + "{{ env.B }} and $" + "{{ env.A }} and $" + "{{ env.B }}";
+      
+      const result = extractRelevantTemplateExpressions(markdown);
+      expect(result).toEqual(["$" + "{{ env.A }}", "$" + "{{ env.B }}"]);
     });
   });
 
   describe("marshalCanonicalJSON", () => {
-    it("should produce deterministic JSON", () => {
-      const data1 = { z: 1, a: 2 };
-      const data2 = { a: 2, z: 1 };
-      
-      const json1 = marshalCanonicalJSON(data1);
-      const json2 = marshalCanonicalJSON(data2);
-      
-      expect(json1).toBe(json2);
-      expect(json1).toBe('{"a":2,"z":1}');
+    it("should serialize with sorted keys", () => {
+      const data = { c: 3, a: 1, b: 2 };
+      const result = marshalCanonicalJSON(data);
+      expect(result).toBe('{"a":1,"b":2,"c":3}');
+    });
+
+    it("should handle nested objects", () => {
+      const data = { outer: { z: 26, a: 1 } };
+      const result = marshalCanonicalJSON(data);
+      expect(result).toBe('{"outer":{"a":1,"z":26}}');
+    });
+
+    it("should handle arrays", () => {
+      const data = { items: [3, 1, 2] };
+      const result = marshalCanonicalJSON(data);
+      expect(result).toBe('{"items":[3,1,2]}');
+    });
+
+    it("should handle mixed types", () => {
+      const data = {
+        str: "value",
+        num: 42,
+        bool: true,
+        nil: null,
+        arr: [1, 2],
+        obj: { x: 1 },
+      };
+      const result = marshalCanonicalJSON(data);
+      expect(result).toBe('{"arr":[1,2],"bool":true,"nil":null,"num":42,"obj":{"x":1},"str":"value"}');
+    });
+  });
+
+  describe("marshalSorted", () => {
+    it("should handle primitives", () => {
+      expect(marshalSorted("test")).toBe('"test"');
+      expect(marshalSorted(42)).toBe("42");
+      expect(marshalSorted(true)).toBe("true");
+      expect(marshalSorted(null)).toBe("null");
+    });
+
+    it("should handle empty collections", () => {
+      expect(marshalSorted([])).toBe("[]");
+      expect(marshalSorted({})).toBe("{}");
     });
   });
 
@@ -169,75 +177,84 @@ description: Test`;
     it("should extract hash from lock file", () => {
       const content = `# frontmatter-hash: abc123def456
 
-name: "Test Workflow"`;
+name: "Test Workflow"
+on:
+  push:`;
       
-      const hash = extractHashFromLockFile(content);
-      expect(hash).toBe("abc123def456");
+      const result = extractHashFromLockFile(content);
+      expect(result).toBe("abc123def456");
     });
 
     it("should return empty string if no hash found", () => {
-      const content = `name: "Test Workflow"`;
-      const hash = extractHashFromLockFile(content);
-      expect(hash).toBe("");
+      const content = `name: "Test Workflow"
+on:
+  push:`;
+      
+      const result = extractHashFromLockFile(content);
+      expect(result).toBe("");
+    });
+  });
+
+  describe("normalizeFrontmatterText", () => {
+    it("should trim whitespace", () => {
+      const text = `  engine: copilot  
+  description: test  `;
+      
+      const result = normalizeFrontmatterText(text);
+      expect(result).toBe("engine: copilot  \n  description: test");
+    });
+
+    it("should normalize line endings", () => {
+      const text = "engine: copilot\r\ndescription: test\r\n";
+      
+      const result = normalizeFrontmatterText(text);
+      expect(result).toBe("engine: copilot\ndescription: test");
     });
   });
 
   describe("computeFrontmatterHash", () => {
-    it("should compute hash for simple workflow", async () => {
-      const tempDir = require("os").tmpdir();
-      const testFile = path.join(tempDir, `test-workflow-${Date.now()}.md`);
-      
-      const content = `---
-engine: copilot
-description: Test workflow
----
-
-# Test Workflow
-
-Use \${{ env.TEST_VAR }} here.`;
+    it("should compute hash for simple frontmatter", async () => {
+      // Create a temporary test file
+      const testFile = path.join(__dirname, "test-workflow-hash-simple.md");
+      const content = "---\nengine: copilot\ndescription: Test workflow\n---\n\nUse $" + "{{ env.TEST }} here";
       
       fs.writeFileSync(testFile, content, "utf8");
       
       try {
         const hash = await computeFrontmatterHash(testFile);
         
-        // Verify hash format
+        // Hash should be a 64-character hex string
         expect(hash).toMatch(/^[a-f0-9]{64}$/);
-        expect(hash.length).toBe(64);
         
-        // Compute again to verify determinism
+        // Computing again should produce the same hash (deterministic)
         const hash2 = await computeFrontmatterHash(testFile);
-        expect(hash).toBe(hash2);
+        expect(hash2).toBe(hash);
       } finally {
-        fs.unlinkSync(testFile);
+        if (fs.existsSync(testFile)) {
+          fs.unlinkSync(testFile);
+        }
       }
     });
 
-    it("should produce consistent hash for same input", async () => {
-      const tempDir = require("os").tmpdir();
-      const testFile = path.join(tempDir, `test-workflow-${Date.now()}.md`);
+    it("should include template expressions in hash", async () => {
+      const testFile1 = path.join(__dirname, "test-workflow-hash-expr1.md");
+      const testFile2 = path.join(__dirname, "test-workflow-hash-expr2.md");
       
-      const content = `---
-engine: copilot
-on:
-  schedule: daily
----
-
-# Test`;
+      const content1 = "---\nengine: copilot\n---\n\nUse $" + "{{ env.VAR1 }}";
+      const content2 = "---\nengine: copilot\n---\n\nUse $" + "{{ env.VAR2 }}";
       
-      fs.writeFileSync(testFile, content, "utf8");
+      fs.writeFileSync(testFile1, content1, "utf8");
+      fs.writeFileSync(testFile2, content2, "utf8");
       
       try {
-        const hashes = [];
-        for (let i = 0; i < 5; i++) {
-          hashes.push(await computeFrontmatterHash(testFile));
-        }
+        const hash1 = await computeFrontmatterHash(testFile1);
+        const hash2 = await computeFrontmatterHash(testFile2);
         
-        // All hashes should be identical
-        const uniqueHashes = new Set(hashes);
-        expect(uniqueHashes.size).toBe(1);
+        // Different expressions should produce different hashes
+        expect(hash1).not.toBe(hash2);
       } finally {
-        fs.unlinkSync(testFile);
+        if (fs.existsSync(testFile1)) fs.unlinkSync(testFile1);
+        if (fs.existsSync(testFile2)) fs.unlinkSync(testFile2);
       }
     });
   });

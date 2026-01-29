@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 054cb386250d40dd8319061633a38d11b040835481ca0285fbc77817086ba077
+# frontmatter-hash: 8703189fddbd5996b4ee036b1134864907717cb2a6a0f982292d76c43d61fe4c
 
 name: "Dictation Prompt Generator"
 "on":

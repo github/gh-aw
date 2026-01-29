@@ -21,7 +21,7 @@
 #
 # Automated security guard that reviews every PR for changes that could weaken security posture, only commenting when concrete evidence of security concerns exists
 #
-# frontmatter-hash: c04ad23f77a76d1993206052b5d1169e84e7f80b693ac8b290a335b943a1f4c0
+# frontmatter-hash: 6041c84e956b495fdd4927173bb7d586c9f5dcff9ca52d33241fb2f6ce3cf277
 
 name: "Security Guard Agent 🛡️"
 "on":

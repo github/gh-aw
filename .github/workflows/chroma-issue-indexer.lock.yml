@@ -24,7 +24,7 @@
 #   Imports:
 #     - shared/mcp/chroma.md
 #
-# frontmatter-hash: 1c098e8298c45b734312cb137199914440f7891c44dad55a0daa6ae25694da1a
+# frontmatter-hash: 1a8a28db16be53b71e8d0bd75603bf679595b6426547d4dd8df7a8f81d95105e
 
 name: "Chroma Issue Indexer"
 "on":

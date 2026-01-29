@@ -3,7 +3,6 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const yaml = require("js-yaml");
 
 // Version information - should match Go constants
 const VERSIONS = {
@@ -16,6 +15,7 @@ const VERSIONS = {
 /**
  * Computes a deterministic SHA-256 hash of workflow frontmatter
  * Pure JavaScript implementation without Go binary dependency
+ * Uses text-based parsing only - no YAML library dependencies
  *
  * @param {string} workflowPath - Path to the workflow file
  * @returns {Promise<string>} The SHA-256 hash as a lowercase hexadecimal string (64 characters)
@@ -23,8 +23,8 @@ const VERSIONS = {
 async function computeFrontmatterHash(workflowPath) {
   const content = fs.readFileSync(workflowPath, "utf8");
   
-  // Extract frontmatter and markdown body
-  const { frontmatter, markdown } = extractFrontmatterAndBody(content);
+  // Extract frontmatter text and markdown body
+  const { frontmatterText, markdown } = extractFrontmatterAndBody(content);
   
   // Get base directory for resolving imports
   const baseDir = path.dirname(workflowPath);
@@ -32,11 +32,27 @@ async function computeFrontmatterHash(workflowPath) {
   // Extract template expressions with env. or vars.
   const expressions = extractRelevantTemplateExpressions(markdown);
   
-  // Process imports
-  const { importedFiles, importedFrontmatters } = await processImports(frontmatter, baseDir);
+  // Process imports using text-based parsing
+  const { importedFiles, importedFrontmatterTexts } = await processImportsTextBased(frontmatterText, baseDir);
   
-  // Build canonical representation by concatenating frontmatters in sorted import order
-  const canonical = buildCanonicalFrontmatterWithImports(frontmatter, importedFiles, importedFrontmatters);
+  // Build canonical representation from text
+  // The key insight is to treat frontmatter as mostly text
+  // and only parse enough to extract field structure for canonical ordering
+  const canonical = {};
+  
+  // Add the main frontmatter text as-is (trimmed and normalized)
+  canonical["frontmatter-text"] = normalizeFrontmatterText(frontmatterText);
+  
+  // Add sorted imported files list
+  if (importedFiles.length > 0) {
+    canonical.imports = importedFiles.sort();
+  }
+  
+  // Add sorted imported frontmatter texts (concatenated with delimiter)
+  if (importedFrontmatterTexts.length > 0) {
+    const sortedTexts = importedFrontmatterTexts.map(t => normalizeFrontmatterText(t)).sort();
+    canonical["imported-frontmatters"] = sortedTexts.join("\n---\n");
+  }
   
   // Add template expressions if present
   if (expressions.length > 0) {
@@ -56,15 +72,16 @@ async function computeFrontmatterHash(workflowPath) {
 }
 
 /**
- * Extracts frontmatter and markdown body from workflow content
+ * Extracts frontmatter text and markdown body from workflow content
+ * Text-based extraction - no YAML parsing
  * @param {string} content - The markdown content
- * @returns {{frontmatter: Record<string, any>, markdown: string}} The parsed frontmatter and body
+ * @returns {{frontmatterText: string, markdown: string}} The frontmatter text and body
  */
 function extractFrontmatterAndBody(content) {
   const lines = content.split("\n");
   
   if (lines.length === 0 || lines[0].trim() !== "---") {
-    return { frontmatter: {}, markdown: content };
+    return { frontmatterText: "", markdown: content };
   }
   
   let endIndex = -1;
@@ -79,47 +96,35 @@ function extractFrontmatterAndBody(content) {
     throw new Error("Frontmatter not properly closed");
   }
   
-  const frontmatterLines = lines.slice(1, endIndex);
+  const frontmatterText = lines.slice(1, endIndex).join("\n");
   const markdown = lines.slice(endIndex + 1).join("\n");
   
-  // Parse YAML frontmatter using js-yaml
-  const yamlContent = frontmatterLines.join("\n");
-  let frontmatter = {};
-  
-  try {
-    frontmatter = yaml.load(yamlContent) || {};
-  } catch (err) {
-    const error = /** @type {Error} */ (err);
-    throw new Error(`Failed to parse YAML frontmatter: ${error.message}`);
-  }
-  
-  return { frontmatter, markdown };
+  return { frontmatterText, markdown };
 }
 
 /**
- * Process imports from frontmatter (simplified concatenation approach)
- * Concatenates frontmatter from imports in sorted order
- * @param {Record<string, any>} frontmatter - The frontmatter object
+ * Process imports from frontmatter using text-based parsing
+ * Only parses enough to extract the imports list
+ * @param {string} frontmatterText - The frontmatter text
  * @param {string} baseDir - Base directory for resolving imports
- * @param {Set<string>} visited - Set of visited files to prevent cycles
- * @returns {Promise<{importedFiles: string[], importedFrontmatters: Array<Record<string, any>>}>}
+ * @param {Set<string>} visited - Set of visited files for cycle detection
+ * @returns {Promise<{importedFiles: string[], importedFrontmatterTexts: string[]}>}
  */
-async function processImports(frontmatter, baseDir, visited = new Set()) {
+async function processImportsTextBased(frontmatterText, baseDir, visited = new Set()) {
   const importedFiles = [];
-  const importedFrontmatters = [];
+  const importedFrontmatterTexts = [];
   
-  // Check if imports field exists
-  if (!frontmatter.imports || !Array.isArray(frontmatter.imports)) {
-    return { importedFiles, importedFrontmatters };
+  // Extract imports field using simple text parsing
+  const imports = extractImportsFromText(frontmatterText);
+  
+  if (imports.length === 0) {
+    return { importedFiles, importedFrontmatterTexts };
   }
   
   // Sort imports for deterministic processing
-  const sortedImports = [...frontmatter.imports].sort();
+  const sortedImports = [...imports].sort();
   
   for (const importPath of sortedImports) {
-    // Skip if string is not provided (handle object imports by skipping)
-    if (typeof importPath !== "string") continue;
-    
     // Resolve import path relative to base directory
     const fullPath = path.resolve(baseDir, importPath);
     
@@ -135,42 +140,40 @@ async function processImports(frontmatter, baseDir, visited = new Set()) {
       }
       
       const importContent = fs.readFileSync(fullPath, "utf8");
-      const { frontmatter: importFrontmatter } = extractFrontmatterAndBody(importContent);
+      const { frontmatterText: importFrontmatterText } = extractFrontmatterAndBody(importContent);
       
       // Add to imported files list
       importedFiles.push(importPath);
-      importedFrontmatters.push(importFrontmatter);
+      importedFrontmatterTexts.push(importFrontmatterText);
       
       // Recursively process imports in the imported file
       const importBaseDir = path.dirname(fullPath);
-      const nestedResult = await processImports(importFrontmatter, importBaseDir, visited);
+      const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited);
       
       // Add nested imports
       importedFiles.push(...nestedResult.importedFiles);
-      importedFrontmatters.push(...nestedResult.importedFrontmatters);
+      importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
     } catch (err) {
       // Skip files that can't be read
       continue;
     }
   }
   
-  return { importedFiles, importedFrontmatters };
+  return { importedFiles, importedFrontmatterTexts };
 }
 
 /**
- * Simple YAML parser for frontmatter
- * Handles basic YAML structures commonly used in agentic workflows
- * @param {string} yamlContent - YAML content to parse
- * @returns {Record<string, any>} Parsed object
+ * Extract imports field from frontmatter text using simple text parsing
+ * Only extracts array items under "imports:" key
+ * @param {string} frontmatterText - The frontmatter text
+ * @returns {string[]} Array of import paths
  */
-function parseSimpleYAML(yamlContent) {
-  const result = {};
-  const lines = yamlContent.split("\n");
-  let currentKey = null;
-  let currentValue = null;
-  let indent = 0;
-  let inArray = false;
-  let arrayItems = [];
+function extractImportsFromText(frontmatterText) {
+  const imports = [];
+  const lines = frontmatterText.split("\n");
+  
+  let inImports = false;
+  let baseIndent = 0;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -179,62 +182,44 @@ function parseSimpleYAML(yamlContent) {
     // Skip empty lines and comments
     if (!trimmed || trimmed.startsWith("#")) continue;
     
-    // Calculate indentation
-    const lineIndent = line.search(/\S/);
+    // Check if this is the imports: key
+    if (trimmed.startsWith("imports:")) {
+      inImports = true;
+      baseIndent = line.search(/\S/);
+      continue;
+    }
     
-    // Handle key-value pairs
-    const colonIndex = trimmed.indexOf(":");
-    if (colonIndex > 0) {
-      // Save previous array if exists
-      if (inArray && currentKey) {
-        result[currentKey] = arrayItems;
-        arrayItems = [];
-        inArray = false;
+    if (inImports) {
+      const lineIndent = line.search(/\S/);
+      
+      // If indentation decreased or same level, we're out of the imports array
+      if (lineIndent <= baseIndent && trimmed && !trimmed.startsWith("#")) {
+        break;
       }
       
-      const key = trimmed.substring(0, colonIndex).trim();
-      let value = trimmed.substring(colonIndex + 1).trim();
-      
-      // Handle different value types
-      if (!value) {
-        // Multi-line or nested object - peek next line
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1];
-          const nextTrimmed = nextLine.trim();
-          if (nextTrimmed.startsWith("-")) {
-            // Array coming
-            currentKey = key;
-            inArray = true;
-            arrayItems = [];
-            continue;
-          }
+      // Extract array item
+      if (trimmed.startsWith("-")) {
+        let item = trimmed.substring(1).trim();
+        // Remove quotes if present
+        item = item.replace(/^["']|["']$/g, "");
+        if (item) {
+          imports.push(item);
         }
-        result[key] = null;
-      } else if (value === "true" || value === "false") {
-        result[key] = value === "true";
-      } else if (/^-?\d+$/.test(value)) {
-        result[key] = parseInt(value, 10);
-      } else if (/^-?\d*\.\d+$/.test(value)) {
-        result[key] = parseFloat(value);
-      } else {
-        // String value - remove quotes if present
-        value = value.replace(/^["']|["']$/g, "");
-        result[key] = value;
       }
-    } else if (trimmed.startsWith("-") && inArray) {
-      // Array item
-      let item = trimmed.substring(1).trim();
-      item = item.replace(/^["']|["']$/g, "");
-      arrayItems.push(item);
     }
   }
   
-  // Save final array if exists
-  if (inArray && currentKey) {
-    result[currentKey] = arrayItems;
-  }
-  
-  return result;
+  return imports;
+}
+
+/**
+ * Normalize frontmatter text for consistent hashing
+ * Removes leading/trailing whitespace and normalizes line endings
+ * @param {string} text - The frontmatter text
+ * @returns {string} Normalized text
+ */
+function normalizeFrontmatterText(text) {
+  return text.trim().replace(/\r\n/g, "\n");
 }
 
 /**
@@ -262,83 +247,8 @@ function extractRelevantTemplateExpressions(markdown) {
 }
 
 /**
- * Builds canonical frontmatter representation with import data
- * Concatenates frontmatter from imports in sorted order for deterministic hashing
- * @param {Record<string, any>} frontmatter - The main frontmatter
- * @param {string[]} importedFiles - List of imported file paths (sorted)
- * @param {Array<Record<string, any>>} importedFrontmatters - Frontmatter from imported files
- * @returns {Record<string, any>} Canonical frontmatter object
- */
-function buildCanonicalFrontmatterWithImports(frontmatter, importedFiles, importedFrontmatters) {
-  const canonical = {};
-  
-  // Helper to add field if exists
-  const addField = (key) => {
-    if (frontmatter[key] !== undefined) {
-      canonical[key] = frontmatter[key];
-    }
-  };
-  
-  // Core configuration fields (order matches Go implementation)
-  addField("engine");
-  addField("on");
-  addField("permissions");
-  addField("tracker-id");
-  
-  // Tool and integration fields
-  addField("tools");
-  addField("mcp-servers");
-  addField("network");
-  addField("safe-outputs");
-  addField("safe-inputs");
-  
-  // Runtime configuration fields
-  addField("runtimes");
-  addField("services");
-  addField("cache");
-  
-  // Workflow structure fields
-  addField("steps");
-  addField("post-steps");
-  addField("jobs");
-  
-  // Trigger and scheduling
-  addField("manual-approval");
-  addField("stop-time");
-  
-  // Metadata fields
-  addField("description");
-  addField("labels");
-  addField("bots");
-  addField("timeout-minutes");
-  addField("secret-masking");
-  
-  // Input parameter definitions
-  addField("inputs");
-  
-  // Add sorted imported files list
-  if (importedFiles.length > 0) {
-    canonical.imports = [...importedFiles].sort();
-  }
-  
-  return canonical;
-}
-
-/**
- * Builds canonical frontmatter representation (legacy function)
- * @param {Record<string, any>} frontmatter - The main frontmatter
- * @param {string} baseDir - Base directory for resolving imports
- * @param {Record<string, any>} cache - Import cache
- * @returns {Promise<Record<string, any>>} Canonical frontmatter object
- */
-async function buildCanonicalFrontmatter(frontmatter, baseDir, cache) {
-  const { importedFiles, importedFrontmatters } = await processImports(frontmatter, baseDir);
-  return buildCanonicalFrontmatterWithImports(frontmatter, importedFiles, importedFrontmatters);
-}
-
-/**
  * Marshals data to canonical JSON with sorted keys
- * @param {Record<string, any>} data - The data to marshal
+ * @param {any} data - The data to marshal
  * @returns {string} Canonical JSON string
  */
 function marshalCanonicalJSON(data) {
@@ -354,19 +264,19 @@ function marshalSorted(data) {
   if (data === null || data === undefined) {
     return "null";
   }
-  
+
   const type = typeof data;
-  
+
   if (type === "string" || type === "number" || type === "boolean") {
     return JSON.stringify(data);
   }
-  
+
   if (Array.isArray(data)) {
     if (data.length === 0) return "[]";
     const elements = data.map(elem => marshalSorted(elem));
     return "[" + elements.join(",") + "]";
   }
-  
+
   if (type === "object") {
     const keys = Object.keys(data).sort();
     if (keys.length === 0) return "{}";
@@ -377,29 +287,33 @@ function marshalSorted(data) {
     });
     return "{" + pairs.join(",") + "}";
   }
-  
+
   return JSON.stringify(data);
 }
 
 /**
- * Extracts hash from lock file header
- * @param {string} lockFileContent - Content of the lock file
- * @returns {string} The hash or empty string if not found
+ * Extract hash from lock file content
+ * @param {string} lockFileContent - Content of the .lock.yml file
+ * @returns {string} The extracted hash or empty string if not found
  */
 function extractHashFromLockFile(lockFileContent) {
-  const hashLine = lockFileContent.split("\n").find(line => line.startsWith("# frontmatter-hash: "));
-  return hashLine ? hashLine.substring(20).trim() : "";
+  const lines = lockFileContent.split("\n");
+  for (const line of lines) {
+    if (line.startsWith("# frontmatter-hash: ")) {
+      return line.substring(20).trim();
+    }
+  }
+  return "";
 }
 
 module.exports = {
   computeFrontmatterHash,
   extractFrontmatterAndBody,
-  parseSimpleYAML,
+  extractImportsFromText,
   extractRelevantTemplateExpressions,
-  buildCanonicalFrontmatter,
-  buildCanonicalFrontmatterWithImports,
-  processImports,
   marshalCanonicalJSON,
   marshalSorted,
   extractHashFromLockFile,
+  normalizeFrontmatterText,
+  processImportsTextBased,
 };
