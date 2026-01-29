@@ -24,6 +24,7 @@
 name: "Security Guard Agent 🛡️"
 "on":
   pull_request:
+    # draft: false # Draft filtering applied via job conditions
     types:
     - opened
     - synchronize
@@ -42,8 +43,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((${{ !github.event.pull_request.draft }}) && ((github.event_name != 'pull_request') ||
-      (github.event.pull_request.head.repo.id == github.repository_id)))
+      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) &&
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1179,7 +1180,9 @@ jobs:
 
   pre_activation:
     if: >
-      (${{ !github.event.pull_request.draft }}) && ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id))
+      ((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) &&
+      ((github.event_name != 'pull_request') ||
+      (github.event.pull_request.head.repo.id == github.repository_id))
     runs-on: ubuntu-slim
     permissions:
       contents: read

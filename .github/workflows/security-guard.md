@@ -3,7 +3,7 @@ description: Automated security guard that reviews every PR for changes that cou
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-if: ${{ !github.event.pull_request.draft }}
+    draft: false
 permissions:
   contents: read
   pull-requests: read
