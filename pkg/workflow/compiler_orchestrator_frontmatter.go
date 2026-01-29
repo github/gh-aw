@@ -182,16 +182,9 @@ func (c *Compiler) copyFrontmatterWithoutInternalMarkers(frontmatter map[string]
 // Only safe-outputs.jobs is supported.
 func (c *Compiler) validateNoTopLevelSafeJobs(frontmatter map[string]any, filePath string) error {
 	if _, hasSafeJobs := frontmatter["safe-jobs"]; hasSafeJobs {
-		return fmt.Errorf("%s: top-level 'safe-jobs' field is not supported. Use 'safe-outputs.jobs' instead.\n"+
-			"Change from:\n"+
-			"  safe-jobs:\n"+
-			"    my-job: ...\n"+
-			"To:\n"+
-			"  safe-outputs:\n"+
-			"    jobs:\n"+
-			"      my-job: ...",
-			filePath,
-		)
+		msg := fmt.Sprintf("%s: top-level 'safe-jobs' field is not supported; use 'safe-outputs.jobs' instead", filePath)
+		suggestion := "\nChange from:\n  safe-jobs:\n    my-job: ...\nTo:\n  safe-outputs:\n    jobs:\n      my-job: ..."
+		return fmt.Errorf("%s%s", msg, suggestion)
 	}
 	return nil
 }

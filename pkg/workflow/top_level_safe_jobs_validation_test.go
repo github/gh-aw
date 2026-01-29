@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestTopLevelSafeJobsRejected verifies that top-level "safe-jobs" field is rejected
@@ -30,12 +31,12 @@ Test workflow with top-level safe-jobs (should be rejected)
 	// Write to a temporary file
 	tmpFile := "/tmp/test-top-level-safe-jobs-validation.md"
 	err := os.WriteFile(tmpFile, []byte(markdown), 0644)
-	assert.NoError(t, err, "Should write test file")
+	require.NoError(t, err, "Should write test file")
 	defer os.Remove(tmpFile)
 
 	// Try to compile - should fail with clear error message
 	_, err = c.ParseWorkflowFile(tmpFile)
-	assert.Error(t, err, "Should reject top-level safe-jobs")
+	require.Error(t, err, "Should reject top-level safe-jobs")
 	assert.Contains(t, err.Error(), "top-level 'safe-jobs' field is not supported", "Error should mention top-level safe-jobs not supported")
 	assert.Contains(t, err.Error(), "safe-outputs.jobs", "Error should suggest using safe-outputs.jobs")
 }
@@ -62,7 +63,7 @@ Test workflow with safe-outputs.jobs (should be accepted)
 	// Write to a temporary file
 	tmpFile := "/tmp/test-safe-outputs-jobs-validation.md"
 	err := os.WriteFile(tmpFile, []byte(markdown), 0644)
-	assert.NoError(t, err, "Should write test file")
+	require.NoError(t, err, "Should write test file")
 	defer os.Remove(tmpFile)
 
 	// Try to compile - should succeed (or fail for other reasons, but not safe-jobs)
@@ -92,11 +93,11 @@ Shared workflow with top-level safe-jobs (should be rejected)
 	// Write to a temporary file
 	tmpFile := "/tmp/test-shared-safe-jobs-validation.md"
 	err := os.WriteFile(tmpFile, []byte(markdown), 0644)
-	assert.NoError(t, err, "Should write test file")
+	require.NoError(t, err, "Should write test file")
 	defer os.Remove(tmpFile)
 
 	// Try to compile - should fail with clear error message
 	_, err = c.ParseWorkflowFile(tmpFile)
-	assert.Error(t, err, "Should reject top-level safe-jobs in shared workflows")
+	require.Error(t, err, "Should reject top-level safe-jobs in shared workflows")
 	assert.Contains(t, err.Error(), "top-level 'safe-jobs' field is not supported", "Error should mention top-level safe-jobs not supported")
 }
