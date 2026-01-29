@@ -163,6 +163,132 @@ This workflow runs in the merge queue.
 		assert.Contains(t, preActivationSection, "github.event_name != 'merge_group'",
 			"pre_activation should skip for merge_group events")
 	})
+
+	t.Run("workflow_with_stop_time_does_not_skip_pre_activation", func(t *testing.T) {
+		// Workflows with stop-after should ALWAYS run pre_activation
+		// even for schedule events, because the stop-time check must run
+		workflowContent := `---
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  issues:
+    types: [opened]
+  stop-after: "+48h"
+engine: codex
+---
+
+# Workflow with Stop Time
+
+This workflow has a deadline and must check stop-time for all events.
+`
+		workflowFile := filepath.Join(tmpDir, "workflow-with-stop-time.md")
+		require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+
+		err := compiler.CompileWorkflow(workflowFile)
+		require.NoError(t, err, "Should compile workflow")
+
+		lockFile := stringutil.MarkdownToLockFile(workflowFile)
+		lockContent, err := os.ReadFile(lockFile)
+		require.NoError(t, err, "Should read lock file")
+		lockContentStr := string(lockContent)
+
+		// Verify pre_activation exists
+		preActivationSection := extractJobSectionForSkipTest(lockContentStr, string(constants.PreActivationJobName))
+		require.NotEmpty(t, preActivationSection, "Should have pre_activation job")
+
+		// The pre_activation job should NOT have skip conditions for schedule
+		// because the stop-time check must always run
+		assert.NotContains(t, preActivationSection, "github.event_name != 'schedule'",
+			"pre_activation should NOT skip for schedule when stop-after is configured")
+
+		// Verify that stop-time check step exists
+		assert.Contains(t, preActivationSection, "check_stop_time",
+			"pre_activation should have stop-time check step")
+	})
+
+	t.Run("workflow_with_skip_if_match_does_not_skip_pre_activation", func(t *testing.T) {
+		// Workflows with skip-if-match should ALWAYS run pre_activation
+		// even for schedule events, because the query check must run
+		workflowContent := `---
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  issues:
+    types: [opened]
+  skip-if-match: "is:issue is:open label:skip-automation"
+engine: codex
+---
+
+# Workflow with Skip-If-Match
+
+This workflow skips if certain issues exist.
+`
+		workflowFile := filepath.Join(tmpDir, "workflow-with-skip-if-match.md")
+		require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+
+		err := compiler.CompileWorkflow(workflowFile)
+		require.NoError(t, err, "Should compile workflow")
+
+		lockFile := stringutil.MarkdownToLockFile(workflowFile)
+		lockContent, err := os.ReadFile(lockFile)
+		require.NoError(t, err, "Should read lock file")
+		lockContentStr := string(lockContent)
+
+		// Verify pre_activation exists
+		preActivationSection := extractJobSectionForSkipTest(lockContentStr, string(constants.PreActivationJobName))
+		require.NotEmpty(t, preActivationSection, "Should have pre_activation job")
+
+		// The pre_activation job should NOT have skip conditions for schedule
+		// because the skip-if-match check must always run
+		assert.NotContains(t, preActivationSection, "github.event_name != 'schedule'",
+			"pre_activation should NOT skip for schedule when skip-if-match is configured")
+
+		// Verify that skip-if-match check step exists
+		assert.Contains(t, preActivationSection, "check_skip_if_match",
+			"pre_activation should have skip-if-match check step")
+	})
+
+	t.Run("workflow_with_skip_if_no_match_does_not_skip_pre_activation", func(t *testing.T) {
+		// Workflows with skip-if-no-match should ALWAYS run pre_activation
+		// even for schedule events, because the query check must run
+		workflowContent := `---
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  issues:
+    types: [opened]
+  skip-if-no-match: "is:issue is:open label:needs-automation"
+engine: codex
+---
+
+# Workflow with Skip-If-No-Match
+
+This workflow only runs if certain issues exist.
+`
+		workflowFile := filepath.Join(tmpDir, "workflow-with-skip-if-no-match.md")
+		require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+
+		err := compiler.CompileWorkflow(workflowFile)
+		require.NoError(t, err, "Should compile workflow")
+
+		lockFile := stringutil.MarkdownToLockFile(workflowFile)
+		lockContent, err := os.ReadFile(lockFile)
+		require.NoError(t, err, "Should read lock file")
+		lockContentStr := string(lockContent)
+
+		// Verify pre_activation exists
+		preActivationSection := extractJobSectionForSkipTest(lockContentStr, string(constants.PreActivationJobName))
+		require.NotEmpty(t, preActivationSection, "Should have pre_activation job")
+
+		// The pre_activation job should NOT have skip conditions for schedule
+		// because the skip-if-no-match check must always run
+		assert.NotContains(t, preActivationSection, "github.event_name != 'schedule'",
+			"pre_activation should NOT skip for schedule when skip-if-no-match is configured")
+
+		// Verify that skip-if-no-match check step exists
+		assert.Contains(t, preActivationSection, "check_skip_if_no_match",
+			"pre_activation should have skip-if-no-match check step")
+	})
 }
 
 // TestSafePreActivationEventsListConsistency verifies that the safe events list

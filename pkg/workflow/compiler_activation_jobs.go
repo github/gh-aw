@@ -256,22 +256,36 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	// Pre-activation job uses the user's original if condition (data.If)
 	// The workflow_run safety check is NOT applied here - it's only on the activation job
 	// Don't include conditions that reference custom job outputs (those belong on the agent job)
-	//
-	// OPTIMIZATION: Skip pre_activation job entirely for safe events (schedule, merge_group)
-	// These events don't require permission checks and are trusted by definition.
-	// When pre_activation is skipped, downstream jobs check for needs.pre_activation.result == 'skipped'
 	var jobIfCondition string
 	if !c.referencesCustomJobOutputs(data.If, data.Jobs) {
 		jobIfCondition = data.If
 	}
 
-	// Add safe event skip condition: don't run pre_activation for schedule/merge_group events
-	safeEventSkipCondition := BuildIsNotSafePreActivationEvent().Render()
-	if jobIfCondition != "" {
-		// Combine existing condition with safe event check
-		jobIfCondition = fmt.Sprintf("(%s) && (%s)", safeEventSkipCondition, jobIfCondition)
+	// OPTIMIZATION: Skip pre_activation job entirely for safe events (schedule, merge_group)
+	// BUT only if there are no checks that MUST run regardless of event type:
+	// - stop-time: deadline enforcement applies to all events
+	// - skip-if-match: query-based skip applies to all events
+	// - skip-if-no-match: query-based skip applies to all events
+	// - custom steps: user-defined steps may have important logic
+	//
+	// When pre_activation is skipped, downstream jobs check for needs.pre_activation.result == 'skipped'
+	canSkipForSafeEvents := data.StopTime == "" &&
+		data.SkipIfMatch == nil &&
+		data.SkipIfNoMatch == nil &&
+		len(customSteps) == 0
+
+	if canSkipForSafeEvents {
+		safeEventSkipCondition := BuildIsNotSafePreActivationEvent().Render()
+		if jobIfCondition != "" {
+			// Combine existing condition with safe event check
+			jobIfCondition = fmt.Sprintf("(%s) && (%s)", safeEventSkipCondition, jobIfCondition)
+		} else {
+			jobIfCondition = safeEventSkipCondition
+		}
+		compilerActivationJobsLog.Print("Pre-activation job can be skipped for safe events (no stop-time, skip-if-match, skip-if-no-match, or custom steps)")
 	} else {
-		jobIfCondition = safeEventSkipCondition
+		compilerActivationJobsLog.Printf("Pre-activation job cannot be skipped for safe events: hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCustomSteps=%v",
+			data.StopTime != "", data.SkipIfMatch != nil, data.SkipIfNoMatch != nil, len(customSteps) > 0)
 	}
 
 	job := &Job{

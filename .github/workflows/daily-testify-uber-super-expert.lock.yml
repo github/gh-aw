@@ -1659,7 +1659,6 @@ jobs:
           if-no-files-found: ignore
 
   pre_activation:
-    if: (github.event_name != 'schedule') && (github.event_name != 'merge_group')
     runs-on: ubuntu-slim
     permissions:
       contents: read
