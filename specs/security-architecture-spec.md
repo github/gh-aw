@@ -891,6 +891,47 @@ if: github.event.pull_request.head.repo.id == github.repository_id
 
 **RS-15**: Invalid output MUST cause job failure with validation error details.
 
+### 11.8 Concurrency Control
+
+**RS-16**: The implementation MUST configure automatic concurrency control to prevent race conditions and resource conflicts.
+
+**RS-17**: Concurrency control MUST use GitHub Actions' native `concurrency` field with:
+- Group identifier that uniquely identifies the workflow context
+- Optional `cancel-in-progress` flag for workflow cancellation behavior
+
+**RS-18**: The implementation SHOULD use dynamic group identifiers that include:
+- Workflow name or identifier
+- Context-specific identifiers (issue number, PR number, or ref)
+
+**RS-19**: Example concurrency configurations:
+
+```yaml
+# For pull request workflows
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+# For issue-based workflows
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
+```
+
+**RS-20**: Concurrency control provides operational security by:
+- Preventing multiple concurrent runs on the same resource
+- Avoiding race conditions in shared state
+- Reducing resource exhaustion risks
+- Ensuring sequential processing when required
+
+**RS-21**: The `cancel-in-progress` flag SHOULD be set to `true` for workflows where:
+- Latest run supersedes previous runs (e.g., PR review workflows)
+- Multiple runs on the same context would cause conflicts
+- Resource conservation is important
+
+**RS-22**: The `cancel-in-progress` flag SHOULD be set to `false` or omitted for workflows where:
+- All runs must complete (e.g., audit workflows)
+- Cancellation could leave inconsistent state
+- Sequential queueing is preferred over cancellation
+
 ---
 
 ## 12. Compliance Testing
@@ -983,6 +1024,9 @@ A conforming implementation MUST provide a compliance test suite covering all MU
 - **T-RS-006**: Verify AWF network enforcement
 - **T-RS-007**: Verify MCP network enforcement
 - **T-RS-008**: Verify output validation
+- **T-RS-009**: Verify concurrency control configuration
+- **T-RS-010**: Verify cancel-in-progress behavior
+- **T-RS-011**: Verify dynamic group identifier generation
 
 ### 12.3 Compliance Checklist
 
@@ -994,7 +1038,7 @@ A conforming implementation MUST provide a compliance test suite covering all MU
 | Compilation-Time Checks | T-CS-001 to T-CS-006 | 1 | Required |
 | Network Isolation | T-NI-001 to T-NI-009 | 2 | Required |
 | Sandbox Isolation | T-SI-001 to T-SI-007 | 2 | Required |
-| Runtime Enforcement | T-RS-001 to T-RS-008 | 2 | Required |
+| Runtime Enforcement | T-RS-001 to T-RS-011 | 2 | Required |
 | Threat Detection | T-TD-001 to T-TD-007 | 3 | Optional |
 
 ### 12.4 Test Execution Procedures
@@ -1273,7 +1317,137 @@ safe-outputs:
 
 **Behavior**: AI detection + TruffleHog scan before PR creation.
 
-### Appendix E: Strict Mode Violations
+#### Example 4: Concurrency Control
+
+```yaml
+# Pull request workflow with cancel-in-progress
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+safe-outputs:
+  add-comment:
+```
+
+**Behavior**: Newer runs cancel older runs for the same PR, ensuring only the latest code is analyzed.
+
+```yaml
+# Issue workflow with sequential processing
+on:
+  issues:
+    types: [opened, labeled]
+
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
+  # cancel-in-progress: false (omitted = queue runs sequentially)
+
+safe-outputs:
+  create-issue:
+```
+
+**Behavior**: All workflow runs complete in order, preventing incomplete operations.
+
+### Appendix E: Concurrency Control Examples
+
+#### Example 1: Pull Request Workflow with Cancellation
+
+```yaml
+name: PR Review Agent
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+safe-outputs:
+  add-comment:
+```
+
+**Group pattern**: `gh-aw-PR Review Agent-123` (where 123 is PR number)
+
+**Behavior**: 
+- When a new commit is pushed to PR #123, any in-progress run for that PR is cancelled
+- Only the latest code version is analyzed, avoiding outdated feedback
+- Resource-efficient for rapidly changing PRs
+
+#### Example 2: Issue Workflow with Sequential Processing
+
+```yaml
+name: Issue Triage
+on:
+  issues:
+    types: [opened, labeled]
+
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
+  # cancel-in-progress: false (default)
+
+safe-outputs:
+  create-issue:
+  add-comment:
+```
+
+**Group pattern**: `gh-aw-Issue Triage-456` (where 456 is issue number)
+
+**Behavior**:
+- Multiple runs on the same issue queue sequentially
+- Each run completes before the next starts
+- Ensures all operations complete without cancellation
+- Prevents race conditions in issue state
+
+#### Example 3: Scheduled Workflow without Concurrency Conflicts
+
+```yaml
+name: Daily Audit
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: "gh-aw-${{ github.workflow }}"
+  # No PR/issue number = single group for all runs
+
+safe-outputs:
+  create-issue:
+```
+
+**Group pattern**: `gh-aw-Daily Audit` (same for all runs)
+
+**Behavior**:
+- Only one run of this workflow can execute at a time
+- Manual triggers queue behind scheduled runs
+- Prevents overlapping audit operations
+
+#### Example 4: Repository-Wide Lock
+
+```yaml
+name: Database Migration
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: "gh-aw-database-migration-${{ github.repository }}"
+  cancel-in-progress: false
+
+safe-outputs:
+  create-pull-request:
+```
+
+**Group pattern**: `gh-aw-database-migration-owner/repo`
+
+**Behavior**:
+- Repository-wide exclusive lock
+- Runs queue sequentially across the entire repository
+- Critical for operations that must not overlap
+
+### Appendix F: Strict Mode Violations
 
 #### Violation 1: Write Permissions
 
@@ -1308,7 +1482,7 @@ network:
 
 **Error**: `strict mode does not allow wildcard (*) in network domains`
 
-### Appendix F: Security Best Practices
+### Appendix G: Security Best Practices
 
 #### BP-01: Always Use Sanitized Context
 

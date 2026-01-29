@@ -19,6 +19,7 @@ All major security architecture claims in the specification have been verified a
 - ✅ Threat detection layer (detection job between agent and safe_outputs)
 - ✅ Action pinning to SHAs
 - ✅ Timestamp validation at runtime
+- ✅ Concurrency control (context-aware grouping with cancel-in-progress)
 
 ---
 
@@ -311,6 +312,47 @@ safe_outputs:
 
 ---
 
+### 10. Concurrency Control (Section 11.8 - RS-16 to RS-22)
+
+**Specification Claim**:
+> **RS-16**: The implementation MUST configure automatic concurrency control to prevent race conditions
+> **RS-17**: Concurrency control MUST use GitHub Actions' native `concurrency` field
+
+**Implementation Validation** (`security-guard.lock.yml`, lines 33-35):
+
+```yaml
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+```
+
+**Implementation Validation** (`security-compliance.lock.yml`, lines 42-43):
+
+```yaml
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
+  # cancel-in-progress omitted (defaults to false, sequential queueing)
+```
+
+**Key Features Verified**:
+- ✅ Dynamic group identifiers include workflow name and context (PR number, issue number, or ref)
+- ✅ `cancel-in-progress: true` for PR workflows (latest run cancels older runs)
+- ✅ `cancel-in-progress` omitted for issue workflows (sequential processing)
+- ✅ Prevents race conditions on the same resource
+- ✅ Reduces resource exhaustion by canceling superseded runs
+
+**Concurrency Patterns**:
+
+| Workflow Type | Group Pattern | Cancel-in-Progress | Behavior |
+|---------------|---------------|-------------------|----------|
+| Pull Request | `workflow-PR#` | `true` | Latest run cancels older |
+| Issue-based | `workflow-Issue#` | `false` (omitted) | Runs queue sequentially |
+| Scheduled | `workflow` | `false` (omitted) | One at a time |
+
+**Status**: ✅ **VERIFIED** - Concurrency control properly configured with context-aware grouping and appropriate cancellation policies.
+
+---
+
 ## Specification Accuracy Summary
 
 | Section | Requirement | Status | Evidence Location |
@@ -324,6 +366,7 @@ safe_outputs:
 | **9.1** | Threat Detection (TD-01) | ✅ Verified | `detection:` job |
 | **10.6** | Action Pinning (CS-10) | ✅ Verified | All `uses:` statements |
 | **11.1** | Timestamp Validation (RS-01, RS-02) | ✅ Verified | `activation.steps` |
+| **11.8** | Concurrency Control (RS-16 to RS-22) | ✅ Verified | `concurrency:` blocks |
 
 ---
 
