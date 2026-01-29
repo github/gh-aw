@@ -42,7 +42,7 @@ If no PRs are found, follow `aw/campaign.md` (No-Work Default).
 ### Update project items
 
 For each discovered PR, call `update_project` with:
-- `project`: "<project_url>"
+- `project`: https://github.com/orgs/githubnext/projects/144
 - `content_type`: "pull_request"
 - `content_number`: the PR number
 - `fields`: follow the defaults in `aw/campaign.md`
