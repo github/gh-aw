@@ -209,7 +209,7 @@ jobs:
                     "type": "string"
                   },
                   "issue_number": {
-                    "description": "Issue number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/issues/234). The issue should contain clear, actionable requirements. Either issue_number or pull_number must be provided, but not both.",
+                    "description": "Issue number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/issues/234). Can also be a temporary_id (e.g., 'aw_abc123def456') from an issue created earlier in the same workflow run. The issue should contain clear, actionable requirements. Either issue_number or pull_number must be provided, but not both.",
                     "type": [
                       "number",
                       "string"
@@ -480,7 +480,7 @@ jobs:
                   "maxLength": 128
                 },
                 "issue_number": {
-                  "optionalPositiveInteger": true
+                  "issueNumberOrTemporaryId": true
                 },
                 "pull_number": {
                   "optionalPositiveInteger": true
@@ -2268,6 +2268,7 @@ jobs:
           GH_AW_AGENT_DEFAULT: "copilot"
           GH_AW_AGENT_TARGET: "*"
           GH_AW_AGENT_ALLOWED: "copilot"
+          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
