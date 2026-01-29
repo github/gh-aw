@@ -233,7 +233,7 @@ This ensures accurate, up-to-date reporting for every run of this workflow.
 
 ### Step 1: Collect Recent Firewall-Enabled Workflow Runs
 
-Use the `logs` tool from the agentic-workflows MCP server to efficiently collect workflow runs that have firewall enabled (see `workflow_runs_analyzed` in specs/metrics-glossary.md - Scope: Last 7 days):
+Use the `logs` tool from the agentic-workflows MCP server to efficiently collect workflow runs that have firewall enabled (see `workflow_runs_analyzed` in scratchpad/metrics-glossary.md - Scope: Last 7 days):
 
 **Using the logs tool:**
 Call the `logs` tool with the following parameters:
@@ -322,7 +322,7 @@ gh aw audit <run-id> --json | jq -r '
 '
 ```
 
-For each workflow run with firewall data (see standardized metric names in specs/metrics-glossary.md):
+For each workflow run with firewall data (see standardized metric names in scratchpad/metrics-glossary.md):
 1. Extract the firewall analysis from the audit JSON output
 2. Track the following metrics per workflow:
    - Total requests (`firewall_requests_total`)

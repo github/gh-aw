@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/goccy/go-yaml"
 )
+
+var contentExtractorLog = logger.New("parser:content_extractor")
 
 // extractToolsFromContent extracts tools and mcp-servers sections from frontmatter as JSON string
 func extractToolsFromContent(content string) (string, error) {
@@ -54,6 +57,7 @@ func extractToolsFromContent(content string) (string, error) {
 
 // extractSafeOutputsFromContent extracts safe-outputs section from frontmatter as JSON string
 func extractSafeOutputsFromContent(content string) (string, error) {
+	contentExtractorLog.Print("Extracting safe-outputs from content")
 	return extractFrontmatterField(content, "safe-outputs", "{}")
 }
 
@@ -175,22 +179,27 @@ func extractCacheFromContent(content string) (string, error) {
 
 // extractFrontmatterField extracts a specific field from frontmatter as JSON string
 func extractFrontmatterField(content, fieldName, emptyValue string) (string, error) {
+	contentExtractorLog.Printf("Extracting field: %s", fieldName)
 	result, err := ExtractFrontmatterFromContent(content)
 	if err != nil {
+		contentExtractorLog.Printf("Failed to extract frontmatter for field %s: %v", fieldName, err)
 		return emptyValue, nil // Return empty value on error
 	}
 
 	// Extract the requested field
 	fieldValue, exists := result.Frontmatter[fieldName]
 	if !exists {
+		contentExtractorLog.Printf("Field %s not found in frontmatter", fieldName)
 		return emptyValue, nil
 	}
 
 	// Convert to JSON string
 	fieldJSON, err := json.Marshal(fieldValue)
 	if err != nil {
+		contentExtractorLog.Printf("Failed to marshal field %s to JSON: %v", fieldName, err)
 		return emptyValue, nil
 	}
 
+	contentExtractorLog.Printf("Successfully extracted field %s: size=%d bytes", fieldName, len(fieldJSON))
 	return strings.TrimSpace(string(fieldJSON)), nil
 }

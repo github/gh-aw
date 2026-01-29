@@ -49,10 +49,13 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issues') && (contains(github.event.issue.body, '/archie')) ||
-      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request == null)) ||
-      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request != null)) ||
-      (github.event_name == 'pull_request') && (contains(github.event.pull_request.body, '/archie')))
+      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
+      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/archie')) || (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request') &&
+      (contains(github.event.pull_request.body, '/archie')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1231,13 +1234,13 @@ jobs:
 
   pre_activation:
     if: >
-      (github.event_name == 'issues') && (contains(github.event.issue.body, '/archie')) ||
-      (github.event_name == 'issue_comment') &&
+      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
+      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/archie')) || (github.event_name == 'issue_comment') &&
       ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request == null)) ||
       (github.event_name == 'issue_comment') &&
       ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request != null)) ||
       (github.event_name == 'pull_request') &&
-      (contains(github.event.pull_request.body, '/archie'))
+      (contains(github.event.pull_request.body, '/archie')))
     runs-on: ubuntu-slim
     permissions:
       contents: read

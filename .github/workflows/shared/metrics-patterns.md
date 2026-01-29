@@ -8,7 +8,7 @@
 #
 # This import provides:
 # - Standardized metric calculation code snippets
-# - References to specs/metrics-glossary.md for metric definitions
+# - References to scratchpad/metrics-glossary.md for metric definitions
 # - Python patterns for issue, PR, code, and workflow metrics
 # - Bash/jq patterns for shell-based calculations
 # - Trend calculation helper functions
@@ -28,13 +28,13 @@ imports:
 
 This shared component provides standardized code patterns for calculating common repository metrics, ensuring consistency across all reporting workflows.
 
-**Reference**: All metric names and definitions follow `specs/metrics-glossary.md` standards.
+**Reference**: All metric names and definitions follow `scratchpad/metrics-glossary.md` standards.
 
 ## Available Patterns
 
 ### 1. Issue Metrics (Python)
 
-Use these patterns for analyzing GitHub issues data. All metric names follow `specs/metrics-glossary.md` standards.
+Use these patterns for analyzing GitHub issues data. All metric names follow `scratchpad/metrics-glossary.md` standards.
 
 ```python
 import pandas as pd
@@ -43,7 +43,7 @@ from datetime import datetime, timedelta
 import json
 
 # Load issues data
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 with open('/tmp/gh-aw/issues-data/issues.json', 'r') as f:
     issues = json.load(f)
 df = pd.DataFrame(issues)
@@ -53,7 +53,7 @@ df['createdAt'] = pd.to_datetime(df['createdAt'])
 df['updatedAt'] = pd.to_datetime(df['updatedAt'])
 df['closedAt'] = pd.to_datetime(df['closedAt'])
 
-# Standardized metric calculations (see specs/metrics-glossary.md)
+# Standardized metric calculations (see scratchpad/metrics-glossary.md)
 now = datetime.now(df['createdAt'].iloc[0].tzinfo if len(df) > 0 else None)
 
 # Volume metrics
@@ -105,7 +105,7 @@ else:
 ```bash
 # Calculate PR metrics using jq
 # Input: /tmp/gh-aw/pr-data/prs.json
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 
 # Volume metrics
 # Scope: All PRs in repository
@@ -152,7 +152,7 @@ echo "Merge Rate: $merge_rate"
 ```bash
 # Lines of code metrics
 # Uses cloc for accurate language detection
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 
 # Ensure output directory exists
 mkdir -p /tmp/gh-aw/data
@@ -183,7 +183,7 @@ if [ -f /tmp/gh-aw/data/cloc_output.json ] && [ -s /tmp/gh-aw/data/cloc_output.j
     
     # Calculate test-to-source ratio
     # Scope: test_lines_of_code / source_lines_of_code (excludes test files from source LOC)
-    # Per specs/metrics-glossary.md: "Excludes test files from source LOC calculation"
+    # Per scratchpad/metrics-glossary.md: "Excludes test files from source LOC calculation"
     if [ "$source_lines_of_code" -gt 0 ]; then
         test_to_source_ratio=$(echo "scale=3; $test_lines_of_code / $source_lines_of_code" | bc)
     else
@@ -205,7 +205,7 @@ fi
 ```python
 # Calculate workflow performance metrics from logs data
 # Input: workflow_runs dict from agentic-workflows tool
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 
 import json
 
@@ -226,7 +226,7 @@ def calculate_workflow_metrics(workflow_runs):
         workflow_runs: Dict mapping workflow name to list of run objects
     
     Returns:
-        Dict with workflow metrics following specs/metrics-glossary.md
+        Dict with workflow metrics following scratchpad/metrics-glossary.md
     """
     workflow_metrics = {}
     
@@ -269,7 +269,7 @@ def calculate_workflow_metrics(workflow_runs):
 
 ```python
 # Calculate trends from historical data
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 
 def calculate_trend(current_value, historical_values):
     """
@@ -385,10 +385,10 @@ echo "30 days ago: $DATE_30D"
 
 ### 1. Always Reference Metrics Glossary
 
-Include comment references to `specs/metrics-glossary.md` above metric calculations:
+Include comment references to `scratchpad/metrics-glossary.md` above metric calculations:
 
 ```python
-# See specs/metrics-glossary.md for metric definitions
+# See scratchpad/metrics-glossary.md for metric definitions
 
 # Scope: All issues in repository, no filters
 total_issues = len(df)
@@ -408,7 +408,7 @@ recent_open_issues = len(df[
 
 ### 3. Use Standardized Names
 
-Follow naming conventions from `specs/metrics-glossary.md`:
+Follow naming conventions from `scratchpad/metrics-glossary.md`:
 
 ✅ **GOOD**:
 ```python
@@ -503,7 +503,7 @@ Then in your workflow, use the patterns:
 # Use the issue metrics patterns from this shared component
 
 # Copy-paste pattern #1 (Issue Metrics) here
-# All metrics will follow specs/metrics-glossary.md standards
+# All metrics will follow scratchpad/metrics-glossary.md standards
 ```
 
 ### Example 2: Workflow Performance Report
@@ -539,7 +539,7 @@ By using these standardized patterns, workflows benefit from:
 
 ## Related Documentation
 
-- **Metrics Definitions**: `specs/metrics-glossary.md`
+- **Metrics Definitions**: `scratchpad/metrics-glossary.md`
 - **Python Visualization**: `shared/python-dataviz.md`
 - **Trend Charts**: `shared/trends.md`
 - **Issue Data Fetching**: `shared/issues-data-fetch.md`

@@ -1,6 +1,30 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+/**
+ * Module-level storage for issues that need copilot assignment
+ * This is populated by the create_issue handler when GH_AW_ASSIGN_COPILOT is true
+ * and consumed by the handler manager to set the issues_to_assign_copilot output
+ * @type {Array<string>}
+ */
+let issuesToAssignCopilotGlobal = [];
+
+/**
+ * Get the list of issues that need copilot assignment
+ * @returns {Array<string>} Array of "repo:number" strings
+ */
+function getIssuesToAssignCopilot() {
+  return issuesToAssignCopilotGlobal;
+}
+
+/**
+ * Reset the list of issues that need copilot assignment
+ * Used for testing
+ */
+function resetIssuesToAssignCopilot() {
+  issuesToAssignCopilotGlobal = [];
+}
+
 const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 const { generateFooter, generateWorkflowIdMarker } = require("./generate_footer.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
@@ -173,6 +197,9 @@ async function main(config = {}) {
   const defaultTargetRepo = getDefaultTargetRepo(config);
   const groupEnabled = config.group === true || config.group === "true";
   const closeOlderIssuesEnabled = config.close_older_issues === true || config.close_older_issues === "true";
+
+  // Check if copilot assignment is enabled
+  const assignCopilot = process.env.GH_AW_ASSIGN_COPILOT === "true";
 
   core.info(`Default target repo: ${defaultTargetRepo}`);
   if (allowedRepos.size > 0) {
@@ -347,6 +374,13 @@ async function main(config = {}) {
       .filter(assignee => assignee)
       .filter((assignee, index, arr) => arr.indexOf(assignee) === index);
 
+    // Check if copilot is in the assignees list
+    const hasCopilot = assignees.includes("copilot");
+
+    // Filter out "copilot" from assignees - it will be assigned separately using GraphQL
+    // Copilot is not a valid GitHub user and must be assigned via the agent assignment API
+    assignees = assignees.filter(assignee => assignee !== "copilot");
+
     let title = createIssueItem.title ? createIssueItem.title.trim() : "";
 
     // Replace temporary ID references in the body using already-created issues
@@ -427,6 +461,12 @@ async function main(config = {}) {
       // Store the mapping of temporary_id -> {repo, number}
       temporaryIdMap.set(normalizeTemporaryId(temporaryId), { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
+
+      // Track issue for copilot assignment if needed
+      if (hasCopilot && assignCopilot) {
+        issuesToAssignCopilotGlobal.push(`${qualifiedItemRepo}:${issue.number}`);
+        core.info(`Queued issue ${qualifiedItemRepo}#${issue.number} for copilot assignment`);
+      }
 
       // Close older issues if enabled
       if (closeOlderIssuesEnabled) {
@@ -591,4 +631,4 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main, createParentIssueTemplate, searchForExistingParent, getSubIssueCount };
+module.exports = { main, createParentIssueTemplate, searchForExistingParent, getSubIssueCount, getIssuesToAssignCopilot, resetIssuesToAssignCopilot };

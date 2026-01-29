@@ -700,7 +700,7 @@ Template injection vulnerabilities were identified and fixed in:
 - `copilot-session-insights.md` - Step output passed through environment variable
 - Pattern: Move template expressions from bash scripts to environment variable assignments
 
-See `specs/template-injection-prevention.md` for detailed analysis and fix documentation.
+See `scratchpad/template-injection-prevention.md` for detailed analysis and fix documentation.
 
 #### Secure Pattern: Sanitized Context (gh-aw specific)
 
@@ -1843,7 +1843,7 @@ Special consideration for strict mode changes:
 
 ## Go Module Summaries
 
-The `specs/mods/` directory contains AI-generated summaries of Go module usage patterns in the gh-aw repository, created by the Go Fan workflow.
+The `scratchpad/mods/` directory contains AI-generated summaries of Go module usage patterns in the gh-aw repository, created by the Go Fan workflow.
 
 ### Purpose
 
@@ -1875,7 +1875,7 @@ graph LR
     C --> D[Analyze Module Usage]
     D --> E[Research GitHub Repo]
     E --> F[Generate Summary]
-    F --> G[Write to specs/mods/]
+    F --> G[Write to scratchpad/mods/]
     G --> H[Update Cache Memory]
     H --> I[Commit & Push]
 ```
@@ -1888,7 +1888,7 @@ graph LR
 
 When working with Go modules in the codebase:
 
-1. **Check existing summaries** in `specs/mods/` for module-specific patterns and best practices
+1. **Check existing summaries** in `scratchpad/mods/` for module-specific patterns and best practices
 2. **Reference improvement opportunities** when upgrading or refactoring module usage
 3. **Consult API documentation links** provided in the summaries for authoritative reference
 4. **Update summaries manually** if significant changes are made to module usage patterns (the workflow will refresh on its next run)

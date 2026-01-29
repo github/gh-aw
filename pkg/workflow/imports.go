@@ -502,6 +502,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	if result.CreateDiscussions == nil && importedConfig.CreateDiscussions != nil {
 		result.CreateDiscussions = importedConfig.CreateDiscussions
 	}
+	if result.UpdateDiscussions == nil && importedConfig.UpdateDiscussions != nil {
+		result.UpdateDiscussions = importedConfig.UpdateDiscussions
+	}
 	if result.CloseDiscussions == nil && importedConfig.CloseDiscussions != nil {
 		result.CloseDiscussions = importedConfig.CloseDiscussions
 	}
@@ -510,6 +513,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	}
 	if result.ClosePullRequests == nil && importedConfig.ClosePullRequests != nil {
 		result.ClosePullRequests = importedConfig.ClosePullRequests
+	}
+	if result.MarkPullRequestAsReadyForReview == nil && importedConfig.MarkPullRequestAsReadyForReview != nil {
+		result.MarkPullRequestAsReadyForReview = importedConfig.MarkPullRequestAsReadyForReview
 	}
 	if result.AddComments == nil && importedConfig.AddComments != nil {
 		result.AddComments = importedConfig.AddComments
@@ -522,6 +528,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	}
 	if result.CreateCodeScanningAlerts == nil && importedConfig.CreateCodeScanningAlerts != nil {
 		result.CreateCodeScanningAlerts = importedConfig.CreateCodeScanningAlerts
+	}
+	if result.AutofixCodeScanningAlert == nil && importedConfig.AutofixCodeScanningAlert != nil {
+		result.AutofixCodeScanningAlert = importedConfig.AutofixCodeScanningAlert
 	}
 	if result.AddLabels == nil && importedConfig.AddLabels != nil {
 		result.AddLabels = importedConfig.AddLabels
@@ -537,6 +546,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	}
 	if result.AssignToAgent == nil && importedConfig.AssignToAgent != nil {
 		result.AssignToAgent = importedConfig.AssignToAgent
+	}
+	if result.AssignToUser == nil && importedConfig.AssignToUser != nil {
+		result.AssignToUser = importedConfig.AssignToUser
 	}
 	if result.UpdateIssues == nil && importedConfig.UpdateIssues != nil {
 		result.UpdateIssues = importedConfig.UpdateIssues
@@ -559,8 +571,29 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	if result.UpdateProjects == nil && importedConfig.UpdateProjects != nil {
 		result.UpdateProjects = importedConfig.UpdateProjects
 	}
+	if result.CopyProjects == nil && importedConfig.CopyProjects != nil {
+		result.CopyProjects = importedConfig.CopyProjects
+	}
+	if result.CreateProjects == nil && importedConfig.CreateProjects != nil {
+		result.CreateProjects = importedConfig.CreateProjects
+	}
+	if result.CreateProjectStatusUpdates == nil && importedConfig.CreateProjectStatusUpdates != nil {
+		result.CreateProjectStatusUpdates = importedConfig.CreateProjectStatusUpdates
+	}
+	if result.LinkSubIssue == nil && importedConfig.LinkSubIssue != nil {
+		result.LinkSubIssue = importedConfig.LinkSubIssue
+	}
+	if result.HideComment == nil && importedConfig.HideComment != nil {
+		result.HideComment = importedConfig.HideComment
+	}
+	if result.DispatchWorkflow == nil && importedConfig.DispatchWorkflow != nil {
+		result.DispatchWorkflow = importedConfig.DispatchWorkflow
+	}
 	if result.MissingTool == nil && importedConfig.MissingTool != nil {
 		result.MissingTool = importedConfig.MissingTool
+	}
+	if result.MissingData == nil && importedConfig.MissingData != nil {
+		result.MissingData = importedConfig.MissingData
 	}
 	if result.NoOp == nil && importedConfig.NoOp != nil {
 		result.NoOp = importedConfig.NoOp

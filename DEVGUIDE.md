@@ -744,14 +744,14 @@ For complete command development patterns including:
 - Error handling best practices
 - Advanced patterns for complex commands
 
-See: **[specs/cli-command-patterns.md](specs/cli-command-patterns.md)**
+See: **[scratchpad/cli-command-patterns.md](scratchpad/cli-command-patterns.md)**
 
 ### Related Guidelines
 
-- **Testing**: [specs/testing.md](specs/testing.md) - Comprehensive testing framework
+- **Testing**: [scratchpad/testing.md](scratchpad/testing.md) - Comprehensive testing framework
 - **Console Output**: [skills/console-rendering/SKILL.md](skills/console-rendering/SKILL.md) - Output formatting
 - **Error Messages**: [skills/error-messages/SKILL.md](skills/error-messages/SKILL.md) - Error message style
-- **Code Organization**: [specs/code-organization.md](specs/code-organization.md) - File structure patterns
+- **Code Organization**: [scratchpad/code-organization.md](scratchpad/code-organization.md) - File structure patterns
 
 ## Debugging and Troubleshooting
 
@@ -1037,7 +1037,7 @@ When adding new features:
 4. **Write tests alongside** - Don't defer testing
 5. **Document patterns** - Update this guide when introducing new patterns
 
-For complete details, see [Code Organization Patterns](specs/code-organization.md).
+For complete details, see [Code Organization Patterns](scratchpad/code-organization.md).
 
 
 

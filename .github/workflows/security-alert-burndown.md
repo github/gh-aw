@@ -19,11 +19,8 @@ safe-outputs:
     max: 100
   create-issue:
     max: 1
-  assign-to-agent:
-    max: 1
-    name: copilot
-    allowed: [copilot]
-    target: "*"
+    title-prefix: "[campaign]"
+    assignees: copilot
 project: https://github.com/orgs/githubnext/projects/144
 ---
 
@@ -84,13 +81,25 @@ For each discovered item (up to 100 total per run):
 
 ### Step 4: Create parent issue and assign work
 
-After updating project items, you must complete **all three actions below in order**:
+After updating project items, **first complete the bundling analysis below, then immediately perform the safe-output calls below in sequence**. Do not proceed to Step 5 until the calls are complete.
 
-1. **Create the parent tracking issue** 
-2. **Add the issue to the project board**
-3. **Assign the issue to the Copilot agent**
+#### Bundling Analysis (Do This First)
 
-**Selection Criteria:**
+Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
+
+#### Required Safe-Output Calls:
+
+After completing the bundling analysis, you must immediately perform these safe-output calls in order:
+
+1. **Call `create_issue`** to create the parent tracking issue
+2. **Call `update_project`** to add the created issue to the project board  
+
+The created issue will be assigned to Copilot automatically via `safe-outputs.create-issue.assignees`.
+
+#### Bundling Guidelines
+
+Analyze all discovered PRs following these rules:
+
 1. Review all discovered PRs
 2. Group by **runtime** (Node.js, Python, etc.) and **target dependency file**
 3. Select up to **3 bundles** total following the bundling rules below
@@ -110,30 +119,30 @@ After updating project items, you must complete **all three actions below in ord
 - Enforce **one runtime + one target file per PR**.
 - All PRs must pass **CI and relevant runtime tests** before merge.
 
-**Action 1: Create the parent issue**
+#### Safe-Output Call: Create Bundle Issues
 
-Create a single issue that contains:
-- The bundling rules (copied below)
-- The proposed bundles (grouped by runtime + target manifest)
-- A checklist of the PRs to bundle, one checkbox per PR
+Create **one issue per planned bundle** (up to 3 total). Each issue should correspond to exactly **one runtime + one manifest file**.
 
-Use the `create_issue` tool:
+For each bundle, call `create_issue`:
 
 ```
-create_issue(title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)", body="<paste body from template below>")
+create_issue(
+  title="[campaign] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
+  body="<use template below>"
+)
 ```
 
-After calling `create_issue`, **store the returned issue number** - you will need it for actions 2 and 3.
+**IMPORTANT**: After each `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use each temporary ID in the corresponding project update.
 
-**Action 2: Add the issue to the project board**
+#### Safe-Output Call: Add Each Bundle Issue to Project Board
 
-Immediately after creating the issue, add it to the project board using `update_project`. Use the issue number from action 1:
+For **each** issue you created above, **immediately** call `update_project`:
 
 ```
 update_project(
   project="https://github.com/orgs/githubnext/projects/144",
   content_type="issue",
-  content_number=<new_issue_number>,
+  content_number="<temporary_id_from_create_issue>",
   fields={
     "campaign_id": "security-alert-burndown",
     "status": "Todo",
@@ -146,21 +155,18 @@ update_project(
 )
 ```
 
-**Action 3: Assign the issue to the agent**
-
-Finally, assign the issue to the Copilot agent using `assign_to_agent`. Use the issue number from action 1:
-
-```
-assign_to_agent(issue_number=<new_issue_number>, name="copilot")
-```
-
-**CRITICAL**: You must call all three tools (create_issue, update_project, assign_to_agent) in sequence to complete this step. Do not skip any of them.
+**Example**: If a bundle `create_issue` returned `aw_sec2026012901`, then call:
+- `update_project(..., content_number="aw_sec2026012901", ...)`
 
 
-**Issue Body Template:**
+**Issue Body Template (one bundle per issue):**
 ```markdown
 ## Context
-This issue tracks Dependabot PR bundling work discovered by the Security Alert Burndown campaign.
+This issue tracks one Dependabot PR bundle discovered by the Security Alert Burndown campaign.
+
+## Bundle
+- Runtime: [runtime]
+- Manifest: [manifest file]
 
 ## Bundling Rules
 - Group work by runtime. Never mix runtimes.
@@ -168,20 +174,13 @@ This issue tracks Dependabot PR bundling work discovered by the Security Alert B
 - Patch/minor updates may be bundled; major updates should be isolated unless tightly coupled.
 - Bundled releases must include a research report (packages, versions, breaking changes, migration, risk, tests).
 
-## Planned Bundles
-
-### [runtime] — [manifest file]
-PRs:
+## PRs in Bundle
 - [ ] #123 - [title] ([old] → [new])
 - [ ] #456 - [title] ([old] → [new])
 
-### [runtime] — [manifest file]
-PRs:
-- [ ] #789 - [title] ([old] → [new])
-
 ## Agent Task
-1. For each bundle section above, research each update for breaking changes and summarize risks.
-2. Bundle PRs per section into a single PR (one runtime + one manifest).
+1. Research each update for breaking changes and summarize risks.
+2. Create a single bundled PR (one runtime + one manifest).
 3. Ensure CI passes; run relevant runtime tests.
 4. Add the research report to the bundled PR.
 5. Update this issue checklist as PRs are merged.
@@ -189,7 +188,7 @@ PRs:
 
 ### Step 5: Report
 
-Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the parent tracking issue number that was created and assigned.
+Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the bundle issue numbers that were created and assigned.
 
 ## Important
 

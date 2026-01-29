@@ -610,6 +610,6 @@ on:
 
 ## See Also
 
-- [Campaign Files Architecture](../specs/campaigns-files.md)
+- [Campaign Files Architecture](../scratchpad/campaigns-files.md)
 - [Campaign Examples](./src/content/docs/examples/campaigns.md)
 - [Safe Outputs Documentation](./src/content/docs/reference/safe-outputs.md)

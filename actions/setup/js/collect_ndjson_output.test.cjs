@@ -1179,7 +1179,7 @@ describe("collect_ndjson_output.cjs", () => {
           (fs.mkdirSync("/opt/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
-          expect(parsedOutput.items[0].body).toBe("Use https://github.com/repo for code, avoid (redacted) and (redacted) but z3 -v:10 should work");
+          expect(parsedOutput.items[0].body).toBe("Use https://github.com/repo for code, avoid (example.com/redacted) and (example.com/redacted) but z3 -v:10 should work");
         }),
         it("should handle mixed protocols and command flags in complex text", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1191,7 +1191,7 @@ describe("collect_ndjson_output.cjs", () => {
           (fs.mkdirSync("/opt/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
-          expect(parsedOutput.items[0].body).toBe("Install from https://github.com/z3prover/z3, then run: z3 -v:10 -memory:high -timeout:30000. Avoid (redacted) or (redacted)");
+          expect(parsedOutput.items[0].body).toBe("Install from https://github.com/z3prover/z3, then run: z3 -v:10 -memory:high -timeout:30000. Avoid (git.example.com/redacted) or (localhost/redacted)");
         }),
         it("should preserve allowed domains while redacting unknown ones", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1202,7 +1202,7 @@ describe("collect_ndjson_output.cjs", () => {
           (fs.mkdirSync("/opt/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
-          expect(parsedOutput.items[0].body).toBe("GitHub URLs: https://github.com/repo, https://api.github.com/users, https://githubusercontent.com/file. External: (redacted)");
+          expect(parsedOutput.items[0].body).toBe("GitHub URLs: https://github.com/repo, https://api.github.com/users, https://githubusercontent.com/file. External: (example.com/redacted)");
         }),
         it("should handle @mentions neutralization", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1250,7 +1250,7 @@ describe("collect_ndjson_output.cjs", () => {
           (fs.mkdirSync("/opt/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items[0].body).toBe("Allowed: https://example.com/page, https://sub.example.com/file, https://test.org/doc. Blocked: (redacted), (redacted)"),
+          (expect(parsedOutput.items[0].body).toBe("Allowed: https://example.com/page, https://sub.example.com/file, https://test.org/doc. Blocked: (github.com/redacted), (blocked.com/redacted)"),
             delete process.env.GH_AW_ALLOWED_DOMAINS,
             originalServerUrl && (process.env.GITHUB_SERVER_URL = originalServerUrl),
             originalApiUrl && (process.env.GITHUB_API_URL = originalApiUrl));
@@ -1314,7 +1314,7 @@ describe("collect_ndjson_output.cjs", () => {
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
           (expect(parsedOutput.items[0].title).toBe("PR with z3 -v:10 flag"),
-            expect(parsedOutput.items[0].body).toBe("Testing https://github.com/repo and (redacted)"),
+            expect(parsedOutput.items[0].body).toBe("Testing https://github.com/repo and (example.com/redacted)"),
             expect(parsedOutput.items[0].branch).toBe("feature/z3-timeout:5000"),
             expect(parsedOutput.items[0].labels).toEqual(["bug", "z3:solver"]));
         }),

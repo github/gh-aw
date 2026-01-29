@@ -1073,11 +1073,11 @@ Use this checklist when developing a new command:
 
 ## Related Documentation
 
-- **Testing Framework**: See `specs/testing.md` for comprehensive testing guidelines
+- **Testing Framework**: See `scratchpad/testing.md` for comprehensive testing guidelines
 - **Console Rendering**: See `skills/console-rendering/SKILL.md` for console output details
 - **Error Messages**: See `skills/error-messages/SKILL.md` for error message style guide
-- **Code Organization**: See `specs/code-organization.md` for file organization patterns
-- **Breaking Changes**: See `specs/breaking-cli-rules.md` for breaking change guidelines
+- **Code Organization**: See `scratchpad/code-organization.md` for file organization patterns
+- **Breaking Changes**: See `scratchpad/breaking-cli-rules.md` for breaking change guidelines
 
 ---
 

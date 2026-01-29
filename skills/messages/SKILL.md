@@ -253,7 +253,7 @@ const message = getMyNewMessage({
 
 ## Step 10: Update Documentation
 
-Update `specs/safe-output-messages.md`:
+Update `scratchpad/safe-output-messages.md`:
 1. Add the new message to the "Message Categories" section
 2. Document placeholders and usage
 3. Add examples
@@ -279,7 +279,7 @@ Before committing:
 - [ ] Go embed directive added in `js.go`
 - [ ] Added to `GetJavaScriptSources()` map
 - [ ] Consumer scripts updated to use minimal imports
-- [ ] Documentation updated in `specs/safe-output-messages.md`
+- [ ] Documentation updated in `scratchpad/safe-output-messages.md`
 - [ ] Tests pass: `make test-js`
 - [ ] Build succeeds: `make build`
 - [ ] Linting passes: `make lint`
@@ -296,7 +296,7 @@ Before committing:
 | `pkg/workflow/js/messages_core.cjs` | Core utilities | Update typedef |
 | `pkg/workflow/js/messages.cjs` | Barrel file | Add re-export |
 | `pkg/workflow/js.go` | Go embeddings | Add embed directive |
-| `specs/safe-output-messages.md` | Documentation | Document new message |
+| `scratchpad/safe-output-messages.md` | Documentation | Document new message |
 
 ## Example: Adding `close-older-discussion` Message
 

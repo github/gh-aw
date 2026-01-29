@@ -42,11 +42,11 @@ You are a regulatory analyst that monitors and cross-checks the outputs of other
 
 Review all daily report discussions from the last 24 hours and:
 1. Extract key metrics and statistics from each daily report
-2. Cross-check numbers across different reports for consistency (using specs/metrics-glossary.md for definitions)
+2. Cross-check numbers across different reports for consistency (using scratchpad/metrics-glossary.md for definitions)
 3. Identify potential issues, anomalies, or concerning trends
 4. Generate a regulatory report summarizing findings and flagging issues
 
-**Important**: Use the metrics glossary at specs/metrics-glossary.md to understand metric definitions and scopes before flagging discrepancies.
+**Important**: Use the metrics glossary at scratchpad/metrics-glossary.md to understand metric definitions and scopes before flagging discrepancies.
 
 ## Report Formatting Guidelines
 
@@ -190,7 +190,7 @@ For each identified daily report, extract key metrics:
 
 ### 2.1 Common Metrics to Extract
 
-See specs/metrics-glossary.md for standardized metric definitions and scopes.
+See scratchpad/metrics-glossary.md for standardized metric definitions and scopes.
 
 **Issues-related metrics:**
 - Total issues analyzed (`total_issues` - may differ by report scope)
@@ -254,7 +254,7 @@ For each report, verify:
 
 ### 3.2 Cross-Report Consistency Checks
 
-Compare metrics across different reports using standardized names from specs/metrics-glossary.md:
+Compare metrics across different reports using standardized names from scratchpad/metrics-glossary.md:
 
 **Before flagging discrepancies:**
 1. **Check metric scopes** - Review the glossary to understand if metrics have different scopes
@@ -273,7 +273,7 @@ Compare metrics across different reports using standardized names from specs/met
 
 ### 3.3 Anomaly Detection
 
-Flag potential issues (referencing specs/metrics-glossary.md for expected scopes):
+Flag potential issues (referencing scratchpad/metrics-glossary.md for expected scopes):
 - **Large discrepancies**: Numbers differ by more than 10% across reports **for metrics with identical scopes**
 - **Scope mismatches**: Document when metrics have intentionally different scopes (e.g., `issues_analyzed`)
 - **Unexpected zeros**: Zero counts where there should be activity
@@ -284,7 +284,7 @@ Flag potential issues (referencing specs/metrics-glossary.md for expected scopes
 **Example validation logic:**
 ```bash
 # When comparing open_issues across reports, check if they're within tolerance
-# This metric has the same scope across all reports (see specs/metrics-glossary.md)
+# This metric has the same scope across all reports (see scratchpad/metrics-glossary.md)
 issues_report_open=150
 arborist_report_open=148
 tolerance=10  # 10% tolerance
@@ -296,8 +296,8 @@ if [ $diff -gt $tolerance ]; then
 fi
 
 # However, issues_analyzed should NOT be compared as they have different scopes:
-# - Daily Issues Report: 1000 issues (see specs/metrics-glossary.md)
-# - Issue Arborist: 100 open issues without parent (see specs/metrics-glossary.md)
+# - Daily Issues Report: 1000 issues (see scratchpad/metrics-glossary.md)
+# - Issue Arborist: 100 open issues without parent (see scratchpad/metrics-glossary.md)
 # These are intentionally different and should be documented, not flagged as errors
 ```
 
@@ -332,7 +332,7 @@ Brief 2-3 paragraph executive summary highlighting:
 
 ### Cross-Report Metrics Comparison
 
-Reference specs/metrics-glossary.md for metric definitions and scopes.
+Reference scratchpad/metrics-glossary.md for metric definitions and scopes.
 
 | Metric | Issues Report | Performance Report | Chronicle | Scope Match | Status |
 |--------|---------------|-------------------|-----------|-------------|--------|
@@ -358,7 +358,7 @@ Reference specs/metrics-glossary.md for metric definitions and scopes.
 
 1. **[Issue Title]**
    - **Affected Reports**: [List of reports]
-   - **Metric**: [Metric name from specs/metrics-glossary.md]
+   - **Metric**: [Metric name from scratchpad/metrics-glossary.md]
    - **Description**: [What was found]
    - **Expected**: [What was expected]
    - **Actual**: [What was found]
@@ -443,7 +443,7 @@ Reference specs/metrics-glossary.md for metric definitions and scopes.
 ---
 *Report generated automatically by the Daily Regulatory workflow*
 *Data sources: Daily report discussions from ${{ github.repository }}*
-*Metric definitions: specs/metrics-glossary.md*
+*Metric definitions: scratchpad/metrics-glossary.md*
 ```
 
 ## Phase 5: Close Previous Reports

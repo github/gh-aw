@@ -9,7 +9,7 @@ sidebar:
 
 **Version**: 1.0.0  
 **Status**: Draft  
-**Latest Version**: [github-mcp-access-control-specification](/gh-aw/specs/github-mcp-access-control-specification/)  
+**Latest Version**: [github-mcp-access-control-specification](/gh-aw/scratchpad/github-mcp-access-control-specification/)  
 **JSON Schema**: [mcp-gateway-config.schema.json](/gh-aw/schemas/mcp-gateway-config.schema.json)  
 **Editors**: GitHub Agentic Workflows Team
 
@@ -1989,7 +1989,7 @@ GitHub API rate limits apply to:
 
 - **[Safe Inputs Spec]** Safe Inputs Specification, GitHub Agentic Workflows. [/gh-aw/reference/safe-inputs-specification/](/gh-aw/reference/safe-inputs-specification/)
 
-- **[Safe Outputs Spec]** Safe Outputs System Specification, GitHub Agentic Workflows. [/gh-aw/specs/safe-outputs-specification/](/gh-aw/specs/safe-outputs-specification/)
+- **[Safe Outputs Spec]** Safe Outputs System Specification, GitHub Agentic Workflows. [/gh-aw/scratchpad/safe-outputs-specification/](/gh-aw/scratchpad/safe-outputs-specification/)
 
 - **[GitHub MCP Server]** GitHub MCP Server Documentation. [/gh-aw/skills/github-mcp-server/](/gh-aw/skills/github-mcp-server/)
 

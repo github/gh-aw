@@ -5,6 +5,8 @@ sidebar:
   badge: { text: 'Recommended', variant: 'success' }
 ---
 
+import { FileTree } from '@astrojs/starlight/components';
+
 > [!TIP]
 > Recommended for Beginners
 > **SideRepoOps is the easiest way to get started with reporting agents.** It requires minimal setup, keeps your main repository clean, and lets you experiment safely without affecting production code. Perfect for trying out agentic workflows before integrating them directly into your main repository.
@@ -350,19 +352,19 @@ Create a PR with suggested improvements.
 
 **Repository Organization**:
 
-```text
-side-repo/
-├── .github/
-│   └── workflows/
-│       ├── triage-main.md           # Scheduled triage
-│       ├── quality-check.md         # Code quality monitoring
-│       ├── doc-sync.md              # Documentation sync
-│       └── manual-task.md           # Manual dispatch tasks
-├── docs/
-│   ├── README.md                    # Side repo documentation
-│   └── workflow-guide.md            # How to use workflows
-└── .env.example                     # Required secrets documentation
-```
+<FileTree>
+- side-repo/
+  - .github/
+    - workflows/
+      - triage-main.md Scheduled triage
+      - quality-check.md Code quality monitoring
+      - doc-sync.md Documentation sync
+      - manual-task.md Manual dispatch tasks
+  - docs/
+    - README.md Side repo documentation
+    - workflow-guide.md How to use workflows
+  - .env.example Required secrets documentation
+</FileTree>
 
 ## Troubleshooting
 

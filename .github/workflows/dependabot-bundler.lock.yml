@@ -36,7 +36,7 @@ run-name: "Dependabot Bundler"
 jobs:
   activation:
     needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
+    if: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
     runs-on: ubuntu-slim
     permissions:
       contents: read

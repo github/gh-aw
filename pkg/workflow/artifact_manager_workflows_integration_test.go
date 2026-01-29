@@ -100,7 +100,7 @@ func TestGenerateArtifactsReference(t *testing.T) {
 	// Generate the markdown reference document
 	markdown := generateArtifactsMarkdown(workflowArtifacts, artifactsByJob)
 
-	// Write to specs/artifacts.md
+	// Write to scratchpad/artifacts.md
 	specsDir := filepath.Join("..", "..", "specs")
 	err = os.MkdirAll(specsDir, 0755)
 	require.NoError(t, err, "Failed to create specs directory")

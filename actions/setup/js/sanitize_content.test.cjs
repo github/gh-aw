@@ -362,9 +362,9 @@ describe("sanitize_content.cjs", () => {
       expect(result).toBe("Visit https://github.com");
     });
 
-    it("should redact HTTP URLs", () => {
+    it("should redact HTTP URLs with sanitized domain", () => {
       const result = sanitizeContent("Visit http://example.com");
-      expect(result).toContain("(redacted)");
+      expect(result).toContain("(example.com/redacted)");
       expect(mockCore.info).toHaveBeenCalled();
     });
 
@@ -399,9 +399,9 @@ describe("sanitize_content.cjs", () => {
       });
     });
 
-    it("should redact disallowed domains", () => {
+    it("should redact disallowed domains with sanitized domain", () => {
       const result = sanitizeContent("Visit https://evil.com/malicious");
-      expect(result).toContain("(redacted)");
+      expect(result).toContain("(evil.com/redacted)");
       expect(mockCore.info).toHaveBeenCalled();
     });
 
@@ -443,7 +443,7 @@ describe("sanitize_content.cjs", () => {
     it("should redact domains not matching wildcard pattern", () => {
       process.env.GH_AW_ALLOWED_DOMAINS = "*.example.com";
       const result = sanitizeContent("Visit https://evil.com/malicious");
-      expect(result).toContain("(redacted)");
+      expect(result).toContain("(evil.com/redacted)");
     });
 
     it("should support mixed wildcard and plain domains", () => {
@@ -455,13 +455,128 @@ describe("sanitize_content.cjs", () => {
     it("should redact domains with wildcards that don't match pattern", () => {
       process.env.GH_AW_ALLOWED_DOMAINS = "*.github.com";
       const result = sanitizeContent("Visit https://github.io/page");
-      expect(result).toContain("(redacted)");
+      expect(result).toContain("(github.io/redacted)");
     });
 
     it("should handle multiple levels of subdomains with wildcard", () => {
       process.env.GH_AW_ALLOWED_DOMAINS = "*.example.com";
       const result = sanitizeContent("Visit https://deep.nested.example.com/page");
       expect(result).toBe("Visit https://deep.nested.example.com/page");
+    });
+  });
+
+  describe("domain sanitization", () => {
+    let sanitizeDomainName;
+
+    beforeEach(async () => {
+      const module = await import("./sanitize_content_core.cjs");
+      sanitizeDomainName = module.sanitizeDomainName;
+    });
+
+    it("should keep domains with 3 or fewer parts unchanged", () => {
+      expect(sanitizeDomainName("example.com")).toBe("example.com");
+      expect(sanitizeDomainName("sub.example.com")).toBe("sub.example.com");
+      // deep.sub.example.com has 4 parts, so it should be truncated
+      expect(sanitizeDomainName("a.b.c")).toBe("a.b.c");
+    });
+
+    it("should truncate domains with more than 3 parts", () => {
+      expect(sanitizeDomainName("a.b.c.d.com")).toBe("a.b.c...");
+      expect(sanitizeDomainName("one.two.three.four.five.com")).toBe("one.two.three...");
+    });
+
+    it("should remove non-alphanumeric characters from each part", () => {
+      expect(sanitizeDomainName("ex@mple.com")).toBe("exmple.com");
+      expect(sanitizeDomainName("my-domain.co.uk")).toBe("mydomain.co.uk");
+      expect(sanitizeDomainName("test_site.com")).toBe("testsite.com");
+    });
+
+    it("should handle empty parts after sanitization", () => {
+      expect(sanitizeDomainName("...example.com")).toBe("example.com");
+      expect(sanitizeDomainName("test..com")).toBe("test.com");
+      expect(sanitizeDomainName("a.-.-.b.com")).toBe("a.b.com");
+    });
+
+    it("should handle domains with ports", () => {
+      expect(sanitizeDomainName("example.com:8080")).toBe("example.com8080");
+    });
+
+    it("should handle complex special characters", () => {
+      expect(sanitizeDomainName("ex!@#$ample.c%^&*om")).toBe("example.com");
+      expect(sanitizeDomainName("test.ex@mple.co-uk")).toBe("test.exmple.couk");
+    });
+
+    it("should handle null and undefined inputs", () => {
+      expect(sanitizeDomainName(null)).toBe("");
+      expect(sanitizeDomainName(undefined)).toBe("");
+    });
+
+    it("should handle empty string", () => {
+      expect(sanitizeDomainName("")).toBe("");
+    });
+
+    it("should handle non-string inputs", () => {
+      expect(sanitizeDomainName(123)).toBe("");
+      expect(sanitizeDomainName({})).toBe("");
+    });
+
+    it("should handle domains that become empty after sanitization", () => {
+      expect(sanitizeDomainName("...")).toBe("");
+      expect(sanitizeDomainName("@#$")).toBe("");
+    });
+
+    it("should truncate with ... for 4+ parts after sanitization", () => {
+      expect(sanitizeDomainName("alpha.beta.gamma.delta.epsilon.com")).toBe("alpha.beta.gamma...");
+    });
+
+    it("should handle mixed case domains", () => {
+      expect(sanitizeDomainName("Example.COM")).toBe("Example.COM");
+      expect(sanitizeDomainName("Sub.Example.Com")).toBe("Sub.Example.Com");
+    });
+
+    it("should handle unicode characters", () => {
+      expect(sanitizeDomainName("tëst.com")).toBe("tst.com");
+      expect(sanitizeDomainName("例え.com")).toBe("com");
+    });
+
+    it("should apply sanitization in actual URL redaction for HTTP", () => {
+      const result = sanitizeContent("Visit http://sub.example.malicious.com/path");
+      expect(result).toContain("(sub.example.malicious.../redacted)");
+    });
+
+    it("should apply sanitization in actual URL redaction for HTTPS", () => {
+      const result = sanitizeContent("Visit https://very.deep.nested.subdomain.evil.com/path");
+      expect(result).toContain("(very.deep.nested.../redacted)");
+    });
+
+    it("should handle domains with special characters in URL context", () => {
+      // The regex captures domain up to first special character like @
+      // So http://ex@mple-domain.co_uk.net captures only "ex" as domain
+      const result = sanitizeContent("Visit http://ex@mple-domain.co_uk.net/path");
+      expect(result).toContain("(ex/redacted)");
+    });
+
+    it("should preserve simple domain structure", () => {
+      const result = sanitizeContent("Visit http://test.com/path");
+      expect(result).toContain("(test.com/redacted)");
+    });
+
+    it("should handle subdomain with 3 parts correctly", () => {
+      // api.v2.example.com has 4 parts, so it will be truncated
+      const result = sanitizeContent("Visit http://api.v2.example.com/endpoint");
+      expect(result).toContain("(api.v2.example.../redacted)");
+    });
+
+    it("should handle 5+ part domains", () => {
+      expect(sanitizeDomainName("a.b.c.d.e.f.com")).toBe("a.b.c...");
+    });
+
+    it("should handle domains starting with numbers", () => {
+      expect(sanitizeDomainName("123.456.example.com")).toBe("123.456.example...");
+    });
+
+    it("should handle single part domain", () => {
+      expect(sanitizeDomainName("localhost")).toBe("localhost");
     });
   });
 

@@ -71,7 +71,7 @@
 //   - Standardizing naming conventions (dashes to underscores)
 //   - Input is already valid but needs format conversion
 //
-// See specs/string-sanitization-normalization.md for detailed guidance.
+// See scratchpad/string-sanitization-normalization.md for detailed guidance.
 
 package workflow
 

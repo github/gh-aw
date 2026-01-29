@@ -319,7 +319,7 @@ func TestEngineCapabilityVariety(t *testing.T) {
 		assert.True(t, claude.SupportsWebFetch())
 		assert.True(t, claude.SupportsWebSearch())
 		assert.True(t, claude.SupportsFirewall())
-		assert.True(t, claude.IsExperimental())
+		assert.False(t, claude.IsExperimental())
 	})
 
 	t.Run("codex capabilities", func(t *testing.T) {
@@ -329,7 +329,7 @@ func TestEngineCapabilityVariety(t *testing.T) {
 		assert.False(t, codex.SupportsWebFetch())
 		assert.True(t, codex.SupportsWebSearch())
 		assert.True(t, codex.SupportsFirewall())
-		assert.True(t, codex.IsExperimental())
+		assert.False(t, codex.IsExperimental())
 	})
 
 	t.Run("custom capabilities", func(t *testing.T) {

@@ -50,7 +50,8 @@ jobs:
       - check_external_user
       - pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'workflow_dispatch') || (needs.check_external_user.outputs.should_skip != 'true'))
+      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
+      ((github.event_name == 'workflow_dispatch') || (needs.check_external_user.outputs.should_skip != 'true'))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1062,6 +1063,8 @@ jobs:
             await main();
 
   pre_activation:
+    if: >
+      ((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')
     runs-on: ubuntu-slim
     permissions:
       contents: read

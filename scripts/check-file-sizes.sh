@@ -74,13 +74,13 @@ else
     echo "Files exceeding ${WARN_THRESHOLD} functions should be evaluated for splitting."
     echo "However, domain complexity may justify larger files."
     echo ""
-    echo "See specs/code-organization.md for file size guidelines and justified large files."
+    echo "See scratchpad/code-organization.md for file size guidelines and justified large files."
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Note: This is an informational check only. Large files may be justified"
-echo "by domain complexity. See specs/code-organization.md for guidelines."
+echo "by domain complexity. See scratchpad/code-organization.md for guidelines."
 
 # Always exit 0 (non-blocking)
 exit 0

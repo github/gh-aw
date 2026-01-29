@@ -38,7 +38,7 @@ run-name: "Breaking Change Checker"
 jobs:
   activation:
     needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
+    if: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -563,7 +563,7 @@ jobs:
           First, read and understand the breaking change rules defined in the spec:
           
           ```bash
-          cat __GH_AW_GITHUB_WORKSPACE__/specs/breaking-cli-rules.md
+          cat __GH_AW_GITHUB_WORKSPACE__/scratchpad/breaking-cli-rules.md
           ```
           
           Key breaking change categories:
@@ -685,14 +685,14 @@ jobs:
           Complete the following items to address these breaking changes:
           
           - [ ] **Review all breaking changes detected** - Verify each change is correctly categorized
-          - [ ] **Create a changeset file in `.changeset/` directory** - Create a file like `major-breaking-change-description.md` with the change details. Specify the semver bump type (`major`, `minor`, or `patch`) in the YAML frontmatter of the changeset file. The release script determines the overall version bump by selecting the highest-priority bump type across all changesets. See [specs/changesets.md](specs/changesets.md) for format details.
+          - [ ] **Create a changeset file in `.changeset/` directory** - Create a file like `major-breaking-change-description.md` with the change details. Specify the semver bump type (`major`, `minor`, or `patch`) in the YAML frontmatter of the changeset file. The release script determines the overall version bump by selecting the highest-priority bump type across all changesets. See [scratchpad/changesets.md](scratchpad/changesets.md) for format details.
           - [ ] **Add migration guidance to changeset** - Include clear migration instructions in the changeset file showing users how to update their workflows
           - [ ] **Document breaking changes in CHANGELOG.md** - Add entries under "Breaking Changes" section with user-facing descriptions
           - [ ] **Verify backward compatibility was considered** - Confirm that alternatives to breaking were evaluated
           
           ### Reference
           
-          See [specs/breaking-cli-rules.md](specs/breaking-cli-rules.md) for the complete breaking change policy.
+          See [scratchpad/breaking-cli-rules.md](scratchpad/breaking-cli-rules.md) for the complete breaking change policy.
           
           ---
           
@@ -1287,11 +1287,24 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_ASSIGN_COPILOT: "true"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
+            await main();
+      - name: Assign copilot to created issues
+        if: steps.process_safe_outputs.outputs.issues_to_assign_copilot != ''
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          GH_AW_ISSUES_TO_ASSIGN_COPILOT: ${{ steps.process_safe_outputs.outputs.issues_to_assign_copilot }}
+        with:
+          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/assign_copilot_to_created_issues.cjs');
             await main();
 

@@ -45,7 +45,7 @@ Analyze codebase daily: compute size, quality, health metrics. Track 7/30-day tr
 
 ## Metrics to Collect
 
-All metrics use standardized names from specs/metrics-glossary.md:
+All metrics use standardized names from scratchpad/metrics-glossary.md:
 
 **Size**: LOC by language (`lines_of_code_total`), by directory (cmd, pkg, docs, workflows), file counts/distribution
 

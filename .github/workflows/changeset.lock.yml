@@ -49,10 +49,10 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && (((github.event.pull_request.base.ref == github.event.repository.default_branch) &&
-      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id))) &&
-      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'changeset' ||
-      github.event.label.name == 'smoke'))))
+      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
+      (((github.event.pull_request.base.ref == github.event.repository.default_branch) && ((github.event_name != 'pull_request') ||
+      (github.event.pull_request.head.repo.id == github.repository_id))) && ((github.event_name != 'pull_request') ||
+      ((github.event.action != 'labeled') || (github.event.label.name == 'changeset' || github.event.label.name == 'smoke'))))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -553,7 +553,7 @@ jobs:
               version: "",
               agent_version: "0.92.0",
               workflow_name: "Changeset Generator",
-              experimental: true,
+              experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,
@@ -1305,9 +1305,10 @@ jobs:
 
   pre_activation:
     if: >
-      ((github.event.pull_request.base.ref == github.event.repository.default_branch) && ((github.event_name != 'pull_request') ||
+      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
+      (((github.event.pull_request.base.ref == github.event.repository.default_branch) && ((github.event_name != 'pull_request') ||
       (github.event.pull_request.head.repo.id == github.repository_id))) && ((github.event_name != 'pull_request') ||
-      ((github.event.action != 'labeled') || (github.event.label.name == 'changeset' || github.event.label.name == 'smoke')))
+      ((github.event.action != 'labeled') || (github.event.label.name == 'changeset' || github.event.label.name == 'smoke'))))
     runs-on: ubuntu-slim
     permissions:
       contents: read

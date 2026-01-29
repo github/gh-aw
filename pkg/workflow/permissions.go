@@ -2,7 +2,11 @@ package workflow
 
 import (
 	"strings"
+
+	"github.com/githubnext/gh-aw/pkg/logger"
 )
+
+var permissionsLog = logger.New("workflow:permissions")
 
 // convertStringToPermissionScope converts a string key to a PermissionScope
 func convertStringToPermissionScope(key string) PermissionScope {
@@ -60,6 +64,7 @@ func ContainsCheckout(customSteps string) bool {
 	lowerSteps := strings.ToLower(customSteps)
 	for _, pattern := range checkoutPatterns {
 		if strings.Contains(lowerSteps, strings.ToLower(pattern)) {
+			permissionsLog.Print("Detected actions/checkout in custom steps")
 			return true
 		}
 	}

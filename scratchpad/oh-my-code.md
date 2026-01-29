@@ -1669,8 +1669,8 @@ The future likely involves both approaches: developers using AI agents locally f
 - **Discord**: #continuous-ai in GitHub Next Discord
 
 ### Related Comparisons
-- **mdflow Comparison**: specs/mdflow-comparison.md
-- **Gastown Concepts**: specs/gastown.md
+- **mdflow Comparison**: scratchpad/mdflow-comparison.md
+- **Gastown Concepts**: scratchpad/gastown.md
 - **GitHub Actions Security**: https://docs.github.com/en/actions/reference/security/secure-use
 
 ---

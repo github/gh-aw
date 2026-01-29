@@ -17,7 +17,7 @@ The terminology for starting an agent is changing from "New Agent Task" to "New 
 1. **Code**: Go source files with types, variables, functions
 2. **JavaScript**: CommonJS action files
 3. **Schema**: JSON schema definitions
-4. **Documentation**: Markdown files in docs/ and specs/
+4. **Documentation**: Markdown files in docs/ and scratchpad/
 5. **Skills**: Skill documentation
 6. **Codemods**: Migration scripts for user workflows
 7. **Tests**: Test files and fixtures
@@ -74,11 +74,11 @@ The terminology for starting an agent is changing from "New Agent Task" to "New 
 - `install.md` - Installation guide
 
 **Specs Files**:
-- `specs/code-organization.md` - Code organization patterns
-- `specs/layout.md` - Layout documentation
-- `specs/safe-output-environment-variables.md` - Environment variables
-- `specs/security_review.md` - Security review
-- `specs/template-injection-prevention.md` - Security patterns
+- `scratchpad/code-organization.md` - Code organization patterns
+- `scratchpad/layout.md` - Layout documentation
+- `scratchpad/safe-output-environment-variables.md` - Environment variables
+- `scratchpad/security_review.md` - Security review
+- `scratchpad/template-injection-prevention.md` - Security patterns
 
 **Test Workflows**:
 - `pkg/cli/workflows/test-copilot-create-agent-session.md` - Test workflow
@@ -211,7 +211,7 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
    - `CHANGELOG.md`
 
 5. **Update Specs**
-   - All files in `specs/` directory
+   - All files in `scratchpad/` directory
 
 ### Phase 5: Test Migration
 
@@ -347,11 +347,11 @@ During transition period:
   - [ ] `CHANGELOG.md` - Add migration entry
   
 - [ ] Update Specs
-  - [ ] `specs/code-organization.md`
-  - [ ] `specs/layout.md`
-  - [ ] `specs/safe-output-environment-variables.md`
-  - [ ] `specs/security_review.md`
-  - [ ] `specs/template-injection-prevention.md`
+  - [ ] `scratchpad/code-organization.md`
+  - [ ] `scratchpad/layout.md`
+  - [ ] `scratchpad/safe-output-environment-variables.md`
+  - [ ] `scratchpad/security_review.md`
+  - [ ] `scratchpad/template-injection-prevention.md`
   
 - [ ] Update Templates
   - [ ] `pkg/cli/templates/github-agentic-workflows.md`

@@ -42,8 +42,8 @@
 //   - It provides security-focused compile-time checks
 //
 // For general validation, see validation.go.
-// For detailed documentation, see specs/validation-architecture.md and
-// specs/template-injection-prevention.md
+// For detailed documentation, see scratchpad/validation-architecture.md and
+// scratchpad/template-injection-prevention.md
 
 package workflow
 
@@ -270,7 +270,7 @@ func formatTemplateInjectionError(violations []TemplateInjectionViolation) error
 	builder.WriteString("References:\n")
 	builder.WriteString("  - https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions\n")
 	builder.WriteString("  - https://docs.zizmor.sh/audits/#template-injection\n")
-	builder.WriteString("  - specs/template-injection-prevention.md\n")
+	builder.WriteString("  - scratchpad/template-injection-prevention.md\n")
 
 	return fmt.Errorf("%s", builder.String())
 }

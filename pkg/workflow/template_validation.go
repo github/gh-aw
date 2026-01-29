@@ -25,7 +25,7 @@
 //   - It ensures template compatibility with other features
 //
 // For general validation, see validation.go.
-// For detailed documentation, see specs/validation-architecture.md
+// For detailed documentation, see scratchpad/validation-architecture.md
 
 package workflow
 

@@ -1,6 +1,6 @@
 ---
 name: Layout Specification Maintainer
-description: Maintains specs/layout.md with patterns of file paths, folder names, and artifact names used in lock.yml files
+description: Maintains scratchpad/layout.md with patterns of file paths, folder names, and artifact names used in lock.yml files
 on:
   schedule:
     # Daily at 7am UTC on weekdays only
@@ -48,8 +48,8 @@ tools:
     - "grep -r '.*' pkg/workflow/js/"
     - "grep -r '.*' pkg/workflow/*.go"
     - "git status"
-    - "git diff specs/layout.md"
-    - "cat specs/layout.md"
+    - "git diff scratchpad/layout.md"
+    - "cat scratchpad/layout.md"
 
 timeout-minutes: 20
 
@@ -61,7 +61,7 @@ You are an AI agent that maintains a comprehensive specification file documentin
 
 ## Your Mission
 
-Scan all `.lock.yml` files in `.github/workflows/` and analyze Go and JavaScript source code to extract patterns, then maintain an up-to-date specification document at `specs/layout.md`.
+Scan all `.lock.yml` files in `.github/workflows/` and analyze Go and JavaScript source code to extract patterns, then maintain an up-to-date specification document at `scratchpad/layout.md`.
 
 ## Task Steps
 
@@ -137,7 +137,7 @@ grep -h "path" pkg/workflow/js/*.cjs | grep -E "(const|let|var)" | head -20
 
 ### 4. Generate Markdown Specification
 
-Create or update `specs/layout.md` with a comprehensive table organized by category:
+Create or update `scratchpad/layout.md` with a comprehensive table organized by category:
 
 **Format**:
 
@@ -198,7 +198,7 @@ Common file paths referenced in workflows:
 | .github/aw/ | Agentic workflow configuration | Contains actions-lock.json and other configs |
 | pkg/workflow/ | Workflow compilation code | Go package for compiling workflows |
 | pkg/workflow/js/ | JavaScript runtime code | CommonJS modules for GitHub Actions |
-| specs/ | Specification documents | Documentation and specs directory |
+| scratchpad/ | Specification documents | Documentation and specs directory |
 
 ## Folder Patterns
 
@@ -242,19 +242,19 @@ After generating the specification:
 git status
 ```
 
-Check if `specs/layout.md` was created or modified.
+Check if `scratchpad/layout.md` was created or modified.
 
 If changes detected:
 
 ```bash
-git diff specs/layout.md
+git diff scratchpad/layout.md
 ```
 
 Review the changes to ensure they're accurate.
 
 ### 6. Create Pull Request
 
-If `specs/layout.md` has changes, use the **create-pull-request** safe-output:
+If `scratchpad/layout.md` has changes, use the **create-pull-request** safe-output:
 
 **PR Title**: `[specs] Update layout specification - [DATE]`
 
@@ -262,7 +262,7 @@ If `specs/layout.md` has changes, use the **create-pull-request** safe-output:
 ```markdown
 ## Layout Specification Update
 
-This PR updates `specs/layout.md` with the latest patterns extracted from compiled workflow files.
+This PR updates `scratchpad/layout.md` with the latest patterns extracted from compiled workflow files.
 
 ### What Changed
 
@@ -317,7 +317,7 @@ This helps improve efficiency over time and avoids re-discovering the same patte
 
 ## Success Criteria
 
-- `specs/layout.md` exists and is up-to-date
+- `scratchpad/layout.md` exists and is up-to-date
 - All major patterns are documented
 - Tables are complete and well-formatted
 - PR is created when changes are detected

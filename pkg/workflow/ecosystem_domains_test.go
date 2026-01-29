@@ -171,6 +171,37 @@ func TestEcosystemDomainExpansion(t *testing.T) {
 		}
 	})
 
+	t.Run("java ecosystem includes Java package and tooling domains", func(t *testing.T) {
+		permissions := &NetworkPermissions{
+			Allowed: []string{"java"},
+		}
+		domains := GetAllowedDomains(permissions)
+
+		expectedDomains := []string{
+			"repo.maven.apache.org",
+			"services.gradle.org",
+			"download.oracle.com",
+			"dlcdn.apache.org",
+			"archive.apache.org",
+			"download.java.net",
+			"api.foojay.io",
+			"cdn.azul.com",
+		}
+
+		for _, expectedDomain := range expectedDomains {
+			found := false
+			for _, domain := range domains {
+				if domain == expectedDomain {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Expected domain '%s' to be included in java ecosystem, but it was not found", expectedDomain)
+			}
+		}
+	})
+
 	t.Run("node ecosystem includes Node.js package domains", func(t *testing.T) {
 		permissions := &NetworkPermissions{
 			Allowed: []string{"node"},
@@ -184,6 +215,8 @@ func TestEcosystemDomainExpansion(t *testing.T) {
 			"yarnpkg.com",
 			"bun.sh",
 			"deno.land",
+			"jsr.io",
+			"*.jsr.io",
 		}
 
 		for _, expectedDomain := range expectedDomains {

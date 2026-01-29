@@ -134,9 +134,6 @@ jobs:
           - name: "Workflow Cache"
             packages: "./pkg/workflow"
             pattern: "^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache"
-          - name: "Workflow Actions Pin Validation"
-            packages: "./pkg/workflow"
-            pattern: "^TestActionPinSHAsMatchVersionTags"
           - name: "Workflow Actions & Containers"
             packages: "./pkg/workflow"
             pattern: "^TestAction[^P]|Container"
@@ -169,7 +166,7 @@ jobs:
           - name: "Workflow Misc Part 2"  # Remaining workflow tests
             packages: "./pkg/workflow"
             pattern: ""
-            skip_pattern: "TestCompile|TestWorkflow|TestGenerate|TestParse|TestMCP|TestTool|TestSkill|TestPlaywright|TestFirewall|TestValidat|TestLock|TestError|TestWarning|SafeOutputs|CreatePullRequest|OutputLabel|HasSafeOutputs|GitHub|Git|PushToPullRequest|BuildFromAllowed|Render|Bundle|Script|WritePromptText|^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache|^TestActionPinSHAsMatchVersionTags|^TestAction[^P]|Container|Dependabot|Security|PII|TestPermissions|TestPackageExtractor|TestCollectPackagesFromWorkflow|TestAgent|TestCopilot|TestCustom|TestEngine|TestModel|TestNetwork|TestOpenAI|TestProvider|String|Sanitize|Normalize|Trim|Clean|Format|Runtime|Setup|Install|Download|Version|Binary"
+            skip_pattern: "TestCompile|TestWorkflow|TestGenerate|TestParse|TestMCP|TestTool|TestSkill|TestPlaywright|TestFirewall|TestValidat|TestLock|TestError|TestWarning|SafeOutputs|CreatePullRequest|OutputLabel|HasSafeOutputs|GitHub|Git|PushToPullRequest|BuildFromAllowed|Render|Bundle|Script|WritePromptText|^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache|^TestAction[^P]|Container|Dependabot|Security|PII|TestPermissions|TestPackageExtractor|TestCollectPackagesFromWorkflow|TestAgent|TestCopilot|TestCustom|TestEngine|TestModel|TestNetwork|TestOpenAI|TestProvider|String|Sanitize|Normalize|Trim|Clean|Format|Runtime|Setup|Install|Download|Version|Binary"
     concurrency:
       group: ci-${{ github.ref }}-integration-${{ matrix.test-group.name }}
       cancel-in-progress: true
@@ -218,6 +215,59 @@ jobs:
         with:
           name: test-result-integration-${{ matrix.test-group.name }}
           path: test-result-integration-*.json
+          retention-days: 14
+
+  canary_go:
+    runs-on: ubuntu-latest
+    needs: [test, integration]
+    if: always()  # Run even if some tests fail to report coverage
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: List all tests in codebase
+        run: |
+          set -euo pipefail
+          echo "Extracting all test function names from source files..."
+          ./scripts/list-all-tests.sh > all-tests.txt
+          echo "Found $(wc -l < all-tests.txt) tests in codebase"
+
+      - name: Download all test result artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          path: test-results
+          pattern: test-result-*
+          merge-multiple: false
+
+      - name: List downloaded artifacts
+        run: |
+          set -euo pipefail
+          echo "Downloaded test result artifacts:"
+          find test-results -type f -name "*.json" | sort
+          echo ""
+          echo "Total JSON files: $(find test-results -type f -name "*.json" | wc -l)"
+
+      - name: Extract executed tests from artifacts
+        run: |
+          set -euo pipefail
+          echo "Extracting test names from JSON artifacts..."
+          ./scripts/extract-executed-tests.sh test-results > executed-tests.txt
+          echo "Found $(wc -l < executed-tests.txt) executed tests"
+
+      - name: Compare test coverage
+        run: |
+          ./scripts/compare-test-coverage.sh all-tests.txt executed-tests.txt
+
+      - name: Upload test coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-coverage-analysis
+          path: |
+            all-tests.txt
+            executed-tests.txt
           retention-days: 14
 
   update:
@@ -715,20 +765,45 @@ jobs:
           # Create directory for fuzz results
           mkdir -p fuzz-results
           
+          # Helper function to run fuzz test and handle context deadline
+          # Go fuzz tests can exit with status 1 and "context deadline exceeded" when
+          # they reach the -fuzztime limit. We treat this as expected success to allow
+          # all fuzz targets to run instead of stopping at the first timeout.
+          run_fuzz_test() {
+            local fuzz_name=$1
+            local package=$2
+            local output_file="fuzz-results/${fuzz_name}.txt"
+            
+            echo "Running ${fuzz_name}..."
+            if go test -run='^$' -fuzz="${fuzz_name}" -fuzztime=10s "${package}" 2>&1 | tee "${output_file}"; then
+              echo "✅ ${fuzz_name} completed successfully"
+              return 0
+            else
+              # Check if the failure was due to context deadline (expected)
+              if grep -q "context deadline exceeded" "${output_file}"; then
+                echo "✅ ${fuzz_name} completed (context deadline reached as expected)"
+                return 0
+              else
+                echo "❌ ${fuzz_name} failed with unexpected error"
+                return 1
+              fi
+            fi
+          }
+          
           # Run fuzz tests and capture output
-          go test -run='^$' -fuzz=FuzzParseFrontmatter -fuzztime=10s ./pkg/parser/ 2>&1 | tee fuzz-results/FuzzParseFrontmatter.txt
-          go test -run='^$' -fuzz=FuzzScheduleParser -fuzztime=10s ./pkg/parser/ 2>&1 | tee fuzz-results/FuzzScheduleParser.txt
-          go test -run='^$' -fuzz=FuzzExpressionParser -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzExpressionParser.txt
-          go test -run='^$' -fuzz=FuzzMentionsFiltering -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzMentionsFiltering.txt
-          go test -run='^$' -fuzz=FuzzSanitizeOutput -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeOutput.txt
-          go test -run='^$' -fuzz=FuzzSanitizeIncomingText -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeIncomingText.txt
-          go test -run='^$' -fuzz=FuzzSanitizeLabelContent -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeLabelContent.txt
-          go test -run='^$' -fuzz=FuzzWrapExpressionsInTemplateConditionals -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzWrapExpressionsInTemplateConditionals.txt
-          go test -run='^$' -fuzz=FuzzYAMLParsing -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzYAMLParsing.txt
-          go test -run='^$' -fuzz=FuzzTemplateRendering -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzTemplateRendering.txt
-          go test -run='^$' -fuzz=FuzzInputValidation -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzInputValidation.txt
-          go test -run='^$' -fuzz=FuzzNetworkPermissions -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzNetworkPermissions.txt
-          go test -run='^$' -fuzz=FuzzSafeJobConfig -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSafeJobConfig.txt
+          run_fuzz_test "FuzzParseFrontmatter" "./pkg/parser/"
+          run_fuzz_test "FuzzScheduleParser" "./pkg/parser/"
+          run_fuzz_test "FuzzExpressionParser" "./pkg/workflow/"
+          run_fuzz_test "FuzzMentionsFiltering" "./pkg/workflow/"
+          run_fuzz_test "FuzzSanitizeOutput" "./pkg/workflow/"
+          run_fuzz_test "FuzzSanitizeIncomingText" "./pkg/workflow/"
+          run_fuzz_test "FuzzSanitizeLabelContent" "./pkg/workflow/"
+          run_fuzz_test "FuzzWrapExpressionsInTemplateConditionals" "./pkg/workflow/"
+          run_fuzz_test "FuzzYAMLParsing" "./pkg/workflow/"
+          run_fuzz_test "FuzzTemplateRendering" "./pkg/workflow/"
+          run_fuzz_test "FuzzInputValidation" "./pkg/workflow/"
+          run_fuzz_test "FuzzNetworkPermissions" "./pkg/workflow/"
+          run_fuzz_test "FuzzSafeJobConfig" "./pkg/workflow/"
           
           # Copy fuzz corpus data (testdata/fuzz directories)
           echo "Copying fuzz corpus data..."

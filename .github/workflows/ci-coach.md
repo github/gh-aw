@@ -37,7 +37,7 @@ Analyze the CI workflow daily to identify concrete optimization opportunities th
 
 - **Repository**: ${{ github.repository }}
 - **Run Number**: #${{ github.run_number }}
-- **Target Workflow**: `.github/workflows/agent-ci.yml`
+- **Target Workflow**: `.github/workflows/ci.yml`
 
 ## Data Available
 
@@ -48,7 +48,7 @@ The `ci-data-analysis` shared module has pre-downloaded CI run data and built th
 
 1. **CI Runs**: `/tmp/ci-runs.json` - Last 100 workflow runs
 2. **Artifacts**: `/tmp/ci-artifacts/` - Coverage reports, benchmarks, and **fuzz test results**
-3. **CI Configuration**: `.github/workflows/agent-ci.yml` - Current workflow
+3. **CI Configuration**: `.github/workflows/ci.yml` - Current workflow
 4. **Cache Memory**: `/tmp/cache-memory/` - Historical analysis data
 5. **Test Results**: `/tmp/gh-aw/test-results.json` - Test performance data
 6. **Fuzz Results**: `/tmp/ci-artifacts/*/fuzz-results/` - Fuzz test output and corpus data
@@ -115,7 +115,7 @@ If you identify improvements worth implementing:
 
 If you identify improvements worth implementing:
 
-1. **Make focused changes** to `.github/workflows/agent-ci.yml`:
+1. **Make focused changes** to `.github/workflows/ci.yml`:
    - Use the `edit` tool to make precise modifications
    - Keep changes minimal and well-documented
    - Add comments explaining why changes improve efficiency

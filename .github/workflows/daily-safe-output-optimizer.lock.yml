@@ -45,7 +45,7 @@ run-name: "Daily Safe Output Tool Optimizer"
 jobs:
   activation:
     needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
+    if: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -496,7 +496,7 @@ jobs:
               version: "",
               agent_version: "2.1.22",
               workflow_name: "Daily Safe Output Tool Optimizer",
-              experimental: true,
+              experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,

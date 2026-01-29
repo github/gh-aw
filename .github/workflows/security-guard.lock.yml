@@ -40,8 +40,9 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) &&
-      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)))
+      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
+      (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) && ((github.event_name != 'pull_request') ||
+      (github.event.pull_request.head.repo.id == github.repository_id)))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1177,9 +1178,9 @@ jobs:
 
   pre_activation:
     if: >
-      ((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) &&
-      ((github.event_name != 'pull_request') ||
-      (github.event.pull_request.head.repo.id == github.repository_id))
+      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
+      (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) && ((github.event_name != 'pull_request') ||
+      (github.event.pull_request.head.repo.id == github.repository_id)))
     runs-on: ubuntu-slim
     permissions:
       contents: read

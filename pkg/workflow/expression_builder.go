@@ -253,6 +253,100 @@ func BuildEventTypeEquals(eventType string) *ComparisonNode {
 	)
 }
 
+// SafePreActivationEvents lists events that don't require pre-activation checks
+// These events are trusted and don't need permission validation:
+// - schedule: Triggered by cron, runs as the repository, not user-initiated
+// - merge_group: Triggered by GitHub's merge queue system, requires branch protection
+var SafePreActivationEvents = []string{"schedule", "merge_group"}
+
+// BuildIsSafePreActivationEvent creates a condition that returns true for events
+// that don't require pre-activation checks (schedule, merge_group).
+// These events are safe because they are not user-initiated and run with repo context.
+func BuildIsSafePreActivationEvent() ConditionNode {
+	expressionBuilderLog.Print("Building safe pre-activation event condition")
+	var terms []ConditionNode
+	for _, event := range SafePreActivationEvents {
+		terms = append(terms, BuildEventTypeEquals(event))
+	}
+	return &DisjunctionNode{Terms: terms}
+}
+
+// BuildIsNotSafePreActivationEvent creates a condition that returns true for events
+// that DO require pre-activation checks (i.e., NOT schedule, NOT merge_group).
+// This is used to skip pre-activation steps for safe events.
+func BuildIsNotSafePreActivationEvent() ConditionNode {
+	expressionBuilderLog.Print("Building NOT safe pre-activation event condition")
+	// Build: github.event_name != 'schedule' && github.event_name != 'merge_group'
+	var terms []ConditionNode
+	for _, event := range SafePreActivationEvents {
+		terms = append(terms, BuildComparison(
+			BuildPropertyAccess("github.event_name"),
+			"!=",
+			BuildStringLiteral(event),
+		))
+	}
+
+	// Combine with AND - all conditions must be true (event is not any of the safe events)
+	if len(terms) == 0 {
+		// No safe events defined, always return true
+		return BuildBooleanLiteral(true)
+	}
+	if len(terms) == 1 {
+		return terms[0]
+	}
+	result := terms[0]
+	for i := 1; i < len(terms); i++ {
+		result = BuildAnd(result, terms[i])
+	}
+	return result
+}
+
+// BuildPreActivationSkipCondition creates a condition for when to skip the pre_activation job.
+// This returns a condition that is TRUE when pre_activation should NOT run (i.e., safe to skip).
+//
+// The condition varies based on whether roles include "write":
+//   - If roles include "write": skip for schedule, merge_group, AND workflow_dispatch
+//     (because check_membership.cjs short-circuits for workflow_dispatch when write is allowed)
+//   - If roles don't include "write": skip only for schedule and merge_group
+//     (workflow_dispatch still needs permission check)
+//
+// Returns a condition that evaluates to FALSE for events that should skip pre_activation.
+func BuildPreActivationSkipCondition(rolesIncludeWrite bool) ConditionNode {
+	expressionBuilderLog.Printf("Building pre-activation skip condition (rolesIncludeWrite=%v)", rolesIncludeWrite)
+
+	// Events that always skip: schedule, merge_group
+	safeEvents := []string{"schedule", "merge_group"}
+
+	// If roles include "write", workflow_dispatch can also skip
+	if rolesIncludeWrite {
+		safeEvents = append(safeEvents, "workflow_dispatch")
+	}
+
+	// Build: github.event_name != 'event1' && github.event_name != 'event2' && ...
+	// This returns TRUE when the event is NOT safe (i.e., pre_activation should run)
+	var terms []ConditionNode
+	for _, event := range safeEvents {
+		terms = append(terms, BuildComparison(
+			BuildPropertyAccess("github.event_name"),
+			"!=",
+			BuildStringLiteral(event),
+		))
+	}
+
+	// Combine with AND - all conditions must be true (event is not any of the safe events)
+	if len(terms) == 0 {
+		return BuildBooleanLiteral(true)
+	}
+	if len(terms) == 1 {
+		return terms[0]
+	}
+	result := terms[0]
+	for i := 1; i < len(terms); i++ {
+		result = BuildAnd(result, terms[i])
+	}
+	return result
+}
+
 // BuildRefStartsWith creates a condition to check if github.ref starts with a prefix
 func BuildRefStartsWith(prefix string) *FunctionCallNode {
 	return BuildFunctionCall("startsWith",

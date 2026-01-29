@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/githubnext/gh-aw/pkg/logger"
 )
+
+var progressLog = logger.New("console:progress")
 
 // ProgressBar provides a reusable progress bar component with TTY detection
 // and graceful fallback to text-based progress for non-TTY environments.
@@ -33,6 +36,7 @@ type ProgressBar struct {
 // NewProgressBar creates a new progress bar with the specified total size (determinate mode)
 // The progress bar automatically adapts to TTY/non-TTY environments
 func NewProgressBar(total int64) *ProgressBar {
+	progressLog.Printf("Creating determinate progress bar: total=%d bytes", total)
 	// Use scaled gradient for improved visual effect
 	// The gradient blends from purple to cyan, creating a smooth
 	// color transition as progress advances. WithScaledGradient
@@ -68,6 +72,7 @@ func NewProgressBar(total int64) *ProgressBar {
 //
 // The progress bar automatically adapts to TTY/non-TTY environments
 func NewIndeterminateProgressBar() *ProgressBar {
+	progressLog.Print("Creating indeterminate progress bar")
 	prog := progress.New(
 		progress.WithScaledGradient("#BD93F9", "#8BE9FD"),
 		progress.WithWidth(40),
@@ -95,6 +100,16 @@ func NewIndeterminateProgressBar() *ProgressBar {
 func (p *ProgressBar) Update(current int64) string {
 	p.current = current
 	p.updateCount++ // Increment counter for animation
+
+	if progressLog.Enabled() && p.updateCount%100 == 0 {
+		// Log every 100 updates to avoid excessive logging
+		if p.indeterminate {
+			progressLog.Printf("Progress update: current=%d bytes, indeterminate mode", current)
+		} else {
+			percent := float64(current) / float64(p.total) * 100
+			progressLog.Printf("Progress update: current=%d bytes, total=%d bytes, percent=%.1f%%", current, p.total, percent)
+		}
+	}
 
 	// Handle indeterminate mode
 	if p.indeterminate {

@@ -15,6 +15,7 @@ const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, normalizeTempor
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
+const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 
 const DEFAULT_AGENTIC_CAMPAIGN_LABEL = "agentic-campaign";
 
@@ -793,6 +794,11 @@ async function main() {
   try {
     core.info("Safe Output Handler Manager starting...");
 
+    // Reset create_issue handler's global state to ensure clean state for this run
+    // This prevents stale data accumulation if the module is reused
+    const { resetIssuesToAssignCopilot } = require("./create_issue.cjs");
+    resetIssuesToAssignCopilot();
+
     // Load configuration
     const config = loadConfig();
     core.debug(`Configuration: ${JSON.stringify(Object.keys(config))}`);
@@ -801,6 +807,9 @@ async function main() {
     const agentOutput = loadAgentOutput();
     if (!agentOutput.success) {
       core.info("No agent output available - nothing to process");
+      // Set empty outputs for downstream steps
+      core.setOutput("temporary_id_map", "{}");
+      core.setOutput("processed_count", 0);
       return;
     }
 
@@ -811,6 +820,9 @@ async function main() {
 
     if (messageHandlers.size === 0) {
       core.info("No handlers loaded - nothing to process");
+      // Set empty outputs for downstream steps
+      core.setOutput("temporary_id_map", "{}");
+      core.setOutput("processed_count", 0);
       return;
     }
 
@@ -869,6 +881,24 @@ async function main() {
     }
     if (skippedNoHandlerResults.length > 0) {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);
+    }
+
+    // Export temporary ID map as output for downstream steps (e.g., assign_to_agent)
+    const temporaryIdMapJson = JSON.stringify(processingResult.temporaryIdMap);
+    core.setOutput("temporary_id_map", temporaryIdMapJson);
+    core.info(`Exported temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
+
+    // Export processed count for consistency with project handler
+    core.setOutput("processed_count", successCount);
+
+    // Export issues that need copilot assignment (if any)
+    const issuesToAssignCopilot = getIssuesToAssignCopilot();
+    if (issuesToAssignCopilot.length > 0) {
+      const issuesToAssignStr = issuesToAssignCopilot.join(",");
+      core.setOutput("issues_to_assign_copilot", issuesToAssignStr);
+      core.info(`Exported ${issuesToAssignCopilot.length} issue(s) for copilot assignment: ${issuesToAssignStr}`);
+    } else {
+      core.setOutput("issues_to_assign_copilot", "");
     }
 
     core.info("Safe Output Handler Manager completed");

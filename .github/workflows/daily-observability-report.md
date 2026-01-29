@@ -98,7 +98,7 @@ The goal is to ensure all workflow runs have the necessary logs and telemetry to
 - **Repository**: ${{ github.repository }}
 - **Run ID**: ${{ github.run_id }}
 - **Date**: Generated daily
-- **Analysis Window**: Last 7 days of workflow runs (see `workflow_runs_analyzed` in specs/metrics-glossary.md)
+- **Analysis Window**: Last 7 days of workflow runs (see `workflow_runs_analyzed` in scratchpad/metrics-glossary.md)
 
 ## Phase 1: Fetch Workflow Runs
 
@@ -150,7 +150,7 @@ If there are many workflows, you can also target specific workflows:
 
 ### Step 1.3: Collect Run Information
 
-The `logs` MCP tool saves all downloaded run logs to `/tmp/gh-aw/aw-mcp/logs/`. For each downloaded run, note (see standardized metric names in specs/metrics-glossary.md):
+The `logs` MCP tool saves all downloaded run logs to `/tmp/gh-aw/aw-mcp/logs/`. For each downloaded run, note (see standardized metric names in scratchpad/metrics-glossary.md):
 - Workflow name
 - Run ID
 - Conclusion (success, failure, cancelled)
@@ -255,7 +255,7 @@ Calculate aggregated metrics across all analyzed runs:
 ### Coverage Metrics
 
 ```python
-# Calculate coverage percentages (see specs/metrics-glossary.md for definitions)
+# Calculate coverage percentages (see scratchpad/metrics-glossary.md for definitions)
 firewall_enabled_workflows = count_runs_with_firewall()
 firewall_logs_present = count_runs_with_access_log()
 firewall_coverage = (firewall_logs_present / firewall_enabled_workflows) * 100 if firewall_enabled_workflows > 0 else "N/A"

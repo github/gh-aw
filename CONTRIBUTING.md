@@ -33,7 +33,7 @@ Fork <https://github.com/githubnext/gh-aw/> to your GitHub account
 - Describe what you want to contribute
 - Explain the use case and expected behavior
 - Provide examples if applicable
-- Tag with appropriate labels (see [Label Guidelines](specs/labels.md))
+- Tag with appropriate labels (see [Label Guidelines](scratchpad/labels.md))
 
 ### Step 3: Create a Pull Request with GitHub Copilot Agent
 
@@ -80,9 +80,9 @@ All contributions are made through GitHub Copilot Agent in pull requests. The ag
 
 The GitHub Copilot Agent automatically:
 
-- **Reads specifications** from `specs/`, `skills/`, and `.github/instructions/`
-- **Follows code organization patterns** (see [specs/code-organization.md](specs/code-organization.md))
-- **Implements validation** following the architecture in [specs/validation-architecture.md](specs/validation-architecture.md)
+- **Reads specifications** from `scratchpad/`, `skills/`, and `.github/instructions/`
+- **Follows code organization patterns** (see [scratchpad/code-organization.md](scratchpad/code-organization.md))
+- **Implements validation** following the architecture in [scratchpad/validation-architecture.md](scratchpad/validation-architecture.md)
 - **Uses console formatting** from `pkg/console` for CLI output
 - **Writes error messages** following the [Error Message Style Guide](.github/instructions/error-messages.instructions.md)
 - **Runs all quality checks**: `make agent-finish` (build, test, recompile, format, lint)
@@ -96,7 +96,7 @@ Use the GitHub issue tracker to report bugs or request features:
 - Include detailed steps to reproduce issues
 - Explain the use case for feature requests
 - Provide examples if applicable
-- Follow [Label Guidelines](specs/labels.md)
+- Follow [Label Guidelines](scratchpad/labels.md)
 - The agent will read the issue and implement fixes in a PR
 
 ### Code Quality Standards
@@ -147,7 +147,7 @@ The agent follows these principles:
 3. **Focused Utilities Pattern** - Self-contained feature files
    - Examples: `expressions.go`, `strings.go`, `artifacts.go`
 
-See [Code Organization Patterns](specs/code-organization.md) for details.
+See [Code Organization Patterns](scratchpad/code-organization.md) for details.
 
 #### Validation Patterns
 
@@ -167,7 +167,7 @@ The agent places validation logic appropriately:
 - `docker_validation.go` - Docker images
 - `expression_safety.go` - Expression security
 
-See [Validation Architecture](specs/validation-architecture.md) for the complete decision tree.
+See [Validation Architecture](scratchpad/validation-architecture.md) for the complete decision tree.
 
 #### CLI Breaking Changes
 
@@ -182,7 +182,7 @@ For breaking changes, the agent:
 - Provides migration guidance
 - Documents in CHANGELOG.md
 
-See [Breaking CLI Rules](specs/breaking-cli-rules.md) for details.
+See [Breaking CLI Rules](scratchpad/breaking-cli-rules.md) for details.
 
 ## 🔄 Pull Request Process via GitHub Copilot Agent
 
@@ -191,7 +191,7 @@ All pull requests are created and managed by GitHub Copilot Agent:
 1. **Issue or discussion first:**
    - Open an issue describing what needs to be done
    - Provide clear context and examples
-   - Tag appropriately using [Label Guidelines](specs/labels.md)
+   - Tag appropriately using [Label Guidelines](scratchpad/labels.md)
 
 2. **Agent creates the PR:**
    - Mention `@github-copilot agent` with instructions
@@ -233,7 +233,7 @@ The agent understands this structure:
 │   ├── console/         # Console formatting utilities
 │   ├── parser/          # Markdown frontmatter parsing
 │   └── workflow/        # Workflow compilation and processing
-├── specs/               # Technical specifications the agent reads
+├── scratchpad/               # Technical specifications the agent reads
 ├── skills/              # Specialized knowledge for agents
 ├── .github/             # Instructions and sample workflows
 │   ├── instructions/    # Agent instructions
@@ -347,7 +347,7 @@ Dependabot prioritizes security patches:
 
 ## 🧪 Testing
 
-For comprehensive testing guidelines including assert vs require usage, table-driven test patterns, and best practices, see **[specs/testing.md](specs/testing.md)**.
+For comprehensive testing guidelines including assert vs require usage, table-driven test patterns, and best practices, see **[scratchpad/testing.md](scratchpad/testing.md)**.
 
 Quick reference:
 - `make test-unit` - Fast unit tests (~25s)

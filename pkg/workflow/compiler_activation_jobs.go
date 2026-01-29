@@ -12,6 +12,16 @@ import (
 
 var compilerActivationJobsLog = logger.New("workflow:compiler_activation_jobs")
 
+// containsRole checks if a role is present in the roles list (case-insensitive)
+func containsRole(roles []string, role string) bool {
+	for _, r := range roles {
+		if strings.EqualFold(r, role) {
+			return true
+		}
+	}
+	return false
+}
+
 // buildPreActivationJob creates a unified pre-activation job that combines membership checks and stop-time validation.
 // This job exposes a single "activated" output that indicates whether the workflow should proceed.
 func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionCheck bool) (*Job, error) {
@@ -259,6 +269,43 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	var jobIfCondition string
 	if !c.referencesCustomJobOutputs(data.If, data.Jobs) {
 		jobIfCondition = data.If
+	}
+
+	// OPTIMIZATION: Skip pre_activation job entirely for safe events
+	// BUT only if there are no checks that MUST run regardless of event type:
+	// - stop-time: deadline enforcement applies to all events
+	// - skip-if-match: query-based skip applies to all events
+	// - skip-if-no-match: query-based skip applies to all events
+	// - custom steps: user-defined steps may have important logic
+	//
+	// Safe events that can skip pre_activation:
+	// - schedule: Triggered by cron, runs as the repository, not user-initiated
+	// - merge_group: Triggered by GitHub's merge queue system, requires branch protection
+	// - workflow_dispatch: Can skip IF roles include "write" (which the default roles do)
+	//   because check_membership.cjs already short-circuits for workflow_dispatch when write is allowed
+	//
+	// When pre_activation is skipped, downstream jobs check for needs.pre_activation.result == 'skipped'
+	canSkipForSafeEvents := data.StopTime == "" &&
+		data.SkipIfMatch == nil &&
+		data.SkipIfNoMatch == nil &&
+		len(customSteps) == 0
+
+	if canSkipForSafeEvents {
+		// Check if workflow_dispatch can also be skipped (when roles include "write")
+		rolesIncludeWrite := containsRole(data.Roles, "write") || containsRole(data.Roles, "all")
+		skipCondition := BuildPreActivationSkipCondition(rolesIncludeWrite)
+		safeEventSkipCondition := skipCondition.Render()
+
+		if jobIfCondition != "" {
+			// Combine existing condition with safe event check
+			jobIfCondition = fmt.Sprintf("(%s) && (%s)", safeEventSkipCondition, jobIfCondition)
+		} else {
+			jobIfCondition = safeEventSkipCondition
+		}
+		compilerActivationJobsLog.Printf("Pre-activation job can be skipped for safe events (rolesIncludeWrite=%v)", rolesIncludeWrite)
+	} else {
+		compilerActivationJobsLog.Printf("Pre-activation job cannot be skipped for safe events: hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCustomSteps=%v",
+			data.StopTime != "", data.SkipIfMatch != nil, data.SkipIfNoMatch != nil, len(customSteps) > 0)
 	}
 
 	job := &Job{
@@ -517,10 +564,19 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 		// Also depend on custom jobs that run after pre_activation but before activation
 		activationNeeds = append(activationNeeds, customJobsBeforeActivation...)
 
-		activatedExpr := BuildEquals(
+		// Build activation condition:
+		// - If pre_activation was skipped (safe event like schedule/merge_group), proceed
+		// - Otherwise, check that pre_activation.outputs.activated == 'true'
+		preActivationSkipped := BuildEquals(
+			BuildPropertyAccess(fmt.Sprintf("needs.%s.result", string(constants.PreActivationJobName))),
+			BuildStringLiteral("skipped"),
+		)
+		preActivationActivated := BuildEquals(
 			BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.PreActivationJobName), constants.ActivatedOutput)),
 			BuildStringLiteral("true"),
 		)
+		// (pre_activation was skipped) OR (pre_activation.outputs.activated == 'true')
+		activatedExpr := BuildOr(preActivationSkipped, preActivationActivated)
 
 		// If there are custom jobs before activation and the if condition references them,
 		// include that condition in the activation job's if clause

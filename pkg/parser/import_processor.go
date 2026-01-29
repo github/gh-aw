@@ -35,7 +35,7 @@ type ImportsResult struct {
 	// ImportInputs uses map[string]any because input values can be different types (string, number, boolean).
 	// This is parsed from YAML frontmatter where the structure is dynamic and not known at compile time.
 	// This is an appropriate use of 'any' for dynamic YAML/JSON data.
-	// See specs/go-type-patterns.md for guidance on when to use map[string]any.
+	// See scratchpad/go-type-patterns.md for guidance on when to use map[string]any.
 	ImportInputs map[string]any // Aggregated input values from all imports (key = input name, value = input value)
 }
 
@@ -56,7 +56,7 @@ type ImportSpec struct {
 	Path string // Import path (required)
 	// Inputs uses map[string]any because input values can be different types (string, number, boolean).
 	// This is parsed from YAML frontmatter and validated against the imported workflow's input definitions.
-	// This is an appropriate use of 'any' for dynamic YAML data. See specs/go-type-patterns.md.
+	// This is an appropriate use of 'any' for dynamic YAML data. See scratchpad/go-type-patterns.md.
 	Inputs map[string]any // Optional input values to pass to the imported workflow (values are string, number, or boolean)
 }
 
@@ -65,7 +65,7 @@ type ImportSpec struct {
 //
 // Type Pattern Note: frontmatter uses map[string]any because it represents parsed YAML with
 // dynamic structure that varies by workflow. This is the appropriate pattern for parsing
-// user-provided configuration files. See specs/go-type-patterns.md for guidance.
+// user-provided configuration files. See scratchpad/go-type-patterns.md for guidance.
 func ProcessImportsFromFrontmatter(frontmatter map[string]any, baseDir string) (mergedTools string, mergedEngines []string, err error) {
 	log.Printf("Processing imports from frontmatter: baseDir=%s", baseDir)
 	result, err := ProcessImportsFromFrontmatterWithManifest(frontmatter, baseDir, nil)

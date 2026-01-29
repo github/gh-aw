@@ -7,10 +7,6 @@ sidebar:
 
 GitHub Agentic Workflows use AI [coding agents or engines](/gh-aw/reference/glossary/#engine) to interpret and execute natural language instructions. Each engine has unique capabilities and configuration options.
 
-> [!NOTE]
-> Experimental Engines
-> Claude and Codex engines are available but marked as experimental. They are not documented here but can still be used by setting `engine: claude` or `engine: codex` in your workflow frontmatter. For production workflows, we recommend using the GitHub Copilot CLI engine.
-
 ## GitHub Copilot CLI
 
 [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli) is the default and recommended AI [coding agent engine](/gh-aw/reference/glossary/#engine).
@@ -37,6 +33,9 @@ Configuration options: `model` (gpt-5 or claude-sonnet-4), `version` (CLI versio
 
 Create a fine-grained PAT at <https://github.com/settings/personal-access-tokens/new>. Select your user account (not an organization), choose "Public repositories" access, and enable "Copilot Requests" permissions. Then add it to your repository:
 
+> [!NOTE]
+> You should leave "Public repositories" enabled; otherwise, you will not have access to the Copilot Requests permission option.
+
 ```bash wrap
 gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
 ```
@@ -58,7 +57,7 @@ gh aw secrets set GH_AW_GITHUB_MCP_SERVER_TOKEN --value "<your-github-pat>"
 
 ## Anthropic Claude
 
-[Anthropic Claude Code](https://www.anthropic.com/index/claude) is an experimental AI engine option.
+[Anthropic Claude Code](https://www.anthropic.com/index/claude) is an AI engine option that provides full MCP tool support and allow-listing capabilities.
 
 ### Claude Setup
 

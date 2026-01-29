@@ -155,12 +155,12 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"assign_to_agent":{"allowed":["copilot"],"default_agent":"copilot","max":1,"target":"*"},"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created.",
+              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created. Assignees [copilot] will be automatically assigned.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -198,34 +198,6 @@ jobs:
                 "type": "object"
               },
               "name": "create_issue"
-            },
-            {
-              "description": "Assign the GitHub Copilot coding agent to work on an issue or pull request. The agent will analyze the issue/PR and attempt to implement a solution, creating a pull request when complete. Use this to delegate coding tasks to Copilot. Example usage: assign_to_agent(issue_number=123, agent=\"copilot\") or assign_to_agent(pull_number=456, agent=\"copilot\") CONSTRAINTS: Maximum 1 issue(s) can be assigned to agent.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "agent": {
-                    "description": "Agent identifier to assign. Defaults to 'copilot' (the Copilot coding agent) if not specified.",
-                    "type": "string"
-                  },
-                  "issue_number": {
-                    "description": "Issue number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/issues/234). Can also be a temporary_id (e.g., 'aw_abc123def456') from an issue created earlier in the same workflow run. The issue should contain clear, actionable requirements. Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  },
-                  "pull_number": {
-                    "description": "Pull request number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 456 in github.com/owner/repo/pull/456). Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  }
-                },
-                "type": "object"
-              },
-              "name": "assign_to_agent"
             },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
@@ -471,23 +443,6 @@ jobs:
           EOF
           cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
           {
-            "assign_to_agent": {
-              "defaultMax": 1,
-              "fields": {
-                "agent": {
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                },
-                "issue_number": {
-                  "issueNumberOrTemporaryId": true
-                },
-                "pull_number": {
-                  "optionalPositiveInteger": true
-                }
-              },
-              "customValidation": "requiresOneOf:issue_number,pull_number"
-            },
             "create_issue": {
               "defaultMax": 1,
               "fields": {
@@ -894,13 +849,25 @@ jobs:
           
           ### Step 4: Create parent issue and assign work
           
-          After updating project items, you must complete **all three actions below in order**:
+          After updating project items, **first complete the bundling analysis below, then immediately perform the safe-output calls below in sequence**. Do not proceed to Step 5 until the calls are complete.
           
-          1. **Create the parent tracking issue** 
-          2. **Add the issue to the project board**
-          3. **Assign the issue to the Copilot agent**
+          #### Bundling Analysis (Do This First)
           
-          **Selection Criteria:**
+          Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
+          
+          #### Required Safe-Output Calls:
+          
+          After completing the bundling analysis, you must immediately perform these safe-output calls in order:
+          
+          1. **Call `create_issue`** to create the parent tracking issue
+          2. **Call `update_project`** to add the created issue to the project board  
+          
+          The created issue will be assigned to Copilot automatically via `safe-outputs.create-issue.assignees`.
+          
+          #### Bundling Guidelines
+          
+          Analyze all discovered PRs following these rules:
+          
           1. Review all discovered PRs
           2. Group by **runtime** (Node.js, Python, etc.) and **target dependency file**
           3. Select up to **3 bundles** total following the bundling rules below
@@ -920,30 +887,30 @@ jobs:
           - Enforce **one runtime + one target file per PR**.
           - All PRs must pass **CI and relevant runtime tests** before merge.
           
-          **Action 1: Create the parent issue**
+          #### Safe-Output Call: Create Bundle Issues
           
-          Create a single issue that contains:
-          - The bundling rules (copied below)
-          - The proposed bundles (grouped by runtime + target manifest)
-          - A checklist of the PRs to bundle, one checkbox per PR
+          Create **one issue per planned bundle** (up to 3 total). Each issue should correspond to exactly **one runtime + one manifest file**.
           
-          Use the `create_issue` tool:
+          For each bundle, call `create_issue`:
           
           ```
-          create_issue(title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)", body="<paste body from template below>")
+          create_issue(
+            title="[campaign] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
+            body="<use template below>"
+          )
           ```
           
-          After calling `create_issue`, **store the returned issue number** - you will need it for actions 2 and 3.
+          **IMPORTANT**: After each `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use each temporary ID in the corresponding project update.
           
-          **Action 2: Add the issue to the project board**
+          #### Safe-Output Call: Add Each Bundle Issue to Project Board
           
-          Immediately after creating the issue, add it to the project board using `update_project`. Use the issue number from action 1:
+          For **each** issue you created above, **immediately** call `update_project`:
           
           ```
           update_project(
             project="https://github.com/orgs/githubnext/projects/144",
             content_type="issue",
-            content_number=<new_issue_number>,
+            content_number="<temporary_id_from_create_issue>",
             fields={
               "campaign_id": "security-alert-burndown",
               "status": "Todo",
@@ -956,21 +923,18 @@ jobs:
           )
           ```
           
-          **Action 3: Assign the issue to the agent**
-          
-          Finally, assign the issue to the Copilot agent using `assign_to_agent`. Use the issue number from action 1:
-          
-          ```
-          assign_to_agent(issue_number=<new_issue_number>, name="copilot")
-          ```
-          
-          **CRITICAL**: You must call all three tools (create_issue, update_project, assign_to_agent) in sequence to complete this step. Do not skip any of them.
+          **Example**: If a bundle `create_issue` returned `aw_sec2026012901`, then call:
+          - `update_project(..., content_number="aw_sec2026012901", ...)`
           
           
-          **Issue Body Template:**
+          **Issue Body Template (one bundle per issue):**
           ```markdown
           ## Context
-          This issue tracks Dependabot PR bundling work discovered by the Security Alert Burndown campaign.
+          This issue tracks one Dependabot PR bundle discovered by the Security Alert Burndown campaign.
+          
+          ## Bundle
+          - Runtime: [runtime]
+          - Manifest: [manifest file]
           
           ## Bundling Rules
           - Group work by runtime. Never mix runtimes.
@@ -978,20 +942,13 @@ jobs:
           - Patch/minor updates may be bundled; major updates should be isolated unless tightly coupled.
           - Bundled releases must include a research report (packages, versions, breaking changes, migration, risk, tests).
           
-          ## Planned Bundles
-          
-          ### [runtime] — [manifest file]
-          PRs:
+          ## PRs in Bundle
           - [ ] #123 - [title] ([old] → [new])
           - [ ] #456 - [title] ([old] → [new])
           
-          ### [runtime] — [manifest file]
-          PRs:
-          - [ ] #789 - [title] ([old] → [new])
-          
           ## Agent Task
-          1. For each bundle section above, research each update for breaking changes and summarize risks.
-          2. Bundle PRs per section into a single PR (one runtime + one manifest).
+          1. Research each update for breaking changes and summarize risks.
+          2. Create a single bundled PR (one runtime + one manifest).
           3. Ensure CI passes; run relevant runtime tests.
           4. Add the research report to the bundled PR.
           5. Update this issue checklist as PRs are merged.
@@ -999,7 +956,7 @@ jobs:
           
           ### Step 5: Report
           
-          Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the parent tracking issue number that was created and assigned.
+          Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the bundle issue numbers that were created and assigned.
           
           ## Important
           
@@ -1316,12 +1273,12 @@ jobs:
           
           
           **Cursor file (repo-memory)**: `memory/campaigns/security-alert-burndown/cursor.json`
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           **File system path**: `/tmp/gh-aw/repo-memory/campaigns/security-alert-burndown/cursor.json`
           - If it exists: read first and continue from its boundary.
           - If it does not exist: create it by end of run.
           - Always write the updated cursor back to the same path.
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           
           
           
@@ -2009,8 +1966,6 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
-          GH_AW_ASSIGNMENT_ERRORS: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_errors }}
-          GH_AW_ASSIGNMENT_ERROR_COUNT: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_error_count }}
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2201,9 +2156,6 @@ jobs:
       GH_AW_WORKFLOW_ID: "security-alert-burndown"
       GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
     outputs:
-      assign_to_agent_assigned: ${{ steps.assign_to_agent.outputs.assigned }}
-      assign_to_agent_assignment_error_count: ${{ steps.assign_to_agent.outputs.assignment_error_count }}
-      assign_to_agent_assignment_errors: ${{ steps.assign_to_agent.outputs.assignment_errors }}
       process_project_safe_outputs_processed_count: ${{ steps.process_project_safe_outputs.outputs.processed_count }}
       process_project_safe_outputs_temporary_project_map: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
@@ -2236,6 +2188,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":100}}"
+          GH_AW_ASSIGN_COPILOT: "true"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
@@ -2250,7 +2203,8 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_ASSIGN_COPILOT: "true"
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2258,22 +2212,16 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
             await main();
-      - name: Assign To Agent
-        id: assign_to_agent
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'assign_to_agent'))
+      - name: Assign copilot to created issues
+        if: steps.process_safe_outputs.outputs.issues_to_assign_copilot != ''
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_AGENT_MAX_COUNT: 1
-          GH_AW_AGENT_DEFAULT: "copilot"
-          GH_AW_AGENT_TARGET: "*"
-          GH_AW_AGENT_ALLOWED: "copilot"
-          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
+          GH_AW_ISSUES_TO_ASSIGN_COPILOT: ${{ steps.process_safe_outputs.outputs.issues_to_assign_copilot }}
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/assign_to_agent.cjs');
+            const { main } = require('/opt/gh-aw/actions/assign_copilot_to_created_issues.cjs');
             await main();
 

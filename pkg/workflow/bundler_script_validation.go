@@ -35,7 +35,7 @@
 // For bundle safety validation, see bundler_safety_validation.go.
 // For runtime mode validation, see bundler_runtime_validation.go.
 // For general validation, see validation.go.
-// For detailed documentation, see specs/validation-architecture.md
+// For detailed documentation, see scratchpad/validation-architecture.md
 
 package workflow
 
