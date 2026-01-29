@@ -190,7 +190,7 @@ func (c *AddInteractiveConfig) collectCopilotPAT() error {
 	}
 
 	// Store in environment for later use
-	os.Setenv("COPILOT_GITHUB_TOKEN", token)
+	_ = os.Setenv("COPILOT_GITHUB_TOKEN", token)
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Copilot token received"))
 
 	return nil
@@ -246,7 +246,7 @@ func (c *AddInteractiveConfig) collectGenericAPIKey(opt *constants.EngineOption)
 	}
 
 	// Store in environment for later use
-	os.Setenv(opt.SecretName, apiKey)
+	_ = os.Setenv(opt.SecretName, apiKey)
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("%s API key received", opt.Label)))
 
 	return nil
