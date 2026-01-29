@@ -44,13 +44,15 @@ The specification defines a **7-layer defense-in-depth architecture**:
 
 The specification defines **7 security guarantees (SG-01 to SG-07)**:
 
-- **SG-01**: No direct template injection of untrusted input
+- **SG-01**: Untrusted input not directly interpolated into GitHub Actions expressions without sanitization
 - **SG-02**: AI agents have no direct write access
 - **SG-03**: Network access restricted to allowlists
 - **SG-04**: Least-privilege permissions by default
 - **SG-05**: Agent processes in isolated sandboxes
 - **SG-06**: All actions produce auditable artifacts
 - **SG-07**: Security failures prevent execution (fail-secure)
+
+**Note on SG-01**: This guarantee protects against template injection in GitHub Actions expressions. It does not prevent AI agents from accessing untrusted data at runtime through tools like GitHub MCP (which can return issue titles, PR bodies, etc.). Such data is subject to AI prompt injection risks, which are addressed through threat detection (Layer 6) and safe outputs isolation (Layer 2).
 
 ### Formal Requirements
 

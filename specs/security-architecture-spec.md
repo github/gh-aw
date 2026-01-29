@@ -199,6 +199,12 @@ A conforming implementation MUST provide the following security guarantees:
 
 **SG-01**: Untrusted input SHALL NOT be directly interpolated into GitHub Actions expressions without sanitization.
 
+> **Note**: This guarantee specifically protects against template injection in GitHub Actions expressions (e.g., `${{ github.event.issue.title }}`). It does not prevent AI agents from accessing untrusted data at runtime through MCP tools (e.g., GitHub MCP returning issue titles or PR bodies). Runtime access to untrusted data via tools is subject to prompt injection risks, which are mitigated through:
+> - Threat detection layer (Section 9) analyzing agent behavior
+> - Output isolation layer (Section 5) preventing direct write access
+> - Network isolation layer (Section 6) restricting data exfiltration
+> - Safe outputs validation (Section 5.4) checking output integrity
+
 **SG-02**: AI agents SHALL NOT have direct write access to repository resources (issues, pull requests, discussions).
 
 **SG-03**: Network access SHALL be restricted to explicitly allowed domains unless explicitly configured otherwise.
@@ -217,10 +223,18 @@ The security architecture protects against:
 
 1. **Template Injection**: Malicious input manipulating GitHub Actions expressions
 2. **Prompt Injection**: Adversarial inputs manipulating AI agent behavior
+   - **Via GitHub event context**: Mitigated through input sanitization layer (Section 4)
+   - **Via MCP tool responses**: Mitigated through threat detection (Section 9), output isolation (Section 5), and network filtering (Section 6)
 3. **Data Exfiltration**: Unauthorized data transmission to external services
 4. **Privilege Escalation**: Unauthorized elevation of permissions or capabilities
 5. **Supply Chain Attacks**: Compromised dependencies or actions
 6. **Resource Exhaustion**: Denial of service through infinite loops or resource consumption
+
+**Threat Model Clarification**: While the input sanitization layer prevents template injection through GitHub event context, AI agents may still access untrusted data at runtime through MCP tools. For example, the GitHub MCP server can return issue titles, PR bodies, and comments that were not pre-sanitized by the activation job. This is an accepted architectural tradeoff that enables dynamic workflows while relying on:
+- **Threat detection**: Analyzes agent output for malicious behavior before execution
+- **Output isolation**: Prevents agents from directly writing to repository resources
+- **Network isolation**: Restricts data exfiltration to allowed domains only
+- **Safe outputs validation**: Validates all output before execution
 
 ### 3.4 Security Principles
 
