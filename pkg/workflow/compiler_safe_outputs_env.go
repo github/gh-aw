@@ -26,6 +26,11 @@ func (c *Compiler) addAllSafeOutputConfigEnvVars(steps *[]string, data *Workflow
 			stagedFlagAdded = true
 			compilerSafeOutputsEnvLog.Print("Added staged flag for create-issue")
 		}
+		// Check if copilot is in assignees - if so, we'll output issues for assign_to_agent job
+		if hasCopilotAssignee(cfg.Assignees) {
+			*steps = append(*steps, "          GH_AW_ASSIGN_COPILOT: \"true\"\n")
+			compilerSafeOutputsEnvLog.Print("Copilot assignment requested - will output issues_to_assign_copilot")
+		}
 	}
 
 	// Add Comment - all config now in handler config JSON
