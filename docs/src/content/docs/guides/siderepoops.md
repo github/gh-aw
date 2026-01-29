@@ -35,15 +35,11 @@ While [MultiRepoOps](/gh-aw/guides/multirepoops/) runs workflows **from** your m
 
 **Example Architecture:**
 
-```text
-┌─────────────────┐          ┌──────────────────┐
-│  Side Repo      │          │  Main Repo       │
-│  (workflows)    │ ────────>│  (target code)   │
-│                 │   Uses   │                  │
-│  - automation/  │   PAT    │  - src/          │
-│  - .github/     │          │  - tests/        │
-│    workflows/   │          │  - docs/         │
-└─────────────────┘          └──────────────────┘
+```mermaid
+graph LR
+    A[Side Repo<br/>workflows<br/>- automation/<br/>- .github/workflows/]
+    B[Main Repo<br/>target code<br/>- src/<br/>- tests/<br/>- docs/]
+    A -->|Uses PAT| B
 ```
 
 In SideRepoOps, workflows run in GitHub Actions **on the side repository** but perform operations (create issues, PRs, comments) **on the main repository** using cross-repository authentication.
@@ -350,18 +346,21 @@ Create a PR with suggested improvements.
 
 **Repository Organization**:
 
-```text
-side-repo/
-├── .github/
-│   └── workflows/
-│       ├── triage-main.md           # Scheduled triage
-│       ├── quality-check.md         # Code quality monitoring
-│       ├── doc-sync.md              # Documentation sync
-│       └── manual-task.md           # Manual dispatch tasks
-├── docs/
-│   ├── README.md                    # Side repo documentation
-│   └── workflow-guide.md            # How to use workflows
-└── .env.example                     # Required secrets documentation
+```mermaid
+graph TD
+    root[side-repo/]
+    root --> github[.github/]
+    root --> docs[docs/]
+    root --> env[.env.example<br/>Required secrets documentation]
+    
+    github --> workflows[workflows/]
+    workflows --> triage[triage-main.md<br/>Scheduled triage]
+    workflows --> quality[quality-check.md<br/>Code quality monitoring]
+    workflows --> docsync[doc-sync.md<br/>Documentation sync]
+    workflows --> manual[manual-task.md<br/>Manual dispatch tasks]
+    
+    docs --> readme[README.md<br/>Side repo documentation]
+    docs --> guide[workflow-guide.md<br/>How to use workflows]
 ```
 
 ## Troubleshooting
