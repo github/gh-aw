@@ -163,7 +163,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"missing_tool":{},"noop":{"max":1},"notion-add-comment":{"description":"Add a comment to a Notion page","inputs":{"comment":{"default":null,"description":"The comment text to add","required":true,"type":"string"}},"output":"Comment added to Notion successfully!"}}
+          {"missing_data":{},"missing_tool":{},"noop":{"max":1},"notion-add-comment":{"description":"Add a comment to a Notion page","inputs":{"comment":{"default":null,"description":"The comment text to add","required":true,"type":"string"}},"output":"Comment added to Notion successfully!"}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -208,6 +208,33 @@ jobs:
                 "type": "object"
               },
               "name": "noop"
+            },
+            {
+              "description": "Report that data or information needed to complete the task is not available. Use this when you cannot accomplish what was requested because required data, context, or information is missing.",
+              "inputSchema": {
+                "additionalProperties": false,
+                "properties": {
+                  "alternatives": {
+                    "description": "Any workarounds, manual steps, or alternative approaches the user could take (max 256 characters).",
+                    "type": "string"
+                  },
+                  "context": {
+                    "description": "Additional context about the missing data or where it should come from (max 256 characters).",
+                    "type": "string"
+                  },
+                  "data_type": {
+                    "description": "Type or description of the missing data or information (max 128 characters). Be specific about what data is needed.",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "description": "Explanation of why this data is needed to complete the task (max 256 characters).",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "missing_data"
             },
             {
               "description": "Add a comment to a Notion page",
@@ -1127,7 +1154,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
