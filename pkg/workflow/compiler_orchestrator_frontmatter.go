@@ -74,12 +74,6 @@ func (c *Compiler) parseFrontmatterSection(markdownPath string) (*frontmatterPar
 	if !hasOnField {
 		detectionLog.Printf("No 'on' field detected - treating as shared agentic workflow")
 
-		// Reject top-level "safe-jobs" field (only safe-outputs.jobs is supported)
-		if err := c.validateNoTopLevelSafeJobs(frontmatterForValidation, cleanPath); err != nil {
-			orchestratorFrontmatterLog.Printf("Top-level safe-jobs validation failed: %v", err)
-			return nil, err
-		}
-
 		// Validate as an included/shared workflow (uses main_workflow_schema with forbidden field checks)
 		if err := parser.ValidateIncludedFileFrontmatterWithSchemaAndLocation(frontmatterForValidation, cleanPath); err != nil {
 			orchestratorFrontmatterLog.Printf("Shared workflow validation failed: %v", err)
@@ -100,12 +94,6 @@ func (c *Compiler) parseFrontmatterSection(markdownPath string) (*frontmatterPar
 	if result.Markdown == "" {
 		orchestratorFrontmatterLog.Print("No markdown content found for main workflow")
 		return nil, fmt.Errorf("no markdown content found")
-	}
-
-	// Reject top-level "safe-jobs" field before schema validation (provides better error message)
-	if err := c.validateNoTopLevelSafeJobs(frontmatterForValidation, cleanPath); err != nil {
-		orchestratorFrontmatterLog.Printf("Top-level safe-jobs validation failed: %v", err)
-		return nil, err
 	}
 
 	// Validate main workflow frontmatter contains only expected entries
@@ -176,15 +164,4 @@ func (c *Compiler) copyFrontmatterWithoutInternalMarkers(frontmatter map[string]
 		}
 	}
 	return copy
-}
-
-// validateNoTopLevelSafeJobs validates that the frontmatter does not contain a top-level "safe-jobs" field.
-// Only safe-outputs.jobs is supported.
-func (c *Compiler) validateNoTopLevelSafeJobs(frontmatter map[string]any, filePath string) error {
-	if _, hasSafeJobs := frontmatter["safe-jobs"]; hasSafeJobs {
-		msg := fmt.Sprintf("%s: top-level 'safe-jobs' field is not supported; use 'safe-outputs.jobs' instead", filePath)
-		suggestion := "\nChange from:\n  safe-jobs:\n    my-job: ...\nTo:\n  safe-outputs:\n    jobs:\n      my-job: ..."
-		return fmt.Errorf("%s%s", msg, suggestion)
-	}
-	return nil
 }
