@@ -1,7 +1,7 @@
 // This file provides post-processing operations for workflow compilation.
 //
 // This file contains functions that perform post-compilation operations such as
-// generating Dependabot manifests, maintenance workflows, and validating campaigns.
+// generating Dependabot manifests and maintenance workflows.
 //
 // # Organization Rationale
 //
@@ -16,9 +16,6 @@
 // Generation:
 //   - generateDependabotManifestsWrapper() - Generate Dependabot manifests
 //   - generateMaintenanceWorkflowWrapper() - Generate maintenance workflow
-//
-// Validation:
-//   - validateCampaignsWrapper() - Validate campaign specs
 //
 // Statistics:
 //   - collectWorkflowStatisticsWrapper() - Collect workflow statistics
@@ -78,21 +75,6 @@ func generateMaintenanceWorkflowWrapper(
 		}
 		// Non-strict mode: just report as warning
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to generate maintenance workflow: %v", err)))
-	}
-
-	return nil
-}
-
-// validateCampaignsWrapper validates campaign specs if they exist
-func validateCampaignsWrapper(workflowDir string, verbose bool, strict bool, campaignFiles []string) error {
-	compilePostProcessingLog.Print("Validating campaign specs")
-
-	if err := validateCampaigns(workflowDir, verbose, campaignFiles); err != nil {
-		if strict {
-			return fmt.Errorf("campaign validation failed: %w", err)
-		}
-		// Non-strict mode: just report as warning
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Campaign validation: %v", err)))
 	}
 
 	return nil

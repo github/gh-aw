@@ -169,66 +169,18 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 		// When no permissions are specified, set default to contents: read.
 		// This provides minimal access needed for most workflows while following
 		// the principle of least privilege.
-		//
-		// CAMPAIGN-SPECIFIC HANDLING:
-		// Campaign orchestrator workflows (.campaign.g.md files) are auto-generated
-		// by the BuildOrchestrator function in pkg/campaign/orchestrator.go.
-		// These generated workflows intentionally omit explicit permissions in their
-		// frontmatter, so we compute minimal read permissions here at compile time.
-		//
-		// This is part of the campaign orchestrator generation pattern where:
-		// 1. Campaign specs (.campaign.md) define high-level campaign configuration
-		// 2. BuildOrchestrator generates orchestrator workflows (.campaign.g.md)
-		// 3. The compiler applies default permissions to the generated workflow
-		//
-		// This separation allows campaign configuration to remain declarative while
-		// ensuring generated orchestrators have appropriate permissions.
 		// ============================================================================
-		if strings.HasSuffix(markdownPath, ".campaign.g.md") {
-			perms := NewPermissions()
-			// Campaign orchestrators always need to read repository contents and tracker issues.
-			perms.Set(PermissionContents, PermissionRead)
-			perms.Set(PermissionIssues, PermissionRead)
-
-			// If GitHub MCP toolsets are configured (including defaults), add any additional
-			// required permissions to avoid validation warnings.
-			var githubTool any
-			if data.Tools != nil {
-				githubTool = data.Tools["github"]
+		perms := NewPermissionsContentsRead()
+		yaml := perms.RenderToYAML()
+		// RenderToYAML uses job-friendly indentation (6 spaces). WorkflowData.Permissions
+		// is stored in workflow-level indentation (2 spaces) and later re-indented for jobs.
+		lines := strings.Split(yaml, "\n")
+		for i := 1; i < len(lines); i++ {
+			if strings.HasPrefix(lines[i], "      ") {
+				lines[i] = "  " + lines[i][6:]
 			}
-			if githubTool != nil {
-				toolsetsStr := getGitHubToolsets(githubTool)
-				readOnly := getGitHubReadOnly(githubTool)
-				required := collectRequiredPermissions(ParseGitHubToolsets(toolsetsStr), readOnly)
-				for scope, level := range required {
-					perms.Set(scope, level)
-				}
-			}
-
-			yaml := perms.RenderToYAML()
-			// RenderToYAML uses job-friendly indentation (6 spaces). WorkflowData.Permissions
-			// is stored in workflow-level indentation (2 spaces) and later re-indented for jobs.
-			lines := strings.Split(yaml, "\n")
-			for i := 1; i < len(lines); i++ {
-				if strings.HasPrefix(lines[i], "      ") {
-					lines[i] = "  " + lines[i][6:]
-				}
-			}
-			data.Permissions = strings.Join(lines, "\n")
-		} else {
-			// For non-campaign workflows, set default to contents: read
-			perms := NewPermissionsContentsRead()
-			yaml := perms.RenderToYAML()
-			// RenderToYAML uses job-friendly indentation (6 spaces). WorkflowData.Permissions
-			// is stored in workflow-level indentation (2 spaces) and later re-indented for jobs.
-			lines := strings.Split(yaml, "\n")
-			for i := 1; i < len(lines); i++ {
-				if strings.HasPrefix(lines[i], "      ") {
-					lines[i] = "  " + lines[i][6:]
-				}
-			}
-			data.Permissions = strings.Join(lines, "\n")
 		}
+		data.Permissions = strings.Join(lines, "\n")
 	}
 	return nil
 }

@@ -48,6 +48,36 @@ import (
 
 var compileHelpersLog = logger.New("cli:compile_helpers")
 
+// getRepositoryRelativePath converts an absolute file path to a repository-relative path
+// This ensures stable workflow identifiers regardless of where the repository is cloned
+func getRepositoryRelativePath(absPath string) (string, error) {
+	// Get the repository root for the specific file
+	repoRoot, err := findGitRootForPath(absPath)
+	if err != nil {
+		// If we can't get the repo root, just use the basename as fallback
+		compileHelpersLog.Printf("Warning: could not get repository root for %s: %v, using basename", absPath, err)
+		return filepath.Base(absPath), nil
+	}
+
+	// Convert both paths to absolute to ensure they can be compared
+	absPath, err = filepath.Abs(absPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Get the relative path from repo root
+	relPath, err := filepath.Rel(repoRoot, absPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get relative path: %w", err)
+	}
+
+	// Normalize path separators to forward slashes for consistency across platforms
+	// This ensures the same hash value on Windows, Linux, and macOS
+	relPath = filepath.ToSlash(relPath)
+
+	return relPath, nil
+}
+
 // compileSingleFile compiles a single markdown workflow file and updates compilation statistics
 // If checkExists is true, the function will check if the file exists before compiling
 // Returns true if compilation was attempted (file exists or checkExists is false), false otherwise

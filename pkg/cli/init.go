@@ -564,32 +564,6 @@ func InitRepository(verbose bool, mcp bool, campaign bool, tokens bool, engine s
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created upgrade workflows prompt"))
 	}
 
-	// Write campaign dispatcher agent if requested
-	if campaign {
-		// Write campaign instruction files
-		initLog.Print("Writing campaign instruction files")
-		campaignEnsureFuncs := []struct {
-			fn   func(bool, bool) error
-			name string
-		}{
-			{ensureCampaignGeneratorInstructions, "campaign generator instructions"},
-			{ensureCampaignOrchestratorInstructions, "campaign orchestrator instructions"},
-			{ensureCampaignProjectUpdateInstructions, "campaign project update instructions"},
-			{ensureCampaignWorkflowExecution, "campaign workflow execution"},
-			{ensureCampaignClosingInstructions, "campaign closing instructions"},
-		}
-
-		for _, item := range campaignEnsureFuncs {
-			if err := item.fn(verbose, false); err != nil {
-				initLog.Printf("Failed to write %s: %v", item.name, err)
-				return fmt.Errorf("failed to write %s: %w", item.name, err)
-			}
-		}
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created campaign instruction files"))
-		}
-	}
-
 	// Configure MCP if requested
 	if mcp {
 		initLog.Print("Configuring GitHub Copilot Agent MCP integration")

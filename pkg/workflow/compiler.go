@@ -213,15 +213,6 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		c.IncrementWarningCount()
 	}
 
-	// Emit experimental warning for campaigns feature
-	// Campaign workflows (.campaign.md) are compiled by the campaign system in pkg/campaign/
-	// This warning is part of the general workflow compilation pipeline and simply
-	// detects campaign files to inform users about the experimental status.
-	if strings.HasSuffix(markdownPath, ".campaign.md") {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental feature: campaigns - This is a preview feature for multi-workflow orchestration. The campaign spec format, CLI commands, and repo-memory conventions may change in future releases. Workflows may break or require migration when the feature stabilizes."))
-		c.IncrementWarningCount()
-	}
-
 	// Validate workflow_run triggers have branch restrictions
 	log.Printf("Validating workflow_run triggers for branch restrictions")
 	if err := c.validateWorkflowRunBranches(workflowData, markdownPath); err != nil {
