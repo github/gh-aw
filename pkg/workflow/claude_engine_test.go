@@ -26,8 +26,8 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected description 'Uses Claude Code with full MCP tool support and allow-listing', got '%s'", engine.GetDescription())
 	}
 
-	if !engine.IsExperimental() {
-		t.Error("Claude engine should be experimental")
+	if engine.IsExperimental() {
+		t.Error("Claude engine should not be experimental")
 	}
 
 	if !engine.SupportsToolsAllowlist() {

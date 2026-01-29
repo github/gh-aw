@@ -48,7 +48,7 @@ run-name: "Daily Issues Report Generator"
 jobs:
   activation:
     needs: pre_activation
-    if: needs.pre_activation.outputs.activated == 'true'
+    if: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -594,7 +594,7 @@ jobs:
               version: "",
               agent_version: "0.92.0",
               workflow_name: "Daily Issues Report Generator",
-              experimental: true,
+              experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,
@@ -2152,6 +2152,8 @@ jobs:
           if-no-files-found: ignore
 
   pre_activation:
+    if: >
+      ((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')
     runs-on: ubuntu-slim
     permissions:
       contents: read

@@ -1481,3 +1481,189 @@ This workflow imports jobs and safe-outputs.
 	require.NotNil(t, workflowData.SafeOutputs.Messages, "Messages should be imported")
 	assert.Equal(t, "> Shared footer", workflowData.SafeOutputs.Messages.Footer, "Footer should match")
 }
+
+// TestProjectSafeOutputsImport tests that project-related safe-output types can be imported from shared workflows
+// This specifically tests the fix for the bug where CreateProjectStatusUpdates was not being merged from imports
+func TestProjectSafeOutputsImport(t *testing.T) {
+	compiler := NewCompilerWithVersion("1.0.0")
+
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	// Create a shared workflow with all project-related safe-output types
+	// This mimics the structure of shared/campaign.md
+	sharedWorkflow := `---
+safe-outputs:
+  update-project:
+    max: 100
+    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
+  create-project-status-update:
+    max: 1
+    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
+  create-project:
+    max: 5
+    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
+  copy-project:
+    max: 2
+    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
+---
+
+# Shared Project Safe Outputs
+
+This shared workflow provides project-related safe-output configuration.
+`
+
+	sharedFile := filepath.Join(workflowsDir, "shared-project.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
+
+	// Create main workflow that imports the project configuration
+	mainWorkflow := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+imports:
+  - ./shared-project.md
+---
+
+# Main Workflow
+
+This workflow uses the imported project safe-output configuration.
+`
+
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
+
+	// Change to the workflows directory for relative path resolution
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	// Parse the main workflow
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+
+	// Verify update-project configuration was imported correctly
+	require.NotNil(t, workflowData.SafeOutputs.UpdateProjects, "UpdateProjects configuration should be imported")
+	assert.Equal(t, 100, workflowData.SafeOutputs.UpdateProjects.Max)
+	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.UpdateProjects.GitHubToken)
+
+	// Verify create-project-status-update configuration was imported correctly (the bug fix)
+	require.NotNil(t, workflowData.SafeOutputs.CreateProjectStatusUpdates, "CreateProjectStatusUpdates configuration should be imported")
+	assert.Equal(t, 1, workflowData.SafeOutputs.CreateProjectStatusUpdates.Max)
+	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CreateProjectStatusUpdates.GitHubToken)
+
+	// Verify create-project configuration was imported correctly
+	require.NotNil(t, workflowData.SafeOutputs.CreateProjects, "CreateProjects configuration should be imported")
+	assert.Equal(t, 5, workflowData.SafeOutputs.CreateProjects.Max)
+	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CreateProjects.GitHubToken)
+
+	// Verify copy-project configuration was imported correctly
+	require.NotNil(t, workflowData.SafeOutputs.CopyProjects, "CopyProjects configuration should be imported")
+	assert.Equal(t, 2, workflowData.SafeOutputs.CopyProjects.Max)
+	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CopyProjects.GitHubToken)
+}
+
+// TestAllMissingSafeOutputTypesImport tests that all previously missing safe-output types can be imported
+// This test ensures that all types in SafeOutputsConfig are properly merged from imports
+func TestAllMissingSafeOutputTypesImport(t *testing.T) {
+	compiler := NewCompilerWithVersion("1.0.0")
+
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	// Create a shared workflow with all the previously missing safe-output types
+	sharedWorkflow := `---
+safe-outputs:
+  update-discussion:
+    max: 10
+  link-sub-issue:
+    max: 5
+  hide-comment:
+    max: 20
+  dispatch-workflow:
+    max: 3
+  assign-to-user:
+    max: 15
+  autofix-code-scanning-alert:
+    max: 8
+  mark-pull-request-as-ready-for-review:
+    max: 12
+  missing-data:
+    max: 2
+---
+
+# Shared Additional Safe Outputs
+
+This shared workflow provides additional safe-output types that were missing from merge logic.
+`
+
+	sharedFile := filepath.Join(workflowsDir, "shared-additional.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
+
+	// Create main workflow that imports the configuration
+	mainWorkflow := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+imports:
+  - ./shared-additional.md
+---
+
+# Main Workflow
+
+This workflow uses the imported safe-output configuration for previously missing types.
+`
+
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
+
+	// Change to the workflows directory for relative path resolution
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	// Parse the main workflow
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+
+	// Verify all previously missing types are now imported correctly
+	require.NotNil(t, workflowData.SafeOutputs.UpdateDiscussions, "UpdateDiscussions should be imported")
+	assert.Equal(t, 10, workflowData.SafeOutputs.UpdateDiscussions.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.LinkSubIssue, "LinkSubIssue should be imported")
+	assert.Equal(t, 5, workflowData.SafeOutputs.LinkSubIssue.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.HideComment, "HideComment should be imported")
+	assert.Equal(t, 20, workflowData.SafeOutputs.HideComment.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.DispatchWorkflow, "DispatchWorkflow should be imported")
+	assert.Equal(t, 3, workflowData.SafeOutputs.DispatchWorkflow.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.AssignToUser, "AssignToUser should be imported")
+	assert.Equal(t, 15, workflowData.SafeOutputs.AssignToUser.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.AutofixCodeScanningAlert, "AutofixCodeScanningAlert should be imported")
+	assert.Equal(t, 8, workflowData.SafeOutputs.AutofixCodeScanningAlert.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.MarkPullRequestAsReadyForReview, "MarkPullRequestAsReadyForReview should be imported")
+	assert.Equal(t, 12, workflowData.SafeOutputs.MarkPullRequestAsReadyForReview.Max)
+
+	require.NotNil(t, workflowData.SafeOutputs.MissingData, "MissingData should be imported")
+	assert.Equal(t, 2, workflowData.SafeOutputs.MissingData.Max)
+}

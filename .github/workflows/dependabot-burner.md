@@ -42,7 +42,7 @@ If no PRs are found, follow `aw/campaign.md` (No-Work Default).
 ### Update project items
 
 For each discovered PR, call `update_project` with:
-- `project`: "<project_url>"
+- `project`: https://github.com/orgs/githubnext/projects/144
 - `content_type`: "pull_request"
 - `content_number`: the PR number
 - `fields`: follow the defaults in `aw/campaign.md`
@@ -62,7 +62,22 @@ For each bundle:
    - A short research section (breaking changes / migration notes / risk)
 
 2. Capture the returned temporary ID, then immediately call `update_project(...)` to add that issue to the project:
-   - `project`: "<project_url>"
+   - `project`: https://github.com/orgs/githubnext/projects/144
    - `content_type`: "issue"
    - `content_number`: "<temporary_id>"
    - `fields`: follow the defaults in `aw/campaign.md` (Project Field Defaults)
+     - Set `status`: "In Progress" (since the issue represents active work)
+     - Set `campaign_id`: "dependabot-burner"
+     - Set `target_repo`: "githubnext/gh-aw"
+     - Set `worker_workflow`: "dependabot"
+
+### Final step
+
+After all work is complete, call `create_project_status_update` exactly once as required by `aw/campaign.md` (Project Status Updates):
+- `project`: https://github.com/orgs/githubnext/projects/144
+- `status`: "ON_TRACK" (or "INACTIVE" if no work was found)
+- `start_date`: today's date (YYYY-MM-DD format)
+- `body`: Include:
+  - Discovery query used
+  - Counts: number of PRs found, issues created, project items updated
+  - Next steps or summary of work completed
