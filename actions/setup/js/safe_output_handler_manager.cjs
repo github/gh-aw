@@ -794,6 +794,11 @@ async function main() {
   try {
     core.info("Safe Output Handler Manager starting...");
 
+    // Reset create_issue handler's global state to ensure clean state for this run
+    // This prevents stale data accumulation if the module is reused
+    const { resetIssuesToAssignCopilot } = require("./create_issue.cjs");
+    resetIssuesToAssignCopilot();
+
     // Load configuration
     const config = loadConfig();
     core.debug(`Configuration: ${JSON.stringify(Object.keys(config))}`);
