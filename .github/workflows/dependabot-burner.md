@@ -3,9 +3,8 @@ name: Dependabot Burner
 description: Burns down Dependabot security alert work items
 
 on:
-  #schedule: daily
-  #skip-if-not-match: prnwith dependabot label
-  workflow_dispatch:
+  schedule: daily
+  skip-if-no-match: 'is:pr is:open author:app/dependabot'
 
 permissions:
   issues: read
@@ -18,10 +17,6 @@ imports:
 ---
 
 # Dependabot Burner
-
-{{#runtime-import aw/campaign.md}}
-
-## Config
 
 - Project URL: https://github.com/orgs/githubnext/projects/144
 - Campaign ID: dependabot-burner
