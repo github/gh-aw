@@ -21,7 +21,7 @@
 #
 # Build and test this project
 #
-# Frontmatter-Hash: 172afff47307203cf85767894c0ae5270743b41ce9adabe4c9cd824c648917ed
+# frontmatter-hash: 41e94e64fd45c58da795194bc129b6f3717dd938f43a536240c57d7d63bfc7cb
 
 name: "Dev"
 "on":

@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# Frontmatter-Hash: b11140f300999bb67f7dada26d01c3eec9693f2b50f25f4dd960d46e28687f0d
+# frontmatter-hash: 33f25afd4aa129b57bf1b04a6c80940e174ab0156c688a284f8dd1ca268a7251
 
 name: "Workflow Health Manager - Meta-Orchestrator"
 "on":

@@ -21,7 +21,7 @@
 #
 # Security testing to find escape paths in the AWF (Agent Workflow Firewall)
 #
-# Frontmatter-Hash: 5653c71f2fced43f65100e94246082cff800b41206997dfc801157a3f0eeac07
+# frontmatter-hash: 09917405b4deff254e05ded47e33c2a6e79a534c936a8d0f20e38330e5b4eb98
 
 name: "The Great Escapi"
 "on":

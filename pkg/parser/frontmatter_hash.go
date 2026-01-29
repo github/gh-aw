@@ -138,9 +138,13 @@ func buildCanonicalFrontmatter(frontmatter map[string]any, result *ImportsResult
 	addSlice("merged-labels", result.MergedLabels)
 	addSlice("merged-caches", result.MergedCaches)
 
-	// Add list of imported files for traceability
+	// Add list of imported files for traceability (sorted for determinism)
 	if len(result.ImportedFiles) > 0 {
-		canonical["imports"] = result.ImportedFiles
+		// Sort imports for deterministic ordering
+		sortedImports := make([]string, len(result.ImportedFiles))
+		copy(sortedImports, result.ImportedFiles)
+		sort.Strings(sortedImports)
+		canonical["imports"] = sortedImports
 	}
 
 	// Add agent file if present
@@ -313,8 +317,10 @@ func buildVersionInfo() map[string]string {
 	// awf (firewall) version
 	versions["awf"] = string(constants.DefaultFirewallVersion)
 
-	// agents (MCP gateway) version
-	versions["agents"] = string(constants.DefaultMCPGatewayVersion)
+	// agents (MCP gateway) version - also aliased as "gateway" for clarity
+	gatewayVersion := string(constants.DefaultMCPGatewayVersion)
+	versions["agents"] = gatewayVersion
+	versions["gateway"] = gatewayVersion
 
 	return versions
 }

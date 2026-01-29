@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# Frontmatter-Hash: ca19a71922e44392b024577420d64418073fddc18e2d52ed3557613acb8ab814
+# frontmatter-hash: 9a00f10e71514378dc11ea20c566493389152b43ad7effc3f29cbf540588b5e9
 
 name: "Blog Auditor"
 "on":

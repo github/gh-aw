@@ -21,7 +21,7 @@
 #
 # Tests network firewall functionality and validates security rules for workflow network access
 #
-# Frontmatter-Hash: 890b12920c8c37439154919cb270248dcbdf7bfdb5667df4698b07b7ec906596
+# frontmatter-hash: 6acae3d7167eda86af696afc042bd66d29dc352695d30afbe2661fb6d0bbc764
 
 name: "Firewall Test Agent"
 "on":

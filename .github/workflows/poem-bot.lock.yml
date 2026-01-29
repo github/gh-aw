@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# Frontmatter-Hash: cf576f47a16c467da56f79607c4136fbcdcccad46fae86d6a15b4e6605f0e76a
+# frontmatter-hash: eca62328167a0bb9fe1f6cc51717d6425c7a3a5cb21a8470c09e93a099d87e55
 
 name: "Poem Bot - A Creative Agentic Workflow"
 "on":

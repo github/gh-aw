@@ -27,7 +27,7 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #
-# Frontmatter-Hash: 027bb28d6e8b0219e968ef6115596f7ea6c21ea13b0a4f071aee89694ee3c60d
+# frontmatter-hash: 9d56b24826501225dc0fd61399e4c308bf5743269cf96ded05443965fdfba128
 
 name: "Daily Safe Output Tool Optimizer"
 "on":

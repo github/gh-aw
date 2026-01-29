@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/brave.md
 #
-# Frontmatter-Hash: ddb22606bdcbee15481ea18319843aeb15ee2728f852962f45a369342ed61112
+# frontmatter-hash: 9a430f215fd97affed72547b7cf435bfb478e00d93f7666cd123a590c3b0ae80
 
 name: "Brave Web Search Agent"
 "on":
