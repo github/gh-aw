@@ -110,7 +110,7 @@ func TestAddWorkflows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := AddWorkflows(tt.workflows, tt.number, false, "", "", false, "", false, false, false, "", false, "")
-			
+
 			if tt.expectError {
 				require.Error(t, err, "Expected error for test case: %s", tt.name)
 				if tt.errorContains != "" {
@@ -170,7 +170,7 @@ func TestAddResolvedWorkflows(t *testing.T) {
 					},
 				},
 			}
-			
+
 			_, err := AddResolvedWorkflows(
 				[]string{"test/repo/test-workflow"},
 				resolved,
@@ -188,7 +188,7 @@ func TestAddResolvedWorkflows(t *testing.T) {
 				false, // noStopAfter
 				"",    // stopAfter
 			)
-			
+
 			if tt.expectError {
 				require.Error(t, err, "Expected error for test case: %s", tt.name)
 				if tt.errorContains != "" {
@@ -303,14 +303,14 @@ func TestAddCommandFlagInteractions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewAddCommand(validateEngineStub)
-			
+
 			// Apply flag setup
 			tt.flagSetup(cmd)
-			
+
 			// Verify flags are set correctly
 			flags := cmd.Flags()
 			assert.NotNil(t, flags, "Command flags should not be nil")
-			
+
 			// The actual validation happens during RunE execution
 			// Here we just verify the flags can be set without panic
 			assert.True(t, tt.expectValid, tt.description)
