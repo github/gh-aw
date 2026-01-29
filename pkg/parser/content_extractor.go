@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/goccy/go-yaml"
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/goccy/go-yaml"
 )
 
 var contentExtractorLog = logger.New("parser:content_extractor")
