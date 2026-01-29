@@ -874,7 +874,7 @@ jobs:
           - ✅ Scans for secret exfiltration patterns
           - ✅ Detects out-of-context code
           - ✅ Checks for suspicious system operations
-          - ✅ Generates code-scanning alerts (not issues) for findings
+          - ✅ **Calls the `create_code_scanning_alert` tool for findings OR calls the `noop` tool if clean**
           - ✅ Provides detailed, actionable alert descriptions
           - ✅ Completes within 15-minute timeout
           - ✅ Handles repositories with no changes gracefully
@@ -884,12 +884,14 @@ jobs:
           Your output MUST:
           
           1. **If suspicious patterns are found**:
-             - Generate code-scanning alerts using the `create_code_scanning_alert` output format
+             - **CALL** the `create_code_scanning_alert` tool for each finding
              - Each alert must include: rule_id, message, severity, file_path, start_line, description
              - Provide detailed descriptions explaining the threat and remediation
           
-          2. **If no suspicious patterns are found**:
-             - Use the `noop` output to log completion:
+          2. **If no suspicious patterns are found** (REQUIRED):
+             - **YOU MUST CALL** the `noop` tool to log completion
+             - This is a **required safe output** - the workflow will fail if you don't call it
+             - Call the tool with this message structure:
              ```json
              {
                "noop": {
@@ -897,6 +899,7 @@ jobs:
                }
              }
              ```
+             - **DO NOT just write this message in your output text** - you MUST actually invoke the `noop` tool
           
           3. **Analysis summary** (in alert descriptions or noop message):
              - Number of files analyzed
@@ -928,6 +931,14 @@ jobs:
             ]
           }
           ```
+          
+          ## ⚠️ CRITICAL REMINDER
+          
+          **YOU MUST produce a safe output:**
+          - **If threats found**: Call the `create_code_scanning_alert` tool for each finding
+          - **If no threats found**: Call the `noop` tool with a completion message
+          
+          **The workflow WILL FAIL if you don't call one of these tools.** Writing a message in your output text is NOT sufficient - you must actually invoke the tool.
           
           Begin your daily malicious code scan now. Analyze all code changes from the last 3 days, identify suspicious patterns, and generate appropriate code-scanning alerts for any threats detected.
           
