@@ -156,7 +156,7 @@ Key directories used across the codebase:
 | `pkg/parser/` | Markdown frontmatter parsing | Schema validation and parsing |
 | `actions/setup/js/` | JavaScript runtime code | CommonJS modules for GitHub Actions |
 | `actions/setup/sh/` | Shell script code | Bash scripts for GitHub Actions |
-| `specs/` | Specification documents | Documentation and specs directory |
+| `scratchpad/` | Specification documents | Documentation and specs directory |
 
 ## Constants and Patterns from Go Code
 

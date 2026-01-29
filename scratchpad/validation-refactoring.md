@@ -115,7 +115,7 @@ For each domain, create a new file following naming convention:
 //
 // For related validation, see {related_files}.
 // For general validation, see validation.go.
-// For detailed documentation, see specs/validation-architecture.md
+// For detailed documentation, see scratchpad/validation-architecture.md
 package workflow
 
 import (
@@ -355,7 +355,7 @@ When refactoring a large validation file:
 
 - **Implementation**: `pkg/workflow/bundler_*_validation.go`
 - **Tests**: `pkg/workflow/bundler_*_validation_test.go`
-- **Architecture**: `specs/validation-architecture.md`
+- **Architecture**: `scratchpad/validation-architecture.md`
 - **Guidelines**: `AGENTS.md` (Validation Architecture section)
 
 ---

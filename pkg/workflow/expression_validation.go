@@ -39,7 +39,7 @@
 //   - It validates expression syntax and structure
 //
 // For general validation, see validation.go.
-// For detailed documentation, see specs/validation-architecture.md
+// For detailed documentation, see scratchpad/validation-architecture.md
 
 package workflow
 

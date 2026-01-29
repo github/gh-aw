@@ -42,7 +42,7 @@ You are an expert analyst that generates comprehensive daily reports about repos
 
 ## Mission
 
-Generate a daily report analyzing up to 1000 issues from the repository (see `issues_analyzed` in specs/metrics-glossary.md):
+Generate a daily report analyzing up to 1000 issues from the repository (see `issues_analyzed` in scratchpad/metrics-glossary.md):
 1. Cluster issues by topic/theme using natural language analysis
 2. Calculate various metrics (open/closed rates, response times, label distribution)
 3. Generate trend charts showing issue activity over time
@@ -80,7 +80,7 @@ Create a Python script to analyze and cluster the issues. Use scikit-learn for c
 - Identify 5-10 major issue clusters/themes
 - Label each cluster based on common keywords
 
-**Metrics to Calculate** (see specs/metrics-glossary.md for definitions):
+**Metrics to Calculate** (see scratchpad/metrics-glossary.md for definitions):
 - Total issues (open vs closed) - `total_issues`, `open_issues`, `closed_issues`
 - Issues opened in last 7, 30 days - `issues_opened_7d`, `issues_opened_30d`
 - Average time to close (for closed issues)
@@ -118,7 +118,7 @@ df['createdAt'] = pd.to_datetime(df['createdAt'])
 df['updatedAt'] = pd.to_datetime(df['updatedAt'])
 df['closedAt'] = pd.to_datetime(df['closedAt'])
 
-# Calculate basic metrics (see specs/metrics-glossary.md for definitions)
+# Calculate basic metrics (see scratchpad/metrics-glossary.md for definitions)
 
 # Scope: All issues in repository, no filters
 total_issues = len(df)
@@ -176,7 +176,7 @@ def cluster_by_keywords(title):
 df['cluster'] = df['title'].apply(cluster_by_keywords)
 
 # Save metrics to JSON for report
-# Note: Using standardized metric names from specs/metrics-glossary.md
+# Note: Using standardized metric names from scratchpad/metrics-glossary.md
 metrics = {
     'total_issues': total_issues,
     'open_issues': open_issues,

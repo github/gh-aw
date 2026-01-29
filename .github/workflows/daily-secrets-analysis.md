@@ -261,7 +261,7 @@ Use the following template for the discussion post:
 ## 📖 Reference Documentation
 
 For detailed information about secret usage patterns, see:
-- Specification: [`specs/secrets-yml.md`](https://github.com/githubnext/gh-aw/blob/main/specs/secrets-yml.md)
+- Specification: [`scratchpad/secrets-yml.md`](https://github.com/githubnext/gh-aw/blob/main/scratchpad/secrets-yml.md)
 - Redaction System: `actions/setup/js/redact_secrets.cjs`
 
 ---

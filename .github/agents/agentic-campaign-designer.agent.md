@@ -262,7 +262,7 @@ gh aw campaign validate <campaign-id>
 Point users to these resources:
 - **Getting started**: https://githubnext.github.io/gh-aw/guides/campaigns/getting-started/
 - **Campaign flow**: https://githubnext.github.io/gh-aw/guides/campaigns/flow/
-- **Spec format**: https://githubnext.github.io/gh-aw/guides/campaigns/specs/
+- **Spec format**: https://githubnext.github.io/gh-aw/guides/campaigns/scratchpad/
 - **Workflow catalog**: https://github.com/githubnext/agentics
 
 ## Success Criteria

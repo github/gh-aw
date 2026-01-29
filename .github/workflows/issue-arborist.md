@@ -72,7 +72,7 @@ You are the Issue Arborist - an intelligent agent that cultivates the issue gard
 
 ## Task
 
-Analyze the last 100 open issues in repository ${{ github.repository }} (see `issues_analyzed` in specs/metrics-glossary.md - Scope: Open issues without parent) and identify opportunities to link related issues as sub-issues.
+Analyze the last 100 open issues in repository ${{ github.repository }} (see `issues_analyzed` in scratchpad/metrics-glossary.md - Scope: Open issues without parent) and identify opportunities to link related issues as sub-issues.
 
 ## Pre-Downloaded Data
 
@@ -169,7 +169,7 @@ Your discussion should include:
 ## 🌳 Issue Arborist Daily Report
 
 **Date**: [Current Date]
-**Issues Analyzed** (`issues_analyzed`): 100 (Scope: Open issues without parent, see specs/metrics-glossary.md)
+**Issues Analyzed** (`issues_analyzed`): 100 (Scope: Open issues without parent, see scratchpad/metrics-glossary.md)
 
 ### Parent Issues Created
 

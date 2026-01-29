@@ -261,7 +261,7 @@ If the history file doesn't exist or has gaps in the data, rebuild it by queryin
 
 #### 4.2 Store Today's Metrics
 
-Store today's metrics (see standardized metric names in specs/metrics-glossary.md):
+Store today's metrics (see standardized metric names in scratchpad/metrics-glossary.md):
 - Total PRs created today (`agent_prs_total`)
 - Number merged/closed/open (`agent_prs_merged`)
 - Average comments per PR
@@ -295,7 +295,7 @@ Store the data in JSON format with proper structure.
 repo:${{ github.repository }} is:pr "START COPILOT CODING AGENT" created:YYYY-MM-DD..YYYY-MM-DD
 ```
 
-Or use `list_pull_requests` with date filtering and filter results by agent criteria (see `agent_prs_total` in specs/metrics-glossary.md for scope).
+Or use `list_pull_requests` with date filtering and filter results by agent criteria (see `agent_prs_total` in scratchpad/metrics-glossary.md for scope).
 
 **Process:**
 - Start with the oldest missing date in your target range (maximum 3 days ago)
@@ -315,7 +315,7 @@ Or use `list_pull_requests` with date filtering and filter results by agent crit
 
 #### 4.3 Store Today's Metrics
 
-After ensuring historical data is available (either from existing repo memory or rebuilt), add today's metrics (see specs/metrics-glossary.md):
+After ensuring historical data is available (either from existing repo memory or rebuilt), add today's metrics (see scratchpad/metrics-glossary.md):
 - Total PRs created today (`agent_prs_total`)
 - Number merged/closed/open (`agent_prs_merged`, `closed_prs`, `open_prs`)
 - Average comments per PR

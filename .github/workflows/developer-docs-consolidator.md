@@ -40,10 +40,10 @@ tools:
   edit:
   bash:
     - "find specs -name '*.md'"
-    - "cat specs/*.md"
+    - "cat scratchpad/*.md"
     - "find specs -maxdepth 1 -ls"
     - "grep -r '*' specs"
-    - "wc -l specs/*.md"
+    - "wc -l scratchpad/*.md"
 
 timeout-minutes: 30
 
@@ -54,7 +54,7 @@ imports:
 
 # Developer Documentation Consolidator
 
-You are an AI documentation consistency agent that daily reviews markdown files in the `specs/` directory, ensures they have a consistent technical tone, and produces a consolidated `developer.instructions.md` file.
+You are an AI documentation consistency agent that daily reviews markdown files in the `scratchpad/` directory, ensures they have a consistent technical tone, and produces a consolidated `developer.instructions.md` file.
 
 ## Mission
 
@@ -65,7 +65,7 @@ Analyze markdown files in the specs directory, standardize their tone and format
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
-- **Specs Directory**: `specs/`
+- **Specs Directory**: `scratchpad/`
 - **Target File**: `.github/agents/developer.instructions.agent.md`
 - **Cache Memory**: `/tmp/gh-aw/cache-memory/`
 
@@ -97,7 +97,7 @@ If there's a previous run's data, load it to understand historical context:
 
 ### 1. Identify All Markdown Files
 
-Find all `.md` files in the `specs/` directory:
+Find all `.md` files in the `scratchpad/` directory:
 
 ```bash
 find specs -name "*.md"
@@ -113,12 +113,12 @@ For each markdown file found:
 
 Create an inventory of files:
 ```
-File: specs/README.md
+File: scratchpad/README.md
 Purpose: Overview and index
 Lines: 50
 Status: To be analyzed
 
-File: specs/code-organization.md  
+File: scratchpad/code-organization.md  
 Purpose: Code organization guidelines
 Lines: 350
 Status: To be analyzed
@@ -272,13 +272,13 @@ applyTo: "**/*"
 ## Overview
 [Brief introduction to the consolidated guidelines]
 
-## [Topic 1 from specs/]
+## [Topic 1 from scratchpad/]
 [Consolidated content from relevant spec files]
 
-## [Topic 2 from specs/]
+## [Topic 2 from scratchpad/]
 [Consolidated content from relevant spec files]
 
-## [Topic N from specs/]
+## [Topic N from scratchpad/]
 [Consolidated content from relevant spec files]
 
 ## Best Practices
@@ -342,7 +342,7 @@ Save to `/tmp/gh-aw/cache-memory/consolidation/latest.json`:
 ```json
 {
   "date": "2025-11-06",
-  "files_analyzed": ["specs/README.md", "specs/code-organization.md", ...],
+  "files_analyzed": ["scratchpad/README.md", "scratchpad/code-organization.md", ...],
   "tone_adjustments": 15,
   "diagrams_added": 3,
   "total_lines_before": 2500,
@@ -375,14 +375,14 @@ Analyzed [N] markdown files in the specs directory, made [X] tone adjustments, a
 
 | File | Lines | Issues Found | Changes Made |
 |------|-------|--------------|--------------|
-| specs/README.md | 50 | 2 tone issues | Fixed marketing language |
-| specs/code-organization.md | 350 | 5 formatting | Added headings, code tags |
+| scratchpad/README.md | 50 | 2 tone issues | Fixed marketing language |
+| scratchpad/code-organization.md | 350 | 5 formatting | Added headings, code tags |
 | ... | ... | ... | ... |
 
 ## Tone Adjustments Made
 
 ### Marketing Language Removed
-- File: specs/code-organization.md, Line 45
+- File: scratchpad/code-organization.md, Line 45
   - Before: "Our powerful validation system makes it easy..."
   - After: "The validation system provides..."
 
@@ -509,7 +509,7 @@ After you've made file changes, a pull request will be created automatically wit
 ```markdown
 ## Developer Documentation Consolidation
 
-This PR consolidates markdown specifications from the `specs/` directory into a unified `.github/agents/developer.instructions.agent.md` file.
+This PR consolidates markdown specifications from the `scratchpad/` directory into a unified `.github/agents/developer.instructions.agent.md` file.
 
 ### Changes Made
 
@@ -610,7 +610,7 @@ on: push
 ## Success Criteria
 
 A successful consolidation run:
-- ✅ Analyzes all markdown files in specs/
+- ✅ Analyzes all markdown files in scratchpad/
 - ✅ Uses Serena for static analysis
 - ✅ Fixes tone issues (marketing → technical) **by directly editing files**
 - ✅ Adds Mermaid diagrams where beneficial **by directly editing files**

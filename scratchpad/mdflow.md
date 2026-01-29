@@ -1173,7 +1173,7 @@ CI/CD Execution (gh-aw):
 **Documentation**:
 - Full documentation site (Astro Starlight)
 - Video tutorials and slides
-- Comprehensive specifications (specs/ directory)
+- Comprehensive specifications (scratchpad/ directory)
 - Enterprise security guidelines
 
 ---

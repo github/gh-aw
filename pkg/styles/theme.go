@@ -27,7 +27,7 @@
 //   - Structural colors: Comment (muted text), Foreground (primary text), Background, Border
 //
 // Each color constant is documented with its light/dark hex values and semantic usage.
-// For visual examples and usage guidelines, see specs/styles-guide.md
+// For visual examples and usage guidelines, see scratchpad/styles-guide.md
 //
 // # Usage Example
 //

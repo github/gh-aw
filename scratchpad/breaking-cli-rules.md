@@ -267,7 +267,7 @@ Special consideration for strict mode changes:
 
 ## References
 
-- **Changeset System**: See `specs/changesets.md` for version management
+- **Changeset System**: See `scratchpad/changesets.md` for version management
 - **CHANGELOG**: See `CHANGELOG.md` for examples of breaking changes
 - **Semantic Versioning**: https://semver.org/
 

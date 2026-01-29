@@ -271,7 +271,7 @@ go test -v -run "Test.*Compile" ./pkg/workflow/ # Pattern matching
 
 ## Testing
 
-For comprehensive testing guidelines, patterns, and conventions, see **[specs/testing.md](specs/testing.md)**.
+For comprehensive testing guidelines, patterns, and conventions, see **[scratchpad/testing.md](scratchpad/testing.md)**.
 
 **Key testing principles:**
 - Use `require.*` for critical setup (stops test on failure)
@@ -361,7 +361,7 @@ Contains 2+ distinct domains? ──YES──> Should split
 Keep as-is
 ```
 
-See **[specs/validation-refactoring.md](specs/validation-refactoring.md)** for step-by-step refactoring guide and examples.
+See **[scratchpad/validation-refactoring.md](scratchpad/validation-refactoring.md)** for step-by-step refactoring guide and examples.
 
 ## Console Message Formatting
 
@@ -458,7 +458,7 @@ DEBUG_COLORS=0 DEBUG=* gh aw compile
 
 ## CLI Command Patterns
 
-For developing new CLI commands, follow these patterns and conventions. See **[specs/cli-command-patterns.md](specs/cli-command-patterns.md)** for comprehensive guidance.
+For developing new CLI commands, follow these patterns and conventions. See **[scratchpad/cli-command-patterns.md](scratchpad/cli-command-patterns.md)** for comprehensive guidance.
 
 ### Command Structure
 
@@ -624,7 +624,7 @@ When developing a new command:
 - [ ] Table-driven tests for multiple scenarios
 - [ ] Valid, invalid, and edge case tests
 
-**See**: [specs/cli-command-patterns.md](specs/cli-command-patterns.md) for complete specification with examples and anti-patterns
+**See**: [scratchpad/cli-command-patterns.md](scratchpad/cli-command-patterns.md) for complete specification with examples and anti-patterns
 
 ## Development Guidelines
 
@@ -741,7 +741,7 @@ go test -race ./...
 
 **Primary YAML Library**: `goccy/go-yaml` v1.19.1
 
-gh-aw uses `goccy/go-yaml` for YAML 1.1/1.2 compatibility with GitHub Actions. See [specs/yaml-version-gotchas.md](specs/yaml-version-gotchas.md) for details on YAML version differences.
+gh-aw uses `goccy/go-yaml` for YAML 1.1/1.2 compatibility with GitHub Actions. See [scratchpad/yaml-version-gotchas.md](scratchpad/yaml-version-gotchas.md) for details on YAML version differences.
 
 **Standard YAML Library**: `go.yaml.in/yaml/v3` v3.0.4
 
@@ -882,7 +882,7 @@ func ValidatePermissions(permissions *Permissions, githubTool any)
 - Large "god" interfaces with many methods
 - Type name collisions (use descriptive, domain-qualified names)
 
-**See**: [specs/go-type-patterns.md](specs/go-type-patterns.md) for detailed guidance and examples
+**See**: [scratchpad/go-type-patterns.md](scratchpad/go-type-patterns.md) for detailed guidance and examples
 
 ### Frontmatter Configuration Types
 
@@ -1074,7 +1074,7 @@ Skills provide specialized, detailed knowledge on specific topics. **Use them on
 - **[console-rendering](skills/console-rendering/SKILL.md)** - Struct tag-based console rendering system for CLI output
 - **[error-messages](skills/error-messages/SKILL.md)** - Error message style guide for validation errors
 - **[error-pattern-safety](skills/error-pattern-safety/SKILL.md)** - Safety guidelines for error pattern regex
-- **[error-recovery-patterns](specs/error-recovery-patterns.md)** - Error handling patterns, recovery strategies, and debugging techniques
+- **[error-recovery-patterns](scratchpad/error-recovery-patterns.md)** - Error handling patterns, recovery strategies, and debugging techniques
 
 ### JavaScript & GitHub Actions
 - **[github-script](skills/github-script/SKILL.md)** - Best practices for GitHub Actions scripts using github-script

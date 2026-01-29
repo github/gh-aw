@@ -222,7 +222,7 @@ require.NoError(t, err, "operation should succeed")
 assert.Equal(t, expected, result, "result should match expected value")
 ```
 
-**Why this matters**: Testify provides clearer error messages, better test output, and is the standard used throughout this codebase (see `specs/testing.md`).
+**Why this matters**: Testify provides clearer error messages, better test output, and is the standard used throughout this codebase (see `scratchpad/testing.md`).
 
 #### 2. Table-Driven Tests
 
@@ -270,7 +270,7 @@ func TestFunctionName(t *testing.T) {
 }
 ```
 
-**Why this matters**: Table-driven tests are easier to extend, maintain, and understand. They follow the pattern used in `specs/testing.md`.
+**Why this matters**: Table-driven tests are easier to extend, maintain, and understand. They follow the pattern used in `scratchpad/testing.md`.
 
 #### 3. Test Coverage Gaps
 
@@ -339,7 +339,7 @@ require.NoError(t, err, "setup should succeed without errors")
 4. **Medium**: Improve test names and organization
 5. **Low**: Add assertion messages
 
-### Best Practices from `specs/testing.md`
+### Best Practices from `scratchpad/testing.md`
 - ✅ Use `require.*` for critical setup (stops test on failure)
 - ✅ Use `assert.*` for test validations (continues checking)
 - ✅ Write table-driven tests with `t.Run()` and descriptive names
@@ -366,11 +366,11 @@ make test-unit
 - [ ] Test names are descriptive and follow conventions
 - [ ] All assertions include helpful messages
 - [ ] Tests pass: `make test-unit`
-- [ ] Code follows patterns in `specs/testing.md`
+- [ ] Code follows patterns in `scratchpad/testing.md`
 
 ## Additional Context
 
-- **Repository Testing Guidelines**: See `specs/testing.md` for comprehensive testing patterns
+- **Repository Testing Guidelines**: See `scratchpad/testing.md` for comprehensive testing patterns
 - **Example Tests**: Look at recent test files in `pkg/workflow/*_test.go` for examples
 - **Testify Documentation**: https://github.com/stretchr/testify
 
@@ -447,14 +447,14 @@ Total Processed Files: [COUNT]
 - **One file per day**: Focus on providing high-quality, detailed analysis for a single file
 - **Use Serena extensively**: Leverage the language server for semantic understanding
 - **Be specific and actionable**: Provide code examples, not vague advice
-- **Follow repository patterns**: Reference `specs/testing.md` and existing test patterns
+- **Follow repository patterns**: Reference `scratchpad/testing.md` and existing test patterns
 - **Cache management**: Always update the cache after processing
 - **30-day cycle**: Files become eligible for re-analysis after 30 days
 - **Priority to uncovered code**: Prefer files with lower test coverage when selecting
 
 ## Testify Best Practices Reference
 
-### Common Patterns from `specs/testing.md`
+### Common Patterns from `scratchpad/testing.md`
 
 **Use `require.*` for setup:**
 ```go

@@ -54,7 +54,7 @@
 //   - No inline shell script interpolation (prevents injection)
 //   - Safe placeholder substitution via JavaScript
 //
-// See specs/template-injection-prevention.md for security details.
+// See scratchpad/template-injection-prevention.md for security details.
 //
 // # When to Use vs Alternatives
 //

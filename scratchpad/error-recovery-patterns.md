@@ -507,7 +507,7 @@ on:
 - `on`, `off` (parsed as booleans)
 - Numbers starting with 0 (parsed as octal)
 
-See `specs/yaml-version-gotchas.md` for complete guide.
+See `scratchpad/yaml-version-gotchas.md` for complete guide.
 
 #### Scenario: Expression Size Limit Exceeded
 
@@ -1130,7 +1130,7 @@ func TestValidationErrorMessage(t *testing.T) {
 }
 ```
 
-See `specs/testing.md` for complete testing guidelines.
+See `scratchpad/testing.md` for complete testing guidelines.
 
 ---
 

@@ -94,7 +94,7 @@ Use `update_issue` with `operation: "append"` so you **do not overwrite** the or
 Docs to link:
 - Getting started: https://githubnext.github.io/gh-aw/guides/campaigns/getting-started/
 - Flow & lifecycle: https://githubnext.github.io/gh-aw/guides/campaigns/flow/
-- Campaign specs: https://githubnext.github.io/gh-aw/guides/campaigns/specs/
+- Campaign specs: https://githubnext.github.io/gh-aw/guides/campaigns/scratchpad/
 
 ### Required structure for the issue update
 

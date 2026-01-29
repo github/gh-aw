@@ -21,7 +21,7 @@ const CLIExtensionPrefix CommandPrefix = "gh aw"
 //   - Clear intent: Signals to readers what the value represents
 //   - Easy refactoring: Can change implementation without affecting API
 //
-// See specs/go-type-patterns.md for detailed guidance on type patterns.
+// See scratchpad/go-type-patterns.md for detailed guidance on type patterns.
 
 // LineLength represents a line length in characters for expression formatting.
 // This semantic type distinguishes line lengths from arbitrary integers,

@@ -10,7 +10,7 @@
 // environment variables only if they exist on the host. This ensures graceful
 // handling of missing variables.
 //
-// Reference: specs/ubuntulatest.md section "Environment Variables"
+// Reference: scratchpad/ubuntulatest.md section "Environment Variables"
 
 package workflow
 
@@ -33,7 +33,7 @@ var envMirrorLog = logger.New("workflow:env_mirror")
 // - Go workspace path
 //
 // Variables are only passed through if they exist on the host runner.
-// Reference: specs/ubuntulatest.md
+// Reference: scratchpad/ubuntulatest.md
 var MirroredEnvVars = []string{
 	// Java JDK homes (multiple versions available on Ubuntu runner)
 	"JAVA_HOME",

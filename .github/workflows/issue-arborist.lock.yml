@@ -773,7 +773,7 @@ jobs:
           
           ## Task
           
-          Analyze the last 100 open issues in repository __GH_AW_GITHUB_REPOSITORY__ (see `issues_analyzed` in specs/metrics-glossary.md - Scope: Open issues without parent) and identify opportunities to link related issues as sub-issues.
+          Analyze the last 100 open issues in repository __GH_AW_GITHUB_REPOSITORY__ (see `issues_analyzed` in scratchpad/metrics-glossary.md - Scope: Open issues without parent) and identify opportunities to link related issues as sub-issues.
           
           ## Pre-Downloaded Data
           
@@ -870,7 +870,7 @@ jobs:
           ## 🌳 Issue Arborist Daily Report
           
           **Date**: [Current Date]
-          **Issues Analyzed** (`issues_analyzed`): 100 (Scope: Open issues without parent, see specs/metrics-glossary.md)
+          **Issues Analyzed** (`issues_analyzed`): 100 (Scope: Open issues without parent, see scratchpad/metrics-glossary.md)
           
           ### Parent Issues Created
           
