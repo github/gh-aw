@@ -2,7 +2,8 @@
 description: Automated security guard that reviews every PR for changes that could weaken security posture, only commenting when concrete evidence of security concerns exists
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
+if: ${{ !github.event.pull_request.draft }}
 permissions:
   contents: read
   pull-requests: read
