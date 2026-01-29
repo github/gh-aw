@@ -19,6 +19,7 @@ safe-outputs:
     max: 100
   create-issue:
     max: 1
+    title-prefix: "[campaign]"
     assignees: copilot
 project: https://github.com/orgs/githubnext/projects/144
 ---
@@ -118,28 +119,30 @@ Analyze all discovered PRs following these rules:
 - Enforce **one runtime + one target file per PR**.
 - All PRs must pass **CI and relevant runtime tests** before merge.
 
-#### Safe-Output Call #1: Create the Issue
+#### Safe-Output Call: Create Bundle Issues
 
-Create a single issue using the `create_issue` tool:
+Create **one issue per planned bundle** (up to 3 total). Each issue should correspond to exactly **one runtime + one manifest file**.
+
+For each bundle, call `create_issue`:
 
 ```
 create_issue(
-  title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)",
+  title="[campaign] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
   body="<use template below>"
 )
 ```
 
-**IMPORTANT**: After calling `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use this temporary ID in the next two calls.
+**IMPORTANT**: After each `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use each temporary ID in the corresponding project update.
 
-#### Safe-Output Call #2: Add Issue to Project Board
+#### Safe-Output Call: Add Each Bundle Issue to Project Board
 
-**Immediately** call `update_project` using the temporary ID from call #1:
+For **each** issue you created above, **immediately** call `update_project`:
 
 ```
 update_project(
   project="https://github.com/orgs/githubnext/projects/144",
   content_type="issue",
-  content_number="<temporary_id_from_call_1>",
+  content_number="<temporary_id_from_create_issue>",
   fields={
     "campaign_id": "security-alert-burndown",
     "status": "Todo",
@@ -152,14 +155,18 @@ update_project(
 )
 ```
 
-**Example**: If `create_issue` returned `aw_sec2026012901`, then call:
-- Call #2: `update_project(..., content_number="aw_sec2026012901", ...)`
+**Example**: If a bundle `create_issue` returned `aw_sec2026012901`, then call:
+- `update_project(..., content_number="aw_sec2026012901", ...)`
 
 
-**Issue Body Template:**
+**Issue Body Template (one bundle per issue):**
 ```markdown
 ## Context
-This issue tracks Dependabot PR bundling work discovered by the Security Alert Burndown campaign.
+This issue tracks one Dependabot PR bundle discovered by the Security Alert Burndown campaign.
+
+## Bundle
+- Runtime: [runtime]
+- Manifest: [manifest file]
 
 ## Bundling Rules
 - Group work by runtime. Never mix runtimes.
@@ -167,20 +174,13 @@ This issue tracks Dependabot PR bundling work discovered by the Security Alert B
 - Patch/minor updates may be bundled; major updates should be isolated unless tightly coupled.
 - Bundled releases must include a research report (packages, versions, breaking changes, migration, risk, tests).
 
-## Planned Bundles
-
-### [runtime] — [manifest file]
-PRs:
+## PRs in Bundle
 - [ ] #123 - [title] ([old] → [new])
 - [ ] #456 - [title] ([old] → [new])
 
-### [runtime] — [manifest file]
-PRs:
-- [ ] #789 - [title] ([old] → [new])
-
 ## Agent Task
-1. For each bundle section above, research each update for breaking changes and summarize risks.
-2. Bundle PRs per section into a single PR (one runtime + one manifest).
+1. Research each update for breaking changes and summarize risks.
+2. Create a single bundled PR (one runtime + one manifest).
 3. Ensure CI passes; run relevant runtime tests.
 4. Add the research report to the bundled PR.
 5. Update this issue checklist as PRs are merged.
@@ -188,7 +188,7 @@ PRs:
 
 ### Step 5: Report
 
-Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the parent tracking issue number that was created and assigned.
+Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the bundle issue numbers that were created and assigned.
 
 ## Important
 
