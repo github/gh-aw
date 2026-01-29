@@ -82,3 +82,51 @@ func TestCopilotAssignmentEnvVarWithMixedAssignees(t *testing.T) {
 	assert.Contains(t, stepsStr, "GH_AW_ASSIGN_COPILOT", "Expected GH_AW_ASSIGN_COPILOT to be set when copilot is among multiple assignees")
 	assert.Contains(t, stepsStr, `GH_AW_ASSIGN_COPILOT: "true"`, "Expected GH_AW_ASSIGN_COPILOT to be set to 'true'")
 }
+
+// TestCopilotAssignmentEnvVarWithNilAssignees verifies that GH_AW_ASSIGN_COPILOT
+// is not set when assignees field is nil
+func TestCopilotAssignmentEnvVarWithNilAssignees(t *testing.T) {
+	compiler := NewCompiler()
+
+	data := &WorkflowData{
+		Name: "Test",
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
+				Assignees:            nil,
+			},
+		},
+	}
+
+	var steps []string
+	compiler.addAllSafeOutputConfigEnvVars(&steps, data)
+
+	// Join steps to search for the env var
+	stepsStr := strings.Join(steps, "")
+
+	assert.NotContains(t, stepsStr, "GH_AW_ASSIGN_COPILOT", "Expected GH_AW_ASSIGN_COPILOT not to be set when assignees is nil")
+}
+
+// TestCopilotAssignmentEnvVarWithEmptyAssignees verifies that GH_AW_ASSIGN_COPILOT
+// is not set when assignees array is empty
+func TestCopilotAssignmentEnvVarWithEmptyAssignees(t *testing.T) {
+	compiler := NewCompiler()
+
+	data := &WorkflowData{
+		Name: "Test",
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{
+				BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
+				Assignees:            []string{},
+			},
+		},
+	}
+
+	var steps []string
+	compiler.addAllSafeOutputConfigEnvVars(&steps, data)
+
+	// Join steps to search for the env var
+	stepsStr := strings.Join(steps, "")
+
+	assert.NotContains(t, stepsStr, "GH_AW_ASSIGN_COPILOT", "Expected GH_AW_ASSIGN_COPILOT not to be set when assignees is empty")
+}
