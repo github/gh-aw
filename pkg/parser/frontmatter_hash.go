@@ -175,7 +175,11 @@ func marshalSorted(data any) string {
 				result.WriteString(",")
 			}
 			// Marshal the key
-			keyJSON, _ := json.Marshal(key)
+			keyJSON, err := json.Marshal(key)
+			if err != nil {
+				frontmatterHashLog.Printf("Warning: failed to marshal key %s: %v", key, err)
+				continue
+			}
 			result.Write(keyJSON)
 			result.WriteString(":")
 			// Marshal the value recursively
@@ -202,12 +206,21 @@ func marshalSorted(data any) string {
 
 	case string, int, int64, float64, bool, nil:
 		// Use standard JSON marshaling for primitives
-		jsonBytes, _ := json.Marshal(v)
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			// This should rarely happen for primitives, but log it for debugging
+			frontmatterHashLog.Printf("Warning: failed to marshal primitive value: %v", err)
+			return "null"
+		}
 		return string(jsonBytes)
 
 	default:
 		// Fallback to standard JSON marshaling
-		jsonBytes, _ := json.Marshal(v)
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			frontmatterHashLog.Printf("Warning: failed to marshal value of type %T: %v", v, err)
+			return "null"
+		}
 		return string(jsonBytes)
 	}
 }

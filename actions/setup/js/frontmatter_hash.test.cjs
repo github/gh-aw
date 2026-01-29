@@ -1,9 +1,6 @@
 // @ts-check
 import { describe, it, expect } from "vitest";
-const {
-  marshalSorted,
-  buildCanonicalFrontmatter,
-} = require("./frontmatter_hash.cjs");
+const { marshalSorted, buildCanonicalFrontmatter } = require("./frontmatter_hash.cjs");
 
 describe("frontmatter_hash", () => {
   describe("marshalSorted", () => {

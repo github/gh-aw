@@ -142,7 +142,7 @@ func TestComputeFrontmatterHash_AllFieldTypes(t *testing.T) {
 		"tracker-id":      "test-workflow",
 		"timeout-minutes": 30,
 		"on": map[string]any{
-			"schedule":         "daily",
+			"schedule":          "daily",
 			"workflow_dispatch": true,
 		},
 		"permissions": map[string]any{

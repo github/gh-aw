@@ -30,6 +30,9 @@ async function computeFrontmatterHash(workflowPath) {
 
 /**
  * Extracts frontmatter from markdown content
+ * NOTE: This is a simplified placeholder. For production use, this should
+ * parse YAML properly or call the Go implementation.
+ * 
  * @param {string} content - The markdown content
  * @returns {Record<string, any>} The parsed frontmatter object
  */
@@ -51,7 +54,10 @@ function extractFrontmatter(content) {
     throw new Error("Frontmatter not properly closed");
   }
 
-  // For now, return empty object - proper YAML parsing would go here
+  // TODO: Implement proper YAML parsing or call Go binary
+  // For now, return empty object - the hash will still be deterministic
+  // but won't include frontmatter content
+  console.warn("extractFrontmatter: YAML parsing not fully implemented, returning empty object");
   return {};
 }
 
@@ -63,7 +69,7 @@ function extractFrontmatter(content) {
  */
 function buildCanonicalFrontmatter(frontmatter, importsResult) {
   const canonical = {};
-  
+
   const addField = (/** @type {string} */ key) => {
     if (frontmatter[key] !== undefined) {
       canonical[key] = frontmatter[key];
