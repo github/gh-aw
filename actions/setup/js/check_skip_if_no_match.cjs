@@ -4,9 +4,7 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 async function main() {
-  const skipQuery = process.env.GH_AW_SKIP_QUERY;
-  const workflowName = process.env.GH_AW_WORKFLOW_NAME;
-  const minMatchesStr = process.env.GH_AW_SKIP_MIN_MATCHES ?? "1";
+  const { GH_AW_SKIP_QUERY: skipQuery, GH_AW_WORKFLOW_NAME: workflowName, GH_AW_SKIP_MIN_MATCHES: minMatchesStr = "1" } = process.env;
 
   if (!skipQuery) {
     core.setFailed("Configuration error: GH_AW_SKIP_QUERY not specified.");
@@ -33,12 +31,13 @@ async function main() {
   core.info(`Scoped query: ${scopedQuery}`);
 
   try {
-    const response = await github.rest.search.issuesAndPullRequests({
+    const {
+      data: { total_count: totalCount },
+    } = await github.rest.search.issuesAndPullRequests({
       q: scopedQuery,
       per_page: 1,
     });
 
-    const totalCount = response.data.total_count;
     core.info(`Search found ${totalCount} matching items`);
 
     if (totalCount < minMatches) {
