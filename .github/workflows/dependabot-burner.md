@@ -1,6 +1,6 @@
 ---
 name: Dependabot Burner
-description: Burns down Dependabot security alert work items
+description: Burns down open Dependabot PRs.
 
 on:
   schedule: daily
@@ -20,59 +20,7 @@ imports:
 
 - Project URL: https://github.com/orgs/githubnext/projects/144
 - Campaign ID: dependabot-burner
-- Target repo: githubnext/gh-aw
 
-## Task
-
-### Discover work items
-
-Find open Dependabot PRs in `githubnext/gh-aw`:
-```
-repo:githubnext/gh-aw is:pr author:app/dependabot label:dependencies label:javascript is:open
-```
-
-Follow `aw/campaign.md` (Budgets & Pacing) for limits and ordering.
-If no PRs are found, follow `aw/campaign.md` (No-Work Default).
-
-### Update project items
-
-For each discovered PR, call `update_project` with:
-- `project`: https://github.com/orgs/githubnext/projects/144
-- `content_type`: "pull_request"
-- `content_number`: the PR number
-- `fields`: follow the defaults in `aw/campaign.md`
-  - Override for this workflow: `worker_workflow`: "dependabot"
-
-### Bundle dependabot PRs into issues
-
-Create up to 3 bundle issues, each representing exactly **one runtime + one manifest file** (never mix runtimes; never mix manifests).
-
-For each bundle:
-
-1. Call `create_issue(...)` with a title like:
-   - `[dependabot-burner] Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)`
-   Issue body should include:
-   - Runtime + manifest
-   - Checklist of PRs in the bundle
-   - A short research section (breaking changes / migration notes / risk)
-
-2. Capture the returned temporary ID, then immediately call `update_project(...)` to add that issue to the project:
-   - `project`: https://github.com/orgs/githubnext/projects/144
-   - `content_type`: "issue"
-   - `content_number`: "<temporary_id>"
-   - `fields`: follow the defaults in `aw/campaign.md` (Project Field Defaults)
-     - Set `status`: "In Progress" (since the issue represents active work)
-     - Set `campaign_id`: "dependabot-burner"
-     - Set `target_repo`: "githubnext/gh-aw"
-     - Set `worker_workflow`: "dependabot"
-
-### Final step
-
-After all work is complete, call `create_project_status_update` exactly once as required by `aw/campaign.md` (Project Status Updates):
-- `project`: https://github.com/orgs/githubnext/projects/144
-- `status`: "ON_TRACK" (or "INACTIVE" if no work was found)
-- `start_date`: today's date (YYYY-MM-DD format)
-- `body`: Include:
-  - Discovery query used
-  - Counts: number of PRs found, issues created, project items updated
-  - Next steps or summary of work completed
+- Find all open Dependabot PRs and add them to the project.
+- Create bundle issues, each for exactly **one runtime + one manifest file**.
+- Add bundle issues to the project, and assign them to Copilot.
