@@ -279,7 +279,7 @@ The required token type depends on whether you own the repository or an organiza
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
    - **Resource owner**: Your user account
    - **Repository access**: "Public repositories" or select specific repos
-     - **Note**: This setting is **not relevant** for Copilot authentication. The token only requires the **Copilot Requests** permission, which is independent of repository visibility. Even if your project is private, you can leave this set to "Public repositories"—it does not affect how the token is used.
+     - **Note**: You should leave "Public repositories" enabled; otherwise, you will not have access to the Copilot Requests permission option.
    - **Permissions**: 
      - Copilot Requests: Read-only (required)
 
