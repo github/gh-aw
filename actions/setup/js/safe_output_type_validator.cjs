@@ -252,6 +252,10 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
 
   // For issueNumberOrTemporaryId fields, delegate required check to validateIssueNumberOrTemporaryId
   if (validation.issueNumberOrTemporaryId) {
+    // If the field is optional and not present, skip validation
+    if (!validation.required && (value === undefined || value === null)) {
+      return { isValid: true };
+    }
     return validateIssueNumberOrTemporaryId(value, `${itemType} '${fieldName}'`, lineNum);
   }
 

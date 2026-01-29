@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { resolveIssueNumber } = require("./temporary_id.cjs");
+const { loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
@@ -55,12 +55,12 @@ async function main(config = {}) {
 
     const item = message;
 
-    // Convert resolvedTemporaryIds object to Map for resolveIssueNumber
-    const temporaryIdMap = new Map(Object.entries(resolvedTemporaryIds || {}));
+    // Convert resolvedTemporaryIds to a normalized Map for resolveIssueNumber
+    const temporaryIdMap = loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
     // Resolve issue numbers, supporting temporary IDs from create_issue job
-    const parentResolved = resolveIssueNumber(item.parent_issue_number, temporaryIdMap);
-    const subResolved = resolveIssueNumber(item.sub_issue_number, temporaryIdMap);
+    const parentResolved = resolveRepoIssueTarget(item.parent_issue_number, temporaryIdMap, context.repo.owner, context.repo.repo);
+    const subResolved = resolveRepoIssueTarget(item.sub_issue_number, temporaryIdMap, context.repo.owner, context.repo.repo);
 
     // Check if either parent or sub issue is an unresolved temporary ID
     // If so, defer the operation to allow for resolution later
@@ -122,18 +122,37 @@ async function main(config = {}) {
     }
 
     if (parentResolved.wasTemporaryId && parentResolved.resolved) {
-      core.info(`Resolved parent temporary ID '${item.parent_issue_number}' to ${parentResolved.resolved.repo}#${parentIssueNumber}`);
+      core.info(`Resolved parent temporary ID '${item.parent_issue_number}' to ${parentResolved.resolved.owner}/${parentResolved.resolved.repo}#${parentIssueNumber}`);
     }
     if (subResolved.wasTemporaryId && subResolved.resolved) {
-      core.info(`Resolved sub-issue temporary ID '${item.sub_issue_number}' to ${subResolved.resolved.repo}#${subIssueNumber}`);
+      core.info(`Resolved sub-issue temporary ID '${item.sub_issue_number}' to ${subResolved.resolved.owner}/${subResolved.resolved.repo}#${subIssueNumber}`);
     }
+
+    // Sub-issue linking is only supported within the same repository.
+    if (parentResolved.resolved && subResolved.resolved) {
+      const parentRepoSlug = `${parentResolved.resolved.owner}/${parentResolved.resolved.repo}`;
+      const subRepoSlug = `${subResolved.resolved.owner}/${subResolved.resolved.repo}`;
+      if (parentRepoSlug !== subRepoSlug) {
+        const error = `Parent and sub-issue must be in the same repository for link_sub_issue (got ${parentRepoSlug} and ${subRepoSlug})`;
+        core.warning(error);
+        return {
+          parent_issue_number: item.parent_issue_number,
+          sub_issue_number: item.sub_issue_number,
+          success: false,
+          error,
+        };
+      }
+    }
+
+    const owner = parentResolved.resolved?.owner || context.repo.owner;
+    const repo = parentResolved.resolved?.repo || context.repo.repo;
 
     // Fetch parent issue to validate filters
     let parentIssue;
     try {
       const parentResponse = await github.rest.issues.get({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner,
+        repo,
         issue_number: parentIssueNumber,
       });
       parentIssue = parentResponse.data;
@@ -177,8 +196,8 @@ async function main(config = {}) {
     let subIssue;
     try {
       const subResponse = await github.rest.issues.get({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner,
+        repo,
         issue_number: subIssueNumber,
       });
       subIssue = subResponse.data;
@@ -208,8 +227,8 @@ async function main(config = {}) {
         }
       `;
       const parentCheckResult = await github.graphql(parentCheckQuery, {
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner,
+        repo,
         number: subIssueNumber,
       });
 

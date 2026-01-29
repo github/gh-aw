@@ -125,10 +125,51 @@ function loadTemporaryIdMap() {
 }
 
 /**
+ * Build a normalized temporary ID map from an object or Map.
+ * Supports values in both formats:
+ * - number (legacy)
+ * - { repo, number }
+ *
+ * @param {any} resolvedTemporaryIds - Object or Map of temporary IDs to resolved values
+ * @returns {Map<string, RepoIssuePair>} Map of normalized temporary_id to {repo, number}
+ */
+function loadTemporaryIdMapFromResolved(resolvedTemporaryIds) {
+  /** @type {Map<string, RepoIssuePair>} */
+  const result = new Map();
+
+  if (!resolvedTemporaryIds) {
+    return result;
+  }
+
+  const contextRepo = typeof context !== "undefined" ? `${context.repo.owner}/${context.repo.repo}` : "";
+
+  const entries = resolvedTemporaryIds instanceof Map ? Array.from(resolvedTemporaryIds.entries()) : Object.entries(resolvedTemporaryIds);
+  for (const [key, value] of entries) {
+    const normalizedKey = normalizeTemporaryId(key);
+    if (typeof value === "number") {
+      result.set(normalizedKey, { repo: contextRepo, number: value });
+      continue;
+    }
+    if (typeof value === "object" && value !== null) {
+      if ("repo" in value && "number" in value) {
+        result.set(normalizedKey, { repo: String(value.repo), number: Number(value.number) });
+        continue;
+      }
+      if ("number" in value) {
+        result.set(normalizedKey, { repo: contextRepo, number: Number(value.number) });
+        continue;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Resolve an issue number that may be a temporary ID or an actual issue number
  * Returns structured result with the resolved number, repo, and metadata
  * @param {any} value - The value to resolve (can be temporary ID, number, or string)
- * @param {Map<string, RepoIssuePair>} temporaryIdMap - Map of temporary ID to {repo, number}
+ * @param {Map<string, any>} temporaryIdMap - Map of temporary ID to resolved value (supports legacy formats)
  * @returns {{resolved: RepoIssuePair|null, wasTemporaryId: boolean, errorMessage: string|null}}
  */
 function resolveIssueNumber(value, temporaryIdMap) {
@@ -144,7 +185,23 @@ function resolveIssueNumber(value, temporaryIdMap) {
   if (isTemporaryId(valueWithoutHash)) {
     const resolvedPair = temporaryIdMap.get(normalizeTemporaryId(valueWithoutHash));
     if (resolvedPair !== undefined) {
-      return { resolved: resolvedPair, wasTemporaryId: true, errorMessage: null };
+      // Support legacy format where the map value is the issue number.
+      const contextRepo = typeof context !== "undefined" ? `${context.repo.owner}/${context.repo.repo}` : "";
+      if (typeof resolvedPair === "number") {
+        return { resolved: { repo: contextRepo, number: resolvedPair }, wasTemporaryId: true, errorMessage: null };
+      }
+      if (typeof resolvedPair === "object" && resolvedPair !== null) {
+        if ("repo" in resolvedPair && "number" in resolvedPair) {
+          return {
+            resolved: { repo: String(resolvedPair.repo), number: Number(resolvedPair.number) },
+            wasTemporaryId: true,
+            errorMessage: null,
+          };
+        }
+        if ("number" in resolvedPair) {
+          return { resolved: { repo: contextRepo, number: Number(resolvedPair.number) }, wasTemporaryId: true, errorMessage: null };
+        }
+      }
     }
     return {
       resolved: null,
@@ -170,6 +227,41 @@ function resolveIssueNumber(value, temporaryIdMap) {
 
   const contextRepo = typeof context !== "undefined" ? `${context.repo.owner}/${context.repo.repo}` : "";
   return { resolved: { repo: contextRepo, number: issueNumber }, wasTemporaryId: false, errorMessage: null };
+}
+
+/**
+ * Resolve an issue number that may be a temporary ID and return a concrete owner/repo/number triple.
+ *
+ * @param {any} value - The value to resolve
+ * @param {Map<string, RepoIssuePair>} temporaryIdMap - Normalized map of temporary IDs to {repo, number}
+ * @param {string} defaultOwner - Fallback owner when repo slug isn't available
+ * @param {string} defaultRepo - Fallback repo when repo slug isn't available
+ * @returns {{resolved: {owner: string, repo: string, number: number}|null, wasTemporaryId: boolean, errorMessage: string|null}}
+ */
+function resolveRepoIssueTarget(value, temporaryIdMap, defaultOwner, defaultRepo) {
+  const result = resolveIssueNumber(value, temporaryIdMap);
+  if (!result.resolved) {
+    return { resolved: null, wasTemporaryId: result.wasTemporaryId, errorMessage: result.errorMessage };
+  }
+
+  // For non-temporary numeric issue numbers, prefer the caller-provided default repo.
+  // For temporary IDs, the resolved repo (if present) should win.
+  const defaultRepoSlug = defaultOwner && defaultRepo ? `${defaultOwner}/${defaultRepo}` : "";
+  const repoSlug = result.wasTemporaryId ? result.resolved.repo || defaultRepoSlug : defaultRepoSlug || result.resolved.repo;
+  const parts = String(repoSlug).split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return {
+      resolved: null,
+      wasTemporaryId: result.wasTemporaryId,
+      errorMessage: `Invalid repository slug '${repoSlug}' while resolving issue target (expected 'owner/repo')`,
+    };
+  }
+
+  return {
+    resolved: { owner: parts[0], repo: parts[1], number: result.resolved.number },
+    wasTemporaryId: result.wasTemporaryId,
+    errorMessage: null,
+  };
 }
 
 /**
@@ -268,7 +360,9 @@ module.exports = {
   replaceTemporaryIdReferences,
   replaceTemporaryIdReferencesLegacy,
   loadTemporaryIdMap,
+  loadTemporaryIdMapFromResolved,
   resolveIssueNumber,
+  resolveRepoIssueTarget,
   hasUnresolvedTemporaryIds,
   serializeTemporaryIdMap,
   loadTemporaryProjectMap,
