@@ -55,6 +55,7 @@ describe("assign_to_agent", () => {
     delete process.env.GH_AW_AGENT_ALLOWED;
     delete process.env.GH_AW_TARGET_REPO;
     delete process.env.GH_AW_AGENT_IGNORE_IF_ERROR;
+    delete process.env.GH_AW_TEMPORARY_ID_MAP;
 
     // Reset context to default
     mockContext.eventName = "issues";
@@ -206,6 +207,56 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Found 3 agent assignments, but max is 2"));
+  });
+
+  it("should resolve temporary issue IDs (aw_...) using GH_AW_TEMPORARY_ID_MAP", async () => {
+    process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({
+      aw_abc123def456: { repo: "test-owner/test-repo", number: 99 },
+    });
+
+    setAgentOutput({
+      items: [
+        {
+          type: "assign_to_agent",
+          issue_number: "aw_abc123def456",
+          agent: "copilot",
+        },
+      ],
+      errors: [],
+    });
+
+    // Mock GraphQL responses: findAgent -> getIssueDetails (issueNumber 99) -> addAssignees
+    mockGithub.graphql
+      .mockResolvedValueOnce({
+        repository: {
+          suggestedActors: {
+            nodes: [{ login: "copilot-swe-agent", id: "MDQ6VXNlcjE=" }],
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: {
+            id: "issue-id-99",
+            assignees: { nodes: [] },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      });
+
+    await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved temporary issue id"));
+
+    // Ensure the issue lookup used the resolved issue number
+    const secondCallArgs = mockGithub.graphql.mock.calls[1];
+    expect(secondCallArgs).toBeDefined();
+    const variables = secondCallArgs[1];
+    expect(variables.issueNumber).toBe(99);
   });
 
   it("should reject unsupported agents", async () => {

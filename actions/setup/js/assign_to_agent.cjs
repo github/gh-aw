@@ -6,12 +6,16 @@ const { generateStagedPreview } = require("./staged_preview.cjs");
 const { AGENT_LOGIN_NAMES, getAvailableAgentLogins, findAgent, getIssueDetails, getPullRequestDetails, assignAgentToIssue, generatePermissionErrorSummary } = require("./assign_agent_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
+const { loadTemporaryIdMap, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 
 async function main() {
   const result = loadAgentOutput();
   if (!result.success) {
     return;
   }
+
+  // Load temporary ID map once (used to resolve aw_... IDs to real issue numbers)
+  const temporaryIdMap = loadTemporaryIdMap();
 
   const assignItems = result.items.filter(item => item.type === "assign_to_agent");
   if (assignItems.length === 0) {
@@ -110,6 +114,14 @@ async function main() {
   for (const item of itemsToProcess) {
     const agentName = item.agent ?? defaultAgent;
 
+    // Use these variables to allow temporary IDs to override target repo per-item.
+    // Default to the configured target repo.
+    let effectiveOwner = targetOwner;
+    let effectiveRepo = targetRepo;
+
+    // Use a copy for target resolution so we never mutate the original item.
+    let itemForTarget = item;
+
     // Validate that both issue_number and pull_number are not specified simultaneously
     if (item.issue_number != null && item.pull_number != null) {
       core.error("Cannot specify both issue_number and pull_number in the same assign_to_agent item");
@@ -123,17 +135,42 @@ async function main() {
       continue;
     }
 
+    // If issue_number is a temporary ID (aw_...), resolve it to a real issue number before calling resolveTarget.
+    // resolveTarget parses issue_number as a number, so we must resolve temporary IDs first.
+    // Note: We only support temporary IDs for issues, not PRs.
+    if (item.issue_number != null) {
+      const resolvedTarget = resolveRepoIssueTarget(item.issue_number, temporaryIdMap, targetOwner, targetRepo);
+      if (!resolvedTarget.resolved) {
+        core.error(resolvedTarget.errorMessage || `Failed to resolve issue target: ${item.issue_number}`);
+        results.push({
+          issue_number: item.issue_number,
+          pull_number: item.pull_number ?? null,
+          agent: agentName,
+          success: false,
+          error: resolvedTarget.errorMessage || `Failed to resolve issue target: ${item.issue_number}`,
+        });
+        continue;
+      }
+
+      effectiveOwner = resolvedTarget.resolved.owner;
+      effectiveRepo = resolvedTarget.resolved.repo;
+      itemForTarget = { ...item, issue_number: resolvedTarget.resolved.number };
+      if (resolvedTarget.wasTemporaryId) {
+        core.info(`Resolved temporary issue id to ${effectiveOwner}/${effectiveRepo}#${resolvedTarget.resolved.number}`);
+      }
+    }
+
     // Determine the effective target configuration:
     // - If issue_number or pull_number is explicitly provided, use "*" (explicit mode)
     // - Otherwise use the configured target (defaults to "triggering")
-    const hasExplicitTarget = item.issue_number != null || item.pull_number != null;
+    const hasExplicitTarget = itemForTarget.issue_number != null || itemForTarget.pull_number != null;
     const effectiveTarget = hasExplicitTarget ? "*" : targetConfig;
 
     // Resolve target number using the same logic as other safe outputs
     // This allows automatic resolution from workflow context when issue_number/pull_number is not explicitly provided
     const targetResult = resolveTarget({
       targetConfig: effectiveTarget,
-      item,
+      item: itemForTarget,
       context,
       itemType: "assign_to_agent",
       supportsPR: true, // Supports both issues and PRs
@@ -206,7 +243,7 @@ async function main() {
       let agentId = agentCache[agentName];
       if (!agentId) {
         core.info(`Looking for ${agentName} coding agent...`);
-        agentId = await findAgent(targetOwner, targetRepo, agentName);
+        agentId = await findAgent(effectiveOwner, effectiveRepo, agentName);
         if (!agentId) {
           throw new Error(`${agentName} coding agent is not available for this repository`);
         }
@@ -220,14 +257,14 @@ async function main() {
       let currentAssignees;
 
       if (issueNumber) {
-        const issueDetails = await getIssueDetails(targetOwner, targetRepo, issueNumber);
+        const issueDetails = await getIssueDetails(effectiveOwner, effectiveRepo, issueNumber);
         if (!issueDetails) {
           throw new Error(`Failed to get issue details`);
         }
         assignableId = issueDetails.issueId;
         currentAssignees = issueDetails.currentAssignees;
       } else if (pullNumber) {
-        const prDetails = await getPullRequestDetails(targetOwner, targetRepo, pullNumber);
+        const prDetails = await getPullRequestDetails(effectiveOwner, effectiveRepo, pullNumber);
         if (!prDetails) {
           throw new Error(`Failed to get pull request details`);
         }
