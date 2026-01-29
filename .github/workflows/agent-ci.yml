@@ -812,45 +812,20 @@ jobs:
           # Create directory for fuzz results
           mkdir -p fuzz-results
           
-          # Helper function to run fuzz test and handle context deadline
-          # Go fuzz tests can exit with status 1 and "context deadline exceeded" when
-          # they reach the -fuzztime limit. We treat this as expected success to allow
-          # all fuzz targets to run instead of stopping at the first timeout.
-          run_fuzz_test() {
-            local fuzz_name=$1
-            local package=$2
-            local output_file="fuzz-results/${fuzz_name}.txt"
-            
-            echo "Running ${fuzz_name}..."
-            if go test -run='^$' -fuzz="${fuzz_name}" -fuzztime=10s "${package}" 2>&1 | tee "${output_file}"; then
-              echo "✅ ${fuzz_name} completed successfully"
-              return 0
-            else
-              # Check if the failure was due to context deadline (expected)
-              if grep -q "context deadline exceeded" "${output_file}"; then
-                echo "✅ ${fuzz_name} completed (context deadline reached as expected)"
-                return 0
-              else
-                echo "❌ ${fuzz_name} failed with unexpected error"
-                return 1
-              fi
-            fi
-          }
-          
           # Run fuzz tests and capture output
-          run_fuzz_test "FuzzParseFrontmatter" "./pkg/parser/"
-          run_fuzz_test "FuzzScheduleParser" "./pkg/parser/"
-          run_fuzz_test "FuzzExpressionParser" "./pkg/workflow/"
-          run_fuzz_test "FuzzMentionsFiltering" "./pkg/workflow/"
-          run_fuzz_test "FuzzSanitizeOutput" "./pkg/workflow/"
-          run_fuzz_test "FuzzSanitizeIncomingText" "./pkg/workflow/"
-          run_fuzz_test "FuzzSanitizeLabelContent" "./pkg/workflow/"
-          run_fuzz_test "FuzzWrapExpressionsInTemplateConditionals" "./pkg/workflow/"
-          run_fuzz_test "FuzzYAMLParsing" "./pkg/workflow/"
-          run_fuzz_test "FuzzTemplateRendering" "./pkg/workflow/"
-          run_fuzz_test "FuzzInputValidation" "./pkg/workflow/"
-          run_fuzz_test "FuzzNetworkPermissions" "./pkg/workflow/"
-          run_fuzz_test "FuzzSafeJobConfig" "./pkg/workflow/"
+          go test -run='^$' -fuzz=FuzzParseFrontmatter -fuzztime=10s ./pkg/parser/ 2>&1 | tee fuzz-results/FuzzParseFrontmatter.txt
+          go test -run='^$' -fuzz=FuzzScheduleParser -fuzztime=10s ./pkg/parser/ 2>&1 | tee fuzz-results/FuzzScheduleParser.txt
+          go test -run='^$' -fuzz=FuzzExpressionParser -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzExpressionParser.txt
+          go test -run='^$' -fuzz=FuzzMentionsFiltering -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzMentionsFiltering.txt
+          go test -run='^$' -fuzz=FuzzSanitizeOutput -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeOutput.txt
+          go test -run='^$' -fuzz=FuzzSanitizeIncomingText -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeIncomingText.txt
+          go test -run='^$' -fuzz=FuzzSanitizeLabelContent -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSanitizeLabelContent.txt
+          go test -run='^$' -fuzz=FuzzWrapExpressionsInTemplateConditionals -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzWrapExpressionsInTemplateConditionals.txt
+          go test -run='^$' -fuzz=FuzzYAMLParsing -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzYAMLParsing.txt
+          go test -run='^$' -fuzz=FuzzTemplateRendering -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzTemplateRendering.txt
+          go test -run='^$' -fuzz=FuzzInputValidation -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzInputValidation.txt
+          go test -run='^$' -fuzz=FuzzNetworkPermissions -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzNetworkPermissions.txt
+          go test -run='^$' -fuzz=FuzzSafeJobConfig -fuzztime=10s ./pkg/workflow/ 2>&1 | tee fuzz-results/FuzzSafeJobConfig.txt
           
           # Copy fuzz corpus data (testdata/fuzz directories)
           echo "Copying fuzz corpus data..."
