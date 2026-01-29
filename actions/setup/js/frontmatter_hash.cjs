@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 
 /**
  * Computes a deterministic SHA-256 hash of workflow frontmatter
@@ -17,8 +17,9 @@ async function computeFrontmatterHash(workflowPath) {
   try {
     const ghAwBin = findGhAwBinary();
     if (ghAwBin) {
-      // Redirect stderr to suppress warnings
-      const result = execSync(`"${ghAwBin}" hash-frontmatter "${workflowPath}" 2>/dev/null`, {
+      // Use array form to avoid command injection
+      const { execFileSync } = require("child_process");
+      const result = execFileSync(ghAwBin, ["hash-frontmatter", workflowPath], {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
       });

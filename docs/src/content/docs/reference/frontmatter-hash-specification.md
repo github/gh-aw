@@ -152,7 +152,7 @@ Input JSON: {"engine":"copilot","on":{"schedule":"daily"},"versions":{"agents":"
 SHA-256: a1b2c3d4e5f6...  (64 hex characters)
 ```
 
-### 6. Cross-Language Consistency
+### 5. Cross-Language Consistency
 
 Both Go and JavaScript implementations MUST:
 - Use the same field selection and merging rules
