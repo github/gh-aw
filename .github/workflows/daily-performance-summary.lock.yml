@@ -1053,7 +1053,7 @@ jobs:
               version: "",
               agent_version: "0.92.0",
               workflow_name: "Daily Project Performance Summary Generator (Using Safe Inputs)",
-              experimental: true,
+              experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,

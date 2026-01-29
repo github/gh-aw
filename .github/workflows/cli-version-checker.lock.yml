@@ -468,7 +468,7 @@ jobs:
               version: "",
               agent_version: "2.1.22",
               workflow_name: "CLI Version Checker",
-              experimental: true,
+              experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,
