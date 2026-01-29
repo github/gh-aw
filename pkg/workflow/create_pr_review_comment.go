@@ -19,7 +19,7 @@ type CreatePullRequestReviewCommentsConfig struct {
 
 // buildCreateOutputPullRequestReviewCommentJob creates the create_pr_review_comment job
 //
-//nolint:unused // Used in integration tests with build tag
+//nolint:unused // Only used in integration tests
 func (c *Compiler) buildCreateOutputPullRequestReviewCommentJob(data *WorkflowData, mainJobName string) (*Job, error) {
 	createPRReviewCommentLog.Printf("Building PR review comment job: main_job=%s", mainJobName)
 

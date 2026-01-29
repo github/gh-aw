@@ -28,7 +28,7 @@ func getCreateCodeScanningAlertScript() string { return "" }
 func getCreateDiscussionScript() string        { return "" }
 func getCreateIssueScript() string             { return "" }
 
-//nolint:unused // Called from create_pr_review_comment.go
+//nolint:unused // Only used in integration tests
 func getCreatePRReviewCommentScript() string { return "" }
 func getNoOpScript() string                  { return "" }
 func getNotifyCommentErrorScript() string    { return "" }

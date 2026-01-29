@@ -10,6 +10,10 @@ This document provides a comprehensive reference for all available frontmatter c
 > [!NOTE]
 > This documentation is automatically generated from the JSON Schema. For a more user-friendly guide, see [Frontmatter](/gh-aw/reference/frontmatter/).
 
+## Schema Description
+
+JSON Schema for validating agentic workflow frontmatter configuration
+
 ## Complete Frontmatter Reference
 
 ```yaml wrap
@@ -74,7 +78,9 @@ on: "example-value"
 # Option 2: Complex trigger configuration with event-specific filters and options
 on:
   # Special slash command trigger for /command workflows (e.g., '/my-bot' in issue
-  # comments). Creates conditions to match slash commands automatically.
+  # comments). Creates conditions to match slash commands automatically. Note: Can
+  # be combined with issues/pull_request events if those events only use 'labeled'
+  # or 'unlabeled' types.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -89,12 +95,22 @@ on:
 
   # Option 3: Command configuration object with custom command name
   slash_command:
-    # Custom command name for slash commands (e.g., 'helper-bot' for '/helper-bot'
-    # triggers). Command names must not start with '/' as the slash is automatically
-    # added when matching commands. Defaults to workflow filename without .md
-    # extension if not specified.
+    # Name of the slash command that triggers the workflow (e.g., '/help',
+    # '/analyze'). Used for comment-based workflow activation.
     # (optional)
+    # This field supports multiple formats (oneOf):
+
+    # Option 1: Single command name for slash commands (e.g., 'helper-bot' for
+    # '/helper-bot' triggers). Command names must not start with '/' as the slash is
+    # automatically added when matching commands. Defaults to workflow filename
+    # without .md extension if not specified.
     name: "My Workflow"
+
+    # Option 2: Array of command names that trigger this workflow (e.g., ['cmd.add',
+    # 'cmd.remove'] for '/cmd.add' and '/cmd.remove' triggers). Each command name must
+    # not start with '/'.
+    name: []
+      # Array items: Command name without leading slash
 
     # Events where the command should be active. Default is all comment-related events
     # ('*'). Use GitHub Actions event names.
@@ -128,12 +144,22 @@ on:
 
   # Option 3: Command configuration object with custom command name
   command:
-    # Custom command name for slash commands (e.g., 'helper-bot' for '/helper-bot'
-    # triggers). Command names must not start with '/' as the slash is automatically
-    # added when matching commands. Defaults to workflow filename without .md
-    # extension if not specified.
+    # Name of the slash command that triggers the workflow (e.g., '/deploy', '/test').
+    # Used for command-based workflow activation.
     # (optional)
+    # This field supports multiple formats (oneOf):
+
+    # Option 1: Custom command name for slash commands (e.g., 'helper-bot' for
+    # '/helper-bot' triggers). Command names must not start with '/' as the slash is
+    # automatically added when matching commands. Defaults to workflow filename
+    # without .md extension if not specified.
     name: "My Workflow"
+
+    # Option 2: Array of command names that trigger this workflow (e.g., ['cmd.add',
+    # 'cmd.remove'] for '/cmd.add' and '/cmd.remove' triggers). Each command name must
+    # not start with '/'.
+    name: []
+      # Array items: Command name without leading slash
 
     # Events where the command should be active. Default is all comment-related events
     # ('*'). Use GitHub Actions event names.
@@ -180,6 +206,8 @@ on:
     types: []
       # Array of strings
 
+    # Array of issue type names that trigger the workflow. Filters workflow execution
+    # to specific issue categories.
     # (optional)
     # This field supports multiple formats (oneOf):
 
@@ -227,24 +255,23 @@ on:
     types: []
       # Array of strings
 
-  # Scheduled trigger events using human-friendly fuzzy format or standard cron
-  # expressions. Supports shorthand string notation (e.g., 'daily', 'daily around 2pm')
-  # or array of schedule objects. Human-friendly formats are automatically converted
-  # to cron expressions with the original format preserved as comments in the generated
-  # workflow.
+  # Scheduled trigger events using fuzzy schedules or standard cron expressions.
+  # Supports shorthand string notation (e.g., 'daily', 'daily around 2pm') or array
+  # of schedule objects. Fuzzy schedules automatically distribute execution times to
+  # prevent load spikes.
   # (optional)
   # This field supports multiple formats (oneOf):
 
   # Option 1: Shorthand schedule string using fuzzy or cron format. Examples:
-  # 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly',
-  # 'weekly on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h',
-  # 'every 10 minutes', '0 9 * * 1'. Fuzzy schedules distribute execution times
-  # to prevent load spikes. For fixed times, use standard cron syntax.
-  # Minimum interval is 5 minutes.
+  # 'daily', 'daily around 14:00', 'daily between 9:00 and 17:00', 'weekly', 'weekly
+  # on monday', 'weekly on friday around 5pm', 'hourly', 'every 2h', 'every 10
+  # minutes', '0 9 * * 1'. Fuzzy schedules distribute execution times to prevent
+  # load spikes. For fixed times, use standard cron syntax. Minimum interval is 5
+  # minutes.
   schedule: "example-value"
 
-  # Option 2: Array of schedule objects with cron expressions (standard cron
-  # or fuzzy format)
+  # Option 2: Array of schedule objects with cron expressions (standard cron or
+  # fuzzy format)
   schedule: []
     # Array items: object
 
@@ -535,6 +562,30 @@ on:
     # (optional)
     max: 1
 
+  # Conditionally skip workflow execution when a GitHub search query has no matches
+  # (or fewer than minimum). Can be a string (query only, implies min=1) or an
+  # object with 'query' and optional 'min' fields.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: GitHub search query string to check before running workflow (implies
+  # min=1). If the search returns no results, the workflow will be skipped. Query is
+  # automatically scoped to the current repository. Example: 'is:pr is:open
+  # label:ready-to-deploy'
+  skip-if-no-match: "example-value"
+
+  # Option 2: Skip-if-no-match configuration object with query and minimum match
+  # count
+  skip-if-no-match:
+    # GitHub search query string to check before running workflow. Query is
+    # automatically scoped to the current repository.
+    query: "example-value"
+
+    # Minimum number of items that must be matched for the workflow to proceed.
+    # Defaults to 1 if not specified.
+    # (optional)
+    min: 1
+
   # Environment name that requires manual approval before the workflow can run. Must
   # match a valid environment configured in the repository settings.
   # (optional)
@@ -559,8 +610,8 @@ on:
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: Simple permissions string: 'read-all' (all read permissions),
-# 'write-all' (all write permissions), 'read' or 'write' (basic level)
+# Option 1: Simple permissions string: 'read-all' (all read permissions) or
+# 'write-all' (all write permissions)
 permissions: "read-all"
 
 # Option 2: Detailed permissions object with granular control over specific GitHub
@@ -596,6 +647,8 @@ permissions:
   # (optional)
   discussions: "read"
 
+  # Permission level for OIDC token requests (read/write/none). Allows workflows to
+  # request JWT tokens for cloud provider authentication.
   # (optional)
   id-token: "read"
 
@@ -614,18 +667,28 @@ permissions:
   # (optional)
   metadata: "read"
 
+  # Permission level for GitHub Packages (read/write/none). Controls access to
+  # publish, modify, or delete packages.
   # (optional)
   packages: "read"
 
+  # Permission level for GitHub Pages (read/write/none). Controls access to deploy
+  # and manage GitHub Pages sites.
   # (optional)
   pages: "read"
 
+  # Permission level for pull requests (read/write/none). Controls access to create,
+  # edit, review, and manage pull requests.
   # (optional)
   pull-requests: "read"
 
+  # Permission level for security events (read/write/none). Controls access to view
+  # and manage code scanning alerts and security findings.
   # (optional)
   security-events: "read"
 
+  # Permission level for commit statuses (read/write/none). Controls access to
+  # create and update commit status checks.
   # (optional)
   statuses: "read"
 
@@ -773,9 +836,13 @@ container:
   # Credentials for private registries
   # (optional)
   credentials:
+    # Username for Docker registry authentication when pulling private container
+    # images.
     # (optional)
     username: "example-value"
 
+    # Password or access token for Docker registry authentication. Should use secrets
+    # syntax: ${{ secrets.DOCKER_PASSWORD }}
     # (optional)
     password: "example-value"
 
@@ -803,7 +870,8 @@ services:
   {}
 
 # Network access control for AI engines using ecosystem identifiers and domain
-# allowlists. Controls web fetch and search capabilities.
+# allowlists. Supports wildcard patterns like '*.example.com' to match any
+# subdomain. Controls web fetch and search capabilities.
 # (optional)
 # This field supports multiple formats (oneOf):
 
@@ -815,30 +883,38 @@ network: "defaults"
 # specific domains
 network:
   # List of allowed domains or ecosystem identifiers (e.g., 'defaults', 'python',
-  # 'node', '*.example.com')
+  # 'node', '*.example.com'). Wildcard patterns match any subdomain AND the base
+  # domain.
   # (optional)
   allowed: []
-    # Array of Domain name or ecosystem identifier (supports wildcards like
-    # '*.example.com' and ecosystem names like 'python', 'node')
+    # Array of Domain name or ecosystem identifier. Supports wildcards like
+    # '*.example.com' (matches sub.example.com, deep.nested.example.com, and
+    # example.com itself) and ecosystem names like 'python', 'node'.
 
   # List of blocked domains or ecosystem identifiers (e.g., 'python', 'node',
   # 'tracker.example.com'). Blocked domains take precedence over allowed domains.
   # (optional)
   blocked: []
-    # Array of Domain name or ecosystem identifier to block (supports wildcards like
-    # '*.example.com' and ecosystem names like 'python', 'node')
+    # Array of Domain name or ecosystem identifier to block. Supports wildcards like
+    # '*.example.com' (matches sub.example.com, deep.nested.example.com, and
+    # example.com itself) and ecosystem names like 'python', 'node'.
 
 # Sandbox configuration for AI engines. Controls agent sandbox (AWF or Sandbox
 # Runtime) and MCP gateway.
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: Legacy string format for sandbox type: 'default' for no sandbox,
+# Option 1: Set to false to completely disable sandbox features (firewall and
+# gateway). Warning: This removes important security protections and should only
+# be used in controlled environments. Not allowed in strict mode.
+sandbox: true
+
+# Option 2: Legacy string format for sandbox type: 'default' for no sandbox,
 # 'sandbox-runtime' or 'srt' for Anthropic Sandbox Runtime, 'awf' for Agent
 # Workflow Firewall
 sandbox: "default"
 
-# Option 2: Object format for full sandbox configuration with agent and mcp
+# Option 3: Object format for full sandbox configuration with agent and mcp
 # options
 sandbox:
   # Legacy sandbox type field (use agent instead)
@@ -846,18 +922,15 @@ sandbox:
   type: "default"
 
   # Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses
-  # Anthropic Sandbox Runtime, or 'false' to disable firewall
+  # Anthropic Sandbox Runtime. Defaults to 'awf' if not specified.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Set to false to disable the agent firewall
-  agent: true
-
-  # Option 2: Sandbox type: 'awf' for Agent Workflow Firewall, 'srt' for Sandbox
+  # Option 1: Sandbox type: 'awf' for Agent Workflow Firewall, 'srt' for Sandbox
   # Runtime
   agent: "awf"
 
-  # Option 3: Custom sandbox runtime configuration
+  # Option 2: Custom sandbox runtime configuration
   agent:
     # Agent identifier (replaces 'type' field in new format): 'awf' for Agent Workflow
     # Firewall, 'srt' for Sandbox Runtime
@@ -868,8 +941,8 @@ sandbox:
     # (optional)
     type: "awf"
 
-    # Custom command to replace the default AWF or SRT installation. For AWF:
-    # '/usr/local/bin/custom-awf-wrapper'. For SRT: '/usr/local/bin/custom-srt-wrapper'
+    # Custom command to replace the default AWF or SRT installation. For AWF: 'docker
+    # run my-custom-awf-image'. For SRT: 'docker run my-custom-srt-wrapper'
     # (optional)
     command: "example-value"
 
@@ -886,8 +959,7 @@ sandbox:
 
     # Container mounts to add when using AWF. Each mount is specified using Docker
     # mount syntax: 'source:destination:mode' where mode can be 'ro' (read-only) or
-    # 'rw' (read-write). Example: '/host/path:/container/path:ro'. Docker socket
-    # mounts such as '/var/run/docker.sock' are not supported.
+    # 'rw' (read-write). Example: '/host/path:/container/path:ro'
     # (optional)
     mounts: []
       # Array of Mount specification in format 'source:destination:mode'
@@ -896,6 +968,8 @@ sandbox:
     # Network configuration is controlled by the top-level 'network' field, not here.
     # (optional)
     config:
+      # Filesystem access control configuration for the agent within the sandbox.
+      # Controls read/write permissions and path restrictions.
       # (optional)
       filesystem:
         # List of paths to deny read access
@@ -918,7 +992,7 @@ sandbox:
       ignoreViolations:
         {}
 
-      # Enable weaker nested sandbox mode (use only when required)
+      # Enable weaker nested sandbox mode (recommended: true for Docker access)
       # (optional)
       enableWeakerNestedSandbox: true
 
@@ -926,35 +1000,91 @@ sandbox:
   # Network configuration is controlled by the top-level 'network' field, not here.
   # (optional)
   config:
+    # Filesystem access control configuration for sandboxed workflows. Controls
+    # read/write permissions and path restrictions for file operations.
     # (optional)
     filesystem:
+      # Array of path patterns that deny read access in the sandboxed environment. Takes
+      # precedence over other read permissions.
       # (optional)
       denyRead: []
         # Array of strings
 
+      # Array of path patterns that allow write access in the sandboxed environment.
+      # Paths outside these patterns are read-only.
       # (optional)
       allowWrite: []
         # Array of strings
 
+      # Array of path patterns that deny write access in the sandboxed environment.
+      # Takes precedence over other write permissions.
       # (optional)
       denyWrite: []
         # Array of strings
 
+    # When true, log sandbox violations without blocking execution. Useful for
+    # debugging and gradual enforcement of sandbox policies.
     # (optional)
     ignoreViolations:
       {}
 
+    # When true, allows nested sandbox processes to run with relaxed restrictions.
+    # Required for certain containerized tools that spawn subprocesses.
     # (optional)
     enableWeakerNestedSandbox: true
 
   # MCP Gateway configuration for routing MCP server calls through a unified HTTP
-  # gateway. Requires the 'mcp-gateway' feature flag to be enabled.
+  # gateway. Requires the 'mcp-gateway' feature flag to be enabled. Per MCP Gateway
+  # Specification v1.0.0: Only container-based execution is supported.
   # (optional)
-  # This field supports multiple formats (anyOf):
+  mcp:
+    # Container image for the MCP gateway executable (required)
+    container: "example-value"
 
-  # Option 1: undefined
+    # Optional version/tag for the container image (e.g., 'latest', 'v1.0.0')
+    # (optional)
+    version: null
 
-  # Option 2: undefined
+    # Optional custom entrypoint for the MCP gateway container. Overrides the
+    # container's default entrypoint.
+    # (optional)
+    entrypoint: "example-value"
+
+    # Arguments for docker run
+    # (optional)
+    args: []
+      # Array of strings
+
+    # Arguments to add after the container image (container entrypoint arguments)
+    # (optional)
+    entrypointArgs: []
+      # Array of strings
+
+    # Volume mounts for the MCP gateway container. Each mount is specified using
+    # Docker mount syntax: 'source:destination:mode' where mode can be 'ro'
+    # (read-only) or 'rw' (read-write). Example: '/host/data:/container/data:ro'
+    # (optional)
+    mounts: []
+      # Array of Mount specification in format 'source:destination:mode'
+
+    # Environment variables for MCP gateway
+    # (optional)
+    env:
+      {}
+
+    # Port number for the MCP gateway HTTP server (default: 8080)
+    # (optional)
+    port: 1
+
+    # API key for authenticating with the MCP gateway (supports ${{ secrets.* }}
+    # syntax)
+    # (optional)
+    api-key: "example-value"
+
+    # Gateway domain for URL generation (default: 'host.docker.internal' when agent is
+    # enabled, 'localhost' when disabled)
+    # (optional)
+    domain: "localhost"
 
 # Conditional execution expression
 # (optional)
@@ -1049,6 +1179,12 @@ engine:
   # Custom user agent string for GitHub MCP server configuration (codex engine only)
   # (optional)
   user-agent: "example-value"
+
+  # Custom executable path for the AI engine CLI. When specified, the workflow will
+  # skip the standard installation steps and use this command instead. The command
+  # should be the full path to the executable or a command available in PATH.
+  # (optional)
+  command: "example-value"
 
   # Custom environment variables to pass to the AI engine, including secret
   # overrides (e.g., OPENAI_API_KEY: ${{ secrets.CUSTOM_KEY }})
@@ -1153,9 +1289,7 @@ tools:
     read-only: true
 
     # Enable lockdown mode to limit content surfaced from public repositories (only
-    # items authored by users with push access)
-    # Default: Automatically enabled for public repositories, disabled for private/internal repositories
-    # Set explicitly to override automatic detection
+    # items authored by users with push access). Default: false
     # (optional)
     lockdown: true
 
@@ -1169,6 +1303,37 @@ tools:
     # (optional)
     toolsets: []
       # Array of Toolset name
+
+    # Volume mounts for the containerized GitHub MCP server (format:
+    # 'host:container:mode' where mode is 'ro' for read-only or 'rw' for read-write).
+    # Applies to local mode only. Example: '/data:/data:ro'
+    # (optional)
+    mounts: []
+      # Array of Mount specification in format 'host:container:mode'
+
+    # GitHub App configuration for token minting. When configured, a GitHub App
+    # installation access token is minted at workflow start and used instead of the
+    # default token. This token overrides any custom github-token setting and provides
+    # fine-grained permissions matching the agent job requirements.
+    # (optional)
+    app:
+      # GitHub App ID (e.g., '${{ vars.APP_ID }}'). Required to mint a GitHub App token.
+      app-id: "example-value"
+
+      # GitHub App private key (e.g., '${{ secrets.APP_PRIVATE_KEY }}'). Required to
+      # mint a GitHub App token.
+      private-key: "example-value"
+
+      # Optional owner of the GitHub App installation (defaults to current repository
+      # owner if not specified)
+      # (optional)
+      owner: "example-value"
+
+      # Optional list of repositories to grant access to (defaults to current repository
+      # if not specified)
+      # (optional)
+      repositories: []
+        # Array of strings
 
   # Bash shell command execution tool. Supports wildcards: '*' (all commands),
   # 'command *' (command with any args, e.g., 'date *', 'echo *'). Default safe
@@ -1340,6 +1505,11 @@ tools:
     # (optional)
     version: null
 
+    # Serena execution mode: 'docker' (default, runs in container) or 'local' (runs
+    # locally with uvx and HTTP transport)
+    # (optional)
+    mode: "docker"
+
     # Optional additional arguments to append to the generated MCP server command
     # (optional)
     args: []
@@ -1348,6 +1518,8 @@ tools:
     # Language-specific configuration for Serena language services
     # (optional)
     languages:
+      # Configuration for Go language support in Serena code analysis. Enables
+      # Go-specific parsing, linting, and security checks.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1368,6 +1540,8 @@ tools:
         # (optional)
         gopls-version: "example-value"
 
+      # Configuration for TypeScript language support in Serena code analysis. Enables
+      # TypeScript-specific parsing, linting, and type checking.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1380,6 +1554,8 @@ tools:
         # (optional)
         version: null
 
+      # Configuration for Python language support in Serena code analysis. Enables
+      # Python-specific parsing, linting, and security checks.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1392,6 +1568,8 @@ tools:
         # (optional)
         version: null
 
+      # Configuration for Java language support in Serena code analysis. Enables
+      # Java-specific parsing, linting, and security checks.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1404,6 +1582,8 @@ tools:
         # (optional)
         version: null
 
+      # Configuration for Rust language support in Serena code analysis. Enables
+      # Rust-specific parsing, linting, and security checks.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1416,6 +1596,8 @@ tools:
         # (optional)
         version: null
 
+      # Configuration for C# language support in Serena code analysis. Enables
+      # C#-specific parsing, linting, and security checks.
       # (optional)
       # This field supports multiple formats (oneOf):
 
@@ -1440,15 +1622,24 @@ tools:
 
   # Option 3: Repo-memory configuration object
   repo-memory:
+    # Branch prefix for memory storage (default: 'memory'). Must be 4-32 characters,
+    # alphanumeric with hyphens/underscores, and cannot be 'copilot'. Branch will be
+    # named {branch-prefix}/{id}
+    # (optional)
+    branch-prefix: "example-value"
+
     # Target repository for memory storage (default: current repository). Format:
     # owner/repo
     # (optional)
     target-repo: "example-value"
 
-    # Git branch name for memory storage (default: memory/default)
+    # Git branch name for memory storage (default: {branch-prefix}/default or
+    # memory/default if branch-prefix not set)
     # (optional)
     branch-name: "example-value"
 
+    # Glob patterns for files to include in repository memory. Supports wildcards
+    # (e.g., '**/*.md', 'docs/**/*.json') to filter cached files.
     # (optional)
     # This field supports multiple formats (oneOf):
 
@@ -1475,6 +1666,11 @@ tools:
     # (optional)
     create-orphan: true
 
+    # Campaign ID for campaign-specific repo-memory (optional, used to correlate
+    # memory with campaign workflows)
+    # (optional)
+    campaign-id: "example-value"
+
   # Option 4: Array of repo-memory configurations for multiple memory locations
   repo-memory: []
     # Array items: object
@@ -1492,6 +1688,8 @@ cache:
   # An explicit key for restoring and saving the cache
   key: "example-value"
 
+  # File path or directory to cache for faster workflow execution. Can be a single
+  # path or an array of paths to cache multiple locations.
   # This field supports multiple formats (oneOf):
 
   # Option 1: A single path to cache
@@ -1501,6 +1699,8 @@ cache:
   path: []
     # Array items: string
 
+  # Optional list of fallback cache key patterns to use if exact cache key is not
+  # found. Enables partial cache restoration for better performance.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1527,6 +1727,213 @@ cache:
 cache: []
   # Array items: object
 
+# (optional)
+# This field supports multiple formats (oneOf):
+
+# Option 1: GitHub Project URL for tracking workflow-created items. When
+# configured, automatically enables project tracking operations (update-project,
+# create-project-status-update) to manage project boards similar to campaign
+# orchestrators.
+project: "example-value"
+
+# Option 2: Project tracking configuration with custom settings for managing
+# GitHub Project boards. Automatically enables update-project and
+# create-project-status-update operations.
+project:
+  # GitHub Project URL (required). Must be a valid GitHub Projects V2 URL.
+  url: "example-value"
+
+  # Maximum number of project update operations per workflow run (default: 100).
+  # Controls the update-project safe-output maximum.
+  # (optional)
+  max-updates: 1
+
+  # Optional list of repositories and organizations this workflow can operate on.
+  # Supports 'owner/repo' for specific repositories and 'org:name' for all
+  # repositories in an organization. When omitted, defaults to the current
+  # repository.
+  # (optional)
+  scope: []
+    # Array of strings
+
+  # Maximum number of project status update operations per workflow run (default:
+  # 1). Controls the create-project-status-update safe-output maximum.
+  # (optional)
+  max-status-updates: 1
+
+  # Optional custom GitHub token for project operations. Should reference a secret
+  # with Projects: Read & Write permissions (e.g., ${{
+  # secrets.GH_AW_PROJECT_GITHUB_TOKEN }}).
+  # (optional)
+  github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # When true, prevents moving items backward in workflow status (e.g., Done → In
+  # Progress). Useful for maintaining completed state integrity.
+  # (optional)
+  do-not-downgrade-done-items: true
+
+  # Optional campaign identifier. If not provided, derived from workflow filename.
+  # (optional)
+  id: "example-value"
+
+  # List of worker workflow IDs (basename without .md) associated with this campaign
+  # (optional)
+  workflows: []
+    # Array of strings
+
+  # Repo-memory paths where this campaign writes its state and metrics
+  # (optional)
+  memory-paths: []
+    # Array of strings
+
+  # Glob pattern for locating JSON metrics snapshots in the memory/campaigns branch
+  # (optional)
+  metrics-glob: "example-value"
+
+  # Glob pattern for locating durable cursor/checkpoint files in the
+  # memory/campaigns branch
+  # (optional)
+  cursor-glob: "example-value"
+
+  # Label used to discover worker-created issues/PRs
+  # (optional)
+  tracker-label: "example-value"
+
+  # Primary human owners for this campaign
+  # (optional)
+  owners: []
+    # Array of strings
+
+  # Campaign risk level
+  # (optional)
+  risk-level: "low"
+
+  # Campaign lifecycle state
+  # (optional)
+  state: "planned"
+
+  # Free-form tags for categorization
+  # (optional)
+  tags: []
+    # Array of strings
+
+  # Campaign governance policies for pacing and opt-out
+  # (optional)
+  governance:
+    # Maximum new items to add to project board per run
+    # (optional)
+    max-new-items-per-run: 1
+
+    # Maximum items to scan during discovery
+    # (optional)
+    max-discovery-items-per-run: 1
+
+    # Maximum pages of results to fetch during discovery
+    # (optional)
+    max-discovery-pages-per-run: 1
+
+    # Labels that opt issues/PRs out of campaign tracking
+    # (optional)
+    opt-out-labels: []
+      # Array of strings
+
+    # Prevent moving items backward (e.g., Done → In Progress)
+    # (optional)
+    do-not-downgrade-done-items: true
+
+    # Maximum project update operations per run
+    # (optional)
+    max-project-updates-per-run: 1
+
+    # Maximum comment operations per run
+    # (optional)
+    max-comments-per-run: 1
+
+  # Bootstrap configuration for creating initial work items
+  # (optional)
+  bootstrap:
+    # Bootstrap strategy
+    mode: "seeder-worker"
+
+    # Seeder worker configuration (only when mode is seeder-worker)
+    # (optional)
+    seeder-worker:
+      # Worker workflow ID to dispatch
+      workflow-id: "example-value"
+
+      # JSON payload to send to seeder worker
+      payload:
+        {}
+
+      # Maximum work items to return
+      # (optional)
+      max-items: 1
+
+    # Project todos configuration (only when mode is project-todos)
+    # (optional)
+    project-todos:
+      # Project status field name
+      # (optional)
+      status-field: "example-value"
+
+      # Status value indicating Todo
+      # (optional)
+      todo-value: "example-value"
+
+      # Maximum Todo items to process
+      # (optional)
+      max-items: 1
+
+      # Project fields that must be populated
+      # (optional)
+      require-fields: []
+        # Array of strings
+
+  # Worker workflow metadata for deterministic selection
+  # (optional)
+  workers: []
+    # Array items:
+      # Worker workflow ID
+      id: "example-value"
+
+      # Human-readable worker name
+      # (optional)
+      name: "My Workflow"
+
+      # Worker description
+      # (optional)
+      description: "Description of the workflow"
+
+      # Work types this worker can perform
+      capabilities: []
+        # Array of strings
+
+      # Worker payload schema definition
+      payload-schema:
+        {}
+
+      # Worker output labeling contract
+      output-labeling:
+        # (optional)
+        labels: []
+          # Array of strings
+
+        key-in-title: true
+
+        # (optional)
+        key-format: "example-value"
+
+        # (optional)
+        metadata-fields: []
+          # Array of strings
+
+      # How worker ensures idempotent execution
+      idempotency-strategy: "branch-based"
+
+      # Worker priority for selection (higher = higher priority)
+      # (optional)
+      priority: 1
+
 # Safe output processing configuration that automatically creates GitHub issues,
 # comments, and pull requests from AI workflow output without requiring write
 # permissions in the main job
@@ -1538,6 +1945,17 @@ safe-outputs:
   allowed-domains: []
     # Array of strings
 
+  # List of allowed repositories for GitHub references (e.g., #123 or
+  # owner/repo#456). Use 'repo' to allow current repository. References to other
+  # repositories will be escaped with backticks. If not specified, all references
+  # are allowed.
+  # (optional)
+  allowed-github-references: []
+    # Array of strings
+
+  # Enable AI agents to create GitHub issues from workflow output. Supports title
+  # prefixes, automatic labeling, assignees, and cross-repository creation. Does not
+  # require 'issues: write' permission.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1562,6 +1980,8 @@ safe-outputs:
     allowed-labels: []
       # Array of strings
 
+    # GitHub usernames to assign the created issue to. Can be a single username string
+    # or array of usernames. Use 'copilot' to assign to GitHub Copilot.
     # (optional)
     # This field supports multiple formats (oneOf):
 
@@ -1593,35 +2013,49 @@ safe-outputs:
     allowed-repos: []
       # Array of strings
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
     # Time until the issue expires and should be automatically closed. Supports
-    # integer (days) or relative time format. When set, a maintenance workflow will be
-    # generated.
+    # integer (days), relative time format, or false to disable expiration. Minimum
+    # duration: 2 hours. When set, a maintenance workflow will be generated.
     # (optional)
     # This field supports multiple formats (oneOf):
 
     # Option 1: Number of days until expires
     expires: 1
 
-    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'; hours <24 = 1 day)
+    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for
+    # hour values
     expires: "example-value"
+
+    # Option 3: Set to false to explicitly disable expiration
+    expires: true
+
+    # If true, group issues as sub-issues under a parent issue. The workflow ID is
+    # used as the group identifier. Parent issues are automatically created and
+    # managed, with a maximum of 64 sub-issues per parent.
+    # (optional)
+    group: true
+
+    # When true, automatically close older issues with the same workflow-id marker as
+    # 'not planned' with a comment linking to the new issue. Searches for issues
+    # containing the workflow-id marker in their body. Maximum 10 issues will be
+    # closed. Only runs if issue creation succeeds.
+    # (optional)
+    close-older-issues: true
 
   # Option 2: Enable issue creation with default configuration
   create-issue: null
 
+  # Enable creation of GitHub Copilot agent tasks from workflow output. Allows
+  # workflows to spawn new agent sessions for follow-up work.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Configuration for creating GitHub Copilot agent sessions from agentic
-  # workflow output using gh agent-task CLI. The main job does not need write
-  # permissions.
-  create-agent-session:
-    # Base branch for the agent session pull request. Defaults to the current branch or
-    # repository default branch.
+  # Option 1: DEPRECATED: Use 'create-agent-session' instead. Configuration for
+  # creating GitHub Copilot agent sessions from agentic workflow output using gh
+  # agent-task CLI. The main job does not need write permissions.
+  create-agent-task:
+    # Base branch for the agent session pull request. Defaults to the current branch
+    # or repository default branch.
     # (optional)
     base: "example-value"
 
@@ -1634,6 +2068,53 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # List of additional repositories in format 'owner/repo' that agent sessions can
+    # be created in. When specified, the agent can use a 'repo' field in the output to
+    # specify which repository to create the agent session in. The target repository
+    # (current or target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable agent session creation with default configuration
+  create-agent-task: null
+
+  # Enable creation of GitHub Copilot agent sessions from workflow output. Allows
+  # workflows to start interactive agent conversations.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for creating GitHub Copilot agent sessions from agentic
+  # workflow output using gh agent-task CLI. The main job does not need write
+  # permissions.
+  create-agent-session:
+    # Base branch for the agent session pull request. Defaults to the current branch
+    # or repository default branch.
+    # (optional)
+    base: "example-value"
+
+    # Maximum number of agent sessions to create (default: 1)
+    # (optional)
+    max: 1
+
+    # Target repository in format 'owner/repo' for cross-repository agent session
+    # creation. Takes precedence over trial target repo settings.
+    # (optional)
+    target-repo: "example-value"
+
+    # List of additional repositories in format 'owner/repo' that agent sessions can
+    # be created in. When specified, the agent can use a 'repo' field in the output to
+    # specify which repository to create the agent session in. The target repository
+    # (current or target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
     # (optional)
@@ -1642,6 +2123,8 @@ safe-outputs:
   # Option 2: Enable agent session creation with default configuration
   create-agent-session: null
 
+  # Enable AI agents to update GitHub Project items (issues, pull requests) with
+  # status changes, field updates, and metadata modifications.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1653,6 +2136,8 @@ safe-outputs:
   # github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT)
   # or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be
   # used for Projects v2. Safe output items produced by the agent use
+  # type=update_project Configuration also supports an optional views array for
+  # declaring project views to create. Safe output items produced by the agent use
   # type=update_project and may include: project (board name), content_type
   # (issue|pull_request), content_number, fields, campaign_id, and
   # create_if_missing.
@@ -1667,71 +2152,204 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Optional array of project views to create automatically. Each view must have a
-    # name and layout. Views are created during workflow execution after processing
-    # agent output items.
+    # Optional array of project views to create. Each view must have a name and
+    # layout. Views are created during project setup.
     # (optional)
-    views:
-      - name: "Sprint Board"
-        layout: board  # table, board, or roadmap
-        filter: "is:issue is:open"  # optional filter query
-      - name: "Task Tracker"
-        layout: table
-        filter: "is:issue is:pr"
-      - name: "Campaign Timeline"
-        layout: roadmap
+    views: []
+      # Array items:
+        # The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')
+        name: "My Workflow"
+
+        # The layout type of the view
+        layout: "table"
+
+        # Optional filter query for the view (e.g., 'is:issue is:open', 'label:bug')
+        # (optional)
+        filter: "example-value"
+
+        # Optional array of field IDs that should be visible in the view (table/board
+        # only, not applicable to roadmap)
+        # (optional)
+        visible-fields: []
+
+        # Optional human description for the view. Not supported by the GitHub Views API
+        # and may be ignored.
+        # (optional)
+        description: "Description of the workflow"
+
+    # Optional array of project custom fields to create up-front. Useful for campaign
+    # projects that require a fixed set of fields.
+    # (optional)
+    field-definitions: []
+      # Array items:
+        # The field name to create (e.g., 'status', 'campaign_id')
+        name: "My Workflow"
+
+        # The GitHub Projects v2 custom field type
+        data-type: "DATE"
+
+        # Options for SINGLE_SELECT fields. GitHub does not support adding options later.
+        # (optional)
+        options: []
+          # Array of strings
 
   # Option 2: Enable project management with default configuration (max=10)
   update-project: null
 
+  # Enable AI agents to duplicate GitHub Project boards with all configuration,
+  # views, and settings.
   # (optional)
   # This field supports multiple formats (oneOf):
 
   # Option 1: Configuration for copying GitHub Projects v2 boards. Creates a new
-  # project with the same structure, fields, and views as the source project.
-  # Useful for duplicating project templates or migrating projects between
-  # organizations. Requires PAT or GitHub App token with Projects: Read+Write
-  # permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output
-  # items use type=copy_project and must include: sourceProject (full project URL),
-  # owner (target org/user login), title (new project title), and optionally
-  # includeDraftIssues (default: false).
+  # project with the same structure, fields, and views as the source project. By
+  # default, draft issues are NOT copied unless explicitly requested with
+  # includeDraftIssues=true in the tool call. Requires a Personal Access Token (PAT)
+  # or GitHub App token with Projects permissions; the GITHUB_TOKEN cannot be used.
+  # Safe output items use type=copy_project and include: sourceProject (URL), owner
+  # (org/user login), title (new project name), and optional includeDraftIssues
+  # (boolean). The source-project and target-owner can be configured in the workflow
+  # frontmatter to provide defaults that the agent can use or override.
   copy-project:
     # Maximum number of copy operations to perform (default: 1).
     # (optional)
     max: 1
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified. Must have Projects: Read+Write permissions.
+    # GitHub token to use for this specific output type. Must have Projects write
+    # permission. Overrides global github-token if specified.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # Optional default source project URL to copy from (e.g.,
+    # 'https://github.com/orgs/myorg/projects/42'). If specified, the agent can omit
+    # the sourceProject field in the tool call and this default will be used. The
+    # agent can still override by providing a sourceProject in the tool call.
+    # (optional)
+    source-project: "example-value"
+
+    # Optional default target owner (organization or user login name) where the new
+    # project will be created (e.g., 'myorg' or 'username'). If specified, the agent
+    # can omit the owner field in the tool call and this default will be used. The
+    # agent can still override by providing an owner in the tool call.
+    # (optional)
+    target-owner: "example-value"
 
   # Option 2: Enable project copying with default configuration (max=1)
   copy-project: null
 
+  # Enable AI agents to create new GitHub Project boards with custom fields, views,
+  # and configurations.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Configuration for creating project status updates on GitHub Projects
-  # v2 boards. Status updates appear in the project's Updates tab and provide
-  # stakeholder communication about campaign progress, findings, and trends.
-  # Typically used by campaign orchestrators to post run summaries. Requires PAT or
-  # GitHub App token with Projects: Read+Write permissions; the GITHUB_TOKEN cannot
-  # be used for Projects v2. Safe output items use type=create_project_status_update
-  # and must include: project (full project URL), body (markdown summary), status
-  # (ON_TRACK/AT_RISK/OFF_TRACK/COMPLETE), and optionally start_date and target_date.
+  # Option 1: Configuration for creating new GitHub Projects v2 boards. Creates a
+  # new empty project that can be populated with issues and custom fields. Requires
+  # a Personal Access Token (PAT) or GitHub App token with Projects permissions; the
+  # GITHUB_TOKEN cannot be used. Safe output items use type=create_project and
+  # include: title (project name), owner (org/user login), owner_type ('org' or
+  # 'user', default: 'org'), and optional item_url (GitHub issue URL to add as first
+  # item). The target-owner can be configured in the workflow frontmatter to provide
+  # a default that the agent can use or override.
+  create-project:
+    # Maximum number of create operations to perform (default: 1).
+    # (optional)
+    max: 1
+
+    # GitHub token to use for this specific output type. Must have Projects write
+    # permission. Overrides global github-token if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # Optional default target owner (organization or user login, e.g., 'myorg' or
+    # 'username') for the new project. If specified, the agent can omit the owner
+    # field in the tool call and this default will be used. The agent can still
+    # override by providing an owner in the tool call.
+    # (optional)
+    target-owner: "example-value"
+
+    # Optional prefix for auto-generated project titles (default: 'Campaign'). When
+    # the agent doesn't provide a title, the project title is auto-generated as
+    # '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the
+    # issue context.
+    # (optional)
+    title-prefix: "example-value"
+
+    # Optional array of project views to create automatically after project creation.
+    # Each view must have a name and layout. Views are created immediately after the
+    # project is created.
+    # (optional)
+    views: []
+      # Array items:
+        # The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')
+        name: "My Workflow"
+
+        # The layout type of the view
+        layout: "table"
+
+        # Optional filter query for the view (e.g., 'is:issue is:open', 'label:bug')
+        # (optional)
+        filter: "example-value"
+
+        # Optional array of field IDs that should be visible in the view (table/board
+        # only, not applicable to roadmap)
+        # (optional)
+        visible-fields: []
+
+        # Optional human description for the view. Not supported by the GitHub Views API
+        # and may be ignored.
+        # (optional)
+        description: "Description of the workflow"
+
+    # Optional array of project custom fields to create automatically after project
+    # creation. Useful for campaign projects that require a fixed set of fields.
+    # (optional)
+    field-definitions: []
+      # Array items:
+        # The field name to create (e.g., 'Campaign Id', 'Priority')
+        name: "My Workflow"
+
+        # The GitHub Projects v2 custom field type
+        data-type: "DATE"
+
+        # Options for SINGLE_SELECT fields. GitHub does not support adding options later.
+        # (optional)
+        options: []
+          # Array of strings
+
+  # Option 2: Enable project creation with default configuration (max=1)
+  create-project: null
+
+  # Option 3: Alternative null value syntax
+
+  # Enable AI agents to post status updates to GitHub Projects, providing progress
+  # reports and milestone tracking.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for creating GitHub Project status updates. Status
+  # updates provide stakeholder communication and historical record of project
+  # progress. Requires a Personal Access Token (PAT) or GitHub App token with
+  # Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects
+  # v2. Status updates are created on the specified project board and appear in the
+  # Updates tab. Typically used by campaign orchestrators to post run summaries with
+  # progress, findings, and next steps.
   create-project-status-update:
-    # Maximum number of status updates per run (default: 1).
+    # Maximum number of status updates to create (default: 1). Typically 1 per
+    # orchestrator run.
     # (optional)
     max: 1
 
     # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified. Must have Projects: Read+Write permissions.
+    # if specified. Must have Projects: Read+Write permission.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
   # Option 2: Enable project status updates with default configuration (max=1)
   create-project-status-update: null
 
+  # Enable AI agents to create GitHub Discussions from workflow output. Supports
+  # categorization, labeling, and automatic closure of older discussions. Does not
+  # require 'discussions: write' permission.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1781,11 +2399,6 @@ safe-outputs:
     allowed-repos: []
       # Array of strings
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
     # When true, automatically close older discussions matching the same title prefix
     # or labels as 'outdated' with a comment linking to the new discussion. Requires
     # title-prefix or labels to be set. Maximum 10 discussions will be closed. Only
@@ -1794,20 +2407,28 @@ safe-outputs:
     close-older-discussions: true
 
     # Time until the discussion expires and should be automatically closed. Supports
-    # integer (days) or relative time format like '7d' (7 days), '2w' (2 weeks), '1m'
-    # (1 month), '1y' (1 year). When set, a maintenance workflow will be generated.
+    # integer (days), relative time format like '2h' (2 hours), '7d' (7 days), '2w' (2
+    # weeks), '1m' (1 month), '1y' (1 year), or false to disable expiration. Minimum
+    # duration: 2 hours. When set, a maintenance workflow will be generated. Defaults
+    # to 7 days if not specified.
     # (optional)
     # This field supports multiple formats (oneOf):
 
     # Option 1: Number of days until expires
     expires: 1
 
-    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'; hours <24 = 1 day)
+    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for
+    # hour values
     expires: "example-value"
+
+    # Option 3: Set to false to explicitly disable expiration
+    expires: true
 
   # Option 2: Enable discussion creation with default configuration
   create-discussion: null
 
+  # Enable AI agents to close GitHub Discussions based on workflow analysis or
+  # conditions.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1841,14 +2462,11 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   # Option 2: Enable discussion closing with default configuration
   close-discussion: null
 
+  # Enable AI agents to edit and update existing GitHub Discussion content, titles,
+  # and metadata.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1888,14 +2506,11 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   # Option 2: Enable discussion updating with default configuration
   update-discussion: null
 
+  # Enable AI agents to close GitHub issues based on workflow analysis, resolution
+  # detection, or automated triage.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1925,14 +2540,11 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   # Option 2: Enable issue closing with default configuration
   close-issue: null
 
+  # Enable AI agents to close pull requests based on workflow analysis or automated
+  # review decisions.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1970,6 +2582,49 @@ safe-outputs:
   # Option 2: Enable pull request closing with default configuration
   close-pull-request: null
 
+  # Enable AI agents to mark draft pull requests as ready for review when criteria
+  # are met.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for marking draft pull requests as ready for review,
+  # with comment from agentic workflow output
+  mark-pull-request-as-ready-for-review:
+    # Only mark pull requests that have any of these labels
+    # (optional)
+    required-labels: []
+      # Array of strings
+
+    # Only mark pull requests with this title prefix
+    # (optional)
+    required-title-prefix: "example-value"
+
+    # Target for marking: 'triggering' (default, current PR), or '*' (any PR with
+    # pull_request_number field)
+    # (optional)
+    target: "example-value"
+
+    # Maximum number of pull requests to mark as ready (default: 1)
+    # (optional)
+    max: 1
+
+    # Target repository in format 'owner/repo' for cross-repository operations. Takes
+    # precedence over trial target repo settings.
+    # (optional)
+    target-repo: "example-value"
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable marking pull requests as ready for review with default
+  # configuration
+  mark-pull-request-as-ready-for-review: null
+
+  # Enable AI agents to add comments to GitHub issues, pull requests, or
+  # discussions. Supports templating, cross-repository commenting, and automatic
+  # mentions.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -1990,15 +2645,13 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
+    # List of additional repositories in format 'owner/repo' that comments can be
+    # created in. When specified, the agent can use a 'repo' field in the output to
+    # specify which repository to create the comment in. The target repository
+    # (current or target-repo) is always implicitly allowed.
     # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-    # Target discussion comments instead of issue/PR comments. Must be true if
-    # present.
-    # (optional)
-    discussion: true
+    allowed-repos: []
+      # Array of strings
 
     # When true, minimizes/hides all previous comments from the same agentic workflow
     # (identified by tracker-id) before creating the new comment. Default: false.
@@ -2015,6 +2668,8 @@ safe-outputs:
   # Option 2: Enable issue comment creation with default configuration
   add-comment: null
 
+  # Enable AI agents to create GitHub pull requests from workflow-generated code
+  # changes, patches, or analysis results.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2078,6 +2733,14 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # List of additional repositories in format 'owner/repo' that pull requests can be
+    # created in. When specified, the agent can use a 'repo' field in the output to
+    # specify which repository to create the pull request in. The target repository
+    # (current or target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
     # (optional)
@@ -2085,19 +2748,28 @@ safe-outputs:
 
     # Time until the pull request expires and should be automatically closed (only for
     # same-repo PRs without target-repo). Supports integer (days) or relative time
-    # format.
+    # format. Minimum duration: 2 hours.
     # (optional)
     # This field supports multiple formats (oneOf):
 
     # Option 1: Number of days until expires
     expires: 1
 
-    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'; hours <24 = 1 day)
+    # Option 2: Relative time (e.g., '2h', '7d', '2w', '1m', '1y'); minimum 2h for
+    # hour values
     expires: "example-value"
+
+    # Enable auto-merge for the pull request. When enabled, the PR will be
+    # automatically merged once all required checks pass and required approvals are
+    # met. Defaults to false.
+    # (optional)
+    auto-merge: true
 
   # Option 2: Enable pull request creation with default configuration
   create-pull-request: null
 
+  # Enable AI agents to add review comments to specific lines in pull request diffs
+  # during code review workflows.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2122,6 +2794,14 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # List of additional repositories in format 'owner/repo' that PR review comments
+    # can be created in. When specified, the agent can use a 'repo' field in the
+    # output to specify which repository to create the review comment in. The target
+    # repository (current or target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
     # (optional)
@@ -2130,6 +2810,8 @@ safe-outputs:
   # Option 2: Enable PR review comment creation with default configuration
   create-pull-request-review-comment: null
 
+  # Enable AI agents to create GitHub Advanced Security code scanning alerts for
+  # detected vulnerabilities or security issues.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2154,6 +2836,28 @@ safe-outputs:
   # (unlimited findings)
   create-code-scanning-alert: null
 
+  # Enable AI agents to create autofixes for code scanning alerts using the GitHub
+  # REST API.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for creating autofixes for code scanning alerts
+  autofix-code-scanning-alert:
+    # Maximum number of autofixes to create (default: 10)
+    # (optional)
+    max: 1
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable code scanning autofix creation with default configuration (max:
+  # 10)
+  autofix-code-scanning-alert: null
+
+  # Enable AI agents to add labels to GitHub issues or pull requests based on
+  # workflow analysis or classification.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2190,6 +2894,43 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to remove labels from GitHub issues or pull requests.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Null configuration allows any labels to be removed.
+  remove-labels: null
+
+  # Option 2: Configuration for removing labels from issues/PRs from agentic
+  # workflow output.
+  remove-labels:
+    # Optional list of allowed labels that can be removed. If omitted, any labels can
+    # be removed.
+    # (optional)
+    allowed: []
+      # Array of strings
+
+    # Optional maximum number of labels to remove (default: 3)
+    # (optional)
+    max: 1
+
+    # Target for labels: 'triggering' (default), '*' (any issue/PR), or explicit
+    # issue/PR number
+    # (optional)
+    target: "example-value"
+
+    # Target repository in format 'owner/repo' for cross-repository label removal.
+    # Takes precedence over trial target repo settings.
+    # (optional)
+    target-repo: "example-value"
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Enable AI agents to request reviews from users or teams on pull requests based
+  # on code changes or expertise matching.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2223,6 +2964,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to assign GitHub milestones to issues or pull requests based on
+  # workflow analysis or project planning.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2252,6 +2995,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to assign issues or pull requests to GitHub Copilot (@copilot)
+  # for automated handling.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2263,14 +3008,14 @@ safe-outputs:
   assign-to-agent:
     # Default agent name to assign (default: 'copilot')
     # (optional)
-    name: "copilot"
+    name: "My Workflow"
 
     # Optional list of allowed agent names. If specified, only these agents can be
-    # assigned. When configured, existing agent assignees not in the list are
-    # removed while regular user assignees are preserved.
+    # assigned. When configured, existing agent assignees not in the list are removed
+    # while regular user assignees are preserved.
     # (optional)
     allowed: []
-      # Array of strings (e.g., ["copilot"])
+      # Array of strings
 
     # Optional maximum number of agent assignments (default: 1)
     # (optional)
@@ -2288,11 +3033,20 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # If true, the workflow continues gracefully when agent assignment fails (e.g.,
+    # due to missing token or insufficient permissions), logging a warning instead of
+    # failing. Default is false. Useful for workflows that should not fail when agent
+    # assignment is optional.
+    # (optional)
+    ignore-if-error: true
+
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to assign issues or pull requests to specific GitHub users
+  # based on workflow logic or expertise matching.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2327,6 +3081,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to create hierarchical relationships between issues using
+  # GitHub's sub-issue (tasklist) feature.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2368,6 +3124,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to edit and update existing GitHub issue content, titles,
+  # labels, assignees, and metadata.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2400,14 +3158,11 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   # Option 2: Enable issue updating with default configuration
   update-issue: null
 
+  # Enable AI agents to edit and update existing pull request content, titles,
+  # labels, reviewers, and metadata.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2425,6 +3180,12 @@ safe-outputs:
     # Allow updating pull request body - defaults to true, set to false to disable
     # (optional)
     body: true
+
+    # Default operation for body updates: 'append' (add to end), 'prepend' (add to
+    # start), or 'replace' (overwrite completely). Defaults to 'replace' if not
+    # specified.
+    # (optional)
+    operation: "append"
 
     # Maximum number of pull requests to update (default: 1)
     # (optional)
@@ -2444,6 +3205,8 @@ safe-outputs:
   # body updates enabled)
   update-pull-request: null
 
+  # Enable AI agents to push commits directly to pull request branches for automated
+  # fixes or improvements.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2489,6 +3252,8 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to minimize (hide) comments on issues or pull requests based on
+  # relevance, spam detection, or moderation rules.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2507,17 +3272,41 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
     # List of allowed reasons for hiding comments. Default: all reasons allowed (spam,
     # abuse, off_topic, outdated, resolved).
     # (optional)
     allowed-reasons: []
       # Array of strings
 
+  # Dispatch workflow_dispatch events to other workflows. Used by orchestrators to
+  # delegate work to worker workflows with controlled maximum dispatch count.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for dispatching workflow_dispatch events to other
+  # workflows. Orchestrators use this to delegate work to worker workflows.
+  dispatch-workflow:
+    # List of workflow names (without .md extension) to allow dispatching. Each
+    # workflow must exist in .github/workflows/.
+    workflows: []
+      # Array of strings
+
+    # Maximum number of workflow dispatch operations per run (default: 1, max: 50)
+    # (optional)
+    max: 1
+
+    # GitHub token to use for dispatching workflows. Overrides global github-token if
+    # specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Shorthand array format: list of workflow names (without .md extension)
+  # to allow dispatching
+  dispatch-workflow: []
+    # Array items: string
+
+  # Enable AI agents to report when required MCP tools are unavailable. Used for
+  # workflow diagnostics and tool discovery.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2526,6 +3315,20 @@ safe-outputs:
     # Maximum number of missing tool reports (default: unlimited)
     # (optional)
     max: 1
+
+    # Whether to create or update GitHub issues when tools are missing (default: true)
+    # (optional)
+    create-issue: true
+
+    # Prefix for issue titles when creating issues for missing tools (default:
+    # '[missing tool]')
+    # (optional)
+    title-prefix: "example-value"
+
+    # Labels to add to created issues for missing tools
+    # (optional)
+    labels: []
+      # Array of strings
 
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
@@ -2539,6 +3342,47 @@ safe-outputs:
   # reporting is enabled by default when safe-outputs is configured.
   missing-tool: true
 
+  # Enable AI agents to report when required data or context is missing. Used for
+  # workflow troubleshooting and data validation.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for reporting missing data required to achieve workflow
+  # goals. Encourages AI agents to be truthful about data gaps instead of
+  # hallucinating information.
+  missing-data:
+    # Maximum number of missing data reports (default: unlimited)
+    # (optional)
+    max: 1
+
+    # Whether to create or update GitHub issues when data is missing (default: true)
+    # (optional)
+    create-issue: true
+
+    # Prefix for issue titles when creating issues for missing data (default:
+    # '[missing data]')
+    # (optional)
+    title-prefix: "example-value"
+
+    # Labels to add to created issues for missing data
+    # (optional)
+    labels: []
+      # Array of strings
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable missing data reporting with default configuration
+  missing-data: null
+
+  # Option 3: Explicitly disable missing data reporting (false). Missing data
+  # reporting is enabled by default when safe-outputs is configured.
+  missing-data: true
+
+  # Enable AI agents to explicitly indicate no action is needed. Used for workflow
+  # control flow and conditional logic.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2561,6 +3405,8 @@ safe-outputs:
   # when safe-outputs is configured.
   noop: true
 
+  # Enable AI agents to publish files (images, charts, reports) to an orphaned git
+  # branch for persistent storage and web access.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2591,6 +3437,8 @@ safe-outputs:
   # Option 2: Enable asset publishing with default configuration
   upload-asset: null
 
+  # Enable AI agents to edit and update GitHub release content, including release
+  # notes, assets, and metadata.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2604,11 +3452,6 @@ safe-outputs:
     # specified, updates releases in the workflow's repository.
     # (optional)
     target-repo: "example-value"
-
-    # GitHub token to use for this specific output type. Overrides global github-token
-    # if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
 
   # Option 2: Enable release updates with default configuration
   update-release: null
@@ -2658,6 +3501,8 @@ safe-outputs:
   # (optional)
   max-patch-size: 1
 
+  # Enable AI agents to report detected security threats, policy violations, or
+  # suspicious patterns for security review.
   # (optional)
   # This field supports multiple formats (oneOf):
 
@@ -2716,6 +3561,18 @@ safe-outputs:
     # (optional)
     footer-install: "example-value"
 
+    # Custom footer message template for workflow recompile issues. Available
+    # placeholders: {workflow_name}, {run_url}, {repository}. Example: '> Workflow
+    # sync report by [{workflow_name}]({run_url}) for {repository}'
+    # (optional)
+    footer-workflow-recompile: "example-value"
+
+    # Custom footer message template for comments on workflow recompile issues.
+    # Available placeholders: {workflow_name}, {run_url}, {repository}. Example: '>
+    # Update from [{workflow_name}]({run_url}) for {repository}'
+    # (optional)
+    footer-workflow-recompile-comment: "example-value"
+
     # Custom title template for staged mode preview. Available placeholders:
     # {operation}. Example: '🎭 Preview: {operation}'
     # (optional)
@@ -2732,11 +3589,6 @@ safe-outputs:
     # [{workflow_name}]({run_url}) triggered by this {event_type}.'
     # (optional)
     run-started: "example-value"
-
-    # When true, the workflow completion notifier creates a new comment instead of
-    # editing the activation comment. Default: false.
-    # (optional)
-    append-only-comments: false
 
     # Custom message template for successful workflow completion. Available
     # placeholders: {workflow_name}, {run_url}. Default: '✅ Agentic
@@ -2755,6 +3607,12 @@ safe-outputs:
     # [{workflow_name}]({run_url}). Review the logs for details.'
     # (optional)
     detection-failure: "example-value"
+
+    # When enabled, workflow completion notifier creates a new comment instead of
+    # editing the activation comment. Creates an append-only timeline of workflow
+    # runs. Default: false
+    # (optional)
+    append-only-comments: true
 
   # Configuration for @mention filtering in safe outputs. Controls whether and how
   # @mentions in AI-generated content are allowed or escaped.
@@ -2828,24 +3686,17 @@ bots: []
   # Array of Bot identifier/name (e.g., 'dependabot[bot]', 'renovate[bot]',
   # 'github-actions[bot]')
 
-# GitHub Actions workflow step
-# (optional)
-# This field supports multiple formats (anyOf):
-
-# Option 1: undefined
-
-# Option 2: undefined
-
 # Enable strict mode validation for enhanced security and compliance. Strict mode
 # enforces: (1) Write Permissions - refuses contents:write, issues:write,
 # pull-requests:write; requires safe-outputs instead, (2) Network Configuration -
-# requires explicit network configuration with no wildcard '*' in allowed domains,
-# (3) Action Pinning - enforces actions pinned to commit SHAs instead of
-# tags/branches, (4) MCP Network - requires network configuration for custom MCP
-# servers with containers, (5) Deprecated Fields - refuses deprecated frontmatter
-# fields. Can be enabled per-workflow via 'strict: true' in frontmatter, or
-# disabled via 'strict: false'. CLI flag takes precedence over frontmatter (gh aw
-# compile --strict enforces strict mode). Defaults to true. See:
+# requires explicit network configuration with no standalone wildcard '*' in
+# allowed domains (patterns like '*.example.com' are allowed), (3) Action Pinning
+# - enforces actions pinned to commit SHAs instead of tags/branches, (4) MCP
+# Network - requires network configuration for custom MCP servers with containers,
+# (5) Deprecated Fields - refuses deprecated frontmatter fields. Can be enabled
+# per-workflow via 'strict: true' in frontmatter, or disabled via 'strict: false'.
+# CLI flag takes precedence over frontmatter (gh aw compile --strict enforces
+# strict mode). Defaults to true. See:
 # https://githubnext.github.io/gh-aw/reference/frontmatter/#strict-mode-strict
 # (optional)
 strict: true
@@ -2856,7 +3707,7 @@ strict: true
 # (JavaScript), 'run' (shell), or 'py' (Python) must be specified per tool.
 # (optional)
 safe-inputs:
-
+  {}
 
 # Runtime environment version overrides. Allows customizing runtime versions
 # (e.g., Node.js, Python) or defining new runtimes. Runtimes from imported shared
