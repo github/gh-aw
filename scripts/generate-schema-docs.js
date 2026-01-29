@@ -313,9 +313,8 @@ function generateMarkdown() {
     "This document provides a comprehensive reference for all available frontmatter configuration options in GitHub Agentic Workflows. The examples below are generated from the JSON Schema and include inline comments describing each field."
   );
   lines.push("");
-  lines.push(":::note");
-  lines.push("This documentation is automatically generated from the JSON Schema. For a more user-friendly guide, see [Frontmatter](/gh-aw/reference/frontmatter/).");
-  lines.push(":::");
+  lines.push("> [!NOTE]");
+  lines.push("> This documentation is automatically generated from the JSON Schema. For a more user-friendly guide, see [Frontmatter](/gh-aw/reference/frontmatter/).");
   lines.push("");
 
   // Schema description
