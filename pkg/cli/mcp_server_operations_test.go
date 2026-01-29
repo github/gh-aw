@@ -48,10 +48,8 @@ This is a test workflow.
 	defer os.Chdir(originalDir)
 	os.Chdir(tmpDir)
 
-	// Initialize git repository in the temp directory
-	initCmd := exec.Command("git", "init")
-	initCmd.Dir = tmpDir
-	if err := initCmd.Run(); err != nil {
+	// Initialize git repository using shared helper
+	if err := initTestGitRepo(tmpDir); err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
 
@@ -140,10 +138,8 @@ This is a test workflow.
 	defer os.Chdir(originalDir)
 	os.Chdir(tmpDir)
 
-	// Initialize git repository in the temp directory
-	initCmd := exec.Command("git", "init")
-	initCmd.Dir = tmpDir
-	if err := initCmd.Run(); err != nil {
+	// Initialize git repository using shared helper
+	if err := initTestGitRepo(tmpDir); err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
 
@@ -154,7 +150,7 @@ This is a test workflow.
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	serverCmd.Dir = tmpDir
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -209,7 +205,7 @@ func TestMCPServer_AuditTool(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -274,7 +270,7 @@ func TestMCPServer_ContextCancellation(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

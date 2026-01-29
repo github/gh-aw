@@ -100,24 +100,9 @@ func TestMCPServer_AddToolInvocation(t *testing.T) {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
-	// Initialize git repository in the temp directory
-	gitCmd := exec.Command("git", "init")
-	gitCmd.Dir = tmpDir
-	if err := gitCmd.Run(); err != nil {
+	// Initialize git repository using shared helper
+	if err := initTestGitRepo(tmpDir); err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
-	}
-
-	// Configure git user (required for commits)
-	configCmds := [][]string{
-		{"git", "config", "user.email", "test@example.com"},
-		{"git", "config", "user.name", "Test User"},
-	}
-	for _, cmdArgs := range configCmds {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		cmd.Dir = tmpDir
-		if err := cmd.Run(); err != nil {
-			t.Fatalf("Failed to configure git: %v", err)
-		}
 	}
 
 	// Change to the temporary directory

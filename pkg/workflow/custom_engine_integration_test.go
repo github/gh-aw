@@ -30,7 +30,7 @@ on: push
 strict: false
 permissions:
   contents: read
-  issues: write
+  issues: read
   pull-requests: read
 engine:
   id: custom

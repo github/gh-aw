@@ -1,3 +1,5 @@
+//go:build !integration
+
 // This file provides tests for expression pattern matching.
 
 package workflow

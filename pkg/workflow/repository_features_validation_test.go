@@ -104,11 +104,6 @@ func TestValidateRepositoryFeatures(t *testing.T) {
 	}
 }
 
-// boolPtr returns a pointer to a boolean value
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func TestGetCurrentRepository(t *testing.T) {
 	// This test will only pass when running in a git repository with GitHub remote
 	// It's expected to fail in non-git environments

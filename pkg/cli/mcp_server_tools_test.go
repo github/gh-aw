@@ -28,7 +28,7 @@ func TestMCPServer_ListTools(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(binaryPath, "mcp-server")
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -82,7 +82,7 @@ func TestMCPServer_ServerInfo(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -122,7 +122,7 @@ func TestMCPServer_UpdateToolSchema(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(binaryPath, "mcp-server")
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -191,7 +191,7 @@ func TestMCPServer_CapabilitiesConfiguration(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -240,7 +240,7 @@ func TestMCPServer_ToolIcons(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(binaryPath, "mcp-server")
+	serverCmd := exec.Command(binaryPath, "mcp-server", "--cmd", binaryPath)
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -267,6 +267,7 @@ func TestMCPServer_ToolIcons(t *testing.T) {
 		"mcp-inspect": "🔎",
 		"add":         "➕",
 		"update":      "🔄",
+		"fix":         "🔧",
 	}
 
 	// Verify each tool has an icon

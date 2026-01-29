@@ -111,10 +111,8 @@ This is a test workflow with MCP configuration.
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
-	// Initialize git repository in the temp directory
-	gitCmd := exec.Command("git", "init")
-	gitCmd.Dir = tmpDir
-	if err := gitCmd.Run(); err != nil {
+	// Initialize git repository using shared helper
+	if err := initTestGitRepo(tmpDir); err != nil {
 		t.Fatalf("Failed to initialize git repository: %v", err)
 	}
 

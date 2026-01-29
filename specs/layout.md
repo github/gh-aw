@@ -31,10 +31,10 @@ Common GitHub Actions used across workflows (24 unique external actions + 1 loca
 | `actions/ai-inference` | `a6101c89c6feaecc585efdd8d461f18bb7896f20` | AI inference action | Used for AI model inference tasks |
 | `astral-sh/setup-uv` | `d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86` | Sets up uv package manager | Used for Python package management |
 | `docker/setup-buildx-action` | `8d2750c68a42422c14e847fe6c8ac0403b4cbd6f` | Sets up Docker Buildx | Used for multi-platform Docker builds |
-| `docker/login-action` | `5e57cd118135c172c3672efd75eb46360885c0ef` | Logs in to Docker registry | Used for Docker registry authentication |
+| `docker/login-action` | `c94ce9fb468520275223c153574b00df6fe4bcc9` | Logs in to Docker registry | Used for Docker registry authentication |
 | `docker/metadata-action` | `c299e40c65443455700f0fdfc63efafe5b349051` | Extracts Docker metadata | Used for Docker image tagging |
 | `docker/build-push-action` | `263435318d21b8e681c14492fe198d362a7d2c83` | Builds and pushes Docker images | Used for containerized workflows |
-| `anchore/sbom-action` | `62ad5284b8ced813296287a0b63906cb364b73ee` | Generates Software Bill of Materials | Used for security compliance |
+| `anchore/sbom-action` | `deef08a0db64bfad603422135db61477b16cef56` | Generates Software Bill of Materials | Used for security compliance |
 | `github/stale-repos` | `3477b6488008d9411aaf22a0924ec7c1f6a69980` | Identifies stale repositories | Used for repository maintenance |
 | `super-linter/super-linter` | `2bdd90ed3262e023ac84bf8fe35dc480721fc1f2` | Lints code across multiple languages | Used for code quality checks |
 | `githubnext/gh-aw/actions/setup` | `623e612ff6a684e9a8634449508bdda21e2c178c` | gh-aw setup action (pinned version) | Used for specific workflow versions |

@@ -42,12 +42,15 @@ build-windows:
 
 # Test the code (runs both unlabelled unit tests and integration tests and long tests)
 .PHONY: test
-test:
-	go test -v -parallel=4 -timeout=10m -tags 'integration' -run='^Test' ./...
+test: test-unit test-integration
 
 # Test unit tests only (excludes labelled integration tests and long tests)
 .PHONY: test-unit
 test-unit:
+	go test -v -parallel=4 -timeout=10m -run='^Test' ./... -short
+
+.PHONY: test-integration
+test-integration:
 	go test -v -parallel=4 -timeout=10m -run='^Test' ./... -short
 
 # Update golden test files

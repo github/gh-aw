@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 // Tests for security and network extraction functions

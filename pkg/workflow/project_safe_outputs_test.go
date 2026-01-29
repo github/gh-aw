@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -253,9 +255,4 @@ func TestProjectConfigIntegration(t *testing.T) {
 	// Check create-project-status-update configuration
 	assert.Equal(t, 2, result.CreateProjectStatusUpdates.Max, "CreateProjectStatusUpdates max should match")
 	assert.Equal(t, "${{ secrets.TEST_TOKEN }}", result.CreateProjectStatusUpdates.GitHubToken, "CreateProjectStatusUpdates token should match")
-}
-
-// boolPtr returns a pointer to a bool value
-func boolPtr(b bool) *bool {
-	return &b
 }

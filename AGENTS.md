@@ -73,6 +73,26 @@ make build       # Rebuild gh-aw after modifying JSON schemas in pkg/parser/sche
 ```
 Schema files are embedded in the binary using `//go:embed` directives, so changes require rebuilding the binary.
 
+**ALWAYS ADD BUILD TAGS TO TEST FILES:**
+
+Every test file (`*_test.go`) **must** have a build tag at the very top of the file:
+
+```go
+//go:build !integration    // For unit tests (default)
+
+//go:build integration     // For integration tests (files with "integration" in name)
+```
+
+**Rules:**
+- Files with "integration" in the filename get `//go:build integration`
+- All other test files get `//go:build !integration`
+- The build tag must be the **first line** of the file, followed by an empty line
+
+**To add build tags to all test files:**
+```bash
+./scripts/add-build-tags.sh
+```
+
 **ALWAYS RUN LINTERS AFTER ADDING TEST FILES:**
 
 When adding new test files (`*_test.go`), the **unused** linter may catch helper functions that are defined but never called. Always run linters after creating test files to catch these issues early.
