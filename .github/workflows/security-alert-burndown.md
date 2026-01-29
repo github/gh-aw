@@ -100,8 +100,6 @@ After completing the bundling analysis, you must immediately perform these three
 
 #### Bundling Guidelines
 
-#### Bundling Guidelines
-
 Analyze all discovered PRs following these rules:
 
 1. Review all discovered PRs

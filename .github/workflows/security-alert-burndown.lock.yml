@@ -910,8 +910,6 @@ jobs:
           
           #### Bundling Guidelines
           
-          #### Bundling Guidelines
-          
           Analyze all discovered PRs following these rules:
           
           1. Review all discovered PRs
@@ -1327,9 +1325,9 @@ jobs:
           ## Traffic and Rate Limits (Required)
           
           - Minimize API calls; avoid full rescans when possible.
+          - Prefer incremental discovery with deterministic ordering (e.g., by `updatedAt`, tie-break by ID).
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          - Prefer incremental discovery with deterministic ordering (e.g., by `updatedAt`, tie-break by ID).
           - Enforce strict pagination budgets; if a query requires many pages, stop early and continue next run.
           - Use a durable cursor/checkpoint so the next run continues without rescanning.
           - On throttling (HTTP 429 / rate-limit 403), do not retry aggressively; back off and end the run after reporting what remains.
