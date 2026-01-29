@@ -30,7 +30,7 @@ name: "Dependabot Burner"
   schedule:
   - cron: "32 23 * * *"
     # Friendly format: daily (scattered)
-  # skip-if-no-match: is:pr is:open author:app/dependabot label:dependencies label:javascript # Skip-if-no-match processed as search check in pre-activation job
+  # skip-if-no-match: is:pr is:open author:app/dependabot # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
 
 permissions: {}
@@ -1463,7 +1463,7 @@ jobs:
         id: check_skip_if_no_match
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_SKIP_QUERY: "is:pr is:open author:app/dependabot label:dependencies label:javascript"
+          GH_AW_SKIP_QUERY: "is:pr is:open author:app/dependabot"
           GH_AW_WORKFLOW_NAME: "Dependabot Burner"
           GH_AW_SKIP_MIN_MATCHES: "1"
         with:
