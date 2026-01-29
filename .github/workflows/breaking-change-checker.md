@@ -129,11 +129,17 @@ Is it removing schema fields or making optional fields required?
 
 ### If NO Breaking Changes Found
 
-Output a noop message:
+**YOU MUST CALL** the `noop` tool to log completion:
 
+```json
+{
+  "noop": {
+    "message": "No breaking changes detected in commits from the last 24 hours. Analysis complete."
+  }
+}
 ```
-No breaking changes detected in commits from the last 24 hours. Analysis complete.
-```
+
+**DO NOT just write this message in your output text** - you MUST actually invoke the `noop` tool. The workflow will fail if you don't call it.
 
 Do NOT create an issue if there are no breaking changes.
 
