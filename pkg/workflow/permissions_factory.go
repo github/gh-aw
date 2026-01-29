@@ -1,5 +1,9 @@
 package workflow
 
+import "github.com/githubnext/gh-aw/pkg/logger"
+
+var permissionsFactoryLog = logger.New("workflow:permissions_factory")
+
 // NewPermissions creates a new Permissions with an empty map
 func NewPermissions() *Permissions {
 	return &Permissions{
@@ -9,6 +13,7 @@ func NewPermissions() *Permissions {
 
 // NewPermissionsReadAll creates a Permissions with read-all shorthand
 func NewPermissionsReadAll() *Permissions {
+	permissionsFactoryLog.Print("Creating permissions with read-all shorthand")
 	return &Permissions{
 		shorthand: "read-all",
 	}
@@ -16,6 +21,7 @@ func NewPermissionsReadAll() *Permissions {
 
 // NewPermissionsWriteAll creates a Permissions with write-all shorthand
 func NewPermissionsWriteAll() *Permissions {
+	permissionsFactoryLog.Print("Creating permissions with write-all shorthand")
 	return &Permissions{
 		shorthand: "write-all",
 	}
@@ -38,6 +44,9 @@ func NewPermissionsEmpty() *Permissions {
 
 // NewPermissionsFromMap creates a Permissions from a map of scopes to levels
 func NewPermissionsFromMap(perms map[PermissionScope]PermissionLevel) *Permissions {
+	if permissionsFactoryLog.Enabled() {
+		permissionsFactoryLog.Printf("Creating permissions from map: scope_count=%d", len(perms))
+	}
 	p := NewPermissions()
 	for scope, level := range perms {
 		p.permissions[scope] = level

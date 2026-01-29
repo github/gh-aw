@@ -4,12 +4,18 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/githubnext/gh-aw/pkg/logger"
 )
+
+var permissionsOpsLog = logger.New("workflow:permissions_operations")
 
 // Set sets a permission for a specific scope
 func (p *Permissions) Set(scope PermissionScope, level PermissionLevel) {
+	permissionsOpsLog.Printf("Setting permission: scope=%s, level=%s", scope, level)
 	if p.shorthand != "" {
 		// Convert from shorthand to map
+		permissionsOpsLog.Printf("Converting from shorthand %s to explicit map", p.shorthand)
 		p.shorthand = ""
 		if p.permissions == nil {
 			p.permissions = make(map[PermissionScope]PermissionLevel)
@@ -17,6 +23,7 @@ func (p *Permissions) Set(scope PermissionScope, level PermissionLevel) {
 	}
 	if p.hasAll {
 		// Convert from all to explicit map
+		permissionsOpsLog.Printf("Converting from all:%s to explicit map", p.allLevel)
 		if p.permissions == nil {
 			p.permissions = make(map[PermissionScope]PermissionLevel)
 		}
@@ -90,6 +97,10 @@ func (p *Permissions) mergePermissionMaps(otherPerms map[PermissionScope]Permiss
 func (p *Permissions) Merge(other *Permissions) {
 	if other == nil {
 		return
+	}
+
+	if permissionsOpsLog.Enabled() {
+		permissionsOpsLog.Printf("Merging permissions: current_perms_count=%d, other_perms_count=%d", len(p.permissions), len(other.permissions))
 	}
 
 	// Handle all permissions - convert to explicit first if needed
