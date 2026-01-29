@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -74,11 +76,12 @@ func TestRenderSharedMCPConfig_CopilotFields(t *testing.T) {
 				RequiresCopilotFields: false,
 			},
 			expectedContent: []string{
-				// After auto-containerization, npx becomes docker with npx in args
-				`"command": "docker"`,
-				`"args": [`,
+				// After auto-containerization, npx becomes container with entrypoint
+				`"type": "stdio"`,
+				`"container": "node:lts-alpine"`, // Auto-assigned container for npx
+				`"entrypoint": "npx"`,
+				`"entrypointArgs": [`,
 				`"env": {`,
-				`"node:lts-alpine"`, // Auto-assigned container for npx
 			},
 			unexpectedContent: []string{
 				`"tools":`, // should NOT include tools field

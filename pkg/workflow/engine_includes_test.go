@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -248,13 +250,12 @@ This should use the default engine.
 	}
 	lockStr := string(lockContent)
 
-	// Should contain references to copilot CLI (default engine) using official install.sh script
-	if !strings.Contains(lockStr, "https://raw.githubusercontent.com/github/copilot-cli/main/install.sh") ||
-		!strings.Contains(lockStr, "export VERSION=") {
-		t.Error("Expected lock file to contain copilot CLI installation using official install.sh script")
+	// Should contain references to copilot CLI (default engine) using install script wrapper
+	if !strings.Contains(lockStr, "/opt/gh-aw/actions/install_copilot_cli.sh") {
+		t.Error("Expected lock file to contain copilot CLI installation using install script wrapper")
 	}
 
-	// Should NOT pipe directly to bash (security improvement)
+	// Should NOT use deprecated formats
 	if strings.Contains(lockStr, "gh.io/copilot-install | sudo bash") {
 		t.Error("Lock file should not pipe installer directly to bash")
 	}

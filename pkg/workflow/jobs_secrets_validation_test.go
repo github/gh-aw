@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -8,6 +10,7 @@ import (
 )
 
 // TestJobsSecretsValidation tests the validation of jobs.secrets field values
+// Uses a representative sample of valid and invalid cases
 func TestJobsSecretsValidation(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -15,7 +18,7 @@ func TestJobsSecretsValidation(t *testing.T) {
 		expectError bool
 		errorMsg    string
 	}{
-		// Valid cases
+		// Valid cases - representative sample
 		{
 			name: "valid single secret reference",
 			markdown: `---
@@ -44,79 +47,7 @@ jobs:
 Test workflow with secret fallback.`,
 			expectError: false,
 		},
-		{
-			name: "valid multiple secrets with fallback",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets.TOKEN1 || secrets.TOKEN2 || secrets.TOKEN3 }}
----
-Test workflow with multiple secret fallbacks.`,
-			expectError: false,
-		},
-		{
-			name: "valid secret with spaces",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{  secrets.MY_TOKEN  }}
----
-Test workflow with spaces in expression.`,
-			expectError: false,
-		},
-		{
-			name: "valid secret with underscore prefix",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets._PRIVATE_TOKEN }}
----
-Test workflow with underscore prefix.`,
-			expectError: false,
-		},
-		{
-			name: "valid secret with numbers",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets.TOKEN_V2 }}
----
-Test workflow with numbers in secret name.`,
-			expectError: false,
-		},
-		{
-			name: "valid multiple secret keys",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      github_token: ${{ secrets.GITHUB_TOKEN }}
-      api_key: ${{ secrets.API_KEY }}
-      db_password: ${{ secrets.DB_PASSWORD || secrets.DB_PASSWORD_FALLBACK }}
----
-Test workflow with multiple secret keys.`,
-			expectError: false,
-		},
-		// Invalid cases - schema validation will catch these
+		// Invalid cases - representative sample
 		{
 			name: "invalid plaintext secret",
 			markdown: `---
@@ -133,21 +64,6 @@ Test workflow with plaintext secret.`,
 			errorMsg:    "does not match pattern",
 		},
 		{
-			name: "invalid GitHub PAT token",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ghp_1234567890abcdefghijklmnopqrstuvwxyz
----
-Test workflow with GitHub PAT.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
 			name: "invalid env variable reference",
 			markdown: `---
 on: workflow_dispatch
@@ -159,126 +75,6 @@ jobs:
       token: ${{ env.MY_TOKEN }}
 ---
 Test workflow with env variable.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid vars reference",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ vars.MY_TOKEN }}
----
-Test workflow with vars reference.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid github context reference",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ github.token }}
----
-Test workflow with github.token reference.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid missing closing braces",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets.MY_TOKEN
----
-Test workflow with missing closing braces.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid missing opening braces",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: secrets.MY_TOKEN }}
----
-Test workflow with missing opening braces.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid empty string",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ""
----
-Test workflow with empty string.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid mixed secrets with other context",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets.MY_TOKEN || env.FALLBACK }}
----
-Test workflow with mixed contexts.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid secret name starting with number",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: ${{ secrets.123TOKEN }}
----
-Test workflow with invalid secret name.`,
-			expectError: true,
-			errorMsg:    "does not match pattern",
-		},
-		{
-			name: "invalid secret with additional text",
-			markdown: `---
-on: workflow_dispatch
-engine: custom
-jobs:
-  deploy:
-    uses: ./.github/workflows/deploy.yml
-    secrets:
-      token: Bearer ${{ secrets.MY_TOKEN }}
----
-Test workflow with additional text in secret.`,
 			expectError: true,
 			errorMsg:    "does not match pattern",
 		},

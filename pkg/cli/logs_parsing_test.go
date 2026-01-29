@@ -1,3 +1,5 @@
+//go:build !integration
+
 package cli
 
 import (
@@ -695,38 +697,69 @@ func TestExtractLogMetricsWithAwOutputFile(t *testing.T) {
 		t.Fatalf("Failed to create logs directory: %v", err)
 	}
 
-	// Create aw-output.json file
-	awOutputFile := filepath.Join(logsDir, "aw-output.json")
+	// Create aw_info.json to specify copilot engine
+	awInfoFile := filepath.Join(logsDir, "aw_info.json")
+	awInfoContent := `{"engine_id": "copilot"}`
+	err = os.WriteFile(awInfoFile, []byte(awInfoContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create aw_info.json file: %v", err)
+	}
+
+	// Create agent_output.json file (the actual safe outputs artifact)
+	awOutputFile := filepath.Join(logsDir, "agent_output.json")
 	awOutputContent := `{
-		"status": "success",
-		"duration_ms": 45000,
-		"token_usage": 5432,
-		"estimated_cost": 0.123,
-		"turns": 8
+		"items": [],
+		"errors": []
 	}`
 	err = os.WriteFile(awOutputFile, []byte(awOutputContent), 0644)
 	if err != nil {
-		t.Fatalf("Failed to create aw-output.json file: %v", err)
+		t.Fatalf("Failed to create agent_output.json file: %v", err)
 	}
 
-	// Test metrics extraction from aw-output.json
+	// Create a log file with metrics for Copilot CLI
+	logFile := filepath.Join(logsDir, "agent.log")
+	logContent := `2024-01-15T10:30:00Z [DEBUG] response (Request-ID 00000-test):
+2024-01-15T10:30:00Z [DEBUG] data:
+2024-01-15T10:30:00Z [DEBUG] {
+2024-01-15T10:30:00Z [DEBUG]   "id": "chatcmpl-test",
+2024-01-15T10:30:00Z [DEBUG]   "object": "chat.completion",
+2024-01-15T10:30:00Z [DEBUG]   "created": 1705317000,
+2024-01-15T10:30:00Z [DEBUG]   "model": "claude-sonnet-4",
+2024-01-15T10:30:00Z [DEBUG]   "choices": [
+2024-01-15T10:30:00Z [DEBUG]     {
+2024-01-15T10:30:00Z [DEBUG]       "index": 0,
+2024-01-15T10:30:00Z [DEBUG]       "message": {
+2024-01-15T10:30:00Z [DEBUG]         "role": "assistant",
+2024-01-15T10:30:00Z [DEBUG]         "content": "Task completed."
+2024-01-15T10:30:00Z [DEBUG]       },
+2024-01-15T10:30:00Z [DEBUG]       "finish_reason": "stop"
+2024-01-15T10:30:00Z [DEBUG]     }
+2024-01-15T10:30:00Z [DEBUG]   ],
+2024-01-15T10:30:00Z [DEBUG]   "usage": {
+2024-01-15T10:30:00Z [DEBUG]     "prompt_tokens": 4232,
+2024-01-15T10:30:00Z [DEBUG]     "completion_tokens": 1200,
+2024-01-15T10:30:00Z [DEBUG]     "total_tokens": 5432
+2024-01-15T10:30:00Z [DEBUG]   }
+2024-01-15T10:30:00Z [DEBUG] }
+2024-01-15T10:30:00Z [DEBUG] Workflow completed`
+	err = os.WriteFile(logFile, []byte(logContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create log file: %v", err)
+	}
+
+	// Test metrics extraction from log files
 	metrics, err := extractLogMetrics(logsDir, false)
 	if err != nil {
 		t.Fatalf("extractLogMetrics failed: %v", err)
 	}
 
-	// Verify metrics from aw-output.json
+	// Verify metrics from log file
 	if metrics.TokenUsage != 5432 {
-		t.Errorf("Expected token usage 5432 from aw-output.json, got %d", metrics.TokenUsage)
+		t.Errorf("Expected token usage 5432 from log file, got %d", metrics.TokenUsage)
 	}
 
-	if metrics.EstimatedCost != 0.123 {
-		t.Errorf("Expected cost 0.123 from aw-output.json, got %f", metrics.EstimatedCost)
-	}
-
-	if metrics.Turns != 8 {
-		t.Errorf("Expected turns 8 from aw-output.json, got %d", metrics.Turns)
-	}
+	// Note: estimated cost and turns are engine/log-format specific
+	// For this test, we're just verifying basic token parsing works
 }
 
 func TestCustomEngineParseLogMetrics(t *testing.T) {

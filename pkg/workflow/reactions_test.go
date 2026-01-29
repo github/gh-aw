@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -108,8 +110,12 @@ func TestParseReactionValue(t *testing.T) {
 		{"int64 5 is invalid", int64(5), "", true},
 		{"uint64 2 is invalid", uint64(2), "", true},
 
+		// Float values (YAML may parse +1/-1 as float)
+		{"float 1.0 becomes +1", 1.0, "+1", false},
+		{"float -1.0 becomes -1", -1.0, "-1", false},
+		{"float 2.0 is invalid", 2.0, "", true},
+
 		// Invalid types
-		{"float is invalid", 1.0, "", true},
 		{"bool is invalid", true, "", true},
 		{"nil is invalid", nil, "", true},
 	}

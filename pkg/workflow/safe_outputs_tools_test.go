@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -283,6 +285,7 @@ func TestGetSafeOutputsToolsJSON(t *testing.T) {
 		"create_pull_request_review_comment",
 		"create_code_scanning_alert",
 		"add_labels",
+		"remove_labels",
 		"add_reviewer",
 		"assign_milestone",
 		"assign_to_agent",
@@ -298,6 +301,7 @@ func TestGetSafeOutputsToolsJSON(t *testing.T) {
 		"copy_project",
 		"create_project",
 		"create_project_status_update",
+		"autofix_code_scanning_alert",
 		"missing_tool",
 		"missing_data",
 		"noop",

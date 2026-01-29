@@ -40,7 +40,7 @@ func generateMaintenanceCron(minExpiresDays int) (string, string) {
 func GenerateMaintenanceWorkflow(workflowDataList []*WorkflowData, workflowDir string, version string, actionMode ActionMode, verbose bool) error {
 	maintenanceLog.Print("Checking if maintenance workflow is needed")
 
-	// Check if any workflow uses expires field for discussions or issues
+	// Check if any workflow uses expires field for discussions, issues, or pull requests
 	// and track the minimum expires value to determine schedule frequency
 	hasExpires := false
 	minExpires := 0 // Track minimum expires value in hours
@@ -69,6 +69,17 @@ func GenerateMaintenanceWorkflow(workflowDataList []*WorkflowData, workflowDir s
 					}
 				}
 			}
+			// Check for expired pull requests
+			if workflowData.SafeOutputs.CreatePullRequests != nil {
+				if workflowData.SafeOutputs.CreatePullRequests.Expires > 0 {
+					hasExpires = true
+					expires := workflowData.SafeOutputs.CreatePullRequests.Expires
+					maintenanceLog.Printf("Workflow %s has expires field set to %d hours for pull requests", workflowData.Name, expires)
+					if minExpires == 0 || expires < minExpires {
+						minExpires = expires
+					}
+				}
+			}
 		}
 	}
 
@@ -88,7 +99,7 @@ func GenerateMaintenanceWorkflow(workflowDataList []*WorkflowData, workflowDir s
 		return nil
 	}
 
-	maintenanceLog.Printf("Generating maintenance workflow for expired discussions and issues (minimum expires: %d hours)", minExpires)
+	maintenanceLog.Printf("Generating maintenance workflow for expired discussions, issues, and pull requests (minimum expires: %d hours)", minExpires)
 
 	// Convert hours to days for cron schedule generation
 	minExpiresDays := minExpires / 24
@@ -111,7 +122,7 @@ Or use the gh-aw CLI directly:
   ./gh-aw compile --validate --verbose
 
 The workflow is generated when any workflow uses the 'expires' field
-in create-discussions or create-issues safe-outputs configuration.
+in create-discussions, create-issues, or create-pull-request safe-outputs configuration.
 Schedule frequency is automatically determined by the shortest expiration time.`
 
 	header := GenerateWorkflowHeader("", "pkg/workflow/maintenance_workflow.go", customInstructions)
@@ -132,6 +143,7 @@ jobs:
     permissions:
       discussions: write
       issues: write
+      pull-requests: write
     steps:
 `)
 
@@ -180,6 +192,18 @@ jobs:
 	yaml.WriteString(`            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/close_expired_issues.cjs');
+            await main();
+
+      - name: Close expired pull requests
+        uses: ` + GetActionPin("actions/github-script") + `
+        with:
+          script: |
+`)
+
+	// Add the close expired pull requests script using require()
+	yaml.WriteString(`            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/close_expired_pull_requests.cjs');
             await main();
 `)
 

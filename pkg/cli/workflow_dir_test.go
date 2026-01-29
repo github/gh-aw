@@ -1,3 +1,5 @@
+//go:build integration
+
 package cli
 
 import (
@@ -10,6 +12,7 @@ import (
 
 // TestCompileWorkflowsWithCustomWorkflowDir tests the --workflows-dir flag functionality
 func TestCompileWorkflowsWithCustomWorkflowDir(t *testing.T) {
+
 	// Save current directory and defer restoration
 	originalWd, err := os.Getwd()
 	if err != nil {
@@ -143,6 +146,7 @@ This is a test workflow in a custom directory.
 
 // TestCompileWorkflowsCustomDirValidation tests the validation of workflow directory paths
 func TestCompileWorkflowsCustomDirValidation(t *testing.T) {
+
 	tests := []struct {
 		name        string
 		workflowDir string

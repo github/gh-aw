@@ -1,117 +1,11 @@
+//go:build !integration
+
 package workflow
 
 import (
 	"strings"
 	"testing"
 )
-
-// TestRenderPlaywrightMCPConfigWithOptions verifies the shared Playwright config helper
-// works correctly with both Copilot and non-Copilot engines
-func TestRenderPlaywrightMCPConfigWithOptions(t *testing.T) {
-	tests := []struct {
-		name                 string
-		playwrightTool       any
-		isLast               bool
-		includeCopilotFields bool
-		inlineArgs           bool
-		expectedContent      []string
-		unexpectedContent    []string
-	}{
-		{
-			name: "Copilot with inline args and type/tools fields",
-			playwrightTool: map[string]any{
-				"version": "v1.45.0", // Version is used for the Docker image tag
-			},
-			isLast:               true,
-			includeCopilotFields: true,
-			inlineArgs:           true,
-			expectedContent: []string{
-				`"playwright": {`,
-				`"type": "stdio"`,
-				`"command": "docker"`,
-				`"mcr.microsoft.com/playwright/mcp"`,
-				`"-v", "/tmp/gh-aw/mcp-logs:/tmp/gh-aw/mcp-logs"`,
-				`"--output-dir", "/tmp/gh-aw/mcp-logs/playwright"`,
-				`"tools": ["*"]`,
-				`              }`,
-			},
-			unexpectedContent: []string{
-				`"--pull=always"`,
-			},
-		},
-		{
-			name: "Claude/Custom with multi-line args, no type/tools fields",
-			playwrightTool: map[string]any{
-				"allowed": []string{"browser_click", "browser_navigate"},
-			},
-			isLast:               false,
-			includeCopilotFields: false,
-			inlineArgs:           false,
-			expectedContent: []string{
-				`"playwright": {`,
-				`"command": "docker"`,
-				`"args": [`,
-				`"run"`,
-				`"-i"`,
-				`"--rm"`,
-				`"--init"`,
-				`"-v"`,
-				`"/tmp/gh-aw/mcp-logs:/tmp/gh-aw/mcp-logs"`,
-				`"mcr.microsoft.com/playwright/mcp"`,
-				`"--output-dir"`,
-				`"/tmp/gh-aw/mcp-logs/playwright"`,
-				`              },`,
-			},
-			unexpectedContent: []string{
-				`"type"`,
-				`"tools"`,
-				`"--pull=always"`,
-			},
-		},
-		{
-			name: "Copilot with allowed domains",
-			playwrightTool: map[string]any{
-				"network": map[string]any{
-					"allowed": []string{"example.com", "test.com"},
-				},
-			},
-			isLast:               false,
-			includeCopilotFields: true,
-			inlineArgs:           true,
-			expectedContent: []string{
-				`"--allowed-hosts"`,
-				`"--allowed-origins"`,
-				`"localhost;localhost:*;127.0.0.1;127.0.0.1:*"`, // Default localhost is always added
-			},
-			unexpectedContent: []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var output strings.Builder
-
-			playwrightConfig := parsePlaywrightTool(tt.playwrightTool)
-			renderPlaywrightMCPConfigWithOptions(&output, playwrightConfig, tt.isLast, tt.includeCopilotFields, tt.inlineArgs)
-
-			result := output.String()
-
-			// Check expected content
-			for _, expected := range tt.expectedContent {
-				if !strings.Contains(result, expected) {
-					t.Errorf("Expected content not found: %q\nActual output:\n%s", expected, result)
-				}
-			}
-
-			// Check unexpected content
-			for _, unexpected := range tt.unexpectedContent {
-				if strings.Contains(result, unexpected) {
-					t.Errorf("Unexpected content found: %q\nActual output:\n%s", unexpected, result)
-				}
-			}
-		})
-	}
-}
 
 // TestRenderSafeOutputsMCPConfigWithOptions verifies the shared Safe Outputs config helper
 // works correctly with both Copilot and non-Copilot engines
@@ -275,64 +169,6 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 }
 
 // TestRenderPlaywrightMCPConfigTOML verifies the TOML format helper for Codex engine
-func TestRenderPlaywrightMCPConfigTOML(t *testing.T) {
-	tests := []struct {
-		name            string
-		playwrightTool  any
-		expectedContent []string
-	}{
-		{
-			name: "Basic Playwright TOML config",
-			playwrightTool: map[string]any{
-				"allowed": []string{"browser_click"},
-			},
-			expectedContent: []string{
-				`[mcp_servers.playwright]`,
-				`command = "docker"`,
-				`args = [`,
-				`"run"`,
-				`"-i"`,
-				`"--rm"`,
-				`"--init"`,
-				`"mcr.microsoft.com/playwright/mcp"`,
-				`"--output-dir"`,
-				`"/tmp/gh-aw/mcp-logs/playwright"`,
-			},
-		},
-		{
-			name: "Playwright TOML with allowed domains",
-			playwrightTool: map[string]any{
-				"network": map[string]any{
-					"allowed": []string{"example.com"},
-				},
-			},
-			expectedContent: []string{
-				`"--allowed-hosts"`,
-				`"--allowed-origins"`,
-				`"localhost;localhost:*;127.0.0.1;127.0.0.1:*"`, // Default localhost is added
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var output strings.Builder
-
-			playwrightConfig := parsePlaywrightTool(tt.playwrightTool)
-			renderPlaywrightMCPConfigTOML(&output, playwrightConfig)
-
-			result := output.String()
-
-			// Check expected content
-			for _, expected := range tt.expectedContent {
-				if !strings.Contains(result, expected) {
-					t.Errorf("Expected content not found: %q\nActual output:\n%s", expected, result)
-				}
-			}
-		})
-	}
-}
-
 // TestRenderSafeOutputsMCPConfigTOML verifies the Safe Outputs TOML format helper
 func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 	var output strings.Builder

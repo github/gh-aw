@@ -1,3 +1,5 @@
+//go:build !integration
+
 // This file provides tests for expression pattern matching.
 
 package workflow
@@ -91,11 +93,6 @@ func TestNeedsStepsPattern(t *testing.T) {
 		{
 			name:      "invalid - github prefix",
 			input:     "github.event.inputs.branch",
-			wantMatch: false,
-		},
-		{
-			name:      "invalid - no job/step name",
-			input:     "needs.outputs.version",
 			wantMatch: false,
 		},
 	}

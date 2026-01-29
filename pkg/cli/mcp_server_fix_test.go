@@ -121,6 +121,11 @@ This is a test workflow with deprecated timeout_minutes field.
 	defer os.Chdir(originalDir)
 	os.Chdir(tmpDir)
 
+	// Initialize git repository using shared helper
+	if err := initTestGitRepo(tmpDir); err != nil {
+		t.Fatalf("Failed to initialize git repository: %v", err)
+	}
+
 	// Create MCP client
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    "test-client",
@@ -215,12 +220,25 @@ This is a test workflow with deprecated timeout_minutes field.
 			t.Fatalf("Failed to read updated workflow file: %v", err)
 		}
 
-		// Verify the deprecated field was replaced
-		if strings.Contains(string(updatedContent), "timeout_minutes") {
-			t.Error("Expected timeout_minutes to be replaced, but it still exists")
+		t.Logf("Updated content:\n%s", string(updatedContent))
+
+		// Verify the deprecated field was replaced in frontmatter
+		// We need to check only the frontmatter, not the markdown body
+		// The frontmatter is between the first and second "---" lines
+		contentStr := string(updatedContent)
+
+		// Extract frontmatter section (between first two ---)
+		parts := strings.SplitN(contentStr, "---", 3)
+		if len(parts) < 3 {
+			t.Fatal("Could not parse frontmatter from updated file")
 		}
-		if !strings.Contains(string(updatedContent), "timeout-minutes") {
-			t.Error("Expected timeout-minutes to be present after fix")
+		frontmatter := parts[1]
+
+		if strings.Contains(frontmatter, "timeout_minutes") {
+			t.Error("Expected timeout_minutes to be replaced in frontmatter, but it still exists")
+		}
+		if !strings.Contains(frontmatter, "timeout-minutes") {
+			t.Error("Expected timeout-minutes to be present in frontmatter after fix")
 		}
 	})
 

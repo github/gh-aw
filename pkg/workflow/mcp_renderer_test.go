@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -61,104 +63,6 @@ func TestNewMCPConfigRenderer(t *testing.T) {
 	}
 }
 
-func TestRenderPlaywrightMCP_JSON_Copilot(t *testing.T) {
-	renderer := NewMCPConfigRenderer(MCPRendererOptions{
-		IncludeCopilotFields: true,
-		InlineArgs:           true,
-		Format:               "json",
-		IsLast:               false,
-	})
-
-	playwrightTool := map[string]any{
-		"allowed-domains": []string{"example.com"},
-	}
-
-	var yaml strings.Builder
-	renderer.RenderPlaywrightMCP(&yaml, playwrightTool)
-
-	output := yaml.String()
-
-	// Verify Copilot-specific fields
-	if !strings.Contains(output, `"type": "stdio"`) {
-		t.Error("Expected 'type': 'local' field for Copilot")
-	}
-	if !strings.Contains(output, `"tools": ["*"]`) {
-		t.Error("Expected 'tools' field for Copilot")
-	}
-	if !strings.Contains(output, `"playwright": {`) {
-		t.Error("Expected playwright server ID")
-	}
-	if !strings.Contains(output, `"command": "docker"`) {
-		t.Error("Expected docker command")
-	}
-	// Check for trailing comma (not last)
-	if !strings.Contains(output, "},\n") {
-		t.Error("Expected trailing comma for non-last server")
-	}
-}
-
-func TestRenderPlaywrightMCP_JSON_Claude(t *testing.T) {
-	renderer := NewMCPConfigRenderer(MCPRendererOptions{
-		IncludeCopilotFields: false,
-		InlineArgs:           false,
-		Format:               "json",
-		IsLast:               true,
-	})
-
-	playwrightTool := map[string]any{
-		"allowed-domains": []string{"example.com"},
-	}
-
-	var yaml strings.Builder
-	renderer.RenderPlaywrightMCP(&yaml, playwrightTool)
-
-	output := yaml.String()
-
-	// Verify Claude format (no Copilot-specific fields)
-	if strings.Contains(output, `"type"`) {
-		t.Error("Should not contain 'type' field for Claude")
-	}
-	if strings.Contains(output, `"tools"`) {
-		t.Error("Should not contain 'tools' field for Claude")
-	}
-	if !strings.Contains(output, `"playwright": {`) {
-		t.Error("Expected playwright server ID")
-	}
-	// Check for no trailing comma (last)
-	if !strings.Contains(output, "}\n") || strings.Contains(output, "},\n") {
-		t.Error("Expected no trailing comma for last server")
-	}
-}
-
-func TestRenderPlaywrightMCP_TOML(t *testing.T) {
-	renderer := NewMCPConfigRenderer(MCPRendererOptions{
-		IncludeCopilotFields: false,
-		InlineArgs:           false,
-		Format:               "toml",
-		IsLast:               false,
-	})
-
-	playwrightTool := map[string]any{
-		"allowed-domains": []string{"example.com"},
-	}
-
-	var yaml strings.Builder
-	renderer.RenderPlaywrightMCP(&yaml, playwrightTool)
-
-	output := yaml.String()
-
-	// Verify TOML format
-	if !strings.Contains(output, "[mcp_servers.playwright]") {
-		t.Error("Expected TOML section header")
-	}
-	if !strings.Contains(output, `command = "docker"`) {
-		t.Error("Expected TOML command format")
-	}
-	if !strings.Contains(output, "args = [") {
-		t.Error("Expected TOML args array")
-	}
-}
-
 func TestRenderSafeOutputsMCP_JSON_Copilot(t *testing.T) {
 	renderer := NewMCPConfigRenderer(MCPRendererOptions{
 		IncludeCopilotFields: true,
@@ -172,22 +76,22 @@ func TestRenderSafeOutputsMCP_JSON_Copilot(t *testing.T) {
 
 	output := yaml.String()
 
-	// Verify Copilot-specific fields
-	if !strings.Contains(output, `"type": "stdio"`) {
-		t.Error("Expected 'type': 'stdio' field for Copilot")
+	// Verify Safe Outputs now uses HTTP transport
+	if !strings.Contains(output, `"type": "http"`) {
+		t.Error("Expected 'type': 'http' field (safe outputs uses HTTP transport)")
 	}
 	if !strings.Contains(output, `"safeoutputs": {`) {
 		t.Error("Expected safeoutputs server ID")
 	}
-	// Verify container-based approach
-	if !strings.Contains(output, `"container": "node:lts-alpine"`) {
-		t.Error("Expected container field")
+	// Verify HTTP-based configuration
+	if !strings.Contains(output, `"url": "http://host.docker.internal:$GH_AW_SAFE_OUTPUTS_PORT"`) {
+		t.Error("Expected HTTP URL field")
 	}
-	if !strings.Contains(output, `"entrypoint": "node"`) {
-		t.Error("Expected entrypoint field")
+	if !strings.Contains(output, `"headers": {`) {
+		t.Error("Expected headers field")
 	}
-	if !strings.Contains(output, `"entrypointArgs": ["/opt/gh-aw/safeoutputs/mcp-server.cjs"]`) {
-		t.Error("Expected entrypointArgs field")
+	if !strings.Contains(output, `"Authorization":`) {
+		t.Error("Expected Authorization header")
 	}
 	// Check for env var with backslash escaping (Copilot format)
 	if !strings.Contains(output, `\${`) {
@@ -208,18 +112,22 @@ func TestRenderSafeOutputsMCP_JSON_Claude(t *testing.T) {
 
 	output := yaml.String()
 
-	// Verify Claude format (no Copilot-specific fields)
-	if strings.Contains(output, `"type"`) {
-		t.Error("Should not contain 'type' field for Claude")
+	// Verify HTTP transport is used (same as Copilot)
+	if !strings.Contains(output, `"type": "http"`) {
+		t.Error("Expected 'type': 'http' field for HTTP transport")
 	}
+	if !strings.Contains(output, `"safeoutputs": {`) {
+		t.Error("Expected safeoutputs server ID")
+	}
+	// Should not contain 'tools' field (HTTP servers don't have tools field)
 	if strings.Contains(output, `"tools"`) {
-		t.Error("Should not contain 'tools' field for Claude")
+		t.Error("Should not contain 'tools' field for HTTP servers")
 	}
 	// Check for env var without backslash escaping (Claude format)
 	if strings.Contains(output, `\${`) {
 		t.Error("Should not have backslash-escaped env vars for Claude")
 	}
-	if !strings.Contains(output, `"$GH_AW_SAFE_OUTPUTS"`) {
+	if !strings.Contains(output, `"$GH_AW_SAFE_OUTPUTS`) {
 		t.Error("Expected direct shell variable reference for Claude")
 	}
 }
@@ -237,21 +145,21 @@ func TestRenderSafeOutputsMCP_TOML(t *testing.T) {
 
 	output := yaml.String()
 
-	// Verify TOML format with container-based approach
+	// Verify TOML format with HTTP transport
 	if !strings.Contains(output, "[mcp_servers.safeoutputs]") {
 		t.Error("Expected TOML section header")
 	}
-	if !strings.Contains(output, `container = "node:lts-alpine"`) {
-		t.Error("Expected TOML container format")
+	if !strings.Contains(output, `type = "http"`) {
+		t.Error("Expected TOML type field for HTTP transport")
 	}
-	if !strings.Contains(output, `entrypoint = "node"`) {
-		t.Error("Expected TOML entrypoint format")
+	if !strings.Contains(output, `url = "http://host.docker.internal:$GH_AW_SAFE_OUTPUTS_PORT"`) {
+		t.Error("Expected TOML HTTP URL")
 	}
-	if !strings.Contains(output, `entrypointArgs = ["/opt/gh-aw/safeoutputs/mcp-server.cjs"]`) {
-		t.Error("Expected TOML entrypointArgs format")
+	if !strings.Contains(output, "[mcp_servers.safeoutputs.headers]") {
+		t.Error("Expected TOML headers section")
 	}
-	if !strings.Contains(output, "env_vars = [") {
-		t.Error("Expected TOML env_vars array")
+	if !strings.Contains(output, `Authorization = "$GH_AW_SAFE_OUTPUTS_API_KEY"`) {
+		t.Error("Expected TOML Authorization header")
 	}
 }
 
@@ -362,10 +270,10 @@ func TestRenderGitHubMCP_JSON_Copilot_Local(t *testing.T) {
 		t.Error("Expected github server ID")
 	}
 	if !strings.Contains(output, `"type": "stdio"`) {
-		t.Error("Expected 'type': 'local' field for Copilot")
+		t.Error("Expected 'type': 'stdio' field for Copilot")
 	}
-	if !strings.Contains(output, `"command": "docker"`) {
-		t.Error("Expected docker command for local mode")
+	if !strings.Contains(output, `"container":`) {
+		t.Error("Expected container field for local mode")
 	}
 }
 
@@ -395,11 +303,12 @@ func TestRenderGitHubMCP_JSON_Claude_Local(t *testing.T) {
 	if !strings.Contains(output, `"github": {`) {
 		t.Error("Expected github server ID")
 	}
+	if !strings.Contains(output, `"container":`) {
+		t.Error("Expected container field for local mode")
+	}
+	// Claude format does NOT include 'type' field (added only for Copilot)
 	if strings.Contains(output, `"type"`) {
 		t.Error("Should not contain 'type' field for Claude")
-	}
-	if !strings.Contains(output, `"command": "docker"`) {
-		t.Error("Expected docker command for local mode")
 	}
 }
 

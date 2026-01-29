@@ -33,7 +33,7 @@ func TestMCPServer_ErrorCodes_InvalidParams(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -115,15 +115,13 @@ This is a test workflow.
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
 
-		// Initialize git repository in the temp directory
-		initCmd := exec.Command("git", "init")
-		initCmd.Dir = tmpDir
-		if err := initCmd.Run(); err != nil {
+		// Initialize git repository using shared helper
+		if err := initTestGitRepo(tmpDir); err != nil {
 			t.Fatalf("Failed to initialize git repository: %v", err)
 		}
 
 		// Start new MCP server in the temp directory
-		serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+		serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 		serverCmd.Dir = tmpDir
 		transport := &mcp.CommandTransport{Command: serverCmd}
 
@@ -177,7 +175,7 @@ func TestMCPServer_ErrorCodes_InternalError(t *testing.T) {
 	}, nil)
 
 	// Start the MCP server as a subprocess
-	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server")
+	serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
 	transport := &mcp.CommandTransport{Command: serverCmd}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -189,25 +187,25 @@ func TestMCPServer_ErrorCodes_InternalError(t *testing.T) {
 	}
 	defer session.Close()
 
-	// Test: audit tool with invalid run_id (should cause internal error)
+	// Test: audit tool with invalid run_id_or_url (should cause internal error)
 	t.Run("audit_invalid_run_id", func(t *testing.T) {
 		params := &mcp.CallToolParams{
 			Name: "audit",
 			Arguments: map[string]any{
-				"run_id": int64(1), // Invalid run ID
+				"run_id_or_url": "1", // Invalid run ID
 			},
 		}
 
 		_, err := session.CallTool(ctx, params)
 		if err == nil {
-			t.Error("Expected error for invalid run_id, got nil")
+			t.Error("Expected error for invalid run_id_or_url, got nil")
 			return
 		}
 
-		// The error message should contain the failed audit error
+		// The error message should contain the failed audit error or validation error
 		errMsg := err.Error()
-		if !strings.Contains(errMsg, "failed to audit workflow run") {
-			t.Errorf("Expected error message about failed audit, got: %s", errMsg)
+		if !strings.Contains(errMsg, "failed to audit") && !strings.Contains(errMsg, "could not determine repository") {
+			t.Errorf("Expected error message about failed audit or invalid parameters, got: %s", errMsg)
 		} else {
 			t.Logf("✓ Correct error for failed audit: %s", errMsg)
 		}

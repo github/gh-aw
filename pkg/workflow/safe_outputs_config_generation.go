@@ -87,6 +87,7 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 				data.SafeOutputs.CreatePullRequests.AllowedLabels,
 				data.SafeOutputs.CreatePullRequests.AllowEmpty,
 				data.SafeOutputs.CreatePullRequests.AutoMerge,
+				data.SafeOutputs.CreatePullRequests.Expires,
 			)
 		}
 		if data.SafeOutputs.CreatePullRequestReviewComments != nil {

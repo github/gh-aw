@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -37,9 +39,9 @@ func TestCustomAWFConfiguration(t *testing.T) {
 			t.Error("Expected installation step to be generated when no agent config is provided")
 		}
 
-		// Should contain standard installation
-		if !strings.Contains(stepStr, "curl") {
-			t.Error("Should contain curl command for standard installation")
+		// Should contain reference to installation script
+		if !strings.Contains(stepStr, "install_awf_binary.sh") {
+			t.Error("Should contain reference to install_awf_binary.sh script for standard installation")
 		}
 	})
 
@@ -56,9 +58,9 @@ func TestCustomAWFConfiguration(t *testing.T) {
 			t.Error("Expected installation step to be generated when command is not specified")
 		}
 
-		// Should contain standard installation
-		if !strings.Contains(stepStr, "curl") {
-			t.Error("Should contain curl command for standard installation")
+		// Should contain reference to installation script
+		if !strings.Contains(stepStr, "install_awf_binary.sh") {
+			t.Error("Should contain reference to install_awf_binary.sh script for standard installation")
 		}
 	})
 }

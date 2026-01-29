@@ -73,6 +73,26 @@ make build       # Rebuild gh-aw after modifying JSON schemas in pkg/parser/sche
 ```
 Schema files are embedded in the binary using `//go:embed` directives, so changes require rebuilding the binary.
 
+**ALWAYS ADD BUILD TAGS TO TEST FILES:**
+
+Every test file (`*_test.go`) **must** have a build tag at the very top of the file:
+
+```go
+//go:build !integration    // For unit tests (default)
+
+//go:build integration     // For integration tests (files with "integration" in name)
+```
+
+**Rules:**
+- Files with "integration" in the filename get `//go:build integration`
+- All other test files get `//go:build !integration`
+- The build tag must be the **first line** of the file, followed by an empty line
+
+**To add build tags to all test files:**
+```bash
+./scripts/add-build-tags.sh
+```
+
 **ALWAYS RUN LINTERS AFTER ADDING TEST FILES:**
 
 When adding new test files (`*_test.go`), the **unused** linter may catch helper functions that are defined but never called. Always run linters after creating test files to catch these issues early.
@@ -229,10 +249,15 @@ The architecture uses runtime file copying instead of embedded scripts:
 ```bash
 make fmt         # Format code (run before linting)
 make lint        # ~5.5s
-make test-unit   # Unit tests only (~25s, recommended for development)
-make test        # All tests including integration tests (~30s)
+make test-unit   # All unit tests (~3 min) - prefer selective tests
+make test        # Full test suite (>5 min, very slow) - avoid locally
 make recompile   # Recompile workflows
 make agent-finish # Complete validation
+
+# Selective testing (preferred during development)
+go test -v -run "TestName" ./pkg/package/       # Single test (BEST)
+go test -v -run "TestFoo|TestBar" ./pkg/cli/    # Group of related tests
+go test -v -run "Test.*Compile" ./pkg/workflow/ # Pattern matching
 ```
 
 ### Manual Testing
@@ -255,10 +280,42 @@ For comprehensive testing guidelines, patterns, and conventions, see **[specs/te
 - No mocks or test suites - test real component interactions
 - Always include helpful assertion messages
 
+**⚠️ PREFER SELECTIVE TESTING during development:**
+
+Running all tests is slow. **Always run the most selective tests possible** to validate your changes quickly:
+
+```bash
+# ✅ BEST - Run specific test(s) by name
+go test -v -run "TestMyFunction" ./pkg/cli/
+go test -v -run "TestCompile" ./pkg/workflow/
+
+# ✅ GOOD - Run related tests using pattern matching
+go test -v -run "TestCompile|TestValidate" ./pkg/workflow/
+go test -v -run "TestAudit.*" ./pkg/cli/           # All TestAudit* tests
+go test -v -run "Test.*Validation" ./pkg/workflow/ # All validation tests
+
+# ⚠️ SLOW - Entire package tests (avoid for large packages like cli/, workflow/)
+go test -v ./pkg/cli/       # ~60-90s for large packages
+go test -v ./pkg/workflow/  # Can be very slow
+
+# ⚠️ SLOW (~3 min) - Only run when needed
+make test-unit       # All unit tests
+
+# 🐌 VERY SLOW (>5 min) - Avoid during development
+make test            # Full test suite including integration tests
+```
+
+**When to use each approach:**
+- **Individual tests**: While developing/debugging a specific feature (PREFERRED)
+- **Test pattern groups**: When changes affect multiple related tests (PREFERRED)
+- **Entire package tests**: Rarely needed - only for small packages or final validation
+- **`make test-unit`**: Before committing (or use `make agent-finish`)
+- **`make test`**: Rarely needed locally - CI runs this
+
 **Quick reference:**
 ```bash
-make test-unit       # Fast unit tests (~25s)
-make test            # Full test suite (~30s)
+make test-unit       # All unit tests (~3 min)
+make test            # Full test suite (>5 min, very slow)
 make test-security   # Security regression tests
 make agent-finish    # Complete validation before committing
 ```
@@ -908,11 +965,13 @@ When modifying JSON schemas in `pkg/parser/schemas/`:
 - Schema changes typically require corresponding Go struct updates
 
 ### Build Times (Don't Cancel)
-- `make agent-finish`: ~10-15s
+- `make agent-finish`: ~10-15s (excluding test-unit)
 - `make deps`: ~1.5min  
 - `make deps-dev`: ~5-8min
-- `make test`: ~4s
+- `make test-unit`: ~3 min (prefer selective tests)
+- `make test`: >5 min (very slow - avoid locally)
 - `make lint`: ~5.5s
+- Selective test (single): ~1-5s
 
 ### Documentation
 
@@ -954,14 +1013,27 @@ tools:
 - Multi-browser support (Chromium, Firefox, Safari)
 
 ## Testing Strategy
-- **Unit tests**: All packages have coverage - run with `make test-unit` for fast feedback during development
-- **Integration tests**: Command behavior and binary compilation - run all tests with `make test`
-- **Combined testing**: Use `make test` to run all tests (unit + integration) 
+
+**⚠️ IMPORTANT: Prefer selective testing over running all tests.**
+
+- **Selective tests (PREFERRED)**: Run individual tests or package tests during development
+  ```bash
+  go test -v -run "TestSpecificFunction" ./pkg/cli/
+  go test -v ./pkg/workflow/
+  ```
+- **Unit tests (`make test-unit`)**: ~3 minutes - run before committing or via `make agent-finish`
+- **Full test suite (`make test`)**: >5 minutes, very slow - rarely needed locally, CI handles this
+- **Integration tests**: Included in `make test` - command behavior and binary compilation
 - **Workflow compilation tests**: Markdown to YAML conversion
-- **Manual validation**: Always test after changes
 - **Test agentic workflows**: Should be added to `pkg/cli/workflows` directory
 
-**Recommended workflow**: Run `make test-unit` first for quick validation, then `make test` for complete coverage.
+**Recommended workflow**:
+1. Run individual tests while developing: `go test -v -run "TestName" ./pkg/package/`
+2. Run related test groups after changes: `go test -v -run "TestFoo|TestBar" ./pkg/package/`
+3. Run `make agent-finish` before committing (includes `make test-unit`)
+4. Let CI run `make test` - don't wait for it locally
+
+**Avoid running entire package tests** for large packages like `pkg/cli/` or `pkg/workflow/` during development - use selective test patterns instead.
 
 ## Release Process
 ```bash

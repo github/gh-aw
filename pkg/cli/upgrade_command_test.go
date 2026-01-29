@@ -1,6 +1,9 @@
+//go:build integration
+
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,6 +72,7 @@ This is a test workflow.
 }
 
 func TestUpgradeCommand_AppliesCodemods(t *testing.T) {
+
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -232,6 +236,7 @@ func TestUpgradeCommand_NonGitRepo(t *testing.T) {
 }
 
 func TestUpgradeCommand_CompilesWorkflows(t *testing.T) {
+
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -456,6 +461,7 @@ This workflow is already up to date.
 }
 
 func TestUpgradeCommand_UpdatesActionPins(t *testing.T) {
+
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -597,10 +603,27 @@ This workflow should not trigger action pin updates with --no-actions.
 	err = RunUpgrade(config)
 	require.NoError(t, err, "Upgrade command should succeed")
 
-	// Verify that actions-lock.json was not modified
+	// Verify that existing action entry was not modified (not upgraded to newer version)
 	updatedContent, err := os.ReadFile(actionsLockPath)
 	require.NoError(t, err, "Failed to read actions-lock.json")
 
-	// Content should be unchanged (actions should not be updated)
-	assert.Equal(t, originalContent, string(updatedContent), "Actions lock file should not be modified with --no-actions")
+	// Parse the updated lock file
+	var updatedLock struct {
+		Entries map[string]struct {
+			Repo    string `json:"repo"`
+			Version string `json:"version"`
+			SHA     string `json:"sha"`
+		} `json:"entries"`
+	}
+	err = json.Unmarshal(updatedContent, &updatedLock)
+	require.NoError(t, err, "Failed to parse updated actions-lock.json")
+
+	// The original checkout entry should not be modified (--no-actions should skip UpdateActions)
+	checkoutEntry, exists := updatedLock.Entries["actions/checkout@v4"]
+	assert.True(t, exists, "Original actions/checkout@v4 entry should still exist")
+	assert.Equal(t, "actions/checkout", checkoutEntry.Repo, "Repo should be unchanged")
+	assert.Equal(t, "v4", checkoutEntry.Version, "Version should be unchanged")
+
+	// Note: Compilation may add new action entries (like github-script) that the workflow needs,
+	// but --no-actions ensures existing entries are not upgraded to newer versions
 }

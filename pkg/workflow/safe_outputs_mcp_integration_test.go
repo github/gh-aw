@@ -62,10 +62,9 @@ Test safe outputs workflow with MCP server integration.
 		t.Error("Expected safeoutputs in MCP server configuration")
 	}
 
-	// Check that the MCP server is configured with Docker containerization (per MCP Gateway spec)
-	if !strings.Contains(yamlStr, `"command": "docker"`) ||
-		!strings.Contains(yamlStr, `"/opt/gh-aw/safeoutputs/mcp-server.cjs"`) {
-		t.Error("Expected safeoutputs MCP server to be configured with docker command (containerized per MCP Gateway spec)")
+	// Check that the MCP server is configured with HTTP transport (per MCP Gateway spec)
+	if !strings.Contains(yamlStr, `"type": "http"`) {
+		t.Error("Expected safeoutputs MCP server to be configured with HTTP transport")
 	}
 
 	// Check that safe outputs config is written to file, not as environment variable
@@ -181,9 +180,9 @@ Test safe outputs workflow with Codex engine.
 		t.Error("Expected safeoutputs in Codex MCP server TOML configuration")
 	}
 
-	// Check that the MCP server is configured with Docker containerization in TOML format (per MCP Gateway spec)
-	if !strings.Contains(yamlStr, `command = "docker"`) {
-		t.Error("Expected safeoutputs MCP server to be configured with docker command in TOML (containerized per MCP Gateway spec)")
+	// Check that the MCP server is configured with HTTP transport (per MCP Gateway spec)
+	if !strings.Contains(yamlStr, `type = "http"`) {
+		t.Error("Expected safeoutputs MCP server to be configured with HTTP transport in TOML")
 	}
 
 	t.Log("Safe outputs MCP server Codex integration test passed")

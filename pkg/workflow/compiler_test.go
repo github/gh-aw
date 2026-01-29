@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -135,37 +137,6 @@ engine: copilot
 	err := compiler.CompileWorkflow(testFile)
 	require.Error(t, err, "Should error when markdown content is missing")
 	assert.Contains(t, err.Error(), "markdown content", "Error should mention markdown content")
-}
-
-// TestCompileWorkflow_CampaignOrchestrator tests lock file naming for campaign orchestrators
-func TestCompileWorkflow_CampaignOrchestrator(t *testing.T) {
-	tmpDir := testutil.TempDir(t, "compiler-campaign")
-
-	testContent := `---
-on: push
-engine: copilot
-strict: false
-features:
-  dangerous-permissions-write: true
----
-
-# Campaign Test
-
-Campaign orchestrator workflow.
-`
-
-	// Create a campaign orchestrator file (*.campaign.g.md)
-	testFile := filepath.Join(tmpDir, "test.campaign.g.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
-
-	compiler := NewCompiler()
-	err := compiler.CompileWorkflow(testFile)
-	require.NoError(t, err, "Campaign orchestrator should compile")
-
-	// Verify lock file has correct name: test.campaign.lock.yml (not test.campaign.g.lock.yml)
-	expectedLockFile := filepath.Join(tmpDir, "test.campaign.lock.yml")
-	_, err = os.Stat(expectedLockFile)
-	require.NoError(t, err, "Campaign lock file should be created with correct name")
 }
 
 // TestCompileWorkflowData_Success tests CompileWorkflowData with valid workflow data

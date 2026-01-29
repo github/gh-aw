@@ -1,6 +1,6 @@
 ---
 title: Sandbox Configuration
-description: Configure sandbox environments for AI engines including MCP Gateway and Sandbox Runtime (SRT)
+description: Configure sandbox environments for AI engines including AWF agent container, mounted tools, runtime environments, and MCP Gateway
 sidebar:
   order: 1350
 ---
@@ -85,12 +85,54 @@ AWF automatically mounts several paths from the host into the container to enabl
 | Host Path | Container Path | Mode | Purpose |
 |-----------|----------------|------|---------|
 | `/tmp` | `/tmp` | `rw` | Temporary files and cache |
+| `${HOME}/.cache` | `${HOME}/.cache` | `rw` | Build caches (Go, npm, etc.) |
 | `${GITHUB_WORKSPACE}` | `${GITHUB_WORKSPACE}` | `rw` | Repository workspace directory |
-| `/usr/bin/{date,gh,yq}` | `/usr/bin/{date,gh,yq}` | `ro` | System utilities (date, GitHub CLI, yq) |
+| `/opt/hostedtoolcache` | `/opt/hostedtoolcache` | `ro` | Runtimes (Node.js, Python, Go, Ruby, Java) |
+| `/opt/gh-aw` | `/opt/gh-aw` | `ro` | Script and configuration files |
 | `/usr/local/bin/copilot` | `/usr/local/bin/copilot` | `ro` | Copilot CLI binary |
 | `/home/runner/.copilot` | `/home/runner/.copilot` | `rw` | Copilot configuration and state |
 
 These default mounts ensure the agent has access to essential tools and the repository files. Custom mounts specified via `sandbox.agent.mounts` are added alongside these defaults.
+
+#### Mounted System Utilities
+
+AWF mounts common system utilities from the host into the container as read-only binaries. These utilities are frequently used in workflow scripts and are organized by priority:
+
+**Essential Utilities** (most commonly used):
+
+| Utility | Purpose |
+|---------|---------|
+| `cat` | Display file contents |
+| `curl` | HTTP client for API calls |
+| `date` | Date/time operations |
+| `find` | Locate files by pattern |
+| `gh` | GitHub CLI operations |
+| `grep` | Pattern matching |
+| `jq` | JSON processing |
+| `yq` | YAML processing |
+
+**Common Utilities** (frequently used for file operations):
+
+| Utility | Purpose |
+|---------|---------|
+| `cp` | Copy files |
+| `cut` | Extract text columns |
+| `diff` | Compare files |
+| `head` | Display file start |
+| `ls` | List directory contents |
+| `mkdir` | Create directories |
+| `rm` | Remove files |
+| `sed` | Stream text editing |
+| `sort` | Sort text lines |
+| `tail` | Display file end |
+| `wc` | Count lines/words |
+| `which` | Locate commands |
+
+All utilities are mounted read-only (`:ro`) from `/usr/bin/` on the host. They execute on the read-write workspace directory inside the container.
+
+> [!TIP]
+> Available Utilities
+> Run `which jq` or `jq --version` in your workflow to verify utility availability. The agent has access to all mounted utilities without additional setup.
 
 > [!WARNING]
 > Docker socket access is not supported for security
@@ -122,6 +164,55 @@ The following environment variables are mirrored (if they exist on the host):
 > [!NOTE]
 > Environment Variable Handling
 > Variables are only passed to the container if they exist on the host runner. Missing variables are silently ignored, ensuring workflows work across different runner configurations.
+
+#### Runtime Tools (hostedtoolcache)
+
+AWF mounts the `/opt/hostedtoolcache` directory from the GitHub Actions runner, providing access to all runtimes installed via `actions/setup-*` steps. This directory contains pre-installed and dynamically-installed versions of popular development tools.
+
+**Available Runtimes:**
+
+| Runtime | Setup Action | Example Versions |
+|---------|-------------|------------------|
+| **Node.js** | `actions/setup-node` | 18.x, 20.x, 22.x |
+| **Python** | `actions/setup-python` | 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 |
+| **Go** | `actions/setup-go` | 1.22.x, 1.23.x, 1.24.x, 1.25.x |
+| **Ruby** | `ruby/setup-ruby` | 3.2, 3.3, 3.4 |
+| **Java** | `actions/setup-java` | 8, 11, 17, 21, 25 |
+
+**PATH Integration:**
+
+All runtime binaries are automatically added to PATH inside the agent container. The PATH is configured using a dynamic `find` command that discovers all `bin` directories within `/opt/hostedtoolcache`:
+
+```bash
+# PATH includes all hostedtoolcache binaries
+export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"
+```
+
+**Version Priority:**
+
+When multiple versions of a runtime are installed, versions configured by `actions/setup-*` take precedence. The agent detects which specific version is active by reading environment variables like `GOROOT`, `JAVA_HOME`, and ensures that version's binaries appear first in PATH.
+
+**Using Runtimes in Workflows:**
+
+```yaml wrap
+---
+jobs:
+  setup:
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+---
+
+Use `go build` or `python3` in your workflow - both are available!
+```
+
+> [!TIP]
+> Verify Runtime Availability
+> Use `node --version`, `python3 --version`, `go version`, or `ruby --version` in your workflow to confirm runtime availability. The agent automatically inherits all runtimes configured by setup actions.
 
 #### Custom AWF Configuration
 

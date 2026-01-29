@@ -103,17 +103,31 @@ func LockFileToMarkdown(lockPath string) string {
 }
 
 // IsAgenticWorkflow returns true if the file path is an agentic workflow file.
-// Agentic workflows end with .md.
+// Agentic workflows end with .md but exclude campaign spec files (.campaign.md)
+// and campaign orchestrator files (.campaign.g.md).
 //
 // Examples:
 //
 //	IsAgenticWorkflow("test.md")                                // returns true
 //	IsAgenticWorkflow("weekly-research.md")                     // returns true
 //	IsAgenticWorkflow(".github/workflows/workflow.md")          // returns true
+//	IsAgenticWorkflow("test.campaign.md")                       // returns false (campaign spec)
+//	IsAgenticWorkflow("test.campaign.g.md")                     // returns false (campaign orchestrator)
 //	IsAgenticWorkflow("test.lock.yml")                          // returns false
 func IsAgenticWorkflow(path string) bool {
 	// Must end with .md
-	return strings.HasSuffix(path, ".md")
+	if !strings.HasSuffix(path, ".md") {
+		return false
+	}
+	// Exclude campaign spec files (.campaign.md)
+	if strings.HasSuffix(path, ".campaign.md") {
+		return false
+	}
+	// Exclude campaign orchestrator files (.campaign.g.md)
+	if strings.HasSuffix(path, ".campaign.g.md") {
+		return false
+	}
+	return true
 }
 
 // IsLockFile returns true if the file path is a compiled lock file.

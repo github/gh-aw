@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -233,13 +235,4 @@ jobs:
 			}
 		})
 	}
-}
-
-// mockValidationError helps create validation errors for testing
-type mockValidationError struct {
-	msg string
-}
-
-func (m *mockValidationError) Error() string {
-	return m.msg
 }

@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -144,9 +146,9 @@ func TestErrorMessageQuality(t *testing.T) {
 			},
 			shouldContain: []string{
 				"invalid secret name",
-				"must start with",
+				"Start with an uppercase letter",
 				"uppercase",
-				"Example:",
+				"Examples:",
 			},
 			shouldNotBeVague: true,
 		},
@@ -335,7 +337,7 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 				"type",
 				"must be a string",
 				"got int",
-				"Valid types:",
+				"Valid types per MCP Gateway Specification:",
 				"stdio",
 				"http",
 				"Example:",

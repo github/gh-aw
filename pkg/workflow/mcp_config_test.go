@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -36,7 +38,7 @@ tools:
 			// With Docker MCP always enabled, default is docker (not services)
 			expectedType:        "docker",
 			expectedCommand:     "docker",
-			expectedDockerImage: "ghcr.io/github/github-mcp-server:v0.30.1",
+			expectedDockerImage: "ghcr.io/github/github-mcp-server:v0.30.2",
 		},
 	}
 
@@ -88,12 +90,9 @@ This is a test workflow for MCP configuration.
 					t.Errorf("Expected no Docker configuration but found it in:\n%s", lockContent)
 				}
 			case "docker":
-				// Should contain Docker configuration
-				if !strings.Contains(lockContent, `"command": "`+tt.expectedCommand+`"`) {
-					t.Errorf("Expected command '%s' but didn't find it in:\n%s", tt.expectedCommand, lockContent)
-				}
-				if !strings.Contains(lockContent, tt.expectedDockerImage) {
-					t.Errorf("Expected Docker image '%s' but didn't find it in:\n%s", tt.expectedDockerImage, lockContent)
+				// Should contain container configuration (new MCP gateway format)
+				if !strings.Contains(lockContent, `"container": "`+tt.expectedDockerImage+`"`) {
+					t.Errorf("Expected container with image '%s' but didn't find it in:\n%s", tt.expectedDockerImage, lockContent)
 				}
 				// Security fix: Verify env block contains GitHub expression and JSON contains shell variable
 				if !strings.Contains(lockContent, `GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}`) {
@@ -174,11 +173,8 @@ func TestGenerateGitHubMCPConfig(t *testing.T) {
 
 			switch tt.expectedType {
 			case "docker":
-				if !strings.Contains(result, `"command": "docker"`) {
-					t.Errorf("Expected Docker command but got:\n%s", result)
-				}
-				if !strings.Contains(result, `"ghcr.io/github/github-mcp-server:v0.30.1"`) {
-					t.Errorf("Expected Docker image but got:\n%s", result)
+				if !strings.Contains(result, `"container": "ghcr.io/github/github-mcp-server:v0.30.2"`) {
+					t.Errorf("Expected container field with GitHub MCP image but got:\n%s", result)
 				}
 				if strings.Contains(result, `"type": "http"`) {
 					t.Errorf("Expected no HTTP type but found it in:\n%s", result)

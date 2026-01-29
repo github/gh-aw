@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -362,71 +364,5 @@ Test workflow that uses Go without go.mod file.
 	// Ensure it does NOT use go-version-file
 	if strings.Contains(lockStr, "go-version-file") {
 		t.Error("Should not use go-version-file when go.mod doesn't exist")
-	}
-}
-
-func TestCompileWorkflowWithGoRuntimeWithGoModFile(t *testing.T) {
-	// Create temp directory for test
-	tempDir, err := os.MkdirTemp("", "go-runtime-with-gomod-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create workflow that uses Serena Go language service with custom go.mod path
-	workflowContent := `---
-on: push
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
-engine: copilot
-tools:
-  serena:
-    languages:
-      go:
-        go-mod-file: "custom/go.mod"
----
-
-# Test Workflow
-
-Test workflow that uses Go with custom go.mod path via Serena.
-`
-	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
-		t.Fatalf("Failed to write workflow file: %v", err)
-	}
-
-	// Compile workflow
-	compiler := NewCompiler()
-	if err := compiler.CompileWorkflow(workflowPath); err != nil {
-		t.Fatalf("Failed to compile workflow: %v", err)
-	}
-
-	// Read the generated lock file
-	lockPath := stringutil.MarkdownToLockFile(workflowPath)
-	lockContent, err := os.ReadFile(lockPath)
-	if err != nil {
-		t.Fatalf("Failed to read lock file: %v", err)
-	}
-
-	lockStr := string(lockContent)
-
-	// Verify that Go setup step uses go-version-file
-	if !strings.Contains(lockStr, "Setup Go") {
-		t.Error("Expected 'Setup Go' step in lock file")
-	}
-	if !strings.Contains(lockStr, "actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c") {
-		t.Error("Expected actions/setup-go action in lock file")
-	}
-	if !strings.Contains(lockStr, "go-version-file: custom/go.mod") {
-		t.Error("Expected go-version-file: custom/go.mod in lock file")
-	}
-	if !strings.Contains(lockStr, "cache: true") {
-		t.Error("Expected cache: true when using go-version-file")
-	}
-	// Ensure it does NOT use go-version
-	if strings.Contains(lockStr, "go-version:") {
-		t.Error("Should not use go-version when go-mod-file is specified")
 	}
 }

@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -306,7 +308,7 @@ func TestCodexEngineRenderMCPConfig(t *testing.T) {
 				"user_agent = \"test-workflow\"",
 				"startup_timeout_sec = 120",
 				"tool_timeout_sec = 60",
-				"container = \"ghcr.io/github/github-mcp-server:v0.30.1\"",
+				"container = \"ghcr.io/github/github-mcp-server:v0.30.2\"",
 				"env = { \"GITHUB_PERSONAL_ACCESS_TOKEN\" = \"$GH_AW_GITHUB_TOKEN\", \"GITHUB_READ_ONLY\" = \"1\", \"GITHUB_TOOLSETS\" = \"context,repos,issues,pull_requests\" }",
 				"env_vars = [\"GITHUB_PERSONAL_ACCESS_TOKEN\", \"GITHUB_READ_ONLY\", \"GITHUB_TOOLSETS\"]",
 				"EOF",
@@ -316,7 +318,7 @@ func TestCodexEngineRenderMCPConfig(t *testing.T) {
 				"{",
 				"\"mcpServers\": {",
 				"\"github\": {",
-				"\"container\": \"ghcr.io/github/github-mcp-server:v0.30.1\",",
+				"\"container\": \"ghcr.io/github/github-mcp-server:v0.30.2\",",
 				"\"env\": {",
 				"\"GITHUB_LOCKDOWN_MODE\": \"$GITHUB_MCP_LOCKDOWN\",",
 				"\"GITHUB_PERSONAL_ACCESS_TOKEN\": \"$GITHUB_MCP_SERVER_TOKEN\",",

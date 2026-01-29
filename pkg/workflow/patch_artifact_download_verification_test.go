@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -126,7 +128,7 @@ on:
     types: [opened]
 safe-outputs:
   push-to-pull-request-branch:
-    target: head
+    target: triggering
 ---
 
 # Test Patch Artifact Download with Push To PR Branch

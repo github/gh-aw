@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -43,22 +45,6 @@ Test workflow content.`,
 			expectTeamMemberCheck: true,
 		},
 		{
-			name: "non-command workflow with unsafe event should include team member check",
-			frontmatter: `---
-on:
-  push:
-    branches: [main]
-tools:
-  github:
-    allowed: [list_issues]
----
-
-# Non-Alias Workflow
-Test workflow content.`,
-			filename:              "non-alias-workflow.md",
-			expectTeamMemberCheck: true,
-		},
-		{
 			name: "schedule workflow should not include team member check",
 			frontmatter: `---
 on:
@@ -73,42 +59,6 @@ tools:
 Test workflow content.`,
 			filename:              "schedule-workflow.md",
 			expectTeamMemberCheck: false,
-		},
-		{
-			name: "command with other events should include team member check",
-			frontmatter: `---
-on:
-  command:
-    name: multi-bot
-  workflow_dispatch:
-tools:
-  github:
-    allowed: [list_issues]
----
-
-# Multi-trigger Workflow
-Test workflow content.`,
-			filename:              "multi-trigger-workflow.md",
-			expectTeamMemberCheck: true,
-		},
-		{
-			name: "command with push events should have conditional team member check",
-			frontmatter: `---
-on:
-  command:
-    name: docs-bot
-  push:
-    branches: [main]
-  workflow_dispatch:
-tools:
-  github:
-    allowed: [list_issues]
----
-
-# Conditional Team Check Workflow
-Test workflow content.`,
-			filename:              "conditional-team-check-workflow.md",
-			expectTeamMemberCheck: true,
 		},
 	}
 

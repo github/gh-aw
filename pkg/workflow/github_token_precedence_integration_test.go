@@ -216,22 +216,18 @@ Test that top-level github-token is used in Codex engine.
 
 		yamlContent := string(content)
 
-		// Verify that the top-level token is used in GH_AW_GITHUB_TOKEN env var
-		if !strings.Contains(yamlContent, "GH_AW_GITHUB_TOKEN: ${{ secrets.TOPLEVEL_PAT }}") {
-			t.Error("Expected top-level github-token to be used in GH_AW_GITHUB_TOKEN env var for Codex")
+		// Verify that the top-level token is used in GITHUB_MCP_SERVER_TOKEN env var
+		// (Codex now uses GITHUB_MCP_SERVER_TOKEN, same as Copilot, for consistency)
+		if !strings.Contains(yamlContent, "GITHUB_MCP_SERVER_TOKEN: ${{ secrets.TOPLEVEL_PAT }}") {
+			t.Error("Expected top-level github-token to be used in GITHUB_MCP_SERVER_TOKEN env var for Codex")
 			t.Logf("Generated YAML:\n%s", yamlContent)
 		}
 
-		// Verify that GITHUB_PERSONAL_ACCESS_TOKEN env var is also set to the same value
-		// The TOML config should reference this via env_vars, not embed the secret directly
-		if !strings.Contains(yamlContent, "GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.TOPLEVEL_PAT }}") {
-			t.Error("Expected top-level github-token to be used in GITHUB_PERSONAL_ACCESS_TOKEN env var for Codex")
+		// Verify that the MCP gateway config uses GITHUB_PERSONAL_ACCESS_TOKEN with the env var reference
+		// The JSON config passes the token to the GitHub MCP server container
+		if !strings.Contains(yamlContent, `"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN"`) {
+			t.Error("Expected MCP gateway config to pass GITHUB_PERSONAL_ACCESS_TOKEN from GITHUB_MCP_SERVER_TOKEN env var")
 			t.Logf("Generated YAML:\n%s", yamlContent)
-		}
-
-		// Verify that the TOML config uses env_vars to reference the environment variable
-		if !strings.Contains(yamlContent, "env_vars = [\"GITHUB_PERSONAL_ACCESS_TOKEN\"]") {
-			t.Error("Expected TOML config to reference GITHUB_PERSONAL_ACCESS_TOKEN via env_vars")
 		}
 	})
 

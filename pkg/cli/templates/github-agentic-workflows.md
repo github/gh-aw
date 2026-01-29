@@ -138,6 +138,20 @@ The YAML frontmatter supports these fields:
   - Enables searching and retrieving assets associated with this workflow
   - Examples: `"workflow-2024-q1"`, `"team-alpha-bot"`, `"security_audit_v2"`
 
+- **`project:`** - GitHub Projects integration configuration (string or object)
+  - String format: `"https://github.com/orgs/myorg/projects/42"` - Project URL only
+  - Object format for advanced configuration:
+    ```yaml
+    project:
+      url: "https://github.com/orgs/myorg/projects/42"  # Required: full project URL
+      scope: ["owner/repo", "org:name"]                  # Optional: repositories/organizations workflow can operate on
+      max-updates: 100                                   # Optional: max project updates per run (default: 100)
+      max-status-updates: 1                              # Optional: max status updates per run (default: 1)
+      github-token: ${{ secrets.PROJECTS_PAT }}          # Optional: custom token for project operations
+    ```
+  - When configured, enables project board management operations
+  - Works with `update-project` safe-output for automated project tracking
+
 - **`secret-masking:`** - Configuration for secret redaction behavior in workflow outputs and artifacts (object)
   - `steps:` - Additional secret redaction steps to inject after the built-in secret redaction (array)
   - Use this to mask secrets in generated files using custom patterns
@@ -609,6 +623,9 @@ The YAML frontmatter supports these fields:
     safe-outputs:
       assign-to-agent:
         name: "copilot"                 # Optional: agent name
+        allowed: [copilot]              # Optional: restrict to specific agent names
+        max: 1                          # Optional: max assignments (default: 1)
+        target: "*"                     # Optional: "triggering" (default), "*", or number
         target-repo: "owner/repo"       # Optional: cross-repository
     ```
     Requires PAT with elevated permissions as `GH_AW_AGENT_TOKEN`.

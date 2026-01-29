@@ -1,18 +1,18 @@
+//go:build integration
+
 package cli
 
 import (
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/githubnext/gh-aw/pkg/constants"
 )
 
 // TestMCPRegistryClient_LiveSearchServers tests SearchServers against the live GitHub MCP registry
 func TestMCPRegistryClient_LiveSearchServers(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping live registry integration test in short mode")
-	}
-
 	// Create client with default production registry URL
 	client := NewMCPRegistryClient(string(constants.DefaultMCPRegistryURL))
 
@@ -109,10 +109,6 @@ func TestMCPRegistryClient_LiveSearchServers(t *testing.T) {
 
 // TestMCPRegistryClient_LiveGetServer tests GetServer against the live GitHub MCP registry
 func TestMCPRegistryClient_LiveGetServer(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping live registry integration test in short mode")
-	}
-
 	// Create client with default production registry URL
 	client := NewMCPRegistryClient(string(constants.DefaultMCPRegistryURL))
 
@@ -185,10 +181,6 @@ func TestMCPRegistryClient_LiveGetServer(t *testing.T) {
 
 // TestMCPRegistryClient_LiveResponseStructure tests that the v0.1 API structure is correctly parsed
 func TestMCPRegistryClient_LiveResponseStructure(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping live registry integration test in short mode")
-	}
-
 	// Create client with default production registry URL
 	client := NewMCPRegistryClient(string(constants.DefaultMCPRegistryURL))
 
@@ -283,4 +275,51 @@ func TestMCPRegistryClient_LiveResponseStructure(t *testing.T) {
 		}
 		t.Logf("✓ Transport types validated for %d servers", len(servers))
 	})
+}
+
+// TestMCPRegistryClient_GitHubRegistryAccessibility tests that the GitHub MCP registry is accessible
+func TestMCPRegistryClient_GitHubRegistryAccessibility(t *testing.T) {
+	// This test verifies that the production GitHub MCP registry is accessible
+	// It checks basic HTTP connectivity to the /servers endpoint
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	registryURL := string(constants.DefaultMCPRegistryURL) + "/servers"
+
+	req, err := http.NewRequest("GET", registryURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	// Set standard headers that our MCP client uses
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "gh-aw-cli")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Logf("Network request failed: %v", err)
+		t.Logf("This may be expected in environments with network restrictions")
+		t.Skip("GitHub MCP registry is not accessible - this may be due to network/firewall restrictions")
+		return
+	}
+	defer resp.Body.Close()
+
+	// We expect either 200 (success) or 403 (firewall/network restriction)
+	// Both indicate the endpoint exists and is reachable
+	switch resp.StatusCode {
+	case http.StatusOK:
+		t.Logf("✓ GitHub MCP registry is accessible and returned 200 OK")
+	case http.StatusForbidden:
+		t.Logf("✓ GitHub MCP registry is reachable but returned 403 (expected due to network restrictions)")
+	default:
+		t.Errorf("GitHub MCP registry returned unexpected status: %d", resp.StatusCode)
+	}
+
+	// Verify the Content-Type header indicates this is a JSON API
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" && !strings.Contains(contentType, "application/json") {
+		t.Logf("Note: Content-Type is '%s', expected JSON", contentType)
+	}
 }

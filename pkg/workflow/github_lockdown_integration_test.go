@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -37,7 +39,7 @@ Test lockdown mode with local GitHub MCP.
 `,
 			expected: []string{
 				`"type": "stdio"`,
-				`"GITHUB_LOCKDOWN_MODE=1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
 				`"ghcr.io/github/github-mcp-server:`,
 			},
 			notExpected: []string{},
@@ -66,7 +68,7 @@ Test lockdown mode with remote GitHub MCP.
 				`"Authorization":`,
 			},
 			notExpected: []string{
-				`"GITHUB_LOCKDOWN_MODE=1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
 			},
 			description: "Copilot with remote mode and lockdown should render X-MCP-Lockdown header",
 		},
@@ -88,7 +90,7 @@ tools:
 Test lockdown mode with Claude engine.
 `,
 			expected: []string{
-				`"GITHUB_LOCKDOWN_MODE=1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
 				`"ghcr.io/github/github-mcp-server:`,
 			},
 			notExpected: []string{
@@ -114,7 +116,7 @@ tools:
 Test lockdown mode with Codex engine.
 `,
 			expected: []string{
-				`GITHUB_LOCKDOWN_MODE=1`,
+				`"GITHUB_LOCKDOWN_MODE" = "1"`,
 				`ghcr.io/github/github-mcp-server:`,
 			},
 			notExpected: []string{},
@@ -139,8 +141,8 @@ tools:
 Test lockdown and read-only modes together.
 `,
 			expected: []string{
-				`"GITHUB_LOCKDOWN_MODE=1"`,
-				`"GITHUB_READ_ONLY=1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
+				`"GITHUB_READ_ONLY": "1"`,
 			},
 			notExpected: []string{},
 			description: "Both lockdown and read-only can be enabled together",
@@ -165,7 +167,7 @@ Test default behavior without lockdown.
 				`"ghcr.io/github/github-mcp-server:`,
 			},
 			notExpected: []string{
-				`"GITHUB_LOCKDOWN_MODE=1"`,
+				`"GITHUB_LOCKDOWN_MODE": "1"`,
 				`"X-MCP-Lockdown"`,
 			},
 			description: "Without lockdown field, no lockdown mode should be rendered",

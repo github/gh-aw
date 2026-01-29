@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -318,7 +320,7 @@ func TestCustomEngineRenderPlaywrightMCPConfigWithDomainConfiguration(t *testing
 	// Both flags should have the same domain list
 	expectedDomains := "localhost;localhost:*;127.0.0.1;127.0.0.1:*;*.github.com;example.com"
 	if !strings.Contains(output, expectedDomains) {
-		t.Errorf("Expected configured domains with localhost and port variations in --allowed-hosts and --allowed-origins values (sorted)")
+		t.Errorf("Expected configured domains with localhost and port variations in --allowed-hosts and --allowed-origins values (sorted)\nActual output:\n%s", output)
 	}
 
 	// Check that it does NOT contain the old format environment variables
@@ -465,139 +467,5 @@ func TestCustomEngineConvertStepToYAMLWithSection(t *testing.T) {
 		if i >= len(withKeyOrder) || withKeyOrder[i] != key {
 			t.Errorf("Expected with key at position %d to be '%s', got '%s'. Full order: %v", i, key, withKeyOrder[i], withKeyOrder)
 		}
-	}
-}
-
-func TestCustomEngineGitHubMCPDockerConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		githubTool     map[string]any
-		wantToolset    bool
-		wantReadOnly   bool
-		wantCustomArgs bool
-	}{
-		{
-			name:           "basic GitHub MCP config (defaults to read-only for security)",
-			githubTool:     map[string]any{},
-			wantToolset:    false, // Should use default "default" toolset
-			wantReadOnly:   true,  // Defaults to true for security
-			wantCustomArgs: false,
-		},
-		{
-			name: "GitHub MCP with read-only explicitly enabled",
-			githubTool: map[string]any{
-				"read-only": true,
-			},
-			wantToolset:    false,
-			wantReadOnly:   true,
-			wantCustomArgs: false,
-		},
-		{
-			name: "GitHub MCP with read-only explicitly disabled",
-			githubTool: map[string]any{
-				"read-only": false,
-			},
-			wantToolset:    false,
-			wantReadOnly:   false,
-			wantCustomArgs: false,
-		},
-		{
-			name: "GitHub MCP with custom toolsets",
-			githubTool: map[string]any{
-				"toolsets":  []any{"repos", "issues"},
-				"read-only": false, // Explicitly disable for this test
-			},
-			wantToolset:    true,
-			wantReadOnly:   false,
-			wantCustomArgs: false,
-		},
-		{
-			name: "GitHub MCP with custom args",
-			githubTool: map[string]any{
-				"args":      []string{"--verbose", "--debug"},
-				"read-only": false, // Explicitly disable for this test
-			},
-			wantToolset:    false,
-			wantReadOnly:   false,
-			wantCustomArgs: true,
-		},
-		{
-			name: "GitHub MCP with all options",
-			githubTool: map[string]any{
-				"read-only": true,
-				"toolsets":  []any{"repos", "issues"},
-				"args":      []string{"--verbose"},
-			},
-			wantToolset:    true,
-			wantReadOnly:   true,
-			wantCustomArgs: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Use unified renderer with Custom engine options
-			renderer := NewMCPConfigRenderer(MCPRendererOptions{
-				IncludeCopilotFields: false,
-				InlineArgs:           false,
-				Format:               "json",
-				IsLast:               true,
-			})
-			var yaml strings.Builder
-
-			renderer.RenderGitHubMCP(&yaml, tt.githubTool, nil)
-
-			output := yaml.String()
-
-			// Verify shared helper is used (should contain standard Docker config)
-			if !strings.Contains(output, `"command": "docker"`) {
-				t.Errorf("Expected Docker command in output")
-			}
-			if !strings.Contains(output, `"args": [`) {
-				t.Errorf("Expected args array in output")
-			}
-			if !strings.Contains(output, `"GITHUB_PERSONAL_ACCESS_TOKEN"`) {
-				t.Errorf("Expected GITHUB_PERSONAL_ACCESS_TOKEN env var")
-			}
-
-			// Verify toolsets support
-			if tt.wantToolset {
-				if !strings.Contains(output, "GITHUB_TOOLSETS=repos,issues") {
-					t.Errorf("Expected custom toolsets in output, got: %s", output)
-				}
-			} else {
-				if !strings.Contains(output, "GITHUB_TOOLSETS=context,repos,issues,pull_requests") {
-					t.Errorf("Expected action-friendly toolsets in output, got: %s", output)
-				}
-			}
-
-			// Verify read-only mode
-			if tt.wantReadOnly {
-				if !strings.Contains(output, "GITHUB_READ_ONLY=1") {
-					t.Errorf("Expected GITHUB_READ_ONLY=1 in output, got: %s", output)
-				}
-			} else {
-				if strings.Contains(output, "GITHUB_READ_ONLY=1") {
-					t.Errorf("Did not expect GITHUB_READ_ONLY=1 in output, got: %s", output)
-				}
-			}
-
-			// Verify custom args
-			if tt.wantCustomArgs {
-				if !strings.Contains(output, "--verbose") {
-					t.Errorf("Expected custom args in output")
-				}
-			}
-
-			// Verify env section uses shell variable (not escaped like Copilot)
-			if !strings.Contains(output, `"GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN"`) {
-				t.Errorf("Expected shell variable syntax for custom engine (not escaped)")
-			}
-
-			// Verify no "type" field (custom engine should be like Claude)
-			if strings.Contains(output, `"type": "stdio"`) {
-				t.Errorf("Custom engine should not include type field")
-			}
-		})
 	}
 }

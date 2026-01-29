@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -159,7 +161,7 @@ Test auto-determination with remote GitHub MCP.
 				}
 			case "true":
 				// Should have hardcoded GITHUB_LOCKDOWN_MODE=1 or X-MCP-Lockdown: true
-				hasDockerLockdown := strings.Contains(yaml, "GITHUB_LOCKDOWN_MODE=1")
+				hasDockerLockdown := strings.Contains(yaml, `"GITHUB_LOCKDOWN_MODE": "1"`)
 				hasRemoteLockdown := strings.Contains(yaml, "X-MCP-Lockdown") && strings.Contains(yaml, "\"true\"")
 				if !hasDockerLockdown && !hasRemoteLockdown {
 					t.Errorf("%s: Expected hardcoded lockdown setting", tt.description)

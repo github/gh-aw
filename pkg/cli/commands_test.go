@@ -1,3 +1,5 @@
+//go:build integration
+
 package cli
 
 import (
@@ -446,6 +448,7 @@ Test workflow for command existence.`
 
 // TestInstallPackage tests the InstallPackage function
 func TestInstallPackage(t *testing.T) {
+
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "gh-aw-test-*")
 	if err != nil {
@@ -1091,6 +1094,7 @@ func TestRunWorkflowOnGitHubWithEnable(t *testing.T) {
 }
 
 func TestGetWorkflowStatus(t *testing.T) {
+
 	// Test with non-existent workflow
 	_, err := getWorkflowStatus("nonexistent-workflow", "", false)
 	if err == nil {

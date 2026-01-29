@@ -185,13 +185,21 @@ var handlerRegistry = map[string]handlerBuilder{
 			return nil
 		}
 		c := cfg.AddLabels
-		return newHandlerConfigBuilder().
+		config := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
 			AddStringSlice("allowed", c.Allowed).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			Build()
+		// If config is empty, it means add_labels was explicitly configured with no options
+		// (null config), which means "allow any labels". Return non-nil empty map to
+		// indicate the handler is enabled.
+		if len(config) == 0 {
+			// Return empty map so handler is included in config
+			return make(map[string]any)
+		}
+		return config
 	},
 	"remove_labels": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.RemoveLabels == nil {
@@ -496,8 +504,10 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	// Build configuration for each handler using the registry
 	for handlerName, builder := range handlerRegistry {
 		handlerConfig := builder(data.SafeOutputs)
-		// Include handler if it has configuration OR if it's auto-enabled (even with empty config)
-		if handlerConfig != nil && (len(handlerConfig) > 0 || autoEnabledHandlers[handlerName]) {
+		// Include handler if:
+		// 1. It returns a non-nil config (explicitly enabled, even if empty)
+		// 2. For auto-enabled handlers, include even with empty config
+		if handlerConfig != nil {
 			compilerSafeOutputsConfigLog.Printf("Adding %s handler configuration", handlerName)
 			config[handlerName] = handlerConfig
 		}

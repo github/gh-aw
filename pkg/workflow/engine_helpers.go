@@ -357,7 +357,43 @@ func GetHostedToolcachePathSetup() string {
 	// Generic find for all other hostedtoolcache binaries (Node.js, Python, etc.)
 	genericFind := `$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')`
 
-	return fmt.Sprintf(`export PATH="$GH_AW_TOOL_BINS%s$PATH"`, genericFind)
+	// Build the raw PATH string, then sanitize it using GetSanitizedPATHExport()
+	// to remove empty elements, leading/trailing colons, and collapse multiple colons
+	rawPath := fmt.Sprintf(`$GH_AW_TOOL_BINS%s$PATH`, genericFind)
+	return GetSanitizedPATHExport(rawPath)
+}
+
+// GetSanitizedPATHExport returns a shell command that sets PATH to the given value
+// with sanitization to remove security risks from malformed PATH entries.
+//
+// The sanitization removes:
+//   - Leading colons (e.g., ":/usr/bin" -> "/usr/bin")
+//   - Trailing colons (e.g., "/usr/bin:" -> "/usr/bin")
+//   - Empty elements (e.g., "/a::/b" -> "/a:/b", multiple colons collapsed to one)
+//
+// Empty PATH elements are a security risk because they cause the current directory
+// to be searched for executables, which could allow malicious code execution.
+//
+// The sanitization logic is implemented in actions/setup/sh/sanitize_path.sh and
+// is sourced at runtime from /opt/gh-aw/actions/sanitize_path.sh.
+//
+// Parameters:
+//   - rawPath: The unsanitized PATH value (may contain shell expansions like $PATH)
+//
+// Returns:
+//   - string: A shell command that sources the sanitize script to export the sanitized PATH
+//
+// Example:
+//
+//	GetSanitizedPATHExport("$GH_AW_TOOL_BINS$PATH")
+//	// Returns: source /opt/gh-aw/actions/sanitize_path.sh "$GH_AW_TOOL_BINS$PATH"
+func GetSanitizedPATHExport(rawPath string) string {
+	// Source the sanitize_path.sh script which handles:
+	// 1. Remove leading colons
+	// 2. Remove trailing colons
+	// 3. Collapse multiple colons into single colons
+	// 4. Export the sanitized PATH
+	return fmt.Sprintf(`source /opt/gh-aw/actions/sanitize_path.sh "%s"`, rawPath)
 }
 
 // GetToolBinsSetup returns a shell command that computes the GH_AW_TOOL_BINS environment

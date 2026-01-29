@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -310,12 +312,12 @@ This is a test workflow for GitHub remote mode configuration.
 						t.Errorf("Expected Docker command but didn't find it in:\n%s", lockContent)
 					}
 				default:
-					// For Claude, check for Docker command
-					if !strings.Contains(lockContent, `"command": "docker"`) {
-						t.Errorf("Expected Docker command but didn't find it in:\n%s", lockContent)
+					// For Claude, check for container field in MCP gateway config
+					if !strings.Contains(lockContent, `"container": "ghcr.io/github/github-mcp-server:`) {
+						t.Errorf("Expected container field but didn't find it in:\n%s", lockContent)
 					}
 				}
-				if !strings.Contains(lockContent, `ghcr.io/github/github-mcp-server:v0.30.1`) {
+				if !strings.Contains(lockContent, `ghcr.io/github/github-mcp-server:v0.30.2`) {
 					t.Errorf("Expected Docker image but didn't find it in:\n%s", lockContent)
 				}
 				// Should NOT contain HTTP type

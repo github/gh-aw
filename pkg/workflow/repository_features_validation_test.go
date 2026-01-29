@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -100,11 +102,6 @@ func TestValidateRepositoryFeatures(t *testing.T) {
 			}
 		})
 	}
-}
-
-// boolPtr returns a pointer to a boolean value
-func boolPtr(b bool) *bool {
-	return &b
 }
 
 func TestGetCurrentRepository(t *testing.T) {

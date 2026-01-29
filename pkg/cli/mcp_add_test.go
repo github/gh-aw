@@ -1,3 +1,5 @@
+//go:build !integration
+
 package cli
 
 import (
@@ -60,43 +62,49 @@ This is a test workflow.
 	// Create a mock registry server
 	registryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/servers" {
-			// Return mock search response with new structure based on official specification
+			// Return mock search response with correct structure based on ServerListResponse
 			response := `{
 				"servers": [
 					{
-						"name": "io.github.makenotion/notion-mcp-server",
-						"description": "MCP server for Notion integration",
-						"status": "active",
-						"version": "1.0.0",
-						"repository": {
-							"url": "https://github.com/example/notion-mcp",
-							"source": "github"
+						"server": {
+							"name": "io.github.makenotion/notion-mcp-server",
+							"description": "MCP server for Notion integration",
+							"version": "1.0.0",
+							"repository": {
+								"url": "https://github.com/example/notion-mcp",
+								"source": "github"
+							},
+							"packages": [
+								{
+									"registryType": "npm",
+									"identifier": "notion-mcp",
+									"version": "1.0.0",
+									"runtimeHint": "node",
+									"transport": {
+										"type": "stdio"
+									},
+									"packageArguments": [
+										{
+											"type": "positional",
+											"value": "notion-mcp"
+										}
+									],
+									"environmentVariables": [
+										{
+											"name": "NOTION_TOKEN",
+											"description": "Notion API token",
+											"isRequired": true,
+											"isSecret": true
+										}
+									]
+								}
+							]
 						},
-						"packages": [
-							{
-								"registry_type": "npm",
-								"identifier": "notion-mcp",
-								"version": "1.0.0",
-								"runtime_hint": "node",
-								"transport": {
-									"type": "stdio"
-								},
-								"package_arguments": [
-									{
-										"type": "positional",
-										"value": "notion-mcp"
-									}
-								],
-								"environment_variables": [
-									{
-										"name": "NOTION_TOKEN",
-										"description": "Notion API token",
-										"is_required": true,
-										"is_secret": true
-									}
-								]
+						"_meta": {
+							"io.modelcontextprotocol.registry/official": {
+								"status": "active"
 							}
-						]
+						}
 					}
 				]
 			}`
@@ -240,32 +248,38 @@ This is a test workflow.
 		response := `{
 			"servers": [
 				{
-					"name": "io.github.makenotion/notion-mcp-server",
-					"description": "MCP server for Notion integration",
-					"status": "active",
-					"version": "1.0.0",
-					"repository": {
-						"url": "https://github.com/example/notion-mcp",
-						"source": "github"
+					"server": {
+						"name": "io.github.makenotion/notion-mcp-server",
+						"description": "MCP server for Notion integration",
+						"version": "1.0.0",
+						"repository": {
+							"url": "https://github.com/example/notion-mcp",
+							"source": "github"
+						},
+						"packages": [
+							{
+								"registryType": "npm",
+								"identifier": "notion-mcp",
+								"version": "1.0.0",
+								"runtimeHint": "node",
+								"transport": {
+									"type": "stdio"
+								},
+								"packageArguments": [
+									{
+										"type": "positional",
+										"value": "notion-mcp"
+									}
+								],
+								"environmentVariables": []
+							}
+						]
 					},
-					"packages": [
-						{
-							"registry_type": "npm",
-							"identifier": "notion-mcp",
-							"version": "1.0.0",
-							"runtime_hint": "node",
-							"transport": {
-								"type": "stdio"
-							},
-							"package_arguments": [
-								{
-									"type": "positional",
-									"value": "notion-mcp"
-								}
-							],
-							"environment_variables": []
+					"_meta": {
+						"io.modelcontextprotocol.registry/official": {
+							"status": "active"
 						}
-					]
+					}
 				}
 			]
 		}`
@@ -336,32 +350,38 @@ This is a test workflow.
 		response := `{
 			"servers": [
 				{
-					"name": "io.github.makenotion/notion-mcp-server",
-					"description": "MCP server for Notion integration",
-					"status": "active",
-					"version": "1.0.0",
-					"repository": {
-						"url": "https://github.com/example/notion-mcp",
-						"source": "github"
+					"server": {
+						"name": "io.github.makenotion/notion-mcp-server",
+						"description": "MCP server for Notion integration",
+						"version": "1.0.0",
+						"repository": {
+							"url": "https://github.com/example/notion-mcp",
+							"source": "github"
+						},
+						"packages": [
+							{
+								"registryType": "npm",
+								"identifier": "notion-mcp",
+								"version": "1.0.0",
+								"runtimeHint": "node",
+								"transport": {
+									"type": "stdio"
+								},
+								"packageArguments": [
+									{
+										"type": "positional",
+										"value": "notion-mcp"
+									}
+								],
+								"environmentVariables": []
+							}
+						]
 					},
-					"packages": [
-						{
-							"registry_type": "npm",
-							"identifier": "notion-mcp",
-							"version": "1.0.0",
-							"runtime_hint": "node",
-							"transport": {
-								"type": "stdio"
-							},
-							"package_arguments": [
-								{
-									"type": "positional",
-									"value": "notion-mcp"
-								}
-							],
-							"environment_variables": []
+					"_meta": {
+						"io.modelcontextprotocol.registry/official": {
+							"status": "active"
 						}
-					]
+					}
 				}
 			]
 		}`

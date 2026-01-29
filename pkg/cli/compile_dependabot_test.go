@@ -1,3 +1,5 @@
+//go:build integration
+
 package cli
 
 import (
@@ -15,6 +17,7 @@ import (
 )
 
 func TestCompileDependabotIntegration(t *testing.T) {
+
 	// Check if npm is available and functional
 	npmPath, err := exec.LookPath("npm")
 	if err != nil {

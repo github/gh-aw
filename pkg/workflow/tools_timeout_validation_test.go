@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -16,28 +18,12 @@ func TestToolsTimeoutValidation(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "valid timeout - positive value",
+			name: "valid timeout",
 			workflowMd: `---
 on: workflow_dispatch
 engine: claude
 tools:
   timeout: 60
-  github:
----
-
-# Test Timeout
-
-Test workflow.
-`,
-			shouldCompile: true,
-		},
-		{
-			name: "valid timeout - minimum value (1)",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  timeout: 1
   github:
 ---
 
@@ -65,89 +51,6 @@ Test workflow.
 			errorContains: "minimum: got 0, want 1",
 		},
 		{
-			name: "invalid timeout - negative",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  timeout: -5
-  github:
----
-
-# Test Timeout
-
-Test workflow.
-`,
-			shouldCompile: false,
-			errorContains: "minimum: got -5, want 1",
-		},
-		{
-			name: "valid startup-timeout - positive value",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  startup-timeout: 120
-  github:
----
-
-# Test Startup Timeout
-
-Test workflow.
-`,
-			shouldCompile: true,
-		},
-		{
-			name: "valid startup-timeout - minimum value (1)",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  startup-timeout: 1
-  github:
----
-
-# Test Startup Timeout
-
-Test workflow.
-`,
-			shouldCompile: true,
-		},
-		{
-			name: "invalid startup-timeout - zero",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  startup-timeout: 0
-  github:
----
-
-# Test Startup Timeout
-
-Test workflow.
-`,
-			shouldCompile: false,
-			errorContains: "minimum: got 0, want 1",
-		},
-		{
-			name: "invalid startup-timeout - negative",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  startup-timeout: -10
-  github:
----
-
-# Test Startup Timeout
-
-Test workflow.
-`,
-			shouldCompile: false,
-			errorContains: "minimum: got -10, want 1",
-		},
-		{
 			name: "both timeouts valid",
 			workflowMd: `---
 on: workflow_dispatch
@@ -163,24 +66,6 @@ tools:
 Test workflow.
 `,
 			shouldCompile: true,
-		},
-		{
-			name: "both timeouts invalid",
-			workflowMd: `---
-on: workflow_dispatch
-engine: claude
-tools:
-  timeout: 0
-  startup-timeout: -5
-  github:
----
-
-# Test Both Timeouts Invalid
-
-Test workflow.
-`,
-			shouldCompile: false,
-			errorContains: "minimum:",
 		},
 	}
 

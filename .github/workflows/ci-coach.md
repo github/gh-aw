@@ -37,7 +37,7 @@ Analyze the CI workflow daily to identify concrete optimization opportunities th
 
 - **Repository**: ${{ github.repository }}
 - **Run Number**: #${{ github.run_number }}
-- **Target Workflow**: `.github/workflows/ci.yml`
+- **Target Workflow**: `.github/workflows/agent-ci.yml`
 
 ## Data Available
 
@@ -48,7 +48,7 @@ The `ci-data-analysis` shared module has pre-downloaded CI run data and built th
 
 1. **CI Runs**: `/tmp/ci-runs.json` - Last 100 workflow runs
 2. **Artifacts**: `/tmp/ci-artifacts/` - Coverage reports, benchmarks, and **fuzz test results**
-3. **CI Configuration**: `.github/workflows/ci.yml` - Current workflow
+3. **CI Configuration**: `.github/workflows/agent-ci.yml` - Current workflow
 4. **Cache Memory**: `/tmp/cache-memory/` - Historical analysis data
 5. **Test Results**: `/tmp/gh-aw/test-results.json` - Test performance data
 6. **Fuzz Results**: `/tmp/ci-artifacts/*/fuzz-results/` - Fuzz test output and corpus data
@@ -68,6 +68,15 @@ Follow the optimization strategies defined in the `ci-optimization-strategies` s
 - Check for orphaned tests not covered by any CI job
 - Verify catch-all matrix groups exist for packages with specific patterns
 - Identify coverage gaps and propose fixes if needed
+- **Use canary job outputs** to detect missing tests:
+  - Review `test-coverage-analysis` artifact from the `canary_go` job
+  - The canary job compares `all-tests.txt` (all tests in codebase) vs `executed-tests.txt` (tests that actually ran)
+  - If canary job fails, investigate which tests are missing from the CI matrix
+  - Ensure all tests defined in `*_test.go` files are covered by at least one test job pattern
+- **Verify test suite integrity**:
+  - Check that the test suite FAILS when individual tests fail (not just reporting failures)
+  - Review test job exit codes - ensure failed tests cause the job to exit with non-zero status
+  - Validate that test result artifacts show actual test failures, not swallowed errors
 - **Analyze fuzz test performance**: Review fuzz test results in `/tmp/ci-artifacts/*/fuzz-results/`
   - Check for new crash inputs or interesting corpus growth
   - Evaluate fuzz test duration (currently 10s per test)
@@ -106,7 +115,7 @@ If you identify improvements worth implementing:
 
 If you identify improvements worth implementing:
 
-1. **Make focused changes** to `.github/workflows/ci.yml`:
+1. **Make focused changes** to `.github/workflows/agent-ci.yml`:
    - Use the `edit` tool to make precise modifications
    - Keep changes minimal and well-documented
    - Add comments explaining why changes improve efficiency
@@ -247,6 +256,33 @@ integration:
 
 ## Important Guidelines
 
+### Test Code Integrity (CRITICAL)
+
+**NEVER MODIFY TEST CODE TO HIDE ERRORS**
+
+The CI Coach workflow must NEVER alter test code (`*_test.go` files) in ways that:
+- Swallow errors or suppress failures
+- Make failing tests appear to pass
+- Add error suppression patterns like `|| true`, `|| :`, or `|| echo "ignoring"`
+- Wrap test execution with `set +e` or similar error-ignoring constructs
+- Comment out failing assertions
+- Skip or disable tests without documented justification
+
+**Test Suite Validation Requirements**:
+- The test suite MUST fail when individual tests fail
+- Failed tests MUST cause the CI job to exit with non-zero status
+- Test artifacts must accurately reflect actual test results
+- If tests are reported as failing, the entire test job must fail
+- Never sacrifice test integrity for optimization
+
+**If tests are failing**:
+1. ✅ **DO**: Fix the root cause of the test failure
+2. ✅ **DO**: Update CI matrix patterns if tests are miscategorized
+3. ✅ **DO**: Investigate why tests fail and propose proper fixes
+4. ❌ **DON'T**: Modify test code to hide errors
+5. ❌ **DON'T**: Suppress error output from test commands
+6. ❌ **DON'T**: Change exit codes to make failures look like successes
+
 ### Quality Standards
 - **Evidence-based**: All recommendations must be based on actual data analysis
 - **Minimal changes**: Make surgical improvements, not wholesale rewrites
@@ -262,6 +298,12 @@ integration:
 - **Keep security** controls in place
 - **Document trade-offs** clearly
 - **Only create PR if validations pass** - don't propose broken changes
+- **NEVER change test code to hide errors**:
+  - NEVER modify test files (`*_test.go`) to swallow errors or ignore failures
+  - NEVER add `|| true` or similar patterns to make failing tests appear to pass
+  - NEVER wrap test commands with error suppression (e.g., `set +e`, `|| echo "ignoring"`)
+  - If tests are failing, fix the root cause or update the CI matrix, not the test code
+  - Test code integrity is non-negotiable - tests must accurately reflect pass/fail status
 
 ### Analysis Discipline
 - **Use pre-downloaded data** - all data is already available

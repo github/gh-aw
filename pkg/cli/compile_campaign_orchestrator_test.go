@@ -1,3 +1,5 @@
+//go:build !integration
+
 package cli
 
 import (
@@ -55,8 +57,8 @@ func TestGenerateAndCompileCampaignOrchestrator(t *testing.T) {
 		t.Fatalf("expected orchestrator markdown to exist, stat error: %v", statErr)
 	}
 
-	// For campaign orchestrators (*.campaign.g.md), the lock file should be *.campaign.lock.yml
-	lockPath := strings.TrimSuffix(campaignSpecPath, ".campaign.md") + ".campaign.lock.yml"
+	// For campaign orchestrators (*.campaign.g.md), the lock file should be *.campaign.g.lock.yml
+	lockPath := strings.TrimSuffix(orchestratorPath, ".md") + ".lock.yml"
 	if _, statErr := os.Stat(lockPath); statErr != nil {
 		t.Fatalf("expected orchestrator lock file to exist at %s, stat error: %v", lockPath, statErr)
 	}

@@ -75,6 +75,56 @@ Generate a comprehensive daily report of Copilot token consumption with:
 - **Visual trends**: Charts showing token usage and cost trends
 - **Actionable insights**: Identify high-cost workflows and optimization opportunities
 
+**CRITICAL**: Follow these formatting guidelines to create well-structured, readable reports:
+
+### 1. Header Levels
+**Use h3 (###) or lower for all headers in your report to maintain proper document hierarchy.**
+
+The discussion title serves as h1, so all content headers should start at h3:
+- Use `###` for main sections (e.g., "### Token Consumption Overview", "### Per-Workflow Statistics")
+- Use `####` for subsections (e.g., "#### Top 10 Most Expensive Workflows", "#### Cost Trends")
+- Never use `##` (h2) or `#` (h1) in the report body
+
+### 2. Progressive Disclosure
+**Wrap detailed sections in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+
+Use collapsible sections for:
+- Per-workflow detailed statistics tables
+- Full workflow run lists
+- Historical comparison data
+- Verbose metrics breakdowns
+
+Example:
+```markdown
+<details>
+<summary><b>Per-Workflow Detailed Statistics</b></summary>
+
+| Workflow | Runs | Total Tokens | Avg Tokens | Total Cost | Avg Cost |
+|----------|------|--------------|------------|------------|----------|
+| workflow-1 | 25 | 1,234,567 | 49,382 | $1.23 | $0.05 |
+| ... | ... | ... | ... | ... | ... |
+
+</details>
+```
+
+### 3. Report Structure Pattern
+
+Your report should follow this structure for optimal readability:
+
+1. **Executive Summary** (always visible): Brief overview of total token usage, costs, and key findings
+2. **Key Highlights** (always visible): Top 5 most expensive workflows, notable cost increases/decreases
+3. **Visual Trends** (always visible): Embedded charts showing token usage and cost trends
+4. **Detailed Per-Workflow Statistics** (in `<details>` tags): Complete breakdown for all workflows
+5. **Recommendations** (always visible): Actionable suggestions for optimization
+
+### Design Principles
+
+Create reports that:
+- **Build trust through clarity**: Most important info (summary, top consumers, trends) immediately visible
+- **Exceed expectations**: Add helpful context like week-over-week comparisons, cost projections
+- **Create delight**: Use progressive disclosure to reduce overwhelm while keeping details accessible
+- **Maintain consistency**: Follow the same patterns as other reporting workflows like `daily-issues-report` and `daily-team-status`
+
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
@@ -505,36 +555,33 @@ Create a comprehensive discussion report with all findings.
 ```markdown
 # 📊 Daily Copilot Token Consumption Report - [DATE]
 
-## Executive Summary
+### Executive Summary
 
 Over the last 30 days, Copilot-powered agentic workflows consumed **[TOTAL_TOKENS]** tokens at an estimated cost of **$[TOTAL_COST]**, across **[TOTAL_RUNS]** workflow runs covering **[NUM_WORKFLOWS]** unique workflows.
 
-**Key Highlights:**
+#### Key Highlights:
 - **Highest consuming workflow**: [WORKFLOW_NAME] ([TOKENS] tokens, $[COST])
 - **Most active workflow**: [WORKFLOW_NAME] ([RUN_COUNT] runs)
 - **Average cost per run**: $[AVG_COST]
 - **Trend**: Token usage is [increasing/decreasing/stable] by [PERCENT]% over the last 7 days
 
-<details>
-<summary><b>Full Report Details</b></summary>
+### 📈 Token Usage Trends
 
-## 📈 Token Usage Trends
-
-### Overall Trends
+#### Overall Trends
 ![Token Usage Trends](URL_FROM_UPLOAD_ASSET_CHART_1)
 
 The chart above shows daily token consumption over the last 30 days. [Brief analysis of the trend: are we increasing, decreasing, or stable? Any spikes or anomalies?]
 
-### Cost Trends
+#### Cost Trends
 ![Cost Trends](URL_FROM_UPLOAD_ASSET_CHART_2)
 
 Daily cost trends show [analysis of cost patterns, efficiency, and notable changes].
 
-## 🏆 Top Workflows by Token Consumption
+### 🏆 Top Workflows by Token Consumption
 
 ![Top Workflows](URL_FROM_UPLOAD_ASSET_CHART_3)
 
-### Detailed Breakdown
+#### Top 10 Most Expensive Workflows
 
 | Rank | Workflow | Total Tokens | Total Cost | Runs | Avg Tokens/Run | Avg Cost/Run |
 |------|----------|--------------|------------|------|----------------|--------------|
@@ -542,10 +589,8 @@ Daily cost trends show [analysis of cost patterns, efficiency, and notable chang
 | 2    | [name]   | [tokens]     | $[cost]    | [n]  | [avg]          | $[avg]       |
 | ...  | ...      | ...          | ...        | ...  | ...            | ...          |
 
-## 📊 Per-Workflow Statistics (All Workflows)
-
 <details>
-<summary><b>View All Workflows</b></summary>
+<summary><b>Per-Workflow Detailed Statistics (All Workflows)</b></summary>
 
 | Workflow | Total Tokens | Total Cost | Runs | Avg Tokens | Avg Cost | Avg Turns | Avg Duration |
 |----------|--------------|------------|------|------------|----------|-----------|--------------|
@@ -554,9 +599,9 @@ Daily cost trends show [analysis of cost patterns, efficiency, and notable chang
 
 </details>
 
-## 💡 Insights & Recommendations
+### 💡 Insights & Recommendations
 
-### High-Cost Workflows
+#### High-Cost Workflows
 
 The following workflows account for the majority of token consumption:
 
@@ -568,7 +613,8 @@ The following workflows account for the majority of token consumption:
    - **Observation**: [Analysis]
    - **Recommendation**: [Suggestion]
 
-### Optimization Opportunities
+<details>
+<summary><b>Optimization Opportunities</b></summary>
 
 1. **[Opportunity 1]**: [Description]
    - **Affected Workflows**: [list]
@@ -580,13 +626,19 @@ The following workflows account for the majority of token consumption:
    - **Potential Savings**: ~$[amount] per month
    - **Action**: [Specific steps to implement]
 
-### Efficiency Trends
+</details>
+
+<details>
+<summary><b>Efficiency Trends</b></summary>
 
 - **Token efficiency**: [Analysis of avg tokens per turn or per workflow]
 - **Cost efficiency**: [Analysis of cost trends and efficiency improvements]
 - **Run patterns**: [Any patterns in when workflows run or how often they succeed]
 
-## 📅 Historical Comparison
+</details>
+
+<details>
+<summary><b>Historical Comparison</b></summary>
 
 | Metric | Last 7 Days | Previous 7 Days | Change | Last 30 Days |
 |--------|-------------|-----------------|--------|--------------|
@@ -595,8 +647,12 @@ The following workflows account for the majority of token consumption:
 | Total Runs | [n] | [n] | [+/-]% | [n] |
 | Avg Cost/Run | $[n] | $[n] | [+/-]% | $[n] |
 
-## 🔧 Methodology
+</details>
 
+<details>
+<summary><b>Methodology & Data Quality Notes</b></summary>
+
+#### Methodology
 - **Data Source**: GitHub Actions workflow run artifacts from last 30 days
 - **Engine Filter**: Copilot engine only
 - **Memory Storage**: `/tmp/gh-aw/repo-memory/default/`
@@ -604,8 +660,7 @@ The following workflows account for the majority of token consumption:
 - **Historical Data**: [N] days of trend data
 - **Cost Model**: Based on Copilot token pricing
 
-## 📊 Data Quality Notes
-
+#### Data Quality Notes
 - [Any caveats about data completeness]
 - [Note about workflows without cost data]
 - [Any filtering or exclusions applied]

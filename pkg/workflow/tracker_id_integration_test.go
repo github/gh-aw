@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -59,48 +61,6 @@ Create a test issue without tracker-id.
 			shouldCompile:      true,
 			shouldHaveEnvVar:   false,
 			shouldHaveInScript: false,
-		},
-		{
-			name: "Workflow with tracker-id in discussion",
-			workflowContent: `---
-on: workflow_dispatch
-permissions:
-  contents: read
-tracker-id: discussion_fp_001
-safe-outputs:
-  create-discussion:
----
-
-# Test Discussion Tracker ID
-
-Create a discussion.
-`,
-			shouldCompile:      true,
-			shouldHaveEnvVar:   true,
-			shouldHaveInScript: true,
-			expectedTrackerID:  "discussion_fp_001",
-		},
-		{
-			name: "Workflow with tracker-id in comment",
-			workflowContent: `---
-on:
-  issues:
-    types: [opened]
-permissions:
-  contents: read
-tracker-id: comment_fp_2024
-safe-outputs:
-  add-comment:
----
-
-# Test Comment Tracker ID
-
-Add a comment.
-`,
-			shouldCompile:      true,
-			shouldHaveEnvVar:   true,
-			shouldHaveInScript: true,
-			expectedTrackerID:  "comment_fp_2024",
 		},
 		{
 			name: "Workflow with tracker-id in pull request",

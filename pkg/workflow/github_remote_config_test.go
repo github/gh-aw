@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -100,7 +102,6 @@ func TestRenderGitHubMCPRemoteConfig(t *testing.T) {
 				`"headers": {`,
 				`"Authorization": "Bearer \${GITHUB_PERSONAL_ACCESS_TOKEN}"`,
 				`"X-MCP-Toolsets": "all"`,
-				`"tools": ["*"]`,
 				`"env": {`,
 				`"GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}"`,
 			},

@@ -1,95 +1,11 @@
+//go:build !integration
+
 package workflow
 
 import (
 	"strings"
 	"testing"
 )
-
-// TestRenderPlaywrightMCPConfigShared tests the shared renderPlaywrightMCPConfig function
-func TestRenderPlaywrightMCPConfigShared(t *testing.T) {
-	tests := []struct {
-		name           string
-		playwrightTool any
-		isLast         bool
-		wantContains   []string
-		wantEnding     string
-	}{
-		{
-			name: "basic playwright config not last",
-			playwrightTool: map[string]any{
-				"allowed_domains": []any{"example.com", "test.com"},
-			},
-			isLast: false,
-			wantContains: []string{
-				`"playwright": {`,
-				`"command": "docker"`,
-				`"run"`,
-				`"-i"`,
-				`"--rm"`,
-				`"--init"`,
-				`"mcr.microsoft.com/playwright/mcp"`,
-				`"--output-dir"`,
-				`"/tmp/gh-aw/mcp-logs/playwright"`,
-				`"--allowed-hosts"`,
-				`"--allowed-origins"`,
-				`example.com;test.com`, // Domains are joined with semicolons
-			},
-			wantEnding: "},\n",
-		},
-		{
-			name: "basic playwright config is last",
-			playwrightTool: map[string]any{
-				"allowed_domains": []any{"example.com"},
-			},
-			isLast: true,
-			wantContains: []string{
-				`"playwright": {`,
-				`"command": "docker"`,
-			},
-			wantEnding: "}\n",
-		},
-		{
-			name:           "playwright config without domains",
-			playwrightTool: map[string]any{},
-			isLast:         false,
-			wantContains: []string{
-				`"playwright": {`,
-				`"command": "docker"`,
-				`"mcr.microsoft.com/playwright/mcp"`,
-				`"--output-dir"`,
-				`"/tmp/gh-aw/mcp-logs/playwright"`,
-			},
-			wantEnding: "},\n",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var yaml strings.Builder
-			playwrightConfig := parsePlaywrightTool(tt.playwrightTool)
-			renderPlaywrightMCPConfig(&yaml, playwrightConfig, tt.isLast)
-
-			result := yaml.String()
-
-			// Check all required strings are present
-			for _, want := range tt.wantContains {
-				if !strings.Contains(result, want) {
-					t.Errorf("renderPlaywrightMCPConfig() result missing %q\nGot:\n%s", want, result)
-				}
-			}
-
-			// Check correct ending
-			if !strings.HasSuffix(result, tt.wantEnding) {
-				// Show last part of result for debugging, but handle short strings
-				endSnippet := result
-				if len(result) > 10 {
-					endSnippet = result[len(result)-10:]
-				}
-				t.Errorf("renderPlaywrightMCPConfig() ending = %q, want suffix %q", endSnippet, tt.wantEnding)
-			}
-		})
-	}
-}
 
 // TestRenderSafeOutputsMCPConfigShared tests the shared renderSafeOutputsMCPConfig function
 func TestRenderSafeOutputsMCPConfigShared(t *testing.T) {

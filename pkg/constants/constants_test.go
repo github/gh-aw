@@ -1,3 +1,5 @@
+//go:build !integration
+
 package constants
 
 import (
@@ -280,8 +282,8 @@ func TestVersionConstants(t *testing.T) {
 		value    Version
 		expected Version
 	}{
-		{"DefaultClaudeCodeVersion", DefaultClaudeCodeVersion, "2.1.20"},
-		{"DefaultCopilotVersion", DefaultCopilotVersion, "0.0.395"},
+		{"DefaultClaudeCodeVersion", DefaultClaudeCodeVersion, "2.1.22"},
+		{"DefaultCopilotVersion", DefaultCopilotVersion, "0.0.397"},
 		{"DefaultCodexVersion", DefaultCodexVersion, "0.92.0"},
 		{"DefaultGitHubMCPServerVersion", DefaultGitHubMCPServerVersion, "v0.30.2"},
 		{"DefaultMCPGatewayVersion", DefaultMCPGatewayVersion, "v0.0.84"},

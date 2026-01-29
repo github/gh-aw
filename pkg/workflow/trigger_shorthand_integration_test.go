@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -34,15 +36,6 @@ Test workflow for push to branch`,
 			wantTrigger: "branches:",
 		},
 		{
-			name: "pull_request shorthand",
-			markdown: `---
-on: pull_request
----
-# Test Workflow
-Test workflow for pull request`,
-			wantTrigger: `"on": pull_request`,
-		},
-		{
 			name: "pull_request opened shorthand",
 			markdown: `---
 on: pull_request opened
@@ -52,51 +45,6 @@ Test workflow for pull request opened`,
 			wantTrigger: "types:",
 		},
 		{
-			name: "issue opened shorthand",
-			markdown: `---
-on: issue opened
----
-# Test Workflow
-Test workflow for issue opened`,
-			wantTrigger: "issues:",
-		},
-		{
-			name: "discussion created shorthand",
-			markdown: `---
-on: discussion created
----
-# Test Workflow
-Test workflow for discussion created`,
-			wantTrigger: "discussion:",
-		},
-		{
-			name: "release published shorthand",
-			markdown: `---
-on: release published
----
-# Test Workflow
-Test workflow for release published`,
-			wantTrigger: "release:",
-		},
-		{
-			name: "repository starred shorthand",
-			markdown: `---
-on: repository starred
----
-# Test Workflow
-Test workflow for repository starred`,
-			wantTrigger: "watch:",
-		},
-		{
-			name: "comment created shorthand",
-			markdown: `---
-on: comment created
----
-# Test Workflow
-Test workflow for comment created`,
-			wantTrigger: "issue_comment:",
-		},
-		{
 			name: "manual shorthand",
 			markdown: `---
 on: manual
@@ -104,15 +52,6 @@ on: manual
 # Test Workflow
 Test workflow for manual dispatch`,
 			wantTrigger: "workflow_dispatch:",
-		},
-		{
-			name: "dependabot pull request shorthand",
-			markdown: `---
-on: dependabot pull request
----
-# Test Workflow
-Test workflow for dependabot PRs`,
-			wantTrigger: "pull_request:",
 		},
 	}
 

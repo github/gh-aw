@@ -292,6 +292,11 @@ func parsePlaywrightTool(val any) *PlaywrightToolConfig {
 						config.AllowedDomains = append(config.AllowedDomains, PlaywrightDomain(str))
 					}
 				}
+			} else if arr, ok := allowedDomains.([]string); ok {
+				config.AllowedDomains = make(PlaywrightAllowedDomains, 0, len(arr))
+				for _, str := range arr {
+					config.AllowedDomains = append(config.AllowedDomains, PlaywrightDomain(str))
+				}
 			}
 		}
 

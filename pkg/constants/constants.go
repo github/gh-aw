@@ -253,12 +253,12 @@ const AgenticCampaignLabel = "agentic-campaign"
 const CampaignLabelPrefix = "z_campaign_"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.20"
+const DefaultClaudeCodeVersion Version = "2.1.22"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // WARNING: UPGRADING COPILOT CLI REQUIRES A FULL INTEGRATION TEST RUN TO ENSURE COMPATIBILITY.
-const DefaultCopilotVersion Version = "0.0.395"
+const DefaultCopilotVersion Version = "0.0.397"
 
 // DefaultCopilotDetectionModel is the default model for the Copilot engine when used in the detection job
 // Updated to gpt-5.1-codex-mini after gpt-5-mini deprecation on 2026-01-17

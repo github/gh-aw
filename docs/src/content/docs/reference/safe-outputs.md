@@ -66,6 +66,7 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 
 - [**Dispatch Workflow**](#workflow-dispatch-dispatch-workflow) (`dispatch-workflow`) — Trigger other workflows with inputs (max: 3, same-repo only)
 - [**Code Scanning Alerts**](#code-scanning-alerts-create-code-scanning-alert) (`create-code-scanning-alert`) — Generate SARIF security advisories (max: unlimited, same-repo only)
+- [**Autofix Code Scanning Alerts**](#autofix-code-scanning-alerts-autofix-code-scanning-alert) (`autofix-code-scanning-alert`) — Create automated fixes for code scanning alerts (max: 10, same-repo only)
 - [**Create Agent Session**](#agent-session-creation-create-agent-session) (`create-agent-session`) — Create Copilot agent sessions (max: 1)
 
 ### System Types (Auto-Enabled)
@@ -706,6 +707,16 @@ Creates security advisories in SARIF format and submits to GitHub Code Scanning.
 safe-outputs:
   create-code-scanning-alert:
     max: 50  # max findings (default: unlimited)
+```
+
+### Autofix Code Scanning Alerts (`autofix-code-scanning-alert:`)
+
+Creates automated fixes for code scanning alerts. Agent outputs fix suggestions that are submitted to GitHub Code Scanning.
+
+```yaml wrap
+safe-outputs:
+  autofix-code-scanning-alert:
+    max: 10  # max autofixes (default: 10)
 ```
 
 ### Push to PR Branch (`push-to-pull-request-branch:`)

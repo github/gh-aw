@@ -118,7 +118,7 @@
     "anchore/sbom-action@v0": {
       "repo": "anchore/sbom-action",
       "version": "v0",
-      "sha": "62ad5284b8ced813296287a0b63906cb364b73ee"
+      "sha": "deef08a0db64bfad603422135db61477b16cef56"
     },
     "anchore/sbom-action@v0.20.10": {
       "repo": "anchore/sbom-action",
@@ -153,7 +153,7 @@
     "docker/login-action@v3": {
       "repo": "docker/login-action",
       "version": "v3",
-      "sha": "5e57cd118135c172c3672efd75eb46360885c0ef"
+      "sha": "c94ce9fb468520275223c153574b00df6fe4bcc9"
     },
     "docker/metadata-action@v5": {
       "repo": "docker/metadata-action",

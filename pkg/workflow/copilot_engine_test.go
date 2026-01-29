@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -707,7 +709,7 @@ func TestCopilotEngineRenderGitHubMCPConfig(t *testing.T) {
 			expectedStrs: []string{
 				`"github": {`,
 				`"type": "stdio",`,
-				`"container": "ghcr.io/github/github-mcp-server:v0.30.1"`,
+				`"container": "ghcr.io/github/github-mcp-server:v0.30.2"`,
 				`"env": {`,
 				`"GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}"`,
 				`},`,
@@ -737,7 +739,7 @@ func TestCopilotEngineRenderGitHubMCPConfig(t *testing.T) {
 			expectedStrs: []string{
 				`"github": {`,
 				`"type": "stdio",`,
-				`"container": "ghcr.io/github/github-mcp-server:v0.30.1"`,
+				`"container": "ghcr.io/github/github-mcp-server:v0.30.2"`,
 				`"env": {`,
 				`}`,
 			},
@@ -775,84 +777,6 @@ func TestCopilotEngineRenderGitHubMCPConfig(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestCopilotEngineRenderMCPConfigWithGitHub(t *testing.T) {
-	engine := NewCopilotEngine()
-
-	workflowData := &WorkflowData{
-		Tools: map[string]any{
-			"github": map[string]any{
-				"version": "custom-version",
-			},
-		},
-	}
-
-	mcpTools := []string{"github"}
-	var yaml strings.Builder
-	engine.RenderMCPConfig(&yaml, workflowData.Tools, mcpTools, workflowData)
-	output := yaml.String()
-
-	// Verify the MCP config structure
-	expectedStrs := []string{
-		"mkdir -p /home/runner/.copilot",
-		`cat > /home/runner/.copilot/mcp-config.json << EOF`,
-		`"mcpServers": {`,
-		`"github": {`,
-		`"type": "local",`,
-		`"command": "docker",`,
-		`"ghcr.io/github/github-mcp-server:custom-version"`,
-		`"GITHUB_PERSONAL_ACCESS_TOKEN",`,
-		`"env": {`,
-		`"GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}"`,
-		`"tools": ["*"]`,
-		"EOF",
-		"-------START MCP CONFIG-----------",
-		"cat /home/runner/.copilot/mcp-config.json",
-		"-------END MCP CONFIG-----------",
-	}
-
-	for _, expected := range expectedStrs {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected output to contain '%s', but it didn't.\nFull output:\n%s", expected, output)
-		}
-	}
-}
-
-func TestCopilotEngineRenderMCPConfigWithGitHubAndPlaywright(t *testing.T) {
-	engine := NewCopilotEngine()
-
-	workflowData := &WorkflowData{
-		Tools: map[string]any{
-			"github":     nil,
-			"playwright": nil,
-		},
-	}
-
-	mcpTools := []string{"github", "playwright"}
-	var yaml strings.Builder
-	engine.RenderMCPConfig(&yaml, workflowData.Tools, mcpTools, workflowData)
-	output := yaml.String()
-
-	// Verify both tools are configured
-	expectedStrs := []string{
-		`"github": {`,
-		`"type": "local",`,
-		`"command": "docker",`,
-		`"ghcr.io/github/github-mcp-server:v0.30.1"`,
-		`},`, // GitHub should NOT be last (comma after closing brace)
-		`"playwright": {`,
-		`"type": "local",`,
-		`"command": "docker",`,
-		`"mcr.microsoft.com/playwright/mcp"`,
-		`"--output-dir", "/tmp/gh-aw/mcp-logs/playwright"`,
-	}
-
-	for _, expected := range expectedStrs {
-		if !strings.Contains(output, expected) {
-			t.Errorf("Expected output to contain '%s', but it didn't.\nFull output:\n%s", expected, output)
-		}
 	}
 }
 

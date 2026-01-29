@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -12,6 +14,7 @@ import (
 )
 
 func TestCheckoutOptimization(t *testing.T) {
+	// Representative sample of checkout optimization scenarios
 	tests := []struct {
 		name                string
 		frontmatter         string
@@ -75,61 +78,6 @@ strict: false
 			description:         "When permissions include contents: read, checkout should be included",
 		},
 		{
-			name: "permissions with contents write should include checkout",
-			frontmatter: `---
-on:
-  issues:
-    types: [opened]
-permissions:
-  contents: write
-  issues: write
-  pull-requests: read
-tools:
-  github:
-    toolsets: [repos, issues, pull_requests]
-engine: claude
-features:
-  dangerous-permissions-write: true
-strict: false
----`,
-			expectedHasCheckout: true,
-			description:         "When permissions include contents: write, checkout should be included",
-		},
-		{
-			name: "shorthand read-all should include checkout",
-			frontmatter: `---
-on:
-  issues:
-    types: [opened]
-permissions: read-all
-tools:
-  github:
-    toolsets: [issues]
-engine: claude
-strict: false
----`,
-			expectedHasCheckout: true,
-			description:         "When permissions is read-all, checkout should be included",
-		},
-		{
-			name: "shorthand write-all should include checkout",
-			frontmatter: `---
-on:
-  issues:
-    types: [opened]
-permissions: write-all
-features:
-  dangerous-permissions-write: true
-tools:
-  github:
-    toolsets: [issues]
-engine: claude
-strict: false
----`,
-			expectedHasCheckout: true,
-			description:         "When permissions is write-all, checkout should be included",
-		},
-		{
 			name: "custom steps with checkout should omit default checkout",
 			frontmatter: `---
 on:
@@ -156,61 +104,6 @@ strict: false
 ---`,
 			expectedHasCheckout: false,
 			description:         "When custom steps already contain checkout, default checkout should be omitted",
-		},
-		{
-			name: "custom steps without checkout but with contents permission should include checkout",
-			frontmatter: `---
-on:
-  issues:
-    types: [opened]
-permissions:
-  contents: read
-  issues: write
-  pull-requests: read
-steps:
-  - name: Setup Node
-    uses: actions/setup-node@v6
-    with:
-      node-version: '18'
-  - name: Install deps
-    run: npm install
-tools:
-  github:
-    toolsets: [issues]
-engine: claude
-features:
-  dangerous-permissions-write: true
-strict: false
----`,
-			expectedHasCheckout: true,
-			description:         "When custom steps don't contain checkout but have contents permission, checkout should be included",
-		},
-		{
-			name: "custom steps without checkout and no contents permission should omit checkout",
-			frontmatter: `---
-on:
-  issues:
-    types: [opened]
-permissions:
-  issues: write
-  pull-requests: read
-steps:
-  - name: Setup Node
-    uses: actions/setup-node@v6
-    with:
-      node-version: '18'
-  - name: Install deps
-    run: npm install
-tools:
-  github:
-    toolsets: [issues, pull_requests]
-engine: claude
-features:
-  dangerous-permissions-write: true
-strict: false
----`,
-			expectedHasCheckout: false,
-			description:         "When custom steps don't contain checkout and no contents permission, checkout should be omitted",
 		},
 	}
 

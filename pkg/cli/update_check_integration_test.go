@@ -13,9 +13,6 @@ import (
 
 // TestUpdateCheckIntegration tests the update check feature in an end-to-end scenario
 func TestUpdateCheckIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
 
 	// Build the binary for testing
 	tempDir := t.TempDir()
@@ -241,9 +238,6 @@ Test workflow content.
 
 // TestUpdateCheckFlagHelp verifies the --no-check-update flag appears in help text
 func TestUpdateCheckFlagHelp(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
 
 	// Build the binary for testing
 	tempDir := t.TempDir()

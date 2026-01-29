@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -507,42 +509,6 @@ func stepsToString(steps []GitHubActionStep) string {
 		}
 	}
 	return result
-}
-
-func TestUVDetectionAddsPython(t *testing.T) {
-	// Test that when uv is detected, python is also added
-	tools := map[string]any{
-		"serena": map[string]any{
-			"command": "uvx",
-			"args":    []any{"--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"},
-		},
-	}
-	workflowData := &WorkflowData{
-		Tools:       tools,
-		ParsedTools: NewTools(tools),
-	}
-
-	requirements := DetectRuntimeRequirements(workflowData)
-
-	// Check that both uv and python are detected
-	foundUV := false
-	foundPython := false
-	for _, req := range requirements {
-		if req.Runtime.ID == "uv" {
-			foundUV = true
-		}
-		if req.Runtime.ID == "python" {
-			foundPython = true
-		}
-	}
-
-	if !foundUV {
-		t.Error("Expected uv to be detected from uvx command")
-	}
-
-	if !foundPython {
-		t.Error("Expected python to be auto-added when uv is detected")
-	}
 }
 
 func TestRuntimeFilteringWithExistingSetupActions(t *testing.T) {

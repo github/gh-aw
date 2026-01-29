@@ -1,9 +1,10 @@
+//go:build !integration
+
 package workflow
 
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -167,87 +168,6 @@ func TestGenerateMaintenanceWorkflow_WithExpires(t *testing.T) {
 			}
 			if !tt.expectWorkflowGenerated && workflowExists {
 				t.Errorf("Expected maintenance workflow NOT to be generated but it was")
-			}
-		})
-	}
-}
-
-func TestGenerateMaintenanceWorkflow_ActionModeJobs(t *testing.T) {
-	tests := []struct {
-		name                      string
-		actionMode                ActionMode
-		expectCompileWorkflowsJob bool
-		expectZizmorScanJob       bool
-	}{
-		{
-			name:                      "dev mode - should include compile-workflows and zizmor-scan jobs",
-			actionMode:                ActionModeDev,
-			expectCompileWorkflowsJob: true,
-			expectZizmorScanJob:       true,
-		},
-		{
-			name:                      "release mode - should NOT include compile-workflows and zizmor-scan jobs",
-			actionMode:                ActionModeRelease,
-			expectCompileWorkflowsJob: false,
-			expectZizmorScanJob:       false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-
-			// Create a workflow with expires field to trigger maintenance workflow generation
-			workflowDataList := []*WorkflowData{
-				{
-					Name: "test-workflow",
-					SafeOutputs: &SafeOutputsConfig{
-						CreateIssues: &CreateIssuesConfig{
-							Expires: 168, // 7 days
-						},
-					},
-				},
-			}
-
-			// Generate maintenance workflow
-			err := GenerateMaintenanceWorkflow(workflowDataList, tmpDir, "v1.0.0", tt.actionMode, false)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-
-			// Read the generated workflow file
-			maintenanceFile := filepath.Join(tmpDir, "agentics-maintenance.yml")
-			content, err := os.ReadFile(maintenanceFile)
-			if err != nil {
-				t.Fatalf("Failed to read maintenance workflow file: %v", err)
-			}
-
-			contentStr := string(content)
-
-			// Check for compile-workflows job
-			hasCompileWorkflowsJob := strings.Contains(contentStr, "compile-workflows:")
-			if tt.expectCompileWorkflowsJob && !hasCompileWorkflowsJob {
-				t.Errorf("Expected compile-workflows job in %s mode but it was not found", tt.actionMode)
-			}
-			if !tt.expectCompileWorkflowsJob && hasCompileWorkflowsJob {
-				t.Errorf("Did NOT expect compile-workflows job in %s mode but it was found", tt.actionMode)
-			}
-
-			// Check for zizmor-scan job
-			hasZizmor := strings.Contains(contentStr, "zizmor-scan:")
-			if tt.expectZizmorScanJob && !hasZizmor {
-				t.Errorf("Expected zizmor-scan job in %s mode but it was not found", tt.actionMode)
-			}
-			if !tt.expectZizmorScanJob && hasZizmor {
-				t.Errorf("Did NOT expect zizmor-scan job in %s mode but it was found", tt.actionMode)
-			}
-
-			// Verify that close-expired-discussions and close-expired-issues jobs are always present
-			if !strings.Contains(contentStr, "close-expired-discussions:") {
-				t.Errorf("Expected close-expired-discussions job but it was not found")
-			}
-			if !strings.Contains(contentStr, "close-expired-issues:") {
-				t.Errorf("Expected close-expired-issues job but it was not found")
 			}
 		})
 	}

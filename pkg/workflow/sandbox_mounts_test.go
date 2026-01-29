@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -41,25 +43,25 @@ func TestValidateMountsSyntax(t *testing.T) {
 			name:    "invalid mount - too few parts",
 			mounts:  []string{"/host/path:/container/path"},
 			wantErr: true,
-			errMsg:  "invalid mount syntax",
+			errMsg:  "mount syntax must follow 'source:destination:mode' format",
 		},
 		{
 			name:    "invalid mount - too many parts",
 			mounts:  []string{"/host/path:/container/path:ro:extra"},
 			wantErr: true,
-			errMsg:  "invalid mount syntax",
+			errMsg:  "mount syntax must follow 'source:destination:mode' format",
 		},
 		{
 			name:    "invalid mount - empty source",
 			mounts:  []string{":/container/path:ro"},
 			wantErr: true,
-			errMsg:  "source path is empty",
+			errMsg:  "source path cannot be empty",
 		},
 		{
 			name:    "invalid mount - empty destination",
 			mounts:  []string{"/host/path::ro"},
 			wantErr: true,
-			errMsg:  "destination path is empty",
+			errMsg:  "destination path cannot be empty",
 		},
 		{
 			name:    "invalid mount - invalid mode",
@@ -80,7 +82,7 @@ func TestValidateMountsSyntax(t *testing.T) {
 				"/invalid:mount",
 			},
 			wantErr: true,
-			errMsg:  "invalid mount syntax at index 1",
+			errMsg:  "mount syntax must follow 'source:destination:mode' format",
 		},
 	}
 
@@ -186,7 +188,7 @@ func TestSandboxConfigWithMounts(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "invalid mount syntax",
+			errMsg:  "mount syntax must follow 'source:destination:mode' format",
 		},
 		{
 			name: "invalid mode in mount",

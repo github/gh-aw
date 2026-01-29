@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -909,7 +911,6 @@ func TestInvalidBranchPrefixRejectsConfig(t *testing.T) {
 		name   string
 		prefix string
 	}{
-		{"too short", "short"},
 		{"too long", "this_is_a_very_long_prefix_that_exceeds_32_characters"},
 		{"reserved word", "copilot"},
 		{"special chars", "my@prefix"},

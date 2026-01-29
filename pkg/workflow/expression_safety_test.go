@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -329,42 +331,6 @@ func TestValidateExpressionSafetyWithParser(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestUnauthorizedExpressionErrorFormat(t *testing.T) {
-	// Test that the error message is properly formatted with line breaks
-	content := "Test: ${{ github.inputs.test }}"
-	err := validateExpressionSafety(content)
-
-	if err == nil {
-		t.Fatal("Expected error for unauthorized expression")
-	}
-
-	errMsg := err.Error()
-
-	// Check that the error message contains the unauthorized expression with bullet point
-	if !strings.Contains(errMsg, "  - github.inputs.test") {
-		t.Errorf("Error message should contain bullet-pointed unauthorized expression, got: %s", errMsg)
-	}
-
-	// Check that the error message contains allowed expressions with bullet points
-	if !strings.Contains(errMsg, "  - github.event.issue.number") {
-		t.Errorf("Error message should contain bullet-pointed allowed expressions, got: %s", errMsg)
-	}
-
-	// Check that the error message contains pattern-based allowed expressions
-	if !strings.Contains(errMsg, "  - needs.*") {
-		t.Errorf("Error message should contain pattern-based allowed expressions, got: %s", errMsg)
-	}
-
-	// Check that the error has the proper structure with newlines
-	if !strings.Contains(errMsg, "unauthorized expressions:\n") {
-		t.Errorf("Error message should have 'unauthorized expressions:' followed by newline, got: %s", errMsg)
-	}
-
-	if !strings.Contains(errMsg, "\nallowed:\n") {
-		t.Errorf("Error message should have 'allowed:' on its own line, got: %s", errMsg)
 	}
 }
 

@@ -166,8 +166,8 @@ if [ -f /tmp/gh-aw/data/cloc_output.json ] && [ -s /tmp/gh-aw/data/cloc_output.j
     lines_of_code_total=$(jq '.SUM.code' /tmp/gh-aw/data/cloc_output.json)
     
     # Test LOC (find test files and measure)
-    # Scope: Files matching test patterns
-    test_files=$(find . -name "*_test.go" -o -name "*.test.js" -o -name "test_*.py" -o -name "*_test.py" 2>/dev/null)
+    # Scope: Files matching test patterns (*_test.go, *.test.js, *.test.cjs, test_*.py, *_test.py)
+    test_files=$(find . -name "*_test.go" -o -name "*.test.js" -o -name "*.test.cjs" -o -name "test_*.py" -o -name "*_test.py" 2>/dev/null)
     
     if [ -n "$test_files" ]; then
         echo "$test_files" | xargs cloc --json --quiet > /tmp/gh-aw/data/test_cloc.json
@@ -176,16 +176,23 @@ if [ -f /tmp/gh-aw/data/cloc_output.json ] && [ -s /tmp/gh-aw/data/cloc_output.j
         test_lines_of_code=0
     fi
     
+    # Calculate source LOC (excluding tests)
+    # Scope: All source files excluding test files
+    # This is needed for the correct test-to-source ratio calculation
+    source_lines_of_code=$((lines_of_code_total - test_lines_of_code))
+    
     # Calculate test-to-source ratio
-    # Scope: test_lines_of_code / lines_of_code_total
-    if [ "$lines_of_code_total" -gt 0 ]; then
-        test_to_source_ratio=$(echo "scale=3; $test_lines_of_code / $lines_of_code_total" | bc)
+    # Scope: test_lines_of_code / source_lines_of_code (excludes test files from source LOC)
+    # Per specs/metrics-glossary.md: "Excludes test files from source LOC calculation"
+    if [ "$source_lines_of_code" -gt 0 ]; then
+        test_to_source_ratio=$(echo "scale=3; $test_lines_of_code / $source_lines_of_code" | bc)
     else
         test_to_source_ratio="0"
     fi
     
     echo "Total LOC: $lines_of_code_total"
     echo "Test LOC: $test_lines_of_code"
+    echo "Source LOC (excluding tests): $source_lines_of_code"
     echo "Test-to-Source Ratio: $test_to_source_ratio"
 else
     echo "Error: cloc did not produce valid output"

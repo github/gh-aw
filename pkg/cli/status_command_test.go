@@ -1,3 +1,5 @@
+//go:build integration
+
 package cli
 
 import (
@@ -13,6 +15,7 @@ import (
 )
 
 func TestStatusWorkflows_JSONOutput(t *testing.T) {
+
 	// Save current directory
 	originalDir, err := os.Getwd()
 	if err != nil {

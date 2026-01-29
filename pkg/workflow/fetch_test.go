@@ -1,3 +1,5 @@
+//go:build !integration
+
 package workflow
 
 import (
@@ -158,7 +160,6 @@ func TestRenderMCPFetchServerConfig(t *testing.T) {
 				`"web-fetch": {`,
 				`"command": "docker"`,
 				`"mcp/fetch"`,
-				`"tools": ["*"]`,
 				`},`,
 			},
 		},
@@ -172,7 +173,6 @@ func TestRenderMCPFetchServerConfig(t *testing.T) {
 				`"web-fetch": {`,
 				`"command": "docker"`,
 				`"mcp/fetch"`,
-				`"tools": ["*"]`,
 				`}`, // No comma
 			},
 		},

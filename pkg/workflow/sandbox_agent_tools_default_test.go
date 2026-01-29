@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -259,7 +261,7 @@ Test workflow where firewall is auto-enabled via network restrictions.
 		assert.Contains(t, lockStr, "bash", "Expected bash tool to be enabled when firewall is auto-enabled")
 
 		// Verify AWF is present
-		assert.Contains(t, lockStr, "gh-aw-firewall", "Expected AWF to be present when auto-enabled")
+		assert.Contains(t, lockStr, "sudo -E awf", "Expected AWF to be present when auto-enabled")
 	})
 }
 

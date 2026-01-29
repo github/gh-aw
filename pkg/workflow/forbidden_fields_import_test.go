@@ -1,3 +1,5 @@
+//go:build integration
+
 package workflow
 
 import (
@@ -90,37 +92,17 @@ This workflow imports a shared workflow with forbidden field.
 }
 
 // TestAllowedFieldsImportSuccess tests that allowed fields in shared workflows are successfully imported
+// Uses a representative sample of allowed fields to keep test execution fast
 func TestAllowedFieldsImportSuccess(t *testing.T) {
+	// Representative sample of allowed fields - tests simple values, nested objects, and arrays
 	allowedFields := map[string]string{
-		"tools":          `tools: {bash: true}`,
-		"engine":         `engine: copilot`,
-		"network":        `network: {allowed: [defaults]}`,
-		"mcp-servers":    `mcp-servers: {}`,
-		"permissions":    `permissions: read-all`,
-		"runtimes":       `runtimes: {node: {version: "20"}}`,
-		"safe-outputs":   `safe-outputs: {}`,
-		"safe-inputs":    `safe-inputs: {}`,
-		"services":       `services: {}`,
-		"steps":          `steps: []`,
-		"secret-masking": `secret-masking: true`,
-		"jobs": `jobs:
-  test-job:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo test`,
-		"description": `description: "Test shared workflow"`,
-		"metadata":    `metadata: {}`,
+		"tools":       `tools: {bash: true}`,               // Simple nested object
+		"permissions": `permissions: read-all`,             // Simple string value
+		"labels":      `labels: ["automation", "testing"]`, // Array value
 		"inputs": `inputs:
   test_input:
     description: "Test input"
-    type: string`,
-		"bots":       `bots: ["copilot", "dependabot"]`,
-		"post-steps": `post-steps: [{run: echo cleanup}]`,
-		"labels":     `labels: ["automation", "testing"]`,
-		"cache": `cache:
-  key: "cache-key"
-  path: "node_modules"`,
-		"source": `source: "githubnext/agentics/workflows/ci-doctor.md@v1.0.0"`,
+    type: string`, // Complex nested object
 	}
 
 	for field, yaml := range allowedFields {

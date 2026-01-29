@@ -1,3 +1,5 @@
+//go:build !integration
+
 package cli
 
 import (
@@ -234,10 +236,11 @@ func TestRunWorkflowOnGitHub_FlagCombinations(t *testing.T) {
 			push:         true,
 			repoOverride: "owner/repo",
 			expectError:  true,
-			// Accept either the expected validation error or GH_TOKEN error in CI
+			// Accept either the expected validation error, GH_TOKEN error in CI, or HTTP 404 for non-existent repo
 			errorContains: []string{
 				"--push flag is only supported for local workflows",
 				"GH_TOKEN environment variable",
+				"HTTP 404",
 			},
 		},
 	}

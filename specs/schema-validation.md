@@ -65,7 +65,7 @@ $ ./gh-aw compile workflow-with-typo.md
 
 ## Adding New Fields
 
-When adding new fields to any of the three schemas:
+When adding new fields to any of the two schemas:
 
 1. **Update the schema JSON file** with the new property definition
 2. **Rebuild the binary** with `make build` (schemas are embedded using `//go:embed`)
