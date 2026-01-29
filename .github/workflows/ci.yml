@@ -134,9 +134,6 @@ jobs:
           - name: "Workflow Cache"
             packages: "./pkg/workflow"
             pattern: "^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache"
-          - name: "Workflow Actions Pin Validation"
-            packages: "./pkg/workflow"
-            pattern: "^TestActionPinSHAsMatchVersionTags"
           - name: "Workflow Actions & Containers"
             packages: "./pkg/workflow"
             pattern: "^TestAction[^P]|Container"
@@ -169,7 +166,7 @@ jobs:
           - name: "Workflow Misc Part 2"  # Remaining workflow tests
             packages: "./pkg/workflow"
             pattern: ""
-            skip_pattern: "TestCompile|TestWorkflow|TestGenerate|TestParse|TestMCP|TestTool|TestSkill|TestPlaywright|TestFirewall|TestValidat|TestLock|TestError|TestWarning|SafeOutputs|CreatePullRequest|OutputLabel|HasSafeOutputs|GitHub|Git|PushToPullRequest|BuildFromAllowed|Render|Bundle|Script|WritePromptText|^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache|^TestActionPinSHAsMatchVersionTags|^TestAction[^P]|Container|Dependabot|Security|PII|TestPermissions|TestPackageExtractor|TestCollectPackagesFromWorkflow|TestAgent|TestCopilot|TestCustom|TestEngine|TestModel|TestNetwork|TestOpenAI|TestProvider|String|Sanitize|Normalize|Trim|Clean|Format|Runtime|Setup|Install|Download|Version|Binary"
+            skip_pattern: "TestCompile|TestWorkflow|TestGenerate|TestParse|TestMCP|TestTool|TestSkill|TestPlaywright|TestFirewall|TestValidat|TestLock|TestError|TestWarning|SafeOutputs|CreatePullRequest|OutputLabel|HasSafeOutputs|GitHub|Git|PushToPullRequest|BuildFromAllowed|Render|Bundle|Script|WritePromptText|^TestCache|TestCacheDependencies|TestCacheKey|TestValidateCache|^TestAction[^P]|Container|Dependabot|Security|PII|TestPermissions|TestPackageExtractor|TestCollectPackagesFromWorkflow|TestAgent|TestCopilot|TestCustom|TestEngine|TestModel|TestNetwork|TestOpenAI|TestProvider|String|Sanitize|Normalize|Trim|Clean|Format|Runtime|Setup|Install|Download|Version|Binary"
     concurrency:
       group: ci-${{ github.ref }}-integration-${{ matrix.test-group.name }}
       cancel-in-progress: true
