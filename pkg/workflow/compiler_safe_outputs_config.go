@@ -9,14 +9,6 @@ import (
 
 var compilerSafeOutputsConfigLog = logger.New("workflow:compiler_safe_outputs_config")
 
-// Auto-enabled handlers that should always be included even with empty configs
-// These handlers are enabled by default when safe-outputs is present
-var autoEnabledHandlers = map[string]bool{
-	"missing_tool": true,
-	"missing_data": true,
-	"noop":         true,
-}
-
 // handlerConfigBuilder provides a fluent API for building handler configurations
 type handlerConfigBuilder struct {
 	config map[string]any
