@@ -1,33 +1,30 @@
 ---
-name: Dependabot Burner Campaign
+name: Dependabot Burner
 description: Burns down Dependabot security alert work items
 on:
-  #schedule:
-  #  - cron: "0 * * * *"
+  #schedule: daily
+  #skip-if-not-match: prnwith dependabot label
   workflow_dispatch:
+
 permissions:
   issues: read
   pull-requests: read
   contents: read
   security-events: read
-safe-outputs:
-  update-project:
-    max: 100
-  create-project-status-update:
-    max: 1
-  create-issue:
-    max: 1
-    title-prefix: "[dependabot-burner]"
-    assignees: copilot
+
+imports:
+  - shared/campaign.md
 ---
 
-# Dependabot Burner Campaign
+# Dependabot Burner
+
+{{#runtime-import aw/campaign.md}}
 
 **Project URL (use for all project safe-output calls):**
 - `https://github.com/orgs/githubnext/projects/144`
 
 **Campaign ID (use for all project safe-output calls):**
-- `dependabot-burndown`
+- `dependabot-burner`
 
 This workflow discovers security alert work items in the githubnext/gh-aw repository and updates the project board with their status:
 
