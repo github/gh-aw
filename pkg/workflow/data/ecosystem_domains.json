@@ -86,7 +86,12 @@
     "repo.grails.org",
     "download.eclipse.org",
     "download.oracle.com",
-    "jcenter.bintray.com"
+    "jcenter.bintray.com",
+    "dlcdn.apache.org",
+    "archive.apache.org",
+    "download.java.net",
+    "api.foojay.io",
+    "cdn.azul.com"
   ],
   "linux-distros": [
     "deb.debian.org",
@@ -125,6 +130,8 @@
     "get.pnpm.io",
     "bun.sh",
     "deno.land",
+    "jsr.io",
+    "*.jsr.io",
     "registry.bower.io"
   ],
   "perl": ["cpan.org", "www.cpan.org", "metacpan.org", "cpan.metacpan.org"],
