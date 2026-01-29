@@ -140,6 +140,17 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
+	// Add parallel installation step if applicable
+	// This parallelizes AWF binary, CLI, and Docker image downloads
+	if ShouldUseParallelInstallation(data, engine) {
+		compilerYamlLog.Print("Generating parallel installation step")
+		parallelConfig := GetParallelInstallConfig(data, engine)
+		parallelStep := generateParallelInstallationStep(parallelConfig)
+		for _, line := range parallelStep {
+			yaml.WriteString(line + "\n")
+		}
+	}
+
 	// GH_AW_SAFE_OUTPUTS is now set at job level, no setup step needed
 
 	// Add GitHub MCP lockdown detection step if needed
@@ -148,8 +159,9 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	// Add GitHub MCP app token minting step if configured
 	c.generateGitHubMCPAppTokenMintingStep(yaml, data)
 
-	// Add MCP setup
-	c.generateMCPSetup(yaml, data.Tools, engine, data)
+	// Add MCP setup (skip Docker downloads if parallel installation is used)
+	skipDockerDownload := ShouldUseParallelInstallation(data, engine)
+	c.generateMCPSetup(yaml, data.Tools, engine, data, skipDockerDownload)
 
 	// Stop-time safety checks are now handled by a dedicated job (stop_time_check)
 	// No longer generated in the main job steps

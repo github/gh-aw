@@ -147,10 +147,14 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.11.2
-      - name: Install Claude Code CLI
-        run: npm install -g --silent @anthropic-ai/claude-code@2.1.22
+      - name: Install dependencies in parallel
+        run: |
+          # Install dependencies in parallel to reduce setup time
+          # This parallelizes AWF binary, CLI, and Docker image downloads
+          bash /opt/gh-aw/actions/install_parallel_setup.sh \
+            --awf v0.11.2 \
+            --claude 2.1.22 \
+            --docker ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:
@@ -161,8 +165,6 @@ jobs:
           script: |
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
-      - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/githubnext/gh-aw-mcpg:v0.0.84 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs

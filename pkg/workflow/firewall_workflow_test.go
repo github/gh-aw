@@ -38,15 +38,32 @@ func TestFirewallWorkflowNetworkConfiguration(t *testing.T) {
 		engine := NewClaudeEngine()
 		steps := engine.GetInstallationSteps(workflowData)
 
-		// With AWF enabled: secret validation, Node.js setup, AWF install, Claude install
-		if len(steps) != 4 {
-			t.Errorf("Expected 4 installation steps with firewall enabled (secret validation + Node.js setup + AWF install + Claude install), got %d", len(steps))
+		// With AWF enabled (using parallel installation): secret validation, Node.js setup
+		// AWF and Claude CLI installation are deferred to parallel installation step
+		if len(steps) != 2 {
+			t.Errorf("Expected 2 installation steps with firewall enabled (secret validation + Node.js setup), got %d", len(steps))
 		}
 
-		// Check AWF installation step (3rd step, index 2)
-		awfStepStr := strings.Join(steps[2], "\n")
-		if !strings.Contains(awfStepStr, "Install awf binary") {
-			t.Error("Third step should install AWF binary")
+		// Verify that AWF installation is skipped (will be handled by parallel installation)
+		for _, step := range steps {
+			stepStr := strings.Join(step, "\n")
+			if strings.Contains(stepStr, "Install awf binary") {
+				t.Error("AWF installation should be deferred to parallel installation step")
+			}
+		}
+
+		// Verify that parallel installation should be used
+		if !ShouldUseParallelInstallation(workflowData, engine) {
+			t.Error("Parallel installation should be enabled with firewall and Claude engine")
+		}
+
+		// Verify parallel installation config includes AWF
+		config := GetParallelInstallConfig(workflowData, engine)
+		if config.AWFVersion == "" {
+			t.Error("Parallel installation should include AWF version")
+		}
+		if config.ClaudeVersion == "" {
+			t.Error("Parallel installation should include Claude version")
 		}
 	})
 

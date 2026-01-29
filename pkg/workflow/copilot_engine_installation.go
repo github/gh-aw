@@ -121,25 +121,21 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 		} else {
 			copilotInstallLog.Print("Skipping SRT installation (custom command specified)")
 		}
+
+		// Add Copilot CLI installation step after SRT installation (sequential for SRT)
+		if len(npmSteps) > 1 {
+			steps = append(steps, npmSteps[1:]...) // Install Copilot CLI and subsequent steps
+		}
 	} else if isFirewallEnabled(workflowData) {
-		// Install AWF after Node.js setup but before Copilot CLI installation
-		firewallConfig := getFirewallConfig(workflowData)
-		agentConfig := getAgentConfig(workflowData)
-		var awfVersion string
-		if firewallConfig != nil {
-			awfVersion = firewallConfig.Version
+		// Use parallel installation for AWF + Copilot CLI
+		// This is handled by generateParallelInstallationStep in compiler_yaml_main_job.go
+		// Skip individual AWF and Copilot steps here - they'll be combined
+		copilotInstallLog.Print("Skipping individual AWF and Copilot installation steps (will use parallel installation)")
+	} else {
+		// No firewall, just install Copilot CLI sequentially
+		if len(npmSteps) > 1 {
+			steps = append(steps, npmSteps[1:]...) // Install Copilot CLI and subsequent steps
 		}
-
-		// Install AWF binary (or skip if custom command is specified)
-		awfInstall := generateAWFInstallationStep(awfVersion, agentConfig)
-		if len(awfInstall) > 0 {
-			steps = append(steps, awfInstall)
-		}
-	}
-
-	// Add Copilot CLI installation step after sandbox installation
-	if len(npmSteps) > 1 {
-		steps = append(steps, npmSteps[1:]...) // Install Copilot CLI and subsequent steps
 	}
 
 	return steps

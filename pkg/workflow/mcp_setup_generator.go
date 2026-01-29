@@ -13,7 +13,9 @@ import (
 var mcpSetupGeneratorLog = logger.New("workflow:mcp_setup_generator")
 
 // generateMCPSetup generates the MCP server configuration setup
-func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any, engine CodingAgentEngine, workflowData *WorkflowData) {
+// If skipDockerDownload is true, Docker image download step is skipped
+// (used when parallel installation is enabled)
+func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any, engine CodingAgentEngine, workflowData *WorkflowData, skipDockerDownload bool) {
 	mcpSetupGeneratorLog.Print("Generating MCP server configuration setup")
 	// Collect tools that need MCP server configuration
 	var mcpTools []string
@@ -68,8 +70,13 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 	ensureDefaultMCPGatewayConfig(workflowData)
 
 	// Collect all Docker images that will be used and generate download step
-	dockerImages := collectDockerImages(tools, workflowData)
-	generateDownloadDockerImagesStep(yaml, dockerImages)
+	// Skip if parallel installation is handling downloads
+	if !skipDockerDownload {
+		dockerImages := collectDockerImages(tools, workflowData)
+		generateDownloadDockerImagesStep(yaml, dockerImages)
+	} else {
+		mcpSetupGeneratorLog.Print("Skipping Docker download step (handled by parallel installation)")
+	}
 
 	// If no MCP tools, no configuration needed
 	if len(mcpTools) == 0 {

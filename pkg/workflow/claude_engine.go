@@ -106,24 +106,15 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 
 	// Add AWF installation if firewall is enabled
 	if isFirewallEnabled(workflowData) {
-		// Install AWF after Node.js setup but before Claude CLI installation
-		firewallConfig := getFirewallConfig(workflowData)
-		agentConfig := getAgentConfig(workflowData)
-		var awfVersion string
-		if firewallConfig != nil {
-			awfVersion = firewallConfig.Version
+		// Use parallel installation for AWF + Claude CLI
+		// This is handled by generateParallelInstallationStep in compiler_yaml_main_job.go
+		// Skip individual AWF and Claude steps here - they'll be combined
+		claudeLog.Print("Skipping individual AWF and Claude installation steps (will use parallel installation)")
+	} else {
+		// No firewall, just install Claude CLI sequentially
+		if len(npmSteps) > 1 {
+			steps = append(steps, npmSteps[1:]...) // Install Claude CLI and subsequent steps
 		}
-
-		// Install AWF binary (or skip if custom command is specified)
-		awfInstall := generateAWFInstallationStep(awfVersion, agentConfig)
-		if len(awfInstall) > 0 {
-			steps = append(steps, awfInstall)
-		}
-	}
-
-	// Add Claude CLI installation step after sandbox installation
-	if len(npmSteps) > 1 {
-		steps = append(steps, npmSteps[1:]...) // Install Claude CLI and subsequent steps
 	}
 
 	return steps
