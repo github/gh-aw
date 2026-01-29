@@ -871,6 +871,14 @@ async function main() {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);
     }
 
+    // Export temporary ID map as output for downstream steps (e.g., assign_to_agent)
+    const temporaryIdMapJson = JSON.stringify(processingResult.temporaryIdMap);
+    core.setOutput("temporary_id_map", temporaryIdMapJson);
+    core.info(`Exported temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
+
+    // Export processed count for consistency with project handler
+    core.setOutput("processed_count", successCount);
+
     core.info("Safe Output Handler Manager completed");
   } catch (error) {
     core.setFailed(`Handler manager failed: ${getErrorMessage(error)}`);
