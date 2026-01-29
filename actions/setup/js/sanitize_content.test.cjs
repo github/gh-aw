@@ -364,7 +364,7 @@ describe("sanitize_content.cjs", () => {
 
     it("should redact HTTP URLs with sanitized domain", () => {
       const result = sanitizeContent("Visit http://example.com");
-      expect(result).toContain("<example.com>/redacted");
+      expect(result).toContain("(example.com/redacted)");
       expect(mockCore.info).toHaveBeenCalled();
     });
 
@@ -401,7 +401,7 @@ describe("sanitize_content.cjs", () => {
 
     it("should redact disallowed domains with sanitized domain", () => {
       const result = sanitizeContent("Visit https://evil.com/malicious");
-      expect(result).toContain("<evil.com>/redacted");
+      expect(result).toContain("(evil.com/redacted)");
       expect(mockCore.info).toHaveBeenCalled();
     });
 
@@ -443,7 +443,7 @@ describe("sanitize_content.cjs", () => {
     it("should redact domains not matching wildcard pattern", () => {
       process.env.GH_AW_ALLOWED_DOMAINS = "*.example.com";
       const result = sanitizeContent("Visit https://evil.com/malicious");
-      expect(result).toContain("<evil.com>/redacted");
+      expect(result).toContain("(evil.com/redacted)");
     });
 
     it("should support mixed wildcard and plain domains", () => {
@@ -455,7 +455,7 @@ describe("sanitize_content.cjs", () => {
     it("should redact domains with wildcards that don't match pattern", () => {
       process.env.GH_AW_ALLOWED_DOMAINS = "*.github.com";
       const result = sanitizeContent("Visit https://github.io/page");
-      expect(result).toContain("<github.io>/redacted");
+      expect(result).toContain("(github.io/redacted)");
     });
 
     it("should handle multiple levels of subdomains with wildcard", () => {
@@ -541,30 +541,30 @@ describe("sanitize_content.cjs", () => {
 
     it("should apply sanitization in actual URL redaction for HTTP", () => {
       const result = sanitizeContent("Visit http://sub.example.malicious.com/path");
-      expect(result).toContain("<sub.example.malicious...>/redacted");
+      expect(result).toContain("(sub.example.malicious.../redacted)");
     });
 
     it("should apply sanitization in actual URL redaction for HTTPS", () => {
       const result = sanitizeContent("Visit https://very.deep.nested.subdomain.evil.com/path");
-      expect(result).toContain("<very.deep.nested...>/redacted");
+      expect(result).toContain("(very.deep.nested.../redacted)");
     });
 
     it("should handle domains with special characters in URL context", () => {
       // The regex captures domain up to first special character like @
       // So http://ex@mple-domain.co_uk.net captures only "ex" as domain
       const result = sanitizeContent("Visit http://ex@mple-domain.co_uk.net/path");
-      expect(result).toContain("<ex>/redacted");
+      expect(result).toContain("(ex/redacted)");
     });
 
     it("should preserve simple domain structure", () => {
       const result = sanitizeContent("Visit http://test.com/path");
-      expect(result).toContain("<test.com>/redacted");
+      expect(result).toContain("(test.com/redacted)");
     });
 
     it("should handle subdomain with 3 parts correctly", () => {
       // api.v2.example.com has 4 parts, so it will be truncated
       const result = sanitizeContent("Visit http://api.v2.example.com/endpoint");
-      expect(result).toContain("<api.v2.example...>/redacted");
+      expect(result).toContain("(api.v2.example.../redacted)");
     });
 
     it("should handle 5+ part domains", () => {

@@ -189,7 +189,7 @@ function sanitizeUrlProtocols(s) {
       }
       addRedactedDomain(domainLower);
       // Return sanitized domain format
-      return sanitized ? `<${sanitized}>/redacted` : "(redacted)";
+      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
     } else {
       // For other protocols (data:, javascript:, etc.), track the protocol itself
       const protocolMatch = match.match(/^([^:]+):/);
@@ -264,7 +264,7 @@ function sanitizeUrlDomains(s, allowed) {
       }
       addRedactedDomain(hostname);
       // Return sanitized domain format
-      return sanitized ? `<${sanitized}>/redacted` : "(redacted)";
+      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
     }
   });
 }
