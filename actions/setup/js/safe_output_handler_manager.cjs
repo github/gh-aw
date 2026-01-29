@@ -15,6 +15,7 @@ const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, normalizeTempor
 const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
+const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 
 const DEFAULT_AGENTIC_CAMPAIGN_LABEL = "agentic-campaign";
 
@@ -884,6 +885,16 @@ async function main() {
 
     // Export processed count for consistency with project handler
     core.setOutput("processed_count", successCount);
+    
+    // Export issues that need copilot assignment (if any)
+    const issuesToAssignCopilot = getIssuesToAssignCopilot();
+    if (issuesToAssignCopilot.length > 0) {
+      const issuesToAssignStr = issuesToAssignCopilot.join(",");
+      core.setOutput("issues_to_assign_copilot", issuesToAssignStr);
+      core.info(`Exported ${issuesToAssignCopilot.length} issue(s) for copilot assignment: ${issuesToAssignStr}`);
+    } else {
+      core.setOutput("issues_to_assign_copilot", "");
+    }
 
     core.info("Safe Output Handler Manager completed");
   } catch (error) {
