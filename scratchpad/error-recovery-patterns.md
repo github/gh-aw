@@ -5,10 +5,11 @@ This document provides comprehensive guidance for error handling, common error s
 ## Table of Contents
 
 1. [Error Handling Patterns](#error-handling-patterns)
-2. [Common Error Scenarios](#common-error-scenarios)
-3. [Error Message Templates](#error-message-templates)
-4. [Debugging Runbook](#debugging-runbook)
-5. [Error Categorization](#error-categorization)
+2. [Retry and Recovery Patterns](#retry-and-recovery-patterns)
+3. [Common Error Scenarios](#common-error-scenarios)
+4. [Error Message Templates](#error-message-templates)
+5. [Debugging Runbook](#debugging-runbook)
+6. [Error Categorization](#error-categorization)
 
 ---
 
@@ -225,6 +226,515 @@ func mustCreateTempFile(t *testing.T, content string) string {
 - `pkg/workflow/action_pins.go:51` - Failed to load embedded action pins
 - `pkg/workflow/permissions_validator.go:47` - Failed to parse embedded permissions JSON
 - `pkg/testutil/tempdir.go:30` - Test directory creation failed
+
+---
+
+## Retry and Recovery Patterns
+
+This section covers proactive error recovery strategies to reduce retry loops and improve workflow reliability. These patterns help prevent the ~23% of agent sessions that exhibit retry loop behavior.
+
+### Circuit Breaker Pattern
+
+Circuit breakers prevent infinite retry loops by limiting the number of retry attempts. The standard pattern in gh-aw is **max 3 attempts** with exponential backoff.
+
+**JavaScript Implementation (actions/setup/js/error_recovery.cjs):**
+
+```javascript
+const { withRetry, DEFAULT_RETRY_CONFIG } = require('./error_recovery.cjs');
+
+// Use default configuration (max 3 retries, exponential backoff)
+const result = await withRetry(
+  async () => {
+    // Operation that may fail transiently
+    return await github.rest.issues.get({ owner, repo, issue_number });
+  },
+  {}, // Use defaults
+  'get issue' // Operation name for logging
+);
+```
+
+**Configuration options:**
+```javascript
+const customConfig = {
+  maxRetries: 3,              // Maximum retry attempts (default: 3)
+  initialDelayMs: 1000,       // Initial delay in ms (default: 1000)
+  maxDelayMs: 10000,          // Maximum delay cap (default: 10000)
+  backoffMultiplier: 2,       // Exponential backoff multiplier (default: 2)
+  shouldRetry: (error) => {   // Custom retry decision function
+    return isTransientError(error);
+  }
+};
+
+await withRetry(operation, customConfig, 'operation-name');
+```
+
+**Transient error detection:**
+```javascript
+// Automatically retries these error patterns:
+// - Network errors: "network", "timeout", "ECONNRESET", "ETIMEDOUT"
+// - HTTP errors: "502 Bad Gateway", "503 Service Unavailable", "504 Gateway Timeout"
+// - GitHub API: "rate limit", "secondary rate limit", "abuse detection"
+// - Temporary: "temporarily unavailable"
+```
+
+**Shell Script Implementation (actions/setup/sh/*.sh):**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Configuration
+MAX_ATTEMPTS=3
+RETRY_DELAY=2  # Initial delay in seconds
+
+# Retry loop with exponential backoff
+download_with_retry() {
+  local url="$1"
+  local output="$2"
+  local attempt=1
+  local delay=$RETRY_DELAY
+  
+  while [ $attempt -le $MAX_ATTEMPTS ]; do
+    echo "Attempt $attempt of $MAX_ATTEMPTS: Downloading..."
+    
+    if curl -fsSL "$url" -o "$output" 2>&1; then
+      echo "✓ Successfully downloaded"
+      return 0
+    fi
+    
+    if [ $attempt -lt $MAX_ATTEMPTS ]; then
+      echo "Failed. Retrying in ${delay}s..."
+      sleep $delay
+      delay=$((delay * 2))  # Exponential backoff
+    else
+      echo "ERROR: Failed after $MAX_ATTEMPTS attempts"
+      return 1
+    fi
+    attempt=$((attempt + 1))
+  done
+}
+
+# Usage
+if ! download_with_retry "$INSTALLER_URL" "$TEMP_FILE"; then
+  exit 1
+fi
+```
+
+**Go Implementation (pkg/cli/run_workflow_tracking.go):**
+
+```go
+const maxRetries = 6
+const initialDelay = 2 * time.Second
+
+for attempt := 0; attempt < maxRetries; attempt++ {
+    result, err := performOperation()
+    if err == nil {
+        return result, nil
+    }
+    
+    // Check if error is retryable
+    if !isTransientError(err) {
+        return nil, err  // Fail fast on non-transient errors
+    }
+    
+    // Last attempt - don't retry
+    if attempt == maxRetries-1 {
+        return nil, fmt.Errorf("operation failed after %d attempts: %w", maxRetries, err)
+    }
+    
+    // Exponential backoff
+    delay := initialDelay * time.Duration(1<<uint(attempt))
+    if delay > maxDelay {
+        delay = maxDelay
+    }
+    
+    log.Printf("Attempt %d/%d failed: %v. Retrying in %v...", attempt+1, maxRetries, err, delay)
+    time.Sleep(delay)
+}
+```
+
+### Installation Failure Recovery
+
+Installation failures are a common source of retry loops. Implement proactive recovery strategies:
+
+#### NPM Installation Recovery
+
+**Problem:** npm install fails due to corrupted cache or registry issues.
+
+**Solution:** Clear cache and retry with alternative registries.
+
+```bash
+#!/usr/bin/env bash
+# Install npm packages with recovery strategies
+
+install_npm_with_recovery() {
+  local package="$1"
+  local max_attempts=3
+  
+  # Strategy 1: Normal install
+  echo "Attempting normal npm install..."
+  if npm install "$package"; then
+    return 0
+  fi
+  
+  # Strategy 2: Clear cache and retry
+  echo "Strategy 2: Clearing npm cache and retrying..."
+  npm cache clean --force 2>/dev/null || true
+  if npm install "$package"; then
+    return 0
+  fi
+  
+  # Strategy 3: Use different registry
+  echo "Strategy 3: Trying alternative npm registry..."
+  if npm install "$package" --registry=https://registry.npmmirror.com; then
+    return 0
+  fi
+  
+  echo "ERROR: All npm install strategies failed"
+  return 1
+}
+```
+
+#### Python Dependency Recovery
+
+**Problem:** pip install fails due to PyPI connectivity or package conflicts.
+
+**Solution:** Use fallback mirrors and conflict resolution.
+
+```bash
+#!/usr/bin/env bash
+# Install Python packages with recovery strategies
+
+install_pip_with_recovery() {
+  local package="$1"
+  
+  # Strategy 1: Normal install
+  if pip install "$package"; then
+    return 0
+  fi
+  
+  # Strategy 2: Use --no-cache-dir
+  echo "Strategy 2: Installing without cache..."
+  if pip install --no-cache-dir "$package"; then
+    return 0
+  fi
+  
+  # Strategy 3: Use alternative index
+  echo "Strategy 3: Using alternative PyPI mirror..."
+  if pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple "$package"; then
+    return 0
+  fi
+  
+  # Strategy 4: Ignore conflicts and force install
+  echo "Strategy 4: Force installing (ignoring dependencies)..."
+  if pip install --no-deps "$package"; then
+    return 0
+  fi
+  
+  echo "ERROR: All pip install strategies failed"
+  return 1
+}
+```
+
+#### Docker Image Pull Recovery
+
+**Problem:** Docker image pull fails due to network issues or rate limiting.
+
+**Solution:** Retry with exponential backoff and alternative registries.
+
+```go
+// pkg/cli/docker_images.go
+func pullImageWithRetry(ctx context.Context, image string) error {
+    const maxRetries = 3
+    const initialDelay = 5 * time.Second
+    
+    var lastErr error
+    delay := initialDelay
+    
+    for attempt := 0; attempt < maxRetries; attempt++ {
+        if attempt > 0 {
+            log.Printf("Retry attempt %d/%d after %v delay", attempt+1, maxRetries, delay)
+            time.Sleep(delay)
+            delay *= 2  // Exponential backoff
+        }
+        
+        // Try pulling the image
+        if err := pullImage(ctx, image); err == nil {
+            return nil  // Success
+        } else {
+            lastErr = err
+            
+            // Check if error is retryable
+            if !isDockerTransientError(err) {
+                return fmt.Errorf("non-retryable error pulling image %s: %w", image, err)
+            }
+            
+            log.Printf("Docker pull attempt %d failed: %v", attempt+1, err)
+        }
+    }
+    
+    return fmt.Errorf("failed to pull image %s after %d attempts: %w", image, maxRetries, lastErr)
+}
+
+func isDockerTransientError(err error) bool {
+    errStr := strings.ToLower(err.Error())
+    transientPatterns := []string{
+        "connection refused",
+        "timeout",
+        "temporary failure",
+        "network",
+        "toomanyrequests",  // Docker Hub rate limiting
+        "service unavailable",
+    }
+    
+    for _, pattern := range transientPatterns {
+        if strings.Contains(errStr, pattern) {
+            return true
+        }
+    }
+    return false
+}
+```
+
+### API Timeout and Rate Limit Handling
+
+#### GitHub API Rate Limiting
+
+**Problem:** GitHub API requests fail due to rate limiting or secondary rate limits.
+
+**Solution:** Detect rate limit errors and wait with exponential backoff.
+
+```javascript
+// actions/setup/js/safe_output_handler_manager.cjs
+const { withRetry, isTransientError } = require('./error_recovery.cjs');
+
+async function createIssueWithRetry(github, owner, repo, title, body) {
+  // Custom retry configuration for GitHub API
+  const githubRetryConfig = {
+    maxRetries: 3,
+    initialDelayMs: 2000,  // Wait 2s initially for rate limits
+    maxDelayMs: 30000,     // Cap at 30s
+    shouldRetry: (error) => {
+      // Retry on transient errors and rate limits
+      if (isTransientError(error)) return true;
+      
+      // Check for specific rate limit status codes
+      if (error.status === 429) return true;  // Too Many Requests
+      if (error.status === 403 && error.message.includes('rate limit')) return true;
+      
+      return false;
+    }
+  };
+  
+  return await withRetry(
+    async () => {
+      return await github.rest.issues.create({
+        owner,
+        repo,
+        title,
+        body
+      });
+    },
+    githubRetryConfig,
+    'create issue'
+  );
+}
+```
+
+#### Copilot CLI Installation Retry
+
+**Problem:** Copilot CLI installation fails due to network issues or server unavailability.
+
+**Solution implemented in `actions/setup/sh/install_copilot_cli.sh`:**
+
+```bash
+#!/usr/bin/env bash
+# Install GitHub Copilot CLI with retry logic
+
+MAX_ATTEMPTS=3
+
+download_installer_with_retry() {
+  local attempt=1
+  local wait_time=5
+  
+  while [ $attempt -le $MAX_ATTEMPTS ]; do
+    echo "Attempt $attempt of $MAX_ATTEMPTS: Downloading Copilot CLI installer..."
+    
+    if curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TEMP" 2>&1; then
+      echo "Successfully downloaded installer"
+      return 0
+    fi
+    
+    if [ $attempt -lt $MAX_ATTEMPTS ]; then
+      echo "Failed to download installer. Retrying in ${wait_time}s..."
+      sleep $wait_time
+      wait_time=$((wait_time * 2))  # Exponential backoff: 5s -> 10s -> 20s
+    else
+      echo "ERROR: Failed to download installer after $MAX_ATTEMPTS attempts"
+      return 1
+    fi
+    attempt=$((attempt + 1))
+  done
+}
+```
+
+### Debug Logging for Recovery Attempts
+
+**ALWAYS** log recovery attempts for debugging and metrics:
+
+```go
+import "github.com/githubnext/gh-aw/pkg/logger"
+
+var retryLog = logger.New("cli:retry")
+
+func operationWithRetry() error {
+    const maxRetries = 3
+    
+    for attempt := 0; attempt < maxRetries; attempt++ {
+        retryLog.Printf("Attempt %d/%d starting", attempt+1, maxRetries)
+        
+        result, err := performOperation()
+        if err == nil {
+            if attempt > 0 {
+                retryLog.Printf("✓ Operation succeeded on retry attempt %d", attempt+1)
+            }
+            return nil
+        }
+        
+        retryLog.Printf("Attempt %d/%d failed: %v", attempt+1, maxRetries, err)
+        
+        if !isTransientError(err) {
+            retryLog.Printf("Non-transient error detected, aborting retries")
+            return err
+        }
+        
+        if attempt < maxRetries-1 {
+            delay := calculateBackoff(attempt)
+            retryLog.Printf("Waiting %v before next attempt", delay)
+            time.Sleep(delay)
+        }
+    }
+    
+    retryLog.Printf("All %d retry attempts exhausted", maxRetries)
+    return fmt.Errorf("operation failed after %d attempts", maxRetries)
+}
+```
+
+**Enable retry logging:**
+```bash
+DEBUG=cli:retry gh aw run workflow.md
+```
+
+### Recovery Strategy Selection
+
+Use this decision tree to select the appropriate recovery strategy:
+
+```mermaid
+graph TD
+    A[Operation Failed] --> B{Error Type?}
+    B -->|Network/Timeout| C[Retry with backoff]
+    B -->|Rate Limit| D[Wait + Retry]
+    B -->|Installation| E[Cache Clear + Retry]
+    B -->|Dependency| F[Alt Registry + Retry]
+    B -->|Validation| G[Fail Fast]
+    
+    C --> H{Max Retries?}
+    D --> H
+    E --> H
+    F --> H
+    
+    H -->|No| I[Exponential Backoff]
+    H -->|Yes| J[Report Failure]
+    
+    I --> A
+    G --> J
+```
+
+### Best Practices for Retry Patterns
+
+1. **Use circuit breakers**: Always limit to max 3 retries (max 6 for critical operations)
+2. **Exponential backoff**: Double delay between retries (1s → 2s → 4s)
+3. **Cap maximum delay**: Don't wait more than 30 seconds between retries
+4. **Fail fast on validation errors**: Don't retry user input errors
+5. **Log all retry attempts**: Use debug logging to track recovery behavior
+6. **Detect transient errors**: Only retry network, timeout, and rate limit errors
+7. **Provide clear error messages**: Tell users what failed and why after exhausting retries
+8. **Test recovery paths**: Write tests that simulate transient failures
+
+### Anti-Patterns to Avoid
+
+❌ **Infinite retry loops:**
+```go
+// BAD: No maximum retry limit
+for {
+    if err := operation(); err != nil {
+        time.Sleep(1 * time.Second)
+        continue  // Loops forever!
+    }
+    break
+}
+```
+
+❌ **Retrying non-transient errors:**
+```go
+// BAD: Retrying validation errors
+if err := validateInput(data); err != nil {
+    // Validation errors won't fix themselves by retrying!
+    time.Sleep(1 * time.Second)
+    return operationWithRetry()  // Wastes time
+}
+```
+
+❌ **No backoff delay:**
+```go
+// BAD: Hammering the server without delay
+for attempt := 0; attempt < 10; attempt++ {
+    if err := apiCall(); err != nil {
+        continue  // Immediately retries, causing rate limits
+    }
+}
+```
+
+❌ **Silent retries:**
+```go
+// BAD: No logging, makes debugging impossible
+for attempt := 0; attempt < 3; attempt++ {
+    if err := operation(); err == nil {
+        return nil
+    }
+    // No indication that retries are happening
+    time.Sleep(1 * time.Second)
+}
+```
+
+### Metrics and Monitoring
+
+Track retry patterns to identify issues:
+
+```go
+// Track retry metrics
+type RetryMetrics struct {
+    TotalAttempts  int
+    SuccessOnRetry int
+    FailedRetries  int
+    OperationName  string
+}
+
+func (m *RetryMetrics) RecordAttempt(attempt int, err error) {
+    m.TotalAttempts++
+    if err == nil && attempt > 0 {
+        m.SuccessOnRetry++
+    } else if err != nil && attempt == maxRetries {
+        m.FailedRetries++
+    }
+}
+```
+
+**Key metrics to track:**
+- Retry loop rate: % of sessions with retries
+- Success on retry rate: % of retries that eventually succeed
+- Average attempts per operation: Mean retry attempts
+- Most retried operations: Which operations retry most frequently
 
 ---
 
