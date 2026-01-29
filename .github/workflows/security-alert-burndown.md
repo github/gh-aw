@@ -84,13 +84,18 @@ For each discovered item (up to 100 total per run):
 
 ### Step 4: Create parent issue and assign work
 
-After updating project items, you must complete **all three actions below in order**:
+After updating project items, you must **immediately perform all three safe-output calls below in sequence**. Do not proceed to Step 5 until all three calls are complete.
 
-1. **Create the parent tracking issue** 
-2. **Add the issue to the project board**
-3. **Assign the issue to the Copilot agent**
+#### Required Safe-Output Calls (All Three Required):
 
-**Selection Criteria:**
+1. **Call `create_issue`** to create the parent tracking issue
+2. **Call `update_project`** to add the created issue to the project board  
+3. **Call `assign_to_agent`** to assign the created issue to Copilot
+
+#### Bundling Analysis (Do This First)
+
+Before creating the issue, analyze the discovered PRs:
+
 1. Review all discovered PRs
 2. Group by **runtime** (Node.js, Python, etc.) and **target dependency file**
 3. Select up to **3 bundles** total following the bundling rules below
@@ -110,30 +115,28 @@ After updating project items, you must complete **all three actions below in ord
 - Enforce **one runtime + one target file per PR**.
 - All PRs must pass **CI and relevant runtime tests** before merge.
 
-**Action 1: Create the parent issue**
+#### Safe-Output Call #1: Create the Issue
 
-Create a single issue that contains:
-- The bundling rules (copied below)
-- The proposed bundles (grouped by runtime + target manifest)
-- A checklist of the PRs to bundle, one checkbox per PR
-
-Use the `create_issue` tool:
+Create a single issue using the `create_issue` tool:
 
 ```
-create_issue(title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)", body="<paste body from template below>")
+create_issue(
+  title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)",
+  body="<use template below>"
+)
 ```
 
-After calling `create_issue`, **store the returned temporary ID** (e.g., `aw_sec2026012901`) - you will need it for actions 2 and 3. The temporary ID will be automatically resolved to the actual issue number.
+**IMPORTANT**: After calling `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use this temporary ID in the next two calls.
 
-**Action 2: Add the issue to the project board**
+#### Safe-Output Call #2: Add Issue to Project Board
 
-Immediately after creating the issue, add it to the project board using `update_project`. Use the temporary ID from action 1:
+**Immediately** call `update_project` using the temporary ID from call #1:
 
 ```
 update_project(
   project="https://github.com/orgs/githubnext/projects/144",
   content_type="issue",
-  content_number=<temporary_id_from_create_issue>,
+  content_number="<temporary_id_from_call_1>",
   fields={
     "campaign_id": "security-alert-burndown",
     "status": "Todo",
@@ -146,20 +149,22 @@ update_project(
 )
 ```
 
-**Action 3: Assign the issue to the agent**
+#### Safe-Output Call #3: Assign to Agent
 
-Finally, assign the issue to the Copilot agent using `assign_to_agent`. Use the temporary ID from action 1:
+**Immediately** call `assign_to_agent` using the temporary ID from call #1:
 
 ```
-assign_to_agent(issue_number=<temporary_id_from_create_issue>, name="copilot")
+assign_to_agent(
+  issue_number="<temporary_id_from_call_1>",
+  name="copilot"
+)
 ```
 
-Example: If `create_issue` returned `aw_sec2026012901`, then call:
-```
-assign_to_agent(issue_number="aw_sec2026012901", name="copilot")
-```
+**Example**: If `create_issue` returned `aw_sec2026012901`, then:
+- Call #2: `update_project(..., content_number="aw_sec2026012901", ...)`
+- Call #3: `assign_to_agent(issue_number="aw_sec2026012901", name="copilot")`
 
-**CRITICAL**: You must call all three tools (create_issue, update_project, assign_to_agent) in sequence to complete this step. Do not skip any of them. The temporary ID will be automatically resolved to the real issue number during execution.
+The temporary ID will be automatically resolved to the real issue number during safe-output processing.
 
 
 **Issue Body Template:**
