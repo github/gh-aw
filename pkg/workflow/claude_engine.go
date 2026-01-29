@@ -23,7 +23,7 @@ func NewClaudeEngine() *ClaudeEngine {
 			id:                     "claude",
 			displayName:            "Claude Code",
 			description:            "Uses Claude Code with full MCP tool support and allow-listing",
-			experimental:           true,
+			experimental:           false,
 			supportsToolsAllowlist: true,
 			supportsHTTPTransport:  true, // Claude supports both stdio and HTTP transport
 			supportsMaxTurns:       true, // Claude supports max-turns feature
