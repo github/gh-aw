@@ -47,7 +47,7 @@ imports:
 ---
 
 # Body`;
-      
+
       const result = extractFrontmatterAndBody(content);
       expect(result.frontmatterText).toContain("imports:");
       expect(result.frontmatterText).toContain("- shared/test.md");
@@ -61,7 +61,7 @@ imports:
   - shared/test.md
   - shared/common.md
 description: Test`;
-      
+
       const result = extractImportsFromText(frontmatterText);
       expect(result).toEqual(["shared/test.md", "shared/common.md"]);
     });
@@ -69,7 +69,7 @@ description: Test`;
     it("should handle no imports", () => {
       const frontmatterText = `engine: copilot
 description: Test`;
-      
+
       const result = extractImportsFromText(frontmatterText);
       expect(result).toEqual([]);
     });
@@ -78,7 +78,7 @@ description: Test`;
       const frontmatterText = `imports:
   - "shared/test.md"
   - 'shared/common.md'`;
-      
+
       const result = extractImportsFromText(frontmatterText);
       expect(result).toEqual(["shared/test.md", "shared/common.md"]);
     });
@@ -87,7 +87,7 @@ description: Test`;
       const frontmatterText = `imports:
   - shared/test.md
 engine: copilot`;
-      
+
       const result = extractImportsFromText(frontmatterText);
       expect(result).toEqual(["shared/test.md"]);
     });
@@ -96,31 +96,28 @@ engine: copilot`;
   describe("extractRelevantTemplateExpressions", () => {
     it("should extract env expressions", () => {
       const markdown = "Use $" + "{{ env.MY_VAR }} here\nAnd also $" + "{{ env.OTHER }}";
-      
+
       const result = extractRelevantTemplateExpressions(markdown);
-      expect(result).toEqual([
-        "$" + "{{ env.MY_VAR }}",
-        "$" + "{{ env.OTHER }}",
-      ]);
+      expect(result).toEqual(["$" + "{{ env.MY_VAR }}", "$" + "{{ env.OTHER }}"]);
     });
 
     it("should extract vars expressions", () => {
       const markdown = "Use $" + "{{ vars.CONFIG }} here";
-      
+
       const result = extractRelevantTemplateExpressions(markdown);
       expect(result).toEqual(["$" + "{{ vars.CONFIG }}"]);
     });
 
     it("should ignore non-env/vars expressions", () => {
       const markdown = "Use $" + "{{ github.repository }} here\nBut include $" + "{{ env.TEST }}";
-      
+
       const result = extractRelevantTemplateExpressions(markdown);
       expect(result).toEqual(["$" + "{{ env.TEST }}"]);
     });
 
     it("should deduplicate and sort expressions", () => {
       const markdown = "$" + "{{ env.B }} and $" + "{{ env.A }} and $" + "{{ env.B }}";
-      
+
       const result = extractRelevantTemplateExpressions(markdown);
       expect(result).toEqual(["$" + "{{ env.A }}", "$" + "{{ env.B }}"]);
     });
@@ -180,7 +177,7 @@ engine: copilot`;
 name: "Test Workflow"
 on:
   push:`;
-      
+
       const result = extractHashFromLockFile(content);
       expect(result).toBe("abc123def456");
     });
@@ -189,7 +186,7 @@ on:
       const content = `name: "Test Workflow"
 on:
   push:`;
-      
+
       const result = extractHashFromLockFile(content);
       expect(result).toBe("");
     });
@@ -199,14 +196,14 @@ on:
     it("should trim whitespace", () => {
       const text = `  engine: copilot  
   description: test  `;
-      
+
       const result = normalizeFrontmatterText(text);
       expect(result).toBe("engine: copilot  \n  description: test");
     });
 
     it("should normalize line endings", () => {
       const text = "engine: copilot\r\ndescription: test\r\n";
-      
+
       const result = normalizeFrontmatterText(text);
       expect(result).toBe("engine: copilot\ndescription: test");
     });
@@ -217,15 +214,15 @@ on:
       // Create a temporary test file
       const testFile = path.join(__dirname, "test-workflow-hash-simple.md");
       const content = "---\nengine: copilot\ndescription: Test workflow\n---\n\nUse $" + "{{ env.TEST }} here";
-      
+
       fs.writeFileSync(testFile, content, "utf8");
-      
+
       try {
         const hash = await computeFrontmatterHash(testFile);
-        
+
         // Hash should be a 64-character hex string
         expect(hash).toMatch(/^[a-f0-9]{64}$/);
-        
+
         // Computing again should produce the same hash (deterministic)
         const hash2 = await computeFrontmatterHash(testFile);
         expect(hash2).toBe(hash);
@@ -239,17 +236,17 @@ on:
     it("should include template expressions in hash", async () => {
       const testFile1 = path.join(__dirname, "test-workflow-hash-expr1.md");
       const testFile2 = path.join(__dirname, "test-workflow-hash-expr2.md");
-      
+
       const content1 = "---\nengine: copilot\n---\n\nUse $" + "{{ env.VAR1 }}";
       const content2 = "---\nengine: copilot\n---\n\nUse $" + "{{ env.VAR2 }}";
-      
+
       fs.writeFileSync(testFile1, content1, "utf8");
       fs.writeFileSync(testFile2, content2, "utf8");
-      
+
       try {
         const hash1 = await computeFrontmatterHash(testFile1);
         const hash2 = await computeFrontmatterHash(testFile2);
-        
+
         // Different expressions should produce different hashes
         expect(hash1).not.toBe(hash2);
       } finally {

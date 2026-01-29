@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/jqschema.md
 #
-# frontmatter-hash: c259a6725e5a19d2bdce3c8777e5cf9ff48f7dbb94a38b336b87244e9a007f31
+# frontmatter-hash: 860703cf0a3d2eb0f9ce2b147020cc82e1acd6e6f3db8925533587371d3d4a73
 
 name: "Issue Arborist"
 "on":

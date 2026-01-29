@@ -22,52 +22,52 @@ const VERSIONS = {
  */
 async function computeFrontmatterHash(workflowPath) {
   const content = fs.readFileSync(workflowPath, "utf8");
-  
+
   // Extract frontmatter text and markdown body
   const { frontmatterText, markdown } = extractFrontmatterAndBody(content);
-  
+
   // Get base directory for resolving imports
   const baseDir = path.dirname(workflowPath);
-  
+
   // Extract template expressions with env. or vars.
   const expressions = extractRelevantTemplateExpressions(markdown);
-  
+
   // Process imports using text-based parsing
   const { importedFiles, importedFrontmatterTexts } = await processImportsTextBased(frontmatterText, baseDir);
-  
+
   // Build canonical representation from text
   // The key insight is to treat frontmatter as mostly text
   // and only parse enough to extract field structure for canonical ordering
   const canonical = {};
-  
+
   // Add the main frontmatter text as-is (trimmed and normalized)
   canonical["frontmatter-text"] = normalizeFrontmatterText(frontmatterText);
-  
+
   // Add sorted imported files list
   if (importedFiles.length > 0) {
     canonical.imports = importedFiles.sort();
   }
-  
+
   // Add sorted imported frontmatter texts (concatenated with delimiter)
   if (importedFrontmatterTexts.length > 0) {
     const sortedTexts = importedFrontmatterTexts.map(t => normalizeFrontmatterText(t)).sort();
     canonical["imported-frontmatters"] = sortedTexts.join("\n---\n");
   }
-  
+
   // Add template expressions if present
   if (expressions.length > 0) {
     canonical["template-expressions"] = expressions;
   }
-  
+
   // Add version information
   canonical.versions = VERSIONS;
-  
+
   // Serialize to canonical JSON
   const canonicalJSON = marshalCanonicalJSON(canonical);
-  
+
   // Compute SHA-256 hash
   const hash = crypto.createHash("sha256").update(canonicalJSON, "utf8").digest("hex");
-  
+
   return hash;
 }
 
@@ -79,11 +79,11 @@ async function computeFrontmatterHash(workflowPath) {
  */
 function extractFrontmatterAndBody(content) {
   const lines = content.split("\n");
-  
+
   if (lines.length === 0 || lines[0].trim() !== "---") {
     return { frontmatterText: "", markdown: content };
   }
-  
+
   let endIndex = -1;
   for (let i = 1; i < lines.length; i++) {
     if (lines[i].trim() === "---") {
@@ -91,14 +91,14 @@ function extractFrontmatterAndBody(content) {
       break;
     }
   }
-  
+
   if (endIndex === -1) {
     throw new Error("Frontmatter not properly closed");
   }
-  
+
   const frontmatterText = lines.slice(1, endIndex).join("\n");
   const markdown = lines.slice(endIndex + 1).join("\n");
-  
+
   return { frontmatterText, markdown };
 }
 
@@ -113,43 +113,43 @@ function extractFrontmatterAndBody(content) {
 async function processImportsTextBased(frontmatterText, baseDir, visited = new Set()) {
   const importedFiles = [];
   const importedFrontmatterTexts = [];
-  
+
   // Extract imports field using simple text parsing
   const imports = extractImportsFromText(frontmatterText);
-  
+
   if (imports.length === 0) {
     return { importedFiles, importedFrontmatterTexts };
   }
-  
+
   // Sort imports for deterministic processing
   const sortedImports = [...imports].sort();
-  
+
   for (const importPath of sortedImports) {
     // Resolve import path relative to base directory
     const fullPath = path.resolve(baseDir, importPath);
-    
+
     // Skip if already visited (cycle detection)
     if (visited.has(fullPath)) continue;
     visited.add(fullPath);
-    
+
     // Read imported file
     try {
       if (!fs.existsSync(fullPath)) {
         // Skip missing imports silently
         continue;
       }
-      
+
       const importContent = fs.readFileSync(fullPath, "utf8");
       const { frontmatterText: importFrontmatterText } = extractFrontmatterAndBody(importContent);
-      
+
       // Add to imported files list
       importedFiles.push(importPath);
       importedFrontmatterTexts.push(importFrontmatterText);
-      
+
       // Recursively process imports in the imported file
       const importBaseDir = path.dirname(fullPath);
       const nestedResult = await processImportsTextBased(importFrontmatterText, importBaseDir, visited);
-      
+
       // Add nested imports
       importedFiles.push(...nestedResult.importedFiles);
       importedFrontmatterTexts.push(...nestedResult.importedFrontmatterTexts);
@@ -158,7 +158,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
       continue;
     }
   }
-  
+
   return { importedFiles, importedFrontmatterTexts };
 }
 
@@ -171,32 +171,32 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 function extractImportsFromText(frontmatterText) {
   const imports = [];
   const lines = frontmatterText.split("\n");
-  
+
   let inImports = false;
   let baseIndent = 0;
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    
+
     // Skip empty lines and comments
     if (!trimmed || trimmed.startsWith("#")) continue;
-    
+
     // Check if this is the imports: key
     if (trimmed.startsWith("imports:")) {
       inImports = true;
       baseIndent = line.search(/\S/);
       continue;
     }
-    
+
     if (inImports) {
       const lineIndent = line.search(/\S/);
-      
+
       // If indentation decreased or same level, we're out of the imports array
       if (lineIndent <= baseIndent && trimmed && !trimmed.startsWith("#")) {
         break;
       }
-      
+
       // Extract array item
       if (trimmed.startsWith("-")) {
         let item = trimmed.substring(1).trim();
@@ -208,7 +208,7 @@ function extractImportsFromText(frontmatterText) {
       }
     }
   }
-  
+
   return imports;
 }
 
@@ -231,17 +231,17 @@ function extractRelevantTemplateExpressions(markdown) {
   const expressions = [];
   const regex = /\$\{\{([^}]+)\}\}/g;
   let match;
-  
+
   while ((match = regex.exec(markdown)) !== null) {
     const expr = match[0]; // Full expression including ${{ }}
     const content = match[1].trim();
-    
+
     // Check if it contains env. or vars.
     if (content.includes("env.") || content.includes("vars.")) {
       expressions.push(expr);
     }
   }
-  
+
   // Remove duplicates and sort
   return [...new Set(expressions)].sort();
 }

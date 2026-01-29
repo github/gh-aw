@@ -21,7 +21,7 @@
 #
 # Performs critical code review with a focus on edge cases, potential bugs, and code quality issues
 #
-# frontmatter-hash: 3fb5fb4f44feb1130f69e678b3c28ddf3096955e1fddc455f1fb6d2c43051d3d
+# frontmatter-hash: 513b6d93f9eabf6cb2df6c00cf5d697ee8e85a578fc2058bf3b6ffc8fa89634d
 
 name: "Grumpy Code Reviewer 🔥"
 "on":
