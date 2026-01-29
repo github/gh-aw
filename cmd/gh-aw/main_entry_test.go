@@ -164,6 +164,14 @@ func TestMainFunction(t *testing.T) {
 		// This is necessary because rootCmd captured the original os.Stderr in init()
 		rootCmd.SetOut(os.Stderr)
 
+		// Read from pipe in goroutine to prevent deadlock when buffer fills
+		var buf bytes.Buffer
+		done := make(chan struct{})
+		go func() {
+			_, _ = buf.ReadFrom(r)
+			close(done)
+		}()
+
 		// Execute help
 		rootCmd.SetArgs([]string{"--help"})
 		err := rootCmd.Execute()
@@ -173,9 +181,8 @@ func TestMainFunction(t *testing.T) {
 		os.Stderr = oldStderr
 		rootCmd.SetOut(os.Stderr) // Restore the command's output to the original stderr
 
-		// Read captured output
-		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(r)
+		// Wait for reader goroutine to finish
+		<-done
 		output := buf.String()
 
 		if err != nil {
@@ -199,6 +206,14 @@ func TestMainFunction(t *testing.T) {
 		// Update the command's output to use the new os.Stderr pipe
 		rootCmd.SetOut(os.Stderr)
 
+		// Read from pipe in goroutine to prevent deadlock when buffer fills
+		var buf bytes.Buffer
+		done := make(chan struct{})
+		go func() {
+			_, _ = buf.ReadFrom(r)
+			close(done)
+		}()
+
 		// Execute help all
 		rootCmd.SetArgs([]string{"help", "all"})
 		err := rootCmd.Execute()
@@ -208,9 +223,8 @@ func TestMainFunction(t *testing.T) {
 		os.Stderr = oldStderr
 		rootCmd.SetOut(os.Stderr)
 
-		// Read captured output
-		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(r)
+		// Wait for reader goroutine to finish
+		<-done
 		output := buf.String()
 
 		if err != nil {
