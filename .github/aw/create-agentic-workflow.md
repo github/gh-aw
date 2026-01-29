@@ -263,6 +263,7 @@ Based on the parsed requirements, determine:
    - Creating issues → `safe-outputs: create-issue:`
    - Commenting → `safe-outputs: add-comment:`
    - Creating PRs → `safe-outputs: create-pull-request:`
+   - **No action needed** → `safe-outputs: noop:` - **IMPORTANT**: When the agent successfully completes but determines nothing needs to be done, use `noop` to signal completion. This is critical for transparency—it shows the agent worked AND that no output was necessary.
    - **Daily reporting workflows** (creates issues/discussions): Add `close-older-issues: true` or `close-older-discussions: true` to prevent clutter
    - **Daily improver workflows** (creates PRs): Add `skip-if-match:` with a filter to avoid opening duplicate PRs (e.g., `'is:pr is:open in:title "[workflow-name]"'`)
    - **New workflows** (when creating, not updating): Consider enabling `missing-tool: create-issue: true` to automatically track missing tools as GitHub issues that expire after 1 week
@@ -276,6 +277,7 @@ Based on the parsed requirements, determine:
    - `timeout-minutes:` - Has sensible defaults, only specify if user needs custom timeout
    - Other fields with good defaults - Let compiler use defaults unless customization needed
 8. **Prompt Body**: Write clear, actionable instructions for the AI agent
+   - **IMPORTANT**: Include guidance for agents to call the `noop` safe output when they successfully complete work but there's nothing to be done (e.g., no issues to triage, no PRs to create, no changes needed). This is essential for transparency—it proves the agent worked and consciously determined no action was necessary.
 
 ### Step 3: Create the Workflow Files (Two-File Structure)
 
@@ -320,6 +322,12 @@ You are an AI agent that <what the agent does>.
 ## Guidelines
 
 <Specific guidelines for behavior>
+
+## Safe Outputs
+
+When you successfully complete your work:
+- If you created/modified resources: Use the appropriate safe output (e.g., `create-issue`, `add-comment`, `create-pull-request`)
+- **If there was nothing to be done**: Call the `noop` safe output with a clear message explaining that you completed the analysis but no action was necessary. This is important for transparency—it signals that you worked successfully AND consciously determined no output was needed.
 
 ## [Additional sections as needed for the specific workflow]
 
