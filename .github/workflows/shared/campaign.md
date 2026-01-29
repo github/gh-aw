@@ -14,7 +14,7 @@ safe-outputs:
 ---
 # Campaign Orchestrator Core Rules
 
-These are generic orchestrator rules intended to be included via `{{#runtime-import ...}}`.
+These are generic orchestrator rules.
 
 ## Operating Model
 
