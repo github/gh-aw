@@ -67,6 +67,46 @@ Always report:
 - Failures (with reasons)
 - Whether cursor was advanced and where the next run should resume
 
+## No-Work Default
+
+If discovery finds **no** work items to process:
+
+- If the campaign uses a GitHub Project, post exactly one `create_project_status_update` with status `INACTIVE`.
+- Then call `noop` with a short message and end the run.
+
+## Project Status Updates (Default)
+
+If the campaign uses a GitHub Project, post exactly **one** `create_project_status_update` per run.
+
+- `status`: use `INACTIVE` when no work was found; otherwise prefer `ON_TRACK` (or `AT_RISK` if partial failures).
+- `start_date`: today (YYYY-MM-DD)
+- `body`: include the discovery query, counts (found / updated / created), and next steps
+
 ## Authority
 
 - If any campaign instructions conflict with Project update instructions, Project update instructions win for project writes.
+
+## Project Field Defaults (When Using GitHub Projects)
+
+If the campaign uses a GitHub Project to track state, use these as **defaults** for `update_project` writes.
+
+Notes:
+- These are defaults. A specific workflow may override them.
+- Only set fields that exist in the target Project schema; omit unknown fields.
+
+Defaults (recommended field keys):
+
+- `campaign_id`: derive from the workflow's **Campaign ID** in its Config section.
+- `target_repo`: derive from the workflow's **Target repo** in its Config section.
+- `worker_workflow`: set to the discovery source (e.g. the orchestrator/workflow name or the system that surfaced the item).
+
+Status defaults:
+
+- If the workflow is tracking **open** work items, set `status` to an active backlog state (commonly `"Todo"`).
+- If tracking **completed** work items (merged PRs / closed issues), set `status` to a done state (commonly `"Done"`).
+
+Optional, best-effort fields (only if the Project has them):
+
+- `priority`: High/Medium/Low
+- `size`: Small/Medium/Large
+- `start_date`: YYYY-MM-DD
