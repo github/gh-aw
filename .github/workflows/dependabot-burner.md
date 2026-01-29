@@ -5,6 +5,7 @@ description: Burns down Dependabot security alert work items
 on:
   schedule: daily
   skip-if-no-match: 'is:pr is:open author:app/dependabot'
+  workflow_dispatch:
 
 permissions:
   issues: read
