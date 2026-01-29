@@ -823,7 +823,8 @@ jobs:
           ### Step 2: Check for Work
           
           If *no* Dependabot PRs are found:
-          - Call the `noop` tool with message: "No security alerts found to process"
+          - Call `create_project_status_update` to post a short status update to the project
+          - Then call the `noop` tool with message: "No security alerts found to process"
           - Exit successfully
           
           ### Step 3: Update Project Board
@@ -962,7 +963,50 @@ jobs:
           5. Update this issue checklist as PRs are merged.
           ```
           
-          ### Step 5: Report
+          ### Step 5: Post a Project Status Update
+          
+          Create exactly **one** project status update so it appears in the Project’s **Updates** panel.
+          
+          - Call `create_project_status_update` with:
+            - `project`: `https://github.com/orgs/githubnext/projects/144`
+            - `status`: choose one of `ON_TRACK`, `AT_RISK`, `OFF_TRACK`, `COMPLETE`, `INACTIVE`
+              - Use `INACTIVE` when no PRs were found
+              - Use `ON_TRACK` when work was found and successfully added/updated
+              - Use `AT_RISK` if you hit partial failures, missing data, or suspected access/label issues
+            - `start_date`: today’s date (YYYY-MM-DD)
+            - `body`: a concise markdown summary that includes:
+              - The exact search query used
+              - Count of PRs discovered
+              - Count of project items updated
+              - Any bundle issue numbers created (if any)
+              - A short “next steps” section
+          
+          Example:
+          ```
+          create_project_status_update(
+            project="https://github.com/orgs/githubnext/projects/144",
+            status="ON_TRACK",
+            start_date="YYYY-MM-DD",
+            body="""
+          ## Dependabot Burner Campaign
+          
+          **Discovery query:** `repo:githubnext/gh-aw is:pr author:app/dependabot label:dependencies label:javascript is:open`
+          
+          ### Results
+          - PRs discovered: N
+          - Project items updated: N
+          - Bundle issues created: #123, #456
+          
+          ### Notes
+          - Any important caveats (labels missing, rate limits, etc.)
+          
+          ### Next steps
+          - Suggested follow-ups
+          """
+          )
+          ```
+          
+          ### Step 6: Report
           
           Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the bundle issue numbers that were created and assigned.
           
