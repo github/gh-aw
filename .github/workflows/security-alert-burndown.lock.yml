@@ -155,12 +155,12 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"assign_to_agent":{"allowed":["copilot"],"default_agent":"copilot","max":1,"target":"*"},"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created.",
+              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created. Assignees [copilot] will be automatically assigned.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -198,34 +198,6 @@ jobs:
                 "type": "object"
               },
               "name": "create_issue"
-            },
-            {
-              "description": "Assign the GitHub Copilot coding agent to work on an issue or pull request. The agent will analyze the issue/PR and attempt to implement a solution, creating a pull request when complete. Use this to delegate coding tasks to Copilot. Example usage: assign_to_agent(issue_number=123, agent=\"copilot\") or assign_to_agent(pull_number=456, agent=\"copilot\") CONSTRAINTS: Maximum 1 issue(s) can be assigned to agent.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "agent": {
-                    "description": "Agent identifier to assign. Defaults to 'copilot' (the Copilot coding agent) if not specified.",
-                    "type": "string"
-                  },
-                  "issue_number": {
-                    "description": "Issue number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/issues/234). Can also be a temporary_id (e.g., 'aw_abc123def456') from an issue created earlier in the same workflow run. The issue should contain clear, actionable requirements. Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  },
-                  "pull_number": {
-                    "description": "Pull request number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 456 in github.com/owner/repo/pull/456). Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  }
-                },
-                "type": "object"
-              },
-              "name": "assign_to_agent"
             },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
@@ -471,23 +443,6 @@ jobs:
           EOF
           cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
           {
-            "assign_to_agent": {
-              "defaultMax": 1,
-              "fields": {
-                "agent": {
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                },
-                "issue_number": {
-                  "issueNumberOrTemporaryId": true
-                },
-                "pull_number": {
-                  "optionalPositiveInteger": true
-                }
-              },
-              "customValidation": "requiresOneOf:issue_number,pull_number"
-            },
             "create_issue": {
               "defaultMax": 1,
               "fields": {
@@ -601,7 +556,7 @@ jobs:
                   "maxLength": 128
                 },
                 "content_number": {
-                  "optionalPositiveInteger": true
+                  "issueNumberOrTemporaryId": true
                 },
                 "content_type": {
                   "type": "string",
@@ -894,19 +849,20 @@ jobs:
           
           ### Step 4: Create parent issue and assign work
           
-          After updating project items, **first complete the bundling analysis below, then immediately perform all three safe-output calls in sequence**. Do not proceed to Step 5 until all three calls are complete.
+          After updating project items, **first complete the bundling analysis below, then immediately perform the safe-output calls below in sequence**. Do not proceed to Step 5 until the calls are complete.
           
           #### Bundling Analysis (Do This First)
           
           Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
           
-          #### Required Safe-Output Calls (All Three Required):
+          #### Required Safe-Output Calls:
           
-          After completing the bundling analysis, you must immediately perform these three safe-output calls in order:
+          After completing the bundling analysis, you must immediately perform these safe-output calls in order:
           
           1. **Call `create_issue`** to create the parent tracking issue
           2. **Call `update_project`** to add the created issue to the project board  
-          3. **Call `assign_to_agent`** to assign the created issue to Copilot
+          
+          The created issue will be assigned to Copilot automatically via `safe-outputs.create-issue.assignees`.
           
           #### Bundling Guidelines
           
@@ -965,22 +921,8 @@ jobs:
           )
           ```
           
-          #### Safe-Output Call #3: Assign to Agent
-          
-          **Immediately** call `assign_to_agent` using the temporary ID from call #1:
-          
-          ```
-          assign_to_agent(
-            issue_number="<temporary_id_from_call_1>",
-            name="copilot"
-          )
-          ```
-          
-          **Example**: If `create_issue` returned `aw_sec2026012901`, then:
+          **Example**: If `create_issue` returned `aw_sec2026012901`, then call:
           - Call #2: `update_project(..., content_number="aw_sec2026012901", ...)`
-          - Call #3: `assign_to_agent(issue_number="aw_sec2026012901", name="copilot")`
-          
-          The temporary ID will be automatically resolved to the real issue number during safe-output processing.
           
           
           **Issue Body Template:**
@@ -1326,14 +1268,14 @@ jobs:
           
           - Minimize API calls; avoid full rescans when possible.
           - Prefer incremental discovery with deterministic ordering (e.g., by `updatedAt`, tie-break by ID).
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           - Enforce strict pagination budgets; if a query requires many pages, stop early and continue next run.
           - Use a durable cursor/checkpoint so the next run continues without rescanning.
           - On throttling (HTTP 429 / rate-limit 403), do not retry aggressively; back off and end the run after reporting what remains.
           
           
           **Cursor file (repo-memory)**: `memory/campaigns/security-alert-burndown/cursor.json`
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           **File system path**: `/tmp/gh-aw/repo-memory/campaigns/security-alert-burndown/cursor.json`
           - If it exists: read first and continue from its boundary.
           - If it does not exist: create it by end of run.
@@ -2025,8 +1967,6 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
-          GH_AW_ASSIGNMENT_ERRORS: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_errors }}
-          GH_AW_ASSIGNMENT_ERROR_COUNT: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_error_count }}
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -2217,9 +2157,6 @@ jobs:
       GH_AW_WORKFLOW_ID: "security-alert-burndown"
       GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
     outputs:
-      assign_to_agent_assigned: ${{ steps.assign_to_agent.outputs.assigned }}
-      assign_to_agent_assignment_error_count: ${{ steps.assign_to_agent.outputs.assignment_error_count }}
-      assign_to_agent_assignment_errors: ${{ steps.assign_to_agent.outputs.assignment_errors }}
       process_project_safe_outputs_processed_count: ${{ steps.process_project_safe_outputs.outputs.processed_count }}
       process_project_safe_outputs_temporary_project_map: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
@@ -2246,11 +2183,25 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs/
           find "/tmp/gh-aw/safeoutputs/" -type f -print
           echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/safeoutputs/agent_output.json" >> "$GITHUB_ENV"
+      - name: Process Safe Outputs
+        id: process_safe_outputs
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+        with:
+          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
+            await main();
       - name: Process Project-Related Safe Outputs
         id: process_project_safe_outputs
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
+          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
           GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":100}}"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
         with:
@@ -2259,37 +2210,5 @@ jobs:
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_project_handler_manager.cjs');
-            await main();
-      - name: Process Safe Outputs
-        id: process_safe_outputs
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
-        with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
-            await main();
-      - name: Assign To Agent
-        id: assign_to_agent
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'assign_to_agent'))
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_AGENT_MAX_COUNT: 1
-          GH_AW_AGENT_DEFAULT: "copilot"
-          GH_AW_AGENT_TARGET: "*"
-          GH_AW_AGENT_ALLOWED: "copilot"
-          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
-        with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/assign_to_agent.cjs');
             await main();
 

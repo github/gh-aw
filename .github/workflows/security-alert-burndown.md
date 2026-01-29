@@ -19,11 +19,7 @@ safe-outputs:
     max: 100
   create-issue:
     max: 1
-  assign-to-agent:
-    max: 1
-    name: copilot
-    allowed: [copilot]
-    target: "*"
+    assignees: [copilot]
 project: https://github.com/orgs/githubnext/projects/144
 ---
 
@@ -84,19 +80,20 @@ For each discovered item (up to 100 total per run):
 
 ### Step 4: Create parent issue and assign work
 
-After updating project items, **first complete the bundling analysis below, then immediately perform all three safe-output calls in sequence**. Do not proceed to Step 5 until all three calls are complete.
+After updating project items, **first complete the bundling analysis below, then immediately perform the safe-output calls below in sequence**. Do not proceed to Step 5 until the calls are complete.
 
 #### Bundling Analysis (Do This First)
 
 Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
 
-#### Required Safe-Output Calls (All Three Required):
+#### Required Safe-Output Calls:
 
-After completing the bundling analysis, you must immediately perform these three safe-output calls in order:
+After completing the bundling analysis, you must immediately perform these safe-output calls in order:
 
 1. **Call `create_issue`** to create the parent tracking issue
 2. **Call `update_project`** to add the created issue to the project board  
-3. **Call `assign_to_agent`** to assign the created issue to Copilot
+
+The created issue will be assigned to Copilot automatically via `safe-outputs.create-issue.assignees`.
 
 #### Bundling Guidelines
 
@@ -155,22 +152,8 @@ update_project(
 )
 ```
 
-#### Safe-Output Call #3: Assign to Agent
-
-**Immediately** call `assign_to_agent` using the temporary ID from call #1:
-
-```
-assign_to_agent(
-  issue_number="<temporary_id_from_call_1>",
-  name="copilot"
-)
-```
-
-**Example**: If `create_issue` returned `aw_sec2026012901`, then:
+**Example**: If `create_issue` returned `aw_sec2026012901`, then call:
 - Call #2: `update_project(..., content_number="aw_sec2026012901", ...)`
-- Call #3: `assign_to_agent(issue_number="aw_sec2026012901", name="copilot")`
-
-The temporary ID will be automatically resolved to the real issue number during safe-output processing.
 
 
 **Issue Body Template:**
