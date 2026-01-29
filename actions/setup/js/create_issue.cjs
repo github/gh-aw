@@ -197,7 +197,7 @@ async function main(config = {}) {
   const defaultTargetRepo = getDefaultTargetRepo(config);
   const groupEnabled = config.group === true || config.group === "true";
   const closeOlderIssuesEnabled = config.close_older_issues === true || config.close_older_issues === "true";
-  
+
   // Check if copilot assignment is enabled
   const assignCopilot = process.env.GH_AW_ASSIGN_COPILOT === "true";
 
@@ -373,10 +373,10 @@ async function main(config = {}) {
       .map(assignee => String(assignee).trim())
       .filter(assignee => assignee)
       .filter((assignee, index, arr) => arr.indexOf(assignee) === index);
-    
+
     // Check if copilot is in the assignees list
     const hasCopilot = assignees.includes("copilot");
-    
+
     // Filter out "copilot" from assignees - it will be assigned separately using GraphQL
     // Copilot is not a valid GitHub user and must be assigned via the agent assignment API
     assignees = assignees.filter(assignee => assignee !== "copilot");
@@ -461,7 +461,7 @@ async function main(config = {}) {
       // Store the mapping of temporary_id -> {repo, number}
       temporaryIdMap.set(normalizeTemporaryId(temporaryId), { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
-      
+
       // Track issue for copilot assignment if needed
       if (hasCopilot && assignCopilot) {
         issuesToAssignCopilotGlobal.push(`${qualifiedItemRepo}:${issue.number}`);

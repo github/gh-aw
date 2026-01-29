@@ -885,7 +885,7 @@ async function main() {
 
     // Export processed count for consistency with project handler
     core.setOutput("processed_count", successCount);
-    
+
     // Export issues that need copilot assignment (if any)
     const issuesToAssignCopilot = getIssuesToAssignCopilot();
     if (issuesToAssignCopilot.length > 0) {
