@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 12592a673890ac41402a0168307ee8c3ad70bd087dd16bff8a2e8ed995488947
+# frontmatter-hash: c5b04c7b77598cb77da47e38c8175769f9741c6029b535029648570dc595fdeb
 
 name: "Repo Audit Analyzer"
 "on":

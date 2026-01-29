@@ -21,7 +21,7 @@
 #
 # Example workflow demonstrating proper permission provisioning and security best practices
 #
-# frontmatter-hash: 2e763cd11ca6c9e2b469bfc2caf4dac4faa47c60eee0bfe6e82904a1898df31d
+# frontmatter-hash: b94737ec809c6ec4e01719728ec6a9885ec942d1c7afee0c2153ecbd3ab689bd
 
 name: "Example: Properly Provisioned Permissions"
 "on":

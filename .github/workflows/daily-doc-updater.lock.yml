@@ -21,7 +21,7 @@
 #
 # Automatically reviews and updates documentation to ensure accuracy and completeness
 #
-# frontmatter-hash: 1ca1a80eb1a1e2159f7af1fd80fb1ffec1899653ee5aefefe16fb5a2c6d4ab9b
+# frontmatter-hash: 4ea0bbc4994d6d6c1aec6657031d593f0e6f446185bf645084bc4c151fd3d33f
 
 name: "Daily Documentation Updater"
 "on":

@@ -21,7 +21,7 @@
 #
 # Daily test workflow using Claude with custom safe-output job containing choice inputs
 #
-# frontmatter-hash: 6765b4a7d559bd676c5a1934bfe2a4913c74c4cf920094fe7567817fb2d4f52f
+# frontmatter-hash: b9af8dd2ea5bd320c4be5a01ed04038700ab8ff9fe48b2739eec31edeb4dad16
 
 name: "Daily Choice Type Test"
 "on":

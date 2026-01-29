@@ -21,7 +21,7 @@
 #
 # Reviews and cleans up instruction files to ensure clarity, consistency, and adherence to best practices
 #
-# frontmatter-hash: 057f12c51051ef6485500c89f9264ca44a038b5390c2fcac82678860c2bdb0b3
+# frontmatter-hash: c3cffd2787ab9ac5db8d5a9dbbc13570ffba5875b792548df18c3fafb788d978
 
 name: "Instructions Janitor"
 "on":

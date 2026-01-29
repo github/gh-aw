@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 342bda34a1fda6feb54e568d033f862050024081555dbcbfe70571f303e016aa
+# frontmatter-hash: 86a57c6013c2b1a8dcf3b1d9da5514f8780e995ba266c09aff98c88a7ac094ab
 
 name: "GitHub MCP Remote Server Tools Report Generator"
 "on":

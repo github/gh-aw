@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: b175b1cb89578a51aeccc2ca910877df7f8ad27691282a19c27f718f309d622b
+# frontmatter-hash: a43fcd776827f8098cca6bf5c4f3362b96c951820b5b19055755a1e9efed72be
 
 name: "Copilot CLI Deep Research Agent"
 "on":

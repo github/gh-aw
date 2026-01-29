@@ -23,6 +23,8 @@
 #
 # Source: githubnext/agentics/workflows/ci-doctor.md@ea350161ad5dcc9624cf510f134c6a9e39a6f94d
 #
+# frontmatter-hash: 2abc1a6d163216337503b35ce7ce201073fcfa546a4fb499e9f57bc00dd69c45
+#
 # Effective stop-time: 2026-03-01 15:52:28
 
 name: "CI Failure Doctor"

@@ -21,7 +21,7 @@
 #
 # Identifies and automatically fixes code security issues by creating autofixes via GitHub Code Scanning
 #
-# frontmatter-hash: 4d74d8179bfc722a99ec8b1e4b096f07f074e72673ac390f6904139593e548f1
+# frontmatter-hash: 79b9e20f7310b2d6d1e3ab401229b3c85ed93c5b76b1dace470150965526666d
 
 name: "Security Fix PR"
 "on":
