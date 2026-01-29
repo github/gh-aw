@@ -188,7 +188,7 @@ func TestGenerateWorkflowHeader(t *testing.T) {
 			compiler := NewCompiler()
 			var yaml strings.Builder
 
-			compiler.generateWorkflowHeader(&yaml, tt.data)
+			compiler.generateWorkflowHeader(&yaml, tt.data, "")
 			result := yaml.String()
 
 			for _, expected := range tt.expectInStr {
