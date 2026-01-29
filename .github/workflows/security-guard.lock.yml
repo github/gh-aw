@@ -26,9 +26,6 @@ name: "Security Guard Agent 🛡️"
   pull_request:
     # draft: false # Draft filtering applied via job conditions
     types:
-    - opened
-    - synchronize
-    - reopened
     - ready_for_review
 
 permissions: {}
