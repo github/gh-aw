@@ -10,7 +10,6 @@ permissions:
   pull-requests: read
   contents: read
   security-events: read
-tools:
 safe-outputs:
   update-project:
     max: 100
