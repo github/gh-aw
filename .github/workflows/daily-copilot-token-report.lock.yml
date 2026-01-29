@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 9b31944cdbd14b2f7b6ed29d2bcdfd8319da5241ec23c48096c41f6f9480fbda
 
 name: "Daily Copilot Token Consumption Report"
 "on":

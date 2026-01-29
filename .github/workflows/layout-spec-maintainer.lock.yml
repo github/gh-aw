@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Maintains scratchpad/layout.md with patterns of file paths, folder names, and artifact names used in lock.yml files
+#
+# Frontmatter-Hash: e6cf0cb24a047ac034efc64766767892e2139fb645c046bfcc73e6ca279c9c92
 
 name: "Layout Specification Maintainer"
 "on":

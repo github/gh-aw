@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Workflow generator that updates issue status and assigns to Copilot agent for workflow design
+#
+# Frontmatter-Hash: 4738e23a097f6566a434bdaf51ffaaf7f6ae98ccb5f077a116b2e5b1be6fb5af
 
 name: "Workflow Generator"
 "on":

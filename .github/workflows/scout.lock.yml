@@ -30,6 +30,8 @@
 #     - shared/mcp/microsoft-docs.md
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 0c7f84094e22b45ea9c6e8f94e3d7f08a8c536103335b680192fa3643872b93b
 
 name: "Scout"
 "on":

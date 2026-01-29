@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: e12c2d495c0bf3505bf7bcf24b532d343d760257c2fded5129b6e44e12aee3a0
 
 name: "Repository Quality Improvement Agent"
 "on":

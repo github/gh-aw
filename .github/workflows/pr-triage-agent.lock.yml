@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automates PR categorization, risk assessment, and prioritization for agent-created pull requests
+#
+# Frontmatter-Hash: d5f8bb626963c70ce1c9eed5163dd6d22d41fb8940d4016641d9ee904a791626
 
 name: "PR Triage Agent"
 "on":

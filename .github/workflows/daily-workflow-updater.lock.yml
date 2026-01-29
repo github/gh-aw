@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automatically updates GitHub Actions versions and creates a PR if changes are detected
+#
+# Frontmatter-Hash: 47871b697f6fceafda0c9b9946ebfe3345a6feddd83f08bfdb4f0c72639b1066
 
 name: "Daily Workflow Updater"
 "on":

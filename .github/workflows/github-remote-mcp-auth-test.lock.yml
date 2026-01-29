@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Daily test of GitHub remote MCP authentication with GitHub Actions token
+#
+# Frontmatter-Hash: 35ad8c75584797a1ec2bc5e31a53fd9768540d72f0afbbfa7d061166ee3b42f5
 
 name: "GitHub Remote MCP Authentication Test"
 "on":

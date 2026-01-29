@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: b8eae0f9b99e1f26eddcfd101fbb22fd0b4cb0c0a3fd6633fad4892c8d217042
 
 name: "Sergo - Serena Go Expert"
 "on":

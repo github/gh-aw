@@ -138,12 +138,12 @@ func TestHashConsistencyAcrossLockFiles(t *testing.T) {
 	t.Logf("\nVerified hash consistency for %d workflows", checkedCount)
 }
 
-// extractHashFromLockFile extracts the Frontmatter-Hash from a lock file
+// extractHashFromLockFile extracts the frontmatter-hash from a lock file
 func extractHashFromLockFile(content string) string {
-	// Look for: # Frontmatter-Hash: <hash>
+	// Look for: # frontmatter-hash: <hash>
 	lines := splitLines(content)
 	for _, line := range lines {
-		if len(line) > 20 && line[:20] == "# Frontmatter-Hash: " {
+		if len(line) > 20 && line[:20] == "# frontmatter-hash: " {
 			return line[20:]
 		}
 	}

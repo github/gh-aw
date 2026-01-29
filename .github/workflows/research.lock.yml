@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 5a8f9b7721969ed82105f9a9e1fa7dba039758d18d6d51addc150b7857aeed66
 
 name: "Basic Research Agent"
 "on":

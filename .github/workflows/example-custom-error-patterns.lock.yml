@@ -19,6 +19,8 @@
 #   gh aw compile
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
+#
+# Frontmatter-Hash: 1b5320fa8579834471c19f36ec051f92cbec3189254511f4df8d6e676dc29c97
 
 name: "Example: Custom Error Patterns"
 "on":

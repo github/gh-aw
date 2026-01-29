@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: ca19a71922e44392b024577420d64418073fddc18e2d52ed3557613acb8ab814
 
 name: "Blog Auditor"
 "on":

@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
+#
+# Frontmatter-Hash: c71080c0fdc581a61ffa8242d380e939f09a0c77b13c53752c49345f5ee0df58
 
 name: "CI Cleaner"
 "on":

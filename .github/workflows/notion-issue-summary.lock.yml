@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/notion.md
+#
+# Frontmatter-Hash: 578e974ca4c30f3810bb293e74322e50b71d7d60e6520bc09315ea41e84ff37f
 
 name: "Issue Summary to Notion"
 "on":

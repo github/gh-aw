@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Collects daily performance metrics for the agent ecosystem and stores them in repo-memory
+#
+# Frontmatter-Hash: 11fb015421502bc99a1f9a46c6f8fdb1e9b51e48fa01788eaa3caf3cf4db3599
 
 name: "Metrics Collector - Infrastructure Agent"
 "on":

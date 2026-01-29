@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/campaign.md
+#
+# Frontmatter-Hash: 73a139ca99da23fcb04880b628e794820ccb563dff280fd698396c278fb3b6bc
 
 name: "Dependabot Burner"
 "on":

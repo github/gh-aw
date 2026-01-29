@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 8dde2de8d6d882764e73b708722d1ffa6e93eb8d3057fd9b7b98e2674d445f02
 
 name: "GitHub MCP Remote Server Tools Report Generator"
 "on":

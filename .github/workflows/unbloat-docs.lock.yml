@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: ad8c4214b11f442d70920c55cce9c942cdb434e17c5bb166624fa2173dbf76b1
 
 name: "Documentation Unbloat"
 "on":

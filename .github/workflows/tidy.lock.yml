@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automatically formats and tidies code files (Go, JS, TypeScript) when code changes are pushed or on command
+#
+# Frontmatter-Hash: c6ac94d5b711aea2a9ffb0cab459a7f2698bc134c4c58501638549b380d2df63
 
 name: "Tidy"
 "on":

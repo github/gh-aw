@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Tests network firewall functionality and validates security rules for workflow network access
+#
+# Frontmatter-Hash: 890b12920c8c37439154919cb270248dcbdf7bfdb5667df4698b07b7ec906596
 
 name: "Firewall Test Agent"
 "on":

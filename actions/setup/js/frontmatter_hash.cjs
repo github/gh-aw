@@ -3,18 +3,32 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { execSync } = require("child_process");
 
 /**
  * Computes a deterministic SHA-256 hash of workflow frontmatter
- * This is a simplified implementation that delegates to the Go binary
- * for maximum compatibility and correctness.
+ * using the Go implementation for exact compatibility.
  *
  * @param {string} workflowPath - Path to the workflow file
  * @returns {Promise<string>} The SHA-256 hash as a lowercase hexadecimal string (64 characters)
  */
 async function computeFrontmatterHash(workflowPath) {
-  // For now, this is a placeholder that computes a simple hash
-  // The full implementation will call the Go binary
+  // Try to use Go implementation via gh-aw binary for exact compatibility
+  try {
+    const ghAwBin = findGhAwBinary();
+    if (ghAwBin) {
+      const result = execSync(`"${ghAwBin}" hash-frontmatter "${workflowPath}"`, {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      return result.trim();
+    }
+  } catch (err) {
+    // Fall through to JavaScript implementation
+  }
+
+  // JavaScript implementation (placeholder)
+  // For production use, this should parse YAML and match Go implementation exactly
   const content = fs.readFileSync(workflowPath, "utf8");
   const frontmatter = extractFrontmatter(content);
   const canonical = buildCanonicalFrontmatter(frontmatter, {
@@ -29,9 +43,37 @@ async function computeFrontmatterHash(workflowPath) {
 }
 
 /**
+ * Finds the gh-aw binary in common locations
+ * @returns {string|null} Path to gh-aw binary or null if not found
+ */
+function findGhAwBinary() {
+  const possiblePaths = [
+    process.env.GH_AW_BIN,
+    "./gh-aw",
+    "../../../gh-aw",
+    "/tmp/gh-aw",
+    "gh-aw",
+  ];
+
+  for (const binPath of possiblePaths) {
+    if (binPath && fs.existsSync(binPath)) {
+      return binPath;
+    }
+  }
+
+  // Try 'which gh-aw'
+  try {
+    const result = execSync("which gh-aw", { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    return result.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extracts frontmatter from markdown content
- * NOTE: This is a simplified placeholder. For production use, this should
- * parse YAML properly or call the Go implementation.
+ * NOTE: This is a simplified placeholder. For production use without Go binary,
+ * this should parse YAML properly.
  * 
  * @param {string} content - The markdown content
  * @returns {Record<string, any>} The parsed frontmatter object
@@ -54,9 +96,7 @@ function extractFrontmatter(content) {
     throw new Error("Frontmatter not properly closed");
   }
 
-  // TODO: Implement proper YAML parsing or call Go binary
-  // For now, return empty object - the hash will still be deterministic
-  // but won't include frontmatter content
+  // TODO: Implement proper YAML parsing
   console.warn("extractFrontmatter: YAML parsing not fully implemented, returning empty object");
   return {};
 }
@@ -69,7 +109,7 @@ function extractFrontmatter(content) {
  */
 function buildCanonicalFrontmatter(frontmatter, importsResult) {
   const canonical = {};
-
+  
   const addField = (/** @type {string} */ key) => {
     if (frontmatter[key] !== undefined) {
       canonical[key] = frontmatter[key];

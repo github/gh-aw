@@ -99,7 +99,7 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 	// Format on a single line to minimize merge conflicts
 	if frontmatterHash != "" {
 		yaml.WriteString("#\n")
-		fmt.Fprintf(yaml, "# Frontmatter-Hash: %s\n", frontmatterHash)
+		fmt.Fprintf(yaml, "# frontmatter-hash: %s\n", frontmatterHash)
 	}
 
 	// Add stop-time comment if configured

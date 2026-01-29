@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 01a9a310376e437744138c09cd9bac7a76af1989955f81158a264ece826dfb50
 
 name: "Repo Audit Analyzer"
 "on":

@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
+#
+# Frontmatter-Hash: 53b0bbb082d3e77ad611e656d77c35726293155777a53804f3f2818eeb2d83d8
 
 name: "Artifacts Summary"
 "on":

@@ -27,6 +27,8 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #     - shared/weekly-issues-data-fetch.md
+#
+# Frontmatter-Hash: ca8b569161199907884eb44b542361921f4d11fafcb970cf6d0ce9ae868889a2
 
 name: "DeepReport - Intelligence Gathering Agent"
 "on":

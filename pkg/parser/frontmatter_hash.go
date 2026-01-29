@@ -11,10 +11,19 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
 
 var frontmatterHashLog = logger.New("parser:frontmatter_hash")
+
+// compilerVersion holds the gh-aw version for hash computation
+var compilerVersion = "dev"
+
+// SetCompilerVersion sets the compiler version for hash computation
+func SetCompilerVersion(version string) {
+	compilerVersion = version
+}
 
 // ComputeFrontmatterHash computes a deterministic SHA-256 hash of frontmatter
 // including contributions from all imported workflows.
@@ -275,6 +284,9 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 		canonical["template-expressions"] = sortedExpressions
 	}
 
+	// Add version information for reproducibility
+	canonical["versions"] = buildVersionInfo()
+
 	// Serialize to canonical JSON
 	canonicalJSON, err := marshalCanonicalJSON(canonical)
 	if err != nil {
@@ -289,6 +301,22 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 
 	frontmatterHashLog.Printf("Computed hash: %s", hashHex)
 	return hashHex, nil
+}
+
+// buildVersionInfo builds version information for hash computation
+func buildVersionInfo() map[string]string {
+	versions := make(map[string]string)
+	
+	// gh-aw version (compiler version)
+	versions["gh-aw"] = compilerVersion
+
+	// awf (firewall) version
+	versions["awf"] = string(constants.DefaultFirewallVersion)
+
+	// agents (MCP gateway) version  
+	versions["agents"] = string(constants.DefaultMCPGatewayVersion)
+
+	return versions
 }
 
 // extractRelevantTemplateExpressions extracts template expressions from markdown

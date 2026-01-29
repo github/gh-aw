@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Discovers security work items (Dependabot PRs, code scanning alerts, secret scanning alerts)
+#
+# Frontmatter-Hash: 493dc7604101726536106c3d790b233e854f51585ad3074074fd2ba3eb0d0ce3
 
 name: "Security Alert Burndown"
 "on":

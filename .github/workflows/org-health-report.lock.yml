@@ -26,6 +26,8 @@
 #     - shared/jqschema.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: c7846924a75b2a6ee3a6315a96ea1d54dd4838d5e06a71437f9b12fc46fbc211
 
 name: "Organization Health Report"
 "on":

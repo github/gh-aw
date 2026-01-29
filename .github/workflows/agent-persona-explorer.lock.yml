@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: ace93809fd33991acb1ae5939c5dd0122f63c81eb65b5d13ee7977fd2704d259
 
 name: "Agent Persona Explorer"
 "on":

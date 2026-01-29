@@ -26,6 +26,8 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
+#
+# Frontmatter-Hash: 773bc8f998db8902c52eda6a6f84c93f0efe5c3459f28bbb254ee1a9daed15d4
 
 name: "Daily Firewall Logs Collector and Reporter"
 "on":

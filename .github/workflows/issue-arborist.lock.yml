@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/jqschema.md
+#
+# Frontmatter-Hash: bc410a7ad54622179f34332c9730fed5738183c65c7a4c083a22a1059b85b28d
 
 name: "Issue Arborist"
 "on":

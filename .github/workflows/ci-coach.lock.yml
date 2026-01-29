@@ -27,6 +27,8 @@
 #     - shared/jqschema.md
 #     - shared/ci-data-analysis.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 25706a526c849f854da19a676e3b9f78ab0f57bb64a77d153d76465200683401
 
 name: "CI Optimization Coach"
 "on":

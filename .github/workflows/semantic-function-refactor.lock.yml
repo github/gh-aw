@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 64183072b97d35e8fc7687ab80054deb7e42c5f7fd11c94c6aea82ff2780e470
 
 name: "Semantic Function Refactoring"
 "on":

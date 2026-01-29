@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/docs-server-lifecycle.md
+#
+# Frontmatter-Hash: cf25a2cbdae34fae4f881d35c0f6042fb5bde5c3ff4216e28e22d30be70d21a7
 
 name: "Documentation Noob Tester"
 "on":

@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Fix critical vulnerabilities before audit deadline with full tracking and reporting
+#
+# Frontmatter-Hash: 5031fb4319c73192816df8b23bd23a3120bb7cc1136eeb1be3dea25ce3a73c2b
 
 name: "Security Compliance Campaign"
 "on":

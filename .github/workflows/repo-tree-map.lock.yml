@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 91956b9f8077adf5ad8db1a479372a83f03a60b3a929a84bbd13cec148c94164
 
 name: "Repository Tree Map Generator"
 "on":

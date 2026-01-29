@@ -26,6 +26,8 @@
 #     - shared/jqschema.md
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 3e52468d594f6384ac4be608560242fb89b8cda6f76ba6c041e3d1e33f292118
 
 name: "Safe Output Health Monitor"
 "on":

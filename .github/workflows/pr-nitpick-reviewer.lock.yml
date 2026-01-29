@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 3596c7ed0cad4d79dac40b742db0aad1f5be0796e6c962ac2d063dd34b8eae63
 
 name: "PR Nitpick Reviewer 🔍"
 "on":

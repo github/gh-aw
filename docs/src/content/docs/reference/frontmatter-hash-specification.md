@@ -98,6 +98,8 @@ Apply these normalization rules to ensure deterministic output:
 
 #### 3.3 Serialization Format
 
+The canonical JSON includes all frontmatter fields plus version information:
+
 ```json
 {
   "bots": ["copilot"],
@@ -117,25 +119,40 @@ Apply these normalization rules to ensure deterministic output:
   "safe-outputs": {"create-discussion": {"category": "audits"}},
   "services": {},
   "steps": [],
+  "template-expressions": ["${{ env.MY_VAR }}"],
   "timeout-minutes": 30,
   "tools": {"repo-memory": {"branch-name": "memory/audit"}},
-  "tracker-id": "audit-workflows-daily"
+  "tracker-id": "audit-workflows-daily",
+  "versions": {
+    "agents": "v0.0.84",
+    "awf": "v0.11.2",
+    "gh-aw": "dev"
+  }
 }
 ```
 
-### 4. Hash Computation
+### 4. Version Information
+
+The hash includes version numbers to ensure hash changes when dependencies are upgraded:
+
+- **gh-aw**: The compiler version (e.g., "0.1.0" or "dev")
+- **awf**: The firewall version (e.g., "v0.11.2")
+- **agents**: The MCP gateway version (e.g., "v0.0.84")
+
+This ensures that upgrading any component invalidates existing hashes.
 
 1. **Serialize**: Convert the merged and normalized frontmatter to canonical JSON
-2. **Hash**: Compute SHA-256 hash of the JSON string (UTF-8 encoded)
-3. **Encode**: Represent the hash as a lowercase hexadecimal string (64 characters)
+2. **Add Versions**: Include version information for gh-aw, awf (firewall), and agents (MCP gateway)
+3. **Hash**: Compute SHA-256 hash of the JSON string (UTF-8 encoded)
+4. **Encode**: Represent the hash as a lowercase hexadecimal string (64 characters)
 
 **Example:**
 ```
-Input JSON: {"engine":"copilot","on":{"schedule":"daily"}}
+Input JSON: {"engine":"copilot","on":{"schedule":"daily"},"versions":{"agents":"v0.0.84","awf":"v0.11.2","gh-aw":"dev"}}
 SHA-256: a1b2c3d4e5f6...  (64 hex characters)
 ```
 
-### 5. Cross-Language Consistency
+### 6. Cross-Language Consistency
 
 Both Go and JavaScript implementations MUST:
 - Use the same field selection and merging rules

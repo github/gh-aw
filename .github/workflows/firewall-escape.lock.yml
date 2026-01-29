@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Security testing to find escape paths in the AWF (Agent Workflow Firewall)
+#
+# Frontmatter-Hash: 5653c71f2fced43f65100e94246082cff800b41206997dfc801157a3f0eeac07
 
 name: "The Great Escapi"
 "on":

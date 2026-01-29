@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Inspects the gh-aw CLI to identify inconsistencies, typos, bugs, or documentation gaps by running commands and analyzing output
+#
+# Frontmatter-Hash: fb20b9e923237004c2698af33722bf970ee98f0253e06b34acb19e41bce3cb79
 
 name: "CLI Consistency Checker"
 "on":

@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Identifies and automatically fixes code security issues by creating autofixes via GitHub Code Scanning
+#
+# Frontmatter-Hash: 7e93cd9af64373f61575a5c696457356d6d8f9518998f7fc70755d3024be9307
 
 name: "Security Fix PR"
 "on":

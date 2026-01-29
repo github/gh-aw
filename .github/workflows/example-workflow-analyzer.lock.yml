@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 21f6b3e78edaacd17dbc70b977884c376825e1ae74519a7e7b095eb24577d90f
 
 name: "Weekly Workflow Analysis"
 "on":

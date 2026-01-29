@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 555e8c2483b0f2d4b7cdabfb370e063be3e143ea18cb60f4accbdac54a2713af
 
 name: "Workflow Skill Extractor"
 "on":

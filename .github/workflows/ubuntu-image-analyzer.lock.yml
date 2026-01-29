@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Weekly analysis of the default Ubuntu Actions runner image and guidance for creating Docker mimics
+#
+# Frontmatter-Hash: 36387d377e42940af1abd34631f0744d1359a664df5e557859787b78d01a8fbe
 
 name: "Ubuntu Actions Image Analyzer"
 "on":

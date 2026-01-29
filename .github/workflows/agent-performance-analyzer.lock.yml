@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 19c65046aba1eceeabaa17afe56396e3fc762c0cc61bba3d4a7927802c8b4992
 
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":

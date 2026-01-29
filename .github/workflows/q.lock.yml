@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/gh-aw.md
+#
+# Frontmatter-Hash: ea54f740195686341ce9c252476b99dd6a4df8f027fccda6365df1f9d35c2e2d
 
 name: "Q"
 "on":

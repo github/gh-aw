@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 41ab71ed3e3667d5aa3e40328d1db0c10b571746a4648a1cda1afc6207e58c85
 
 name: "Schema Consistency Checker"
 "on":

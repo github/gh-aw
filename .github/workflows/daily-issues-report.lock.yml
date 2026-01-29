@@ -28,6 +28,8 @@
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #     - shared/trends.md
+#
+# Frontmatter-Hash: b447e19bbc568c7b2dedf077e0fd71a0f8d686f633cde84cb99b88e9c94fdc18
 
 name: "Daily Issues Report Generator"
 "on":

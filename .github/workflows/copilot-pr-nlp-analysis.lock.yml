@@ -27,6 +27,8 @@
 #     - shared/jqschema.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 13f80bd139f6dd0c263cf59de678293061509844abbc83c782c8c58d39c3b0d1
 
 name: "Copilot PR Conversation NLP Analysis"
 "on":

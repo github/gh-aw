@@ -26,6 +26,8 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
+#
+# Frontmatter-Hash: b69124bb7a8c2c40ef2fdf91d3c37be205f4b676beb53be863dd2fb3da4d9627
 
 name: "Daily Project Performance Summary Generator (Using Safe Inputs)"
 "on":

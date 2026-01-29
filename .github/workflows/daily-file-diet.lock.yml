@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
+#
+# Frontmatter-Hash: dfa48da56f962cebb42388fe6ed504dd6cd9ef83d075ed1deb0e52821bd297cd
 
 name: "Daily File Diet"
 "on":

@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: b11140f300999bb67f7dada26d01c3eec9693f2b50f25f4dd960d46e28687f0d
 
 name: "Workflow Health Manager - Meta-Orchestrator"
 "on":

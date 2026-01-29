@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: cba100401dd9147661e8d5a73d1329f17cae0ecb18f6937931b64a0d22613792
 
 name: "Code Simplifier"
 "on":

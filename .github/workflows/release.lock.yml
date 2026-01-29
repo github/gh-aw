@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
+#
+# Frontmatter-Hash: 26c2466464a7384353dccaeb78f631b9de36b7f2c612ca9061132109eaaa1ef0
 
 name: "Release"
 "on":

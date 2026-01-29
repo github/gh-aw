@@ -39,6 +39,8 @@
 #     - shared/mcp/slack.md
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: c277ecdde6965ba27b87538231f9b42fb07199a9a3171dc03f01615e2ffe3c23
 
 name: "MCP Inspector Agent"
 "on":

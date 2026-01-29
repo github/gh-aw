@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 0cd6fe59abc07fc87e2eef9285bfef37344b64371dab1f6aa7213ada29fae769
 
 name: "Auto-Triage Issues"
 "on":

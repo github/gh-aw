@@ -23,6 +23,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# Frontmatter-Hash: 0d1d043128dfbcdfff2d530f71567fc1fd12097625c0f508a409633bd8298aeb
 
 name: "Issue Triage Agent"
 "on":

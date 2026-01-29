@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Smoke test to validate common development tools are available in the agent container
+#
+# Frontmatter-Hash: c58715754ba57e0b9a7638fc4c21bbc9e7f0f787a20832f41cae6152124573bc
 
 name: "Agent Container Smoke Test"
 "on":
