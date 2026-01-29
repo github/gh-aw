@@ -21,7 +21,7 @@
 #
 # Scheduled workflow that recursively closes parent issues when all sub-issues are 100% complete
 #
-# frontmatter-hash: d5380f8147a936ec72469e2b66accefd40f36ccf4ac44091390b18d97aec3bd1
+# frontmatter-hash: 9534344e8028b075a695fbd6685bdd5df1e742c0e6398332b6a1b7be4e1db7b1
 
 name: "Sub-Issue Closer"
 "on":

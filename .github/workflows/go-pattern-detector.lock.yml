@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/ast-grep.md
 #
-# frontmatter-hash: 728664aff256ce1687f7220baf8c484cb7a9f2b1385150ebaa9f7c97ff4ab427
+# frontmatter-hash: 82cd8b5e909f3f26cfb73d335227675bad08368a241b141a18d74da4d52c3010
 
 name: "Go Pattern Detector"
 "on":

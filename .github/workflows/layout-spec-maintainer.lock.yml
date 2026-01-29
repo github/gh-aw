@@ -21,7 +21,7 @@
 #
 # Maintains scratchpad/layout.md with patterns of file paths, folder names, and artifact names used in lock.yml files
 #
-# frontmatter-hash: 7160143b9c9de4372dc89a76afd9024e75f209ea222d5c6c755eae963a0b31e5
+# frontmatter-hash: 22b58bbca644973302426cfec52d39abb37b722008cd5358dfedd2f32a56dce5
 
 name: "Layout Specification Maintainer"
 "on":

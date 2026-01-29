@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
-# frontmatter-hash: d271847c429497a78c56e6f6e180b988af2d3eeda4110017bb8140876f753ffb
+# frontmatter-hash: 518e7f917a4e0c8ee4927d6f0d09c760b5cacf8b20f9130dd561895bc5e78bf9
 
 name: "Dependabot Burner"
 "on":

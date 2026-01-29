@@ -27,7 +27,7 @@
 #     - shared/python-dataviz.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 586589dd259c45128e0a8459f5359d0ab8e2938b17735e055a6e5c251f2a1f7c
+# frontmatter-hash: 56acc0f8a597fbd136dda5d54919872f7e50887fb88f26617efc1e4f56b4695e
 
 name: "Stale Repository Identifier"
 "on":
