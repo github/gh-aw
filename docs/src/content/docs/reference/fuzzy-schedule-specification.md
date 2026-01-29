@@ -7,7 +7,7 @@ sidebar:
 
 # Fuzzy Schedule Time Syntax Specification
 
-**Version**: 1.0.0  
+**Version**: 1.1.0  
 **Status**: Draft Specification  
 **Latest Version**: [fuzzy-schedule-specification](/gh-aw/reference/fuzzy-schedule-specification/)  
 **Editor**: GitHub Agentic Workflows Team
@@ -16,7 +16,7 @@ sidebar:
 
 ## Abstract
 
-This specification defines the Fuzzy Schedule Time Syntax, a human-friendly scheduling language for GitHub Agentic Workflows that automatically distributes workflow execution times to prevent server load spikes. The syntax supports daily, hourly, weekly, and interval-based schedules with optional time constraints and timezone conversions. The specification includes a deterministic scattering algorithm that assigns consistent execution times to workflows based on their identifiers, ensuring predictable behavior across multiple compilations while distributing load across an organization's infrastructure.
+This specification defines the Fuzzy Schedule Time Syntax, a human-friendly scheduling language for GitHub Agentic Workflows that automatically distributes workflow execution times to prevent server load spikes. The syntax supports daily, hourly, weekly, and interval-based schedules with optional time constraints and timezone conversions. The specification includes a deterministic scattering algorithm that uses hash functions to assign consistent execution times to workflows based on their identifiers, ensuring predictable behavior across multiple compilations while distributing load across an organization's infrastructure.
 
 ## Status of This Document
 
@@ -502,9 +502,16 @@ The scattering algorithm MUST provide:
 
 ### 6.2 Hash Function Requirements
 
-#### 6.2.1 Hash Algorithm
+#### 6.2.1 Hash Algorithm Selection
 
-An implementation MUST use the FNV-1a (Fowler-Noll-Vo) 32-bit hash algorithm defined as:
+An implementation MUST use a hash function that satisfies the following requirements:
+
+1. **Determinism**: The hash function MUST produce the same output for the same input across all platforms and executions
+2. **Distribution**: The hash function SHOULD produce uniformly distributed outputs across the hash space
+3. **Stability**: The hash function MUST NOT change behavior across different versions of the implementation
+4. **Integer output**: The hash function MUST produce an integer output suitable for modulo operations
+
+An implementation SHOULD use the FNV-1a (Fowler-Noll-Vo) 32-bit hash algorithm as a reference implementation:
 
 ```
 hash = FNV_offset_basis
@@ -517,6 +524,8 @@ Where:
     FNV_offset_basis = 2166136261 (0x811c9dc5)
     FNV_prime = 16777619 (0x01000193)
 ```
+
+Other suitable hash functions MAY be used, such as MurmurHash, xxHash, or CityHash, provided they meet the above requirements.
 
 #### 6.2.2 Workflow Identifier Format
 
@@ -1069,11 +1078,11 @@ Implementations MUST validate all user inputs before processing:
 
 - **[RFC 2119]** S. Bradner. "Key words for use in RFCs to Indicate Requirement Levels". RFC 2119, March 1997. [https://www.ietf.org/rfc/rfc2119.txt](https://www.ietf.org/rfc/rfc2119.txt)
 
-- **[FNV]** G. Fowler, L. C. Noll, K.-P. Vo. "FNV Hash". [http://www.isthe.com/chongo/tech/comp/fnv/](http://www.isthe.com/chongo/tech/comp/fnv/)
-
 - **[ABNF]** D. Crocker, P. Overell. "Augmented BNF for Syntax Specifications: ABNF". RFC 5234, January 2008. [https://tools.ietf.org/html/rfc5234](https://tools.ietf.org/html/rfc5234)
 
 ### Informative References
+
+- **[FNV]** G. Fowler, L. C. Noll, K.-P. Vo. "FNV Hash". [http://www.isthe.com/chongo/tech/comp/fnv/](http://www.isthe.com/chongo/tech/comp/fnv/)
 
 - **[GitHub Actions Cron]** GitHub Documentation. "Events that trigger workflows - schedule". [https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule)
 
@@ -1082,6 +1091,13 @@ Implementations MUST validate all user inputs before processing:
 ---
 
 ## Change Log
+
+### Version 1.1.0 (Draft)
+
+- **Changed**: Hash function requirement relaxed from MUST to SHOULD for FNV-1a
+- **Added**: General hash function requirements (determinism, distribution, stability, integer output)
+- **Added**: Support for alternative hash functions (MurmurHash, xxHash, CityHash)
+- **Changed**: Moved FNV reference from normative to informative references
 
 ### Version 1.0.0 (Draft)
 
