@@ -101,7 +101,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 		DefaultMax:       1,
 		CustomValidation: "requiresOneOf:issue_number,pull_number",
 		Fields: map[string]FieldValidation{
-			"issue_number": {OptionalPositiveInteger: true},
+			"issue_number": {IssueNumberOrTemporaryID: true},
 			"pull_number":  {OptionalPositiveInteger: true},
 			"agent":        {Type: "string", Sanitize: true, MaxLength: 128},
 		},

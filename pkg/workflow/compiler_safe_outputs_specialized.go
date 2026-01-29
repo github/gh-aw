@@ -48,6 +48,12 @@ func (c *Compiler) buildAssignToAgentStepConfig(data *WorkflowData, mainJobName 
 		customEnvVars = append(customEnvVars, "          GH_AW_AGENT_IGNORE_IF_ERROR: \"true\"\n")
 	}
 
+	// Allow assign_to_agent to reference issues created earlier in the same run via temporary IDs (aw_...)
+	// The handler manager (process_safe_outputs) produces a temporary_id_map output when create_issue is enabled.
+	if data.SafeOutputs != nil && data.SafeOutputs.CreateIssues != nil {
+		customEnvVars = append(customEnvVars, "          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}\n")
+	}
+
 	condition := BuildSafeOutputType("assign_to_agent")
 
 	return SafeOutputStepConfig{

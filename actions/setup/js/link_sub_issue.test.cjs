@@ -161,4 +161,20 @@ const mockCore = {
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved parent temporary ID"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved sub-issue temporary ID"));
     });
+
+    it("should fail when parent and sub temporary IDs resolve to different repos", async () => {
+      const message = { type: "link_sub_issue", parent_issue_number: "aw_123456789abc", sub_issue_number: "aw_456789abcdef" };
+
+      const resolvedIds = {
+        aw_123456789abc: { repo: "org-a/repo-a", number: 100 },
+        aw_456789abcdef: { repo: "org-b/repo-b", number: 50 },
+      };
+
+      const result = await handler(message, resolvedIds);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("must be in the same repository");
+      expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+      expect(mockGithub.graphql).not.toHaveBeenCalled();
+    });
   }));

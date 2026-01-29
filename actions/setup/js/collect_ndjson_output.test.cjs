@@ -97,7 +97,15 @@ describe("collect_ndjson_output.cjs", () => {
               ruleIdSuffix: { type: "string", pattern: "^[a-zA-Z0-9_-]+$", patternError: "must contain only alphanumeric characters, hyphens, and underscores", sanitize: !0, maxLength: 128 },
             },
           },
-          assign_to_agent: { defaultMax: 1, fields: { issue_number: { required: !0, positiveInteger: !0 }, agent: { type: "string", sanitize: !0, maxLength: 128 } } },
+          assign_to_agent: {
+            defaultMax: 1,
+            customValidation: "requiresOneOf:issue_number,pull_number",
+            fields: {
+              issue_number: { issueNumberOrTemporaryId: !0 },
+              pull_number: { optionalPositiveInteger: !0 },
+              agent: { type: "string", sanitize: !0, maxLength: 128 },
+            },
+          },
           create_discussion: {
             defaultMax: 1,
             fields: { title: { required: !0, type: "string", sanitize: !0, maxLength: 128 }, body: { required: !0, type: "string", sanitize: !0, maxLength: 65e3 }, category: { type: "string", sanitize: !0, maxLength: 128 } },
@@ -1521,6 +1529,19 @@ describe("collect_ndjson_output.cjs", () => {
           const parsedOutput = JSON.parse(outputCall[1]);
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].issue_number).toBe(42), expect(parsedOutput.errors).toHaveLength(0));
         }),
+        it("should validate assign_to_agent with temporary_id issue_number", async () => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
+            ndjsonContent = '{"type": "assign_to_agent", "issue_number": "aw_abc123def456"}';
+          (fs.writeFileSync(testFile, ndjsonContent), (process.env.GH_AW_SAFE_OUTPUTS = testFile));
+          const __config = '{"assign_to_agent": true}',
+            configPath = "/opt/gh-aw/safeoutputs/config.json";
+          (fs.mkdirSync("/opt/gh-aw/safeoutputs", { recursive: !0 }), fs.writeFileSync(configPath, __config), await eval(`(async () => { ${collectScript}; await main(); })()`));
+          const setOutputCalls = mockCore.setOutput.mock.calls,
+            outputCall = setOutputCalls.find(call => "output" === call[0]);
+          expect(outputCall).toBeDefined();
+          const parsedOutput = JSON.parse(outputCall[1]);
+          (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].issue_number).toBe("aw_abc123def456"), expect(parsedOutput.errors).toHaveLength(0));
+        }),
         it("should validate assign_to_agent with optional fields", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
             ndjsonContent = '{"type": "assign_to_agent", "issue_number": 42, "agent": "my-agent"}';
@@ -1549,7 +1570,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("assign_to_agent 'issue_number' is required"))).toBe(!0));
+          (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("assign_to_agent requires at least one of"))).toBe(!0));
         }));
     }),
     describe("link_sub_issue temporary ID validation", () => {
