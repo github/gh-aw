@@ -37,6 +37,9 @@ Configuration options: `model` (gpt-5 or claude-sonnet-4), `version` (CLI versio
 
 Create a fine-grained PAT at <https://github.com/settings/personal-access-tokens/new>. Select your user account (not an organization), choose "Public repositories" access, and enable "Copilot Requests" permissions. Then add it to your repository:
 
+> [!NOTE]
+> You should leave "Public repositories" enabled; otherwise, you will not have access to the Copilot Requests permission option.
+
 ```bash wrap
 gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
 ```

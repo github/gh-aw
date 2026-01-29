@@ -84,7 +84,7 @@ const mockCore = {
           }),
           it("should block HTTP URLs while preserving HTTPS URLs", () => {
             const result = sanitizeContentFunction("HTTP: http://bad.com and HTTPS: https://github.com");
-            (expect(result).toContain("(redacted)"), expect(result).toContain("https://github.com"), expect(result).not.toContain("http://bad.com"));
+            (expect(result).toContain("(bad.com/redacted)"), expect(result).toContain("https://github.com"), expect(result).not.toContain("http://bad.com"));
           }),
           it("should block various unsafe protocols", () => {
             const result = sanitizeContentFunction("Bad: ftp://file.com javascript:alert(1) file://local data:text/html,<script>");
@@ -96,7 +96,7 @@ const mockCore = {
           }),
           it("should block HTTPS URLs for disallowed domains", () => {
             const result = sanitizeContentFunction("Bad: https://evil.com/malware Good: https://github.com/repo");
-            (expect(result).toContain("(redacted)"), expect(result).toContain("https://github.com/repo"), expect(result).not.toContain("https://evil.com"));
+            (expect(result).toContain("(evil.com/redacted)"), expect(result).toContain("https://github.com/repo"), expect(result).not.toContain("https://evil.com"));
           }),
           it("should respect custom allowed domains from environment", () => {
             const originalServerUrl = process.env.GITHUB_SERVER_URL,
@@ -109,7 +109,7 @@ const mockCore = {
               result = customSanitize(input);
             (expect(result).toContain("https://example.com/page"),
               expect(result).toContain("https://trusted.org/file"),
-              expect(result).toContain("(redacted)"),
+              expect(result).toContain("(github.com/redacted)"),
               expect(result).not.toContain("https://github.com/repo"),
               originalServerUrl && (process.env.GITHUB_SERVER_URL = originalServerUrl),
               originalApiUrl && (process.env.GITHUB_API_URL = originalApiUrl));
@@ -125,7 +125,7 @@ const mockCore = {
               expect(result).toContain("https://github.example.com/repo"),
               expect(result).toContain("https://api.github.example.com/v1"),
               expect(result).toContain("https://raw.github.example.com/file"),
-              expect(result).toContain("(redacted)"),
+              expect(result).toContain("(blocked.com/redacted)"),
               expect(result).not.toContain("https://blocked.com/page"),
               delete process.env.GITHUB_SERVER_URL,
               delete process.env.GITHUB_API_URL,
@@ -194,7 +194,7 @@ const mockCore = {
             const customSanitize = global.testSanitizeContent,
               input = "Link: https://github.com/repo",
               result = customSanitize(input);
-            (expect(result).toContain("(redacted)"),
+            (expect(result).toContain("(github.com/redacted)"),
               expect(result).not.toContain("https://github.com/repo"),
               originalServerUrl && (process.env.GITHUB_SERVER_URL = originalServerUrl),
               originalApiUrl && (process.env.GITHUB_API_URL = originalApiUrl));
@@ -240,11 +240,11 @@ const mockCore = {
             );
             (expect(result).toContain("https://api.github.com/v4/graphql"),
               expect(result).toContain("https://docs.github.com/en/"),
-              expect(result).toContain("(redacted)"),
-              expect(result).not.toContain("github.com.evil.com"),
-              expect(result).not.toContain("notgithub.com"),
-              expect(result).not.toContain("github.com.attacker.com"),
-              expect(result).not.toContain("sub.github.io.fake.com"));
+              expect(result).toContain("/redacted"),
+              expect(result).not.toContain("https://github.com.evil.com"),
+              expect(result).not.toContain("https://notgithub.com"),
+              expect(result).not.toContain("https://github.com.attacker.com"),
+              expect(result).not.toContain("https://sub.github.io.fake.com"));
           }),
           it("should handle URLs with special characters and edge cases", () => {
             const result = sanitizeContentFunction(
@@ -309,7 +309,7 @@ const mockCore = {
               "\n        Good HTTPS: https://github.com/repo\n        Bad HTTPS: https://evil.com/malware  \n        Bad HTTP allowed domain: http://github.com/repo\n        Mixed: https://evil.com/path?goto=https://github.com/safe\n      "
             );
             (expect(result).toContain("https://github.com/repo"),
-              expect(result).toContain("(redacted)"),
+              expect(result).toContain("/redacted"),
               expect(result).not.toContain("https://evil.com"),
               expect(result).not.toContain("http://github.com"),
               expect(result).toContain("https://github.com/safe"));
@@ -356,7 +356,7 @@ const mockCore = {
             const sanitizedOutput = outputCall[1];
             (expect(sanitizedOutput).toContain("`@user`"),
               expect(sanitizedOutput).toContain("`fixes #123`"),
-              expect(sanitizedOutput).toContain("(redacted)"),
+              expect(sanitizedOutput).toContain("/redacted"),
               expect(sanitizedOutput).toContain("https://github.com/repo"),
               fs.unlinkSync(testFile));
           }),
@@ -409,7 +409,7 @@ const mockCore = {
             const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]);
             expect(outputCall).toBeDefined();
             const result = outputCall[1];
-            (expect(result).toMatch(/\[Content truncated due to (line count|length)\]/), expect(result).toContain("`@user`"), expect(result).toContain("(redacted)"), expect(result).toContain("(script)"), fs.unlinkSync(testFile));
+            (expect(result).toMatch(/\[Content truncated due to (line count|length)\]/), expect(result).toContain("`@user`"), expect(result).toContain("/redacted"), expect(result).toContain("(script)"), fs.unlinkSync(testFile));
           }),
           it("should preserve log message format for short content", async () => {
             const shortContent = "Short message with @user",
@@ -481,7 +481,7 @@ const mockCore = {
             const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]);
             expect(outputCall).toBeDefined();
             const result = outputCall[1];
-            (expect(result).toContain("`/analyze-bot`"), expect(result).toContain("`@user`"), expect(result).toContain("(redacted)"), fs.unlinkSync(testFile), delete process.env.GH_AW_COMMAND);
+            (expect(result).toContain("`/analyze-bot`"), expect(result).toContain("`@user`"), expect(result).toContain("/redacted"), fs.unlinkSync(testFile), delete process.env.GH_AW_COMMAND);
           }));
       }),
       describe("URL Redaction Logging", () => {

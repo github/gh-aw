@@ -76,7 +76,7 @@ const mockCore = {
           }),
           it("should redact non-https protocols", () => {
             const result = sanitizeIncomingTextFunction("Visit http://example.com or ftp://files.com");
-            (expect(result).toContain("(redacted)"), expect(result).not.toContain("http://example.com"));
+            (expect(result).toContain("/redacted"), expect(result).not.toContain("http://example.com"));
           }),
           it("should allow github.com domains", () => {
             const result = sanitizeIncomingTextFunction("Visit https://github.com/user/repo");
@@ -84,7 +84,7 @@ const mockCore = {
           }),
           it("should redact unknown domains", () => {
             const result = sanitizeIncomingTextFunction("Visit https://evil.com/malware");
-            (expect(result).toContain("(redacted)"), expect(result).not.toContain("evil.com"));
+            (expect(result).toContain("/redacted"), expect(result).not.toContain("https://evil.com"));
           }),
           it("should truncate long content", () => {
             const longContent = "a".repeat(6e5),
@@ -103,7 +103,7 @@ const mockCore = {
           it("should respect custom allowed domains", () => {
             process.env.GH_AW_ALLOWED_DOMAINS = "example.com,trusted.org";
             const result = sanitizeIncomingTextFunction("Visit https://example.com and https://trusted.org and https://evil.com");
-            (expect(result).toContain("https://example.com"), expect(result).toContain("https://trusted.org"), expect(result).toContain("(redacted)"));
+            (expect(result).toContain("https://example.com"), expect(result).toContain("https://trusted.org"), expect(result).toContain("/redacted"));
           }));
       }),
       describe("main function", () => {
@@ -168,7 +168,7 @@ const mockCore = {
           it("should sanitize extracted text before output", async () => {
             ((mockContext.eventName = "issues"), (mockContext.payload = { issue: { title: "Test @user fixes #123", body: "Visit https://evil.com" } }), await testMain());
             const outputCall = mockCore.setOutput.mock.calls[0];
-            (expect(outputCall[1]).toContain("`@user`"), expect(outputCall[1]).toContain("`fixes #123`"), expect(outputCall[1]).toContain("(redacted)"));
+            (expect(outputCall[1]).toContain("`@user`"), expect(outputCall[1]).toContain("`fixes #123`"), expect(outputCall[1]).toContain("/redacted"));
           }),
           it("should handle missing title and body gracefully", async () => {
             ((mockContext.eventName = "issues"), (mockContext.payload = { issue: {} }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""));

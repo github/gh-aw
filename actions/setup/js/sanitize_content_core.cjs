@@ -135,7 +135,37 @@ function buildAllowedDomains() {
 }
 
 /**
- * Sanitize URL protocols - replace non-https with (redacted)
+ * Sanitize a domain name to only include alphanumeric characters and dots,
+ * keeping up to 3 domain parts (e.g., sub.example.com).
+ * If more than 3 parts exist, truncates with "..."
+ * @param {string} domain - The domain to sanitize
+ * @returns {string} The sanitized domain
+ */
+function sanitizeDomainName(domain) {
+  if (!domain || typeof domain !== "string") {
+    return "";
+  }
+
+  // Split domain into parts
+  const parts = domain.split(".");
+
+  // Keep only alphanumeric characters in each part
+  const sanitizedParts = parts.map(part => part.replace(/[^a-zA-Z0-9]/g, ""));
+
+  // Filter out empty parts
+  const nonEmptyParts = sanitizedParts.filter(part => part.length > 0);
+
+  // Take up to 3 parts
+  if (nonEmptyParts.length <= 3) {
+    return nonEmptyParts.join(".");
+  } else {
+    // Take first 3 parts and add "..."
+    return nonEmptyParts.slice(0, 3).join(".") + "...";
+  }
+}
+
+/**
+ * Sanitize URL protocols - replace non-https with <sanitized-domain>/redacted
  * @param {string} s - The string to process
  * @returns {string} The string with non-https protocols redacted
  */
@@ -149,6 +179,7 @@ function sanitizeUrlProtocols(s) {
     // Extract domain for http/ftp/file/ssh/git protocols
     if (domain) {
       const domainLower = domain.toLowerCase();
+      const sanitized = sanitizeDomainName(domainLower);
       const truncated = domainLower.length > 12 ? domainLower.substring(0, 12) + "..." : domainLower;
       if (typeof core !== "undefined" && core.info) {
         core.info(`Redacted URL: ${truncated}`);
@@ -157,6 +188,8 @@ function sanitizeUrlProtocols(s) {
         core.debug(`Redacted URL (full): ${match}`);
       }
       addRedactedDomain(domainLower);
+      // Return sanitized domain format
+      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
     } else {
       // For other protocols (data:, javascript:, etc.), track the protocol itself
       const protocolMatch = match.match(/^([^:]+):/);
@@ -172,8 +205,8 @@ function sanitizeUrlProtocols(s) {
         }
         addRedactedDomain(protocol);
       }
+      return "(redacted)";
     }
-    return "(redacted)";
   });
 }
 
@@ -221,6 +254,7 @@ function sanitizeUrlDomains(s, allowed) {
       return match; // Keep the full URL as-is
     } else {
       // Redact the domain but preserve the protocol and structure for debugging
+      const sanitized = sanitizeDomainName(hostname);
       const truncated = hostname.length > 12 ? hostname.substring(0, 12) + "..." : hostname;
       if (typeof core !== "undefined" && core.info) {
         core.info(`Redacted URL: ${truncated}`);
@@ -229,7 +263,8 @@ function sanitizeUrlDomains(s, allowed) {
         core.debug(`Redacted URL (full): ${match}`);
       }
       addRedactedDomain(hostname);
-      return "(redacted)";
+      // Return sanitized domain format
+      return sanitized ? `(${sanitized}/redacted)` : "(redacted)";
     }
   });
 }
@@ -522,6 +557,7 @@ module.exports = {
   buildAllowedDomains,
   buildAllowedGitHubReferences,
   getCurrentRepoSlug,
+  sanitizeDomainName,
   sanitizeUrlProtocols,
   sanitizeUrlDomains,
   neutralizeCommands,
