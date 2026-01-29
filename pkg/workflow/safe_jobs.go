@@ -34,24 +34,18 @@ func HasSafeJobsEnabled(safeJobs map[string]*SafeJobConfig) bool {
 	return len(safeJobs) > 0
 }
 
-// parseSafeJobsConfig parses safe-jobs configuration from a frontmatter map.
-// This is an internal helper function that expects a map with a "safe-jobs" key.
-// User workflows should use "safe-outputs.jobs" syntax; the top-level "safe-jobs" key is NOT supported.
-func (c *Compiler) parseSafeJobsConfig(frontmatter map[string]any) map[string]*SafeJobConfig {
-	safeJobsSection, exists := frontmatter["safe-jobs"]
-	if !exists {
+// parseSafeJobsConfig parses safe-jobs configuration from a jobs map.
+// This function expects a map of job configurations directly (from safe-outputs.jobs).
+// The top-level "safe-jobs" key is NOT supported - only "safe-outputs.jobs" is valid.
+func (c *Compiler) parseSafeJobsConfig(jobsMap map[string]any) map[string]*SafeJobConfig {
+	if jobsMap == nil {
 		return nil
 	}
 
-	safeJobsMap, ok := safeJobsSection.(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	safeJobsLog.Printf("Parsing %d safe-jobs from frontmatter", len(safeJobsMap))
+	safeJobsLog.Printf("Parsing %d safe-jobs from jobs map", len(jobsMap))
 	result := make(map[string]*SafeJobConfig)
 
-	for jobName, jobValue := range safeJobsMap {
+	for jobName, jobValue := range jobsMap {
 		jobConfig, ok := jobValue.(map[string]any)
 		if !ok {
 			continue
@@ -300,7 +294,7 @@ func (c *Compiler) buildSafeJobs(data *WorkflowData, threatDetectionEnabled bool
 }
 
 // extractSafeJobsFromFrontmatter extracts safe-jobs configuration from frontmatter.
-// Only checks the safe-outputs.jobs location. The old top-level "safe-jobs" syntax is NOT supported.
+// Only checks the safe-outputs.jobs location. The top-level "safe-jobs" syntax is NOT supported.
 func extractSafeJobsFromFrontmatter(frontmatter map[string]any) map[string]*SafeJobConfig {
 	// Check location: safe-outputs.jobs
 	if safeOutputs, exists := frontmatter["safe-outputs"]; exists {
@@ -308,8 +302,7 @@ func extractSafeJobsFromFrontmatter(frontmatter map[string]any) map[string]*Safe
 			if jobs, exists := safeOutputsMap["jobs"]; exists {
 				if jobsMap, ok := jobs.(map[string]any); ok {
 					c := &Compiler{} // Create a temporary compiler instance for parsing
-					frontmatterCopy := map[string]any{"safe-jobs": jobsMap}
-					return c.parseSafeJobsConfig(frontmatterCopy)
+					return c.parseSafeJobsConfig(jobsMap)
 				}
 			}
 		}

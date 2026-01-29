@@ -360,12 +360,11 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.Mentions = parseMentionsConfig(mentions)
 			}
 
-			// Handle jobs (safe-jobs moved under safe-outputs)
+			// Handle jobs (safe-jobs must be under safe-outputs)
 			if jobs, exists := outputMap["jobs"]; exists {
 				if jobsMap, ok := jobs.(map[string]any); ok {
 					c := &Compiler{} // Create a temporary compiler instance for parsing
-					jobsFrontmatter := map[string]any{"safe-jobs": jobsMap}
-					config.Jobs = c.parseSafeJobsConfig(jobsFrontmatter)
+					config.Jobs = c.parseSafeJobsConfig(jobsMap)
 				}
 			}
 

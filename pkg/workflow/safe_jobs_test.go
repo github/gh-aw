@@ -10,48 +10,46 @@ import (
 func TestParseSafeJobsConfig(t *testing.T) {
 	c := NewCompiler()
 
-	// Test parseSafeJobsConfig internal function which expects a "safe-jobs" key.
+	// Test parseSafeJobsConfig internal function which now expects a jobs map directly.
 	// Note: User workflows should use "safe-outputs.jobs" syntax; this test validates
 	// the internal parsing logic used by extractSafeJobsFromFrontmatter and safe_outputs.go.
-	frontmatter := map[string]any{
-		"safe-jobs": map[string]any{
-			"deploy": map[string]any{
-				"runs-on": "ubuntu-latest",
-				"if":      "github.event.issue.number",
-				"needs":   []any{"task"},
-				"env": map[string]any{
-					"DEPLOY_ENV": "production",
+	jobsMap := map[string]any{
+		"deploy": map[string]any{
+			"runs-on": "ubuntu-latest",
+			"if":      "github.event.issue.number",
+			"needs":   []any{"task"},
+			"env": map[string]any{
+				"DEPLOY_ENV": "production",
+			},
+			"permissions": map[string]any{
+				"contents": "write",
+				"issues":   "read",
+			},
+			"github-token": "${{ secrets.CUSTOM_TOKEN }}",
+			"inputs": map[string]any{
+				"environment": map[string]any{
+					"description": "Target deployment environment",
+					"required":    true,
+					"type":        "choice",
+					"options":     []any{"staging", "production"},
 				},
-				"permissions": map[string]any{
-					"contents": "write",
-					"issues":   "read",
+				"force": map[string]any{
+					"description": "Force deployment even if tests fail",
+					"required":    false,
+					"type":        "boolean",
+					"default":     "false",
 				},
-				"github-token": "${{ secrets.CUSTOM_TOKEN }}",
-				"inputs": map[string]any{
-					"environment": map[string]any{
-						"description": "Target deployment environment",
-						"required":    true,
-						"type":        "choice",
-						"options":     []any{"staging", "production"},
-					},
-					"force": map[string]any{
-						"description": "Force deployment even if tests fail",
-						"required":    false,
-						"type":        "boolean",
-						"default":     "false",
-					},
-				},
-				"steps": []any{
-					map[string]any{
-						"name": "Deploy application",
-						"run":  "echo 'Deploying to ${{ inputs.environment }}'",
-					},
+			},
+			"steps": []any{
+				map[string]any{
+					"name": "Deploy application",
+					"run":  "echo 'Deploying to ${{ inputs.environment }}'",
 				},
 			},
 		},
 	}
 
-	result := c.parseSafeJobsConfig(frontmatter)
+	result := c.parseSafeJobsConfig(jobsMap)
 
 	if result == nil {
 		t.Fatal("Expected safe-jobs config to be parsed, got nil")
@@ -680,52 +678,50 @@ func TestMergeSafeJobsFromIncludedConfigs(t *testing.T) {
 func TestSafeJobsInputTypes(t *testing.T) {
 	c := NewCompiler()
 
-	frontmatter := map[string]any{
-		"safe-jobs": map[string]any{
-			"test-job": map[string]any{
-				"runs-on": "ubuntu-latest",
-				"inputs": map[string]any{
-					"message": map[string]any{
-						"description": "String input",
-						"type":        "string",
-						"default":     "Hello World",
-						"required":    true,
-					},
-					"debug": map[string]any{
-						"description": "Boolean input",
-						"type":        "boolean",
-						"default":     false,
-						"required":    false,
-					},
-					"count": map[string]any{
-						"description": "Number input",
-						"type":        "number",
-						"default":     100,
-						"required":    true,
-					},
-					"environment": map[string]any{
-						"description": "Choice input",
-						"type":        "choice",
-						"default":     "staging",
-						"options":     []any{"dev", "staging", "prod"},
-					},
-					"deploy_env": map[string]any{
-						"description": "Environment input",
-						"type":        "environment",
-						"required":    false,
-					},
+	jobsMap := map[string]any{
+		"test-job": map[string]any{
+			"runs-on": "ubuntu-latest",
+			"inputs": map[string]any{
+				"message": map[string]any{
+					"description": "String input",
+					"type":        "string",
+					"default":     "Hello World",
+					"required":    true,
 				},
-				"steps": []any{
-					map[string]any{
-						"name": "Test step",
-						"run":  "echo 'Testing inputs'",
-					},
+				"debug": map[string]any{
+					"description": "Boolean input",
+					"type":        "boolean",
+					"default":     false,
+					"required":    false,
+				},
+				"count": map[string]any{
+					"description": "Number input",
+					"type":        "number",
+					"default":     100,
+					"required":    true,
+				},
+				"environment": map[string]any{
+					"description": "Choice input",
+					"type":        "choice",
+					"default":     "staging",
+					"options":     []any{"dev", "staging", "prod"},
+				},
+				"deploy_env": map[string]any{
+					"description": "Environment input",
+					"type":        "environment",
+					"required":    false,
+				},
+			},
+			"steps": []any{
+				map[string]any{
+					"name": "Test step",
+					"run":  "echo 'Testing inputs'",
 				},
 			},
 		},
 	}
 
-	result := c.parseSafeJobsConfig(frontmatter)
+	result := c.parseSafeJobsConfig(jobsMap)
 
 	if result == nil {
 		t.Fatal("Expected safe-jobs config to be parsed, got nil")
