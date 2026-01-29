@@ -446,6 +446,12 @@ jobs:
             "create_issue": {
               "defaultMax": 1,
               "fields": {
+                "assignees": {
+                  "type": "array",
+                  "itemType": "string",
+                  "itemSanitize": true,
+                  "itemMaxLength": 39
+                },
                 "body": {
                   "required": true,
                   "type": "string",

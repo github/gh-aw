@@ -49,6 +49,7 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"title":        {Required: true, Type: "string", Sanitize: true, MaxLength: 128},
 			"body":         {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 			"labels":       {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: 128},
+			"assignees":    {Type: "array", ItemType: "string", ItemSanitize: true, ItemMaxLength: MaxGitHubUsernameLength},
 			"parent":       {IssueOrPRNumber: true},
 			"temporary_id": {Type: "string"},
 			"repo":         {Type: "string", MaxLength: 256}, // Optional: target repository in format "owner/repo"
