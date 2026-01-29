@@ -123,17 +123,17 @@ Use the `create_issue` tool:
 create_issue(title="Security Alert Burndown: Dependabot bundling plan (YYYY-MM-DD)", body="<paste body from template below>")
 ```
 
-After calling `create_issue`, **store the returned issue number** - you will need it for actions 2 and 3.
+After calling `create_issue`, **store the returned temporary ID** (e.g., `aw_sec2026012901`) - you will need it for actions 2 and 3. The temporary ID will be automatically resolved to the actual issue number.
 
 **Action 2: Add the issue to the project board**
 
-Immediately after creating the issue, add it to the project board using `update_project`. Use the issue number from action 1:
+Immediately after creating the issue, add it to the project board using `update_project`. Use the temporary ID from action 1:
 
 ```
 update_project(
   project="https://github.com/orgs/githubnext/projects/144",
   content_type="issue",
-  content_number=<new_issue_number>,
+  content_number=<temporary_id_from_create_issue>,
   fields={
     "campaign_id": "security-alert-burndown",
     "status": "Todo",
@@ -148,13 +148,18 @@ update_project(
 
 **Action 3: Assign the issue to the agent**
 
-Finally, assign the issue to the Copilot agent using `assign_to_agent`. Use the issue number from action 1:
+Finally, assign the issue to the Copilot agent using `assign_to_agent`. Use the temporary ID from action 1:
 
 ```
-assign_to_agent(issue_number=<new_issue_number>, name="copilot")
+assign_to_agent(issue_number=<temporary_id_from_create_issue>, name="copilot")
 ```
 
-**CRITICAL**: You must call all three tools (create_issue, update_project, assign_to_agent) in sequence to complete this step. Do not skip any of them.
+Example: If `create_issue` returned `aw_sec2026012901`, then call:
+```
+assign_to_agent(issue_number="aw_sec2026012901", name="copilot")
+```
+
+**CRITICAL**: You must call all three tools (create_issue, update_project, assign_to_agent) in sequence to complete this step. Do not skip any of them. The temporary ID will be automatically resolved to the real issue number during execution.
 
 
 **Issue Body Template:**
