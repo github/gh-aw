@@ -48,13 +48,7 @@ async function computeFrontmatterHash(workflowPath) {
  * @returns {string|null} Path to gh-aw binary or null if not found
  */
 function findGhAwBinary() {
-  const possiblePaths = [
-    process.env.GH_AW_BIN,
-    "./gh-aw",
-    "../../../gh-aw",
-    "/tmp/gh-aw",
-    "gh-aw",
-  ];
+  const possiblePaths = [process.env.GH_AW_BIN, "./gh-aw", "../../../gh-aw", "/tmp/gh-aw", "gh-aw"];
 
   for (const binPath of possiblePaths) {
     if (binPath && fs.existsSync(binPath)) {
@@ -75,7 +69,7 @@ function findGhAwBinary() {
  * Extracts frontmatter from markdown content
  * NOTE: This is a simplified placeholder. For production use without Go binary,
  * this should parse YAML properly.
- * 
+ *
  * @param {string} content - The markdown content
  * @returns {Record<string, any>} The parsed frontmatter object
  */
@@ -110,7 +104,7 @@ function extractFrontmatter(content) {
  */
 function buildCanonicalFrontmatter(frontmatter, importsResult) {
   const canonical = {};
-  
+
   const addField = (/** @type {string} */ key) => {
     if (frontmatter[key] !== undefined) {
       canonical[key] = frontmatter[key];

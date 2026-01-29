@@ -252,7 +252,7 @@ func TestComputeFrontmatterHashFromFile_NonExistent(t *testing.T) {
 	cache := NewImportCache("")
 
 	hash, err := ComputeFrontmatterHashFromFile("/nonexistent/file.md", cache)
-	assert.Error(t, err, "Should error for nonexistent file")
+	require.Error(t, err, "Should error for nonexistent file")
 	assert.Empty(t, hash, "Hash should be empty on error")
 }
 
@@ -374,7 +374,7 @@ func TestBuildCanonicalFrontmatter(t *testing.T) {
 	assert.NotNil(t, canonical["tools"], "Should include tools")
 
 	// Verify merged content is included
-	assert.Equal(t, `{"mcp":{"server":"remote"}}`, canonical["merged-tools"], "Should include merged tools")
+	assert.JSONEq(t, `{"mcp":{"server":"remote"}}`, canonical["merged-tools"].(string), "Should include merged tools")
 	assert.Equal(t, []string{"claude", "copilot"}, canonical["merged-engines"], "Should include merged engines")
 	assert.Equal(t, []string{"shared/common.md"}, canonical["imports"], "Should include imported files")
 }
