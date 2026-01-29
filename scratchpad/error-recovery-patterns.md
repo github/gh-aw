@@ -323,8 +323,9 @@ fi
 **Go Implementation (pkg/cli/run_workflow_tracking.go):**
 
 ```go
-const maxRetries = 6
+const maxRetries = 6  // Higher limit for critical workflow tracking operations
 const initialDelay = 2 * time.Second
+const maxDelay = 30 * time.Second
 
 for attempt := 0; attempt < maxRetries; attempt++ {
     result, err := performOperation()
@@ -342,7 +343,7 @@ for attempt := 0; attempt < maxRetries; attempt++ {
         return nil, fmt.Errorf("operation failed after %d attempts: %w", maxRetries, err)
     }
     
-    // Exponential backoff
+    // Exponential backoff with cap
     delay := initialDelay * time.Duration(1<<uint(attempt))
     if delay > maxDelay {
         delay = maxDelay
@@ -373,20 +374,21 @@ install_npm_with_recovery() {
   
   # Strategy 1: Normal install
   echo "Attempting normal npm install..."
-  if npm install "$package"; then
+  if npm install "$package" 2>&1 | grep -v "npm WARN"; then
     return 0
   fi
   
   # Strategy 2: Clear cache and retry
   echo "Strategy 2: Clearing npm cache and retrying..."
   npm cache clean --force 2>/dev/null || true
-  if npm install "$package"; then
+  if npm install "$package" 2>&1 | grep -v "npm WARN"; then
     return 0
   fi
   
-  # Strategy 3: Use different registry
+  # Strategy 3: Use different registry (customize based on your region)
+  # Example mirrors: https://registry.npmjs.org (global), https://registry.npmmirror.com (CN)
   echo "Strategy 3: Trying alternative npm registry..."
-  if npm install "$package" --registry=https://registry.npmmirror.com; then
+  if npm install "$package" --registry=https://registry.npmjs.org 2>&1 | grep -v "npm WARN"; then
     return 0
   fi
   
@@ -409,25 +411,29 @@ install_pip_with_recovery() {
   local package="$1"
   
   # Strategy 1: Normal install
-  if pip install "$package"; then
+  if pip install "$package" 2>&1; then
     return 0
   fi
   
   # Strategy 2: Use --no-cache-dir
   echo "Strategy 2: Installing without cache..."
-  if pip install --no-cache-dir "$package"; then
+  if pip install --no-cache-dir "$package" 2>&1; then
     return 0
   fi
   
-  # Strategy 3: Use alternative index
+  # Strategy 3: Use alternative index (customize based on your region)
+  # Example mirrors: https://pypi.org/simple (global), https://pypi.tuna.tsinghua.edu.cn/simple (CN)
   echo "Strategy 3: Using alternative PyPI mirror..."
-  if pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple "$package"; then
+  if pip install --index-url https://pypi.org/simple "$package" 2>&1; then
     return 0
   fi
   
-  # Strategy 4: Ignore conflicts and force install
-  echo "Strategy 4: Force installing (ignoring dependencies)..."
-  if pip install --no-deps "$package"; then
+  # Strategy 4: Force install (WARNING: Only for development/testing)
+  # This installs without dependencies and may cause runtime errors
+  echo "Strategy 4: Force installing without dependencies (use with caution)..."
+  echo "WARNING: Package may fail at runtime if dependencies are missing"
+  if pip install --no-deps "$package" 2>&1; then
+    echo "NOTE: Remember to install missing dependencies manually"
     return 0
   fi
   
@@ -447,6 +453,7 @@ install_pip_with_recovery() {
 func pullImageWithRetry(ctx context.Context, image string) error {
     const maxRetries = 3
     const initialDelay = 5 * time.Second
+    const maxDelay = 30 * time.Second
     
     var lastErr error
     delay := initialDelay
@@ -456,9 +463,12 @@ func pullImageWithRetry(ctx context.Context, image string) error {
             log.Printf("Retry attempt %d/%d after %v delay", attempt+1, maxRetries, delay)
             time.Sleep(delay)
             delay *= 2  // Exponential backoff
+            if delay > maxDelay {
+                delay = maxDelay
+            }
         }
         
-        // Try pulling the image
+        // Try pulling the image (dockerClient.ImagePull or similar)
         if err := pullImage(ctx, image); err == nil {
             return nil  // Success
         } else {
@@ -551,6 +561,9 @@ async function createIssueWithRetry(github, owner, repo, title, body) {
 #!/usr/bin/env bash
 # Install GitHub Copilot CLI with retry logic
 
+# Configuration
+INSTALLER_URL="https://raw.githubusercontent.com/github/copilot-cli/main/install.sh"
+INSTALLER_TEMP="/tmp/copilot-install.sh"
 MAX_ATTEMPTS=3
 
 download_installer_with_retry() {
@@ -560,7 +573,7 @@ download_installer_with_retry() {
   while [ $attempt -le $MAX_ATTEMPTS ]; do
     echo "Attempt $attempt of $MAX_ATTEMPTS: Downloading Copilot CLI installer..."
     
-    if curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TEMP" 2>&1; then
+    if curl -fsSL "$INSTALLER_URL" -o "$INSTALLER_TEMP"; then
       echo "Successfully downloaded installer"
       return 0
     fi
@@ -630,7 +643,7 @@ DEBUG=cli:retry gh aw run workflow.md
 Use this decision tree to select the appropriate recovery strategy:
 
 ```mermaid
-graph TD
+flowchart TD
     A[Operation Failed] --> B{Error Type?}
     B -->|Network/Timeout| C[Retry with backoff]
     B -->|Rate Limit| D[Wait + Retry]
@@ -677,11 +690,16 @@ for {
 
 ❌ **Retrying non-transient errors:**
 ```go
-// BAD: Retrying validation errors
+// BAD: Retrying validation errors that won't self-correct
 if err := validateInput(data); err != nil {
     // Validation errors won't fix themselves by retrying!
-    time.Sleep(1 * time.Second)
-    return operationWithRetry()  // Wastes time
+    // This wastes time and could cause infinite loops if done in a loop
+    for i := 0; i < 3; i++ {
+        time.Sleep(1 * time.Second)
+        if err := validateInput(data); err == nil {
+            break
+        }
+    }
 }
 ```
 
@@ -692,7 +710,9 @@ for attempt := 0; attempt < 10; attempt++ {
     if err := apiCall(); err != nil {
         continue  // Immediately retries, causing rate limits
     }
+    return nil
 }
+// Better: Add exponential backoff delay between attempts
 ```
 
 ❌ **Silent retries:**
@@ -718,13 +738,14 @@ type RetryMetrics struct {
     SuccessOnRetry int
     FailedRetries  int
     OperationName  string
+    MaxRetries     int  // Maximum attempts allowed
 }
 
 func (m *RetryMetrics) RecordAttempt(attempt int, err error) {
     m.TotalAttempts++
     if err == nil && attempt > 0 {
         m.SuccessOnRetry++
-    } else if err != nil && attempt == maxRetries {
+    } else if err != nil && attempt >= m.MaxRetries-1 {
         m.FailedRetries++
     }
 }

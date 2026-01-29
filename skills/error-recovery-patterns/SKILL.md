@@ -79,7 +79,7 @@ The skill includes production-ready examples for:
 
 ## Full Documentation
 
-Complete documentation available at: `scratchpad/error-recovery-patterns.md`
+Complete documentation available at: `../../scratchpad/error-recovery-patterns.md`
 
 This skill references the comprehensive error recovery patterns document which includes:
 - Console formatting requirements
