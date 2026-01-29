@@ -804,7 +804,7 @@ jobs:
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           # Campaign Orchestrator Core Rules
           
-          These are generic orchestrator rules intended to be included via `{{#runtime-import ...}}`.
+          These are generic orchestrator rules.
           
           ## Operating Model
           
