@@ -197,11 +197,12 @@ The YAML frontmatter supports these fields:
     ```
 
 - **`engine:`** - AI processor configuration
-  - String format: `"copilot"` (default, recommended), `"claude"`, `"codex"`, or `"custom"` (user-defined steps)
+  - String format: `"copilot"` (default, recommended), `"custom"` (user-defined steps)
+  - ⚠️ **Experimental engines**: `"claude"` and `"codex"` are available but experimental
   - Object format for extended configuration:
     ```yaml
     engine:
-      id: copilot                       # Required: coding agent identifier (copilot, claude, codex, or custom)
+      id: copilot                       # Required: coding agent identifier (copilot, custom, or experimental: claude, codex)
       version: beta                     # Optional: version of the action (has sensible default)
       model: gpt-5                      # Optional: LLM model to use (has sensible default)
       max-turns: 5                      # Optional: maximum chat iterations per run (has sensible default)
