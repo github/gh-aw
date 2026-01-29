@@ -19,7 +19,7 @@ safe-outputs:
     max: 100
   create-issue:
     max: 1
-    assignees: [copilot]
+    assignees: copilot
 project: https://github.com/orgs/githubnext/projects/144
 ---
 
