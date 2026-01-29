@@ -627,7 +627,7 @@ func main() {
 
 	// Set version information in the workflow package for generated file headers
 	workflow.SetVersion(version)
-	
+
 	// Set version information in the parser package for frontmatter hash computation
 	parser.SetCompilerVersion(version)
 

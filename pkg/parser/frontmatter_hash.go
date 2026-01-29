@@ -306,14 +306,14 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 // buildVersionInfo builds version information for hash computation
 func buildVersionInfo() map[string]string {
 	versions := make(map[string]string)
-	
+
 	// gh-aw version (compiler version)
 	versions["gh-aw"] = compilerVersion
 
 	// awf (firewall) version
 	versions["awf"] = string(constants.DefaultFirewallVersion)
 
-	// agents (MCP gateway) version  
+	// agents (MCP gateway) version
 	versions["agents"] = string(constants.DefaultMCPGatewayVersion)
 
 	return versions

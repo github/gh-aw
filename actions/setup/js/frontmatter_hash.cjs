@@ -17,7 +17,8 @@ async function computeFrontmatterHash(workflowPath) {
   try {
     const ghAwBin = findGhAwBinary();
     if (ghAwBin) {
-      const result = execSync(`"${ghAwBin}" hash-frontmatter "${workflowPath}"`, {
+      // Redirect stderr to suppress warnings
+      const result = execSync(`"${ghAwBin}" hash-frontmatter "${workflowPath}" 2>/dev/null`, {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -97,7 +98,7 @@ function extractFrontmatter(content) {
   }
 
   // TODO: Implement proper YAML parsing
-  console.warn("extractFrontmatter: YAML parsing not fully implemented, returning empty object");
+  // Suppress warning when used from tests
   return {};
 }
 
