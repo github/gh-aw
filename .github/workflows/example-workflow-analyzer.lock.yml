@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 6b8c34cd5ffcfde5d3fd9b6972948c9439d5dab3a48621bf4aaf48d5e0268fab
+# frontmatter-hash: 3f1ac76b51d84c65d010dc78deeceac37510743e6e4e2fd5c863867b165970a1
 
 name: "Weekly Workflow Analysis"
 "on":

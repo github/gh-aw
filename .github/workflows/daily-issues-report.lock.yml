@@ -29,7 +29,7 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-# frontmatter-hash: 22bff049278e3886ce88243604533294614126fa622b3c0a495183a8776e469e
+# frontmatter-hash: aca4f3797fdc3448c8497b3c87007bc052d2537b40160bf0f63ad009e454f72a
 
 name: "Daily Issues Report Generator"
 "on":

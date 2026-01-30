@@ -21,7 +21,7 @@
 #
 # Generates Mermaid diagrams to visualize issue and pull request relationships when invoked with the /archie command
 #
-# frontmatter-hash: 1dc3afecc9771225f0e64282e625f03027be9a94097344eb2991db36c5e7534d
+# frontmatter-hash: 1e1961da3d71b52aeca809c14f840e2e867a86b6c41dfb6c0a4555f0b47a19c0
 
 name: "Archie"
 "on":

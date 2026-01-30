@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: ac2f0108b2631596cd627386b15ad5187abd8772e073c6b9ed23fd7176c77ad4
+# frontmatter-hash: 20d2d56adb2ce02fa3bdc5364ae323894a0d2de9a75ecd7f621792df552d371b
 
 name: "Lockfile Statistics Analysis Agent"
 "on":

@@ -21,7 +21,7 @@
 #
 # Daily test of GitHub remote MCP authentication with GitHub Actions token
 #
-# frontmatter-hash: f1e6e31250504f36b158c31ff5668f621c8eb69409adeeedd8ceb16537368321
+# frontmatter-hash: 0904a7bd74cb8285a05ac5ac53c02b52327ebd55dfea7d7748ab839df7634d57
 
 name: "GitHub Remote MCP Authentication Test"
 "on":

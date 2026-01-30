@@ -21,7 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# frontmatter-hash: 35216d2a429ed36fe19b29618a88684a76093566d631701127fad13e1eda78b6
+# frontmatter-hash: c6aada8316e2cc2ed684f1aae955e9ce52d67bb83779d0cfb4eacb428ba46c71
 
 name: "Release"
 "on":

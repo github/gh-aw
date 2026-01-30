@@ -21,7 +21,7 @@
 #
 # Daily analysis of recent commits and merged PRs for breaking CLI changes
 #
-# frontmatter-hash: 6edca82ff95d5c48aeb8ed9ef22e4bb3673c7664d46881ea33be1cb1c8d3048f
+# frontmatter-hash: 4e4a0b8532578dd64bd14ed327f698d35dea70fe835ea9daaf2703157dae7828
 
 name: "Breaking Change Checker"
 "on":
