@@ -252,7 +252,7 @@ A type of GitHub Personal Access Token with granular permission control. Specify
 
 ### CLI (Command Line Interface)
 
-The `gh-aw` extension for the GitHub CLI (`gh`) that provides commands for managing agentic workflows: `gh aw compile` (compile workflows), `gh aw run` (trigger runs), `gh aw status` (check status), `gh aw logs` (download and analyze logs), and `gh aw add` (add workflows from repositories).
+The `gh-aw` extension for the GitHub CLI (`gh`) that provides commands for managing agentic workflows: `gh aw compile` (compile workflows), `gh aw run` (trigger runs), `gh aw status` (check status), `gh aw logs` (download and analyze logs), `gh aw add` (add workflows from repositories), and `gh aw project` (create and manage GitHub Projects V2).
 
 ### Validation
 

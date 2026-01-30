@@ -30,7 +30,7 @@ When `"additionalProperties": false` is set at the root level of a JSON schema, 
 
 ## Testing
 
-Comprehensive test coverage is provided in:
+Test coverage is provided in:
 - **File**: `pkg/parser/schema_additional_properties_test.go`
 - **Test cases**: Tests for common typos and validation
   - Tests for common typos in main workflow schema

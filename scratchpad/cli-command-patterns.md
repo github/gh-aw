@@ -1,6 +1,6 @@
 # CLI Command Patterns and Conventions
 
-This document provides comprehensive guidance for developing CLI commands in GitHub Agentic Workflows. It covers command structure, naming conventions, flag patterns, error handling, testing requirements, and help text standards.
+This document provides guidance for developing CLI commands in GitHub Agentic Workflows. It covers command structure, naming conventions, flag patterns, error handling, testing requirements, and help text standards.
 
 ## Table of Contents
 
@@ -1073,7 +1073,7 @@ Use this checklist when developing a new command:
 
 ## Related Documentation
 
-- **Testing Framework**: See `scratchpad/testing.md` for comprehensive testing guidelines
+- **Testing Framework**: See `scratchpad/testing.md` for testing guidelines
 - **Console Rendering**: See `skills/console-rendering/SKILL.md` for console output details
 - **Error Messages**: See `skills/error-messages/SKILL.md` for error message style guide
 - **Code Organization**: See `scratchpad/code-organization.md` for file organization patterns
