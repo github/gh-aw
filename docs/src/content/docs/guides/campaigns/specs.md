@@ -1,20 +1,23 @@
 ---
-title: Campaign specs (deprecated)
-description: Historical reference for deprecated .campaign.md file format
+title: Campaign Specs (removed)
+description: Campaign specs no longer exist - use regular workflows instead
 banner:
-  content: '<strong>⚠️ Deprecated:</strong> The <code>.campaign.md</code> file format is no longer supported. Use the <code>project</code> field in workflow frontmatter instead.'
+  content: '<strong>⚠️ Removed:</strong> Campaign specs no longer exist. Campaigns are now regular workflows with optional <code>project</code> and <code>imports</code> fields.'
 ---
 
-:::caution[File format removed]
-The `.campaign.md` standalone file format has been **removed** from gh-aw.
+:::caution[Feature removed]
+The `.campaign.md` standalone file format and campaign specs have been **removed** from gh-aw.
 
-**Current approach:** Use the `project` field in regular workflow frontmatter for project tracking.
+**Current approach:** Campaigns are regular workflows that optionally use:
+- `project:` field for GitHub Projects tracking
+- `imports: [shared/campaign.md]` for standard orchestration patterns
 
-See [Getting Started](/gh-aw/guides/campaigns/getting-started/) for how to use the current implementation.
+See [Campaign Orchestration](/gh-aw/guides/campaigns/) for the current implementation.
 :::
 
 ## See Also
 
+- [Campaign Orchestration](/gh-aw/guides/campaigns/) - Overview and examples
 - [Getting Started](/gh-aw/guides/campaigns/getting-started/) - Quick start tutorial
 - [Project Tracking](/gh-aw/examples/project-tracking/) - Complete guide
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Project operations reference

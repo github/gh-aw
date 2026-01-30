@@ -1,9 +1,9 @@
 ---
 title: Getting started
-description: Quick start guide for creating workflows with project tracking
+description: Quick start guide for creating campaign workflows
 ---
 
-This guide shows how to create a workflow with project tracking enabled.
+This guide shows how to create a campaign workflow that coordinates work across repositories.
 
 ## Prerequisites
 
@@ -11,30 +11,31 @@ This guide shows how to create a workflow with project tracking enabled.
 - GitHub Actions enabled
 - A GitHub Projects board (or create one during setup)
 
-## Create a workflow with project tracking
+## Create a campaign workflow
 
-1. **Create a new workflow file** at `.github/workflows/dependency-scanner.md`:
+1. **Create a new workflow file** at `.github/workflows/my-campaign.md`:
 
 ```yaml wrap
 ---
+name: My Campaign
 on:
-  schedule:
-    - cron: "0 0 * * 1"  # Weekly on Monday
-project: https://github.com/orgs/myorg/projects/1
-safe-outputs:
-  create-issue:
-    max: 10
+  schedule: daily
+  workflow_dispatch:
+
+permissions:
+  issues: read
+  pull-requests: read
+
+imports:
+  - shared/campaign.md
 ---
 
-# Dependency Scanner
+# My Campaign
 
-Scan for outdated dependencies and create tracking issues.
+- Project URL: https://github.com/orgs/myorg/projects/1
+- Campaign ID: my-campaign
 
-## Task
-
-1. Check for outdated npm packages
-2. Create an issue for each outdated package
-3. The issue will be automatically added to the project board
+Your campaign instructions here...
 ```
 
 2. **Set up authentication** for project access:
@@ -54,51 +55,51 @@ gh aw compile
 4. **Commit and push**:
 
 ```bash
-git add .github/workflows/dependency-scanner.md
-git add .github/workflows/dependency-scanner.lock.yml
-git commit -m "Add dependency scanner workflow"
+git add .github/workflows/my-campaign.md
+git add .github/workflows/my-campaign.lock.yml
+git commit -m "Add my campaign workflow"
 git push
 ```
 
 ## How it works
 
-When the workflow runs:
+The campaign workflow:
 
-1. The AI agent analyzes your repository for outdated dependencies
-2. Creates issues for packages that need updating
-3. Each issue is automatically added to your GitHub Project
-4. The project board updates with the new items
+1. Imports standard orchestration rules from `shared/campaign.md`
+2. Runs on schedule to discover work items
+3. Processes items according to your instructions
+4. Updates the GitHub Project board with progress
+5. Reports status via project status updates
 
-## Coordinating multiple workflows
+## Campaign orchestration
 
-You can create additional workflows that share the same project:
+The `imports: [shared/campaign.md]` provides:
 
-```yaml wrap
-# .github/workflows/dependency-updater.md
----
-on:
-  workflow_dispatch:
-project: https://github.com/orgs/myorg/projects/1
-safe-outputs:
-  create-pull-request:
-    max: 5
----
+- **Safe-output defaults**: Pre-configured limits for project operations
+- **Execution phases**: Discover → Decide → Write → Report
+- **Best practices**: Deterministic execution, pagination budgets, cursor management
+- **Project integration**: Standard field mappings and status updates
 
-# Dependency Updater
+## Example: Dependabot Burner
 
-Create PRs to update dependencies based on project issues.
-```
+See the [Dependabot Burner](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/dependabot-burner.md) workflow for a complete example:
 
-Both workflows will track their items in the same project board.
+- Discovers open Dependabot PRs
+- Creates bundle issues for upgrades
+- Tracks everything in a GitHub Project
+- Runs daily with smart conditional execution
 
 ## Best practices
 
-- **Start small** - Begin with one workflow and add more as needed
+- **Use imports** - Include `shared/campaign.md` for standard orchestration
+- **Define campaign ID** - Include a clear Campaign ID in your workflow
+- **Specify project URL** - Document the GitHub Projects board URL
 - **Test manually** - Use `workflow_dispatch` trigger to test before scheduling
 - **Monitor progress** - Check your project board to see tracked items
 
-## Next steps
+## Next Steps
 
+- [Campaign Orchestration](/gh-aw/guides/campaigns/) - Overview and patterns
 - [Project Tracking Example](/gh-aw/examples/project-tracking/) - Complete configuration reference
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Available project operations
 - [Trigger Events](/gh-aw/reference/triggers/) - Workflow trigger options
