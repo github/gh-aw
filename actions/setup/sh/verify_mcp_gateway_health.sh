@@ -4,6 +4,15 @@
 
 set -e
 
+# Timing helper functions
+print_timing() {
+  local start_time=$1
+  local label=$2
+  local end_time=$(date +%s%3N)
+  local duration=$((end_time - start_time))
+  echo "⏱️  TIMING: $label took ${duration}ms"
+}
+
 # Usage: verify_mcp_gateway_health.sh GATEWAY_URL MCP_CONFIG_PATH LOGS_FOLDER
 #
 # Arguments:
@@ -23,6 +32,9 @@ fi
 gateway_url="$1"
 mcp_config_path="$2"
 logs_folder="$3"
+
+# Start overall timing
+SCRIPT_START_TIME=$(date +%s%3N)
 
 echo 'Waiting for MCP Gateway to be ready...'
 echo ''
@@ -47,6 +59,7 @@ echo ''
 
 # Wait for gateway to be ready FIRST before checking config
 echo '=== Testing Gateway Health ==='
+HEALTH_CHECK_START=$(date +%s%3N)
 
 # Capture both response body and HTTP code in a single curl call
 # Use curl retry: 120 attempts with 1 second delay = 120s total
@@ -66,6 +79,7 @@ fi
 
 if [ "$http_code" = "200" ]; then
   echo "✓ MCP Gateway is ready!"
+  print_timing $HEALTH_CHECK_START "Health endpoint polling"
 else
   echo ''
   echo "✗ Error: MCP Gateway failed to start"
@@ -95,6 +109,7 @@ echo ''
 
 # Now that gateway is ready, check the config file
 echo '=== MCP Configuration File ==='
+CONFIG_CHECK_START=$(date +%s%3N)
 if [ -f "$mcp_config_path" ]; then
   echo "✓ Config file exists at: $mcp_config_path"
   echo "File size: $(stat -f%z "$mcp_config_path" 2>/dev/null || stat -c%s "$mcp_config_path" 2>/dev/null || echo 'unknown') bytes"
@@ -123,6 +138,7 @@ if ! grep -q '"safeoutputs"' "$mcp_config_path"; then
   exit 1
 fi
 echo '✓ safeoutputs server found in configuration'
+print_timing $CONFIG_CHECK_START "Configuration file verification"
 echo ''
 
 # Fetch and display gateway servers list
@@ -133,6 +149,7 @@ echo ''
 
 # Test MCP server connectivity through gateway
 echo '=== Testing MCP Server Connectivity ==='
+CONNECTIVITY_TEST_START=$(date +%s%3N)
 
 # Extract first external MCP server name from config (excluding safeinputs/safeoutputs)
 mcp_server=$(jq -r '.mcpServers | to_entries[] | select(.key != "safeinputs" and .key != "safeoutputs") | .key' "$mcp_config_path" | head -n 1)
@@ -176,8 +193,12 @@ if [ -n "$mcp_server" ]; then
     echo "Gateway logs (last 20 lines):"
     tail -20 "${logs_folder}/gateway.log" 2>/dev/null || echo "Could not read gateway logs"
   fi
+  print_timing $CONNECTIVITY_TEST_START "MCP server connectivity test"
 else
   echo "No external MCP servers configured for testing"
 fi
+
+print_timing $SCRIPT_START_TIME "Overall gateway health verification"
+echo ""
 
 exit 0
