@@ -10,13 +10,17 @@ import (
 	"time"
 
 	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/githubnext/gh-aw/pkg/workflow"
 )
 
+var mcpInspectorLog = logger.New("cli:mcp_inspect_inspector")
+
 // spawnMCPInspector launches the official @modelcontextprotocol/inspector tool
 // and spawns any stdio MCP servers beforehand
 func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) error {
+	mcpInspectorLog.Printf("Spawning MCP inspector: workflow_file=%s, server_filter=%s", workflowFile, serverFilter)
 	// Check if npx is available
 	if _, err := exec.LookPath("npx"); err != nil {
 		return fmt.Errorf("npx not found. Please install Node.js and npm to use the MCP inspector: %w", err)
@@ -60,8 +64,11 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 		// Extract MCP configurations from the merged frontmatter
 		mcpConfigs, err = parser.ExtractMCPConfigurations(frontmatterForMCP, serverFilter)
 		if err != nil {
+			mcpInspectorLog.Printf("Failed to extract MCP configurations: %v", err)
 			return err
 		}
+
+		mcpInspectorLog.Printf("Extracted %d MCP server configurations from workflow", len(mcpConfigs))
 
 		if len(mcpConfigs) > 0 {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Found %d MCP server(s) in workflow:", len(mcpConfigs))))
@@ -79,6 +86,7 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 			}
 
 			if len(stdioServers) > 0 {
+				mcpInspectorLog.Printf("Starting %d stdio MCP servers", len(stdioServers))
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Starting stdio MCP servers..."))
 
 				for _, config := range stdioServers {
@@ -111,10 +119,12 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 
 					// Start the server process
 					if err := cmd.Start(); err != nil {
+						mcpInspectorLog.Printf("Failed to start MCP server %s: %v", config.Name, err)
 						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to start server %s: %v", config.Name, err)))
 						continue
 					}
 
+					mcpInspectorLog.Printf("Started MCP server %s (PID: %d, type: %s)", config.Name, cmd.Process.Pid, config.Type)
 					serverProcesses = append(serverProcesses, cmd)
 
 					// Monitor the process in the background
@@ -166,6 +176,7 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 	// Set up cleanup function for stdio servers
 	defer func() {
 		if len(serverProcesses) > 0 {
+			mcpInspectorLog.Printf("Cleaning up %d MCP server processes", len(serverProcesses))
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Cleaning up MCP servers..."))
 			for i, cmd := range serverProcesses {
 				if cmd.Process != nil {
@@ -197,6 +208,7 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 		}
 	}()
 
+	mcpInspectorLog.Print("Launching @modelcontextprotocol/inspector")
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Launching @modelcontextprotocol/inspector..."))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Visit http://localhost:5173 after the inspector starts"))
 	if len(serverProcesses) > 0 {
@@ -209,5 +221,11 @@ func spawnMCPInspector(workflowFile string, serverFilter string, verbose bool) e
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		mcpInspectorLog.Printf("MCP inspector exited with error: %v", err)
+	} else {
+		mcpInspectorLog.Print("MCP inspector exited successfully")
+	}
+	return err
 }

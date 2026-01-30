@@ -7,13 +7,17 @@ import (
 	"path/filepath"
 
 	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/stringutil"
 )
+
+var updateMergeLog = logger.New("cli:update_merge")
 
 // hasLocalModifications checks if the local workflow file has been modified from its source
 // It resolves the source field and imports on the remote content, then compares with local
 // Note: stop-after field is ignored during comparison as it's a deployment-specific setting
 func hasLocalModifications(sourceContent, localContent, sourceSpec string, verbose bool) bool {
+	updateMergeLog.Printf("Checking for local modifications: source_spec=%s", sourceSpec)
 	// Normalize both contents
 	sourceNormalized := stringutil.NormalizeWhitespace(sourceContent)
 	localNormalized := stringutil.NormalizeWhitespace(localContent)
@@ -67,6 +71,8 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec string, verbo
 	// Compare the normalized contents
 	hasModifications := sourceResolvedNormalized != localNormalized
 
+	updateMergeLog.Printf("Local modifications detected: %v", hasModifications)
+
 	if verbose && hasModifications {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Local modifications detected"))
 	}
@@ -77,6 +83,8 @@ func hasLocalModifications(sourceContent, localContent, sourceSpec string, verbo
 // MergeWorkflowContent performs a 3-way merge of workflow content using git merge-file
 // It returns the merged content, whether conflicts exist, and any error
 func MergeWorkflowContent(base, current, new, oldSourceSpec, newRef string, verbose bool) (string, bool, error) {
+	updateMergeLog.Printf("Starting 3-way merge: old_ref=%s, new_ref=%s", oldSourceSpec, newRef)
+
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("Performing 3-way merge using git merge-file"))
 	}
@@ -84,6 +92,7 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRef string, verb
 	// Parse the old source spec to get the current ref
 	sourceSpec, err := parseSourceSpec(oldSourceSpec)
 	if err != nil {
+		updateMergeLog.Printf("Failed to parse source spec: %v", err)
 		return "", false, fmt.Errorf("failed to parse source spec: %w", err)
 	}
 	currentSourceSpec := fmt.Sprintf("%s/%s@%s", sourceSpec.Repo, sourceSpec.Path, sourceSpec.Ref)
@@ -159,17 +168,21 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRef string, verb
 				// Conflicts found (exit codes 1-127 indicate conflicts)
 				// Exit codes >= 128 typically indicate system errors
 				hasConflicts = true
+				updateMergeLog.Printf("Merge conflicts detected: exit_code=%d", exitCode)
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Merge conflicts detected (exit code: %d)", exitCode)))
 				}
 			} else {
 				// Real error (exit code >= 128)
+				updateMergeLog.Printf("Git merge-file failed: exit_code=%d", exitCode)
 				return "", false, fmt.Errorf("git merge-file failed: %w\nOutput: %s", err, output)
 			}
 		} else {
 			return "", false, fmt.Errorf("failed to execute git merge-file: %w", err)
 		}
 	}
+
+	updateMergeLog.Printf("Merge completed: has_conflicts=%v", hasConflicts)
 
 	// Read the merged content from the current file (git merge-file updates it in-place)
 	mergedContent, err := os.ReadFile(currentFile)
