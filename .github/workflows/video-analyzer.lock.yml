@@ -504,6 +504,7 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
+          GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL: ${{ github.event.inputs.video_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -563,7 +564,271 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/video-analyzer.md}}
+          # FFmpeg Usage Guide
+          
+          FFmpeg and ffprobe have been installed and are available in your PATH. A temporary folder `/tmp/gh-aw/ffmpeg` is available for caching intermediate results.
+          
+          **Note**: FFmpeg operations can take several minutes for large video files. Bash commands have a 5-minute timeout. For longer operations, break them into smaller steps or increase workflow timeout-minutes.
+          
+          ## Common FFmpeg Operations
+          
+          ### Extract Audio from Video
+          
+          ```bash
+          # Extract audio as MP3 with high quality
+          ffmpeg -i input.mp4 -vn -acodec libmp3lame -ab 192k output.mp3
+          
+          # Extract audio for transcription (optimized for speech-to-text)
+          # Uses Opus codec with mono channel and low bitrate for optimal transcription
+          ffmpeg -i input.mp4 -vn -acodec libopus -ac 1 -ab 12k -application voip -map_metadata -1 -f ogg output.ogg
+          ```
+          
+          **Key flags:**
+          - `-vn`: No video output
+          - `-acodec`: Audio codec (libmp3lame, pcm_s16le, aac, libopus)
+          - `-ab`: Audio bitrate (128k, 192k, 256k, 320k, or 12k for transcription)
+          - `-ac`: Audio channels (1 for mono, 2 for stereo)
+          - `-application voip`: Optimize Opus for voice (for transcription)
+          - `-map_metadata -1`: Remove metadata
+          
+          **For transcription:**
+          - Use `libopus` codec with OGG format
+          - Mono channel (`-ac 1`) is sufficient for speech
+          - Low bitrate (12k) keeps file size small
+          - `-application voip` optimizes for voice
+          
+          ### Extract Video Frames
+          
+          ```bash
+          # Extract all keyframes (I-frames)
+          ffmpeg -i input.mp4 -vf "select='eq(pict_type,I)'" -fps_mode vfr -frame_pts 1 keyframe_%06d.jpg
+          
+          # Extract frames at specific interval (e.g., 1 frame per second)
+          ffmpeg -i input.mp4 -vf "fps=1" frame_%06d.jpg
+          
+          # Extract single frame at specific timestamp
+          ffmpeg -i input.mp4 -ss 00:00:05 -frames:v 1 frame.jpg
+          ```
+          
+          **Key flags:**
+          - `-vf`: Video filter
+          - `-fps_mode vfr`: Variable frame rate (for keyframes)
+          - `-frame_pts 1`: Include frame presentation timestamp
+          - `-ss`: Seek to timestamp (HH:MM:SS or seconds)
+          - `-frames:v`: Number of video frames to extract
+          
+          ### Scene Detection
+          
+          ```bash
+          # Detect scene changes with threshold (0.0-1.0, default 0.4)
+          # Lower threshold = more sensitive to changes
+          ffmpeg -i input.mp4 -vf "select='gt(scene,0.3)',showinfo" -fps_mode passthrough -frame_pts 1 scene_%06d.jpg
+          
+          # Common threshold values:
+          # 0.1-0.2: Very sensitive (minor changes trigger detection)
+          # 0.3-0.4: Moderate sensitivity (good for most videos)
+          # 0.5-0.6: Less sensitive (only major scene changes)
+          ```
+          
+          **Scene detection tips:**
+          - Start with threshold 0.4 and adjust based on results
+          - Use `showinfo` filter to see timestamps in logs
+          - Lower threshold detects more scenes but may include false positives
+          - Higher threshold misses gradual transitions
+          
+          ### Resize and Convert
+          
+          ```bash
+          # Resize video to specific dimensions (maintains aspect ratio)
+          ffmpeg -i input.mp4 -vf "scale=1280:720" output.mp4
+          
+          # Resize with padding to maintain aspect ratio
+          ffmpeg -i input.mp4 -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" output.mp4
+          
+          # Convert to different format with quality control
+          ffmpeg -i input.mp4 -c:v libx264 -crf 23 -c:a aac -b:a 128k output.mp4
+          ```
+          
+          **Quality flags:**
+          - `-crf`: Constant Rate Factor (0-51, lower=better quality, 23 is default)
+          - `18`: Visually lossless
+          - `23`: High quality (default)
+          - `28`: Medium quality
+          
+          ### Get Video Information
+          
+          ```bash
+          # Get detailed video information
+          ffprobe -v quiet -print_format json -show_format -show_streams input.mp4
+          
+          # Get video duration
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 input.mp4
+          
+          # Get video dimensions
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 input.mp4
+          ```
+          
+          ### Compute Stable Hash for Video Encoding Task
+          
+          Compute a SHA-256 hash that uniquely identifies an ffmpeg command and all input files it references. This is useful for caching and detecting when re-processing is needed.
+          
+          **Steps:**
+          1. Capture the full ffmpeg command line (exact text with all arguments)
+          2. Concatenate the command string with the binary contents of each input file in the same order
+          3. Pipe the combined data into `sha256sum` (or `shasum -a 256` on macOS)
+          
+          **Example Bash:**
+          
+          ```bash
+          cmd='ffmpeg -i input1.mp4 -i input2.wav -filter_complex "..." -c:v libx264 output.mp4'
+          (
+            echo "$cmd"
+            cat input1.mp4 input2.wav
+          ) | sha256sum | awk '{print $1}'
+          ```
+          
+          This hash changes only when:
+          - The ffmpeg command arguments change
+          - Any input file content changes
+          
+          Use this hash as a cache key in `/tmp/gh-aw/ffmpeg/` to avoid reprocessing identical operations.
+          
+          # Video Analysis Agent
+          
+          You are a video analysis agent that uses ffmpeg to process and analyze video files.
+          
+          ## Current Context
+          
+          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
+          - **Video URL**: "__GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL__"
+          - **Triggered by**: @__GH_AW_GITHUB_ACTOR__
+          
+          ## Your Task
+          
+          Perform a comprehensive video analysis using ffmpeg, including scene detection and audio analysis. Create a detailed report with all findings.
+          
+          ### Step 1: Download and Verify Video
+          
+          1. Download the video file from the provided URL
+          2. Verify the file is valid and get basic information:
+             ```bash
+             ffprobe -v quiet -print_format json -show_format -show_streams video.mp4
+             ```
+          3. Extract key metadata:
+             - Video duration
+             - Resolution (width x height)
+             - Frame rate
+             - Video codec
+             - Audio codec (if present)
+             - File size
+          
+          ### Step 2: Perform Full Analysis
+          
+          Perform both analyses to provide a comprehensive report:
+          
+          #### Scene Detection:
+          1. Detect scene changes using threshold 0.4:
+             ```bash
+             ffmpeg -i video.mp4 -vf "select='gt(scene,0.4)',showinfo" -fps_mode passthrough -frame_pts 1 scene_%06d.jpg
+             ```
+          2. Count the number of scenes detected
+          3. Analyze scene change patterns:
+             - Average time between scene changes
+             - Longest scene duration
+             - Shortest scene duration
+          4. List the first 10 scenes with timestamps
+          
+          **Scene Detection Tips**:
+          - If too few scenes detected, try lower threshold (0.3)
+          - If too many scenes detected, try higher threshold (0.5)
+          - Adjust based on video content type (action vs. documentary)
+          
+          #### Audio Analysis:
+          1. Check if video has audio stream
+          2. Extract audio as high quality MP3:
+             ```bash
+             ffmpeg -i video.mp4 -vn -acodec libmp3lame -ab 192k audio.mp3
+             ```
+          3. Report audio properties:
+             - Sample rate
+             - Bit depth
+             - Channels (mono/stereo)
+             - Duration
+             - Estimated quality
+          
+          ### Step 3: Generate Analysis Report
+          
+          Create a GitHub issue with your comprehensive analysis containing:
+          
+          #### Video Information Section
+          - Source URL
+          - File size
+          - Duration (MM:SS format)
+          - Resolution and frame rate
+          - Video codec and audio codec
+          - Estimated bitrate
+          
+          #### Analysis Results Section
+          Include results from both analyses:
+          - Scene detection results
+          - Audio extraction results
+          
+          #### Technical Details Section
+          - FFmpeg version used
+          - Processing time for each operation
+          - Any warnings or issues encountered
+          - File sizes of generated outputs
+          
+          #### Recommendations Section
+          Provide actionable recommendations based on the analysis:
+          - Suggested optimal encoding settings
+          - Potential quality improvements
+          - Scene detection threshold recommendations
+          - Audio quality optimization suggestions
+          
+          ## Output Format
+          
+          Create your issue with the following markdown structure:
+          
+          ```markdown
+          # Video Analysis Report: [Video Filename]
+          
+          *Analysis performed by @__GH_AW_GITHUB_ACTOR__ on [Date]*
+          
+          ## 📊 Video Information
+          
+          - **Source**: [URL]
+          - **Duration**: [MM:SS]
+          - **Resolution**: [Width]x[Height] @ [FPS]fps
+          - **File Size**: [Size in MB]
+          - **Video Codec**: [Codec]
+          - **Audio Codec**: [Codec] (if present)
+          
+          ## 🔍 Analysis Results
+          
+          ### Scene Detection Analysis
+          
+          [Detailed scene detection results]
+          
+          ### Audio Analysis
+          
+          [Detailed audio analysis results]
+          
+          ## 🛠 Technical Details
+          
+          - **FFmpeg Version**: [Version]
+          - **Processing Time**: [Time]
+          - **Output Files**: [List of generated files with sizes]
+          
+          ## 💡 Recommendations
+          
+          [Actionable recommendations based on analysis]
+          
+          ---
+          
+          *Generated using ffmpeg via GitHub Agentic Workflows*
+          ```
+          
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -572,6 +837,7 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
+          GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL: ${{ github.event.inputs.video_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -588,6 +854,7 @@ jobs:
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
+                GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL: process.env.GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
@@ -599,6 +866,9 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
+          GH_AW_GITHUB_EVENT_INPUTS_VIDEO_URL: ${{ github.event.inputs.video_url }}
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

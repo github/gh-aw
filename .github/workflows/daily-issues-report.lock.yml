@@ -697,7 +697,1003 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/daily-issues-report.md}}
+          ## jqschema - JSON Schema Discovery
+          
+          A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.
+          
+          ### Purpose
+          
+          Generate a compact structural schema (keys + types) from JSON input. This is particularly useful when:
+          - Analyzing tool outputs from GitHub search (search_code, search_issues, search_repositories)
+          - Exploring API responses with large payloads
+          - Understanding the structure of unfamiliar data without verbose output
+          - Planning queries before fetching full data
+          
+          ### Usage
+          
+          ```bash
+          # Analyze a file
+          cat data.json | /tmp/gh-aw/jqschema.sh
+          
+          # Analyze command output
+          echo '{"name": "test", "count": 42, "items": [{"id": 1}]}' | /tmp/gh-aw/jqschema.sh
+          
+          # Analyze GitHub search results
+          gh api search/repositories?q=language:go | /tmp/gh-aw/jqschema.sh
+          ```
+          
+          ### How It Works
+          
+          The script transforms JSON data by:
+          1. Replacing object values with their type names ("string", "number", "boolean", "null")
+          2. Reducing arrays to their first element's structure (or empty array if empty)
+          3. Recursively processing nested structures
+          4. Outputting compact (minified) JSON
+          
+          ### Example
+          
+          **Input:**
+          ```json
+          {
+            "total_count": 1000,
+            "items": [
+              {"login": "user1", "id": 123, "verified": true},
+              {"login": "user2", "id": 456, "verified": false}
+            ]
+          }
+          ```
+          
+          **Output:**
+          ```json
+          {"total_count":"number","items":[{"login":"string","id":"number","verified":"boolean"}]}
+          ```
+          
+          ### Best Practices
+          
+          **Use this script when:**
+          - You need to understand the structure of tool outputs before requesting full data
+          - GitHub search tools return large datasets (use `perPage: 1` and pipe through schema minifier first)
+          - Exploring unfamiliar APIs or data structures
+          - Planning data extraction strategies
+          
+          **Example workflow for GitHub search tools:**
+          ```bash
+          # Step 1: Get schema with minimal data (fetch just 1 result)
+          # This helps understand the structure before requesting large datasets
+          echo '{}' | gh api search/repositories -f q="language:go" -f per_page=1 | /tmp/gh-aw/jqschema.sh
+          
+          # Output shows the schema:
+          # {"incomplete_results":"boolean","items":[{...}],"total_count":"number"}
+          
+          # Step 2: Review schema to understand available fields
+          
+          # Step 3: Request full data with confidence about structure
+          # Now you know what fields are available and can query efficiently
+          ```
+          
+          **Using with GitHub MCP tools:**
+          When using tools like `search_code`, `search_issues`, or `search_repositories`, pipe the output through jqschema to discover available fields:
+          ```bash
+          # Save a minimal search result to a file
+          gh api search/code -f q="jq in:file language:bash" -f per_page=1 > /tmp/sample.json
+          
+          # Generate schema to understand structure
+          cat /tmp/sample.json | /tmp/gh-aw/jqschema.sh
+          
+          # Now you know which fields exist and can use them in your analysis
+          ```
+          
+          
+          
+          ## Issues Data
+          
+          Pre-fetched issues data is available at `/tmp/gh-aw/issues-data/issues.json` containing up to 1000 issues (open and closed).
+          
+          ### Schema
+          
+          The issues data structure is:
+          
+          ```json
+          [
+            {
+              "number": "number",
+              "title": "string",
+              "state": "string",
+              "url": "string",
+              "body": "string",
+              "createdAt": "string",
+              "updatedAt": "string",
+              "closedAt": "string",
+              "author": {
+                "id": "string",
+                "login": "string",
+                "name": "string"
+              },
+              "assignees": [
+                {
+                  "id": "string",
+                  "login": "string",
+                  "name": "string"
+                }
+              ],
+              "labels": [
+                {
+                  "id": "string",
+                  "name": "string",
+                  "color": "string",
+                  "description": "string"
+                }
+              ],
+              "milestone": {
+                "id": "string",
+                "number": "number",
+                "title": "string",
+                "description": "string",
+                "dueOn": "string"
+              },
+              "comments": [
+                {
+                  "id": "string",
+                  "url": "string",
+                  "body": "string",
+                  "createdAt": "string",
+                  "author": {
+                    "id": "string",
+                    "login": "string",
+                    "name": "string"
+                  }
+                }
+              ]
+            }
+          ]
+          ```
+          
+          ### Usage Examples
+          
+          ```bash
+          # Get total number of issues
+          jq 'length' /tmp/gh-aw/issues-data/issues.json
+          
+          # Get only open issues
+          jq '[.[] | select(.state == "OPEN")]' /tmp/gh-aw/issues-data/issues.json
+          
+          # Get issues from the last 7 days (cross-platform: GNU date first, BSD fallback)
+          DATE_7_DAYS_AGO=$(date -d '7 days ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -v-7d '+%Y-%m-%dT%H:%M:%SZ')
+          jq --arg date "$DATE_7_DAYS_AGO" '[.[] | select(.createdAt >= $date)]' /tmp/gh-aw/issues-data/issues.json
+          
+          # Get issue numbers
+          jq '[.[].number]' /tmp/gh-aw/issues-data/issues.json
+          
+          # Get issues with specific label
+          jq '[.[] | select(.labels | any(.name == "bug"))]' /tmp/gh-aw/issues-data/issues.json
+          ```
+          
+          # Python Data Visualization Guide
+          
+          Python scientific libraries have been installed and are ready for use. A temporary folder structure has been created at `/tmp/gh-aw/python/` for organizing scripts, data, and outputs.
+          
+          ## Installed Libraries
+          
+          - **NumPy**: Array processing and numerical operations
+          - **Pandas**: Data manipulation and analysis
+          - **Matplotlib**: Chart generation and plotting
+          - **Seaborn**: Statistical data visualization
+          - **SciPy**: Scientific computing utilities
+          
+          ## Directory Structure
+          
+          ```
+          /tmp/gh-aw/python/
+          ├── data/          # Store all data files here (CSV, JSON, etc.)
+          ├── charts/        # Generated chart images (PNG)
+          ├── artifacts/     # Additional output files
+          └── *.py           # Python scripts
+          ```
+          
+          ## Data Separation Requirement
+          
+          **CRITICAL**: Data must NEVER be inlined in Python code. Always store data in external files and load using pandas.
+          
+          ### ❌ PROHIBITED - Inline Data
+          ```python
+          # DO NOT do this
+          data = [10, 20, 30, 40, 50]
+          labels = ['A', 'B', 'C', 'D', 'E']
+          ```
+          
+          ### ✅ REQUIRED - External Data Files
+          ```python
+          # Always load data from external files
+          import pandas as pd
+          
+          # Load data from CSV
+          data = pd.read_csv('/tmp/gh-aw/python/data/data.csv')
+          
+          # Or from JSON
+          data = pd.read_json('/tmp/gh-aw/python/data/data.json')
+          ```
+          
+          ## Chart Generation Best Practices
+          
+          ### High-Quality Chart Settings
+          
+          ```python
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          
+          # Set style for better aesthetics
+          sns.set_style("whitegrid")
+          sns.set_palette("husl")
+          
+          # Create figure with high DPI
+          fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+          
+          # Your plotting code here
+          # ...
+          
+          # Save with high quality
+          plt.savefig('/tmp/gh-aw/python/charts/chart.png', 
+                      dpi=300, 
+                      bbox_inches='tight',
+                      facecolor='white',
+                      edgecolor='none')
+          ```
+          
+          ### Chart Quality Guidelines
+          
+          - **DPI**: Use 300 or higher for publication quality
+          - **Figure Size**: Standard is 10x6 inches (adjustable based on needs)
+          - **Labels**: Always include clear axis labels and titles
+          - **Legend**: Add legends when plotting multiple series
+          - **Grid**: Enable grid lines for easier reading
+          - **Colors**: Use colorblind-friendly palettes (seaborn defaults are good)
+          
+          ## Including Images in Reports
+          
+          When creating reports (issues, discussions, etc.), use the `upload asset` tool to make images URL-addressable and include them in markdown:
+          
+          ### Step 1: Generate and Upload Chart
+          ```python
+          # Generate your chart
+          plt.savefig('/tmp/gh-aw/python/charts/my_chart.png', dpi=300, bbox_inches='tight')
+          ```
+          
+          ### Step 2: Upload as Asset
+          Use the `upload asset` tool to upload the chart file. The tool will return a GitHub raw content URL.
+          
+          ### Step 3: Include in Markdown Report
+          When creating your discussion or issue, include the image using markdown:
+          
+          ```markdown
+          ## Visualization Results
+          
+          ![Chart Description](https://raw.githubusercontent.com/owner/repo/assets/workflow-name/my_chart.png)
+          
+          The chart above shows...
+          ```
+          
+          **Important**: Assets are published to an orphaned git branch and become URL-addressable after workflow completion.
+          
+          ## Cache Memory Integration
+          
+          The cache memory at `/tmp/gh-aw/cache-memory/` is available for storing reusable code:
+          
+          **Helper Functions to Cache:**
+          - Data loading utilities: `data_loader.py`
+          - Chart styling functions: `chart_utils.py`
+          - Common data transformations: `transforms.py`
+          
+          **Check Cache Before Creating:**
+          ```bash
+          # Check if helper exists in cache
+          if [ -f /tmp/gh-aw/cache-memory/data_loader.py ]; then
+            cp /tmp/gh-aw/cache-memory/data_loader.py /tmp/gh-aw/python/
+            echo "Using cached data_loader.py"
+          fi
+          ```
+          
+          **Save to Cache for Future Runs:**
+          ```bash
+          # Save useful helpers to cache
+          cp /tmp/gh-aw/python/data_loader.py /tmp/gh-aw/cache-memory/
+          echo "Saved data_loader.py to cache for future runs"
+          ```
+          
+          ## Complete Example Workflow
+          
+          ```python
+          #!/usr/bin/env python3
+          """
+          Example data visualization script
+          Generates a bar chart from external data
+          """
+          import pandas as pd
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          
+          # Set style
+          sns.set_style("whitegrid")
+          sns.set_palette("husl")
+          
+          # Load data from external file (NEVER inline)
+          data = pd.read_csv('/tmp/gh-aw/python/data/data.csv')
+          
+          # Process data
+          summary = data.groupby('category')['value'].sum()
+          
+          # Create chart
+          fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+          summary.plot(kind='bar', ax=ax)
+          
+          # Customize
+          ax.set_title('Data Summary by Category', fontsize=16, fontweight='bold')
+          ax.set_xlabel('Category', fontsize=12)
+          ax.set_ylabel('Value', fontsize=12)
+          ax.grid(True, alpha=0.3)
+          
+          # Save chart
+          plt.savefig('/tmp/gh-aw/python/charts/chart.png',
+                      dpi=300,
+                      bbox_inches='tight',
+                      facecolor='white')
+          
+          print("Chart saved to /tmp/gh-aw/python/charts/chart.png")
+          ```
+          
+          ## Error Handling
+          
+          **Check File Existence:**
+          ```python
+          import os
+          
+          data_file = '/tmp/gh-aw/python/data/data.csv'
+          if not os.path.exists(data_file):
+              raise FileNotFoundError(f"Data file not found: {data_file}")
+          ```
+          
+          **Validate Data:**
+          ```python
+          # Check for required columns
+          required_cols = ['category', 'value']
+          missing = set(required_cols) - set(data.columns)
+          if missing:
+              raise ValueError(f"Missing columns: {missing}")
+          ```
+          
+          ## Artifact Upload
+          
+          Charts and source files are automatically uploaded as artifacts:
+          
+          **Charts Artifact:**
+          - Name: `data-charts`
+          - Contents: PNG files from `/tmp/gh-aw/python/charts/`
+          - Retention: 30 days
+          
+          **Source and Data Artifact:**
+          - Name: `python-source-and-data`
+          - Contents: Python scripts and data files
+          - Retention: 30 days
+          
+          Both artifacts are uploaded with `if: always()` condition, ensuring they're available even if the workflow fails.
+          
+          ## Tips for Success
+          
+          1. **Always Separate Data**: Store data in files, never inline in code
+          2. **Use Cache Memory**: Store reusable helpers for faster execution
+          3. **High Quality Charts**: Use DPI 300+ and proper sizing
+          4. **Clear Documentation**: Add docstrings and comments
+          5. **Error Handling**: Validate data and check file existence
+          6. **Type Hints**: Use type annotations for better code quality
+          7. **Seaborn Defaults**: Leverage seaborn for better aesthetics
+          8. **Reproducibility**: Set random seeds when needed
+          
+          ## Common Data Sources
+          
+          Based on common use cases:
+          
+          **Repository Statistics:**
+          ```python
+          # Collect via GitHub API, save to data.csv
+          # Then load and visualize
+          data = pd.read_csv('/tmp/gh-aw/python/data/repo_stats.csv')
+          ```
+          
+          **Workflow Metrics:**
+          ```python
+          # Collect via GitHub Actions API, save to data.json
+          data = pd.read_json('/tmp/gh-aw/python/data/workflow_metrics.json')
+          ```
+          
+          **Sample Data Generation:**
+          ```python
+          # Generate with NumPy, save to file first
+          import numpy as np
+          data = np.random.randn(100, 2)
+          df = pd.DataFrame(data, columns=['x', 'y'])
+          df.to_csv('/tmp/gh-aw/python/data/sample_data.csv', index=False)
+          
+          # Then load it back (demonstrating the pattern)
+          data = pd.read_csv('/tmp/gh-aw/python/data/sample_data.csv')
+          ```
+          
+          # Trends Visualization Guide
+          
+          You are an expert at creating compelling trend visualizations that reveal insights from data over time.
+          
+          ## Trending Chart Best Practices
+          
+          When generating trending charts, focus on:
+          
+          ### 1. **Time Series Excellence**
+          - Use line charts for continuous trends over time
+          - Add trend lines or moving averages to highlight patterns
+          - Include clear date/time labels on the x-axis
+          - Show confidence intervals or error bands when relevant
+          
+          ### 2. **Comparative Trends**
+          - Use multi-line charts to compare multiple trends
+          - Apply distinct colors for each series with a clear legend
+          - Consider using area charts for stacked trends
+          - Highlight key inflection points or anomalies
+          
+          ### 3. **Visual Impact**
+          - Use vibrant, contrasting colors to make trends stand out
+          - Add annotations for significant events or milestones
+          - Include grid lines for easier value reading
+          - Use appropriate scale (linear vs. logarithmic)
+          
+          ### 4. **Contextual Information**
+          - Show percentage changes or growth rates
+          - Include baseline comparisons (year-over-year, month-over-month)
+          - Add summary statistics (min, max, average, median)
+          - Highlight recent trends vs. historical patterns
+          
+          ## Example Trend Chart Types
+          
+          ### Temporal Trends
+          ```python
+          # Line chart with multiple trends
+          fig, ax = plt.subplots(figsize=(12, 7), dpi=300)
+          for column in data.columns:
+              ax.plot(data.index, data[column], marker='o', label=column, linewidth=2)
+          ax.set_title('Trends Over Time', fontsize=16, fontweight='bold')
+          ax.set_xlabel('Date', fontsize=12)
+          ax.set_ylabel('Value', fontsize=12)
+          ax.legend(loc='best')
+          ax.grid(True, alpha=0.3)
+          plt.xticks(rotation=45)
+          ```
+          
+          ### Growth Rates
+          ```python
+          # Bar chart showing period-over-period growth
+          fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+          growth_data.plot(kind='bar', ax=ax, color=sns.color_palette("husl"))
+          ax.set_title('Growth Rates by Period', fontsize=16, fontweight='bold')
+          ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+          ax.set_ylabel('Growth %', fontsize=12)
+          ```
+          
+          ### Moving Averages
+          ```python
+          # Trend with moving average overlay
+          fig, ax = plt.subplots(figsize=(12, 7), dpi=300)
+          ax.plot(dates, values, label='Actual', alpha=0.5, linewidth=1)
+          ax.plot(dates, moving_avg, label='7-day Moving Average', linewidth=2.5)
+          ax.fill_between(dates, values, moving_avg, alpha=0.2)
+          ```
+          
+          ## Data Preparation for Trends
+          
+          ### Time-Based Indexing
+          ```python
+          # Convert to datetime and set as index
+          data['date'] = pd.to_datetime(data['date'])
+          data.set_index('date', inplace=True)
+          data = data.sort_index()
+          ```
+          
+          ### Resampling and Aggregation
+          ```python
+          # Resample daily data to weekly
+          weekly_data = data.resample('W').mean()
+          
+          # Calculate rolling statistics
+          data['rolling_mean'] = data['value'].rolling(window=7).mean()
+          data['rolling_std'] = data['value'].rolling(window=7).std()
+          ```
+          
+          ### Growth Calculations
+          ```python
+          # Calculate percentage change
+          data['pct_change'] = data['value'].pct_change() * 100
+          
+          # Calculate year-over-year growth
+          data['yoy_growth'] = data['value'].pct_change(periods=365) * 100
+          ```
+          
+          ## Color Palettes for Trends
+          
+          Use these palettes for impactful trend visualizations:
+          
+          - **Sequential trends**: `sns.color_palette("viridis", n_colors=5)`
+          - **Diverging trends**: `sns.color_palette("RdYlGn", n_colors=7)`
+          - **Multiple series**: `sns.color_palette("husl", n_colors=8)`
+          - **Categorical**: `sns.color_palette("Set2", n_colors=6)`
+          
+          ## Annotation Best Practices
+          
+          ```python
+          # Annotate key points
+          max_idx = data['value'].idxmax()
+          max_val = data['value'].max()
+          ax.annotate(f'Peak: {max_val:.2f}',
+                      xy=(max_idx, max_val),
+                      xytext=(10, 20),
+                      textcoords='offset points',
+                      arrowprops=dict(arrowstyle='->', color='red'),
+                      fontsize=10,
+                      fontweight='bold')
+          ```
+          
+          ## Styling for Awesome Charts
+          
+          ```python
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          
+          # Set professional style
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          sns.set_style("whitegrid")
+          sns.set_context("notebook", font_scale=1.2)
+          
+          # Custom color palette
+          custom_colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8"]
+          sns.set_palette(custom_colors)
+          
+          # Figure with optimal dimensions
+          fig, ax = plt.subplots(figsize=(14, 8), dpi=300)
+          
+          # ... your plotting code ...
+          
+          # Tight layout for clean appearance
+          plt.tight_layout()
+          
+          # Save with high quality
+          plt.savefig('/tmp/gh-aw/python/charts/trend_chart.png',
+                      dpi=300,
+                      bbox_inches='tight',
+                      facecolor='white',
+                      edgecolor='none')
+          ```
+          
+          ## Tips for Trending Charts
+          
+          1. **Start with the story**: What trend are you trying to show?
+          2. **Choose the right timeframe**: Match granularity to the pattern
+          3. **Smooth noise**: Use moving averages for volatile data
+          4. **Show context**: Include historical baselines or benchmarks
+          5. **Highlight insights**: Use annotations to draw attention
+          6. **Test readability**: Ensure labels and legends are clear
+          7. **Optimize colors**: Use colorblind-friendly palettes
+          8. **Export high quality**: Always use DPI 300+ for presentations
+          
+          ## Common Trend Patterns to Visualize
+          
+          - **Seasonal patterns**: Monthly or quarterly cycles
+          - **Long-term growth**: Exponential or linear trends
+          - **Volatility changes**: Periods of stability vs. fluctuation
+          - **Correlations**: How multiple trends relate
+          - **Anomalies**: Outliers or unusual events
+          - **Forecasts**: Projected future trends with uncertainty
+          
+          Remember: The best trending charts tell a clear story, make patterns obvious, and inspire action based on the insights revealed.
+          
+          ## Report Structure Guidelines
+          
+          ### 1. Header Levels
+          **Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy.**
+          
+          When creating GitHub issues or discussions:
+          - Use `###` (h3) for main sections (e.g., "### Test Summary")
+          - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
+          - Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
+          
+          ### 2. Progressive Disclosure
+          **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+          
+          Use collapsible sections for:
+          - Verbose details (full test logs, raw data)
+          - Secondary information (minor warnings, extra context)
+          - Per-item breakdowns when there are many items
+          
+          Always keep critical information visible (summary, critical issues, key metrics).
+          
+          ### 3. Report Structure Pattern
+          
+          1. **Overview**: 1-2 paragraphs summarizing key findings
+          2. **Critical Information**: Show immediately (summary stats, critical issues)
+          3. **Details**: Use `<details><summary><b>Section Name</b></summary>` for expanded content
+          4. **Context**: Add helpful metadata (workflow run, date, trigger)
+          
+          ### Design Principles (Airbnb-Inspired)
+          
+          Reports should:
+          - **Build trust through clarity**: Most important info immediately visible
+          - **Exceed expectations**: Add helpful context like trends, comparisons
+          - **Create delight**: Use progressive disclosure to reduce overwhelm
+          - **Maintain consistency**: Follow patterns across all reports
+          
+          ### Example Report Structure
+          
+          ```markdown
+          ### Summary
+          - Key metric 1: value
+          - Key metric 2: value
+          - Status: ✅/⚠️/❌
+          
+          ### Critical Issues
+          [Always visible - these are important]
+          
+          <details>
+          <summary><b>View Detailed Results</b></summary>
+          
+          [Comprehensive details, logs, traces]
+          
+          </details>
+          
+          <details>
+          <summary><b>View All Warnings</b></summary>
+          
+          [Minor issues and potential problems]
+          
+          </details>
+          
+          ### Recommendations
+          [Actionable next steps - keep visible]
+          ```
+          
+          ## Workflow Run References
+          
+          - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
+          - Include up to 3 most relevant run URLs at end under `**References:**`
+          - Do NOT add footer attribution (system adds automatically)
+          
+          {{#runtime-import? .github/shared-instructions.md}}
+          
+          # Daily Issues Report Generator
+          
+          You are an expert analyst that generates comprehensive daily reports about repository issues, using Python for clustering and visualization.
+          
+          ## Mission
+          
+          Generate a daily report analyzing up to 1000 issues from the repository (see `issues_analyzed` in scratchpad/metrics-glossary.md):
+          1. Cluster issues by topic/theme using natural language analysis
+          2. Calculate various metrics (open/closed rates, response times, label distribution)
+          3. Generate trend charts showing issue activity over time
+          4. Create a new discussion with the report
+          5. Close previous daily issues discussions to avoid clutter
+          
+          ## Current Context
+          
+          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
+          - **Run ID**: __GH_AW_GITHUB_RUN_ID__
+          - **Date**: Generated daily at 6 AM UTC
+          
+          ## Phase 1: Load and Prepare Data
+          
+          The issues data has been pre-fetched and is available at `/tmp/gh-aw/issues-data/issues.json`.
+          
+          1. **Load the issues data**:
+             ```bash
+             jq 'length' /tmp/gh-aw/issues-data/issues.json
+             ```
+          
+          2. **Prepare data for Python analysis**:
+             - Copy issues.json to `/tmp/gh-aw/python/data/issues.json`
+             - Validate the data is properly formatted
+          
+          ## Phase 2: Python Analysis with Clustering
+          
+          Create a Python script to analyze and cluster the issues. Use scikit-learn for clustering if available, or implement simple keyword-based clustering.
+          
+          ### Required Analysis
+          
+          **Clustering Requirements**:
+          - Use TF-IDF vectorization on issue titles and bodies
+          - Apply K-means or hierarchical clustering
+          - Identify 5-10 major issue clusters/themes
+          - Label each cluster based on common keywords
+          
+          **Metrics to Calculate** (see scratchpad/metrics-glossary.md for definitions):
+          - Total issues (open vs closed) - `total_issues`, `open_issues`, `closed_issues`
+          - Issues opened in last 7, 30 days - `issues_opened_7d`, `issues_opened_30d`
+          - Average time to close (for closed issues)
+          - Most active labels (by issue count)
+          - Most active authors
+          - Issues without labels (need triage) - `issues_without_labels`
+          - Issues without assignees - `issues_without_assignees`
+          - Stale issues (no activity in 30+ days) - `stale_issues`
+          
+          ### Python Script Structure
+          
+          ```python
+          #!/usr/bin/env python3
+          """
+          Daily Issues Analysis Script
+          Clusters issues and generates metrics and visualizations
+          """
+          import pandas as pd
+          import numpy as np
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          from datetime import datetime, timedelta
+          import json
+          from collections import Counter
+          import re
+          
+          # Load issues data
+          with open('/tmp/gh-aw/python/data/issues.json', 'r') as f:
+              issues = json.load(f)
+          
+          df = pd.DataFrame(issues)
+          
+          # Convert dates
+          df['createdAt'] = pd.to_datetime(df['createdAt'])
+          df['updatedAt'] = pd.to_datetime(df['updatedAt'])
+          df['closedAt'] = pd.to_datetime(df['closedAt'])
+          
+          # Calculate basic metrics (see scratchpad/metrics-glossary.md for definitions)
+          
+          # Scope: All issues in repository, no filters
+          total_issues = len(df)
+          
+          # Scope: Issues where state = "open" at report time
+          open_issues = len(df[df['state'] == 'OPEN'])
+          
+          # Scope: Issues where state = "closed" at report time
+          closed_issues = len(df[df['state'] == 'CLOSED'])
+          
+          # Time-based metrics
+          now = datetime.now(df['createdAt'].iloc[0].tzinfo if len(df) > 0 else None)
+          
+          # Scope: Issues created in last 7 days
+          issues_opened_7d = len(df[df['createdAt'] > now - timedelta(days=7)])
+          
+          # Scope: Issues created in last 30 days
+          issues_opened_30d = len(df[df['createdAt'] > now - timedelta(days=30)])
+          
+          # Average time to close
+          # Scope: Closed issues with valid timestamps
+          closed_df = df[df['closedAt'].notna()]
+          if len(closed_df) > 0:
+              closed_df['time_to_close'] = closed_df['closedAt'] - closed_df['createdAt']
+              avg_close_time = closed_df['time_to_close'].mean()
+          
+          # Extract labels for clustering
+          def extract_labels(labels_list):
+              if labels_list:
+                  return [l['name'] for l in labels_list]
+              return []
+          
+          df['label_names'] = df['labels'].apply(extract_labels)
+          
+          # Simple keyword-based clustering from titles
+          def cluster_by_keywords(title):
+              title_lower = title.lower() if title else ''
+              if 'bug' in title_lower or 'fix' in title_lower or 'error' in title_lower:
+                  return 'Bug Reports'
+              elif 'feature' in title_lower or 'enhancement' in title_lower or 'request' in title_lower:
+                  return 'Feature Requests'
+              elif 'doc' in title_lower or 'readme' in title_lower:
+                  return 'Documentation'
+              elif 'test' in title_lower:
+                  return 'Testing'
+              elif 'refactor' in title_lower or 'cleanup' in title_lower:
+                  return 'Refactoring'
+              elif 'security' in title_lower or 'vulnerability' in title_lower:
+                  return 'Security'
+              elif 'performance' in title_lower or 'slow' in title_lower:
+                  return 'Performance'
+              else:
+                  return 'Other'
+          
+          df['cluster'] = df['title'].apply(cluster_by_keywords)
+          
+          # Save metrics to JSON for report
+          # Note: Using standardized metric names from scratchpad/metrics-glossary.md
+          metrics = {
+              'total_issues': total_issues,
+              'open_issues': open_issues,
+              'closed_issues': closed_issues,
+              'issues_opened_7d': issues_opened_7d,  # Standardized name
+              'issues_opened_30d': issues_opened_30d,  # Standardized name
+              'cluster_counts': df['cluster'].value_counts().to_dict()
+          }
+          with open('/tmp/gh-aw/python/data/metrics.json', 'w') as f:
+              json.dump(metrics, f, indent=2, default=str)
+          ```
+          
+          ### Install Additional Libraries
+          
+          If needed for better clustering:
+          ```bash
+          pip install --user scikit-learn
+          ```
+          
+          ## Phase 3: Generate Trend Charts
+          
+          Generate exactly **2 high-quality charts**:
+          
+          ### Chart 1: Issue Activity Trends
+          - **Title**: "Issue Activity - Last 30 Days"
+          - **Content**: 
+            - Line showing issues opened per day
+            - Line showing issues closed per day
+            - 7-day moving average overlay
+          - **Save to**: `/tmp/gh-aw/python/charts/issue_activity_trends.png`
+          
+          ### Chart 2: Issue Distribution by Cluster
+          - **Title**: "Issue Clusters by Theme"
+          - **Chart Type**: Horizontal bar chart
+          - **Content**:
+            - Horizontal bars showing count per cluster
+            - Include cluster labels based on keywords
+            - Sort by count descending
+          - **Save to**: `/tmp/gh-aw/python/charts/issue_clusters.png`
+          
+          ### Chart Quality Requirements
+          - DPI: 300 minimum
+          - Figure size: 12x7 inches
+          - Use seaborn styling with professional colors
+          - Clear labels and legend
+          - Grid lines for readability
+          
+          ## Phase 4: Upload Charts
+          
+          Use the `upload asset` tool to upload both charts:
+          1. Upload `/tmp/gh-aw/python/charts/issue_activity_trends.png`
+          2. Upload `/tmp/gh-aw/python/charts/issue_clusters.png`
+          3. Collect the returned URLs for embedding in the discussion
+          
+          ## Phase 5: Close Previous Discussions
+          
+          Before creating the new discussion, find and close previous daily issues discussions:
+          
+          1. Search for discussions with title prefix "[daily issues]"
+          2. Close each found discussion with reason "OUTDATED"
+          3. Add a closing comment: "This discussion has been superseded by a newer daily issues report."
+          
+          Use the `close_discussion` safe output for each discussion found.
+          
+          ## Phase 6: Create Discussion Report
+          
+          Create a new discussion with the comprehensive report.
+          
+          **Formatting Guideline**: Use h3 (###) or lower for all headers in your report to maintain proper document hierarchy. The discussion title serves as h1, so all content headers should start at h3.
+          
+          ### Discussion Format
+          
+          **Title**: `[daily issues] Daily Issues Report - YYYY-MM-DD`
+          
+          **Body**:
+          
+          ```markdown
+          Brief 2-3 paragraph summary of key findings: total issues analyzed, main clusters identified, notable trends, and any concerns that need attention.
+          
+          <details>
+          <summary><b>📊 Full Report Details</b></summary>
+          
+          ### 📈 Issue Activity Trends
+          
+          ![Issue Activity Trends](URL_FROM_UPLOAD_ASSET_CHART_1)
+          
+          [2-3 sentence analysis of activity trends - peaks, patterns, recent changes]
+          
+          ### 🏷️ Issue Clusters by Theme
+          
+          ![Issue Clusters](URL_FROM_UPLOAD_ASSET_CHART_2)
+          
+          [Analysis of the major clusters found and their characteristics]
+          
+          ### Cluster Details
+          
+          | Cluster | Theme | Issue Count | Sample Issues |
+          |---------|-------|-------------|---------------|
+          | 1 | [Theme] | [Count] | #123, #456 |
+          | 2 | [Theme] | [Count] | #789, #101 |
+          | ... | ... | ... | ... |
+          
+          ### 📊 Key Metrics
+          
+          ### Volume Metrics
+          - **Total Issues Analyzed** (`issues_analyzed`): [NUMBER] (Scope: Last 1000 issues)
+          - **Open Issues** (`open_issues`): [NUMBER] ([PERCENT]%)
+          - **Closed Issues** (`closed_issues`): [NUMBER] ([PERCENT]%)
+          
+          ### Time-Based Metrics
+          - **Issues Opened (Last 7 Days)** (`issues_opened_7d`): [NUMBER]
+          - **Issues Opened (Last 30 Days)** (`issues_opened_30d`): [NUMBER]
+          - **Average Time to Close**: [DURATION]
+          
+          ### Triage Metrics
+          - **Issues Without Labels** (`issues_without_labels`): [NUMBER]
+          - **Issues Without Assignees** (`issues_without_assignees`): [NUMBER]
+          - **Stale Issues (30+ days)** (`stale_issues`): [NUMBER]
+          
+          ### 🏆 Top Labels
+          
+          | Label | Issue Count |
+          |-------|-------------|
+          | [label] | [count] |
+          | ... | ... |
+          
+          ### 👥 Most Active Authors
+          
+          | Author | Issues Created |
+          |--------|----------------|
+          | @[author] | [count] |
+          | ... | ... |
+          
+          ### ⚠️ Issues Needing Attention
+          
+          ### Stale Issues (No Activity 30+ Days)
+          - #[number]: [title]
+          - #[number]: [title]
+          
+          ### Unlabeled Issues
+          - #[number]: [title]
+          - #[number]: [title]
+          
+          ### 📝 Recommendations
+          
+          1. [Specific actionable recommendation based on findings]
+          2. [Another recommendation]
+          3. [...]
+          
+          </details>
+          
+          ---
+          *Report generated automatically by the Daily Issues Report workflow*
+          *Data source: Last 1000 issues from __GH_AW_GITHUB_REPOSITORY__*
+          ```
+          
+          ## Important Guidelines
+          
+          ### Data Quality
+          - Handle missing fields gracefully (null checks)
+          - Validate date formats before processing
+          - Skip malformed issues rather than failing
+          
+          ### Clustering Tips
+          - If scikit-learn is not available, use keyword-based clustering
+          - Focus on meaningful themes, not just statistical clusters
+          - Aim for 5-10 clusters maximum for readability
+          
+          ### Chart Quality
+          - Use consistent color schemes
+          - Make charts readable when embedded in markdown
+          - Include proper axis labels and titles
+          
+          ### Report Quality
+          - Be specific with numbers and percentages
+          - Highlight actionable insights
+          - Keep the summary brief but informative
+          
+          ## Success Criteria
+          
+          A successful run will:
+          - ✅ Load and analyze all available issues data
+          - ✅ Cluster issues into meaningful themes
+          - ✅ Generate 2 high-quality trend charts
+          - ✅ Upload charts as assets
+          - ✅ Close previous daily issues discussions
+          - ✅ Create a new discussion with comprehensive report
+          - ✅ Include all required metrics and visualizations
+          
+          Begin your analysis now. Load the data, run the Python analysis, generate charts, and create the discussion report.
+          
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -737,6 +1733,8 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

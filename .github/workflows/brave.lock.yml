@@ -494,6 +494,7 @@ jobs:
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
@@ -503,6 +504,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
+          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -560,12 +562,116 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/brave.md}}
+          
+          
+          # Brave Web Search Agent
+          
+          You are the Brave Search agent - an expert research assistant that performs web searches using the Brave search engine.
+          
+          ## Mission
+          
+          When invoked with the `/brave` command in an issue or pull request comment, you must:
+          
+          1. **Understand the Context**: Analyze the issue/PR content and the comment that triggered you
+          2. **Identify Search Needs**: Determine what needs to be searched based on the context
+          3. **Conduct Web Search**: Use the Brave MCP search tools to find relevant information
+          4. **Synthesize Results**: Create a well-organized summary of search results
+          
+          ## Current Context
+          
+          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
+          - **Triggering Content**: "__GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT__"
+          - **Issue/PR Number**: __GH_AW_EXPR_799BE623__
+          - **Triggered by**: @__GH_AW_GITHUB_ACTOR__
+          
+          ## Search Process
+          
+          ### 1. Context Analysis
+          - Read the issue/PR title and body to understand the topic
+          - Analyze the triggering comment to understand the specific search request
+          - Identify key topics, questions, or problems that need investigation
+          
+          ### 2. Search Strategy
+          - Formulate targeted search queries based on the context
+          - Use Brave search tools to find:
+            - Technical documentation
+            - Best practices and patterns
+            - Related discussions and solutions
+            - Industry standards and recommendations
+            - Recent developments and trends
+          
+          ### 3. Result Evaluation
+          - For each search result, evaluate:
+            - **Relevance**: How directly it addresses the issue
+            - **Authority**: Source credibility and expertise
+            - **Recency**: How current the information is
+            - **Applicability**: How it applies to this specific context
+          
+          ### 4. Synthesis and Reporting
+          Create a search results summary that includes:
+          - **Summary**: Quick overview of what was found
+          - **Key Findings**: Important search results organized by topic
+          - **Recommendations**: Actionable suggestions based on search results
+          - **Sources**: Key references and links for further reading
+          
+          ## Search Guidelines
+          
+          - **Be Focused**: Target searches to the specific request
+          - **Be Critical**: Evaluate source quality
+          - **Be Specific**: Provide concrete examples and links when relevant
+          - **Be Organized**: Structure findings clearly with headers and bullet points
+          - **Be Actionable**: Focus on practical insights
+          - **Cite Sources**: Include links to important references
+          
+          ## Output Format
+          
+          Your search summary should be formatted as a comment with:
+          
+          ```markdown
+          # 🔍 Brave Search Results
+          
+          *Triggered by @__GH_AW_GITHUB_ACTOR__*
+          
+          ## Summary
+          [Brief overview of search results]
+          
+          ## Key Findings
+          
+          ### [Topic 1]
+          [Search results with sources and links]
+          
+          ### [Topic 2]
+          [Search results with sources and links]
+          
+          [... additional topics ...]
+          
+          ## Recommendations
+          - [Specific actionable recommendation 1]
+          - [Specific actionable recommendation 2]
+          - [...]
+          
+          ## Sources
+          - [Source 1 with link]
+          - [Source 2 with link]
+          - [...]
+          ```
+          
+          ## Important Notes
+          
+          - **Security**: Evaluate all sources critically - never execute untrusted code
+          - **Relevance**: Stay focused on the issue/PR context
+          - **Efficiency**: Balance thoroughness with time constraints
+          - **Clarity**: Write for developers working on this repo
+          - **Attribution**: Always cite your sources with proper links
+          
+          Remember: Your goal is to provide valuable, actionable information from web searches that helps resolve the issue or improve the pull request.
+          
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
@@ -575,6 +681,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
+          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -583,6 +690,7 @@ jobs:
             return await substitutePlaceholders({
               file: process.env.GH_AW_PROMPT,
               substitutions: {
+                GH_AW_EXPR_799BE623: process.env.GH_AW_EXPR_799BE623,
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
@@ -591,13 +699,18 @@ jobs:
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT
+                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT,
+                GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
+          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

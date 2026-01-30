@@ -532,7 +532,191 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/repo-tree-map.md}}
+          ## Report Structure Guidelines
+          
+          ### 1. Header Levels
+          **Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy.**
+          
+          When creating GitHub issues or discussions:
+          - Use `###` (h3) for main sections (e.g., "### Test Summary")
+          - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
+          - Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
+          
+          ### 2. Progressive Disclosure
+          **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+          
+          Use collapsible sections for:
+          - Verbose details (full test logs, raw data)
+          - Secondary information (minor warnings, extra context)
+          - Per-item breakdowns when there are many items
+          
+          Always keep critical information visible (summary, critical issues, key metrics).
+          
+          ### 3. Report Structure Pattern
+          
+          1. **Overview**: 1-2 paragraphs summarizing key findings
+          2. **Critical Information**: Show immediately (summary stats, critical issues)
+          3. **Details**: Use `<details><summary><b>Section Name</b></summary>` for expanded content
+          4. **Context**: Add helpful metadata (workflow run, date, trigger)
+          
+          ### Design Principles (Airbnb-Inspired)
+          
+          Reports should:
+          - **Build trust through clarity**: Most important info immediately visible
+          - **Exceed expectations**: Add helpful context like trends, comparisons
+          - **Create delight**: Use progressive disclosure to reduce overwhelm
+          - **Maintain consistency**: Follow patterns across all reports
+          
+          ### Example Report Structure
+          
+          ```markdown
+          ### Summary
+          - Key metric 1: value
+          - Key metric 2: value
+          - Status: ✅/⚠️/❌
+          
+          ### Critical Issues
+          [Always visible - these are important]
+          
+          <details>
+          <summary><b>View Detailed Results</b></summary>
+          
+          [Comprehensive details, logs, traces]
+          
+          </details>
+          
+          <details>
+          <summary><b>View All Warnings</b></summary>
+          
+          [Minor issues and potential problems]
+          
+          </details>
+          
+          ### Recommendations
+          [Actionable next steps - keep visible]
+          ```
+          
+          ## Workflow Run References
+          
+          - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
+          - Include up to 3 most relevant run URLs at end under `**References:**`
+          - Do NOT add footer attribution (system adds automatically)
+          
+          # Repository Tree Map Generator
+          
+          Generate a comprehensive ASCII tree map visualization of the repository file structure.
+          
+          ## Mission
+          
+          Your task is to analyze the repository structure and create an ASCII tree map that visualizes:
+          1. Directory hierarchy
+          2. File sizes (relative visualization)
+          3. File counts per directory
+          4. Key statistics about the repository
+          
+          ## Analysis Steps
+          
+          ### 1. Collect Repository Statistics
+          
+          Use bash tools to gather:
+          - **Total file count** across the repository
+          - **Total repository size** (excluding .git directory)
+          - **File type distribution** (count by extension)
+          - **Largest files** in the repository (top 10)
+          - **Largest directories** by total size
+          - **Directory depth** and structure
+          
+          Example commands you might use:
+          ```bash
+          # Count total files
+          find . -type f -not -path "./.git/*" | wc -l
+          
+          # Get repository size
+          du -sh . --exclude=.git
+          
+          # Count files by extension
+          find . -type f -not -path "./.git/*" | sed 's/.*\.//' | sort | uniq -c | sort -rn | head -20
+          
+          # Find largest files
+          find . -type f -not -path "./.git/*" -exec du -h {} + | sort -rh | head -10
+          
+          # Directory sizes
+          du -h --max-depth=2 --exclude=.git . | sort -rh | head -15
+          ```
+          
+          ### 2. Generate ASCII Tree Map
+          
+          Create an ASCII visualization that shows:
+          - **Directory tree structure** with indentation
+          - **Size indicators** using symbols or bars (e.g., █ ▓ ▒ ░)
+          - **File counts** in brackets [count]
+          - **Relative size representation** (larger files/directories shown with more bars)
+          
+          Example visualization format:
+          ```
+          Repository Tree Map
+          ===================
+          
+          / [1234 files, 45.2 MB]
+          │
+          ├─ .github/ [156 files, 2.3 MB] ████████░░
+          │  ├─ workflows/ [89 files, 1.8 MB] ██████░░
+          │  └─ actions/ [12 files, 234 KB] ██░░
+          │
+          ├─ pkg/ [456 files, 28.5 MB] ██████████████████░░
+          │  ├─ cli/ [78 files, 5.2 MB] ████░░
+          │  ├─ parser/ [34 files, 3.1 MB] ███░░
+          │  └─ workflow/ [124 files, 12.8 MB] ████████░░
+          │
+          ├─ docs/ [234 files, 8.7 MB] ██████░░
+          │  └─ src/ [189 files, 7.2 MB] █████░░
+          │
+          └─ cmd/ [45 files, 2.1 MB] ██░░
+          ```
+          
+          ### Visualization Guidelines
+          
+          - Use **box-drawing characters** for tree structure: │ ├ └ ─
+          - Use **block characters** for size bars: █ ▓ ▒ ░
+          - Scale the visualization bars **proportionally** to sizes
+          - Keep the tree **readable** - don't go too deep (max 3-4 levels recommended)
+          - Add **color indicators** using emojis:
+            - 📁 for directories
+            - 📄 for files
+            - 🔧 for config files
+            - 📚 for documentation
+            - 🧪 for test files
+          
+          ### 5. Output Format
+          
+          Create a GitHub discussion with:
+          - **Title**: "Repository Tree Map - [current date]"
+          - **Body**: Your complete tree map visualization with all sections
+          - Use proper markdown formatting with code blocks for the ASCII art
+          
+          ## Important Notes
+          
+          - **Exclude .git directory** from all calculations to avoid skewing results
+          - **Exclude package manager directories** (node_modules, vendor, etc.) if present
+          - **Handle special characters** in filenames properly
+          - **Format sizes** in human-readable units (KB, MB, GB)
+          - **Round percentages** to 1-2 decimal places
+          - **Sort intelligently** - largest first for most sections
+          - **Be creative** with the ASCII visualization but keep it readable
+          - **Test your bash commands** before including them in analysis
+          - The tree map should give a **quick visual understanding** of the repository structure and size distribution
+          
+          ## Security
+          
+          Treat all repository content as trusted since you're analyzing the repository you're running in. However:
+          - Don't execute any code files
+          - Don't read sensitive files (.env, secrets, etc.)
+          - Focus on file metadata (sizes, counts, names) rather than content
+          
+          ## Tips
+          
+          Your terminal is already in the workspace root. No need to use `cd`.
+          
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

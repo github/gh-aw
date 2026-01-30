@@ -648,7 +648,824 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/copilot-pr-nlp-analysis.md}}
+          ## jqschema - JSON Schema Discovery
+          
+          A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.
+          
+          ### Purpose
+          
+          Generate a compact structural schema (keys + types) from JSON input. This is particularly useful when:
+          - Analyzing tool outputs from GitHub search (search_code, search_issues, search_repositories)
+          - Exploring API responses with large payloads
+          - Understanding the structure of unfamiliar data without verbose output
+          - Planning queries before fetching full data
+          
+          ### Usage
+          
+          ```bash
+          # Analyze a file
+          cat data.json | /tmp/gh-aw/jqschema.sh
+          
+          # Analyze command output
+          echo '{"name": "test", "count": 42, "items": [{"id": 1}]}' | /tmp/gh-aw/jqschema.sh
+          
+          # Analyze GitHub search results
+          gh api search/repositories?q=language:go | /tmp/gh-aw/jqschema.sh
+          ```
+          
+          ### How It Works
+          
+          The script transforms JSON data by:
+          1. Replacing object values with their type names ("string", "number", "boolean", "null")
+          2. Reducing arrays to their first element's structure (or empty array if empty)
+          3. Recursively processing nested structures
+          4. Outputting compact (minified) JSON
+          
+          ### Example
+          
+          **Input:**
+          ```json
+          {
+            "total_count": 1000,
+            "items": [
+              {"login": "user1", "id": 123, "verified": true},
+              {"login": "user2", "id": 456, "verified": false}
+            ]
+          }
+          ```
+          
+          **Output:**
+          ```json
+          {"total_count":"number","items":[{"login":"string","id":"number","verified":"boolean"}]}
+          ```
+          
+          ### Best Practices
+          
+          **Use this script when:**
+          - You need to understand the structure of tool outputs before requesting full data
+          - GitHub search tools return large datasets (use `perPage: 1` and pipe through schema minifier first)
+          - Exploring unfamiliar APIs or data structures
+          - Planning data extraction strategies
+          
+          **Example workflow for GitHub search tools:**
+          ```bash
+          # Step 1: Get schema with minimal data (fetch just 1 result)
+          # This helps understand the structure before requesting large datasets
+          echo '{}' | gh api search/repositories -f q="language:go" -f per_page=1 | /tmp/gh-aw/jqschema.sh
+          
+          # Output shows the schema:
+          # {"incomplete_results":"boolean","items":[{...}],"total_count":"number"}
+          
+          # Step 2: Review schema to understand available fields
+          
+          # Step 3: Request full data with confidence about structure
+          # Now you know what fields are available and can query efficiently
+          ```
+          
+          **Using with GitHub MCP tools:**
+          When using tools like `search_code`, `search_issues`, or `search_repositories`, pipe the output through jqschema to discover available fields:
+          ```bash
+          # Save a minimal search result to a file
+          gh api search/code -f q="jq in:file language:bash" -f per_page=1 > /tmp/sample.json
+          
+          # Generate schema to understand structure
+          cat /tmp/sample.json | /tmp/gh-aw/jqschema.sh
+          
+          # Now you know which fields exist and can use them in your analysis
+          ```
+          
+          # Python Data Visualization Guide
+          
+          Python scientific libraries have been installed and are ready for use. A temporary folder structure has been created at `/tmp/gh-aw/python/` for organizing scripts, data, and outputs.
+          
+          ## Installed Libraries
+          
+          - **NumPy**: Array processing and numerical operations
+          - **Pandas**: Data manipulation and analysis
+          - **Matplotlib**: Chart generation and plotting
+          - **Seaborn**: Statistical data visualization
+          - **SciPy**: Scientific computing utilities
+          
+          ## Directory Structure
+          
+          ```
+          /tmp/gh-aw/python/
+          ├── data/          # Store all data files here (CSV, JSON, etc.)
+          ├── charts/        # Generated chart images (PNG)
+          ├── artifacts/     # Additional output files
+          └── *.py           # Python scripts
+          ```
+          
+          ## Data Separation Requirement
+          
+          **CRITICAL**: Data must NEVER be inlined in Python code. Always store data in external files and load using pandas.
+          
+          ### ❌ PROHIBITED - Inline Data
+          ```python
+          # DO NOT do this
+          data = [10, 20, 30, 40, 50]
+          labels = ['A', 'B', 'C', 'D', 'E']
+          ```
+          
+          ### ✅ REQUIRED - External Data Files
+          ```python
+          # Always load data from external files
+          import pandas as pd
+          
+          # Load data from CSV
+          data = pd.read_csv('/tmp/gh-aw/python/data/data.csv')
+          
+          # Or from JSON
+          data = pd.read_json('/tmp/gh-aw/python/data/data.json')
+          ```
+          
+          ## Chart Generation Best Practices
+          
+          ### High-Quality Chart Settings
+          
+          ```python
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          
+          # Set style for better aesthetics
+          sns.set_style("whitegrid")
+          sns.set_palette("husl")
+          
+          # Create figure with high DPI
+          fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+          
+          # Your plotting code here
+          # ...
+          
+          # Save with high quality
+          plt.savefig('/tmp/gh-aw/python/charts/chart.png', 
+                      dpi=300, 
+                      bbox_inches='tight',
+                      facecolor='white',
+                      edgecolor='none')
+          ```
+          
+          ### Chart Quality Guidelines
+          
+          - **DPI**: Use 300 or higher for publication quality
+          - **Figure Size**: Standard is 10x6 inches (adjustable based on needs)
+          - **Labels**: Always include clear axis labels and titles
+          - **Legend**: Add legends when plotting multiple series
+          - **Grid**: Enable grid lines for easier reading
+          - **Colors**: Use colorblind-friendly palettes (seaborn defaults are good)
+          
+          ## Including Images in Reports
+          
+          When creating reports (issues, discussions, etc.), use the `upload asset` tool to make images URL-addressable and include them in markdown:
+          
+          ### Step 1: Generate and Upload Chart
+          ```python
+          # Generate your chart
+          plt.savefig('/tmp/gh-aw/python/charts/my_chart.png', dpi=300, bbox_inches='tight')
+          ```
+          
+          ### Step 2: Upload as Asset
+          Use the `upload asset` tool to upload the chart file. The tool will return a GitHub raw content URL.
+          
+          ### Step 3: Include in Markdown Report
+          When creating your discussion or issue, include the image using markdown:
+          
+          ```markdown
+          ## Visualization Results
+          
+          ![Chart Description](https://raw.githubusercontent.com/owner/repo/assets/workflow-name/my_chart.png)
+          
+          The chart above shows...
+          ```
+          
+          **Important**: Assets are published to an orphaned git branch and become URL-addressable after workflow completion.
+          
+          ## Cache Memory Integration
+          
+          The cache memory at `/tmp/gh-aw/cache-memory/` is available for storing reusable code:
+          
+          **Helper Functions to Cache:**
+          - Data loading utilities: `data_loader.py`
+          - Chart styling functions: `chart_utils.py`
+          - Common data transformations: `transforms.py`
+          
+          **Check Cache Before Creating:**
+          ```bash
+          # Check if helper exists in cache
+          if [ -f /tmp/gh-aw/cache-memory/data_loader.py ]; then
+            cp /tmp/gh-aw/cache-memory/data_loader.py /tmp/gh-aw/python/
+            echo "Using cached data_loader.py"
+          fi
+          ```
+          
+          **Save to Cache for Future Runs:**
+          ```bash
+          # Save useful helpers to cache
+          cp /tmp/gh-aw/python/data_loader.py /tmp/gh-aw/cache-memory/
+          echo "Saved data_loader.py to cache for future runs"
+          ```
+          
+          ## Complete Example Workflow
+          
+          ```python
+          #!/usr/bin/env python3
+          """
+          Example data visualization script
+          Generates a bar chart from external data
+          """
+          import pandas as pd
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          
+          # Set style
+          sns.set_style("whitegrid")
+          sns.set_palette("husl")
+          
+          # Load data from external file (NEVER inline)
+          data = pd.read_csv('/tmp/gh-aw/python/data/data.csv')
+          
+          # Process data
+          summary = data.groupby('category')['value'].sum()
+          
+          # Create chart
+          fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
+          summary.plot(kind='bar', ax=ax)
+          
+          # Customize
+          ax.set_title('Data Summary by Category', fontsize=16, fontweight='bold')
+          ax.set_xlabel('Category', fontsize=12)
+          ax.set_ylabel('Value', fontsize=12)
+          ax.grid(True, alpha=0.3)
+          
+          # Save chart
+          plt.savefig('/tmp/gh-aw/python/charts/chart.png',
+                      dpi=300,
+                      bbox_inches='tight',
+                      facecolor='white')
+          
+          print("Chart saved to /tmp/gh-aw/python/charts/chart.png")
+          ```
+          
+          ## Error Handling
+          
+          **Check File Existence:**
+          ```python
+          import os
+          
+          data_file = '/tmp/gh-aw/python/data/data.csv'
+          if not os.path.exists(data_file):
+              raise FileNotFoundError(f"Data file not found: {data_file}")
+          ```
+          
+          **Validate Data:**
+          ```python
+          # Check for required columns
+          required_cols = ['category', 'value']
+          missing = set(required_cols) - set(data.columns)
+          if missing:
+              raise ValueError(f"Missing columns: {missing}")
+          ```
+          
+          ## Artifact Upload
+          
+          Charts and source files are automatically uploaded as artifacts:
+          
+          **Charts Artifact:**
+          - Name: `data-charts`
+          - Contents: PNG files from `/tmp/gh-aw/python/charts/`
+          - Retention: 30 days
+          
+          **Source and Data Artifact:**
+          - Name: `python-source-and-data`
+          - Contents: Python scripts and data files
+          - Retention: 30 days
+          
+          Both artifacts are uploaded with `if: always()` condition, ensuring they're available even if the workflow fails.
+          
+          ## Tips for Success
+          
+          1. **Always Separate Data**: Store data in files, never inline in code
+          2. **Use Cache Memory**: Store reusable helpers for faster execution
+          3. **High Quality Charts**: Use DPI 300+ and proper sizing
+          4. **Clear Documentation**: Add docstrings and comments
+          5. **Error Handling**: Validate data and check file existence
+          6. **Type Hints**: Use type annotations for better code quality
+          7. **Seaborn Defaults**: Leverage seaborn for better aesthetics
+          8. **Reproducibility**: Set random seeds when needed
+          
+          ## Common Data Sources
+          
+          Based on common use cases:
+          
+          **Repository Statistics:**
+          ```python
+          # Collect via GitHub API, save to data.csv
+          # Then load and visualize
+          data = pd.read_csv('/tmp/gh-aw/python/data/repo_stats.csv')
+          ```
+          
+          **Workflow Metrics:**
+          ```python
+          # Collect via GitHub Actions API, save to data.json
+          data = pd.read_json('/tmp/gh-aw/python/data/workflow_metrics.json')
+          ```
+          
+          **Sample Data Generation:**
+          ```python
+          # Generate with NumPy, save to file first
+          import numpy as np
+          data = np.random.randn(100, 2)
+          df = pd.DataFrame(data, columns=['x', 'y'])
+          df.to_csv('/tmp/gh-aw/python/data/sample_data.csv', index=False)
+          
+          # Then load it back (demonstrating the pattern)
+          data = pd.read_csv('/tmp/gh-aw/python/data/sample_data.csv')
+          ```
+          
+          ## Report Structure Guidelines
+          
+          ### 1. Header Levels
+          **Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy.**
+          
+          When creating GitHub issues or discussions:
+          - Use `###` (h3) for main sections (e.g., "### Test Summary")
+          - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
+          - Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
+          
+          ### 2. Progressive Disclosure
+          **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+          
+          Use collapsible sections for:
+          - Verbose details (full test logs, raw data)
+          - Secondary information (minor warnings, extra context)
+          - Per-item breakdowns when there are many items
+          
+          Always keep critical information visible (summary, critical issues, key metrics).
+          
+          ### 3. Report Structure Pattern
+          
+          1. **Overview**: 1-2 paragraphs summarizing key findings
+          2. **Critical Information**: Show immediately (summary stats, critical issues)
+          3. **Details**: Use `<details><summary><b>Section Name</b></summary>` for expanded content
+          4. **Context**: Add helpful metadata (workflow run, date, trigger)
+          
+          ### Design Principles (Airbnb-Inspired)
+          
+          Reports should:
+          - **Build trust through clarity**: Most important info immediately visible
+          - **Exceed expectations**: Add helpful context like trends, comparisons
+          - **Create delight**: Use progressive disclosure to reduce overwhelm
+          - **Maintain consistency**: Follow patterns across all reports
+          
+          ### Example Report Structure
+          
+          ```markdown
+          ### Summary
+          - Key metric 1: value
+          - Key metric 2: value
+          - Status: ✅/⚠️/❌
+          
+          ### Critical Issues
+          [Always visible - these are important]
+          
+          <details>
+          <summary><b>View Detailed Results</b></summary>
+          
+          [Comprehensive details, logs, traces]
+          
+          </details>
+          
+          <details>
+          <summary><b>View All Warnings</b></summary>
+          
+          [Minor issues and potential problems]
+          
+          </details>
+          
+          ### Recommendations
+          [Actionable next steps - keep visible]
+          ```
+          
+          ## Workflow Run References
+          
+          - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
+          - Include up to 3 most relevant run URLs at end under `**References:**`
+          - Do NOT add footer attribution (system adds automatically)
+          
+          
+          
+          # Copilot PR Conversation NLP Analysis
+          
+          You are an AI analytics agent specialized in Natural Language Processing (NLP) and conversation analysis. Your mission is to analyze GitHub Copilot pull request conversations to identify trends, sentiment patterns, and recurring topics.
+          
+          ## Mission
+          
+          Generate a daily NLP-based analysis report of Copilot-created PRs merged within the last 24 hours, focusing on conversation patterns, sentiment trends, and topic clustering. Post the findings with visualizations as a GitHub Discussion in the `audit` category.
+          
+          ## Current Context
+          
+          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
+          - **Analysis Period**: Last 24 hours (merged PRs only)
+          - **Data Location**: 
+            - PR metadata: `/tmp/gh-aw/pr-data/copilot-prs.json`
+            - PR comments: `/tmp/gh-aw/pr-comments/pr-*.json`
+          - **Python Environment**: NumPy, Pandas, Matplotlib, Seaborn, SciPy, NLTK, scikit-learn, TextBlob, WordCloud
+          - **Output Directory**: `/tmp/gh-aw/python/charts/`
+          
+          ## Task Overview
+          
+          ### Phase 1: Load and Parse PR Conversation Data
+          
+          **Pre-fetched Data Available**: The shared component has downloaded all Copilot PRs from the last 30 days. The data is available at:
+          - `/tmp/gh-aw/pr-data/copilot-prs.json` - Full PR data in JSON format
+          - `/tmp/gh-aw/pr-data/copilot-prs-schema.json` - Schema showing the structure
+          
+          **Note**: This workflow focuses on merged PRs from the last 24 hours. Use jq to filter:
+          ```bash
+          # Get PRs merged in the last 24 hours
+          DATE_24H_AGO=$(date -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -v-1d '+%Y-%m-%dT%H:%M:%SZ')
+          jq --arg date "$DATE_24H_AGO" '[.[] | select(.mergedAt != null and .mergedAt >= $date)]' /tmp/gh-aw/pr-data/copilot-prs.json
+          ```
+          
+          1. **Load PR metadata**:
+             ```bash
+             cat /tmp/gh-aw/pr-data/copilot-prs.json
+             echo "Total PRs: $(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)"
+             ```
+          
+          2. **Parse conversation threads** using `jq`:
+             - For each PR in `/tmp/gh-aw/pr-comments/pr-*.json`, extract:
+               - Comments (from `comments` array)
+               - Review comments (from `reviewComments` array)
+               - Reviews (from `reviews` array)
+             - Identify conversation participants (human vs Copilot)
+             - Structure as message exchanges
+          
+          3. **Create structured conversation dataset**:
+             - Save to `/tmp/gh-aw/python/data/conversations.csv` with columns:
+               - `pr_number`: PR number
+               - `pr_title`: PR title
+               - `message_type`: "comment", "review", "review_comment"
+               - `author`: Username
+               - `is_copilot`: Boolean
+               - `text`: Message content
+               - `created_at`: Timestamp
+               - `sentiment_polarity`: (to be filled in Phase 2)
+          
+          ### Phase 2: Preprocess with jq and Python
+          
+          1. **Use jq to extract conversation threads**:
+             ```bash
+             # Example: Extract all comment bodies from a PR
+             jq '.comments[].body' /tmp/gh-aw/pr-comments/pr-123.json
+             ```
+          
+          2. **Create Python script** (`/tmp/gh-aw/python/parse_conversations.py`) to:
+             - Read all PR comment JSON files
+             - Extract and clean text (remove markdown, code blocks, URLs)
+             - Combine PR body with conversation threads
+             - Identify user ↔ Copilot exchange patterns
+             - Save cleaned data to CSV
+          
+          3. **Text preprocessing**:
+             - Lowercase conversion
+             - Remove special characters and code snippets
+             - Tokenization
+             - Remove stopwords
+             - Lemmatization
+          
+          ### Phase 3: NLP Analysis
+          
+          Create Python analysis script (`/tmp/gh-aw/python/nlp_analysis.py`) to perform:
+          
+          #### 3.1 Sentiment Analysis
+          - Use TextBlob or NLTK VADER for sentiment scoring
+          - Calculate sentiment polarity (-1 to +1) for each message
+          - Aggregate sentiment by:
+            - PR (overall PR sentiment)
+            - Message type (comments vs reviews)
+            - Conversation stage (early vs late messages)
+          
+          #### 3.2 Topic Extraction and Clustering
+          - Use TF-IDF vectorization to identify important terms
+          - Apply K-means clustering or LDA topic modeling
+          - Identify common discussion themes:
+            - Code quality feedback
+            - Bug reports
+            - Feature requests
+            - Documentation discussions
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+            - Testing concerns
+          
+          #### 3.3 Keyword and Phrase Analysis
+          - Extract most frequent n-grams (1-3 words)
+          - Identify recurring technical terms
+          - Find common feedback patterns
+          - Detect sentiment-laden phrases
+          
+          #### 3.4 Temporal Patterns
+          - Analyze sentiment changes over conversation timeline
+          - Identify if discussions become more positive/negative over time
+          - Detect rapid sentiment shifts (controversy indicators)
+          
+          ### Phase 4: Generate Visualizations
+          
+          Create the following charts in `/tmp/gh-aw/python/charts/`:
+          
+          1. **`sentiment_distribution.png`**: Histogram of sentiment polarity scores
+          2. **`topics_wordcloud.png`**: Word cloud of most common terms (colored by topic cluster)
+          3. **`sentiment_timeline.png`**: Line chart showing sentiment progression across conversation stages
+          4. **`topic_frequencies.png`**: Bar chart of identified topic clusters and their frequencies
+          5. **`keyword_trends.png`**: Top 15 keywords/phrases with occurrence counts
+          
+          **Chart Quality Requirements**:
+          - DPI: 300 minimum
+          - Size: 10x6 inches (or appropriate for data)
+          - Style: Use seaborn styling for professional appearance
+          - Labels: Clear titles, axis labels, and legends
+          - Colors: Colorblind-friendly palette
+          
+          ### Phase 5: Upload Visualizations as Assets
+          
+          For each generated chart:
+          
+          1. **Verify chart was created**:
+             ```bash
+             find /tmp/gh-aw/python/charts/ -maxdepth 1 -ls
+             ```
+          
+          2. **Upload each chart** using the `upload asset` tool
+          3. **Collect returned URLs** for embedding in the discussion
+          
+          ### Phase 6: Create Analysis Discussion
+          
+          Post a comprehensive discussion with the following structure:
+          
+          **Title**: `Copilot PR Conversation NLP Analysis - [DATE]`
+          
+          **Content Template**:
+          ````markdown
+          # 🤖 Copilot PR Conversation NLP Analysis - [DATE]
+          
+          ## Executive Summary
+          
+          **Analysis Period**: Last 24 hours (merged PRs only)  
+          **Repository**: __GH_AW_GITHUB_REPOSITORY__  
+          **Total PRs Analyzed**: [count]  
+          **Total Messages**: [count] comments, [count] reviews, [count] review comments  
+          **Average Sentiment**: [polarity score] ([positive/neutral/negative])
+          
+          ## Sentiment Analysis
+          
+          ### Overall Sentiment Distribution
+          ![Sentiment Distribution](URL_FROM_UPLOAD_ASSET_sentiment_distribution)
+          
+          **Key Findings**:
+          - **Positive messages**: [count] ([percentage]%)
+          - **Neutral messages**: [count] ([percentage]%)
+          - **Negative messages**: [count] ([percentage]%)
+          - **Average polarity**: [score] on scale of -1 (very negative) to +1 (very positive)
+          
+          ### Sentiment Over Conversation Timeline
+          ![Sentiment Timeline](URL_FROM_UPLOAD_ASSET_sentiment_timeline)
+          
+          **Observations**:
+          - [e.g., "Conversations typically start neutral and become more positive as issues are resolved"]
+          - [e.g., "PR #123 showed unusual negative sentiment spike mid-conversation"]
+          
+          ## Topic Analysis
+          
+          ### Identified Discussion Topics
+          ![Topic Frequencies](URL_FROM_UPLOAD_ASSET_topic_frequencies)
+          
+          **Major Topics Detected**:
+          1. **[Topic 1 Name]** ([count] messages, [percentage]%): [brief description]
+          2. **[Topic 2 Name]** ([count] messages, [percentage]%): [brief description]
+          3. **[Topic 3 Name]** ([count] messages, [percentage]%): [brief description]
+          4. **[Topic 4 Name]** ([count] messages, [percentage]%): [brief description]
+          
+          ### Topic Word Cloud
+          ![Topics Word Cloud](URL_FROM_UPLOAD_ASSET_topics_wordcloud)
+          
+          ## Keyword Trends
+          
+          ### Most Common Keywords and Phrases
+          ![Keyword Trends](URL_FROM_UPLOAD_ASSET_keyword_trends)
+          
+          **Top Recurring Terms**:
+          - **Technical**: [list top 5 technical terms]
+          - **Action-oriented**: [list top 5 action verbs/phrases]
+          - **Feedback**: [list top 5 feedback-related terms]
+          
+          ## Conversation Patterns
+          
+          ### User ↔ Copilot Exchange Analysis
+          
+          **Typical Exchange Pattern**:
+          - Average messages per PR: [number]
+          - Average Copilot responses: [number]
+          - Average user follow-ups: [number]
+          
+          **Engagement Metrics**:
+          - PRs with active discussion (>3 messages): [count]
+          - PRs merged without discussion: [count]
+          - Average response time: [if timestamps available]
+          
+          ## Insights and Trends
+          
+          ### 🔍 Key Observations
+          
+          1. **[Insight 1]**: [e.g., "Code quality feedback is the most common topic, appearing in 78% of conversations"]
+          
+          2. **[Insight 2]**: [e.g., "Sentiment improves by an average of 0.3 points between initial comment and final approval"]
+          
+          3. **[Insight 3]**: [e.g., "Testing concerns are mentioned in 45% of PRs but sentiment remains neutral"]
+          
+          ### 📊 Trend Highlights
+          
+          - **Positive Pattern**: [e.g., "Quick acknowledgment of suggestions correlates with faster merge"]
+          - **Concerning Pattern**: [e.g., "PRs with >5 review cycles show declining sentiment"]
+          - **Emerging Theme**: [e.g., "Increased focus on documentation quality this period"]
+          
+          ## Sentiment by Message Type
+          
+          | Message Type | Avg Sentiment | Count | Percentage |
+          |--------------|---------------|-------|------------|
+          | Comments | [score] | [count] | [%] |
+          | Reviews | [score] | [count] | [%] |
+          | Review Comments | [score] | [count] | [%] |
+          
+          ## PR Highlights
+          
+          ### Most Positive PR 😊
+          **PR #[number]**: [title]  
+          **Sentiment**: [score]  
+          **Summary**: [brief summary of why positive]
+          
+          ### Most Discussed PR 💬
+          **PR #[number]**: [title]  
+          **Messages**: [count]  
+          **Summary**: [brief summary of discussion]
+          
+          ### Notable Topics PR 🔖
+          **PR #[number]**: [title]  
+          **Topics**: [list of topics]  
+          **Summary**: [brief summary]
+          
+          ## Historical Context
+          
+          [If cache memory has historical data, compare to previous periods]
+          
+          | Date | PRs | Avg Sentiment | Top Topic |
+          |------|-----|---------------|-----------|
+          | [today] | [count] | [score] | [topic] |
+          | [previous] | [count] | [score] | [topic] |
+          | [delta] | [change] | [change] | - |
+          
+          **7-Day Trend**: [e.g., "Sentiment trending upward, +0.15 increase"]
+          
+          ## Recommendations
+          
+          Based on NLP analysis:
+          
+          1. **🎯 Focus Areas**: [e.g., "Continue emphasis on clear documentation - correlates with positive sentiment"]
+          
+          2. **⚠️ Watch For**: [e.g., "Monitor PRs that generate >7 review comments - may need earlier intervention"]
+          
+          3. **✨ Best Practices**: [e.g., "Quick initial acknowledgment (within 1 hour) associated with smoother conversations"]
+          
+          ## Methodology
+          
+          **NLP Techniques Applied**:
+          - Sentiment Analysis: TextBlob/VADER
+          - Topic Modeling: TF-IDF + K-means clustering
+          - Keyword Extraction: N-gram frequency analysis
+          - Text Preprocessing: Tokenization, stopword removal, lemmatization
+          
+          **Data Sources**:
+          - GitHub PR metadata (title, body, labels)
+          - PR comments and review threads
+          - Review comments on code lines
+          - Pull request reviews
+          
+          **Libraries Used**:
+          - NLTK: Natural language processing
+          - scikit-learn: Machine learning and clustering
+          - TextBlob: Sentiment analysis
+          - WordCloud: Visualization
+          - Pandas/NumPy: Data processing
+          - Matplotlib/Seaborn: Charting
+          
+          ## Workflow Details
+          
+          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
+          - **Run ID**: __GH_AW_GITHUB_RUN_ID__
+          - **Run URL**: https://github.com/__GH_AW_GITHUB_REPOSITORY__/actions/runs/__GH_AW_GITHUB_RUN_ID__
+          - **Analysis Date**: [current date]
+          
+          ---
+          
+          *This report was automatically generated by the Copilot PR Conversation NLP Analysis workflow.*
+          ````
+          
+          ## Edge Cases and Error Handling
+          
+          ### No PRs in Last 24 Hours
+          If no Copilot PRs were merged in the last 24 hours:
+          - Create a minimal discussion noting no activity
+          - Include message: "No Copilot-authored PRs were merged in the last 24 hours"
+          - Still maintain cache memory with zero counts
+          - Optionally show historical trends
+          
+          ### PRs with No Comments
+          If PRs have no conversation data:
+          - Analyze only PR title and body
+          - Note in report: "X PRs had no discussion comments"
+          - Perform sentiment on PR body text
+          - Include in "merged without discussion" metric
+          
+          ### Insufficient Data for Clustering
+          If fewer than 5 messages total:
+          - Skip topic clustering
+          - Perform only basic sentiment analysis
+          - Note: "Sample size too small for topic modeling"
+          - Focus on keyword extraction instead
+          
+          ### Empty or Invalid JSON
+          Handle parsing errors gracefully:
+          ```python
+          try:
+              data = json.load(file)
+          except json.JSONDecodeError:
+              print(f"Warning: Invalid JSON in {filename}, skipping")
+              continue
+          ```
+          
+          ## Success Criteria
+          
+          A successful analysis workflow:
+          - ✅ Fetches only Copilot-authored PRs merged in last 24 hours
+          - ✅ Pre-downloads all PR and comment data as JSON
+          - ✅ Uses jq for efficient data filtering and preprocessing
+          - ✅ Applies multiple NLP techniques (sentiment, topics, keywords)
+          - ✅ Generates 5 high-quality visualization charts
+          - ✅ Uploads charts as assets with URL-addressable locations
+          - ✅ Posts comprehensive discussion in `audit` category
+          - ✅ Handles edge cases (no data, parsing errors) gracefully
+          - ✅ Completes within 20-minute timeout
+          - ✅ Stores analysis metadata in cache memory for trends
+          
+          ## Important Security and Data Guidelines
+          
+          ### Data Privacy
+          - **No sensitive data**: Redact usernames if discussing specific examples
+          - **Aggregate focus**: Report trends, not individual message content
+          - **Public data only**: All analyzed data is from public PR conversations
+          
+          ### Rate Limiting
+          - Sleep 0.5 seconds between PR API calls to avoid rate limits
+          - Batch requests where possible
+          - Handle API errors with retries
+          
+          ### Resource Management
+          - Clean up temporary files after analysis
+          - Use efficient data structures (pandas DataFrames)
+          - Stream large files rather than loading all into memory
+          
+          ## Cache Memory Usage
+          
+          Store reusable components and historical data:
+          
+          **Historical Analysis Data** (`/tmp/gh-aw/cache-memory/nlp-history.json`):
+          ```json
+          {
+            "daily_analysis": [
+              {
+                "date": "2024-11-04",
+                "pr_count": 8,
+                "message_count": 45,
+                "avg_sentiment": 0.32,
+                "top_topic": "code_quality",
+                "top_keywords": ["fix", "test", "update", "documentation"]
+              }
+            ]
+          }
+          ```
+          
+          **Reusable NLP Helper Functions** (save to cache):
+          - Text preprocessing utilities
+          - Sentiment analysis wrapper
+          - Topic extraction helpers
+          - Chart generation templates
+          
+          **Before Analysis**: Check cache for helper scripts
+          **After Analysis**: Save updated history and helpers to cache
+          
+          ---
+          
+          **Remember**: Focus on identifying actionable patterns in Copilot PR conversations that can inform prompt improvements, development practices, and collaboration quality.
+          
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -688,6 +1505,8 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

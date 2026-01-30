@@ -494,13 +494,12 @@ async function processUrlImport(url, optional, startLine, endLine) {
 
 /**
  * Wraps bare GitHub expressions in template conditionals with ${{ }}
- * Transforms {{#if expression}} to {{#if ${{ expression }} }} if not already wrapped
+ * Transforms {{#if expression}} to {{#if ${{ expression }} }} if expression looks like a GitHub Actions expression
  * @param {string} content - The markdown content
- * @returns {string} - Content with expressions wrapped
+ * @returns {string} - Content with GitHub expressions wrapped
  */
 function wrapExpressionsInTemplateConditionals(content) {
   // Pattern to match {{#if expression}} where expression is not already wrapped in ${{ }}
-  // This regex captures the entire {{#if ...}} block
   const pattern = /\{\{#if\s+((?:\$\{\{[^\}]*\}\}|[^\}])*?)\s*\}\}/g;
 
   return content.replace(pattern, (match, expr) => {
@@ -508,6 +507,35 @@ function wrapExpressionsInTemplateConditionals(content) {
 
     // If already wrapped in ${{ }}, return as-is
     if (trimmed.startsWith("${{") && trimmed.endsWith("}}")) {
+      return match;
+    }
+
+    // If it's an environment variable reference (starts with ${), return as-is
+    if (trimmed.startsWith("${")) {
+      return match;
+    }
+
+    // If it's a placeholder reference (starts with __), return as-is
+    if (trimmed.startsWith("__")) {
+      return match;
+    }
+
+    // Only wrap expressions that look like GitHub Actions expressions
+    // GitHub Actions expressions typically contain dots (e.g., github.actor, github.event.issue.number)
+    // or specific keywords (true, false, null)
+    const looksLikeGitHubExpr =
+      trimmed.includes(".") ||
+      trimmed === "true" ||
+      trimmed === "false" ||
+      trimmed === "null" ||
+      trimmed.startsWith("github.") ||
+      trimmed.startsWith("needs.") ||
+      trimmed.startsWith("steps.") ||
+      trimmed.startsWith("env.") ||
+      trimmed.startsWith("inputs.");
+
+    if (!looksLikeGitHubExpr) {
+      // Not a GitHub Actions expression, leave as-is
       return match;
     }
 
