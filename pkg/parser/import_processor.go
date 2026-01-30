@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/goccy/go-yaml"
 )
 
 var importLog = logger.New("parser:import_processor")
@@ -30,6 +31,7 @@ type ImportsResult struct {
 	MergedPostSteps     string   // Merged post-steps configuration from all imports (appended in order)
 	MergedLabels        []string // Merged labels from all imports (union of label names)
 	MergedCaches        []string // Merged cache configurations from all imports (appended in order)
+	MergedJobs          string   // Merged jobs from imported YAML workflows (JSON format)
 	ImportedFiles       []string // List of imported file paths (for manifest)
 	AgentFile           string   // Path to custom agent file (if imported)
 	// ImportInputs uses map[string]any because input values can be different types (string, number, boolean).
@@ -177,6 +179,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	var labels []string                  // Track unique labels
 	labelsSet := make(map[string]bool)   // Set for deduplicating labels
 	var caches []string                  // Track cache configurations (appended in order)
+	var jobsBuilder strings.Builder      // Track jobs from imported YAML workflows
 	var agentFile string                 // Track custom agent file
 	importInputs := make(map[string]any) // Aggregated input values from all imports
 
@@ -210,6 +213,22 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			}
 			// Fallback to generic error if no source information
 			return nil, fmt.Errorf("failed to resolve import '%s': %w", filePath, err)
+		}
+
+		// Validate that .lock.yml files are not imported
+		if strings.HasSuffix(strings.ToLower(fullPath), ".lock.yml") {
+			if workflowFilePath != "" && yamlContent != "" {
+				line, column := findImportItemLocation(yamlContent, importPath)
+				importErr := &ImportError{
+					ImportPath: importPath,
+					FilePath:   workflowFilePath,
+					Line:       line,
+					Column:     column,
+					Cause:      fmt.Errorf("cannot import .lock.yml files. Lock files are compiled outputs from gh-aw. Import the source .md file instead"),
+				}
+				return nil, FormatImportError(importErr, yamlContent)
+			}
+			return nil, fmt.Errorf("cannot import .lock.yml files: '%s'. Lock files are compiled outputs from gh-aw. Import the source .md file instead", importPath)
 		}
 
 		// Check for duplicates before adding to queue
@@ -279,6 +298,41 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			}
 
 			// Agent files don't have nested imports, skip to next item
+			continue
+		}
+
+		// Check if this is a YAML workflow file (not .lock.yml)
+		if isYAMLWorkflowFile(item.fullPath) {
+			log.Printf("Detected YAML workflow file: %s", item.fullPath)
+			
+			// Process YAML workflow import to extract jobs and services
+			jobsJSON, servicesJSON, err := processYAMLWorkflowImport(item.fullPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to process YAML workflow '%s': %w", item.importPath, err)
+			}
+			
+			// Append jobs to merged jobs
+			if jobsJSON != "" && jobsJSON != "{}" {
+				jobsBuilder.WriteString(jobsJSON + "\n")
+				log.Printf("Added jobs from YAML workflow: %s", item.importPath)
+			}
+			
+			// Append services to merged services (services from YAML are already in JSON format)
+			// Need to convert to YAML format for consistency with other services
+			if servicesJSON != "" && servicesJSON != "{}" {
+				// Convert JSON services to YAML format
+				var services map[string]any
+				if err := json.Unmarshal([]byte(servicesJSON), &services); err == nil {
+					servicesWrapper := map[string]any{"services": services}
+					servicesYAML, err := yaml.Marshal(servicesWrapper)
+					if err == nil {
+						servicesBuilder.WriteString(string(servicesYAML) + "\n")
+						log.Printf("Added services from YAML workflow: %s", item.importPath)
+					}
+				}
+			}
+			
+			// YAML workflows don't have nested imports or markdown content, skip to next item
 			continue
 		}
 
@@ -510,6 +564,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedPostSteps:     postStepsBuilder.String(),
 		MergedLabels:        labels,
 		MergedCaches:        caches,
+		MergedJobs:          jobsBuilder.String(),
 		ImportedFiles:       topologicalOrder,
 		AgentFile:           agentFile,
 		ImportInputs:        importInputs,
