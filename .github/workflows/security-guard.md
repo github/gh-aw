@@ -9,6 +9,9 @@ permissions:
   pull-requests: read
   actions: read
   security-events: read
+engine:
+  id: copilot
+  model: gpt-5.1-codex-mini
 tools:
   github:
     toolsets: [repos, pull_requests, code_security]
