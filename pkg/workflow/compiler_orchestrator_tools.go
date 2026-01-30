@@ -20,6 +20,8 @@ type toolsProcessingResult struct {
 	toolsTimeout        int
 	toolsStartupTimeout int
 	markdownContent     string
+	importedMarkdown    string // imported markdown from frontmatter imports (separate from main body)
+	mainWorkflowMarkdown string // main workflow markdown without imports (for runtime-import)
 	allIncludedFiles    []string
 	workflowName        string
 	frontmatterName     string
@@ -181,8 +183,13 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		return nil, fmt.Errorf("failed to expand includes in markdown: %w", err)
 	}
 
+	// Store the main workflow markdown (before prepending imports)
+	mainWorkflowMarkdown := markdownContent
+
 	// Prepend imported markdown from frontmatter imports field
+	var importedMarkdown string
 	if importsResult.MergedMarkdown != "" {
+		importedMarkdown = importsResult.MergedMarkdown
 		markdownContent = importsResult.MergedMarkdown + markdownContent
 	}
 
@@ -236,19 +243,21 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}
 
 	return &toolsProcessingResult{
-		tools:               tools,
-		runtimes:            runtimes,
-		toolsTimeout:        toolsTimeout,
-		toolsStartupTimeout: toolsStartupTimeout,
-		markdownContent:     markdownContent,
-		allIncludedFiles:    allIncludedFiles,
-		workflowName:        workflowName,
-		frontmatterName:     frontmatterName,
-		needsTextOutput:     needsTextOutput,
-		trackerID:           trackerID,
-		safeOutputs:         safeOutputs,
-		secretMasking:       secretMasking,
-		parsedFrontmatter:   parsedFrontmatter,
+		tools:                tools,
+		runtimes:             runtimes,
+		toolsTimeout:         toolsTimeout,
+		toolsStartupTimeout:  toolsStartupTimeout,
+		markdownContent:      markdownContent,
+		importedMarkdown:     importedMarkdown,
+		mainWorkflowMarkdown: mainWorkflowMarkdown,
+		allIncludedFiles:     allIncludedFiles,
+		workflowName:         workflowName,
+		frontmatterName:      frontmatterName,
+		needsTextOutput:      needsTextOutput,
+		trackerID:            trackerID,
+		safeOutputs:          safeOutputs,
+		secretMasking:        secretMasking,
+		parsedFrontmatter:    parsedFrontmatter,
 	}, nil
 }
 
