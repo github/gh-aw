@@ -229,7 +229,7 @@ func TestParseProjectURL(t *testing.T) {
 			if tt.shouldErr {
 				assert.Error(t, err, "Should return error for invalid URL")
 			} else {
-				assert.NoError(t, err, "Should not return error for valid URL")
+				require.NoError(t, err, "Should not return error for valid URL")
 				assert.Equal(t, tt.expectedScope, result.scope, "Scope should match")
 				assert.Equal(t, tt.expectedOwner, result.ownerLogin, "Owner should match")
 				assert.Equal(t, tt.expectedNumber, result.projectNumber, "Project number should match")
@@ -291,14 +291,14 @@ func TestEnsureSingleSelectOptionBefore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, changed := ensureSingleSelectOptionBefore(tt.options, tt.desired, tt.beforeName)
 			assert.Equal(t, tt.expectChanged, changed, "Changed status should match expectation")
-			assert.Equal(t, tt.expectedLength, len(result), "Result length should match")
+			assert.Len(t, result, tt.expectedLength, "Result length should match")
 
 			if !tt.expectChanged {
 				// If nothing changed, result should be equal to input
 				assert.Equal(t, tt.options, result, "Options should be unchanged")
 			} else {
 				// Find the desired option and Done option
-				var desiredIdx, doneIdx int = -1, -1
+				desiredIdx, doneIdx := -1, -1
 				for i, opt := range result {
 					if opt.Name == tt.desired.Name {
 						desiredIdx = i

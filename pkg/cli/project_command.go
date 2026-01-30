@@ -697,7 +697,7 @@ func getStatusField(ctx context.Context, info projectURLInfo, verbose bool) (sta
 		}
 	}
 
-	return statusFieldInfo{}, fmt.Errorf("Status field not found in project")
+	return statusFieldInfo{}, fmt.Errorf("status field not found in project")
 }
 
 // getString safely extracts a string value from a map
