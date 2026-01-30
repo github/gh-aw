@@ -31,10 +31,6 @@ func TestNewProjectNewCommand(t *testing.T) {
 	repoFlag := cmd.Flags().Lookup("repo")
 	require.NotNil(t, repoFlag, "Should have --repo flag")
 	assert.Equal(t, "r", repoFlag.Shorthand, "Repo flag should have short form 'r'")
-
-	descFlag := cmd.Flags().Lookup("description")
-	require.NotNil(t, descFlag, "Should have --description flag")
-	assert.Equal(t, "d", descFlag.Shorthand, "Description flag should have short form 'd'")
 }
 
 func TestEscapeGraphQLString(t *testing.T) {
@@ -116,16 +112,6 @@ func TestProjectConfig(t *testing.T) {
 				Repo:      "myorg/myrepo",
 			},
 			description: "Should create project linked to repo",
-		},
-		{
-			name: "project with description",
-			config: ProjectConfig{
-				Title:       "Sprint 1",
-				Owner:       "testuser",
-				OwnerType:   "user",
-				Description: "Q1 Sprint Planning",
-			},
-			description: "Should create project with description",
 		},
 	}
 

@@ -17,13 +17,12 @@ var projectLog = logger.New("cli:project")
 
 // ProjectConfig holds configuration for creating a GitHub Project
 type ProjectConfig struct {
-	Title       string   // Project title
-	Owner       string   // Owner login (user or org)
-	OwnerType   string   // "user" or "org"
-	Description string   // Project description (optional)
-	Repo        string   // Repository to link project to (optional, format: owner/repo)
-	Views       []string // View names to create (optional)
-	Verbose     bool     // Verbose output
+	Title       string // Project title
+	Owner       string // Owner login (user or org)
+	OwnerType   string // "user" or "org"
+	Description string // Project description (note: not currently supported by GitHub Projects V2 API during creation)
+	Repo        string // Repository to link project to (optional, format: owner/repo)
+	Verbose     bool   // Verbose output
 }
 
 // NewProjectCommand creates the project command
@@ -71,13 +70,11 @@ Token Requirements:
 Examples:
   gh aw project new "My Project" --owner @me                    # Create user project
   gh aw project new "Team Board" --owner myorg                  # Create org project  
-  gh aw project new "Bugs" --owner myorg --repo myorg/myrepo   # Create and link to repo
-  gh aw project new "Sprint 1" --owner @me --description "Q1 Sprint Planning"`,
+  gh aw project new "Bugs" --owner myorg --repo myorg/myrepo   # Create and link to repo`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner, _ := cmd.Flags().GetString("owner")
 			repo, _ := cmd.Flags().GetString("repo")
-			description, _ := cmd.Flags().GetString("description")
 			verbose, _ := cmd.Flags().GetBool("verbose")
 
 			if owner == "" {
@@ -85,11 +82,10 @@ Examples:
 			}
 
 			config := ProjectConfig{
-				Title:       args[0],
-				Owner:       owner,
-				Description: description,
-				Repo:        repo,
-				Verbose:     verbose,
+				Title:   args[0],
+				Owner:   owner,
+				Repo:    repo,
+				Verbose: verbose,
 			}
 
 			return RunProjectNew(cmd.Context(), config)
@@ -98,7 +94,6 @@ Examples:
 
 	cmd.Flags().StringP("owner", "o", "", "Project owner: '@me' for current user or organization name (required)")
 	cmd.Flags().StringP("repo", "r", "", "Repository to link project to (format: owner/repo)")
-	cmd.Flags().StringP("description", "d", "", "Project description")
 	_ = cmd.MarkFlagRequired("owner")
 
 	return cmd
@@ -158,10 +153,6 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Created project #%v: %s", project["number"], config.Title)))
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("  URL: %s", project["url"])))
 
-	if config.Description != "" {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("  Description: %s", config.Description)))
-	}
-
 	return nil
 }
 
@@ -189,9 +180,9 @@ func validateOwner(ctx context.Context, ownerType, owner string, verbose bool) e
 
 	var query string
 	if ownerType == "org" {
-		query = fmt.Sprintf(`query { organization(login: "%s") { id login } }`, owner)
+		query = fmt.Sprintf(`query { organization(login: "%s") { id login } }`, escapeGraphQLString(owner))
 	} else {
-		query = fmt.Sprintf(`query { user(login: "%s") { id login } }`, owner)
+		query = fmt.Sprintf(`query { user(login: "%s") { id login } }`, escapeGraphQLString(owner))
 	}
 
 	_, err := workflow.RunGH("Validating owner...", "api", "graphql", "-f", fmt.Sprintf("query=%s", query))
@@ -222,10 +213,10 @@ func getOwnerNodeId(ctx context.Context, ownerType, owner string, verbose bool) 
 	var query string
 	var jqPath string
 	if ownerType == "org" {
-		query = fmt.Sprintf(`query { organization(login: "%s") { id } }`, owner)
+		query = fmt.Sprintf(`query { organization(login: "%s") { id } }`, escapeGraphQLString(owner))
 		jqPath = ".data.organization.id"
 	} else {
-		query = fmt.Sprintf(`query { user(login: "%s") { id } }`, owner)
+		query = fmt.Sprintf(`query { user(login: "%s") { id } }`, escapeGraphQLString(owner))
 		jqPath = ".data.user.id"
 	}
 
@@ -308,7 +299,7 @@ func linkProjectToRepo(ctx context.Context, projectId, repoSlug string, verbose 
 	repoName := parts[1]
 
 	// Get repository ID
-	query := fmt.Sprintf(`query { repository(owner: "%s", name: "%s") { id } }`, repoOwner, repoName)
+	query := fmt.Sprintf(`query { repository(owner: "%s", name: "%s") { id } }`, escapeGraphQLString(repoOwner), escapeGraphQLString(repoName))
 	output, err := workflow.RunGH("Getting repository ID...", "api", "graphql", "-f", fmt.Sprintf("query=%s", query), "--jq", ".data.repository.id")
 	if err != nil {
 		return fmt.Errorf("repository '%s' not found: %w", repoSlug, err)
