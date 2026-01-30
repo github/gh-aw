@@ -806,11 +806,6 @@ func ensureMaintenanceWorkflow(verbose bool) error {
 	// Parse all workflows to collect WorkflowData
 	var workflowDataList []*workflow.WorkflowData
 	for _, file := range files {
-		// Skip campaign specs and generated files
-		if strings.HasSuffix(file, ".campaign.md") || strings.HasSuffix(file, ".campaign.g.md") {
-			continue
-		}
-
 		initLog.Printf("Parsing workflow: %s", file)
 		workflowData, err := compiler.ParseWorkflowFile(file)
 		if err != nil {
