@@ -573,19 +573,15 @@ jobs:
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
-          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_QUERY: ${{ github.event.inputs.query }}
-          GH_AW_GITHUB_EVENT_INPUTS_URL: ${{ github.event.inputs.url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -646,173 +642,24 @@ jobs:
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           
           
-          # Resource Summarizer Agent
-          
-          You are a resource analysis and summarization agent powered by the markitdown MCP server.
-          
-          ## Mission
-          
-          When invoked with the `/summarize` command or triggered via workflow_dispatch, you must:
-          
-          1. **Identify Resources**: Extract URLs from the command or use the provided URL input
-          2. **Convert to Markdown**: Use the markitdown MCP server to convert each resource to markdown
-          3. **Analyze Content**: Analyze the converted markdown content
-          4. **Answer Query**: Respond to the query or provide a summary
-          
-          ## Current Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Triggered by**: @__GH_AW_GITHUB_ACTOR__
-          - **Triggering Content**: "__GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT__"
-          - **Issue/PR Number**: __GH_AW_EXPR_799BE623__
-          - **Workflow Dispatch URL**: __GH_AW_GITHUB_EVENT_INPUTS_URL__
-          - **Workflow Dispatch Query**: __GH_AW_GITHUB_EVENT_INPUTS_QUERY__
-          - **Persistent Storage**: `/tmp/gh-aw/cache-memory/` (use this to store analysis results for future reference)
-          
-          ## Processing Steps
-          
-          ### 1. Identify Resources and Query
-          
-          **For Command Trigger (`/summarize`):**
-          - Parse the triggering comment/issue to extract URL(s) to resources
-          - Look for URLs in the comment text (e.g., `/summarize https://example.com/document.pdf`)
-          - Extract any query or question after the URL(s)
-          - If no query is provided, use: "summarize in the context of this repository"
-          
-          **For Workflow Dispatch:**
-          - Use the provided `url` input (may contain comma-separated URLs)
-          - Use the provided `query` input (defaults to "summarize in the context of this repository")
-          
-          ### 2. Fetch and Convert Resources
-          
-          For each identified URL:
-          - Use the markitdown MCP server to convert the resource to markdown
-          - Supported formats include: PDF, HTML, Word documents, PowerPoint, images, and more
-          - Handle conversion errors gracefully and note any issues
-          
-          ### 3. Analyze Content
-          
-          - Review the converted markdown content from all resources
-          - Consider the repository context when analyzing
-          - Identify key information relevant to the query
-          
-          ### 4. Generate Response
-          
-          - Answer the query based on the analyzed content
-          - Provide a well-structured response that includes:
-            - Summary of findings
-            - Key points from the resources
-            - Relevant insights in the context of this repository
-            - Any conversion issues or limitations encountered
-          
-          ### 5. Store Results in Cache Memory
-          
-          - Store the analysis results in the cache-memory folder (`/tmp/gh-aw/cache-memory/`)
-          - Create a structured file with the resource URL, query, and analysis results
-          - Use a naming convention like: `analysis-{timestamp}.json` or organize by resource domain
-          - This allows future runs to reference previous analyses and build on prior knowledge
-          - Store both the converted markdown and your analysis for future reference
-          
-          ### 6. Post Response
-          
-          - Post your analysis as a comment on the triggering issue/PR
-          - Format the response clearly with headers and bullet points
-          - Include references to the analyzed URLs
-          - Create a discussion in the repository with the result of the summarization using safe-outputs:
-            - Create a discussion with the title format: "Summary: [Brief description of resource]"
-            - Include the full analysis as the discussion body
-            - The discussion will be automatically created through the safe-outputs system
-          
-          ## Response Format
-          
-          Your response should be formatted as:
-          
-          ```markdown
-          # 📊 Resource Analysis
-          
-          **Query**: [The query or question being answered]
-          
-          **Resources Analyzed**:
-          - [URL 1] - [Brief description]
-          - [URL 2] - [Brief description]
-          - ...
-          
-          ## Summary
-          
-          [Comprehensive summary addressing the query]
-          
-          ## Key Findings
-          
-          - **Finding 1**: [Detail]
-          - **Finding 2**: [Detail]
-          - ...
-          
-          ## Context for This Repository
-          
-          [How these findings relate to __GH_AW_GITHUB_REPOSITORY__]
-          
-          ## Additional Notes
-          
-          [Any conversion issues, limitations, or additional observations]
-          ```
-          
-          ## Important Notes
-          
-          - **URL Extraction**: Be flexible in parsing URLs from comments - they may appear anywhere in the text
-          - **Multiple Resources**: Handle multiple URLs when provided (comma-separated or space-separated)
-          - **Error Handling**: If a resource cannot be converted, note this in your response and continue with other resources
-          - **Query Flexibility**: Adapt your analysis to the specific query provided
-          - **Repository Context**: Always consider how the analyzed content relates to the current repository
-          - **Default Query**: When no specific query is provided, use "summarize in the context of this repository"
-          - **Cache Memory Storage**: Store all analysis results in `/tmp/gh-aw/cache-memory/` for future reference. This allows you to:
-            - Build knowledge over time about analyzed resources
-            - Reference previous analyses when new queries come in
-            - Track patterns and recurring themes across multiple resource analyses
-            - Create a searchable database of analyzed resources for this repository
-          
-          ## Cache Memory Usage
-          
-          You have access to persistent storage in `/tmp/gh-aw/cache-memory/` across workflow runs. Use this to:
-          
-          1. **Store Analysis Results**: Save each resource analysis as a structured JSON file
-          2. **Track History**: Maintain a log of all analyzed resources and their summaries
-          3. **Build Knowledge**: Reference previous analyses to provide more contextual insights
-          4. **Avoid Redundancy**: Check if a resource has been analyzed before and reference prior findings
-          
-          Example structure for stored analysis:
-          ```json
-          {
-            "timestamp": "2024-01-15T10:30:00Z",
-            "url": "https://example.com/document.pdf",
-            "query": "summarize in the context of this repository",
-            "analysis": "...",
-            "key_findings": ["finding1", "finding2"],
-            "repository_context": "..."
-          }
-          ```
-          
-          Remember: Your goal is to help users understand external resources in the context of their repository by converting them to markdown, providing insightful analysis, and building persistent knowledge over time.
           
           PROMPT_EOF
+          echo '{{#runtime-import workflows/pdf-summary.md}}' >> "$GH_AW_PROMPT"
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_CACHE_DESCRIPTION: ${{ '' }}
           GH_AW_CACHE_DIR: ${{ '/tmp/gh-aw/cache-memory/' }}
-          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_QUERY: ${{ github.event.inputs.query }}
-          GH_AW_GITHUB_EVENT_INPUTS_URL: ${{ github.event.inputs.url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -823,31 +670,21 @@ jobs:
               substitutions: {
                 GH_AW_CACHE_DESCRIPTION: process.env.GH_AW_CACHE_DESCRIPTION,
                 GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR,
-                GH_AW_EXPR_799BE623: process.env.GH_AW_EXPR_799BE623,
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
-                GH_AW_GITHUB_EVENT_INPUTS_QUERY: process.env.GH_AW_GITHUB_EVENT_INPUTS_QUERY,
-                GH_AW_GITHUB_EVENT_INPUTS_URL: process.env.GH_AW_GITHUB_EVENT_INPUTS_URL,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT,
-                GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT
+                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_INPUTS_QUERY: ${{ github.event.inputs.query }}
-          GH_AW_GITHUB_EVENT_INPUTS_URL: ${{ github.event.inputs.url }}
-          GH_AW_EXPR_799BE623: ${{ github.event.issue.number || github.event.pull_request.number }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

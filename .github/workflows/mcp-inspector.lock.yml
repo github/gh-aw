@@ -1037,50 +1037,9 @@ jobs:
           - Include up to 3 most relevant run URLs at end under `**References:**`
           - Do NOT add footer attribution (system adds automatically)
           
-          # MCP Inspector Agent
-          
-          Systematically investigate and document all MCP server configurations in `.github/workflows/shared/mcp/*.md`.
-          
-          ## Mission
-          
-          For each MCP configuration file:
-          1. Read the file in `.github/workflows/shared/mcp/`
-          2. Extract: server name, type (http/container/local), tools, secrets required
-          3. Document configuration status and any issues
-          
-          Generate:
-          
-          ```markdown
-          # 🔍 MCP Inspector Report - [DATE]
-          
-          ## Summary
-          - **Servers Inspected**: [NUMBER]  
-          - **By Type**: HTTP: [N], Container: [N], Local: [N]
-          
-          ## Inventory Table
-          
-          | Server | Type | Tools | Secrets | Status |
-          |--------|------|-------|---------|--------|
-          | [name] | [type] | [count] | [Y/N] | [✅/⚠️/❌] |
-          
-          ## Details
-          
-          ### [Server Name]
-          - **File**: `shared/mcp/[file].md`
-          - **Type**: [http/container/local]
-          - **Tools**: [list or count]
-          - **Secrets**: [list if any]
-          - **Notes**: [observations]
-          
-          [Repeat for all servers]
-          
-          ## Recommendations
-          1. [Issue or improvement]
-          ```
-          
-          Save to `/tmp/gh-aw/cache-memory/mcp-inspections/[DATE].json` and create discussion in "audits" category.
           
           PROMPT_EOF
+          echo '{{#runtime-import workflows/mcp-inspector.md}}' >> "$GH_AW_PROMPT"
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:

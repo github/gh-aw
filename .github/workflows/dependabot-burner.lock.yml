@@ -917,16 +917,9 @@ jobs:
           - `size`: Small/Medium/Large
           - `start_date`: YYYY-MM-DD
           
-          # Dependabot Burner
-          
-          - Project URL: https://github.com/orgs/githubnext/projects/144
-          - Campaign ID: dependabot-burner
-          
-          - Find all open Dependabot PRs and add them to the project.
-          - Create bundle issues, each for exactly **one runtime + one manifest file**.
-          - Add bundle issues to the project, and assign them to Copilot.
           
           PROMPT_EOF
+          echo '{{#runtime-import workflows/dependabot-burner.md}}' >> "$GH_AW_PROMPT"
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:

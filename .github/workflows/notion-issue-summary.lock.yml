@@ -451,7 +451,6 @@ jobs:
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
-          GH_AW_EXPR_FD3E9604: ${{ github.event.inputs.issue-number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
@@ -516,22 +515,13 @@ jobs:
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           
           
-          # Issue Summary to Notion
-          
-          Analyze the issue #__GH_AW_EXPR_FD3E9604__ and create a brief summary, then add it as a comment to the Notion page.
-          
-          ## Instructions
-          
-          1. Read and analyze the issue content
-          2. Create a concise summary (2-3 sentences) of the issue
-          3. Use the `notion_add_comment` safe-job to add your summary as a comment to the Notion page
           
           PROMPT_EOF
+          echo '{{#runtime-import workflows/notion-issue-summary.md}}' >> "$GH_AW_PROMPT"
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_EXPR_FD3E9604: ${{ github.event.inputs.issue-number }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
@@ -548,7 +538,6 @@ jobs:
             return await substitutePlaceholders({
               file: process.env.GH_AW_PROMPT,
               substitutions: {
-                GH_AW_EXPR_FD3E9604: process.env.GH_AW_EXPR_FD3E9604,
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
@@ -563,7 +552,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_EXPR_FD3E9604: ${{ github.event.inputs.issue-number }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

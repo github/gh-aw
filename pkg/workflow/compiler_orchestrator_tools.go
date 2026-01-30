@@ -185,12 +185,16 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 
 	// Store the main workflow markdown (before prepending imports)
 	mainWorkflowMarkdown := markdownContent
+	orchestratorToolsLog.Printf("Main workflow markdown: %d bytes", len(mainWorkflowMarkdown))
 
 	// Prepend imported markdown from frontmatter imports field
 	var importedMarkdown string
 	if importsResult.MergedMarkdown != "" {
 		importedMarkdown = importsResult.MergedMarkdown
 		markdownContent = importsResult.MergedMarkdown + markdownContent
+		orchestratorToolsLog.Printf("Stored imported markdown: %d bytes, combined markdown: %d bytes", len(importedMarkdown), len(markdownContent))
+	} else {
+		orchestratorToolsLog.Print("No imported markdown")
 	}
 
 	log.Print("Expanded includes in markdown content")
