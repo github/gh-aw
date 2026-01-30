@@ -804,13 +804,13 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Campaign Orchestrator Core Rules
+          # Campaign Coordinator Core Rules
           
-          These are generic orchestrator rules.
+          These are generic coordinator rules.
           
           ## Operating Model
           
-          - The orchestrator coordinates a single campaign: discover state, decide deterministically, apply minimal writes, and report.
+          - The coordinator coordinates a single campaign: discover state, decide deterministically, apply minimal writes, and report.
           - Delegate repo/code changes (PRs, commits) to worker workflows unless the campaign explicitly grants direct repo authority.
           - The GitHub Project board (when used) is the authoritative campaign state; do not invent state.
           

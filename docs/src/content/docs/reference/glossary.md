@@ -38,7 +38,9 @@ An AI-powered workflow that can reason, make decisions, and take autonomous acti
 
 ### Agentic Campaign
 
-An initiative that coordinates multiple agentic workflows toward a shared goal.
+Workflows that coordinate multiple autonomous agents working toward a shared goal, with built-in progress tracking via GitHub Projects. Campaigns use standard agent coordination patterns (imported from `shared/campaign.md`) to discover work, dispatch workers, and track progress systematically.
+
+See the [detailed Agentic campaign entry](#agentic-campaign-1) below and the [Campaigns Guide](/gh-aw/guides/campaigns/) for implementation patterns.
 
 ### Agentic Engine or Coding Agent
 
@@ -284,7 +286,7 @@ See the [ProjectOps Guide](/gh-aw/examples/issue-pr-events/projectops/) for impl
 
 ### Agentic campaign
 
-An initiative that coordinates multiple agentic workflows toward a shared goal. Agentic campaigns can be enterprise-scale, with explicit ownership, approval gates, and executive visibility.
+Workflows that coordinate multiple autonomous agents working toward a shared goal, with built-in progress tracking via GitHub Projects. Campaigns use standard agent coordination patterns to discover work, dispatch workers, and track progress systematically. Agentic campaigns can be enterprise-scale, with explicit ownership, approval gates, and executive visibility.
 
 :::caution[File format deprecated]
 The `.campaign.md` file format is **deprecated**. Use the `project` field in workflow frontmatter for project tracking instead. See [Project Tracking](/gh-aw/reference/frontmatter/#project-tracking-project).
