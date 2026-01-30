@@ -23,7 +23,7 @@ The campaign coordinates three workers (scanner, fixer, reviewer) that create se
 
 ### Key patterns
 
-**Orchestrator responsibilities (dispatch-only):**
+**Coordinator responsibilities (dispatch-only):**
 - Runs discovery precomputation (writes a manifest for the agent)
 - Dispatches workers on schedule
 - Coordinates work by dispatching allowlisted workflows
@@ -119,8 +119,8 @@ Workflows with schedules or event triggers should run independently and let the 
 
 ```
 .github/workflows/
-├── security-audit.md                    # Campaign orchestrator workflow
-├── security-audit.lock.yml              # Compiled orchestrator
+├── security-audit.md                    # Campaign coordinator workflow
+├── security-audit.lock.yml              # Compiled coordinator
 ├── security-scanner.md                  # Worker workflow
 ├── security-fixer.md                    # Worker workflow
 └── security-reviewer.md                 # Worker workflow
@@ -132,14 +132,14 @@ Workers are regular workflows, not in campaign-specific folders. The dispatch-on
 
 ### Startup
 
-1. Orchestrator dispatches workers
+1. Coordinator dispatches workers
 2. Workers create issues/PRs with campaign labels
 3. Next run discovers these items
 4. Items added to project board
 
 ### Ongoing execution
 
-1. Orchestrator dispatches workers (new work)
+1. Coordinator dispatches workers (new work)
 2. Discovers outputs from previous runs
 3. Updates project board incrementally
 4. Reports progress against KPIs
@@ -149,7 +149,7 @@ Workers are regular workflows, not in campaign-specific folders. The dispatch-on
 1. All work items processed
 2. Final status update with metrics
 3. Campaign state set to `completed`
-4. Orchestrator disabled
+4. Coordinator disabled
 
 ## Idempotency example
 
