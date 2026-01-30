@@ -1228,6 +1228,11 @@ engine:
   # (optional)
   config: "example-value"
 
+  # Agent identifier to pass to copilot --agent flag (copilot engine only).
+  # Specifies which custom agent to use for the workflow.
+  # (optional)
+  agent: "example-value"
+
   # Optional array of command-line arguments to pass to the AI engine CLI. These
   # arguments are injected after all other args but before the prompt.
   # (optional)
