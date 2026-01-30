@@ -298,13 +298,23 @@ async function main(config = {}) {
 
     const output = message;
 
-    // Validate required fields
-    if (!output.project) {
-      core.error("Missing required field: project (GitHub project URL)");
-      return {
-        success: false,
-        error: "Missing required field: project",
-      };
+    // Get default project URL from environment if available
+    const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
+
+    // Validate project field - can use default from frontmatter if available
+    let effectiveProjectUrl = output.project;
+
+    if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
+      if (defaultProjectUrl) {
+        core.info(`Using default project URL from frontmatter: ${defaultProjectUrl}`);
+        effectiveProjectUrl = defaultProjectUrl;
+      } else {
+        core.error("Missing required field: project (GitHub project URL)");
+        return {
+          success: false,
+          error: "Missing required field: project",
+        };
+      }
     }
 
     if (!output.body) {
@@ -316,10 +326,10 @@ async function main(config = {}) {
     }
 
     try {
-      core.info(`Creating status update for project: ${output.project}`);
+      core.info(`Creating status update for project: ${effectiveProjectUrl}`);
 
       // Parse project URL and resolve project ID
-      const projectInfo = parseProjectUrl(output.project);
+      const projectInfo = parseProjectUrl(effectiveProjectUrl);
       const projectNumberInt = parseInt(projectInfo.projectNumber, 10);
 
       if (!Number.isFinite(projectNumberInt)) {

@@ -1225,4 +1225,58 @@ describe("updateProject", () => {
     expect(result.error).toContain('Missing required "project" field');
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Missing required"));
   });
+
+  it("should use default project URL from GH_AW_PROJECT_URL when message.project is missing", async () => {
+    // Set default project URL in environment
+    const defaultProjectUrl = "https://github.com/orgs/testowner/projects/60";
+    process.env.GH_AW_PROJECT_URL = defaultProjectUrl;
+
+    const messageHandler = await updateProjectHandlerFactory({});
+
+    const messageWithoutProject = {
+      type: "update_project",
+      content_type: "draft_issue",
+      draft_title: "Test Draft Issue",
+      draft_body: "This is a test",
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(defaultProjectUrl, 60, "project-default"), addDraftIssueResponse("draft-item-default")]);
+
+    const result = await messageHandler(messageWithoutProject, new Map());
+
+    expect(result.success).toBe(true);
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+    expect(getOutput("item-id")).toBe("draft-item-default");
+
+    // Cleanup
+    delete process.env.GH_AW_PROJECT_URL;
+  });
+
+  it("should prioritize message.project over GH_AW_PROJECT_URL when both are present", async () => {
+    // Set default project URL in environment
+    process.env.GH_AW_PROJECT_URL = "https://github.com/orgs/testowner/projects/999";
+
+    const messageHandler = await updateProjectHandlerFactory({});
+
+    const messageProjectUrl = "https://github.com/orgs/testowner/projects/60";
+    const messageWithProject = {
+      type: "update_project",
+      project: messageProjectUrl,
+      content_type: "draft_issue",
+      draft_title: "Test Draft Issue",
+      draft_body: "This is a test",
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(messageProjectUrl, 60, "project-message"), addDraftIssueResponse("draft-item-message")]);
+
+    const result = await messageHandler(messageWithProject, new Map());
+
+    expect(result.success).toBe(true);
+    // Should not use default from environment
+    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+    expect(getOutput("item-id")).toBe("draft-item-message");
+
+    // Cleanup
+    delete process.env.GH_AW_PROJECT_URL;
+  });
 });

@@ -367,9 +367,10 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 // TestBuildProjectHandlerManagerStep tests project handler manager step generation
 func TestBuildProjectHandlerManagerStep(t *testing.T) {
 	tests := []struct {
-		name          string
-		safeOutputs   *SafeOutputsConfig
-		checkContains []string
+		name              string
+		safeOutputs       *SafeOutputsConfig
+		parsedFrontmatter *FrontmatterConfig
+		checkContains     []string
 	}{
 		{
 			name: "project handler manager with create_project",
@@ -419,6 +420,25 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 				"github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
 			},
 		},
+		{
+			name: "project handler manager with project URL from frontmatter",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: 10,
+					},
+				},
+			},
+			parsedFrontmatter: &FrontmatterConfig{
+				Project: &ProjectConfig{
+					URL: "https://github.com/orgs/test-org/projects/123",
+				},
+			},
+			checkContains: []string{
+				"name: Process Project-Related Safe Outputs",
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/test-org/projects/123\"",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -426,8 +446,9 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 			compiler := NewCompiler()
 
 			workflowData := &WorkflowData{
-				Name:        "Test Workflow",
-				SafeOutputs: tt.safeOutputs,
+				Name:              "Test Workflow",
+				SafeOutputs:       tt.safeOutputs,
+				ParsedFrontmatter: tt.parsedFrontmatter,
 			}
 
 			steps := compiler.buildProjectHandlerManagerStep(workflowData)
