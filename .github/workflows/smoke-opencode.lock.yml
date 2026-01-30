@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/opencode.md
 #
-# frontmatter-hash: 24a8c291a81458ace8d5906dd5bc013a4e3576280c5f52e01a17466ae1e1bedd
+# frontmatter-hash: b3ee0cac66b904a9b6b9549ab856ba769c2be1aec79ebf424d4bdd351039c628
 
 name: "Smoke OpenCode"
 "on":

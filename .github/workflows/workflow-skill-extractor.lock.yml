@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 8359b757b44da6f85dfd1444a2e9cbcabe098f99ddc347798ee295efec4934aa
+# frontmatter-hash: 1b1d18f1f3909639ac446af8d5c1694386796f79bb8bacec2b57e871d569b019
 
 name: "Workflow Skill Extractor"
 "on":

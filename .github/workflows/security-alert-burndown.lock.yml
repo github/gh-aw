@@ -21,7 +21,7 @@
 #
 # Discovers security work items (Dependabot PRs, code scanning alerts, secret scanning alerts)
 #
-# frontmatter-hash: 55ef6fcc1bfa75d323c870d02c8c744aedea693e510ecc4ef78273aebec253cc
+# frontmatter-hash: d4cde8a80b924e11e10b73993404d016f3bee39c4f81d43d659f26dbc58aed51
 
 name: "Security Alert Burndown"
 "on":

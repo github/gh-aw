@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: b3d769761ccfafc98d76d578fe3b7dbd1505db07e3774896c796b177156569fe
+# frontmatter-hash: bdafc9e04ae3cb82d19f105daf172ffe5bc77fa787d1f320015a85b1843c744e
 
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":

@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 86e8d433805d17c7543dfdb22d2d78b0e87ef3aba6578da7d79d9b0d7186c129
+# frontmatter-hash: 87b6e7d1f3eff15c2660dc31f2d00f472260f2998f2092b60b1bafef9b0f455d
 
 name: "Daily Observability Report for AWF Firewall and MCP Gateway"
 "on":
