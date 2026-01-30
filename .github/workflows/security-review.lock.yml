@@ -1147,10 +1147,9 @@ jobs:
 
   pre_activation:
     if: >
-      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
-      ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/security-review')) &&
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/security-review')) &&
       (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
-      (contains(github.event.comment.body, '/security-review')))
+      (contains(github.event.comment.body, '/security-review'))
     runs-on: ubuntu-slim
     permissions:
       contents: read

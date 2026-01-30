@@ -17,9 +17,11 @@ import (
 
 // TestPreActivationSkipForScheduleEvents verifies that the pre_activation job is skipped
 // for safe events (schedule, merge_group) and that downstream jobs handle this correctly.
+// NOTE: This test enables the pre_activation skip optimization which is disabled by default.
 func TestPreActivationSkipForScheduleEvents(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "pre-activation-skip-test")
-	compiler := NewCompiler()
+	// Enable the pre_activation skip optimization for this test since we're specifically testing this behavior
+	compiler := NewCompiler(WithSkipPreActivationOptimization(true))
 
 	t.Run("schedule_only_workflow_has_no_pre_activation", func(t *testing.T) {
 		// Schedule-only workflows don't need a pre_activation job at all

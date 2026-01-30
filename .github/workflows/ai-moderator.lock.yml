@@ -937,8 +937,6 @@ jobs:
             await main();
 
   pre_activation:
-    if: >
-      ((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')
     runs-on: ubuntu-slim
     permissions:
       contents: read

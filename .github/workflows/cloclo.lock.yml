@@ -1408,8 +1408,7 @@ jobs:
 
   pre_activation:
     if: >
-      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
-      ((((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request' ||
+      (((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request' ||
       github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment') &&
       ((github.event_name == 'issues') && (contains(github.event.issue.body, '/cloclo')) || (github.event_name == 'issue_comment') &&
       ((contains(github.event.comment.body, '/cloclo')) && (github.event.issue.pull_request == null)) ||
@@ -1423,7 +1422,7 @@ jobs:
       (contains(github.event.comment.body, '/cloclo')))) || (!(github.event_name == 'issues' || github.event_name == 'issue_comment' ||
       github.event_name == 'pull_request' || github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' ||
       github.event_name == 'discussion_comment'))) && ((github.event_name != 'issues') || ((github.event.action != 'labeled') ||
-      (github.event.label.name == 'cloclo'))))
+      (github.event.label.name == 'cloclo')))
     runs-on: ubuntu-slim
     permissions:
       contents: read

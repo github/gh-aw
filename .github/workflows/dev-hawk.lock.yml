@@ -1039,9 +1039,7 @@ jobs:
           if-no-files-found: ignore
 
   pre_activation:
-    if: >
-      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
-      (${{ github.event.workflow_run.event == 'workflow_dispatch' }})
+    if: ${{ github.event.workflow_run.event == 'workflow_dispatch' }}
     runs-on: ubuntu-slim
     permissions:
       contents: read

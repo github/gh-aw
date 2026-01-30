@@ -1726,8 +1726,8 @@ jobs:
 
   pre_activation:
     if: >
-      ((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (((github.event_name == 'issues') &&
-      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/poem-bot')))) || (!(github.event_name == 'issues')))
+      ((github.event_name == 'issues') && ((github.event_name == 'issues') && (contains(github.event.issue.body, '/poem-bot')))) ||
+      (!(github.event_name == 'issues'))
     runs-on: ubuntu-slim
     permissions:
       contents: read

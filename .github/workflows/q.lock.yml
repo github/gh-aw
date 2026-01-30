@@ -1183,8 +1183,7 @@ jobs:
 
   pre_activation:
     if: >
-      (((github.event_name != 'schedule') && (github.event_name != 'merge_group')) && (github.event_name != 'workflow_dispatch')) &&
-      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/q')) || (github.event_name == 'issue_comment') &&
+      (github.event_name == 'issues') && (contains(github.event.issue.body, '/q')) || (github.event_name == 'issue_comment') &&
       ((contains(github.event.comment.body, '/q')) && (github.event.issue.pull_request == null)) ||
       (github.event_name == 'issue_comment') &&
       ((contains(github.event.comment.body, '/q')) && (github.event.issue.pull_request != null)) ||
@@ -1193,7 +1192,7 @@ jobs:
       (contains(github.event.pull_request.body, '/q')) ||
       (github.event_name == 'discussion') && (contains(github.event.discussion.body, '/q')) ||
       (github.event_name == 'discussion_comment') &&
-      (contains(github.event.comment.body, '/q')))
+      (contains(github.event.comment.body, '/q'))
     runs-on: ubuntu-slim
     permissions:
       contents: read
