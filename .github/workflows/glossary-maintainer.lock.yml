@@ -26,7 +26,7 @@
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
 #
-# frontmatter-hash: 572c7f72bc5cedf5ffff95765398b7b7104aec8da46a6ecb34d08981cb9478c8
+# frontmatter-hash: 93b04d40097b7eb45dae37b4712b7d509b932afcd6b8abac1af02045dda7e31a
 
 name: "Glossary Maintainer"
 "on":

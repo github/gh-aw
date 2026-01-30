@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: e63dd091c60944be25077e30c19f9a74e86e89b7873f1967c2cad22e4aecebc0
+# frontmatter-hash: f0cdcba2334a0648c3b2670d356a858f7c059a4ceb600a6cb5a601ecd707cbb6
 
 name: "Super Linter Report"
 "on":

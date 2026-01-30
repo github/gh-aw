@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: b4e560a11667f37e710e592d7550dc46c570610f09309d647a0dbc0c792e6f59
+# frontmatter-hash: e763d7c07a4a0ac678109f9e50f5aa92e1666cee0e6b45b90027b7ec174e5ab7
 
 name: "Commit Changes Analyzer"
 "on":

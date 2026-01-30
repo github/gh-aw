@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/go-make.md
 #
-# frontmatter-hash: e1483cac72d023f048c5fb593d89a34714e89acd31dd6c79588ec0ef7d2059c1
+# frontmatter-hash: 0df95e83411928970f56f82132456f84f20ab7c3b417de94f818662aa749ac3d
 
 name: "Go Logger Enhancement"
 "on":

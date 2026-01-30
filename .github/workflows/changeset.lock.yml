@@ -27,7 +27,7 @@
 #     - shared/jqschema.md
 #     - shared/safe-output-app.md
 #
-# frontmatter-hash: 29bb00950a5b727f6e67ef807cc1a3ab987d85c3c907626e3936ecea074f2211
+# frontmatter-hash: 31e1501f03c102980f357ff99e90bdfce672b9064acc004851385c067d724bae
 
 name: "Changeset Generator"
 "on":

@@ -25,7 +25,7 @@
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
 #
-# frontmatter-hash: 209e5ab0b39352eec6e7ac1b7849e1ce083b103033579ee165e0c9ad268a03c5
+# frontmatter-hash: 397e2da5e1cabc5e23c718285583dd953c0d0f219342f66672aa61f0f4f165ce
 
 name: "CI Cleaner"
 "on":
