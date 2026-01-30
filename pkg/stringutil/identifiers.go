@@ -103,43 +103,27 @@ func LockFileToMarkdown(lockPath string) string {
 }
 
 // IsAgenticWorkflow returns true if the file path is an agentic workflow file.
-// Agentic workflows end with .md but exclude campaign spec files (.campaign.md)
-// and campaign orchestrator files (.campaign.g.md).
+// Agentic workflows end with .md.
 //
 // Examples:
 //
 //	IsAgenticWorkflow("test.md")                                // returns true
 //	IsAgenticWorkflow("weekly-research.md")                     // returns true
 //	IsAgenticWorkflow(".github/workflows/workflow.md")          // returns true
-//	IsAgenticWorkflow("test.campaign.md")                       // returns false (campaign spec)
-//	IsAgenticWorkflow("test.campaign.g.md")                     // returns false (campaign orchestrator)
 //	IsAgenticWorkflow("test.lock.yml")                          // returns false
 func IsAgenticWorkflow(path string) bool {
 	// Must end with .md
-	if !strings.HasSuffix(path, ".md") {
-		return false
-	}
-	// Exclude campaign spec files (.campaign.md)
-	if strings.HasSuffix(path, ".campaign.md") {
-		return false
-	}
-	// Exclude campaign orchestrator files (.campaign.g.md)
-	if strings.HasSuffix(path, ".campaign.g.md") {
-		return false
-	}
-	return true
+	return strings.HasSuffix(path, ".md")
 }
 
 // IsLockFile returns true if the file path is a compiled lock file.
-// Lock files end with .lock.yml and can be compiled from agentic workflows or campaign orchestrators.
+// Lock files end with .lock.yml and are compiled from agentic workflows.
 //
 // Examples:
 //
 //	IsLockFile("test.lock.yml")                                 // returns true
-//	IsLockFile("test.campaign.lock.yml")                        // returns true
 //	IsLockFile(".github/workflows/workflow.lock.yml")           // returns true
 //	IsLockFile("test.md")                                       // returns false
-//	IsLockFile("test.campaign.md")                              // returns false
 func IsLockFile(path string) bool {
 	return strings.HasSuffix(path, ".lock.yml")
 }

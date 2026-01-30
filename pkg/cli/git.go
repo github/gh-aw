@@ -203,16 +203,6 @@ func ensureGitAttributes() error {
 		}
 	}
 
-	// Remove old campaign.g.md entries if they exist (they're now in .gitignore)
-	for i := len(lines) - 1; i >= 0; i-- {
-		trimmedLine := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(trimmedLine, ".github/workflows/*.campaign.g.md") {
-			gitLog.Print("Removing obsolete .campaign.g.md .gitattributes entry")
-			lines = append(lines[:i], lines[i+1:]...)
-			modified = true
-		}
-	}
-
 	if !modified {
 		gitLog.Print(".gitattributes already contains required entries")
 		return nil

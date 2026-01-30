@@ -306,23 +306,8 @@ func TestIsAgenticWorkflow(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "campaign spec",
-			path:     "test.campaign.md",
-			expected: false,
-		},
-		{
-			name:     "campaign orchestrator",
-			path:     "test.campaign.g.md",
-			expected: false,
-		},
-		{
 			name:     "lock file",
 			path:     "test.lock.yml",
-			expected: false,
-		},
-		{
-			name:     "campaign lock file",
-			path:     "test.campaign.lock.yml",
 			expected: false,
 		},
 		{
@@ -359,23 +344,8 @@ func TestIsLockFile(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "campaign lock file",
-			path:     "test.campaign.lock.yml",
-			expected: true,
-		},
-		{
 			name:     "workflow file",
 			path:     "test.md",
-			expected: false,
-		},
-		{
-			name:     "campaign spec",
-			path:     "test.campaign.md",
-			expected: false,
-		},
-		{
-			name:     "campaign orchestrator",
-			path:     "test.campaign.g.md",
 			expected: false,
 		},
 		{

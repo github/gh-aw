@@ -22,14 +22,6 @@ var validationLog = logger.New("cli:run_workflow_validation")
 // getLockFilePath converts a markdown workflow path to its compiled lock file path
 // Example: "/path/to/workflow.md" -> "/path/to/workflow.lock.yml"
 func getLockFilePath(markdownPath string) string {
-	// Handle campaign orchestrator files
-	if strings.HasSuffix(markdownPath, ".campaign.g.md") {
-		return strings.TrimSuffix(markdownPath, ".campaign.g.md") + ".campaign.lock.yml"
-	}
-	// Handle regular campaign files
-	if strings.HasSuffix(markdownPath, ".campaign.md") {
-		return strings.TrimSuffix(markdownPath, ".campaign.md") + ".campaign.lock.yml"
-	}
 	// Handle regular workflow files
 	return strings.TrimSuffix(markdownPath, ".md") + ".lock.yml"
 }

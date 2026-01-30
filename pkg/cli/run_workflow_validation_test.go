@@ -24,16 +24,6 @@ func TestGetLockFilePath(t *testing.T) {
 			expected:     "/path/to/workflow.lock.yml",
 		},
 		{
-			name:         "campaign workflow",
-			markdownPath: "/path/to/campaign.campaign.md",
-			expected:     "/path/to/campaign.campaign.lock.yml",
-		},
-		{
-			name:         "campaign orchestrator",
-			markdownPath: "/path/to/campaign.campaign.g.md",
-			expected:     "/path/to/campaign.campaign.lock.yml",
-		},
-		{
 			name:         "workflow in nested directory",
 			markdownPath: "/path/to/workflows/nested/workflow.md",
 			expected:     "/path/to/workflows/nested/workflow.lock.yml",
