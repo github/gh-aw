@@ -61,16 +61,55 @@ echo ''
 echo '=== Testing Gateway Health ==='
 HEALTH_CHECK_START=$(date +%s%3N)
 
-# Capture both response body and HTTP code in a single curl call
-# Use curl retry: 120 attempts with 1 second delay = 120s total
+# Capture both response body and HTTP code with custom retry loop
 echo "Calling health endpoint: ${gateway_url}/health"
 echo "Retrying up to 120 times with 1s delay (120s total timeout)"
-response=$(curl -s --retry 120 --retry-delay 1 --retry-connrefused --retry-all-errors -w "\n%{http_code}" "${gateway_url}/health")
-http_code=$(echo "$response" | tail -n 1)
-health_response=$(echo "$response" | head -n -1)
+echo ""
+
+# Custom retry loop with progress indication: 120 attempts with 1 second delay = 120s total
+MAX_RETRIES=120
+RETRY_DELAY=1
+RETRY_COUNT=0
+http_code=""
+health_response=""
+
+echo "=== Health Check Progress ==="
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  
+  # Calculate elapsed time since health check started
+  ELAPSED_MS=$(($(date +%s%3N) - HEALTH_CHECK_START))
+  ELAPSED_SEC=$((ELAPSED_MS / 1000))
+  
+  # Show progress every 10 retries or on first attempt
+  if [ $((RETRY_COUNT % 10)) -eq 1 ] || [ $RETRY_COUNT -eq 1 ]; then
+    echo "Attempt $RETRY_COUNT/$MAX_RETRIES (${ELAPSED_SEC}s elapsed)..."
+  fi
+  
+  # Try to connect to health endpoint
+  response=$(curl -s --max-time 2 --connect-timeout 1 -w "\n%{http_code}" "${gateway_url}/health" 2>&1)
+  
+  # Parse response
+  http_code=$(echo "$response" | tail -n 1)
+  health_response=$(echo "$response" | head -n -1)
+  
+  # Check if we got a successful response
+  if [ "$http_code" = "200" ]; then
+    echo "✓ Health check succeeded on attempt $RETRY_COUNT (${ELAPSED_SEC}s elapsed)"
+    break
+  fi
+  
+  # If this is not the last attempt, wait before retrying
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    sleep $RETRY_DELAY
+  fi
+done
+echo "=== End Health Check Progress ==="
+echo ""
 
 # Always log the health response for debugging
-echo "Health endpoint HTTP code: $http_code"
+echo "Final HTTP code: $http_code"
+echo "Total attempts: $RETRY_COUNT"
 if [ -n "$health_response" ]; then
   echo "Health response body: $health_response"
 else
