@@ -244,8 +244,11 @@ network:
 Automatically enables project board management operations for tracking workflow-created items. See [Project Tracking](/gh-aw/examples/project-tracking/) for complete documentation.
 
 ```yaml wrap
-# Simple format - just the URL
+# Simple format - just the URL (quotes optional)
 project: https://github.com/orgs/github/projects/123
+
+# With placeholder values (quotes recommended for angle brackets)
+project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
 
 # Full configuration with custom settings
 project:
@@ -257,6 +260,9 @@ project:
   max-status-updates: 2
   github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
+
+> [!NOTE]
+> Quotes are optional for plain URLs but recommended when using placeholder values with angle brackets (`<ORG>`, `<NUMBER>`) to ensure proper YAML parsing.
 
 When configured, automatically enables:
 - **update-project** - Add items to projects, update fields (status, priority, etc.)

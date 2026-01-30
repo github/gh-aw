@@ -746,7 +746,9 @@ jobs:
           }
           ```
           
-          This will automatically use `https://github.com/orgs/githubnext/projects/1` from the frontmatter.
+          This will automatically use `https://github.com/orgs/<ORG>/projects/<NUMBER>` from the frontmatter.
+          
+          Important: this is a placeholder. Replace it with a real GitHub Projects v2 URL before running the workflow.
           
           ```json
           {
@@ -1259,7 +1261,7 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":5}}"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-          GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/1"
+          GH_AW_PROJECT_URL: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
         with:
           github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
           script: |
