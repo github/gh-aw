@@ -21,7 +21,7 @@
 #
 # Collects daily performance metrics for the agent ecosystem and stores them in repo-memory
 #
-# frontmatter-hash: 74dc7cc10eb47f34c14ae3745f9c87d96d671419861818645781bec7300a6fbc
+# frontmatter-hash: c65547fb64b77e738f6b83d7884a0392b618d705aa0983441d4f17bc9d320ae4
 
 name: "Metrics Collector - Infrastructure Agent"
 "on":

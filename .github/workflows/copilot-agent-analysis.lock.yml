@@ -27,7 +27,7 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e5c269bde3b70ee32a29e4c90c9d8ecd133e287de444ba435da2596744a927e2
+# frontmatter-hash: 6e5ef8e642d4cfc735ce7b3ee54864285349058791dd5f0ad99c071b3957ceaa
 
 name: "Copilot Agent PR Analysis"
 "on":

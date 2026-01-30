@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/markitdown.md
 #
-# frontmatter-hash: ba04035916d93739d675de2d22c28e25ae79b226c0a5f0c3f627c9dc91508a17
+# frontmatter-hash: a2b104b85d50cab5cdf556f63a05d8cd5238aeab2654ba02cf871f4a0b1b1745
 
 name: "Resource Summarizer Agent"
 "on":

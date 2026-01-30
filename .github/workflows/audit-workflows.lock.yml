@@ -28,7 +28,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: e6921bba782230243a6d13b11ca8c9b3e2f307902fa0104a09beab152d8ff781
+# frontmatter-hash: 2aab0299b42c23ac13ce9bea7eea4aee26f3650b658d087018ceeeb057a106f3
 
 name: "Agentic Workflow Audit Agent"
 "on":

@@ -31,7 +31,7 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: f33a01cb3025212cb611e83247cf00e4cb0eaceaa868a67564ac96525c098995
+# frontmatter-hash: b3a6b40170a058cbb569e30c00b70d711061af2f4ce748ba810cefb44478ca6e
 
 name: "Smoke Claude"
 "on":

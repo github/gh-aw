@@ -21,7 +21,7 @@
 #
 # Automatically formats and tidies code files (Go, JS, TypeScript) when code changes are pushed or on command
 #
-# frontmatter-hash: 7aefe922e13a7478afd3b487abeb5ec392586c7b293b99a76e76b8045c4baed6
+# frontmatter-hash: cb875ca39ebb596f55b7414d8ec380b8c847757f934ad47a59debb15eb69c237
 
 name: "Tidy"
 "on":

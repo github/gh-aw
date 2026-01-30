@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 7f6cffef90a9fe1b768dc251acdb60f7d63cf409256e3a00c22c82bd5eda39cf
+# frontmatter-hash: dd91f7a7ee7a32e3d93aec134e7c971fa9551ce83f6a60954e3afbd65878db0c
 
 name: "Repository Quality Improvement Agent"
 "on":
