@@ -27,7 +27,11 @@ You are a specialized code review agent. Focus on:
 
 ## Using Custom Agents
 
-Import the agent file in your workflow using the `imports` field:
+Import agent files in your workflow using the `imports` field. Agents can be imported from local `.github/agents/` directories or from external repositories.
+
+### Local Agent Import
+
+Import an agent from your repository:
 
 ```yaml wrap
 ---
@@ -40,14 +44,35 @@ imports:
 Review the pull request and provide feedback.
 ```
 
+### Remote Agent Import
+
+Import an agent from an external repository using the `owner/repo/path@ref` format:
+
+```yaml wrap
+---
+on: pull_request
+engine: copilot
+imports:
+  - acme-org/shared-agents/.github/agents/code-reviewer.md@v1.0.0
+---
+
+Perform comprehensive code review using shared agent instructions.
+```
+
+Remote agent imports support versioning:
+- **Semantic tags**: `@v1.0.0` (recommended for production)
+- **Branch names**: `@main`, `@develop` (for development)
+- **Commit SHAs**: `@abc123def` (for immutable references)
+
 The agent instructions are merged with the workflow prompt, customizing the AI engine's behavior for specific tasks.
 
 ## Agent File Requirements
 
-- **Location**: Must be in `.github/agents/` directory
+- **Location**: Must be in a `.github/agents/` directory (local or remote repository)
 - **Format**: Markdown with YAML frontmatter
 - **Frontmatter**: Can include `name`, `description`, `tools`, and `mcp-servers`
 - **One per workflow**: Only one agent file can be imported per workflow
+- **Caching**: Remote agents are cached by commit SHA in `.github/aw/imports/`
 
 ## Built-in Agents
 

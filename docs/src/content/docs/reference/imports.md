@@ -75,7 +75,11 @@ Remote imports are cached in `.github/aw/imports/` to enable offline compilation
 
 ## Agent Files
 
-Import custom agent files from `.github/agents/` to customize AI engine behavior. Agent files are markdown documents with specialized instructions that modify how the AI interprets and executes workflows.
+Import custom agent files to customize AI engine behavior. Agent files are markdown documents with specialized instructions that modify how the AI interprets and executes workflows. Agent files can be imported from local `.github/agents/` directories or from external repositories.
+
+### Local Agent Imports
+
+Import agent files from your repository's `.github/agents/` directory:
 
 ```yaml wrap
 ---
@@ -86,7 +90,33 @@ imports:
 ---
 ```
 
-Only one agent file can be imported per workflow.
+### Remote Agent Imports
+
+Import agent files from external repositories using the `owner/repo/path@ref` format:
+
+```yaml wrap
+---
+on: pull_request
+engine: copilot
+imports:
+  - githubnext/shared-agents/.github/agents/security-reviewer.md@v1.0.0
+---
+
+# PR Security Review
+
+Analyze pull requests for security vulnerabilities using the shared security reviewer agent.
+```
+
+Remote agent imports support the same versioning as other imports:
+- Semantic tags: `@v1.0.0`, `@v2.1.3`
+- Branch names: `@main`, `@develop`
+- Commit SHAs: `@abc123def456` (immutable references)
+
+### Constraints
+
+- **One agent per workflow**: Only one agent file can be imported per workflow (local or remote)
+- **Agent path detection**: Files in `.github/agents/` directories are automatically recognized as agent files
+- **Caching**: Remote agents are cached in `.github/aw/imports/` by commit SHA, enabling offline compilation
 
 ## Frontmatter Merging
 
