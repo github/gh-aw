@@ -42,6 +42,15 @@ func validateSharedWorkflowFields(frontmatter map[string]any) error {
 }
 
 // ValidateMainWorkflowFrontmatterWithSchema validates main workflow frontmatter using JSON schema
+//
+// This function validates all frontmatter fields including pass-through fields that are
+// extracted and passed directly to GitHub Actions (concurrency, container, environment, env,
+// runs-on, services). The JSON schema validation catches structural errors at compile time:
+//   - Invalid data types (e.g., array when object expected)
+//   - Missing required properties (e.g., container missing 'image')
+//   - Invalid additional properties (e.g., unknown fields)
+//
+// See pkg/parser/schema_passthrough_validation_test.go for comprehensive test coverage.
 func ValidateMainWorkflowFrontmatterWithSchema(frontmatter map[string]any) error {
 	schemaValidationLog.Print("Validating main workflow frontmatter with schema")
 
@@ -55,6 +64,7 @@ func ValidateMainWorkflowFrontmatterWithSchema(frontmatter map[string]any) error
 	}
 
 	// Then run the standard schema validation
+	// This validates all fields including pass-through fields (concurrency, container, etc.)
 	if err := validateWithSchema(filtered, mainWorkflowSchema, "main workflow file"); err != nil {
 		schemaValidationLog.Printf("Schema validation failed for main workflow: %v", err)
 		return err
