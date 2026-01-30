@@ -747,5 +747,352 @@ describe("runtime_import", () => {
           expect(result).toBe("Level 1\nLevel 2\nLevel 3\nLevel 4\nLevel 5");
         });
       });
+
+      describe("arbitrary graph patterns", () => {
+        describe("tree topologies", () => {
+          it("should handle balanced binary tree (depth 3)", async () => {
+            // Root -> [L1, R1], L1 -> [L2, L3], R1 -> [R2, R3]
+            fs.writeFileSync(path.join(githubDir, "leaf-l2.md"), "L2");
+            fs.writeFileSync(path.join(githubDir, "leaf-l3.md"), "L3");
+            fs.writeFileSync(path.join(githubDir, "leaf-r2.md"), "R2");
+            fs.writeFileSync(path.join(githubDir, "leaf-r3.md"), "R3");
+            fs.writeFileSync(path.join(githubDir, "left-branch.md"), "L1-start\n{{#runtime-import leaf-l2.md}}\nL1-mid\n{{#runtime-import leaf-l3.md}}\nL1-end");
+            fs.writeFileSync(path.join(githubDir, "right-branch.md"), "R1-start\n{{#runtime-import leaf-r2.md}}\nR1-mid\n{{#runtime-import leaf-r3.md}}\nR1-end");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import left-branch.md}}\n---\n{{#runtime-import right-branch.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nL1-start\nL2\nL1-mid\nL3\nL1-end\n---\nR1-start\nR2\nR1-mid\nR3\nR1-end");
+          });
+
+          it("should handle wide tree (one root, many leaves)", async () => {
+            // Root -> [leaf1, leaf2, leaf3, ..., leaf10]
+            for (let i = 1; i <= 10; i++) {
+              fs.writeFileSync(path.join(githubDir, `leaf${i}.md`), `Leaf ${i}`);
+            }
+            const imports = Array.from({ length: 10 }, (_, i) => `{{#runtime-import leaf${i + 1}.md}}`).join("\n");
+            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            const expected = "Root\n" + Array.from({ length: 10 }, (_, i) => `Leaf ${i + 1}`).join("\n");
+            expect(result).toBe(expected);
+          });
+
+          it("should handle unbalanced tree (left-skewed)", async () => {
+            // Root -> L1, L1 -> L2, L2 -> L3, Root -> R1 (short right branch)
+            fs.writeFileSync(path.join(githubDir, "l3.md"), "L3");
+            fs.writeFileSync(path.join(githubDir, "l2.md"), "L2\n{{#runtime-import l3.md}}");
+            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2.md}}");
+            fs.writeFileSync(path.join(githubDir, "r1.md"), "R1");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import l1.md}}\n{{#runtime-import r1.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nL1\nL2\nL3\nR1");
+          });
+
+          it("should handle very deep tree (depth 15)", async () => {
+            // Create a chain of 15 levels deep
+            fs.writeFileSync(path.join(githubDir, "d15.md"), "D15");
+            for (let i = 14; i >= 1; i--) {
+              fs.writeFileSync(path.join(githubDir, `d${i}.md`), `D${i}\n{{#runtime-import d${i + 1}.md}}`);
+            }
+
+            const result = await processRuntimeImports("{{#runtime-import d1.md}}", tempDir);
+            const expected = Array.from({ length: 15 }, (_, i) => `D${i + 1}`).join("\n");
+            expect(result).toBe(expected);
+          });
+        });
+
+        describe("DAG (Directed Acyclic Graph) patterns", () => {
+          it("should handle diamond dependency pattern", async () => {
+            // Root -> [A, B], A -> Shared, B -> Shared
+            fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
+            fs.writeFileSync(path.join(githubDir, "path-a.md"), "Path A\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(githubDir, "path-b.md"), "Path B\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import path-a.md}}\n---\n{{#runtime-import path-b.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nPath A\nShared content\n---\nPath B\nShared content");
+            // Verify caching is used for second import
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for shared.md");
+          });
+
+          it("should handle multiple diamond patterns", async () => {
+            // Root -> [A, B], A -> [S1, S2], B -> [S1, S2]
+            fs.writeFileSync(path.join(githubDir, "s1.md"), "S1");
+            fs.writeFileSync(path.join(githubDir, "s2.md"), "S2");
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nA\nS1\nS2\nB\nS1\nS2");
+            // Both S1 and S2 should be cached after first use
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for s1.md");
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for s2.md");
+          });
+
+          it("should handle complex DAG with multiple levels", async () => {
+            // L1 -> [L2a, L2b], L2a -> [L3a, L3b], L2b -> [L3b, L3c], L3a -> L4, L3b -> L4, L3c -> L4
+            fs.writeFileSync(path.join(githubDir, "l4.md"), "L4");
+            fs.writeFileSync(path.join(githubDir, "l3a.md"), "L3a\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(githubDir, "l3b.md"), "L3b\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(githubDir, "l3c.md"), "L3c\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(githubDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}");
+            fs.writeFileSync(path.join(githubDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
+            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
+            expect(result).toBe("L1\nL2a\nL3a\nL4\nL3b\nL4\nL2b\nL3b\nL4\nL3c\nL4");
+            // L3b and L4 should be cached after first use
+            expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Reusing cached content"));
+          });
+
+          it("should handle convergent DAG (many nodes converge to one)", async () => {
+            // [A, B, C, D] -> Sink
+            fs.writeFileSync(path.join(githubDir, "sink.md"), "Sink");
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(githubDir, "d.md"), "D\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}\n{{#runtime-import d.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nA\nSink\nB\nSink\nC\nSink\nD\nSink");
+            // Sink should be cached after first use
+            const cacheInfoCalls = core.info.mock.calls.filter(call => call[0].includes("Reusing cached content for sink.md"));
+            expect(cacheInfoCalls.length).toBeGreaterThanOrEqual(3); // Used 4 times, cached 3 times
+          });
+        });
+
+        describe("star topology patterns", () => {
+          it("should handle hub-and-spoke (one center, many peripherals)", async () => {
+            // Root -> Hub, Hub -> [Spoke1, Spoke2, ..., Spoke8]
+            for (let i = 1; i <= 8; i++) {
+              fs.writeFileSync(path.join(githubDir, `spoke${i}.md`), `Spoke ${i}`);
+            }
+            const imports = Array.from({ length: 8 }, (_, i) => `{{#runtime-import spoke${i + 1}.md}}`).join("\n");
+            fs.writeFileSync(path.join(githubDir, "hub.md"), `Hub\n${imports}`);
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import hub.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            const expected = "Root\nHub\n" + Array.from({ length: 8 }, (_, i) => `Spoke ${i + 1}`).join("\n");
+            expect(result).toBe(expected);
+          });
+
+          it("should handle reverse star (many import one common file)", async () => {
+            // Root -> [A, B, C], all import Common
+            fs.writeFileSync(path.join(githubDir, "common.md"), "Common");
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nA\nCommon\nB\nCommon\nC\nCommon");
+            // Common should be cached after first use
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for common.md");
+          });
+        });
+
+        describe("complex multi-level patterns", () => {
+          it("should handle grid-like dependency pattern", async () => {
+            // Row1 -> [C1, C2, C3], Row2 -> [C1, C2, C3], Root -> [Row1, Row2]
+            fs.writeFileSync(path.join(githubDir, "c1.md"), "C1");
+            fs.writeFileSync(path.join(githubDir, "c2.md"), "C2");
+            fs.writeFileSync(path.join(githubDir, "c3.md"), "C3");
+            fs.writeFileSync(path.join(githubDir, "row1.md"), "Row1\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
+            fs.writeFileSync(path.join(githubDir, "row2.md"), "Row2\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import row1.md}}\n---\n{{#runtime-import row2.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nRow1\nC1\nC2\nC3\n---\nRow2\nC1\nC2\nC3");
+            // All columns should be cached in Row2
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for c1.md");
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for c2.md");
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for c3.md");
+          });
+
+          it("should handle pyramid pattern (expanding then contracting)", async () => {
+            // L1 -> [L2a, L2b], L2a -> [L3a, L3b, L3c], L2b -> [L3b, L3c, L3d], L3a/b/c/d -> Apex
+            fs.writeFileSync(path.join(githubDir, "apex.md"), "Apex");
+            fs.writeFileSync(path.join(githubDir, "l3a.md"), "L3a\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(githubDir, "l3b.md"), "L3b\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(githubDir, "l3c.md"), "L3c\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(githubDir, "l3d.md"), "L3d\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(githubDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
+            fs.writeFileSync(path.join(githubDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}\n{{#runtime-import l3d.md}}");
+            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
+            expect(result).toBe("L1\nL2a\nL3a\nApex\nL3b\nApex\nL3c\nApex\nL2b\nL3b\nApex\nL3c\nApex\nL3d\nApex");
+            // Multiple files should be cached
+            expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Reusing cached content"));
+          });
+
+          it("should handle layered architecture (strict layer dependencies)", async () => {
+            // Layer1 -> [Layer2a, Layer2b], Layer2a -> Layer3a, Layer2b -> Layer3b, Layer3a -> Core, Layer3b -> Core
+            fs.writeFileSync(path.join(githubDir, "core.md"), "Core");
+            fs.writeFileSync(path.join(githubDir, "layer3a.md"), "Layer3a\n{{#runtime-import core.md}}");
+            fs.writeFileSync(path.join(githubDir, "layer3b.md"), "Layer3b\n{{#runtime-import core.md}}");
+            fs.writeFileSync(path.join(githubDir, "layer2a.md"), "Layer2a\n{{#runtime-import layer3a.md}}");
+            fs.writeFileSync(path.join(githubDir, "layer2b.md"), "Layer2b\n{{#runtime-import layer3b.md}}");
+            fs.writeFileSync(path.join(githubDir, "layer1.md"), "Layer1\n{{#runtime-import layer2a.md}}\n{{#runtime-import layer2b.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import layer1.md}}", tempDir);
+            expect(result).toBe("Layer1\nLayer2a\nLayer3a\nCore\nLayer2b\nLayer3b\nCore");
+            // Core should be cached on second use
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for core.md");
+          });
+        });
+
+        describe("cache efficiency tests", () => {
+          it("should efficiently cache heavily reused dependencies", async () => {
+            // Create a pattern where one file is imported by many others
+            fs.writeFileSync(path.join(githubDir, "base.md"), "Base content");
+            for (let i = 1; i <= 20; i++) {
+              fs.writeFileSync(path.join(githubDir, `consumer${i}.md`), `Consumer ${i}\n{{#runtime-import base.md}}`);
+            }
+            const imports = Array.from({ length: 20 }, (_, i) => `{{#runtime-import consumer${i + 1}.md}}`).join("\n");
+            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+
+            // Verify base.md is only processed once and cached for remaining 19 uses
+            const baseCacheCalls = core.info.mock.calls.filter(call => call[0].includes("Reusing cached content for base.md"));
+            expect(baseCacheCalls.length).toBe(19); // First use processes, next 19 use cache
+
+            // Verify output is correct
+            const expectedLines = ["Root"];
+            for (let i = 1; i <= 20; i++) {
+              expectedLines.push(`Consumer ${i}`);
+              expectedLines.push("Base content");
+            }
+            expect(result).toBe(expectedLines.join("\n"));
+          });
+
+          it("should cache files with line ranges independently", async () => {
+            // Create a file that is imported with different line ranges
+            const content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
+            fs.writeFileSync(path.join(githubDir, "lines.md"), content);
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import lines.md:1-2}}\n---\n{{#runtime-import lines.md:3-5}}\n===\n{{#runtime-import lines.md:1-2}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nLine 1\nLine 2\n---\nLine 3\nLine 4\nLine 5\n===\nLine 1\nLine 2");
+
+            // Verify lines.md:1-2 is cached on second use
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for lines.md:1-2");
+          });
+
+          it("should handle mixed optional and required imports with caching", async () => {
+            // Create pattern with both optional and required imports of same file
+            fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared");
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import? shared.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            expect(result).toBe("Root\nA\nShared\nB\nShared\nC\nShared");
+
+            // Verify shared.md is cached
+            expect(core.info).toHaveBeenCalledWith("Reusing cached content for shared.md");
+          });
+        });
+
+        describe("circular dependency detection in complex graphs", () => {
+          it("should detect indirect cycles in DAG-like structures", async () => {
+            // A -> B, B -> C, C -> D, D -> A (cycle)
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import b.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(githubDir, "d.md"), "D\n{{#runtime-import a.md}}");
+
+            await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> c.md -> d.md -> a.md");
+          });
+
+          it("should detect cycles in branching structures", async () => {
+            // Root -> [A, B], A -> C, B -> C, C -> A (cycle through A)
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import a.md}}");
+            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+
+            await expect(processRuntimeImports("{{#runtime-import root.md}}", tempDir)).rejects.toThrow("Circular dependency detected");
+            await expect(processRuntimeImports("{{#runtime-import root.md}}", tempDir)).rejects.toThrow("a.md -> c.md -> a.md");
+          });
+
+          it("should detect long cycles (length 10)", async () => {
+            // Create a cycle: f1 -> f2 -> f3 -> ... -> f10 -> f1
+            for (let i = 1; i <= 9; i++) {
+              fs.writeFileSync(path.join(githubDir, `f${i}.md`), `F${i}\n{{#runtime-import f${i + 1}.md}}`);
+            }
+            fs.writeFileSync(path.join(githubDir, "f10.md"), "F10\n{{#runtime-import f1.md}}");
+
+            await expect(processRuntimeImports("{{#runtime-import f1.md}}", tempDir)).rejects.toThrow("Circular dependency detected");
+            await expect(processRuntimeImports("{{#runtime-import f1.md}}", tempDir)).rejects.toThrow("f1.md");
+            await expect(processRuntimeImports("{{#runtime-import f1.md}}", tempDir)).rejects.toThrow("f10.md");
+          });
+
+          it("should allow diamond patterns without false positive cycle detection", async () => {
+            // Verify that diamond (A -> [B, C], B -> D, C -> D) is NOT detected as a cycle
+            fs.writeFileSync(path.join(githubDir, "d.md"), "D");
+            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+
+            const result = await processRuntimeImports("{{#runtime-import a.md}}", tempDir);
+            expect(result).toBe("A\nB\nD\nC\nD");
+            // Should complete without throwing cycle error
+          });
+        });
+
+        describe("performance and stress tests", () => {
+          it("should handle large fan-out (1 root -> 50 direct imports)", async () => {
+            // Create 50 leaf files
+            for (let i = 1; i <= 50; i++) {
+              fs.writeFileSync(path.join(githubDir, `leaf${i}.md`), `Leaf ${i}`);
+            }
+            const imports = Array.from({ length: 50 }, (_, i) => `{{#runtime-import leaf${i + 1}.md}}`).join("\n");
+            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+
+            const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
+            const lines = result.split("\n");
+            expect(lines[0]).toBe("Root");
+            expect(lines.length).toBe(51); // Root + 50 leaves
+          });
+
+          it("should handle moderate depth with moderate breadth (depth 5, breadth 4)", async () => {
+            // Each level has 4 nodes, each node imports 4 nodes from next level
+            // But use a shared pattern to keep file count reasonable
+            fs.writeFileSync(path.join(githubDir, "l5.md"), "L5");
+
+            // Level 4: 4 nodes each importing l5
+            for (let i = 1; i <= 4; i++) {
+              fs.writeFileSync(path.join(githubDir, `l4-${i}.md`), `L4-${i}\n{{#runtime-import l5.md}}`);
+            }
+
+            // Level 3: 4 nodes each importing all level 4 nodes
+            for (let i = 1; i <= 4; i++) {
+              const imports = Array.from({ length: 4 }, (_, j) => `{{#runtime-import l4-${j + 1}.md}}`).join("\n");
+              fs.writeFileSync(path.join(githubDir, `l3-${i}.md`), `L3-${i}\n${imports}`);
+            }
+
+            // Level 2: 4 nodes each importing one level 3 node
+            for (let i = 1; i <= 4; i++) {
+              fs.writeFileSync(path.join(githubDir, `l2-${i}.md`), `L2-${i}\n{{#runtime-import l3-${i}.md}}`);
+            }
+
+            // Level 1: Root imports all level 2 nodes
+            const imports = Array.from({ length: 4 }, (_, i) => `{{#runtime-import l2-${i + 1}.md}}`).join("\n");
+            fs.writeFileSync(path.join(githubDir, "l1.md"), `L1\n${imports}`);
+
+            const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
+            expect(result).toContain("L1");
+            expect(result).toContain("L5");
+            // Verify caching is used extensively
+            expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Reusing cached content"));
+          });
+        });
+      });
     }));
 });

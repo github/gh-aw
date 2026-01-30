@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -327,6 +328,54 @@ func (c *Compiler) processAndMergeServices(frontmatter map[string]any, workflowD
 	}
 }
 
+// mergeJobsFromYAMLImports merges jobs from imported YAML workflows with main workflow jobs
+// Main workflow jobs take precedence over imported jobs (override behavior)
+func (c *Compiler) mergeJobsFromYAMLImports(mainJobs map[string]any, mergedJobsJSON string) map[string]any {
+	orchestratorWorkflowLog.Print("Merging jobs from imported YAML workflows")
+
+	if mergedJobsJSON == "" || mergedJobsJSON == "{}" {
+		orchestratorWorkflowLog.Print("No imported jobs to merge")
+		return mainJobs
+	}
+
+	// Initialize result with main jobs or create empty map
+	result := make(map[string]any)
+	for k, v := range mainJobs {
+		result[k] = v
+	}
+
+	// Split by newlines to handle multiple JSON objects from different imports
+	lines := strings.Split(mergedJobsJSON, "\n")
+	orchestratorWorkflowLog.Printf("Processing %d job definition lines", len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "{}" {
+			continue
+		}
+
+		// Parse JSON line to map
+		var importedJobs map[string]any
+		if err := json.Unmarshal([]byte(line), &importedJobs); err != nil {
+			orchestratorWorkflowLog.Printf("Skipping malformed job entry: %v", err)
+			continue
+		}
+
+		// Merge jobs - main workflow jobs take precedence (don't override)
+		for jobName, jobConfig := range importedJobs {
+			if _, exists := result[jobName]; !exists {
+				orchestratorWorkflowLog.Printf("Adding imported job: %s", jobName)
+				result[jobName] = jobConfig
+			} else {
+				orchestratorWorkflowLog.Printf("Skipping imported job %s (already defined in main workflow)", jobName)
+			}
+		}
+	}
+
+	orchestratorWorkflowLog.Printf("Successfully merged jobs: total=%d, imported=%d", len(result), len(result)-len(mainJobs))
+	return result
+}
+
 // extractAdditionalConfigurations extracts cache-memory, repo-memory, safe-inputs, and safe-outputs configurations
 func (c *Compiler) extractAdditionalConfigurations(
 	frontmatter map[string]any,
@@ -360,6 +409,12 @@ func (c *Compiler) extractAdditionalConfigurations(
 	// Extract and process safe-inputs and safe-outputs
 	workflowData.Command, workflowData.CommandEvents = c.extractCommandConfig(frontmatter)
 	workflowData.Jobs = c.extractJobsFromFrontmatter(frontmatter)
+
+	// Merge jobs from imported YAML workflows
+	if importsResult.MergedJobs != "" && importsResult.MergedJobs != "{}" {
+		workflowData.Jobs = c.mergeJobsFromYAMLImports(workflowData.Jobs, importsResult.MergedJobs)
+	}
+
 	workflowData.Roles = c.extractRoles(frontmatter)
 	workflowData.Bots = c.extractBots(frontmatter)
 

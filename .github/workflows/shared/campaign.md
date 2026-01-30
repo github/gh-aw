@@ -10,7 +10,6 @@ safe-outputs:
     max: 1
   create-issue:
     max: 5
-    assignees: copilot
 ---
 # Campaign Orchestrator Core Rules
 

@@ -1,9 +1,9 @@
 // Package cli provides the command-line interface for gh-aw (GitHub Agentic Workflows).
 //
 // This package implements the `gh aw` CLI extension using the Cobra command framework.
-// It provides commands for compiling workflows, managing campaigns, running audits,
-// and inspecting MCP servers. Each command follows consistent patterns for error
-// handling, output formatting, and user interaction.
+// It provides commands for compiling workflows, running audits, and inspecting MCP
+// servers. Each command follows consistent patterns for error handling, output
+// formatting, and user interaction.
 //
 // # Available Commands
 //
@@ -18,8 +18,6 @@
 // mcp - Manage and inspect MCP (Model Context Protocol) servers
 //
 // actions - Build and manage custom GitHub Actions
-//
-// campaign - Execute and manage multi-repository workflow campaigns
 //
 // # Basic Usage
 //
