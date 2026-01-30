@@ -22,9 +22,9 @@
 #
 # Resolved workflow manifest:
 #   Imports:
-#     - example-ci-workflow.yml
+#     - license-check.yml
 #
-# frontmatter-hash: 788f46ea47f15405d8c2d685efa1d778ee40957a07cdc02bfd5c3f95a2a418f2
+# frontmatter-hash: 83f31132f451df6f4c3a39b4ad4cc696f31f1257849dbafd4dd0c8a7ac8beac8
 
 name: "Test YAML Import"
 "on": issue_comment
@@ -71,8 +71,7 @@ jobs:
   agent:
     needs:
       - activation
-      - build
-      - test
+      - license-check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -457,14 +456,34 @@ jobs:
             /tmp/gh-aw/agent-stdio.log
           if-no-files-found: ignore
 
-  build:
-    needs: test
+  license-check:
+    needs: activation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-      - name: Build
-        run: echo "Building..."
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # 3041bf56c941b39c61721a86cd11f3bb1338122a
+        with:
+          go-version-file: go.mod
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+      - name: Check licenses
+        run: |
+          echo "Checking dependency licenses for compliance..."
+          go-licenses check --disallowed_types=forbidden,reciprocal,restricted,unknown ./...
+      - name: Generate license report
+        if: always()
+        run: |
+          echo "Generating license report..."
+          go-licenses csv ./... > licenses.csv 2>&1 || true
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: license-report
+          path: licenses.csv
 
   pre_activation:
     if: >
@@ -497,13 +516,4 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/check_membership.cjs');
             await main();
-
-  test:
-    needs: activation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-      - name: Run tests
-        run: echo "Running tests..."
 

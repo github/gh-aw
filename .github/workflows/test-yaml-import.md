@@ -2,12 +2,12 @@
 name: Test YAML Import
 on: issue_comment
 imports:
-  - example-ci-workflow.yml
+  - license-check.yml
 engine: copilot
 ---
 
 # Test YAML Import
 
-This workflow imports a YAML workflow file to demonstrate the new YAML import feature.
+This workflow imports the existing License Check workflow (license-check.yml) to demonstrate the YAML import feature.
 
-The imported workflow contains jobs that will be merged with any jobs defined in this workflow.
+The imported workflow contains a job (license-check) that will be merged with any jobs defined in this workflow.
