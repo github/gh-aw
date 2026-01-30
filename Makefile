@@ -594,13 +594,6 @@ sync-templates:
 
 	# Agent templates
 	@cp .github/agents/agentic-workflows.agent.md pkg/cli/templates/
-	
-	# Campaign management templates (lifecycle order)
-	@cp .github/aw/generate-agentic-campaign.md pkg/cli/templates/
-	@cp .github/aw/orchestrate-agentic-campaign.md pkg/cli/templates/
-	@cp .github/aw/execute-agentic-campaign-workflow.md pkg/cli/templates/
-	@cp .github/aw/update-agentic-campaign-project.md pkg/cli/templates/
-	@cp .github/aw/close-agentic-campaign.md pkg/cli/templates/
 
 	@echo "✓ Templates synced successfully"
 
