@@ -276,10 +276,10 @@ Examples:
 			FailFast:               failFast,
 		}
 		if _, err := cli.CompileWorkflows(cmd.Context(), config); err != nil {
-			errMsg := err.Error()
-			// Check if error is already formatted (contains suggestions or starts with ✗)
-			if strings.Contains(errMsg, "Suggestions:") || strings.HasPrefix(errMsg, "✗") {
-				return fmt.Errorf("%s", errMsg)
+			// Print formatted validation error to stderr for better user experience
+			// This applies console formatting while preserving error structure
+			if !jsonOutput {
+				cli.PrintValidationError(err)
 			}
 			return err
 		}
