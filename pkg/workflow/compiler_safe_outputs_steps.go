@@ -239,6 +239,15 @@ func (c *Compiler) buildProjectHandlerManagerStep(data *WorkflowData) []string {
 	token := getEffectiveProjectGitHubToken(customToken, data.GitHubToken)
 	steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_GITHUB_TOKEN: %s\n", token))
 
+	// Add GH_AW_PROJECT_URL if project is configured in frontmatter
+	// This provides a default project URL for update-project and create-project-status-update operations
+	// when target=context (or target not specified). Users can override by setting target=* and
+	// providing an explicit project field in the safe output message.
+	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.Project != nil && data.ParsedFrontmatter.Project.URL != "" {
+		consolidatedSafeOutputsStepsLog.Printf("Adding GH_AW_PROJECT_URL environment variable: %s", data.ParsedFrontmatter.Project.URL)
+		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", data.ParsedFrontmatter.Project.URL))
+	}
+
 	// With section for github-token
 	// Use the project token for authentication
 	steps = append(steps, "        with:\n")

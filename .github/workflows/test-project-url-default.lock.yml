@@ -19,11 +19,10 @@
 #   gh aw compile
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
-# Discovers security work items (Dependabot PRs, code scanning alerts, secret scanning alerts)
 #
-# frontmatter-hash: 8f9fa60113cb96711455be860b4a755c990da4ba1d2098a69c8f1cc9bca39980
+# frontmatter-hash: 609acaef228d88d6766264e6b4e33fb6ac41495c195cb8cd99c0a7a2980ca75c
 
-name: "Security Alert Burndown"
+name: "Test Project URL Default"
 "on":
   workflow_dispatch:
 
@@ -32,7 +31,7 @@ permissions: {}
 concurrency:
   group: "gh-aw-${{ github.workflow }}"
 
-run-name: "Security Alert Burndown"
+run-name: "Test Project URL Default"
 
 jobs:
   activation:
@@ -56,7 +55,7 @@ jobs:
       - name: Check workflow file timestamps
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_WORKFLOW_FILE: "security-alert-burndown.lock.yml"
+          GH_AW_WORKFLOW_FILE: "test-project-url-default.lock.yml"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
@@ -69,9 +68,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: read
-      pull-requests: read
-      security-events: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
     env:
@@ -122,9 +118,9 @@ jobs:
           github.event.pull_request
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
@@ -157,50 +153,10 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":5}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
-            {
-              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created. Assignees [copilot] will be automatically assigned.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "body": {
-                    "description": "Detailed issue description in Markdown. Do NOT repeat the title as a heading since it already appears as the issue's h1. Include context, reproduction steps, or acceptance criteria as appropriate.",
-                    "type": "string"
-                  },
-                  "labels": {
-                    "description": "Labels to categorize the issue (e.g., 'bug', 'enhancement'). Labels must exist in the repository.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  },
-                  "parent": {
-                    "description": "Parent issue number for creating sub-issues. This is the numeric ID from the GitHub URL (e.g., 42 in github.com/owner/repo/issues/42). Can also be a temporary_id (e.g., 'aw_abc123def456') from a previously created issue in the same workflow run.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  },
-                  "temporary_id": {
-                    "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation.",
-                    "type": "string"
-                  },
-                  "title": {
-                    "description": "Concise issue title summarizing the bug, feature, or task. The title appears as the main heading, so keep it brief and descriptive.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "title",
-                  "body"
-                ],
-                "type": "object"
-              },
-              "name": "create_issue"
-            },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
               "inputSchema": {
@@ -445,39 +401,6 @@ jobs:
           EOF
           cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
           {
-            "create_issue": {
-              "defaultMax": 1,
-              "fields": {
-                "body": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 65000
-                },
-                "labels": {
-                  "type": "array",
-                  "itemType": "string",
-                  "itemSanitize": true,
-                  "itemMaxLength": 128
-                },
-                "parent": {
-                  "issueOrPRNumber": true
-                },
-                "repo": {
-                  "type": "string",
-                  "maxLength": 256
-                },
-                "temporary_id": {
-                  "type": "string"
-                },
-                "title": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                }
-              }
-            },
             "create_project_status_update": {
               "defaultMax": 10,
               "fields": {
@@ -660,7 +583,7 @@ jobs:
                   "GITHUB_LOCKDOWN_MODE": "$GITHUB_MCP_LOCKDOWN",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}",
                   "GITHUB_READ_ONLY": "1",
-                  "GITHUB_TOOLSETS": "repos,issues,pull_requests"
+                  "GITHUB_TOOLSETS": "context,repos,issues,pull_requests"
                 }
               },
               "safeoutputs": {
@@ -691,7 +614,7 @@ jobs:
               model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
               version: "",
               agent_version: "0.0.397",
-              workflow_name: "Security Alert Burndown",
+              workflow_name: "Test Project URL Default",
               experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
@@ -794,179 +717,46 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Security Alert Burndown
+          # Test Default Project URL
           
-          This workflow discovers security alert work items in the githubnext/gh-aw repository and updates the project board with their status:
+          This workflow demonstrates the new `GH_AW_PROJECT_URL` environment variable feature.
           
-          - Dependabot-created PRs for JavaScript dependency updates
+          When the `project` field is configured in the frontmatter, safe output entries like
+          `update-project` and `create-project-status-update` will automatically use this project
+          URL as a default when the message doesn't specify a project field.
           
-          ## Task
+          ## Test Cases
           
-          You need to discover and update security work items on the project board. Follow these steps:
+          1. **Default project URL from frontmatter**: Safe output messages without a `project` field 
+             will use the URL from the frontmatter configuration.
           
-          ### Step 1: Discover Dependabot PRs
+          2. **Override with explicit project**: If a safe output message includes a `project` field,
+             it takes precedence over the frontmatter default.
           
-          Use the GitHub MCP server to search for pull requests in the `githubnext/gh-aw` repository with:
-          - Author: `app/dependabot`
-          - Labels: `dependencies`, `javascript`
-          - State: open
+          ## Example Safe Outputs
           
-          Example search query:
-          ```
-          repo:githubnext/gh-aw is:pr author:app/dependabot label:dependencies label:javascript is:open
-          ```
-          
-          ### Step 2: Check for Work
-          
-          If *no* Dependabot PRs are found:
-          - Call the `noop` tool with message: "No security alerts found to process"
-          - Exit successfully
-          
-          ### Step 3: Update Project Board
-          
-          For each discovered item (up to 100 total per run):
-          - Add or update the corresponding work item on the project board:
-          - Use the `update-project` safe output tool
-          - Always include the campaign project URL (this is what makes it a campaign):
-            - `project`: "https://github.com/orgs/githubnext/projects/144"
-          - Always include the content identity:
-            - `content_type`: `pull_request` (Dependabot PRs)
-            - `content_number`: PR/issue number
-          - Set fields:
-            - `campaign_id`: "security-alert-burndown"
-            - `status`: "Todo" (for open items)
-            - `target_repo`: "githubnext/gh-aw"
-            - `worker_workflow`: who discovered it, using one of:
-              - "dependabot"
-            - `priority`: Estimate priority:
-              - "High" for critical/severe alerts
-              - "Medium" for moderate alerts
-              - "Low" for low/none alerts
-            - `size`: Estimate size:
-              - "Small" for single dependency updates
-              - "Medium" for multiple dependency updates
-              - "Large" for complex updates with breaking changes
-            - `start_date`: Item created date (YYYY-MM-DD format)
-            - `end_date`: Item closed date (YYYY-MM-DD format) or today's date if still open
-          
-          ### Step 4: Create parent issue and assign work
-          
-          After updating project items, **first complete the bundling analysis below, then immediately perform the safe-output calls below in sequence**. Do not proceed to Step 5 until the calls are complete.
-          
-          #### Bundling Analysis (Do This First)
-          
-          Before creating the issue, analyze the discovered PRs and determine which PRs to bundle together.
-          
-          #### Required Safe-Output Calls:
-          
-          After completing the bundling analysis, you must immediately perform these safe-output calls in order:
-          
-          1. **Call `create_issue`** to create the parent tracking issue
-          2. **Call `update_project`** to add the created issue to the project board  
-          
-          The created issue will be assigned to Copilot automatically via `safe-outputs.create-issue.assignees`.
-          
-          #### Bundling Guidelines
-          
-          Analyze all discovered PRs following these rules:
-          
-          1. Review all discovered PRs
-          2. Group by **runtime** (Node.js, Python, etc.) and **target dependency file**
-          3. Select up to **3 bundles** total following the bundling rules below
-          
-          **Dependabot Bundling Rules:**
-          
-          - Group work by **runtime** (Node.js, Python, etc.). Never mix runtimes.
-          - Group changes by **target dependency file**. Each PR must modify **one manifest (and its lockfile) only**.
-          - Bundle updates **only within a single target file**.
-          - Patch and minor updates **may be bundled**; major updates **should be isolated** unless dependencies are tightly coupled.
-          - Bundled releases **must include a research report** describing:
-            - Packages updated and old → new versions
-            - Breaking or behavioral changes
-            - Migration steps or code impact
-            - Risk level and test coverage impact
-          - Prioritize **security alerts and high-risk updates** first within each runtime.
-          - Enforce **one runtime + one target file per PR**.
-          - All PRs must pass **CI and relevant runtime tests** before merge.
-          
-          #### Safe-Output Call: Create Bundle Issues
-          
-          Create **one issue per planned bundle** (up to 3 total). Each issue should correspond to exactly **one runtime + one manifest file**.
-          
-          For each bundle, call `create_issue`:
-          
-          ```
-          create_issue(
-            title="[campaign] Security Alert Burndown: Dependabot bundle — <runtime> — <manifest> (YYYY-MM-DD)",
-            body="<use template below>"
-          )
-          ```
-          
-          **IMPORTANT**: After each `create_issue`, save the returned temporary ID (e.g., `aw_sec2026012901`). You MUST use each temporary ID in the corresponding project update.
-          
-          #### Safe-Output Call: Add Each Bundle Issue to Project Board
-          
-          For **each** issue you created above, **immediately** call `update_project`:
-          
-          ```
-          update_project(
-            project="https://github.com/orgs/githubnext/projects/144",
-            content_type="issue",
-            content_number="<temporary_id_from_create_issue>",
-            fields={
-              "campaign_id": "security-alert-burndown",
-              "status": "Todo",
-              "target_repo": "githubnext/gh-aw",
-              "worker_workflow": "dependabot",
-              "priority": "High",
-              "size": "Medium",
-              "start_date": "YYYY-MM-DD"
+          ```json
+          {
+            "type": "update_project",
+            "content_type": "draft_issue",
+            "draft_title": "Test Issue Using Default Project URL",
+            "fields": {
+              "status": "Todo"
             }
-          )
+          }
           ```
           
-          **Example**: If a bundle `create_issue` returned `aw_sec2026012901`, then call:
-          - `update_project(..., content_number="aw_sec2026012901", ...)`
+          This will automatically use `https://github.com/orgs/githubnext/projects/1` from the frontmatter.
           
-          
-          **Issue Body Template (one bundle per issue):**
-          ```markdown
-          ## Context
-          This issue tracks one Dependabot PR bundle discovered by the Security Alert Burndown campaign.
-          
-          ## Bundle
-          - Runtime: [runtime]
-          - Manifest: [manifest file]
-          
-          ## Bundling Rules
-          - Group work by runtime. Never mix runtimes.
-          - Group changes by target dependency file (one manifest + its lockfile).
-          - Patch/minor updates may be bundled; major updates should be isolated unless tightly coupled.
-          - Bundled releases must include a research report (packages, versions, breaking changes, migration, risk, tests).
-          
-          ## PRs in Bundle
-          - [ ] #123 - [title] ([old] → [new])
-          - [ ] #456 - [title] ([old] → [new])
-          
-          ## Agent Task
-          1. Research each update for breaking changes and summarize risks.
-          2. Create a single bundled PR (one runtime + one manifest).
-          3. Ensure CI passes; run relevant runtime tests.
-          4. Add the research report to the bundled PR.
-          5. Update this issue checklist as PRs are merged.
+          ```json
+          {
+            "type": "create_project_status_update",
+            "body": "Project status update using default project URL",
+            "status": "ON_TRACK"
+          }
           ```
           
-          ### Step 5: Report
-          
-          Summarize how many items were discovered and added/updated on the project board, broken down by category, and include the bundle issue numbers that were created and assigned.
-          
-          ## Important
-          
-          - Always use the `update-project` tool for project board updates
-          - If no work is found, call `noop` to indicate successful completion with no actions
-          - Focus only on open items:
-            - PRs: open only
-          - Limit updates to 100 items per run to respect rate limits (prioritize highest severity/most recent first)
+          This will also use the default project URL from the frontmatter.
           
           PROMPT_EOF
       - name: Substitute placeholders
@@ -1076,9 +866,8 @@ jobs:
             const { main } = require('/opt/gh-aw/actions/redact_secrets.cjs');
             await main();
         env:
-          GH_AW_SECRET_NAMES: 'COPILOT_GITHUB_TOKEN,GH_AW_AGENT_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
+          GH_AW_SECRET_NAMES: 'COPILOT_GITHUB_TOKEN,GH_AW_GITHUB_MCP_SERVER_TOKEN,GH_AW_GITHUB_TOKEN,GITHUB_TOKEN'
           SECRET_COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          SECRET_GH_AW_AGENT_TOKEN: ${{ secrets.GH_AW_AGENT_TOKEN }}
           SECRET_GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
           SECRET_GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
           SECRET_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1218,9 +1007,9 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_NOOP_MAX: 1
-          GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
+          GH_AW_WORKFLOW_NAME: "Test Project URL Default"
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
@@ -1231,9 +1020,9 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
+          GH_AW_WORKFLOW_NAME: "Test Project URL Default"
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
@@ -1244,12 +1033,12 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
+          GH_AW_WORKFLOW_NAME: "Test Project URL Default"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
@@ -1263,11 +1052,11 @@ jobs:
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
+          GH_AW_WORKFLOW_NAME: "Test Project URL Default"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.result }}
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
@@ -1315,8 +1104,8 @@ jobs:
       - name: Setup threat detection
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          WORKFLOW_NAME: "Security Alert Burndown"
-          WORKFLOW_DESCRIPTION: "Discovers security work items (Dependabot PRs, code scanning alerts, secret scanning alerts)"
+          WORKFLOW_NAME: "Test Project URL Default"
+          WORKFLOW_DESCRIPTION: "No description provided"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
           script: |
@@ -1431,12 +1220,11 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-      issues: write
     timeout-minutes: 15
     env:
       GH_AW_ENGINE_ID: "copilot"
-      GH_AW_WORKFLOW_ID: "security-alert-burndown"
-      GH_AW_WORKFLOW_NAME: "Security Alert Burndown"
+      GH_AW_WORKFLOW_ID: "test-project-url-default"
+      GH_AW_WORKFLOW_NAME: "Test Project URL Default"
     outputs:
       process_project_safe_outputs_processed_count: ${{ steps.process_project_safe_outputs.outputs.processed_count }}
       process_project_safe_outputs_temporary_project_map: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
@@ -1469,10 +1257,9 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":100}}"
-          GH_AW_ASSIGN_COPILOT: "true"
+          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":5}}"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-          GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
+          GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/1"
         with:
           github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
           script: |
@@ -1486,25 +1273,12 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
-          GH_AW_ASSIGN_COPILOT: "true"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
         with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
-            await main();
-      - name: Assign copilot to created issues
-        if: steps.process_safe_outputs.outputs.issues_to_assign_copilot != ''
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          GH_AW_ISSUES_TO_ASSIGN_COPILOT: ${{ steps.process_safe_outputs.outputs.issues_to_assign_copilot }}
-        with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/assign_copilot_to_created_issues.cjs');
             await main();
 

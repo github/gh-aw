@@ -25,7 +25,7 @@
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
 #
-# frontmatter-hash: 44346eb8bced718907376c4997b4d6c2cd9c50748d1edf8f24b34fde3f84a076
+# frontmatter-hash: cf34c9ca048904e350b43974103be2dc6b03a96ca98d7459e8ce4c281e8d185e
 
 name: "CI Cleaner"
 "on":
@@ -576,9 +576,23 @@ jobs:
           
           Read the ENTIRE content of this file carefully before proceeding. Follow the instructions precisely.
           
+          ## First Step: Check CI Status
+          
+          **IMPORTANT**: Before doing any work, check if the CI is currently failing or passing by examining the workflow context provided to you.
+          
+          If the workflow context indicates that **CI is passing** (e.g., `ci_status: success`):
+          1. **STOP immediately** - Do not run any commands
+          2. **Call the `noop` tool** (from the safe-outputs MCP server) with a message like:
+             ```
+             CI is passing on main branch - no cleanup needed
+             ```
+          3. **Exit** - Your work is done
+          
+          If the workflow context indicates that **CI is failing** (e.g., `ci_status: failure`), proceed with the cleanup tasks below.
+          
           ## Your Responsibilities
           
-          You perform the following tasks in sequence to clean up the CI state:
+          When CI is failing, you perform the following tasks in sequence to clean up the CI state:
           
           1. **Format sources** (Go, JavaScript, JSON)
           2. **Run linters** and fix any linting issues
@@ -864,9 +878,17 @@ jobs:
           - **CI Status**: __GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_STATUS__
           - **CI Run ID**: __GH_AW_NEEDS_CHECK_CI_STATUS_OUTPUTS_CI_RUN_ID__
           
-          ## Your Task
+          ## First: Check CI Status
           
-          The CI workflow has failed on the main branch. Follow the instructions from the ci-cleaner agent to:
+          **CRITICAL**: Before starting any work, check the CI Status value above:
+          
+          - **If CI Status is "success"**: The CI is passing. **Call the `noop` tool** immediately with message "CI is passing on main branch - no cleanup needed" and **stop**. Do not run any commands or make any changes.
+          
+          - **If CI Status is "failure"** or anything else: The CI workflow has failed. Proceed with the cleanup tasks below.
+          
+          ## Your Task (Only if CI Status is "failure")
+          
+          Follow the instructions from the ci-cleaner agent to:
           
           1. **Format sources** - Run `make fmt` to format all code
           2. **Run linters** - Run `make lint` and fix any issues
@@ -1124,12 +1146,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      contents: read
 
     outputs:
       ci_needs_fix: ${{ steps.ci_check.outputs.ci_needs_fix }}
       ci_run_id: ${{ steps.ci_check.outputs.ci_run_id }}
       ci_status: ${{ steps.ci_check.outputs.ci_status }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check last CI workflow run status on main branch
         id: ci_check
         run: |
