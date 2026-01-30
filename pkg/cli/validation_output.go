@@ -24,7 +24,7 @@ func FormatValidationError(err error) string {
 	}
 
 	errMsg := err.Error()
-	
+
 	// Apply console formatting to the entire error message
 	// This preserves structured multi-line errors while adding visual styling
 	return console.FormatErrorMessage(errMsg)
@@ -37,10 +37,11 @@ func FormatValidationError(err error) string {
 // styling across the CLI.
 //
 // Example usage:
-//   if err := ValidateWorkflow(config); err != nil {
-//       PrintValidationError(err)
-//       return err
-//   }
+//
+//	if err := ValidateWorkflow(config); err != nil {
+//	    PrintValidationError(err)
+//	    return err
+//	}
 func PrintValidationError(err error) {
 	if err == nil {
 		return
