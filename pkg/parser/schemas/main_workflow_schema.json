@@ -3657,8 +3657,8 @@
         {
           "type": "string",
           "description": "GitHub Project URL for tracking workflow-created items. When configured, automatically enables project tracking operations (update-project, create-project-status-update) to manage project boards similar to campaign orchestrators.",
-          "pattern": "^https://github\\.com/(users|orgs)/[^/]+/projects/\\d+$",
-          "examples": ["https://github.com/orgs/github/projects/123", "https://github.com/users/username/projects/456"]
+          "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
+          "examples": ["https://github.com/orgs/github/projects/123", "https://github.com/users/username/projects/456", "https://github.com/orgs/<ORG>/projects/<NUMBER>"]
         },
         {
           "type": "object",
@@ -3669,8 +3669,8 @@
             "url": {
               "type": "string",
               "description": "GitHub Project URL (required). Must be a valid GitHub Projects V2 URL.",
-              "pattern": "^https://github\\.com/(users|orgs)/[^/]+/projects/\\d+$",
-              "examples": ["https://github.com/orgs/github/projects/123", "https://github.com/users/username/projects/456"]
+              "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
+              "examples": ["https://github.com/orgs/github/projects/123", "https://github.com/users/username/projects/456", "https://github.com/orgs/<ORG>/projects/<NUMBER>"]
             },
             "max-updates": {
               "type": "integer",
