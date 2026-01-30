@@ -66,7 +66,7 @@ The content is reasonable and won't generate overly long environment variables.
 			"The validateExpressionSizes() function checks individual YAML lines, but markdown content " +
 			"from .md files is not stored in the .lock.yml as environment variables or expressions. " +
 			"This test needs to be redesigned or removed.")
-		
+
 		// Create a workflow with markdown content that will exceed the 21KB limit
 		// The content will be written to the workflow YAML as a single line in a heredoc
 		// We need 25KB+ of content to trigger the validation
@@ -118,7 +118,7 @@ safe-outputs:
 			"The validateExpressionSizes() function checks individual YAML lines, but markdown content " +
 			"from .md files is not stored in the .lock.yml as environment variables or expressions. " +
 			"This test needs to be redesigned or removed.")
-		
+
 		// Expression size validation should always run, even when skipValidation is true (default)
 		// This is because GitHub Actions enforces a hard 21KB limit that cannot be bypassed
 		largeContent := strings.Repeat("y", 25000)
