@@ -11,21 +11,6 @@ This guide introduces GitHub Actions—GitHub's native automation platform—and
 
 **GitHub Actions** is GitHub's integrated automation platform that enables you to build, test, and deploy code directly from your repository. It allows you to automate workflows in response to repository events, schedules, or manual triggers—all defined in YAML files stored in your repository.
 
-### Brief History
-
-GitHub Actions launched in **November 2019** as GitHub's answer to the growing need for built-in CI/CD (Continuous Integration/Continuous Deployment) capabilities within the development platform. Before Actions, developers relied on external services like Travis CI, CircleCI, or Jenkins that required separate configuration and maintenance.
-
-**Key milestones in GitHub Actions evolution:**
-
-- **2019**: Initial release with workflow automation and CI/CD capabilities
-- **2020**: Added Docker container actions and improved marketplace
-- **2021**: Expanded to include deployment environments and reusable workflows
-- **2022**: Introduced larger runners, deployment protection rules, and enhanced security features
-- **2023**: Added OpenID Connect (OIDC) support for secure cloud deployments
-- **2024-2026**: Integration with AI agents and Model Context Protocol (MCP) servers
-
-Today, GitHub Actions processes billions of workflow runs monthly and has become the de facto standard for automating GitHub-based development workflows.
-
 ## Core Concepts
 
 Understanding these fundamental concepts is essential for working with both traditional GitHub Actions and agentic workflows.
@@ -231,13 +216,12 @@ jobs:
 
 **Using workflow_dispatch for testing:**
 
-1. **Create test workflow** with `workflow_dispatch` trigger in a feature branch
-2. **Push to your branch** - the workflow file is now visible in the Actions tab
-3. **Navigate to Actions** tab in GitHub repository
-4. **Select your workflow** from the left sidebar
-5. **Click "Run workflow"** dropdown on the right
-6. **Choose your branch** and provide input values
-7. **Click "Run workflow"** button to execute
+1. **Create test workflow** with `workflow_dispatch` trigger and **merge to main branch**
+2. **Navigate to Actions** tab in GitHub repository
+3. **Select your workflow** from the left sidebar
+4. **Click "Run workflow"** dropdown on the right
+5. **Choose your branch** (you can select any branch to run from) and provide input values
+6. **Click "Run workflow"** button to execute
 
 > [!TIP]
 > Enable debug logging for workflow runs by setting repository secrets:
@@ -245,9 +229,8 @@ jobs:
 > - `ACTIONS_RUNNER_DEBUG: true` - Enables runner diagnostic logging
 
 **Limitations of branch-based testing:**
-- Cannot access repository secrets from feature branches (security restriction)
 - Must use `workflow_dispatch` - event triggers don't activate on non-default branches
-- Workflow must exist on the branch you're testing
+- Workflow definition must be merged to main branch before it can be executed
 
 ### Debugging Workflow Runs
 
@@ -276,19 +259,6 @@ steps:
       printenv | sort
 ```
 
-**Interactive debugging with tmate:**
-
-For complex debugging scenarios, use the `tmate` action to SSH into the runner:
-
-```yaml
-steps:
-  - uses: actions/checkout@v4
-  
-  - name: Setup tmate session
-    uses: mxschmitt/action-tmate@v3
-    if: ${{ failure() }}
-```
-
 ## Agentic Workflows vs Traditional GitHub Actions
 
 While agentic workflows compile to GitHub Actions YAML and run on the same infrastructure, they introduce significant enhancements in security, simplicity, and AI-powered decision-making.
@@ -307,131 +277,6 @@ While agentic workflows compile to GitHub Actions YAML and run on the same infra
 | **Tool Integration** | Manual action selection | MCP server automatic tool discovery |
 | **Testing** | `workflow_dispatch` on branches | Same, plus local compilation |
 | **Auditability** | Standard workflow logs | Enhanced with agent reasoning logs |
-
-### Enhanced Sandboxing in Agentic Workflows
-
-Agentic workflows implement **defense-in-depth security** beyond standard GitHub Actions:
-
-```mermaid
-flowchart TB
-    subgraph Traditional["Traditional GitHub Actions"]
-        A1["Workflow File (.yml)"]
-        A2["Runner VM"]
-        A3["Steps with $GITHUB_TOKEN"]
-        A4["Direct API Access"]
-        
-        A1 --> A2
-        A2 --> A3
-        A3 --> A4
-    end
-    
-    subgraph Agentic["Agentic Workflows"]
-        B1["Workflow File (.md)"]
-        B2["Compiled Lock File (.lock.yml)"]
-        B3["Agent Sandbox"]
-        B4["MCP Gateway"]
-        B5["Network Firewall"]
-        B6["Safe Outputs Job"]
-        B7["Sanitized API Access"]
-        
-        B1 --> B2
-        B2 --> B3
-        B3 --> B4
-        B4 --> B5
-        B3 --> B6
-        B6 --> B7
-    end
-```
-
-**Agentic workflow security enhancements:**
-
-1. **Agent Sandbox**: AI agent runs with **read-only** permissions by default
-2. **MCP Gateway**: Controls tool access and filters communications
-3. **Network Firewall**: Blocks all egress except explicitly allowlisted domains
-4. **Safe Outputs**: Agent writes are buffered, validated, and sanitized before execution
-5. **Secret Redaction**: Automatic removal of credentials from agent outputs
-6. **Tool Allowlisting**: Only explicitly permitted tools are available to the agent
-
-### Example: Issue Triage
-
-**Traditional GitHub Actions** (explicit YAML steps):
-
-```yaml
-name: Issue Triage
-on:
-  issues:
-    types: [opened]
-
-jobs:
-  triage:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Check if bug report
-        id: check
-        run: |
-          if echo "${{ github.event.issue.body }}" | grep -i "bug"; then
-            echo "is_bug=true" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Add bug label
-        if: steps.check.outputs.is_bug == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: ['bug']
-            });
-```
-
-**Agentic Workflow** (natural language):
-
-```markdown
----
-on:
-  issues:
-    types: [opened]
-permissions: read-all
-safe-outputs:
-  add-label:
-  add-comment:
----
-# Issue Triage
-
-Analyze the issue content and:
-- Add appropriate labels (bug, feature, documentation)
-- Ask for clarification if the issue is unclear
-- Suggest related issues if similar problems exist
-```
-
-**Key differences:**
-
-- **Agentic approach**: Describes **intent** rather than exact steps
-- **AI decision-making**: Agent determines appropriate labels based on content understanding
-- **Safe-outputs**: Labels and comments validated before posting
-- **Adaptability**: Handles edge cases without explicit programming
-- **Sandboxing**: Agent cannot directly modify issues—all changes go through safe-output validation
-
-### When to Use Each Approach
-
-**Use Traditional GitHub Actions when:**
-- Fixed, deterministic workflows (build, test, deploy)
-- Performance-critical operations (large-scale builds)
-- Existing YAML workflows that work well
-- Simple automation without context analysis
-
-**Use Agentic Workflows when:**
-- Natural language processing of issues, PRs, or comments
-- Context-aware decision-making required
-- Complex triage, analysis, or research tasks
-- Want to describe intent rather than implementation
-- Need enhanced security for AI-powered operations
 
 ## Next Steps
 
