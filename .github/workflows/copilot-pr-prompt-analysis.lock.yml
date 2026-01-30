@@ -27,7 +27,7 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: c71e3b4adcfc14e24a9b1f5ca96e0d2f3251d914388cf2710b64a026ebf784f1
+# frontmatter-hash: ee0b8302f5f4873662d216de453d40bfba1639007f64a8abececf586832c8d61
 
 name: "Copilot PR Prompt Pattern Analysis"
 "on":

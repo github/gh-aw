@@ -21,7 +21,7 @@
 #
 # Test workflow to verify create_pull_request error handling
 #
-# frontmatter-hash: 22236e5d7c48195a7aac455b450b8bbbfd2fa9b4e527a77e91c40a5814038973
+# frontmatter-hash: 12ba065cfec731f45a495f0b62a726c9283f6d0e88e36bc044e01f6295272fdf
 
 name: "Test Create PR Error Handling"
 "on":

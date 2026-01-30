@@ -21,7 +21,7 @@
 #
 # Reviews project documentation from the perspective of a Claude Code user who does not use GitHub Copilot or Copilot CLI
 #
-# frontmatter-hash: 866a49e925e136104d6f92e3847c84cb057e82e091f0817cfbb8b6ab5abe486d
+# frontmatter-hash: 28183a57080890fa0b22c7f44ec0d357ae9cd72b2ebb113b70bb405b60ad2592
 
 name: "Claude Code User Documentation Review"
 "on":

@@ -21,7 +21,7 @@
 #
 # Posts a daily poetic verse about the gh-aw project to a discussion thread
 #
-# frontmatter-hash: 51e799b8347ff91d6c4f242f799b61d8a47714448f124fa2964357a286341326
+# frontmatter-hash: 5db0137f6088e36766accbf64c675c1e572eafd1cf44dc91df99335a492adac2
 
 name: "Daily Fact About gh-aw"
 "on":

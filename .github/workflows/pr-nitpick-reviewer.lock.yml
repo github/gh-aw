@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 5db7cf92cdecbb539ad45b2ce18d7d7ec4ae582a4ea388f58cf64ad2c55a04ca
+# frontmatter-hash: dd3925dbc6bbf71c3e991fb57515d9d45c389b646f16c20e22ffe9887ce50fc6
 
 name: "PR Nitpick Reviewer 🔍"
 "on":

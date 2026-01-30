@@ -21,7 +21,7 @@
 #
 # Test Codex engine with GitHub remote MCP server
 #
-# frontmatter-hash: e9dc4d6d417f55702c3b61288dd10b5dae80b7bf2d195843b0fb75de3db6a70a
+# frontmatter-hash: a585453ebfdb7a951ceb347a8fe5a1df0ffd9207760127639fa4c718d2c5af18
 
 name: "Codex GitHub Remote MCP Test"
 "on":
