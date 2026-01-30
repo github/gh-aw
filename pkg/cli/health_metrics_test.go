@@ -69,13 +69,9 @@ func TestCalculateWorkflowHealth(t *testing.T) {
 			health := CalculateWorkflowHealth(tt.workflowName, tt.runs, tt.threshold)
 
 			assert.Equal(t, tt.workflowName, health.WorkflowName, "Workflow name should match")
-			
-			// Use InEpsilon for non-zero values, Equal for zero
-			if tt.expectedRate == 0 {
-				assert.Equal(t, tt.expectedRate, health.SuccessRate, "Success rate should match")
-			} else {
-				assert.InEpsilon(t, tt.expectedRate, health.SuccessRate, 0.01, "Success rate should match")
-			}
+
+			// Use InDelta for all float comparisons to satisfy testifylint
+			assert.InDelta(t, tt.expectedRate, health.SuccessRate, 0.01, "Success rate should match")
 
 			if tt.expectedTrend != "" {
 				assert.Equal(t, tt.expectedTrend, health.Trend, "Trend should match")
