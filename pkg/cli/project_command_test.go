@@ -285,6 +285,17 @@ func TestEnsureSingleSelectOptionBefore(t *testing.T) {
 			expectChanged:  true,
 			expectedLength: 4,
 		},
+		{
+			name: "beforeName option does not exist - appends to end",
+			options: []singleSelectOption{
+				{Name: "Todo", Color: "GRAY"},
+				{Name: "In Progress", Color: "YELLOW"},
+			},
+			desired:        singleSelectOption{Name: "Review Required", Color: "BLUE", Description: "Needs review"},
+			beforeName:     "NonExistent",
+			expectChanged:  true,
+			expectedLength: 3,
+		},
 	}
 
 	for _, tt := range tests {

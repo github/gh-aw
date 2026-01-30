@@ -171,8 +171,16 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	}
 
 	// Create views and fields if requested
-	projectURL, _ := project["url"].(string)
-	projectNumber, _ := project["number"].(float64)
+	projectURL, ok := project["url"].(string)
+	if !ok || projectURL == "" {
+		return fmt.Errorf("failed to get project URL from response")
+	}
+
+	projectNumberFloat, ok := project["number"].(float64)
+	if !ok || projectNumberFloat <= 0 {
+		return fmt.Errorf("failed to get valid project number from response")
+	}
+	projectNumber := int(projectNumberFloat)
 
 	if config.WithCampaignSetup || config.CreateViews {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
@@ -185,7 +193,7 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 
 	if config.WithCampaignSetup || config.CreateFields {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating custom fields..."))
-		if err := createStandardFields(ctx, projectURL, int(projectNumber), config.Owner, config.Verbose); err != nil {
+		if err := createStandardFields(ctx, projectURL, projectNumber, config.Owner, config.Verbose); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create fields: %v", err)))
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created custom fields"))
@@ -709,6 +717,7 @@ func getString(m map[string]any, key string) string {
 }
 
 // ensureSingleSelectOptionBefore ensures an option exists before a specific option
+// If beforeName is not found in the options list, the desired option is appended to the end
 func ensureSingleSelectOptionBefore(options []singleSelectOption, desired singleSelectOption, beforeName string) ([]singleSelectOption, bool) {
 	var existing *singleSelectOption
 	without := make([]singleSelectOption, 0, len(options))
@@ -735,7 +744,7 @@ func ensureSingleSelectOptionBefore(options []singleSelectOption, desired single
 		}
 	}
 
-	// Find insertion point (before the specified option)
+	// Find insertion point (before the specified option, or at end if not found)
 	insertAt := len(without)
 	for i, opt := range without {
 		if opt.Name == beforeName {
