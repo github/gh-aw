@@ -20,7 +20,7 @@ This document provides a deep research comparison between **oh-my-opencode** and
 | **Multi-Agent** | Native multi-agent orchestration | Single-agent per workflow (event-driven) |
 | **Tool Ecosystem** | LSP, AST-Grep, MCP servers | GitHub MCP, Bash allowlist, Playwright |
 | **State Management** | Stateful, persistent across sessions | Stateless workflow runs |
-| **Philosophy** | Provide comprehensive agent capabilities | "Safe by default" - minimize risk |
+| **Philosophy** | Provide extensive agent capabilities | "Safe by default" - minimize risk |
 
 ---
 
@@ -1077,7 +1077,7 @@ gh aw mcp inspect issue-responder
 
 **Scalability**:
 - **Horizontal**: Unlimited parallel workflows (GitHub manages)
-- **Vertical**: Use more powerful runners (self-hosted or GitHub)
+- **Vertical**: Use higher-spec runners (self-hosted or GitHub)
 - **Cost**: Pay for Actions minutes + LLM tokens
 
 **Optimization Tips**:
@@ -1449,7 +1449,7 @@ Use oh-my-opencode with gh-aw integration:
 **Ideal User Profiles**:
 - **Power Users**: Developers who want "coding on steroids"
 - **Refactoring Projects**: Large-scale code transformations
-- **Rapid Prototyping**: Build features quickly with parallel agents
+- **Rapid Prototyping**: Build features using parallel agents
 - **Open Source Contributors**: Personal productivity tool
 - **Consultants**: Accelerate client projects
 
@@ -1585,7 +1585,7 @@ Merge and Deploy:
 4. **Simplified Configuration**
    - Add "auto" mode that detects needed tools
    - Implement preset configurations for common workflows
-   - Reduce boilerplate for simple cases
+   - Reduce boilerplate for basic use cases
 
 ### 15.2 Potential oh-my-opencode Enhancements Inspired by gh-aw
 

@@ -85,7 +85,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 
 - Test 6-8 representative scenarios (not all scenarios)
 - Focus on quality over quantity
-- Prioritize critical issues over comprehensive coverage
+- Prioritize critical issues over complete coverage
 ```
 
 **Efficiency Instructions:**
@@ -108,7 +108,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 - No token budget controls
 - 600-minute timeout
 - Tests all 15-20 generated scenarios
-- Comprehensive documentation
+- Complete documentation
 
 **Optimized Configuration:**
 - `timeout-minutes: 180` (reduced from 600)
@@ -130,7 +130,7 @@ Explicit instructions in workflow prompts to reduce token consumption:
 - Reduce test scenarios from 15-20 to 6-8 representative cases
 - Enforce concise output with word limits
 - Use progressive disclosure to hide verbose content
-- Focus on quality insights over comprehensive coverage
+- Focus on quality insights over complete coverage
 
 ### CI Cleaner
 
@@ -184,7 +184,7 @@ Test a representative subset of 6-8 scenarios to reduce token consumption...
 **Before:**
 ```markdown
 ### Detailed Analysis
-[5000 word comprehensive report with all scenario details]
+[5000 word detailed report with all scenario details]
 ```
 
 **After:**

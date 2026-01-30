@@ -110,7 +110,7 @@ Domain-specific validation is organized into separate files based on functional 
 - `validateExpressionSafety()` - Validates allowed GitHub expressions
 - `validateSingleExpression()` - Validates individual expression syntax
 
-**Pattern**: Security-focused allowlist validation with comprehensive error reporting
+**Pattern**: Security-focused allowlist validation with detailed error reporting
 
 **When to add validation here**:
 - ✅ GitHub Actions expression parsing

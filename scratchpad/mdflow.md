@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document provides a deep technical analysis of mdflow and GitHub Agentic Workflows (gh-aw), focusing on custom engine opportunities, architectural patterns, and strategic insights for gh-aw development. While the existing `mdflow-comparison.md` provides a comprehensive syntax comparison, this document focuses on **what gh-aw can learn from mdflow** and **opportunities for custom engine development**.
+This document provides a deep technical analysis of mdflow and GitHub Agentic Workflows (gh-aw), focusing on custom engine opportunities, architectural patterns, and strategic insights for gh-aw development. While the existing `mdflow-comparison.md` provides a detailed syntax comparison, this document focuses on **what gh-aw can learn from mdflow** and **opportunities for custom engine development**.
 
 ### Key Findings
 
@@ -693,13 +693,13 @@ mdflow compile task.claude.md --output github-actions.yml
 
 #### 1. **Simplified Quickstart Templates**
 - Create `gh aw init` with curated templates
-- mdflow-inspired simple syntax option
+- mdflow-inspired minimal syntax option
 - Reduce boilerplate for common use cases
 
 **Example**:
 ```bash
 gh aw init issue-responder
-gh aw init pr-reviewer --simple
+gh aw init pr-reviewer --basic
 gh aw init daily-report --template mdflow
 ```
 
@@ -1156,7 +1156,7 @@ CI/CD Execution (gh-aw):
 **Size**: Enterprise-focused, GitHub-backed
 - GitHub stars: Growing (GitHub Next project)
 - Contributors: Microsoft Research + community
-- Examples: Comprehensive documentation site
+- Examples: Full documentation site
 
 **Integration**:
 - GitHub Actions ecosystem
@@ -1173,7 +1173,7 @@ CI/CD Execution (gh-aw):
 **Documentation**:
 - Full documentation site (Astro Starlight)
 - Video tutorials and slides
-- Comprehensive specifications (scratchpad/ directory)
+- Detailed specifications (scratchpad/ directory)
 - Enterprise security guidelines
 
 ---
@@ -1310,7 +1310,7 @@ CI/CD Execution (gh-aw):
 
 ### Key Takeaways
 
-1. **mdflow excels at**: Personal productivity, local tasks, simple workflows, fast iteration
+1. **mdflow excels at**: Personal productivity, local tasks, basic workflows, fast iteration
 2. **gh-aw excels at**: Team automation, CI/CD, security, GitHub integration, structured output
 3. **They serve different needs**: mdflow = developer tool, gh-aw = platform tool
 4. **Cross-pollination is valuable**: Each can learn from the other's strengths
@@ -1318,7 +1318,7 @@ CI/CD Execution (gh-aw):
 ### Top 3 Recommendations for gh-aw
 
 #### 1. **Simplified Quickstart Experience** (Inspired by mdflow)
-- Create "simple mode" templates that hide complexity
+- Create "basic mode" templates that hide complexity
 - Add `gh aw init --template mdflow-style` for familiar syntax
 - Provide sensible defaults that work out-of-the-box
 
@@ -1354,7 +1354,7 @@ gh aw compile --engine mdflow-compat review.claude.md
 **Benefits**:
 - Provide migration path for mdflow users
 - Leverage mdflow's simplicity in gh-aw context
-- Enable gradual adoption (start simple, add security later)
+- Enable gradual adoption (start with minimal features, add security later)
 
 ### Final Thoughts
 
