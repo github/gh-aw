@@ -78,16 +78,16 @@ func (c *Compiler) processStopAfterConfiguration(frontmatter map[string]any, wor
 			stopAfterLog.Printf("Resolved stop time from %s to %s", originalStopTime, resolvedStopTime)
 
 			if c.verbose && isRelativeStopTime(originalStopTime) {
-				fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Refreshed relative stop-after to: %s", resolvedStopTime)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Refreshed relative stop-after to: %s", resolvedStopTime)))
 			} else if c.verbose && originalStopTime != resolvedStopTime {
-				fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Refreshed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
 			}
 		} else if existingStopTime != "" {
 			// Preserve existing stop time during recompilation (default behavior)
 			stopAfterLog.Printf("Preserving existing stop time from lock file: %s", existingStopTime)
 			workflowData.StopTime = existingStopTime
 			if c.verbose {
-				fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Preserving existing stop time from lock file: %s", existingStopTime)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Preserving existing stop time from lock file: %s", existingStopTime)))
 			}
 		} else {
 			// First compilation or no existing stop time, generate new one
@@ -100,9 +100,9 @@ func (c *Compiler) processStopAfterConfiguration(frontmatter map[string]any, wor
 			workflowData.StopTime = resolvedStopTime
 
 			if c.verbose && isRelativeStopTime(originalStopTime) {
-				fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Resolved relative stop-after to: %s", resolvedStopTime)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Resolved relative stop-after to: %s", resolvedStopTime)))
 			} else if c.verbose && originalStopTime != resolvedStopTime {
-				fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Parsed absolute stop-after from '%s' to: %s", originalStopTime, resolvedStopTime)))
 			}
 		}
 	}
@@ -329,9 +329,9 @@ func (c *Compiler) processSkipIfMatchConfiguration(frontmatter map[string]any, w
 
 	if c.verbose && workflowData.SkipIfMatch != nil {
 		if workflowData.SkipIfMatch.Max == 1 {
-			fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Skip-if-match query configured: %s (max: 1 match)", workflowData.SkipIfMatch.Query)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skip-if-match query configured: %s (max: 1 match)", workflowData.SkipIfMatch.Query)))
 		} else {
-			fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Skip-if-match query configured: %s (max: %d matches)", workflowData.SkipIfMatch.Query, workflowData.SkipIfMatch.Max)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skip-if-match query configured: %s (max: %d matches)", workflowData.SkipIfMatch.Query, workflowData.SkipIfMatch.Max)))
 		}
 	}
 
@@ -349,9 +349,9 @@ func (c *Compiler) processSkipIfNoMatchConfiguration(frontmatter map[string]any,
 
 	if c.verbose && workflowData.SkipIfNoMatch != nil {
 		if workflowData.SkipIfNoMatch.Min == 1 {
-			fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Skip-if-no-match query configured: %s (min: 1 match)", workflowData.SkipIfNoMatch.Query)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skip-if-no-match query configured: %s (min: 1 match)", workflowData.SkipIfNoMatch.Query)))
 		} else {
-			fmt.Println(console.FormatInfoMessage(fmt.Sprintf("Skip-if-no-match query configured: %s (min: %d matches)", workflowData.SkipIfNoMatch.Query, workflowData.SkipIfNoMatch.Min)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skip-if-no-match query configured: %s (min: %d matches)", workflowData.SkipIfNoMatch.Query, workflowData.SkipIfNoMatch.Min)))
 		}
 	}
 

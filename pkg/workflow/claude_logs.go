@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -149,7 +150,7 @@ func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMe
 		// If that fails, try to parse as mixed format (debug logs + JSONL)
 		claudeLogsLog.Print("JSON array parse failed, trying JSONL format")
 		if verbose {
-			fmt.Printf("Failed to parse Claude log as JSON array, trying JSONL format: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to parse Claude log as JSON array, trying JSONL format: %v\n", err)
 		}
 
 		logEntries = []map[string]any{}
@@ -208,7 +209,7 @@ func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMe
 			if err := json.Unmarshal([]byte(trimmedLine), &jsonEntry); err != nil {
 				// Skip invalid JSON lines (could be partial debug output)
 				if verbose {
-					fmt.Printf("Skipping invalid JSON line: %s\n", trimmedLine)
+					fmt.Fprintf(os.Stderr, "Skipping invalid JSON line: %s\n", trimmedLine)
 				}
 				continue
 			}
@@ -218,13 +219,13 @@ func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMe
 
 		if len(logEntries) == 0 {
 			if verbose {
-				fmt.Printf("No valid JSON entries found in Claude log\n")
+				fmt.Fprintf(os.Stderr, "No valid JSON entries found in Claude log\n")
 			}
 			return metrics
 		}
 
 		if verbose {
-			fmt.Printf("Extracted %d JSON entries from mixed format Claude log\n", len(logEntries))
+			fmt.Fprintf(os.Stderr, "Extracted %d JSON entries from mixed format Claude log\n", len(logEntries))
 		}
 	}
 
@@ -276,7 +277,7 @@ func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMe
 				}
 
 				if verbose {
-					fmt.Printf("Extracted from Claude result payload: tokens=%d, cost=%.4f, turns=%d\n",
+					fmt.Fprintf(os.Stderr, "Extracted from Claude result payload: tokens=%d, cost=%.4f, turns=%d\n",
 						metrics.TokenUsage, metrics.EstimatedCost, metrics.Turns)
 				}
 				break
@@ -319,7 +320,7 @@ func (e *ClaudeEngine) parseClaudeJSONLog(logContent string, verbose bool) LogMe
 		for _, seq := range metrics.ToolSequences {
 			totalTools += len(seq)
 		}
-		fmt.Printf("Claude parser extracted %d tool sequences with %d total tool calls\n",
+		fmt.Fprintf(os.Stderr, "Claude parser extracted %d tool sequences with %d total tool calls\n",
 			len(metrics.ToolSequences), totalTools)
 	}
 

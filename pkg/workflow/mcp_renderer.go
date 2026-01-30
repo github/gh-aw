@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -489,7 +490,7 @@ func HandleCustomMCPToolInSwitch(
 	if toolConfig, ok := tools[toolName].(map[string]any); ok {
 		if hasMcp, _ := hasMCPConfig(toolConfig); hasMcp {
 			if err := renderFunc(yaml, toolName, toolConfig, isLast); err != nil {
-				fmt.Printf("Error generating custom MCP configuration for %s: %v\n", toolName, err)
+				fmt.Fprintf(os.Stderr, "Error generating custom MCP configuration for %s: %v\n", toolName, err)
 			}
 			return true
 		}

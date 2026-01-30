@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
@@ -238,7 +239,7 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 	var topLevel map[string]any
 	if err := yaml.Unmarshal([]byte(data.Cache), &topLevel); err != nil {
 		if verbose {
-			fmt.Printf("Warning: Failed to parse cache configuration: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Warning: Failed to parse cache configuration: %v\n", err)
 		}
 		return
 	}
@@ -247,7 +248,7 @@ func generateCacheSteps(builder *strings.Builder, data *WorkflowData, verbose bo
 	cacheConfig, exists := topLevel["cache"]
 	if !exists {
 		if verbose {
-			fmt.Printf("Warning: No cache key found in parsed configuration\n")
+			fmt.Fprintf(os.Stderr, "Warning: No cache key found in parsed configuration\n")
 		}
 		return
 	}

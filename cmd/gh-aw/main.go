@@ -364,7 +364,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show gh aw extension version information",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("%s version %s\n", string(constants.CLIExtensionPrefix), version)
+		fmt.Fprintf(os.Stderr, "%s version %s\n", string(constants.CLIExtensionPrefix), version)
 		return nil
 	},
 }

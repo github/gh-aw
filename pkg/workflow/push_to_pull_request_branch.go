@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
@@ -68,7 +69,7 @@ func (c *Compiler) parsePushToPullRequestBranchConfig(outputMap map[string]any) 
 					default:
 						// Invalid value, use default and log warning
 						if c.verbose {
-							fmt.Printf("Warning: invalid if-no-changes value '%s', using default 'warn'\n", ifNoChangesStr)
+							fmt.Fprintf(os.Stderr, "Warning: invalid if-no-changes value '%s', using default 'warn'\n", ifNoChangesStr)
 						}
 						pushToBranchConfig.IfNoChanges = "warn"
 					}

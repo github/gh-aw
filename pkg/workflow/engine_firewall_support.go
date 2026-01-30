@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/logger"
@@ -71,7 +72,7 @@ func (c *Compiler) checkNetworkSupport(engine CodingAgentEngine, networkPermissi
 	}
 
 	// In non-strict mode, emit a warning
-	fmt.Println(console.FormatWarningMessage(message))
+	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 	c.IncrementWarningCount()
 
 	return nil
@@ -99,7 +100,7 @@ func (c *Compiler) checkFirewallDisable(engine CodingAgentEngine, networkPermiss
 			}
 
 			// In non-strict mode, emit a warning
-			fmt.Println(console.FormatWarningMessage(message))
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(message))
 			c.IncrementWarningCount()
 		}
 
