@@ -24,7 +24,7 @@ func TestCompileWorkflowFileSizeValidation(t *testing.T) {
 		// Create a normal workflow that should be well under 500KB
 		testContent := `---
 on: push
-timeout_minutes: 10
+timeout-minutes: 10
 permissions:
   contents: read
   issues: write
@@ -69,7 +69,7 @@ This is a normal workflow that should compile successfully.
 		// Create a normal workflow
 		testContent := `---
 on: push
-timeout_minutes: 10
+timeout-minutes: 10
 permissions:
   contents: read
   issues: write
