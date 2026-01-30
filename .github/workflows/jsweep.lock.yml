@@ -21,7 +21,7 @@
 #
 # Daily JavaScript unbloater that cleans one .cjs file per day, prioritizing files with @ts-nocheck to enable type checking
 #
-# frontmatter-hash: 0c457544570e7ee3c4eea6fbd582af7ebd6b6e9d953e0fb202c442be911995b9
+# frontmatter-hash: 1d20dece4c3c4e23f84c072b4c8e96fed9d9e54aa2dfc2914b6e85b25b8a93bd
 
 name: "jsweep - JavaScript Unbloater"
 "on":

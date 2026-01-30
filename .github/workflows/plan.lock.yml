@@ -21,7 +21,7 @@
 #
 # Generates project plans and task breakdowns when invoked with /plan command in issues or PRs
 #
-# frontmatter-hash: fdff89cc107503dd382f2b93962b00c7948e7bb61e40b24b4e3d1124606f9b31
+# frontmatter-hash: 967edfcf035437f7a3a198a5e3bc4a764cb7c643eca0dc12f672e44fdf56df16
 
 name: "Plan Command"
 "on":

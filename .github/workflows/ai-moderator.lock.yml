@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: f6f98e51c5cf9323bd82e980e3c9e44ddfed5efda169381d7d4ceb3fce01b42b
+# frontmatter-hash: 868446b757f39b0cc1e3d424b0cd505c5c2614ee12c06162a5e22f65ada65e98
 
 name: "AI Moderator"
 "on":

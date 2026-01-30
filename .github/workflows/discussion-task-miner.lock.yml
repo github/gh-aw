@@ -26,7 +26,7 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: a4ae24fc3bc6975db6ef78428171d35617265e93b808ea0b5e05547ffd216ddc
+# frontmatter-hash: ec2d0db93bbb1eff9279654d0ccdde1cc92dae402792f4e57b14e80fbe85b6e2
 
 name: "Discussion Task Miner - Code Quality Improvement Agent"
 "on":
