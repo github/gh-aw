@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 625b76d207cca3adab3d3b2dc2ee40f1fb0dc5d9d9ad6d509f7fd6bcd02e007b
+# frontmatter-hash: bdb7eae3cf57e1d69e5ecb529a1ff14fd41faec323e9563d0ad4a08d30faae10
 
 name: "Typist - Go Type Analysis"
 "on":

@@ -21,7 +21,7 @@
 #
 # Automatically merges the main branch into pull request branches when invoked with /mergefest command
 #
-# frontmatter-hash: 1444064d10dd50179109e59554c2096574123b1ec2df577a13819ca4cd3aa3ee
+# frontmatter-hash: 3ca51a58b52a4f0b89cd6a591f0e482ad8fa3ec2f6dd5963b6c0103a4fed6c8b
 
 name: "Mergefest"
 "on":

@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/semgrep.md
 #
-# frontmatter-hash: 286afdd791471c2e41d218e15d3db56468881ca74894bba7746f60550803b96a
+# frontmatter-hash: 4e08950c236218944ef052b13a3dce0146df4659ad184f5de3179d527ca52832
 
 name: "Daily Semgrep Scan"
 "on":
