@@ -28,9 +28,9 @@ func TestNewProjectNewCommand(t *testing.T) {
 	require.NotNil(t, ownerFlag, "Should have --owner flag")
 	assert.Equal(t, "o", ownerFlag.Shorthand, "Owner flag should have short form 'o'")
 
-	repoFlag := cmd.Flags().Lookup("repo")
-	require.NotNil(t, repoFlag, "Should have --repo flag")
-	assert.Equal(t, "r", repoFlag.Shorthand, "Repo flag should have short form 'r'")
+	linkFlag := cmd.Flags().Lookup("link")
+	require.NotNil(t, linkFlag, "Should have --link flag")
+	assert.Equal(t, "l", linkFlag.Shorthand, "Link flag should have short form 'l'")
 }
 
 func TestEscapeGraphQLString(t *testing.T) {

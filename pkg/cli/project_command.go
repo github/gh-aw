@@ -39,9 +39,9 @@ This command allows you to create new projects owned by users or organizations
 and optionally link them to specific repositories.
 
 Examples:
-  gh aw project new "My Project" --owner @me                    # Create user project
-  gh aw project new "Team Board" --owner myorg                  # Create org project
-  gh aw project new "Bugs" --owner myorg --repo myorg/myrepo   # Create and link to repo`,
+  gh aw project new "My Project" --owner @me                      # Create user project
+  gh aw project new "Team Board" --owner myorg                    # Create org project
+  gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo`,
 	}
 
 	// Add subcommands
@@ -68,13 +68,13 @@ Token Requirements:
   with a token that has the required permissions.
 
 Examples:
-  gh aw project new "My Project" --owner @me                    # Create user project
-  gh aw project new "Team Board" --owner myorg                  # Create org project  
-  gh aw project new "Bugs" --owner myorg --repo myorg/myrepo   # Create and link to repo`,
+  gh aw project new "My Project" --owner @me                      # Create user project
+  gh aw project new "Team Board" --owner myorg                    # Create org project  
+  gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner, _ := cmd.Flags().GetString("owner")
-			repo, _ := cmd.Flags().GetString("repo")
+			link, _ := cmd.Flags().GetString("link")
 			verbose, _ := cmd.Flags().GetBool("verbose")
 
 			if owner == "" {
@@ -84,7 +84,7 @@ Examples:
 			config := ProjectConfig{
 				Title:   args[0],
 				Owner:   owner,
-				Repo:    repo,
+				Repo:    link,
 				Verbose: verbose,
 			}
 
@@ -93,7 +93,7 @@ Examples:
 	}
 
 	cmd.Flags().StringP("owner", "o", "", "Project owner: '@me' for current user or organization name (required)")
-	cmd.Flags().StringP("repo", "r", "", "Repository to link project to (format: owner/repo)")
+	cmd.Flags().StringP("link", "l", "", "Repository to link project to (format: owner/repo)")
 	_ = cmd.MarkFlagRequired("owner")
 
 	return cmd
