@@ -24,7 +24,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: f242547385e4769d7d4e325ba329636b83806d455f10a2679a6a5ce4c5ed7d4a
+# frontmatter-hash: 77f4b7100904fede3353c0e124821af40c4329cd4fd42a0e4e45aefbbfd97645
 
 name: "Issue Triage Agent"
 "on":

@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 15a4e2189926dc12142d3b3cb3f7c336b62a0246f123535ec308ff28b2de50ed
+# frontmatter-hash: a1e6d9edc444e97d7bb033d419697b7320e2423f3eef2944e31ce65956e721c7
 
 name: "Auto-Assign Issue"
 "on":

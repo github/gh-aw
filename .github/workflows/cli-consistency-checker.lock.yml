@@ -21,7 +21,7 @@
 #
 # Inspects the gh-aw CLI to identify inconsistencies, typos, bugs, or documentation gaps by running commands and analyzing output
 #
-# frontmatter-hash: 6547a29b671ab37e1b8456971e1c02fbcb6b669f05b44e4ff60acb770c736959
+# frontmatter-hash: 963484b41243a56f27d3dd85da86cad1f980080bf06b44d610f7f44292dad5e9
 
 name: "CLI Consistency Checker"
 "on":

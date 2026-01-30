@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 1a45b407c74e40b6c03c111ccade7bb3347a1b8b8fbf70416bfd56d266a0e87c
+# frontmatter-hash: 8124a2bd7d295773a7f8df1480c7df712778539f213fc16f6a0ea16ba9e003ea
 
 name: "Repository Tree Map Generator"
 "on":
