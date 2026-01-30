@@ -23,6 +23,7 @@ tools:
   bash:
 imports:
   - shared/reporting.md
+project: https://github.com/orgs/githubnext/projects/144
 safe-outputs:
   add-labels:
     allowed:

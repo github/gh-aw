@@ -24,6 +24,7 @@ tools:
       file-glob: [security-alert-burndown/**]
       campaign-id: security-alert-burndown
   cache-memory:
+project: https://github.com/orgs/githubnext/projects/144
 safe-outputs:
   add-labels:
     allowed:

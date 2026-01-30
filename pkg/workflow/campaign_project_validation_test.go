@@ -193,10 +193,10 @@ func TestValidateCampaignProject(t *testing.T) {
 
 func TestDetectCampaignWorkflow(t *testing.T) {
 	tests := []struct {
-		name            string
-		frontmatter     map[string]any
+		name             string
+		frontmatter      map[string]any
 		expectedCampaign bool
-		expectedSource  string
+		expectedSource   string
 	}{
 		{
 			name: "detect via agentic-campaign label",
@@ -311,9 +311,9 @@ func TestIsCampaignLabel(t *testing.T) {
 
 func TestHasCampaignID(t *testing.T) {
 	tests := []struct {
-		name     string
+		name        string
 		frontmatter map[string]any
-		expected bool
+		expected    bool
 	}{
 		{
 			name: "single repo-memory with campaign-id",
@@ -340,9 +340,9 @@ func TestHasCampaignID(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "no tools",
+			name:        "no tools",
 			frontmatter: map[string]any{},
-			expected: false,
+			expected:    false,
 		},
 		{
 			name: "no repo-memory",
@@ -385,9 +385,9 @@ func TestHasCampaignID(t *testing.T) {
 
 func TestHasCampaignLabels(t *testing.T) {
 	tests := []struct {
-		name     string
+		name        string
 		frontmatter map[string]any
-		expected bool
+		expected    bool
 	}{
 		{
 			name: "add-labels with agentic-campaign",
@@ -434,9 +434,9 @@ func TestHasCampaignLabels(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "no safe-outputs",
+			name:        "no safe-outputs",
 			frontmatter: map[string]any{},
-			expected: false,
+			expected:    false,
 		},
 		{
 			name: "regular labels only",
@@ -499,9 +499,9 @@ func TestCampaignValidationIntegration(t *testing.T) {
 
 func TestCampaignValidationErrorMessages(t *testing.T) {
 	tests := []struct {
-		name                string
-		frontmatter         map[string]any
-		expectedInError     []string
+		name            string
+		frontmatter     map[string]any
+		expectedInError []string
 	}{
 		{
 			name: "error message explains campaign source - labels",
@@ -540,7 +540,7 @@ func TestCampaignValidationErrorMessages(t *testing.T) {
 			compiler := NewCompiler()
 			err := compiler.validateCampaignProject(tt.frontmatter)
 			require.Error(t, err, "Should fail validation")
-			
+
 			errMsg := err.Error()
 			for _, expected := range tt.expectedInError {
 				assert.Contains(t, strings.ToLower(errMsg), strings.ToLower(expected),
