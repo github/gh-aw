@@ -239,9 +239,8 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 		return nil
 	}
 
-	// Display detailed table
+	// Display header message
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow Health: %s (Last %d Days)", config.WorkflowName, config.Days)))
-	fmt.Fprintln(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(os.Stderr, "")
 
 	// Create detailed view
@@ -267,9 +266,9 @@ func displayDetailedHealth(runs []WorkflowRun, config HealthConfig) error {
 
 	// Display warning if below threshold
 	if health.BelowThresh {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("⚠️  Success rate (%.1f%%) is below threshold (%.1f%%)", health.SuccessRate, config.Threshold)))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Success rate (%.1f%%) is below threshold (%.1f%%)", health.SuccessRate, config.Threshold)))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Success rate (%.1f%%) is above threshold (%.1f%%)", health.SuccessRate, config.Threshold)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Success rate (%.1f%%) is above threshold (%.1f%%)", health.SuccessRate, config.Threshold)))
 	}
 
 	return nil
@@ -288,7 +287,6 @@ func outputHealthJSON(summary HealthSummary) error {
 // outputHealthTable outputs health summary as a formatted table
 func outputHealthTable(summary HealthSummary, threshold float64) error {
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow Health Summary (%s)", summary.Period)))
-	fmt.Fprintln(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(os.Stderr, "")
 
 	// Render table
@@ -297,10 +295,10 @@ func outputHealthTable(summary HealthSummary, threshold float64) error {
 
 	// Display summary message
 	if summary.BelowThreshold > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("⚠️  %d workflow(s) below %.0f%% success threshold", summary.BelowThreshold, threshold)))
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("ℹ Run '%s health <workflow-name>' for details", string(constants.CLIExtensionPrefix))))
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("%d workflow(s) below %.0f%% success threshold", summary.BelowThreshold, threshold)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Run '%s health <workflow-name>' for details", string(constants.CLIExtensionPrefix))))
 	} else {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ All workflows above %.0f%% success threshold", threshold)))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("All workflows above %.0f%% success threshold", threshold)))
 	}
 
 	return nil
