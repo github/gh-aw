@@ -48,30 +48,11 @@ Use the `project` field when you need:
 
 ## Configuration
 
-### Simple Configuration
-
-Use just a project URL:
+Use a project URL in your workflow frontmatter:
 
 ```yaml
 project: https://github.com/orgs/myorg/projects/1
 ```
-
-### Advanced Configuration
-
-Customize behavior with additional options:
-
-```yaml
-project:
-  url: https://github.com/orgs/myorg/projects/1
-  scope:
-    - owner/repo1
-    - owner/repo2
-    - org:myorg
-  max-updates: 50
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-```
-
-See the [Project Tracking example](/gh-aw/examples/project-tracking/) for complete configuration details.
 
 ## How It Works
 

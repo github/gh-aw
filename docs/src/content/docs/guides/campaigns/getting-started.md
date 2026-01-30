@@ -94,7 +94,6 @@ Both workflows will track their items in the same project board.
 ## Best practices
 
 - **Start small** - Begin with one workflow and add more as needed
-- **Set conservative limits** - Use `max-updates: 10` in project config to start
 - **Test manually** - Use `workflow_dispatch` trigger to test before scheduling
 - **Monitor progress** - Check your project board to see tracked items
 
