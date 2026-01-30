@@ -43,33 +43,21 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 	runPushLog.Printf("Checking lock file: %s", lockFilePath)
 	needsRecompile := false
 
-	if lockStat, err := os.Stat(lockFilePath); err == nil {
+	if _, err := os.Stat(lockFilePath); err == nil {
 		runPushLog.Printf("Lock file exists: %s", lockFilePath)
-		// Lock file exists - check if it's outdated
-		if mdStat, err := os.Stat(absWorkflowPath); err == nil {
-			runPushLog.Printf("Comparing modification times - md: %v, lock: %v", mdStat.ModTime(), lockStat.ModTime())
-			if mdStat.ModTime().After(lockStat.ModTime()) {
-				needsRecompile = true
-				runPushLog.Printf("Lock file is outdated by mtime (md: %v, lock: %v)", mdStat.ModTime(), lockStat.ModTime())
-				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (mtime), recompiling workflow..."))
-				}
-			} else {
-				// Modification times are ok, also check frontmatter hash
-				runPushLog.Print("Modification times match, checking frontmatter hash")
-				if hashMismatch, err := checkFrontmatterHashMismatch(absWorkflowPath, lockFilePath); err != nil {
-					runPushLog.Printf("Error checking frontmatter hash: %v", err)
-					// Don't fail, just log the error
-				} else if hashMismatch {
-					needsRecompile = true
-					runPushLog.Print("Lock file is outdated: frontmatter hash mismatch")
-					if verbose {
-						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (frontmatter changed), recompiling workflow..."))
-					}
-				} else {
-					runPushLog.Printf("Lock file is up-to-date (mtime and frontmatter hash match)")
-				}
+		// Lock file exists - check frontmatter hash
+		runPushLog.Print("Checking frontmatter hash")
+		if hashMismatch, err := checkFrontmatterHashMismatch(absWorkflowPath, lockFilePath); err != nil {
+			runPushLog.Printf("Error checking frontmatter hash: %v", err)
+			// Don't fail, just log the error
+		} else if hashMismatch {
+			needsRecompile = true
+			runPushLog.Print("Lock file is outdated: frontmatter hash mismatch")
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (frontmatter changed), recompiling workflow..."))
 			}
+		} else {
+			runPushLog.Printf("Lock file is up-to-date (frontmatter hash matches)")
 		}
 	} else if os.IsNotExist(err) {
 		// Lock file doesn't exist - needs compilation
@@ -187,8 +175,7 @@ func checkLockFileStatus(workflowPath string) (*LockFileStatus, error) {
 	}
 
 	// Check if lock file exists
-	lockStat, err := os.Stat(lockFilePath)
-	if err != nil {
+	if _, err := os.Stat(lockFilePath); err != nil {
 		if os.IsNotExist(err) {
 			status.Missing = true
 			runPushLog.Printf("Lock file missing: %s", lockFilePath)
@@ -197,21 +184,20 @@ func checkLockFileStatus(workflowPath string) (*LockFileStatus, error) {
 		runPushLog.Printf("Error stating lock file: %v", err)
 		return nil, fmt.Errorf("failed to stat lock file: %w", err)
 	}
-	runPushLog.Printf("Lock file exists: %s (modtime: %v)", lockFilePath, lockStat.ModTime())
+	runPushLog.Printf("Lock file exists: %s", lockFilePath)
 
-	// Lock file exists - check if it's outdated
-	mdStat, err := os.Stat(absWorkflowPath)
+	// Lock file exists - check frontmatter hash
+	hashMismatch, err := checkFrontmatterHashMismatch(absWorkflowPath, lockFilePath)
 	if err != nil {
-		runPushLog.Printf("Error stating workflow file: %v", err)
-		return nil, fmt.Errorf("failed to stat workflow file: %w", err)
-	}
-	runPushLog.Printf("Workflow file modtime: %v", mdStat.ModTime())
-
-	if mdStat.ModTime().After(lockStat.ModTime()) {
+		runPushLog.Printf("Error checking frontmatter hash: %v", err)
+		// Treat hash check error as outdated to be safe
 		status.Outdated = true
-		runPushLog.Printf("Lock file outdated (md: %v, lock: %v)", mdStat.ModTime(), lockStat.ModTime())
+		runPushLog.Printf("Lock file considered outdated due to hash check error")
+	} else if hashMismatch {
+		status.Outdated = true
+		runPushLog.Printf("Lock file outdated (frontmatter hash mismatch)")
 	} else {
-		runPushLog.Printf("Lock file is up-to-date")
+		runPushLog.Printf("Lock file is up-to-date (frontmatter hash matches)")
 	}
 
 	return status, nil
