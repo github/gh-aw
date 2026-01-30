@@ -25,6 +25,28 @@
 //   - bundler_script_validation.go: JavaScript script content (execSync, GitHub globals)
 //   - bundler_runtime_validation.go: JavaScript runtime mode compatibility
 //
+// # Pass-Through Field Validation
+//
+// Several workflow frontmatter fields are "pass-through" fields - they are extracted
+// from frontmatter and passed directly to GitHub Actions without modification:
+//   - concurrency: Workflow concurrency control
+//   - container: Container configuration for jobs
+//   - environment: GitHub environment configuration
+//   - env: Environment variables
+//   - runs-on: Runner selection
+//   - services: Service containers
+//
+// These fields ARE validated during frontmatter parsing using JSON Schema validation
+// (see pkg/parser/schemas/main_workflow_schema.json). The schema catches:
+//   - Invalid data types (e.g., array when object expected)
+//   - Missing required properties (e.g., container missing 'image')
+//   - Invalid additional properties (e.g., unknown fields in concurrency)
+//   - Structure violations (e.g., runs-on as number instead of string/array/object)
+//
+// Schema validation happens in pkg/parser/schema_validation.go during frontmatter
+// parsing, so errors are caught at compile time rather than GitHub Actions runtime.
+// See pkg/parser/schema_passthrough_validation_test.go for comprehensive test coverage.
+//
 // # When to Add New Validation
 //
 // Add validation to existing domain files when:

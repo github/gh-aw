@@ -7,19 +7,29 @@ import (
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/githubnext/gh-aw/pkg/logger"
 )
+
+var addWorkflowPRLog = logger.New("cli:add_workflow_pr")
 
 // addWorkflowsWithPR handles workflow addition with PR creation and returns the PR number and URL.
 func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, quiet bool, engineOverride string, name string, force bool, appendText string, push bool, noGitattributes bool, fromWildcard bool, workflowDir string, noStopAfter bool, stopAfter string) (int, string, error) {
+	addWorkflowPRLog.Printf("Adding %d workflow(s) with PR creation", len(workflows))
+
 	// Get current branch for restoration later
 	currentBranch, err := getCurrentBranch()
 	if err != nil {
+		addWorkflowPRLog.Printf("Failed to get current branch: %v", err)
 		return 0, "", fmt.Errorf("failed to get current branch: %w", err)
 	}
+
+	addWorkflowPRLog.Printf("Current branch: %s", currentBranch)
 
 	// Create temporary branch with random 4-digit number
 	randomNum := rand.Intn(9000) + 1000 // Generate number between 1000-9999
 	branchName := fmt.Sprintf("add-workflow-%s-%04d", strings.ReplaceAll(workflows[0].WorkflowPath, "/", "-"), randomNum)
+
+	addWorkflowPRLog.Printf("Creating temporary branch: %s", branchName)
 
 	if err := createAndSwitchBranch(branchName, verbose); err != nil {
 		return 0, "", fmt.Errorf("failed to create branch %s: %w", branchName, err)
@@ -39,7 +49,9 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 	}()
 
 	// Add workflows using the normal function logic
+	addWorkflowPRLog.Print("Adding workflows to repository")
 	if err := addWorkflowsNormal(workflows, number, verbose, quiet, engineOverride, name, force, appendText, push, noGitattributes, fromWildcard, workflowDir, noStopAfter, stopAfter); err != nil {
+		addWorkflowPRLog.Printf("Failed to add workflows: %v", err)
 		// Rollback on error
 		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
@@ -48,6 +60,7 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 	}
 
 	// Stage all files before creating PR
+	addWorkflowPRLog.Print("Staging workflow files")
 	if err := tracker.StageAllFiles(verbose); err != nil {
 		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
@@ -87,7 +100,9 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 	}
 
 	// Push branch
+	addWorkflowPRLog.Printf("Pushing branch %s to remote", branchName)
 	if err := pushBranch(branchName, verbose); err != nil {
+		addWorkflowPRLog.Printf("Failed to push branch: %v", err)
 		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
@@ -95,13 +110,17 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 	}
 
 	// Create PR
+	addWorkflowPRLog.Printf("Creating pull request: %s", prTitle)
 	prNumber, prURL, err := createPR(branchName, prTitle, prBody, verbose)
 	if err != nil {
+		addWorkflowPRLog.Printf("Failed to create PR: %v", err)
 		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to create PR: %w", err)
 	}
+
+	addWorkflowPRLog.Printf("Successfully created PR #%d: %s", prNumber, prURL)
 
 	// Success - no rollback needed
 

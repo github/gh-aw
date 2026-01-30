@@ -4,8 +4,11 @@ import (
 	"fmt"
 
 	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
 )
+
+var mcpToolTableLog = logger.New("cli:mcp_tool_table")
 
 // MCPToolTableOptions configures how the MCP tool table is rendered
 type MCPToolTableOptions struct {
@@ -33,7 +36,11 @@ func DefaultMCPToolTableOptions() MCPToolTableOptions {
 // renderMCPToolTable renders an MCP tool table with configurable options
 // This is the shared rendering logic used by both mcp list-tools and mcp inspect commands
 func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) string {
+	mcpToolTableLog.Printf("Rendering MCP tool table: server=%s, tool_count=%d, truncate=%d",
+		info.Config.Name, len(info.Tools), opts.TruncateLength)
+
 	if len(info.Tools) == 0 {
+		mcpToolTableLog.Print("No tools to render")
 		return ""
 	}
 
@@ -48,6 +55,8 @@ func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) st
 		}
 		allowedMap[allowed] = true
 	}
+
+	mcpToolTableLog.Printf("Tool permissions: has_wildcard=%v, allowed_count=%d", hasWildcard, len(allowedMap))
 
 	// Build table headers and rows
 	headers := []string{"Tool Name", "Allow", "Description"}
@@ -114,7 +123,10 @@ func renderMCPToolTable(info *parser.MCPServerInfo, opts MCPToolTableOptions) st
 // renderMCPHierarchyTree renders all MCP servers and their tools as a tree structure
 // This provides a hierarchical view of the MCP configuration
 func renderMCPHierarchyTree(configs []parser.MCPServerConfig, serverInfos map[string]*parser.MCPServerInfo) string {
+	mcpToolTableLog.Printf("Rendering MCP hierarchy tree: server_count=%d", len(configs))
+
 	if len(configs) == 0 {
+		mcpToolTableLog.Print("No MCP servers to render")
 		return ""
 	}
 
