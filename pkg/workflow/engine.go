@@ -24,6 +24,7 @@ type EngineConfig struct {
 	Config      string
 	Args        []string
 	Firewall    *FirewallConfig // AWF firewall configuration
+	Agent       string          // Agent identifier for copilot --agent flag (copilot engine only)
 }
 
 // NetworkPermissions represents network access permissions for workflow execution
@@ -197,6 +198,14 @@ func (c *Compiler) ExtractEngineConfig(frontmatter map[string]any) (string, *Eng
 					}
 				} else if argsStrArray, ok := args.([]string); ok {
 					config.Args = argsStrArray
+				}
+			}
+
+			// Extract optional 'agent' field (string - copilot engine only)
+			if agent, hasAgent := engineObj["agent"]; hasAgent {
+				if agentStr, ok := agent.(string); ok {
+					config.Agent = agentStr
+					engineLog.Printf("Extracted agent identifier: %s", agentStr)
 				}
 			}
 

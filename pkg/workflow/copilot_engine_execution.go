@@ -73,11 +73,20 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		copilotArgs = append(copilotArgs, "--model", workflowData.EngineConfig.Model)
 	}
 
-	// Add --agent flag if custom agent file is specified (via imports)
-	// Copilot CLI expects agent identifier (filename without extension), not full path
-	if workflowData.AgentFile != "" {
-		agentIdentifier := ExtractAgentIdentifier(workflowData.AgentFile)
-		copilotExecLog.Printf("Using custom agent: %s (identifier: %s)", workflowData.AgentFile, agentIdentifier)
+	// Add --agent flag if specified in engine configuration or via imports
+	// Priority: engine.agent (explicit) > AgentFile (from imports, deprecated)
+	var agentIdentifier string
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Agent != "" {
+		// Use explicit agent ID from engine.agent field
+		agentIdentifier = workflowData.EngineConfig.Agent
+		copilotExecLog.Printf("Using agent from engine.agent: %s", agentIdentifier)
+	} else if workflowData.AgentFile != "" {
+		// Fallback to import-based agent (deprecated)
+		agentIdentifier = ExtractAgentIdentifier(workflowData.AgentFile)
+		copilotExecLog.Printf("Using agent from imports (deprecated): %s (identifier: %s)", workflowData.AgentFile, agentIdentifier)
+	}
+
+	if agentIdentifier != "" {
 		copilotArgs = append(copilotArgs, "--agent", agentIdentifier)
 	}
 
