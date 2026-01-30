@@ -94,6 +94,9 @@ func (c *Compiler) CompileWorkflow(markdownPath string) error {
 // CompileWorkflowData compiles a workflow from already-parsed WorkflowData
 // This avoids re-parsing when the data has already been parsed
 func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error {
+	// Store markdownPath for use in dynamic tool generation and prompt generation
+	c.markdownPath = markdownPath
+
 	// Track compilation time for performance monitoring
 	startTime := time.Now()
 	defer func() {
@@ -387,6 +390,15 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		log.Print("Validation completed - no lock file generated (--no-emit enabled)")
 	} else {
 		log.Printf("Writing output to: %s", lockFile)
+
+		// Write the markdown body to a separate .body.md file
+		// This allows users to edit the body without recompiling
+		bodyFile := strings.TrimSuffix(markdownPath, ".md") + ".body.md"
+		bodyContent := workflowData.MarkdownContent
+		if err := os.WriteFile(bodyFile, []byte(bodyContent), 0644); err != nil {
+			return formatCompilerError(bodyFile, "error", fmt.Sprintf("failed to write body file: %v", err))
+		}
+		log.Printf("Wrote body file: %s", bodyFile)
 
 		// Check if we need to force write to update timestamp
 		shouldForceWrite := false

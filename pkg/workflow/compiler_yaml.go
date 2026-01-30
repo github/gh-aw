@@ -231,49 +231,58 @@ func splitContentIntoChunks(content string) []string {
 func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	compilerYamlLog.Printf("Generating prompt for workflow: %s (markdown size: %d bytes)", data.Name, len(data.MarkdownContent))
 
-	// Clean the markdown content
-	cleanedMarkdownContent := removeXMLComments(data.MarkdownContent)
-
-	// Substitute import inputs before expression extraction
-	// This replaces ${{ github.aw.inputs.<key> }} with actual values from imports
-	if len(data.ImportInputs) > 0 {
-		cleanedMarkdownContent = SubstituteImportInputs(cleanedMarkdownContent, data.ImportInputs)
-	}
-
-	// Wrap GitHub expressions in template conditionals BEFORE extracting expressions
-	// This ensures that expressions created by wrapping (e.g., {{#if ${{ expr }} }})
-	// are also extracted and replaced with environment variables
-	cleanedMarkdownContent = wrapExpressionsInTemplateConditionals(cleanedMarkdownContent)
-
-	// Extract expressions and create environment variable mappings for security
-	extractor := NewExpressionExtractor()
-	expressionMappings, err := extractor.ExtractExpressions(cleanedMarkdownContent)
-	if err != nil {
-		// Log error but continue - this is a compiler step, we shouldn't fail
-		// The original expressions will be used if extraction fails
-		expressionMappings = nil
-	}
-
-	// Replace expressions with environment variable references
-	if len(expressionMappings) > 0 {
-		cleanedMarkdownContent = extractor.ReplaceExpressionsWithEnvVars(cleanedMarkdownContent)
-	}
-
-	// Split content into manageable chunks
-	userPromptChunks := splitContentIntoChunks(cleanedMarkdownContent)
-	compilerYamlLog.Printf("Split user prompt into %d chunks", len(userPromptChunks))
-
 	// Collect built-in prompt sections (these should be prepended to user prompt)
 	builtinSections := c.collectPromptSections(data)
 	compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
 
+	// Get the body file path relative to .github folder
+	// The body file is created as {workflow-name}.body.md in the same directory as the workflow
+	// Extract workflow basename from the markdown path stored in the compiler
+	workflowBasename := filepath.Base(c.markdownPath)
+	workflowBasename = strings.TrimSuffix(workflowBasename, ".md")
+
+	// Determine the directory path relative to .github
+	// For a workflow at ".github/workflows/test.md", the runtime-import path should be "workflows/test.body.md"
+	// Extract the relative path from .github (e.g., "workflows" for ".github/workflows/test.md")
+	var bodyFilePath string
+	if strings.Contains(c.markdownPath, ".github") {
+		// Extract everything after ".github/"
+		githubIndex := strings.Index(c.markdownPath, ".github")
+		if githubIndex != -1 {
+			relPath := c.markdownPath[githubIndex+len(".github/"):]
+			// Get the directory part (e.g., "workflows" from "workflows/test.md")
+			dirPart := filepath.Dir(relPath)
+			if dirPart == "." {
+				bodyFilePath = fmt.Sprintf("%s.body.md", workflowBasename)
+			} else {
+				bodyFilePath = fmt.Sprintf("%s/%s.body.md", dirPart, workflowBasename)
+			}
+		} else {
+			// Fallback
+			bodyFilePath = fmt.Sprintf("%s.body.md", workflowBasename)
+		}
+	} else {
+		// For non-standard paths (like /tmp/test.md), just use the basename
+		bodyFilePath = fmt.Sprintf("%s.body.md", workflowBasename)
+	}
+
+	// Create a runtime-import macro for the body file
+	// This will be processed at runtime by the runtime_import.cjs helper
+	runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", bodyFilePath)
+	compilerYamlLog.Printf("Using runtime-import for body file: %s", bodyFilePath)
+
+	// Create a single chunk containing the runtime-import macro
+	userPromptChunks := []string{runtimeImportMacro}
+
 	// Generate a single unified prompt creation step that includes:
 	// 1. Built-in context instructions (prepended)
-	// 2. User prompt content (appended after built-in)
-	c.generateUnifiedPromptCreationStep(yaml, builtinSections, userPromptChunks, expressionMappings, data)
+	// 2. Runtime-import macro for user prompt content (appended after built-in)
+	// Note: Expression mappings are now handled at runtime by runtime_import.cjs
+	c.generateUnifiedPromptCreationStep(yaml, builtinSections, userPromptChunks, nil, data)
 
 	// Add combined interpolation and template rendering step
-	c.generateInterpolationAndTemplateStep(yaml, expressionMappings, data)
+	// This will process the runtime-import macro and substitute expressions
+	c.generateInterpolationAndTemplateStep(yaml, nil, data)
 
 	// Validate that all placeholders have been substituted
 	yaml.WriteString("      - name: Validate prompt placeholders\n")
