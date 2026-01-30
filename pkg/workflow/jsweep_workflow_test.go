@@ -144,48 +144,67 @@ func TestJSweepWorkflowConfiguration(t *testing.T) {
 }
 
 // TestJSweepWorkflowLockFile validates that the compiled jsweep.lock.yml file
-// contains the expected configuration for single file processing.
+// uses runtime-import to reference the original workflow file
 func TestJSweepWorkflowLockFile(t *testing.T) {
 	// Read the jsweep.lock.yml file
 	lockPath := filepath.Join("..", "..", ".github", "workflows", "jsweep.lock.yml")
-	content, err := os.ReadFile(lockPath)
+	lockContent, err := os.ReadFile(lockPath)
 	if err != nil {
 		t.Fatalf("Failed to read jsweep.lock.yml: %v", err)
 	}
 
-	lockContent := string(content)
+	lockStr := string(lockContent)
 
-	// Test 1: Verify the compiled workflow processes one file
+	// Verify the lock file uses runtime-import (jsweep has no imports)
+	if !strings.Contains(lockStr, "{{#runtime-import") {
+		t.Error("jsweep lock file should use runtime-import (workflow has no imports)")
+	}
+
+	if !strings.Contains(lockStr, "jsweep.md") {
+		t.Error("Runtime-import should reference jsweep.md")
+	}
+
+	// For runtime-import workflows, the content is in the original .md file
+	// Read the source workflow file to verify the content
+	mdPath := filepath.Join("..", "..", ".github", "workflows", "jsweep.md")
+	mdContent, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("Failed to read jsweep.md: %v", err)
+	}
+
+	mdStr := string(mdContent)
+
+	// Test 1: Verify the workflow processes one file
 	t.Run("CompiledProcessesSingleFile", func(t *testing.T) {
-		if !strings.Contains(lockContent, "one .cjs file per day") {
-			t.Error("Compiled jsweep workflow should process one .cjs file per day")
+		if !strings.Contains(mdStr, "one .cjs file per day") {
+			t.Error("jsweep workflow should process one .cjs file per day")
 		}
-		if strings.Contains(lockContent, "three .cjs files per day") {
-			t.Error("Compiled jsweep workflow should not process three files")
+		if strings.Contains(mdStr, "three .cjs files per day") {
+			t.Error("jsweep workflow should not process three files")
 		}
 	})
 
-	// Test 2: Verify TypeScript validation is in the compiled workflow
+	// Test 2: Verify TypeScript validation is in the workflow
 	t.Run("CompiledTypeScriptValidation", func(t *testing.T) {
-		if !strings.Contains(lockContent, "npm run typecheck") {
-			t.Error("Compiled jsweep workflow should include TypeScript validation")
+		if !strings.Contains(mdStr, "npm run typecheck") {
+			t.Error("jsweep workflow should include TypeScript validation")
 		}
 	})
 
-	// Test 3: Verify prettier formatting is in the compiled workflow
+	// Test 3: Verify prettier formatting is in the workflow
 	t.Run("CompiledPrettierFormatting", func(t *testing.T) {
-		if !strings.Contains(lockContent, "npm run format:cjs") {
-			t.Error("Compiled jsweep workflow should include prettier formatting")
+		if !strings.Contains(mdStr, "npm run format:cjs") {
+			t.Error("jsweep workflow should include prettier formatting")
 		}
 	})
 
-	// Test 4: Verify @ts-nocheck prioritization is in the compiled workflow
+	// Test 4: Verify @ts-nocheck prioritization is in the workflow
 	t.Run("CompiledTsNocheckPrioritization", func(t *testing.T) {
-		if !strings.Contains(lockContent, "Priority 1") {
-			t.Error("Compiled jsweep workflow should prioritize files with @ts-nocheck")
+		if !strings.Contains(mdStr, "Priority 1") {
+			t.Error("jsweep workflow should prioritize files with @ts-nocheck")
 		}
-		if !strings.Contains(lockContent, "@ts-nocheck") {
-			t.Error("Compiled jsweep workflow should mention @ts-nocheck")
+		if !strings.Contains(mdStr, "@ts-nocheck") {
+			t.Error("jsweep workflow should mention @ts-nocheck")
 		}
 	})
 }

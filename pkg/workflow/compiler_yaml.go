@@ -229,104 +229,103 @@ func splitContentIntoChunks(content string) []string {
 }
 
 func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
-compilerYamlLog.Printf("Generating prompt for workflow: %s (markdown size: %d bytes)", data.Name, len(data.MarkdownContent))
+	compilerYamlLog.Printf("Generating prompt for workflow: %s (markdown size: %d bytes)", data.Name, len(data.MarkdownContent))
 
-// Collect built-in prompt sections (these should be prepended to user prompt)
-builtinSections := c.collectPromptSections(data)
-compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
+	// Collect built-in prompt sections (these should be prepended to user prompt)
+	builtinSections := c.collectPromptSections(data)
+	compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
 
-// Determine if we should use runtime-import or inline the content
-// Use runtime-import ONLY for workflows without imports or import inputs
-// This allows users to edit simple workflows without recompilation
-hasImports := len(data.ImportedFiles) > 0
-hasImportInputs := len(data.ImportInputs) > 0
+	// Determine if we should use runtime-import or inline the content
+	// Use runtime-import ONLY for workflows without imports or import inputs
+	// This allows users to edit simple workflows without recompilation
+	hasImports := len(data.ImportedFiles) > 0
+	hasImportInputs := len(data.ImportInputs) > 0
 
-var userPromptChunks []string
-var expressionMappings []*ExpressionMapping
+	var userPromptChunks []string
+	var expressionMappings []*ExpressionMapping
 
-if !hasImports && !hasImportInputs {
-// Simple workflow without imports - use runtime-import
-// Get the workflow file path relative to .github folder
-workflowBasename := filepath.Base(c.markdownPath)
+	if !hasImports && !hasImportInputs {
+		// Simple workflow without imports - use runtime-import
+		// Get the workflow file path relative to .github folder
+		workflowBasename := filepath.Base(c.markdownPath)
 
-// Determine the directory path relative to .github
-// For a workflow at ".github/workflows/test.md", the runtime-import path should be "workflows/test.md"
-var workflowFilePath string
-if strings.Contains(c.markdownPath, ".github") {
-// Extract everything after ".github/"
-githubIndex := strings.Index(c.markdownPath, ".github")
-if githubIndex != -1 {
-relPath := c.markdownPath[githubIndex+len(".github/"):]
-workflowFilePath = relPath
-} else {
-// Fallback
-workflowFilePath = workflowBasename
+		// Determine the directory path relative to .github
+		// For a workflow at ".github/workflows/test.md", the runtime-import path should be "workflows/test.md"
+		var workflowFilePath string
+		if strings.Contains(c.markdownPath, ".github") {
+			// Extract everything after ".github/"
+			githubIndex := strings.Index(c.markdownPath, ".github")
+			if githubIndex != -1 {
+				relPath := c.markdownPath[githubIndex+len(".github/"):]
+				workflowFilePath = relPath
+			} else {
+				// Fallback
+				workflowFilePath = workflowBasename
+			}
+		} else {
+			// For non-standard paths (like /tmp/test.md), just use the basename
+			workflowFilePath = workflowBasename
+		}
+
+		// Create a runtime-import macro for the original workflow file
+		// The runtime_import.cjs helper will extract and process the markdown body at runtime
+		runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
+		compilerYamlLog.Printf("Using runtime-import for workflow file: %s (no imports)", workflowFilePath)
+
+		userPromptChunks = []string{runtimeImportMacro}
+		expressionMappings = nil // Handled at runtime
+	} else {
+		// Workflow with imports or import inputs - use traditional inlining
+		// This ensures imported content and substituted inputs are included
+		compilerYamlLog.Printf("Using inline mode (has imports=%t, has import inputs=%t)", hasImports, hasImportInputs)
+
+		// Clean the markdown content
+		cleanedMarkdownContent := removeXMLComments(data.MarkdownContent)
+
+		// Substitute import inputs before expression extraction
+		if len(data.ImportInputs) > 0 {
+			cleanedMarkdownContent = SubstituteImportInputs(cleanedMarkdownContent, data.ImportInputs)
+		}
+
+		// Wrap GitHub expressions in template conditionals
+		cleanedMarkdownContent = wrapExpressionsInTemplateConditionals(cleanedMarkdownContent)
+
+		// Extract expressions and create environment variable mappings
+		extractor := NewExpressionExtractor()
+		var err error
+		expressionMappings, err = extractor.ExtractExpressions(cleanedMarkdownContent)
+		if err != nil {
+			expressionMappings = nil
+		}
+
+		// Replace expressions with environment variable references
+		if len(expressionMappings) > 0 {
+			cleanedMarkdownContent = extractor.ReplaceExpressionsWithEnvVars(cleanedMarkdownContent)
+		}
+
+		// Split content into manageable chunks
+		userPromptChunks = splitContentIntoChunks(cleanedMarkdownContent)
+		compilerYamlLog.Printf("Split user prompt into %d chunks (inline mode)", len(userPromptChunks))
+	}
+
+	// Generate a single unified prompt creation step
+	c.generateUnifiedPromptCreationStep(yaml, builtinSections, userPromptChunks, expressionMappings, data)
+
+	// Add combined interpolation and template rendering step
+	c.generateInterpolationAndTemplateStep(yaml, expressionMappings, data)
+
+	// Validate that all placeholders have been substituted
+	yaml.WriteString("      - name: Validate prompt placeholders\n")
+	yaml.WriteString("        env:\n")
+	yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
+	yaml.WriteString("        run: bash /opt/gh-aw/actions/validate_prompt_placeholders.sh\n")
+
+	// Print prompt (merged into prompt generation)
+	yaml.WriteString("      - name: Print prompt\n")
+	yaml.WriteString("        env:\n")
+	yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
+	yaml.WriteString("        run: bash /opt/gh-aw/actions/print_prompt_summary.sh\n")
 }
-} else {
-// For non-standard paths (like /tmp/test.md), just use the basename
-workflowFilePath = workflowBasename
-}
-
-// Create a runtime-import macro for the original workflow file
-// The runtime_import.cjs helper will extract and process the markdown body at runtime
-runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
-compilerYamlLog.Printf("Using runtime-import for workflow file: %s (no imports)", workflowFilePath)
-
-userPromptChunks = []string{runtimeImportMacro}
-expressionMappings = nil // Handled at runtime
-} else {
-// Workflow with imports or import inputs - use traditional inlining
-// This ensures imported content and substituted inputs are included
-compilerYamlLog.Printf("Using inline mode (has imports=%t, has import inputs=%t)", hasImports, hasImportInputs)
-
-// Clean the markdown content
-cleanedMarkdownContent := removeXMLComments(data.MarkdownContent)
-
-// Substitute import inputs before expression extraction
-if len(data.ImportInputs) > 0 {
-cleanedMarkdownContent = SubstituteImportInputs(cleanedMarkdownContent, data.ImportInputs)
-}
-
-// Wrap GitHub expressions in template conditionals
-cleanedMarkdownContent = wrapExpressionsInTemplateConditionals(cleanedMarkdownContent)
-
-// Extract expressions and create environment variable mappings
-extractor := NewExpressionExtractor()
-var err error
-expressionMappings, err = extractor.ExtractExpressions(cleanedMarkdownContent)
-if err != nil {
-expressionMappings = nil
-}
-
-// Replace expressions with environment variable references
-if len(expressionMappings) > 0 {
-cleanedMarkdownContent = extractor.ReplaceExpressionsWithEnvVars(cleanedMarkdownContent)
-}
-
-// Split content into manageable chunks
-userPromptChunks = splitContentIntoChunks(cleanedMarkdownContent)
-compilerYamlLog.Printf("Split user prompt into %d chunks (inline mode)", len(userPromptChunks))
-}
-
-// Generate a single unified prompt creation step
-c.generateUnifiedPromptCreationStep(yaml, builtinSections, userPromptChunks, expressionMappings, data)
-
-// Add combined interpolation and template rendering step
-c.generateInterpolationAndTemplateStep(yaml, expressionMappings, data)
-
-// Validate that all placeholders have been substituted
-yaml.WriteString("      - name: Validate prompt placeholders\n")
-yaml.WriteString("        env:\n")
-yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
-yaml.WriteString("        run: bash /opt/gh-aw/actions/validate_prompt_placeholders.sh\n")
-
-// Print prompt (merged into prompt generation)
-yaml.WriteString("      - name: Print prompt\n")
-yaml.WriteString("        env:\n")
-yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
-yaml.WriteString("        run: bash /opt/gh-aw/actions/print_prompt_summary.sh\n")
-}
-
 
 func (c *Compiler) generatePostSteps(yaml *strings.Builder, data *WorkflowData) {
 	if data.PostSteps != "" {
