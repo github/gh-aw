@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Reviews and cleans up instruction files to ensure clarity, consistency, and adherence to best practices
+#
+# frontmatter-hash: 65a591149f04359a639f0e02bd5036792d503cb6594b1eb00b0b506107074cbc
 
 name: "Instructions Janitor"
 "on":

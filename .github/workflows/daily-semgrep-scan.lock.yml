@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/semgrep.md
+#
+# frontmatter-hash: 15afa2e1cb35056f730278efc8a098aab7edce4162557f640218bb494d4181dc
 
 name: "Daily Semgrep Scan"
 "on":

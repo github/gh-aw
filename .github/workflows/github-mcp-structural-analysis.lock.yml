@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: d95c3ecef4b9101b0c7a31da9b033340c2681073cb24d66d10048b8024d10386
 
 name: "GitHub MCP Structural Analysis"
 "on":

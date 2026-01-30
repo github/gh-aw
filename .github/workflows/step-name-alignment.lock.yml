@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Scans step names in .lock.yml files and aligns them with step intent and project glossary
+#
+# frontmatter-hash: 1035beccc5f3efb0ecd708c685dde6f6efec28735299c5acbb6979959ab1b075
 
 name: "Step Name Alignment"
 "on":

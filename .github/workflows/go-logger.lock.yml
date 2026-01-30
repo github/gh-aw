@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/go-make.md
+#
+# frontmatter-hash: e0121febb8fa00a4d4119a151105cb4a282e82a1503e97a25352a8eea5d803d7
 
 name: "Go Logger Enhancement"
 "on":

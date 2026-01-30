@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automated cleanup policy for stale draft pull requests to reduce clutter and improve triage efficiency
+#
+# frontmatter-hash: dcd4179cb4664cd271ca2cd1613f91606fb9296dac67a408cf12666307f1f51d
 
 name: "Draft PR Cleanup"
 "on":

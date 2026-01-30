@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 6c6a595f01376f3caeadb08a64b6a8dac0d22dc15ab7df32806c69cfb959f5f9
 
 name: "Developer Documentation Consolidator"
 "on":

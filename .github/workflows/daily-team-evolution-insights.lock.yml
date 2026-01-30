@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 6c1117a660615fa55aed5435cfe4a0777753989c88ffc2360a1a16ff5e1b83d7
 
 name: "Daily Team Evolution Insights"
 "on":

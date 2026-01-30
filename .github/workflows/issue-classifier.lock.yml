@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/actions-ai-inference.md
+#
+# frontmatter-hash: a24420417fbfd197d3744f8591d7bb1b95522ea2b6c7e981df9da8886fc686c4
 
 name: "Issue Classifier"
 "on":

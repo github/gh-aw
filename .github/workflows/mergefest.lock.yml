@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automatically merges the main branch into pull request branches when invoked with /mergefest command
+#
+# frontmatter-hash: f162df6c8673a9c4b0b705cc49657bf1ffecfea9c9b9107cfd1a058b367e5b50
 
 name: "Mergefest"
 "on":

@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Checks for Go module and NPM dependency updates and analyzes Dependabot PRs for compatibility and breaking changes
+#
+# frontmatter-hash: 134168e129435300e43b1fed682850b84f4067157d416709ee8d5feebf6cee36
 
 name: "Dependabot Dependency Checker"
 "on":

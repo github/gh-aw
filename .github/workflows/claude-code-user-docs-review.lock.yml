@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Reviews project documentation from the perspective of a Claude Code user who does not use GitHub Copilot or Copilot CLI
+#
+# frontmatter-hash: 6b7123cb70a41f5294921005baa1857269cddf064a23675f9d42d9f8244d19e2
 
 name: "Claude Code User Documentation Review"
 "on":

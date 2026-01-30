@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Generates project plans and task breakdowns when invoked with /plan command in issues or PRs
+#
+# frontmatter-hash: ae690fd5cd2f66fd14f2afc5e31bdcbbf8827c613845b3e5dfbec134ad51cca4
 
 name: "Plan Command"
 "on":

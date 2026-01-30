@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: ea212cd5f5dad3db1629045f7157f1a5373cd5f33a687946ad8590aafc885e13
 
 name: "Daily Regulatory Report Generator"
 "on":

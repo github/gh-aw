@@ -25,6 +25,8 @@
 #   Imports:
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
+#
+# frontmatter-hash: ff7a028a92576ae9c1fb329f2dbf2c65c560924785a632bf513fc5db1b71eb28
 
 name: "Rebuild the documentation after making changes"
 "on":

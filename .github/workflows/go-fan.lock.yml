@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 43c221db65cfebc0580311d13448456e0913172bb121af7b509c77c5f640ac21
 
 name: "Go Fan"
 "on":

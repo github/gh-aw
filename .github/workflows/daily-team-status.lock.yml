@@ -31,6 +31,8 @@
 #   Imports:
 #     - githubnext/agentics/workflows/shared/reporting.md@d3422bf940923ef1d43db5559652b8e1e71869f3
 #
+# frontmatter-hash: 3cb9f1eab0fb2f6276dcf2519190fcbce530e10b7f75eb9c0a29be702185ab1d
+#
 # Effective stop-time: 2026-02-09 04:24:39
 
 name: "Daily Team Status"

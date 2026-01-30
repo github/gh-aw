@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Test Codex engine with GitHub remote MCP server
+#
+# frontmatter-hash: 54ec29edab1873d63fc5629a6ca22e5af8b4518dc190593c3c851d2752cd7ca4
 
 name: "Codex GitHub Remote MCP Test"
 "on":

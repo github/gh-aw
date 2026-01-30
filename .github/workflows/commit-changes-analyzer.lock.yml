@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 93c0ce44187e680d405b8f0941d670fefef604ab5daab6dc28d58ed079758dfa
 
 name: "Commit Changes Analyzer"
 "on":

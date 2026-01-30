@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automated security guard that reviews every PR for changes that could weaken security posture, only commenting when concrete evidence of security concerns exists
+#
+# frontmatter-hash: 59dc5fe139727fe114dbdf8839d0b27611f7beb7352c97aaa83ddd4782446d83
 
 name: "Security Guard Agent 🛡️"
 "on":

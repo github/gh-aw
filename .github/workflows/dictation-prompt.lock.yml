@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 3ce96fd08206adafcf45540cc107eb7b1092c940c03bfcaef002ea97166e4401
 
 name: "Dictation Prompt Generator"
 "on":

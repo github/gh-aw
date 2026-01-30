@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Identifies duplicate code patterns across the codebase and suggests refactoring opportunities
+#
+# frontmatter-hash: 41b27697ad6a65d1c1bff0304b40cb190a48022117498d6134cf7e3b7941775f
 
 name: "Duplicate Code Detector"
 "on":

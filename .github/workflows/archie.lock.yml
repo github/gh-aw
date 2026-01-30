@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Generates Mermaid diagrams to visualize issue and pull request relationships when invoked with the /archie command
+#
+# frontmatter-hash: c6702aee88806caf63f58c193ee4f5da21d179035f73975b602a3f85e6b4f3ce
 
 name: "Archie"
 "on":

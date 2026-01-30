@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Bundles Dependabot security alert updates per package.json into a single PR
+#
+# frontmatter-hash: c66630d963dac39d61ec5194fdaf9386b6c84ba5885b4221afaea4147e6a3264
 
 name: "Dependabot Bundler"
 "on":

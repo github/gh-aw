@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Generates new agentic workflow markdown files based on user requests when invoked with /craft command
+#
+# frontmatter-hash: 1428fe74677a9517258cbc0ce143902d0f6dfd68c41204ce4b7cec3ddb00ce20
 
 name: "Workflow Craft Agent"
 "on":

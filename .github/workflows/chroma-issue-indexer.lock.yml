@@ -23,6 +23,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/chroma.md
+#
+# frontmatter-hash: c56ba9557a53f83fe2b1caacc0b0eada901a352473b5ac31494757d55953c60d
 
 name: "Chroma Issue Indexer"
 "on":

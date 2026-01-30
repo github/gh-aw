@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Test workflow to verify create_pull_request error handling
+#
+# frontmatter-hash: d15887605f23a5a8c6d7e3cce0d91e9d382c5ba3152b9fd582f239fa103ac2f6
 
 name: "Test Create PR Error Handling"
 "on":

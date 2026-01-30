@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Maintains the gh-aw slide deck by scanning repository content and detecting layout issues using Playwright
+#
+# frontmatter-hash: 8c7f45b5e6ae9709264f184c58a1d1c9fb0ad4ba22c7c45a671451af06a8d1e1
 
 name: "Slide Deck Maintainer"
 "on":

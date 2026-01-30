@@ -8,6 +8,7 @@ import (
 	"github.com/githubnext/gh-aw/pkg/cli"
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/githubnext/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -275,10 +276,11 @@ Examples:
 			FailFast:               failFast,
 		}
 		if _, err := cli.CompileWorkflows(cmd.Context(), config); err != nil {
-			errMsg := err.Error()
-			// Check if error is already formatted (contains suggestions or starts with ✗)
-			if strings.Contains(errMsg, "Suggestions:") || strings.HasPrefix(errMsg, "✗") {
-				return fmt.Errorf("%s", errMsg)
+			// Format validation error for better user experience
+			// The main function will detect the ✗ prefix and print it without double formatting
+			if !jsonOutput {
+				// Return a new error with formatted message so main() can print it
+				return fmt.Errorf("%s", cli.FormatValidationError(err))
 			}
 			return err
 		}
@@ -557,6 +559,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	fixCmd := cli.NewFixCommand()
 	upgradeCmd := cli.NewUpgradeCommand()
 	completionCmd := cli.NewCompletionCommand()
+	hashCmd := cli.NewHashCommand()
 
 	// Assign commands to groups
 	// Setup Commands
@@ -590,6 +593,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	mcpServerCmd.GroupID = "utilities"
 	prCmd.GroupID = "utilities"
 	completionCmd.GroupID = "utilities"
+	hashCmd.GroupID = "utilities"
 
 	// version command is intentionally left without a group (common practice)
 
@@ -617,6 +621,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	rootCmd.AddCommand(secretsCmd)
 	rootCmd.AddCommand(fixCmd)
 	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(hashCmd)
 }
 
 func main() {
@@ -625,6 +630,10 @@ func main() {
 
 	// Set version information in the workflow package for generated file headers
 	workflow.SetVersion(version)
+
+	// Set version information in the parser package for frontmatter hash computation
+	parser.SetCompilerVersion(version)
+	parser.SetIsRelease(isRelease == "true")
 
 	// Set release flag in the workflow package
 	workflow.SetIsRelease(isRelease == "true")

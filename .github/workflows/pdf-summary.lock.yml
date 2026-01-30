@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/markitdown.md
+#
+# frontmatter-hash: cc509512f8780579d98befb991cef73d2a0af1d6085c0fe6b3fff2abd39ec6d7
 
 name: "Resource Summarizer Agent"
 "on":

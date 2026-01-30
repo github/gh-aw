@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 83fd914f58933861aaf74c2d5d1e73f06d83899989db716ae22677533aa842a8
 
 name: "Daily Observability Report for AWF Firewall and MCP Gateway"
 "on":

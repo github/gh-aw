@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Posts a daily poetic verse about the gh-aw project to a discussion thread
+#
+# frontmatter-hash: abeeb59ced6ed5461adef94f138aebde877c904f8282cfd752b515bbc84159d5
 
 name: "Daily Fact About gh-aw"
 "on":

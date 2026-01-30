@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Security-focused AI agent that reviews pull requests to identify changes that could weaken security posture or extend AWF boundaries
+#
+# frontmatter-hash: 51809161c4895bf3c20ebf086c13d06fff06f9a757cc1b1bb55cfdb904296f37
 
 name: "Security Review Agent 🔒"
 "on":

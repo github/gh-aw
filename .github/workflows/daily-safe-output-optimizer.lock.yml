@@ -26,6 +26,8 @@
 #     - shared/jqschema.md
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: 2f039119d5f4b93cc45423a7423a5f415f6076e7d8560257203a4f36d1c16a79
 
 name: "Daily Safe Output Tool Optimizer"
 "on":

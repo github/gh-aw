@@ -27,6 +27,8 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: f0fc8a8ef2db22567cafe22b3eb11c8f7d28b56a901579bc3157d74add6e3a89
 
 name: "Smoke Codex"
 "on":

@@ -28,6 +28,8 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
+#
+# frontmatter-hash: 153c7506c8a56dae4db555c8336c189044cc493ca232ee0be97fe17b0442f561
 
 name: "Copilot Agent Prompt Clustering Analysis"
 "on":

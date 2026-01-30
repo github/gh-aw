@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/ffmpeg.md
+#
+# frontmatter-hash: 261e905a2f93104f46d9213abf79a56902259ef966397ebeb17fa7aa87d578b9
 
 name: "Video Analysis Agent"
 "on":

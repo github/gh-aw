@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/jqschema.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: 1f423b1bd9ecde31407a1d7ceeec195086903c19795d7335521ad54431afb3f1
 
 name: "Delight"
 "on":

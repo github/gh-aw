@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 1db8c43eecc0a96a67d5832cca0c21123215abb7bbd5c935982262128d1daea3
 
 name: "Poem Bot - A Creative Agentic Workflow"
 "on":

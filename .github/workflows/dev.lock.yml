@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Build and test this project
+#
+# frontmatter-hash: 2d5246899d2e88ad0c991158a077997c1082f0370df4547bd0d6a5d61f2fb7eb
 
 name: "Dev"
 "on":

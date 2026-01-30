@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 23ca9e4c3bca8296931483514fec63dbb1afbf3041f3a7bc534570e1266be352
 
 name: "Daily Compiler Quality Check"
 "on":

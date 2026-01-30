@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Example workflow demonstrating proper permission provisioning and security best practices
+#
+# frontmatter-hash: b2150d8042d8b581a3cadf4fa0499f679584c810ea04a83b808e63a1248a293d
 
 name: "Example: Properly Provisioned Permissions"
 "on":

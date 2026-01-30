@@ -26,6 +26,8 @@
 #     - shared/jqschema.md
 #     - shared/python-dataviz.md
 #     - shared/trending-charts-simple.md
+#
+# frontmatter-hash: b2640e864c7443388ea50ff250430f60084ea8de57d853dba196d77af7929f66
 
 name: "Stale Repository Identifier"
 "on":

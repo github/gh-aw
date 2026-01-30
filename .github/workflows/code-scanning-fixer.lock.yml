@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automatically fixes code scanning alerts by creating pull requests with remediation
+#
+# frontmatter-hash: 17ddbf03f6c67cdb5ad0256496171c5f395b973f295c3af1b26404d39b57f70c
 
 name: "Code Scanning Fixer"
 "on":

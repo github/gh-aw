@@ -25,6 +25,8 @@
 #   Imports:
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
+#
+# frontmatter-hash: 861189cd7b7ff3842896009972a81707001f011835e20bdae4aed1e86d2f9b36
 
 name: "Static Analysis Report"
 "on":

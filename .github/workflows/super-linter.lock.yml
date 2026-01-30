@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 642dad22e3f40b3b3fc72b56ccdec6774d706d557eb05e6b9668f4302557dcad
 
 name: "Super Linter Report"
 "on":

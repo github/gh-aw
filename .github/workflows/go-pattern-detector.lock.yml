@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/ast-grep.md
+#
+# frontmatter-hash: ce67c245925a716dea8b7f6f0c026ce71ffe921f39bb7c7cdd5af0872bb4c2bd
 
 name: "Go Pattern Detector"
 "on":

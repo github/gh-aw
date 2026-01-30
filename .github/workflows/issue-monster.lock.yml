@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
+#
+# frontmatter-hash: 99675caaf3917f12c5315787dac2829bf85b29466ba95d4931bd5446f7454af9
 
 name: "Issue Monster"
 "on":

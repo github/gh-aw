@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Daily JavaScript unbloater that cleans one .cjs file per day, prioritizing files with @ts-nocheck to enable type checking
+#
+# frontmatter-hash: 4ec41aafc108dd43e9a95ef7ef79bdead937deb63e052570799ab23822356efa
 
 name: "jsweep - JavaScript Unbloater"
 "on":

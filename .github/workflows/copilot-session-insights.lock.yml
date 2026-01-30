@@ -29,6 +29,8 @@
 #     - shared/reporting.md
 #     - shared/session-analysis-charts.md
 #     - shared/session-analysis-strategies.md
+#
+# frontmatter-hash: a0b8c0590df66c892a064b9ca322755383d128d0ab4e80625fd6ad50b5c24cd1
 
 name: "Copilot Session Insights"
 "on":

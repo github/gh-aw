@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Daily test workflow using Claude with custom safe-output job containing choice inputs
+#
+# frontmatter-hash: 157badfee0348bd0cfc948ce789a0ec9851605ef79ee0a47656adf82866b019b
 
 name: "Daily Choice Type Test"
 "on":

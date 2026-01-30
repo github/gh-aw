@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 9f0d1d322d57884a1968fe4ece9f499c0e7bb9f9eca36bfd11b421a3100a3c59
 
 name: "Daily Malicious Code Scan Agent"
 "on":

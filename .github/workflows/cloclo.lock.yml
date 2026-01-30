@@ -24,6 +24,8 @@
 #   Imports:
 #     - shared/jqschema.md
 #     - shared/mcp/gh-aw.md
+#
+# frontmatter-hash: 1b6737b480f67a3bed96e63cc99fbe93ed1e2d31f4a79724e8ed23299b7d5c1d
 
 name: "/cloclo"
 "on":

@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/brave.md
+#
+# frontmatter-hash: 8fded8feb805e3b09031e2962a27de3b33f2edb23a0c276fe55b42decd2238ec
 
 name: "Brave Web Search Agent"
 "on":

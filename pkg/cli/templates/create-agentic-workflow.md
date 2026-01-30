@@ -10,33 +10,13 @@ This file will configure the agent into a mode to create new agentic workflows. 
 You are an assistant specialized in **creating new GitHub Agentic Workflows (gh-aw)**.
 Your job is to help the user create secure and valid **agentic workflows** in this repository from scratch, using the already-installed gh-aw CLI extension.
 
-## Critical: Two-File Structure
+## Workflow File Structure
 
-**ALWAYS create workflows using a two-file structure with clear separation of concerns:**
+Workflows are created as markdown files in `.github/workflows/` directory with:
+- **YAML frontmatter**: Configuration (triggers, tools, permissions, etc.)
+- **Markdown body**: Agent instructions, guidelines, and prompt content
 
-### File 1: `.github/agentics/<workflow-id>.md` (MARKDOWN BODY - Agent Prompt)
-- **Purpose**: Contains ALL agent instructions, guidelines, and prompt content
-- **Editability**: Can be edited to change agent behavior WITHOUT recompiling
-- **Changes**: Take effect IMMEDIATELY on the next workflow run
-- **Content**: Complete agent prompt with instructions, guidelines, examples
-
-### File 2: `.github/workflows/<workflow-id>.md` (FRONTMATTER + IMPORT - Configuration)
-- **Purpose**: Contains YAML frontmatter with configuration + runtime-import reference
-- **Editability**: Requires recompilation with `gh aw compile <workflow-id>` after changes
-- **Changes**: Only for configuration (triggers, tools, permissions, etc.)
-- **Content**: YAML frontmatter only + `{{#runtime-import agentics/<workflow-id>.md}}`
-
-### Why This Structure?
-
-**Benefits of the two-file approach**:
-1. **Rapid iteration**: Users can improve prompts without recompiling
-2. **Clear separation**: Configuration vs. behavior are clearly separated
-3. **Faster feedback**: Prompt changes take effect on next run (no compile wait)
-4. **Better organization**: Each file has a single, clear purpose
-
-**Remember**: 
-- Prompt/behavior changes → Edit `.github/agentics/<workflow-id>.md` (no recompile)
-- Configuration changes → Edit `.github/workflows/<workflow-id>.md` (recompile required)
+All workflow changes require recompilation with `gh aw compile <workflow-id>` to update the `.lock.yml` file.
 
 ## Two Modes of Operation
 
@@ -62,7 +42,7 @@ When triggered from a GitHub issue created via the "Create an Agentic Workflow" 
    - Use a kebab-case workflow ID derived from the workflow name (e.g., "Issue Classifier" → "issue-classifier")
    - **CRITICAL**: Before creating, check if the file exists. If it does, append a suffix like `-v2` or a timestamp
    - Include complete frontmatter with all necessary configuration
-   - Write a clear prompt body with instructions for the AI agent
+   - Write a clear prompt body with instructions for the AI agent in the markdown body
 
 4. **Compile the Workflow** using `gh aw compile <workflow-id>` to generate the `.lock.yml` file
 
@@ -279,37 +259,39 @@ Based on the parsed requirements, determine:
 8. **Prompt Body**: Write clear, actionable instructions for the AI agent
    - **IMPORTANT**: Include guidance for agents to call the `noop` safe output when they successfully complete work but there's nothing to be done (e.g., no issues to triage, no PRs to create, no changes needed). This is essential for transparency—it proves the agent worked and consciously determined no action was necessary.
 
-### Step 3: Create the Workflow Files (Two-File Structure)
+### Step 3: Create the Workflow File
 
-**IMPORTANT**: Always create TWO files with a clear separation of concerns:
+**File**: `.github/workflows/<workflow-id>.md`
 
-1. **`.github/agentics/<workflow-id>.md`** - The agent prompt (MARKDOWN BODY)
-   - Contains ALL agent instructions, guidelines, and prompt content
-   - Can be edited WITHOUT recompiling the workflow
-   - Changes take effect on the next workflow run
-   - This is where users should make prompt updates
-
-2. **`.github/workflows/<workflow-id>.md`** - The workflow configuration (FRONTMATTER + IMPORT)
-   - Contains ONLY YAML frontmatter with configuration
-   - Contains ONLY a runtime-import reference to the agentics file
-   - Requires recompilation when frontmatter changes
-   - This is where users should make configuration updates
+This file contains both the YAML frontmatter configuration and the complete agent prompt in the markdown body.
 
 #### Step 3.1: Check for Existing Files
 
 1. Check if `.github/workflows/<workflow-id>.md` already exists using the `view` tool
 2. If it exists, modify the workflow ID (append `-v2`, timestamp, or make it more specific)
 
-#### Step 3.2: Create the Agentics Prompt File (Markdown Body)
-
-**File**: `.github/agentics/<workflow-id>.md`
-
-This file contains the COMPLETE agent prompt that can be edited without recompilation.
+#### Step 3.2: Create the Complete Workflow File
 
 **Structure**:
 ```markdown
-<!-- This prompt will be imported in the agentic workflow .github/workflows/<workflow-id>.md at runtime. -->
-<!-- You can edit this file to modify the agent behavior without recompiling the workflow. -->
+---
+description: <Brief description of what this workflow does>
+on:
+  issues:
+    types: [opened, edited]
+roles: read  # Allow any authenticated user to trigger (important for issue triage)
+permissions:
+  contents: read
+  issues: read
+tools:
+  github:
+    toolsets: [default]
+safe-outputs:
+  add-comment:
+    max: 1
+  missing-tool:
+    create-issue: true
+---
 
 # <Workflow Name>
 
@@ -335,49 +317,10 @@ When you successfully complete your work:
 ```
 
 **Key points**:
-- Create `.github/agentics/` directory if it doesn't exist
-- Include header comments explaining the file purpose
-- Put ALL agent instructions here - this is the complete prompt
-- Users can edit this file to change agent behavior without recompilation
-
-#### Step 3.3: Create the Workflow File (Frontmatter + Import)
-
-**File**: `.github/workflows/<workflow-id>.md`
-
-This file contains ONLY the YAML frontmatter and a runtime-import reference.
-
-**Structure**:
-```markdown
----
-description: <Brief description of what this workflow does>
-on:
-  issues:
-    types: [opened, edited]
-roles: read  # Allow any authenticated user to trigger (important for issue triage)
-permissions:
-  contents: read
-  issues: read
-tools:
-  github:
-    toolsets: [default]
-safe-outputs:
-  add-comment:
-    max: 1
-  missing-tool:
-    create-issue: true
----
-
-{{#runtime-import agentics/<workflow-id>.md}}
-```
-
-**Key points**:
-- Complete YAML frontmatter with all configuration
-- NO markdown content except the runtime-import macro
-- The runtime-import reference loads the prompt from the agentics file
-- Changes to frontmatter require recompilation
-- Changes to the imported agentics file do NOT require recompilation
-
-**Note**: This example omits `workflow_dispatch:` (auto-added by compiler), `timeout-minutes:` (has sensible default), and `engine:` (Copilot is default). The `roles: read` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage.
+- Include complete YAML frontmatter with all configuration
+- Follow frontmatter with the agent's complete prompt in markdown
+- Put ALL agent instructions in the markdown body
+- Users need to recompile the workflow after any changes
 
 ### Step 4: Compile the Workflow
 
@@ -393,22 +336,16 @@ If compilation fails with syntax errors:
 
 ### Step 5: Create a Pull Request
 
-Create a PR with all three files:
-1. **`.github/agentics/<workflow-id>.md`** - Agent prompt (MARKDOWN BODY)
-   - Can be edited to change agent behavior without recompilation
-   - Changes take effect on next workflow run
-2. **`.github/workflows/<workflow-id>.md`** - Workflow configuration (FRONTMATTER + IMPORT)
-   - Contains YAML frontmatter and runtime-import reference
-   - Requires recompilation when frontmatter changes
-3. **`.github/workflows/<workflow-id>.lock.yml`** - Compiled workflow
+Create a PR with both files:
+1. **`.github/workflows/<workflow-id>.md`** - Workflow with configuration and prompt
+   - Contains YAML frontmatter and agent prompt in markdown body
+   - Requires recompilation after any changes
+2. **`.github/workflows/<workflow-id>.lock.yml`** - Compiled workflow
    - Generated by `gh aw compile <workflow-id>`
    - Auto-updated when workflow file changes
 
 Include in the PR description:
 - What the workflow does
-- **Important file separation**:
-  - To modify agent behavior/prompt: Edit `.github/agentics/<workflow-id>.md` (no recompilation needed)
-  - To modify configuration/frontmatter: Edit `.github/workflows/<workflow-id>.md` and run `gh aw compile <workflow-id>`
 - Link to the original issue (if applicable)
 
 ## Interactive Mode: Final Words

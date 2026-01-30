@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Automatically reviews and updates documentation to ensure accuracy and completeness
+#
+# frontmatter-hash: 4cc1dbb19240bfd5c1729a068c5824f9a586d52e873baa1a53e139d0cd735a61
 
 name: "Daily Documentation Updater"
 "on":

@@ -26,6 +26,8 @@
 #     - shared/python-dataviz.md
 #     - shared/trends.md
 #     - shared/charts-with-trending.md
+#
+# frontmatter-hash: 2df9483ddce8c3c42067465d27688cb5be70f785812e752c13ed87a6e4896958
 
 name: "Python Data Visualization Generator"
 "on":

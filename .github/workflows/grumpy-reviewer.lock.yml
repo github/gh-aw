@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Performs critical code review with a focus on edge cases, potential bugs, and code quality issues
+#
+# frontmatter-hash: 7a7c966cebcd583c30e01fa5a614a117b4b4cd4e47d4a7b72a522de66281979d
 
 name: "Grumpy Code Reviewer 🔥"
 "on":

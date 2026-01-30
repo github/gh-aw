@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 9675cd15b578fe40ba225012d9f70c33b8326ad878f89beca93df674490600d2
 
 name: "Lockfile Statistics Analysis Agent"
 "on":

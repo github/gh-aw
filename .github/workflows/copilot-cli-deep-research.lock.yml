@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 201158c48d2b544d3809a408cf9487840d0218c78b6800826c49ae100744a677
 
 name: "Copilot CLI Deep Research Agent"
 "on":

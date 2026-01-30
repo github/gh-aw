@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#
+# frontmatter-hash: 5e3d6e98815e7affce9b6907d672359a33469d0bca3c09fc80a656cbc0d08982
 
 name: "Typist - Go Type Analysis"
 "on":

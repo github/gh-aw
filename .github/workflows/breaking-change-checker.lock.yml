@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Daily analysis of recent commits and merged PRs for breaking CLI changes
+#
+# frontmatter-hash: 375f51be539529d580960515c8a9ee46ab2401d2db0a693aa49a443680b9127f
 
 name: "Breaking Change Checker"
 "on":

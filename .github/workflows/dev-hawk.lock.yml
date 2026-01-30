@@ -24,6 +24,8 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/gh-aw.md
+#
+# frontmatter-hash: e0260bd1d4c52a1f987b4a7b4e186e9911e3ae4f8a8a50b6fd0471a0c0995c8c
 
 name: "Dev Hawk"
 "on":

@@ -27,6 +27,8 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
+#
+# frontmatter-hash: fdb3a82d0ad9657df62b1ea2e564daeceed08e663c992f1be066dec020dedbf0
 
 name: "Agentic Workflow Audit Agent"
 "on":

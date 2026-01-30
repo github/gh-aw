@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Analyzes and improves console output styling and formatting in the codebase
+#
+# frontmatter-hash: c2c30ae07e0057008c4bb494cb35e320b5d76fbc84a40e8385b89b83f4502241
 
 name: "Terminal Stylist"
 "on":

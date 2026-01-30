@@ -3,10 +3,12 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/githubnext/gh-aw/pkg/stringutil"
 )
 
@@ -43,9 +45,9 @@ func (c *Compiler) buildJobsAndValidate(data *WorkflowData, markdownPath string)
 }
 
 // generateWorkflowHeader generates the YAML header section including comments
-// for description, source, imports/includes, stop-time, and manual-approval.
+// for description, source, imports/includes, frontmatter-hash, stop-time, and manual-approval.
 // All ANSI escape codes are stripped from the output.
-func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowData) {
+func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowData, frontmatterHash string) {
 	// Add workflow header with logo and instructions
 	sourceFile := "the corresponding .md file"
 	if data.Source != "" {
@@ -91,6 +93,13 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 				fmt.Fprintf(yaml, "#     - %s\n", cleanFile)
 			}
 		}
+	}
+
+	// Add frontmatter hash if computed
+	// Format on a single line to minimize merge conflicts
+	if frontmatterHash != "" {
+		yaml.WriteString("#\n")
+		fmt.Fprintf(yaml, "# frontmatter-hash: %s\n", frontmatterHash)
 	}
 
 	// Add stop-time comment if configured
@@ -149,13 +158,28 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 		return "", err
 	}
 
+	// Compute frontmatter hash before generating YAML
+	var frontmatterHash string
+	if markdownPath != "" {
+		baseDir := filepath.Dir(markdownPath)
+		cache := parser.NewImportCache(baseDir)
+		hash, err := parser.ComputeFrontmatterHashFromFile(markdownPath, cache)
+		if err != nil {
+			compilerYamlLog.Printf("Warning: failed to compute frontmatter hash: %v", err)
+			// Continue without hash - non-fatal error
+		} else {
+			frontmatterHash = hash
+			compilerYamlLog.Printf("Computed frontmatter hash: %s", hash)
+		}
+	}
+
 	// Pre-allocate builder capacity based on estimated workflow size
 	// Average workflow generates ~200KB, allocate 256KB to minimize reallocations
 	var yaml strings.Builder
 	yaml.Grow(256 * 1024)
 
-	// Generate workflow header comments
-	c.generateWorkflowHeader(&yaml, data)
+	// Generate workflow header comments (including hash)
+	c.generateWorkflowHeader(&yaml, data, frontmatterHash)
 
 	// Generate workflow body structure
 	c.generateWorkflowBody(&yaml, data)

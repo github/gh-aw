@@ -19,6 +19,8 @@
 #   gh aw compile
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
+#
+# frontmatter-hash: d32d207e77c635b267ad439eb080bfda6b1604a547be5d9c225505217633417b
 
 name: "AI Moderator"
 "on":

@@ -20,6 +20,8 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Scheduled workflow that recursively closes parent issues when all sub-issues are 100% complete
+#
+# frontmatter-hash: 43592d3d16fcdbcd698ab50f81f7ed5e3ff2fbd6a88212e180d801ca1f7f081f
 
 name: "Sub-Issue Closer"
 "on":
