@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: b9f8715097b9418e1db4ec25479e69d963df7db883fb431d2922553dcab64a59
+# frontmatter-hash: 6500832eff5b949af0250310aa53ebdbfa98dc92ea6558c387cc23d83d02b3bc
 
 name: "Semantic Function Refactoring"
 "on":

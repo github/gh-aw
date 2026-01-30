@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/ffmpeg.md
 #
-# frontmatter-hash: 63265afecdce254cd8b5e00d2c6954b5285f435eded0d95161617bc491e043c3
+# frontmatter-hash: 261e905a2f93104f46d9213abf79a56902259ef966397ebeb17fa7aa87d578b9
 
 name: "Video Analysis Agent"
 "on":

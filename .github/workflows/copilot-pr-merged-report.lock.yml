@@ -26,7 +26,7 @@
 #     - shared/gh.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 539c5a2b2bfe156eac6087e9c46bde0b04573dcbf3edacac0dba6ee68de5d43f
+# frontmatter-hash: ace9353baab930eb3c36d0ce769781744a64c4c18a5949593e5c60026794686a
 
 name: "Daily Copilot PR Merged Report"
 "on":

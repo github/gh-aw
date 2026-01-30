@@ -5,8 +5,10 @@ const path = require("path");
 const crypto = require("crypto");
 
 // Version information - should match Go constants
+// Note: gh-aw version is excluded for non-release builds to prevent
+// hash changes during development. Only include it for release builds.
 const VERSIONS = {
-  "gh-aw": "dev",
+  // "gh-aw": "dev", // Excluded for non-release builds
   awf: "v0.11.2",
   agents: "v0.0.84",
   gateway: "v0.0.84",

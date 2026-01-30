@@ -20,9 +20,17 @@ var frontmatterHashLog = logger.New("parser:frontmatter_hash")
 // compilerVersion holds the gh-aw version for hash computation
 var compilerVersion = "dev"
 
+// isReleaseVersion indicates whether the current version is a release
+var isReleaseVersion = false
+
 // SetCompilerVersion sets the compiler version for hash computation
 func SetCompilerVersion(version string) {
 	compilerVersion = version
+}
+
+// SetIsRelease sets whether the current version is a release build
+func SetIsRelease(isRelease bool) {
+	isReleaseVersion = isRelease
 }
 
 // ComputeFrontmatterHash computes a deterministic SHA-256 hash of frontmatter
@@ -311,8 +319,11 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 func buildVersionInfo() map[string]string {
 	versions := make(map[string]string)
 
-	// gh-aw version (compiler version)
-	versions["gh-aw"] = compilerVersion
+	// gh-aw version (compiler version) - only include for release builds
+	// This prevents hash changes during development when version is "dev"
+	if isReleaseVersion {
+		versions["gh-aw"] = compilerVersion
+	}
 
 	// awf (firewall) version
 	versions["awf"] = string(constants.DefaultFirewallVersion)

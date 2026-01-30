@@ -21,7 +21,7 @@
 #
 # Identifies duplicate code patterns across the codebase and suggests refactoring opportunities
 #
-# frontmatter-hash: ab759a7b740655fa7e41d64e8dbaddbca913a8d9dd54a66c1afbb170e78a478a
+# frontmatter-hash: 41b27697ad6a65d1c1bff0304b40cb190a48022117498d6134cf7e3b7941775f
 
 name: "Duplicate Code Detector"
 "on":

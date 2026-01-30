@@ -207,7 +207,15 @@ Use env: ${{ env.TEST_VAR }}
 
 	versions, hasVersions := parsed["versions"].(map[string]any)
 	require.True(t, hasVersions, "Canonical JSON should include versions")
-	assert.NotNil(t, versions["gh-aw"], "Should include gh-aw version")
+	
+	// gh-aw version is only included for release builds
+	if isReleaseVersion {
+		assert.NotNil(t, versions["gh-aw"], "Should include gh-aw version for release builds")
+	} else {
+		assert.Nil(t, versions["gh-aw"], "Should not include gh-aw version for non-release builds")
+	}
+	
+	// awf and agents versions should always be included
 	assert.NotNil(t, versions["awf"], "Should include awf version")
 	assert.NotNil(t, versions["agents"], "Should include agents version")
 

@@ -630,6 +630,7 @@ func main() {
 
 	// Set version information in the parser package for frontmatter hash computation
 	parser.SetCompilerVersion(version)
+	parser.SetIsRelease(isRelease == "true")
 
 	// Set release flag in the workflow package
 	workflow.SetIsRelease(isRelease == "true")

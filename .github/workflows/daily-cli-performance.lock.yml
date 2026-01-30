@@ -26,7 +26,7 @@
 #     - shared/go-make.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e4bf870dc04587005ea19bc051f970d2b8a2ff8e45aaf433dd43e0c463abe6b9
+# frontmatter-hash: 5239b0d277594b7a2012143e63172762519aba0dcdcd7b5dc097120e4cdb7aa6
 
 name: "Daily CLI Performance Agent"
 "on":
