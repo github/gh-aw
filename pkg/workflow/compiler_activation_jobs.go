@@ -285,7 +285,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	//   because check_membership.cjs already short-circuits for workflow_dispatch when write is allowed
 	//
 	// When pre_activation is skipped, downstream jobs check for needs.pre_activation.result == 'skipped'
-	canSkipForSafeEvents := c.skipPreActivationOptimization &&
+	canSkipForSafeEvents := c.skipPreActivationWithIfOptimization &&
 		data.StopTime == "" &&
 		data.SkipIfMatch == nil &&
 		data.SkipIfNoMatch == nil &&

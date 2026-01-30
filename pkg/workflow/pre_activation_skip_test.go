@@ -21,7 +21,7 @@ import (
 func TestPreActivationSkipForScheduleEvents(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "pre-activation-skip-test")
 	// Enable the pre_activation skip optimization for this test since we're specifically testing this behavior
-	compiler := NewCompiler(WithSkipPreActivationOptimization(true))
+	compiler := NewCompiler(WithSkipPreActivationWithIfOptimization(true))
 
 	t.Run("schedule_only_workflow_has_no_pre_activation", func(t *testing.T) {
 		// Schedule-only workflows don't need a pre_activation job at all
