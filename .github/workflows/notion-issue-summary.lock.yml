@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/notion.md
 #
-# frontmatter-hash: 783ec74decd1de966f67c4ab59dc5b3290c8992a67744a6306e7079c53ec8866
+# frontmatter-hash: 495527c21ea4d7d6fda9b212962331baea39d32486a27b84d1c3fe7f111fc3fc
 
 name: "Issue Summary to Notion"
 "on":

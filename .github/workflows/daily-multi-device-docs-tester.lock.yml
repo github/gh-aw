@@ -26,7 +26,7 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: feb16492019a8b20409f46a9cf3f88e415cad5b0a0da99d846a7b169d81ee761
+# frontmatter-hash: cb6964d722ca2c66140de983b8ecd29a549f120d9c6926d974426aab9861c4c4
 
 name: "Multi-Device Docs Tester"
 "on":
