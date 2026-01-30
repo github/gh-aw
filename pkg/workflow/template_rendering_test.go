@@ -81,23 +81,40 @@ Normal content here.
 		t.Error("Interpolation and template rendering step should use github-script action")
 	}
 
-	// Verify that GitHub expressions are replaced with placeholders
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__ }}") {
-		t.Error("Compiled workflow should contain placeholder for github.event.issue.number expression")
+	// Verify runtime-import macro is in lock file
+	if !strings.Contains(compiledStr, "{{#runtime-import") {
+		t.Error("Compiled workflow should contain runtime-import macro")
 	}
 
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_ACTOR__ }}") {
-		t.Error("Compiled workflow should contain placeholder for github.actor expression")
+	// Verify the runtime-import references the test workflow file
+	if !strings.Contains(compiledStr, "test-template-rendering.md") {
+		t.Error("Runtime-import should reference the original workflow file")
 	}
 
-	// Verify that literal values are also replaced with placeholders
-	// true and false literals get normalized to __GH_AW_TRUE__ and __GH_AW_FALSE__
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_TRUE__ }}") {
-		t.Error("Compiled workflow should contain placeholder for literal true")
+	// With runtime-import, expressions and templates are processed at runtime
+	// The original workflow file (testFile) contains the template conditionals
+	// Let's verify the original file has the conditionals (runtime_import.cjs will process them)
+	testFileContent, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatalf("Failed to read test file: %v", err)
+	}
+	testFileStr := string(testFileContent)
+
+	// Verify the original file contains the template conditionals (processed at runtime)
+	if !strings.Contains(testFileStr, "{{#if github.event.issue.number}}") {
+		t.Error("Workflow file should contain conditional for github.event.issue.number")
 	}
 
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_FALSE__ }}") {
-		t.Error("Compiled workflow should contain placeholder for literal false")
+	if !strings.Contains(testFileStr, "{{#if github.actor}}") {
+		t.Error("Workflow file should contain conditional for github.actor")
+	}
+
+	if !strings.Contains(testFileStr, "{{#if true}}") {
+		t.Error("Workflow file should contain conditional for literal true")
+	}
+
+	if !strings.Contains(testFileStr, "{{#if false}}") {
+		t.Error("Workflow file should contain conditional for literal false")
 	}
 
 	// Verify the setupGlobals helper is used
