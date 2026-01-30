@@ -361,6 +361,11 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		awfArgs = append(awfArgs, "--agent-image", "act")
 		claudeLog.Print("Using ACT agent container for GitHub Actions parity")
 
+		// Enable chroot for transparent host binary execution (v0.13.0+)
+		// This allows host binaries like Python, Node, Go, etc. to run inside the container
+		awfArgs = append(awfArgs, "--enable-chroot")
+		claudeLog.Print("Added --enable-chroot for transparent host binary execution")
+
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
 		sslBumpArgs := getSSLBumpArgs(firewallConfig)
 		awfArgs = append(awfArgs, sslBumpArgs...)

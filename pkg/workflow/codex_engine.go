@@ -274,6 +274,11 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		awfArgs = append(awfArgs, "--agent-image", "act")
 		codexEngineLog.Print("Using ACT agent container for GitHub Actions parity")
 
+		// Enable chroot for transparent host binary execution (v0.13.0+)
+		// This allows host binaries like Python, Node, Go, etc. to run inside the container
+		awfArgs = append(awfArgs, "--enable-chroot")
+		codexEngineLog.Print("Added --enable-chroot for transparent host binary execution")
+
 		// Note: No --tty flag for Codex (it's not a TUI, it outputs to stdout/stderr)
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)

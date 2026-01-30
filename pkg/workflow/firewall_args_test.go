@@ -324,4 +324,32 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 			t.Error("Expected AWF command to NOT contain '--allow-urls' flag when SSLBump is false")
 		}
 	})
+
+	t.Run("AWF command includes enable-chroot flag for transparent host binary execution", func(t *testing.T) {
+		workflowData := &WorkflowData{
+			Name: "test-workflow",
+			EngineConfig: &EngineConfig{
+				ID: "copilot",
+			},
+			NetworkPermissions: &NetworkPermissions{
+				Firewall: &FirewallConfig{
+					Enabled: true,
+				},
+			},
+		}
+
+		engine := NewCopilotEngine()
+		steps := engine.GetExecutionSteps(workflowData, "test.log")
+
+		if len(steps) == 0 {
+			t.Fatal("Expected at least one execution step")
+		}
+
+		stepContent := strings.Join(steps[0], "\n")
+
+		// Check that --enable-chroot flag is included
+		if !strings.Contains(stepContent, "--enable-chroot") {
+			t.Error("Expected AWF command to contain '--enable-chroot' flag for transparent host binary execution")
+		}
+	})
 }
