@@ -69,15 +69,37 @@ func isRepositoryImport(importPath string) bool {
 	parts := strings.Split(pathWithoutRef, "/")
 
 	// Repository import has exactly 2 parts: owner/repo
-	// File imports have 3+ parts: owner/repo/path/to/file
-	if len(parts) == 2 {
-		// Check it's not a local path
-		if !strings.HasPrefix(pathWithoutRef, ".") && !strings.HasPrefix(pathWithoutRef, "/") {
-			return true
-		}
+	// File imports have 1 part (local file) or 3+ parts (owner/repo/path/to/file)
+	if len(parts) != 2 {
+		return false
 	}
 
-	return false
+	// Reject local paths
+	if strings.HasPrefix(pathWithoutRef, ".") || strings.HasPrefix(pathWithoutRef, "/") {
+		return false
+	}
+
+	// Reject paths that start with common local directory names
+	if strings.HasPrefix(pathWithoutRef, "shared/") {
+		return false
+	}
+	
+	// Additional validation: check if it looks like a valid owner/repo format
+	// GitHub identifiers can't start with numbers, must be alphanumeric with hyphens/underscores
+	owner := parts[0]
+	repo := parts[1]
+	
+	// Basic validation - ensure they're not empty and don't look like file extensions
+	if owner == "" || repo == "" {
+		return false
+	}
+	
+	// Reject if repo part looks like a file extension (ends with .md, .yaml, etc.)
+	if strings.Contains(repo, ".") {
+		return false
+	}
+
+	return true
 }
 
 // ResolveIncludePath resolves include path based on workflowspec format or relative path

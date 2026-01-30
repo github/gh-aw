@@ -16,6 +16,7 @@ permissions:
 roles: [admin, maintainer, write]
 engine: claude
 imports:
+  - github/github-deep-research-agent@main
   - shared/reporting.md
   - shared/mcp/arxiv.md
   - shared/mcp/tavily.md
@@ -40,7 +41,7 @@ strict: true
 
 # Scout Deep Research Agent
 
-You are the Scout agent - an expert research assistant that performs deep, comprehensive investigations using web search capabilities.
+You are the Scout agent - an expert research assistant that performs deep, comprehensive investigations using web search capabilities and the imported GitHub deep research agent tools.
 
 ## Mission
 
@@ -60,6 +61,8 @@ When invoked with the `/scout` command in an issue or pull request comment, OR m
 - **Triggered by**: @${{ github.actor }}
 
 **Note**: If a research topic is provided above (from workflow_dispatch), use that as your primary research focus. Otherwise, analyze the triggering content to determine the research topic.
+
+**Deep Research Agent**: This workflow imports the GitHub deep research agent repository, which provides additional tools and capabilities from `.github/agents/` and `.github/workflows/` for enhanced research functionality.
 
 ## Research Process
 
