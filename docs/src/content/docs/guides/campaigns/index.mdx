@@ -1,103 +1,32 @@
 ---
 title: About Campaigns
-description: Coordinate agentic workflows toward one goal, tracked in GitHub Projects.
+description: Agent workflows that orchestrate work and track progress.
 sidebar:
-  label: About Campaigns
+  label: Campaigns
 banner:
-  content: '<strong>Do not use.</strong> Campaigns are still incomplete and may produce unreliable or unintended results.'
+  content: '<strong>⚠️ Experimental:</strong> This feature is under active development and may change or behave unpredictably.'
 ---
 
 ## What are Agentic Campaigns?
 
-**[Agentic campaigns](/gh-aw/reference/glossary/#agentic-campaign)** are initiatives that coordinate multiple [agentic workflows](/gh-aw/reference/glossary/#agentic-workflow) toward a shared goal.
+Agentic Campaigns are workflows that coordinate work across one or more repositories to drive progress toward a shared goal and make that progress easy to track.
 
-When you need to roll out changes across many repositories—like upgrading dependencies, fixing security issues, or standardizing configurations—campaigns provide the orchestration layer you need to do that efficiently.
+They run on a schedule and include:
+- **Natural language coordination** with defaults being imported from `shared/campaign.md`
+- **Progress tracking** with optional automatic [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2)
 
-They run on a schedule to work through repositories systematically, dispatch workers in batches to control load and avoid rate limits, and track all progress centrally in [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2).
+## Getting Started
 
-You get complete visibility into what's done, what's in progress, and what's blocked—all in one place.
+To create your first campaign workflow with step-by-step instructions, see the [Getting Started guide](/gh-aw/guides/campaigns/getting-started/).
 
-## When to use Campaigns
+## How it works
 
-Choose a campaign when you need coordination across repos or multiple workflows, with progress tracked in one place.
+The `shared/campaign.md` import provides:
 
-- **Coordinate multiple worker workflows** that each do part of the job
-- **Work across many repositories** (using campaign scope)
-- **Track progress in one place** (a single [GitHub Project](/gh-aw/reference/glossary/#github-projects-projects-v2))
-- **Roll out changes in batches across repos** (repeatable runs with per-run limits and central tracking)
+- **Safe-output defaults** - Pre-configured limits for project updates, issues, and status updates
+- **Coordination rules** - Best practices for discovery, deterministic execution, and reporting
+- **Project integration** - Standard patterns for tracking work in GitHub Projects
 
-**Don't need a campaign?** A single scheduled workflow is simpler if you're just automating work in one repository.
+## When should this just be a workflow?
 
-**Not sure?** Start with one repository and one worker workflow, then scale up once you see how it works.
-
-## Campaign Specs
-
-To create a campaign, you write a single markdown file:
-
-- `.github/workflows/<id>.campaign.md`
-
-That file has two parts:
-
-- **[Frontmatter](/gh-aw/reference/glossary/#frontmatter)**: the configuration ([GitHub Project URL](/gh-aw/reference/glossary/#github-projects-projects-v2), scope, worker list, governance limits)
-- **Markdown body**: the narrative (objective, KPIs, prioritization, constraints)
-
-Here’s a small example:
-
-```markdown wrap
----
-id: dependency-upgrades
-project-url: "https://github.com/orgs/ORG/projects/1"
-scope:
-  - "org:ORG"
-workflows:
-  - dependency-scanner
-  - dependency-upgrader
----
-
-# Dependency Upgrades
-
-Upgrade dependencies across repos.
-```
-
-See: [Campaign specs](/gh-aw/guides/campaigns/specs/).
-
-## From markdown to GitHub Actions
-
-Just like regular workflows, campaigns get compiled:
-
-- You run `gh aw compile`
-- The compiler produces a **[workflow lock file](/gh-aw/reference/glossary/#workflow-lock-file-lockyml)** (`.lock.yml`) that GitHub Actions runs
-
-This is the same idea as [compilation](/gh-aw/reference/glossary/#compilation) for normal workflows: you edit human-friendly markdown, GitHub Actions runs the compiled YAML.
-
-## Orchestrator + workers (who does what)
-
-Campaigns split responsibilities on purpose:
-
-- **Orchestrator (generated from the spec)**
-  - Runs on a schedule
-  - Coordinates and decides what to do next
-  - Uses **[safe outputs](/gh-aw/reference/glossary/#safe-outputs)** to dispatch worker workflows
-- **Workers (you provide these)**
-  - Are normal agentic workflows triggered via [`workflow_dispatch`](/gh-aw/reference/glossary/#workflow_dispatch)
-  - Do the actual GitHub writes (issues/PRs/Projects/comments) using their own safe outputs
-
-## What you’ll see in GitHub
-
-When a campaign is working, you’ll usually see:
-
-- A compiled workflow named `<id>.campaign.lock.yml` in `.github/workflows/`
-- A GitHub Project filling up with issues/PRs created by workers
-- Tracking labels on those issues/PRs like `z_campaign_<id>`
-- Optional [labels](/gh-aw/reference/glossary/#labels) you can use to group and filter related workflows
-- Worker workflow runs that create PRs and move items through statuses
-
-If you want the full execution story, see: [Campaign lifecycle](/gh-aw/guides/campaigns/lifecycle/).
-
-## Next steps
-
-- [Getting started](/gh-aw/guides/campaigns/getting-started/) – step-by-step tutorial
-- [Creating campaigns](/gh-aw/guides/campaigns/creating-campaigns/) – issue-based or CLI creation
-- [Campaign specs](/gh-aw/guides/campaigns/specs/) – configuration reference
-- [Campaign Lifecycle](/gh-aw/guides/campaigns/lifecycle/) – execution model
-- [CLI commands](/gh-aw/guides/campaigns/cli-commands/) – command reference
+**Rule of thumb:** If you're not tracking work items in a GitHub Project or coordinating multiple agents, you probably just need a regular workflow.

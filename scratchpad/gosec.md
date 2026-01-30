@@ -5,7 +5,7 @@ applyTo: "**/*"
 
 # Gosec Security Exclusions
 
-This document provides comprehensive documentation for all gosec security rule exclusions configured in `.golangci.yml`. These exclusions have been reviewed for security impact and provide an audit trail for compliance requirements.
+This document provides documentation for all gosec security rule exclusions configured in `.golangci.yml`. These exclusions have been reviewed for security impact and provide an audit trail for compliance requirements.
 
 ## Configuration Source
 

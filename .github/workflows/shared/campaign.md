@@ -1,5 +1,5 @@
 ---
-# Shared safe-outputs defaults for campaign orchestrators.
+# Shared safe-outputs defaults for campaign orchestator.
 # Intended to be included via frontmatter `imports:`.
 # Workflows may override any specific safe-output type by defining it at top-level.
 

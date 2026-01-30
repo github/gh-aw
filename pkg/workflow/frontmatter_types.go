@@ -251,22 +251,28 @@ func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, err
 	var config FrontmatterConfig
 
 	// Normalize mixed-type fields before unmarshaling into typed structs.
-	// In YAML frontmatter, "project" can be either:
-	//   - a URL string (short form): project: https://github.com/orgs/.../projects/123
-	//   - an object (long form):      project: { url: ... , ... }
-	// The typed struct expects an object, so convert the short form to the long form.
+	// In YAML frontmatter, "project" must be a URL string:
+	//   project: https://github.com/orgs/.../projects/123
 	normalizedFrontmatter := make(map[string]any, len(frontmatter))
 	for k, v := range frontmatter {
 		normalizedFrontmatter[k] = v
 	}
 	if projectValue, ok := frontmatter["project"]; ok {
-		if projectURL, ok := projectValue.(string); ok {
-			projectURL = strings.TrimSpace(projectURL)
+		switch v := projectValue.(type) {
+		case nil:
+			delete(normalizedFrontmatter, "project")
+		case string:
+			projectURL := strings.TrimSpace(v)
 			if projectURL == "" {
 				delete(normalizedFrontmatter, "project")
 			} else {
+				// Normalize string value into the typed struct shape.
 				normalizedFrontmatter["project"] = map[string]any{"url": projectURL}
 			}
+		case map[string]any, map[any]any:
+			return nil, fmt.Errorf("invalid frontmatter field 'project': expected URL string, got mapping")
+		default:
+			return nil, fmt.Errorf("invalid frontmatter field 'project': expected URL string, got %T", projectValue)
 		}
 	}
 

@@ -894,7 +894,7 @@ When using `target: "*"`, the agent must provide `discussion_number` in the outp
 
 ### Workflow Dispatch (`dispatch-workflow:`)
 
-Triggers other workflows in the same repository using GitHub's `workflow_dispatch` event. This enables workflow orchestration and task delegation patterns, such as campaign workflows that coordinate multiple worker workflows.
+Triggers other workflows in the same repository using GitHub's `workflow_dispatch` event. This enables agent orchestration patterns, such as campaign workflows that coordinate multiple worker workflows.
 
 **Shorthand Syntax:**
 ```yaml wrap

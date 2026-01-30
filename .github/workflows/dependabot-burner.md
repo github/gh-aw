@@ -1,6 +1,6 @@
 ---
 name: Dependabot Burner
-description: Burns down open open dependabot pull requests.
+description: Burns down open Dependabot pull requests.
 
 on:
   schedule: daily
@@ -15,12 +15,11 @@ permissions:
 
 imports:
   - shared/campaign.md
+
+project: https://github.com/orgs/githubnext/projects/144
 ---
 
 # Dependabot Burner
-
-- Project URL: https://github.com/orgs/githubnext/projects/144
-- Campaign ID: dependabot-burner
 
 - Find all open Dependabot PRs and add them to the project.
 - Create bundle issues, each for exactly **one runtime + one manifest file**.

@@ -417,7 +417,7 @@ Manage campaign definitions. See [Agentic Campaigns Guide](/gh-aw/guides/campaig
 
 **Options:** `--json`
 
-Alternative: create an issue with the `create-agentic-campaign` label to trigger automated campaign creation ([docs](/gh-aw/guides/campaigns/getting-started/)).
+Alternative: create an issue with the `create-agentic-campaign` label to trigger automated campaign creation ([docs](/gh-aw/guides/campaigns/)).
 
 ### Management
 
@@ -563,6 +563,36 @@ gh aw completion powershell           # Generate powershell script
 **Subcommands:** `install`, `uninstall`, `bash`, `zsh`, `fish`, `powershell`
 
 See [Shell Completions](#shell-completions) for detailed installation instructions.
+
+#### `project`
+
+Create and manage GitHub Projects V2 boards. Use this to create project boards for tracking issues, pull requests, and tasks.
+
+##### `project new`
+
+Create a new GitHub Project V2 owned by a user or organization. Optionally link the project to a specific repository.
+
+```bash wrap
+gh aw project new "My Project" --owner @me                      # Create user project
+gh aw project new "Team Board" --owner myorg                    # Create org project
+gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo
+```
+
+**Options:**
+- `--owner` (required): Project owner - use `@me` for current user or specify organization name
+- `--link`: Repository to link project to (format: `owner/repo`)
+
+**Token Requirements:**
+
+> [!IMPORTANT]
+> The default `GITHUB_TOKEN` cannot create projects. You must use a Personal Access Token (PAT) with Projects permissions:
+>
+> - **Classic PAT**: `project` scope (user projects) or `project` + `repo` (org projects)
+> - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
+>
+> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or use `gh auth login` with a suitable token.
+
+**Related:** See [Tokens Reference](/gh-aw/reference/tokens/) for complete token configuration guide.
 
 ## Shell Completions
 

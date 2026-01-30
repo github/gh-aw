@@ -17,7 +17,7 @@ For GitHub Agentic Workflows, you only need to create a few **optional** secrets
 | Copilot workflows (CLI, engine, agent sessions, etc.)   | `COPILOT_GITHUB_TOKEN`                 | Needs Copilot Requests permission. For org-owned repos, needs org permissions: Members (read-only), GitHub Copilot Business (read-only). |
 | Cross-repo Project Ops / remote GitHub tools         | `GH_AW_GITHUB_TOKEN`                   | PAT or app token with cross-repo access. |
 | Assigning agents/bots to issues or pull requests     | `GH_AW_AGENT_TOKEN`                    | Used by `assign-to-agent` and Copilot assignee/reviewer flows. |
-| Any GitHub Projects v2 operations                    | `GH_AW_PROJECT_GITHUB_TOKEN`           | **Required** for `update-project`. Default `GITHUB_TOKEN` cannot access Projects v2 API. |
+| Any GitHub Projects v2 operations                    | `GH_AW_PROJECT_GITHUB_TOKEN`           | **Required** for `project new` CLI command, `create-project`, and `update-project`. Default `GITHUB_TOKEN` cannot access Projects v2 API. |
 | Isolating Model Context Protocol (MCP) server permissions (advanced optional) | `GH_AW_GITHUB_MCP_SERVER_TOKEN`        | Only if you want MCP to use a different token than other jobs. |
 
 > [!TIP]
@@ -160,7 +160,11 @@ The compiler automatically sets `GITHUB_MCP_SERVER_TOKEN` and passes it as `GITH
 
 **Type**: Personal Access Token (required for Projects v2 operations)
 
-A specialized token for GitHub Projects v2 operations used by the [`update-project`](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) safe output. **Required** because the default `GITHUB_TOKEN` cannot access the GitHub Projects v2 GraphQL API.
+A specialized token for GitHub Projects v2 operations used by:
+- The [`project new`](/gh-aw/setup/cli/#project-new) CLI command for creating projects
+- The [`update-project`](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) safe output for updating projects
+
+**Required** because the default `GITHUB_TOKEN` cannot access the GitHub Projects v2 GraphQL API.
 
 **When to use**:
 

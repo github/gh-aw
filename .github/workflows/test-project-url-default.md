@@ -4,8 +4,7 @@ engine: copilot
 on:
   workflow_dispatch:
 
-project:
-  url: "https://github.com/orgs/githubnext/projects/1"
+project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
 
 safe-outputs:
   update-project:
@@ -43,7 +42,9 @@ URL as a default when the message doesn't specify a project field.
 }
 ```
 
-This will automatically use `https://github.com/orgs/githubnext/projects/1` from the frontmatter.
+This will automatically use `https://github.com/orgs/<ORG>/projects/<NUMBER>` from the frontmatter.
+
+Important: this is a placeholder. Replace it with a real GitHub Projects v2 URL before running the workflow.
 
 ```json
 {

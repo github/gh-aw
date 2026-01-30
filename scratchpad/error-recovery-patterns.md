@@ -1,6 +1,6 @@
 # Error Recovery Patterns
 
-This document provides comprehensive guidance for error handling, common error scenarios, recovery strategies, and debugging techniques in GitHub Agentic Workflows (gh-aw).
+This document provides guidance for error handling, common error scenarios, recovery strategies, and debugging techniques in GitHub Agentic Workflows (gh-aw).
 
 ## Table of Contents
 
@@ -116,7 +116,7 @@ func compileWorkflow(file string) error {
 
 Internal error types (like `yaml.TypeError`, `os.PathError`) are implementation details that should not leak to user-facing error messages. Breaking the chain with `errors.New()` or `fmt.Errorf()` (without `%w`) prevents downstream code from making assumptions about internal error types.
 
-See `pkg/workflow/error_wrapping_test.go` for comprehensive examples of error wrapping patterns.
+See `pkg/workflow/error_wrapping_test.go` for examples of error wrapping patterns.
 
 **Key rules:**
 - Use `%w` for internal errors that need type checking
@@ -1128,7 +1128,7 @@ return fmt.Errorf(
 - Explain what's expected (format, valid values, type)
 - Provide concrete example of correct usage
 
-See `skills/error-messages/SKILL.md` for comprehensive style guide.
+See `skills/error-messages/SKILL.md` for the style guide.
 
 ### Runtime Error Template
 
@@ -1616,7 +1616,7 @@ graph TD
 
 ### Related Documentation
 
-- **[Error Message Style Guide](../skills/error-messages/SKILL.md)** - Comprehensive guide for writing validation error messages
+- **[Error Message Style Guide](../skills/error-messages/SKILL.md)** - Guide for writing validation error messages
 - **[Console Formatting](../AGENTS.md#console-message-formatting)** - Console formatting requirements and helpers
 - **[Debug Logging](../pkg/logger/README.md)** - Logger package documentation with DEBUG environment variable syntax
 - **[Validation Architecture](validation-architecture.md)** - Overview of validation system organization

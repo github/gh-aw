@@ -38,7 +38,9 @@ An AI-powered workflow that can reason, make decisions, and take autonomous acti
 
 ### Agentic Campaign
 
-An initiative that coordinates multiple agentic workflows toward a shared goal.
+Workflows that coordinate one or more workers toward a shared goal, with built-in progress tracking.
+
+See the [Campaigns Guide](/gh-aw/guides/campaigns/) for implementation patterns.
 
 ### Agentic Engine or Coding Agent
 
@@ -250,7 +252,7 @@ A type of GitHub Personal Access Token with granular permission control. Specify
 
 ### CLI (Command Line Interface)
 
-The `gh-aw` extension for the GitHub CLI (`gh`) that provides commands for managing agentic workflows: `gh aw compile` (compile workflows), `gh aw run` (trigger runs), `gh aw status` (check status), `gh aw logs` (download and analyze logs), and `gh aw add` (add workflows from repositories).
+The `gh-aw` extension for the GitHub CLI (`gh`) that provides commands for managing agentic workflows: `gh aw compile` (compile workflows), `gh aw run` (trigger runs), `gh aw status` (check status), `gh aw logs` (download and analyze logs), `gh aw add` (add workflows from repositories), and `gh aw project` (create and manage GitHub Projects V2).
 
 ### Validation
 
@@ -281,53 +283,6 @@ AI-powered GitHub Projects board management that automates issue triage, routing
 **When to use:** Event-driven workflows (issue opened, PR created) that need to categorize and track work on project boards.
 
 See the [ProjectOps Guide](/gh-aw/examples/issue-pr-events/projectops/) for implementation details.
-
-### Agentic campaign
-
-An initiative that coordinates multiple agentic workflows toward a shared goal. Agentic campaigns can be enterprise-scale, with explicit ownership, approval gates, and executive visibility.
-
-:::caution[File format deprecated]
-The `.campaign.md` file format is **deprecated**. Use the `project` field in workflow frontmatter for project tracking instead. See [Project Tracking](/gh-aw/reference/frontmatter/#project-tracking-project).
-:::
-
-Campaigns previously used `.campaign.md` files where YAML frontmatter defined configuration (project URL, workflows, scope, governance) and the markdown body defined narrative context (objective, KPIs, timeline). The current approach uses the `project` field in regular workflow frontmatter:
-
-```yaml
-# Current approach - workflow frontmatter with project field
----
-on:
-  schedule:
-    - cron: "0 0 * * *"
-project:
-  url: https://github.com/orgs/myorg/projects/1
-  workflows:
-    - framework-scanner
-    - framework-upgrader
----
-
-# Framework Upgrade
-
-## Objective
-
-Upgrade all services to Framework vNext.
-
-## KPIs
-
-### Primary KPI: Services upgraded
-- **Target**: 50
-```
-
-**Key characteristics:**
-
-- Finite duration (days to months) with clear start and end
-- Named owners and executive sponsors
-- Formal approval gates and change control
-- Budget tracking with ROI metrics
-- Stateful execution using repo-memory for audit trails
-- Cross-team and cross-repository coordination
-- Executive dashboards and KPI reporting
-
-See the [Agentic campaigns Guide](/gh-aw/guides/campaigns/) for implementation patterns (note: guides describe deprecated format).
 
 ### Command Triggers
 

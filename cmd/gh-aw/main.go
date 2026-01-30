@@ -560,6 +560,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	upgradeCmd := cli.NewUpgradeCommand()
 	completionCmd := cli.NewCompletionCommand()
 	hashCmd := cli.NewHashCommand()
+	projectCmd := cli.NewProjectCommand()
 
 	// Assign commands to groups
 	// Setup Commands
@@ -594,6 +595,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	prCmd.GroupID = "utilities"
 	completionCmd.GroupID = "utilities"
 	hashCmd.GroupID = "utilities"
+	projectCmd.GroupID = "utilities"
 
 	// version command is intentionally left without a group (common practice)
 
@@ -622,6 +624,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	rootCmd.AddCommand(fixCmd)
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(hashCmd)
+	rootCmd.AddCommand(projectCmd)
 }
 
 func main() {

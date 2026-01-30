@@ -192,7 +192,6 @@ The [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) demonstrates Spec
 
 ## Related Patterns
 
-- **[Campaign Specs](/gh-aw/guides/campaigns/specs/)** - Reviewable workflow contracts
 - **[MultiRepoOps](/gh-aw/guides/multirepoops/)** - Cross-repository coordination
 
 ## References
