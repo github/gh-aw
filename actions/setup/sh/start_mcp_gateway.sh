@@ -182,21 +182,63 @@ HEALTH_CHECK_HOST="localhost"
 echo "Health endpoint: http://${HEALTH_CHECK_HOST}:${MCP_GATEWAY_PORT}/health"
 echo "(Note: MCP_GATEWAY_DOMAIN is '${MCP_GATEWAY_DOMAIN}' for container access)"
 echo "Retrying up to 120 times with 1s delay (120s total timeout)"
+echo ""
 
 # Check health endpoint using localhost (since we're running on the host)
 # Per MCP Gateway Specification v1.3.0, /health must return HTTP 200 with JSON body containing specVersion and gatewayVersion
-# Use curl retry: 120 attempts with 1 second delay = 120s total
+# Custom retry loop with progress indication: 120 attempts with 1 second delay = 120s total
 # Note: Disable errexit temporarily to capture curl exit code
 set +e
-RESPONSE=$(curl -s --retry 120 --retry-delay 1 --retry-connrefused --retry-all-errors -w "\n%{http_code}" "http://${HEALTH_CHECK_HOST}:${MCP_GATEWAY_PORT}/health" 2>&1)
-CURL_EXIT_CODE=$?
+
+MAX_RETRIES=120
+RETRY_DELAY=1
+RETRY_COUNT=0
+HTTP_CODE=""
+HEALTH_RESPONSE=""
+CURL_EXIT_CODE=1
+
+echo "=== Health Check Progress ==="
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  RETRY_START=$(date +%s%3N)
+  
+  # Calculate elapsed time since health check started
+  ELAPSED_MS=$(($(date +%s%3N) - HEALTH_CHECK_START))
+  ELAPSED_SEC=$((ELAPSED_MS / 1000))
+  
+  # Show progress every 10 retries or on first attempt
+  if [ $((RETRY_COUNT % 10)) -eq 1 ] || [ $RETRY_COUNT -eq 1 ]; then
+    echo "Attempt $RETRY_COUNT/$MAX_RETRIES (${ELAPSED_SEC}s elapsed)..."
+  fi
+  
+  # Try to connect to health endpoint
+  RESPONSE=$(curl -s --max-time 2 --connect-timeout 1 -w "\n%{http_code}" "http://${HEALTH_CHECK_HOST}:${MCP_GATEWAY_PORT}/health" 2>&1)
+  CURL_EXIT_CODE=$?
+  
+  # Parse response
+  HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+  HEALTH_RESPONSE=$(echo "$RESPONSE" | head -n -1)
+  
+  # Check if we got a successful response
+  if [ "$HTTP_CODE" = "200" ] && [ -n "$HEALTH_RESPONSE" ]; then
+    echo "✓ Health check succeeded on attempt $RETRY_COUNT (${ELAPSED_SEC}s elapsed)"
+    break
+  fi
+  
+  # If this is not the last attempt, wait before retrying
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    sleep $RETRY_DELAY
+  fi
+done
+echo "=== End Health Check Progress ==="
+echo ""
+
 set -e
-HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-HEALTH_RESPONSE=$(echo "$RESPONSE" | head -n -1)
 
 # Always log the health response for debugging
-echo "Curl exit code: $CURL_EXIT_CODE"
-echo "Health endpoint HTTP code: $HTTP_CODE"
+echo "Final curl exit code: $CURL_EXIT_CODE"
+echo "Final HTTP code: $HTTP_CODE"
+echo "Total attempts: $RETRY_COUNT"
 if [ -n "$HEALTH_RESPONSE" ]; then
   echo "Health response body: $HEALTH_RESPONSE"
 else
