@@ -31,9 +31,9 @@ Analysis of 15 workflows exceeding 100 KB identified **safe-inputs configuration
 #### Smoke Tests (3 workflows, avg 105KB)
 | Workflow | Source | Compiled | Ratio | Safe-Inputs | Prompt | Other |
 |----------|--------|----------|-------|-------------|--------|-------|
-| smoke-claude | 4.4K | 112.6K | 25.6x | ~83KB (74%) | 0.4KB | 29KB |
-| smoke-copilot | 4.5K | 101.5K | 22.7x | ~71KB (70%) | 0.4KB | 30KB |
-| smoke-codex | 4.2K | 101.0K | 24.0x | ~71KB (70%) | 0.4KB | 30KB |
+| smoke-claude | 4.4K | 112.6K | 25.6x | ~83KB (74%) | 0.4KB | ~29KB |
+| smoke-copilot | 4.5K | 101.5K | 22.7x | ~71KB (70%) | 0.4KB | ~30KB |
+| smoke-codex | 4.2K | 101.0K | 24.0x | ~71KB (70%) | 0.4KB | ~30KB |
 
 **Analysis**: Smoke tests have minimal prompts but massive compilation overhead from `github-queries-safe-input.md` import.
 
@@ -89,9 +89,15 @@ Contains 4 tools:
 1. **github-issue-query** (~50 lines): GraphQL query with jq filtering
 2. **github-pr-query** (~50 lines): PR query with state filtering
 3. **github-discussion-query** (~50 lines): Discussion query with category filtering
-4. **gh** wrapper (~10 lines): Basic gh CLI wrapper
+4. **gh** (~10 lines): Wrapper for safe execution of arbitrary gh CLI commands
 
-Total: ~160 lines of shell script + JSON schema → **83KB in compiled YAML**
+Total: ~160 lines of shell script + JSON input schemas + descriptions → **83KB in compiled YAML**
+
+**Why so large?** The 16KB source expands to 83KB during compilation because:
+- Each tool's shell script is embedded in a heredoc (adds YAML indentation and delimiters)
+- JSON input schemas are converted to YAML format (expands size ~20%)
+- Tool descriptions and examples are duplicated in both config and script files
+- YAML formatting adds whitespace and structure overhead
 
 ### Why Embedded vs Runtime Files?
 
@@ -238,4 +244,4 @@ The 15 oversized workflows fall into two categories:
 - ✅ Size reduction guidelines documented
 - ⚠️ Optimization implementation: 1 high-value optimization identified
 
-**Recommendation**: Implement Priority 1 (modularize github-queries-safe-input.md) to optimize 6 workflows and prevent future overhead. Add a section to workflow documentation noting that the remaining 9 workflows (copilot-session-insights, copilot-pr-nlp-analysis, security-alert-burndown, poem-bot, python-data-charts, and 4 daily reports without safe-inputs) have justified sizes due to complex analysis requirements.
+**Recommendation**: Implement Priority 1 (modularize github-queries-safe-input.md) to optimize 6 workflows and prevent future size overhead. Add a section to workflow documentation noting that workflows without safe-inputs (copilot-session-insights, copilot-pr-nlp-analysis, security-alert-burndown, poem-bot, python-data-charts, and several daily reports) have justified sizes due to complex analysis requirements with large prompts containing Python code and report templates.
