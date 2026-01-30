@@ -394,6 +394,23 @@ fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
 - **NEVER** use `fmt.Println()` or `fmt.Printf()` directly - all output should go to stderr
 - Use console formatting helpers with `os.Stderr` for consistent styling
 - For simple messages without console formatting: `fmt.Fprintf(os.Stderr, "message\n")`
+- **Exception**: Structured output (JSON, hashes, graphs) goes to stdout for piping/redirection
+
+**Examples:**
+```go
+// ✅ CORRECT - Diagnostic output to stderr
+fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Processing..."))
+fmt.Fprintf(os.Stderr, "Warning: %s\n", msg)
+
+// ✅ CORRECT - Structured output to stdout
+fmt.Println(string(jsonBytes))  // JSON output
+fmt.Println(hash)                // Hash output
+fmt.Println(mermaidGraph)        // Graph output
+
+// ❌ INCORRECT - Diagnostic output to stdout
+fmt.Println("Processing...")     // Should use stderr
+fmt.Printf("Warning: %s\n", msg) // Should use stderr
+```
 
 ## Debug Logging
 
@@ -525,18 +542,26 @@ if err != nil {
 ### Console Output Requirements
 
 ```go
-// ✅ CORRECT - All output to stderr with console formatting
+// ✅ CORRECT - All diagnostic output to stderr with console formatting
 fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Compiled successfully"))
 fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Processing workflow..."))
 fmt.Fprintln(os.Stderr, console.FormatWarningMessage("File has changes"))
 fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
 
-// ❌ INCORRECT - stdout, no formatting
+// ✅ CORRECT - Structured output to stdout for piping/redirection
+fmt.Println(string(jsonBytes))  // JSON output
+fmt.Println(hash)                // Hash output
+fmt.Println(mermaidGraph)        // Graph output
+
+// ❌ INCORRECT - Diagnostic output to stdout, no formatting
 fmt.Println("Success")
 fmt.Printf("Status: %s\n", status)
 ```
 
-**Exception**: JSON output goes to stdout, all other output to stderr
+**Output Routing Rules (Unix Conventions):**
+- **Diagnostic output** (messages, warnings, errors) → `stderr`
+- **Structured data** (JSON, hashes, graphs) → `stdout`
+- **Rationale**: Allows users to pipe/redirect data without diagnostic noise
 
 ### Help Text Standards
 
