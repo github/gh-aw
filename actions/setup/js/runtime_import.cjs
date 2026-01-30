@@ -545,6 +545,60 @@ function wrapExpressionsInTemplateConditionals(content) {
 }
 
 /**
+ * Extracts GitHub expressions from wrapped template conditionals and replaces them with placeholders
+ * Transforms {{#if ${{ expression }} }} to {{#if __GH_AW_PLACEHOLDER__ }}
+ * @param {string} content - The markdown content with wrapped expressions
+ * @returns {string} - Content with expressions replaced by placeholders
+ */
+function extractAndReplacePlaceholders(content) {
+  // Pattern to match {{#if ${{ expression }} }} where expression needs to be extracted
+  const pattern = /\{\{#if\s+\$\{\{\s*(.*?)\s*\}\}\s*\}\}/g;
+
+  return content.replace(pattern, (match, expr) => {
+    const trimmed = expr.trim();
+
+    // Generate placeholder name from expression
+    // Convert dots and special chars to underscores and uppercase
+    const placeholder = generatePlaceholderName(trimmed);
+
+    // Return the conditional with placeholder
+    return `{{#if __${placeholder}__ }}`;
+  });
+}
+
+/**
+ * Generates a placeholder name from a GitHub expression
+ * @param {string} expr - The GitHub expression (e.g., "github.event.issue.number")
+ * @returns {string} - The placeholder name (e.g., "GH_AW_GITHUB_EVENT_ISSUE_NUMBER")
+ */
+function generatePlaceholderName(expr) {
+  // Check if it's a simple property access chain (e.g., github.event.issue.number)
+  const simplePattern = /^[a-zA-Z][a-zA-Z0-9_.]*$/;
+
+  if (simplePattern.test(expr)) {
+    // Convert dots to underscores and uppercase
+    // e.g., "github.event.issue.number" -> "GH_AW_GITHUB_EVENT_ISSUE_NUMBER"
+    return "GH_AW_" + expr.replace(/\./g, "_").toUpperCase();
+  }
+
+  // For boolean literals, use special placeholders
+  if (expr === "true") {
+    return "GH_AW_TRUE";
+  }
+  if (expr === "false") {
+    return "GH_AW_FALSE";
+  }
+  if (expr === "null") {
+    return "GH_AW_NULL";
+  }
+
+  // For complex expressions or unknown variables, create a generic placeholder
+  // Replace non-alphanumeric characters with underscores
+  const sanitized = expr.replace(/[^a-zA-Z0-9_]/g, "_").toUpperCase();
+  return "GH_AW_" + sanitized;
+}
+
+/**
  * Reads and processes a file or URL for runtime import
  * @param {string} filepathOrUrl - The path to the file (relative to GITHUB_WORKSPACE) or URL to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
@@ -660,6 +714,10 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
   content = wrapExpressionsInTemplateConditionals(content);
+
+  // Extract and replace GitHub expressions in template conditionals with placeholders
+  // This transforms {{#if ${{ expression }} }} to {{#if __GH_AW_PLACEHOLDER__ }}
+  content = extractAndReplacePlaceholders(content);
 
   // Process GitHub Actions expressions (validate and render safe ones)
   if (hasGitHubActionsMacros(content)) {
@@ -781,4 +839,6 @@ module.exports = {
   evaluateExpression,
   processExpressions,
   wrapExpressionsInTemplateConditionals,
+  extractAndReplacePlaceholders,
+  generatePlaceholderName,
 };

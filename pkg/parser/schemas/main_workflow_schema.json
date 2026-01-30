@@ -1791,6 +1791,12 @@
       "description": "Workflow timeout in minutes (GitHub Actions standard field). Defaults to 20 minutes for agentic workflows. Has sensible defaults and can typically be omitted.",
       "examples": [5, 10, 30]
     },
+    "timeout_minutes": {
+      "type": "integer",
+      "deprecated": true,
+      "description": "DEPRECATED: Use 'timeout-minutes' instead. Workflow timeout in minutes.",
+      "x-deprecation-message": "Use 'timeout-minutes' (with hyphen) instead of 'timeout_minutes' (with underscore) to follow GitHub Actions naming conventions."
+    },
     "concurrency": {
       "description": "Concurrency control to limit concurrent workflow runs (GitHub Actions standard field). Supports two forms: simple string for basic group isolation, or object with cancel-in-progress option for advanced control. Agentic workflows enhance this with automatic per-engine concurrency policies (defaults to single job per engine across all workflows) and token-based rate limiting. Default behavior: workflows in the same group queue sequentially unless cancel-in-progress is true. See https://docs.github.com/en/actions/using-jobs/using-concurrency",
       "oneOf": [

@@ -96,17 +96,24 @@ ${{ needs.activation.outputs.text }}
 	}
 
 	// Verify GitHub expressions are properly replaced with placeholders in template conditionals
-	// After the fix, expressions should be replaced with __GH_AW_*__ placeholders
+	// The GitHub context section (built-in) should have placeholders
+	// User markdown content is loaded via runtime-import and processed at runtime
 	expectedPlaceholderExpressions := []string{
 		"{{#if __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__ }}",
 		"{{#if __GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER__ }}",
-		"{{#if __GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT__ }}",
 	}
 
 	for _, expectedExpr := range expectedPlaceholderExpressions {
 		if !strings.Contains(compiledStr, expectedExpr) {
-			t.Errorf("Compiled workflow should contain placeholder expression: %s", expectedExpr)
+			t.Errorf("Compiled workflow should contain placeholder expression in GitHub context: %s", expectedExpr)
 		}
+	}
+
+	// Verify that the main workflow content is loaded via runtime-import
+	// Template conditionals in the user's markdown (like needs.activation.outputs.text)
+	// are processed at runtime by the JavaScript runtime_import helper
+	if !strings.Contains(compiledStr, "{{#runtime-import") {
+		t.Error("Compiled workflow should contain runtime-import macro for main workflow content")
 	}
 
 	// Verify that expressions OUTSIDE template conditionals are NOT double-wrapped
@@ -271,27 +278,17 @@ Steps expression - will be wrapped.
 
 	compiledStr := string(compiledYAML)
 
-	// Verify all expressions are replaced with placeholders (correct behavior)
+	// Verify GitHub expressions in the GitHub context section are replaced with placeholders
+	// (These are in the built-in context, not the user's markdown)
 	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__ }}") {
-		t.Error("GitHub expression should be replaced with placeholder")
+		t.Error("GitHub context should contain placeholder for github.event.issue.number")
 	}
 
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_STEPS_MY_STEP_OUTPUTS_VALUE__ }}") {
-		t.Error("Steps expression should be replaced with placeholder")
-	}
-
-	// Verify that literal values are also replaced with placeholders
-	// true and false literals get normalized to __GH_AW_TRUE__ and __GH_AW_FALSE__
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_TRUE__ }}") {
-		t.Error("Literal 'true' should be replaced with placeholder")
-	}
-
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_FALSE__ }}") {
-		t.Error("Literal 'false' should be replaced with placeholder")
-	}
-
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_SOME_VARIABLE__ }}") {
-		t.Error("Unknown variable should be replaced with placeholder")
+	// Verify that the main workflow content is loaded via runtime-import
+	// Template conditionals in the user's markdown (like steps, true/false literals, etc.)
+	// are processed at runtime by the JavaScript runtime_import helper
+	if !strings.Contains(compiledStr, "{{#runtime-import") {
+		t.Error("Compiled workflow should contain runtime-import macro for main workflow content")
 	}
 
 	// Make sure we didn't create invalid double-wrapping
