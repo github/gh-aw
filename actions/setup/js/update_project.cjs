@@ -3,6 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { loadTemporaryIdMap, resolveIssueNumber } = require("./temporary_id.cjs");
 
 /**
  * Campaign label prefix constant.
@@ -338,7 +339,13 @@ function checkFieldTypeMismatch(fieldName, field, expectedDataType) {
  * @param {any} output - Safe output configuration
  * @returns {Promise<void>}
  */
-async function updateProject(output) {
+/**
+ * Update a GitHub Project v2
+ * @param {any} output - Safe output configuration
+ * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
+ * @returns {Promise<void>}
+ */
+async function updateProject(output, temporaryIdMap) {
   const { owner, repo } = context.repo;
   const projectInfo = parseProjectUrl(output.project);
   const projectNumberFromUrl = projectInfo.projectNumber;
@@ -771,12 +778,29 @@ async function updateProject(output) {
     }
     let contentNumber = null;
     if (hasContentNumber || hasIssue || hasPullRequest) {
-      const rawContentNumber = hasContentNumber ? output.content_number : hasIssue ? output.issue : output.pull_request,
-        sanitizedContentNumber = null == rawContentNumber ? "" : "number" == typeof rawContentNumber ? rawContentNumber.toString() : String(rawContentNumber).trim();
+      const rawContentNumber = hasContentNumber ? output.content_number : hasIssue ? output.issue : output.pull_request;
+      const sanitizedContentNumber = null == rawContentNumber ? "" : "number" == typeof rawContentNumber ? rawContentNumber.toString() : String(rawContentNumber).trim();
+
       if (sanitizedContentNumber) {
-        if (!/^\d+$/.test(sanitizedContentNumber)) throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer.`);
-        contentNumber = Number.parseInt(sanitizedContentNumber, 10);
-      } else core.warning("Content number field provided but empty; skipping project item update.");
+        // Try to resolve as temporary ID first
+        const resolved = resolveIssueNumber(sanitizedContentNumber, temporaryIdMap);
+
+        if (resolved.wasTemporaryId) {
+          if (resolved.errorMessage || !resolved.resolved) {
+            throw new Error(`Failed to resolve temporary ID in content_number: ${resolved.errorMessage || "Unknown error"}`);
+          }
+          core.info(`✓ Resolved temporary ID ${sanitizedContentNumber} to issue #${resolved.resolved.number}`);
+          contentNumber = resolved.resolved.number;
+        } else {
+          // Not a temporary ID - validate as numeric
+          if (!/^\d+$/.test(sanitizedContentNumber)) {
+            throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer or a valid temporary ID (format: aw_XXXXXXXXXXXX).`);
+          }
+          contentNumber = Number.parseInt(sanitizedContentNumber, 10);
+        }
+      } else {
+        core.warning("Content number field provided but empty; skipping project item update.");
+      }
     }
     if (null !== contentNumber) {
       const contentType = "pull_request" === output.content_type ? "PullRequest" : "issue" === output.content_type || output.issue ? "Issue" : "PullRequest",
@@ -1004,9 +1028,10 @@ async function main(config = {}) {
    * Message handler function that processes a single update_project message
    * @param {Object} message - The update_project message to process
    * @param {Map<string, string>} temporaryProjectMap - Map of temporary project IDs to actual URLs
+   * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
    * @returns {Promise<Object>} Result with success/error status
    */
-  return async function handleUpdateProject(message, temporaryProjectMap) {
+  return async function handleUpdateProject(message, temporaryProjectMap, temporaryIdMap = new Map()) {
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping update_project: max count of ${maxCount} reached`);
@@ -1093,7 +1118,7 @@ async function main(config = {}) {
           };
 
           try {
-            await updateProject(fieldsOutput);
+            await updateProject(fieldsOutput, temporaryIdMap);
             core.info("✓ Created configured fields");
           } catch (err) {
             // prettier-ignore
@@ -1111,7 +1136,7 @@ async function main(config = {}) {
       }
 
       // Process the update_project message
-      await updateProject(effectiveMessage);
+      await updateProject(effectiveMessage, temporaryIdMap);
 
       // After processing the first message, create configured views if any
       // Views are created after the first item is processed to ensure the project exists
@@ -1136,7 +1161,7 @@ async function main(config = {}) {
               },
             };
 
-            await updateProject(viewOutput);
+            await updateProject(viewOutput, temporaryIdMap);
             core.info(`✓ Created view ${i + 1}/${configuredViews.length}: ${viewConfig.name} (${viewConfig.layout})`);
           } catch (err) {
             // prettier-ignore

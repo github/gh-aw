@@ -516,6 +516,49 @@ describe("updateProject", () => {
     await expect(updateProject(output)).rejects.toThrow(/Invalid content number/);
   });
 
+  it("resolves temporary IDs in content_number", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "issue",
+      content_number: "aw_abc123def456",
+    };
+
+    // Create temporary ID map with the mapping
+    const temporaryIdMap = new Map([["aw_abc123def456", { repo: "testowner/testrepo", number: 42 }]]);
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project123"), issueResponse("issue-id-42"), emptyItemsResponse(), { addProjectV2ItemById: { item: { id: "item123" } } }]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Verify that the temporary ID was resolved and the issue was added
+    const getOutput = key => {
+      const calls = mockCore.setOutput.mock.calls;
+      const call = calls.find(c => c[0] === key);
+      return call ? call[1] : undefined;
+    };
+
+    expect(getOutput("item-id")).toBe("item123");
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved temporary ID aw_abc123def456 to issue #42"));
+  });
+
+  it("rejects unresolved temporary IDs in content_number", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "issue",
+      content_number: "aw_abc123def789", // Valid format but not in map
+    };
+
+    const temporaryIdMap = new Map(); // Empty map - ID not resolved
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project123")]);
+
+    await expect(updateProject(output, temporaryIdMap)).rejects.toThrow(/Temporary ID 'aw_abc123def789' not found in map/);
+  });
+
   it("updates an existing text field", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const output = {

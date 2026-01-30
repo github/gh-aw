@@ -16,6 +16,7 @@
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
+const { loadTemporaryIdMap } = require("./temporary_id.cjs");
 
 /**
  * Handler map configuration for project-related safe outputs
@@ -115,6 +116,12 @@ async function processMessages(messageHandlers, messages) {
   // Build a temporary project ID map as we process create_project messages
   const temporaryProjectMap = new Map();
 
+  // Load temporary ID map from environment (populated by previous step)
+  const temporaryIdMap = loadTemporaryIdMap();
+  if (temporaryIdMap.size > 0) {
+    core.info(`Loaded temporary ID map with ${temporaryIdMap.size} entry(ies)`);
+  }
+
   core.info(`Processing ${messages.length} project-related message(s)...`);
 
   // Process messages in order of appearance
@@ -140,8 +147,8 @@ async function processMessages(messageHandlers, messages) {
       core.info(`Processing message ${i + 1}/${messages.length}: ${messageType}`);
 
       // Call the message handler with the individual message
-      // Pass the temporary project map for resolution
-      const result = await messageHandler(message, temporaryProjectMap);
+      // Pass both the temporary project map and temporary ID map for resolution
+      const result = await messageHandler(message, temporaryProjectMap, temporaryIdMap);
 
       // Check if the handler explicitly returned a failure
       if (result && result.success === false) {
