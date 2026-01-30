@@ -52,6 +52,11 @@ func WithStrictMode(strict bool) CompilerOption {
 	return func(c *Compiler) { c.strictMode = strict }
 }
 
+// WithFailFast configures whether to stop at first validation error
+func WithFailFast(failFast bool) CompilerOption {
+	return func(c *Compiler) { c.failFast = failFast }
+}
+
 // WithForceRefreshActionPins configures whether to force refresh of action pins
 func WithForceRefreshActionPins(force bool) CompilerOption {
 	return func(c *Compiler) { c.forceRefreshActionPins = force }
@@ -101,6 +106,7 @@ type Compiler struct {
 	trialLogicalRepoSlug    string              // If set in trial mode, the logical repository to checkout
 	refreshStopTime         bool                // If true, regenerate stop-after times instead of preserving existing ones
 	forceRefreshActionPins  bool                // If true, clear action cache and resolve all actions from GitHub API
+	failFast                bool                // If true, stop at first validation error instead of collecting all errors
 	actionCacheCleared      bool                // Tracks if action cache has already been cleared (for forceRefreshActionPins)
 	markdownPath            string              // Path to the markdown file being compiled (for context in dynamic tool generation)
 	actionMode              ActionMode          // Mode for generating JavaScript steps (inline vs custom actions)

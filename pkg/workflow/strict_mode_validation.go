@@ -234,33 +234,47 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 
 	strictModeValidationLog.Printf("Starting strict mode validation")
 
+	// Collect all strict mode validation errors
+	collector := NewErrorCollector(c.failFast)
+
 	// 1. Refuse write permissions
 	if err := c.validateStrictPermissions(frontmatter); err != nil {
-		return err
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
 	}
 
 	// 2. Require network configuration and refuse "*" wildcard
 	if err := c.validateStrictNetwork(networkPermissions); err != nil {
-		return err
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
 	}
 
 	// 3. Require network configuration on custom MCP servers
 	if err := c.validateStrictMCPNetwork(frontmatter, networkPermissions); err != nil {
-		return err
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
 	}
 
 	// 4. Validate tools configuration
 	if err := c.validateStrictTools(frontmatter); err != nil {
-		return err
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
 	}
 
 	// 5. Refuse deprecated fields
 	if err := c.validateStrictDeprecatedFields(frontmatter); err != nil {
-		return err
+		if returnErr := collector.Add(err); returnErr != nil {
+			return returnErr // Fail-fast mode
+		}
 	}
 
-	strictModeValidationLog.Printf("Strict mode validation completed successfully")
-	return nil
+	strictModeValidationLog.Printf("Strict mode validation completed: error_count=%d", collector.Count())
+
+	return collector.FormattedError("strict mode")
 }
 
 // validateStrictFirewall requires firewall to be enabled in strict mode for copilot and codex engines

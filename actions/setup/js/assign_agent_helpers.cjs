@@ -289,6 +289,9 @@ async function assignAgentToIssue(assignableId, agentId, currentAssignees, agent
     const response = await github.graphql(mutation, {
       assignableId: assignableId,
       actorIds,
+      headers: {
+        "GraphQL-Features": "issues_copilot_assignment_api_support",
+      },
     });
 
     if (response?.replaceActorsForAssignable?.__typename) {
@@ -386,6 +389,9 @@ async function assignAgentToIssue(assignableId, agentId, currentAssignees, agent
         const fallbackResp = await github.graphql(fallbackMutation, {
           assignableId: assignableId,
           assigneeIds: [agentId],
+          headers: {
+            "GraphQL-Features": "issues_copilot_assignment_api_support",
+          },
         });
         if (fallbackResp?.addAssigneesToAssignable) {
           core.info(`Fallback succeeded: agent '${agentName}' added via addAssigneesToAssignable.`);
