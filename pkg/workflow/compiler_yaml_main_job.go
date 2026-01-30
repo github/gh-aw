@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -35,15 +36,32 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
-	// Add merge remote agent .github folder step if agent is imported from remote repository
-	if data.AgentFile != "" && data.AgentImportSpec != "" {
-		compilerYamlLog.Printf("Adding merge remote agent .github folder step for agent: %s (spec: %s)", data.AgentFile, data.AgentImportSpec)
-		yaml.WriteString("      - name: Merge remote agent .github folder\n")
+	// Add merge remote .github folder step for repository imports or agent imports
+	needsGithubMerge := (len(data.RepositoryImports) > 0) || (data.AgentFile != "" && data.AgentImportSpec != "")
+	if needsGithubMerge {
+		compilerYamlLog.Printf("Adding merge remote .github folder step")
+		yaml.WriteString("      - name: Merge remote .github folder\n")
 		yaml.WriteString("        if: ${{ always() }}\n")
 		fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/github-script"))
 		yaml.WriteString("        env:\n")
-		fmt.Fprintf(yaml, "          GH_AW_AGENT_FILE: \"%s\"\n", data.AgentFile)
-		fmt.Fprintf(yaml, "          GH_AW_AGENT_IMPORT_SPEC: \"%s\"\n", data.AgentImportSpec)
+
+		// Set repository imports if present
+		if len(data.RepositoryImports) > 0 {
+			// Convert to JSON array for the script
+			repoImportsJSON, err := json.Marshal(data.RepositoryImports)
+			if err != nil {
+				compilerYamlLog.Printf("Warning: failed to marshal repository imports: %v", err)
+			} else {
+				fmt.Fprintf(yaml, "          GH_AW_REPOSITORY_IMPORTS: '%s'\n", string(repoImportsJSON))
+			}
+		}
+
+		// Set agent import spec if present (legacy path)
+		if data.AgentFile != "" && data.AgentImportSpec != "" {
+			fmt.Fprintf(yaml, "          GH_AW_AGENT_FILE: \"%s\"\n", data.AgentFile)
+			fmt.Fprintf(yaml, "          GH_AW_AGENT_IMPORT_SPEC: \"%s\"\n", data.AgentImportSpec)
+		}
+
 		yaml.WriteString("        with:\n")
 		yaml.WriteString("          script: |\n")
 		yaml.WriteString("            const script = require('./actions/setup/js/merge_remote_agent_github_folder.cjs');\n")

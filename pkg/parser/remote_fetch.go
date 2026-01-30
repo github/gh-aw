@@ -50,6 +50,36 @@ func isCustomAgentFile(filePath string) bool {
 	return strings.Contains(normalizedPath, ".github/agents/") && strings.HasSuffix(strings.ToLower(normalizedPath), ".md")
 }
 
+// isRepositoryImport checks if an import spec is a repository-only import (no file path)
+// Format: owner/repo@ref or owner/repo (downloads entire .github folder, no agent extraction)
+func isRepositoryImport(importPath string) bool {
+	// Remove section reference if present
+	cleanPath := importPath
+	if idx := strings.Index(importPath, "#"); idx != -1 {
+		cleanPath = importPath[:idx]
+	}
+
+	// Remove ref if present to check the path structure
+	pathWithoutRef := cleanPath
+	if idx := strings.Index(cleanPath, "@"); idx != -1 {
+		pathWithoutRef = cleanPath[:idx]
+	}
+
+	// Split by slash to count parts
+	parts := strings.Split(pathWithoutRef, "/")
+
+	// Repository import has exactly 2 parts: owner/repo
+	// File imports have 3+ parts: owner/repo/path/to/file
+	if len(parts) == 2 {
+		// Check it's not a local path
+		if !strings.HasPrefix(pathWithoutRef, ".") && !strings.HasPrefix(pathWithoutRef, "/") {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ResolveIncludePath resolves include path based on workflowspec format or relative path
 func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, error) {
 	remoteLog.Printf("Resolving include path: file_path=%s, base_dir=%s", filePath, baseDir)

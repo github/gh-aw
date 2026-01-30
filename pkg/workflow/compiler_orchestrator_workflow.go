@@ -119,6 +119,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		EngineConfig:         engineSetup.engineConfig,
 		AgentFile:            importsResult.AgentFile,
 		AgentImportSpec:      importsResult.AgentImportSpec,
+		RepositoryImports:    importsResult.RepositoryImports,
 		NetworkPermissions:   engineSetup.networkPermissions,
 		SandboxConfig:        applySandboxDefaults(engineSetup.sandboxConfig, engineSetup.engineConfig),
 		NeedsTextOutput:      toolsResult.needsTextOutput,

@@ -395,6 +395,7 @@ type WorkflowData struct {
 	EngineConfig         *EngineConfig // Extended engine configuration
 	AgentFile            string        // Path to custom agent file (from imports)
 	AgentImportSpec      string        // Original import specification for agent file (e.g., "owner/repo/path@ref")
+	RepositoryImports    []string      // Repository-only imports (format: "owner/repo@ref") for .github folder merging
 	StopTime             string
 	SkipIfMatch          *SkipIfMatchConfig   // skip-if-match configuration with query and max threshold
 	SkipIfNoMatch        *SkipIfNoMatchConfig // skip-if-no-match configuration with query and min threshold

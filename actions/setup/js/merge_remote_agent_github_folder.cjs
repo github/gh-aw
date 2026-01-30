@@ -196,16 +196,118 @@ function mergeGithubFolder(sourcePath, destPath) {
 }
 
 /**
+ * Merge a repository's .github folder into the workspace
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {string} ref - Git reference
+ * @param {string} workspace - Workspace path
+ */
+async function mergeRepositoryGithubFolder(owner, repo, ref, workspace) {
+  core.info(`Merging .github folder from ${owner}/${repo}@${ref} into workspace`);
+
+  // Create temporary directory for sparse checkout
+  const tempDir = path.join("/tmp", `gh-aw-repo-merge-${Date.now()}`);
+  fs.mkdirSync(tempDir, { recursive: true });
+  core.info(`Created temporary directory: ${tempDir}`);
+
+  try {
+    // Sparse checkout .github folder from remote repository
+    sparseCheckoutGithubFolder(owner, repo, ref, tempDir);
+
+    // Check if .github folder exists in remote repository
+    const sourceGithubFolder = path.join(tempDir, ".github");
+    if (!pathExists(sourceGithubFolder)) {
+      core.warning(`Remote repository ${owner}/${repo}@${ref} does not contain a .github folder`);
+      return;
+    }
+
+    // Merge .github folder into current repository
+    const destGithubFolder = path.join(workspace, ".github");
+
+    // Ensure destination .github folder exists
+    if (!pathExists(destGithubFolder)) {
+      fs.mkdirSync(destGithubFolder, { recursive: true });
+      core.info("Created .github folder in workspace");
+    }
+
+    const { merged, conflicts } = mergeGithubFolder(sourceGithubFolder, destGithubFolder);
+
+    // Report results
+    if (conflicts.length > 0) {
+      core.error(`Found ${conflicts.length} file conflicts:`);
+      for (const conflict of conflicts) {
+        core.error(`  - ${conflict}`);
+      }
+      throw new Error(`Cannot merge .github folder from ${owner}/${repo}@${ref}: ${conflicts.length} file(s) conflict with existing files`);
+    }
+
+    if (merged > 0) {
+      core.info(`Successfully merged ${merged} file(s) from ${owner}/${repo}@${ref}`);
+    } else {
+      core.info("No new files to merge");
+    }
+  } finally {
+    // Clean up temporary directory
+    if (pathExists(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      core.info("Cleaned up temporary directory");
+    }
+  }
+}
+
+/**
  * Main execution
  */
 async function main() {
   try {
-    core.info("Starting remote agent .github folder merge");
+    core.info("Starting remote .github folder merge");
 
+    // Check for repository imports (owner/repo@ref format - merge entire .github folder)
+    const repositoryImportsEnv = process.env.GH_AW_REPOSITORY_IMPORTS;
+    if (repositoryImportsEnv) {
+      core.info(`Repository imports detected: ${repositoryImportsEnv}`);
+
+      // Parse the JSON array of repository imports
+      let repositoryImports;
+      try {
+        repositoryImports = JSON.parse(repositoryImportsEnv);
+      } catch (error) {
+        throw new Error(`Failed to parse GH_AW_REPOSITORY_IMPORTS: ${getErrorMessage(error)}`);
+      }
+
+      if (!Array.isArray(repositoryImports)) {
+        throw new Error("GH_AW_REPOSITORY_IMPORTS must be a JSON array");
+      }
+
+      // Get workspace path
+      const workspace = process.env.GITHUB_WORKSPACE;
+      if (!workspace) {
+        throw new Error("GITHUB_WORKSPACE environment variable not set");
+      }
+
+      // Process each repository import
+      for (const repoImport of repositoryImports) {
+        core.info(`Processing repository import: ${repoImport}`);
+
+        const parsed = parseAgentImportSpec(repoImport);
+        if (!parsed) {
+          core.warning(`Skipping invalid repository import: ${repoImport}`);
+          continue;
+        }
+
+        const { owner, repo, ref } = parsed;
+        await mergeRepositoryGithubFolder(owner, repo, ref, workspace);
+      }
+
+      core.info("All repository imports processed successfully");
+      return;
+    }
+
+    // Legacy path: Handle agent file imports (for backward compatibility)
     // Get agent file path from environment
     const agentFile = process.env.GH_AW_AGENT_FILE;
     if (!agentFile) {
-      core.info("No GH_AW_AGENT_FILE specified, skipping .github folder merge");
+      core.info("No GH_AW_AGENT_FILE or GH_AW_REPOSITORY_IMPORTS specified, skipping .github folder merge");
       return;
     }
 
@@ -236,61 +338,12 @@ async function main() {
       throw new Error("GITHUB_WORKSPACE environment variable not set");
     }
 
-    core.info(`Workspace: ${workspace}`);
+    await mergeRepositoryGithubFolder(owner, repo, ref, workspace);
 
-    // Create temporary directory for sparse checkout
-    const tempDir = path.join("/tmp", `gh-aw-agent-merge-${Date.now()}`);
-    fs.mkdirSync(tempDir, { recursive: true });
-    core.info(`Created temporary directory: ${tempDir}`);
-
-    try {
-      // Sparse checkout .github folder from remote repository
-      sparseCheckoutGithubFolder(owner, repo, ref, tempDir);
-
-      // Check if .github folder exists in remote repository
-      const sourceGithubFolder = path.join(tempDir, ".github");
-      if (!pathExists(sourceGithubFolder)) {
-        core.warning(`Remote repository ${owner}/${repo}@${ref} does not contain a .github folder`);
-        return;
-      }
-
-      // Merge .github folder into current repository
-      const destGithubFolder = path.join(workspace, ".github");
-
-      // Ensure destination .github folder exists
-      if (!pathExists(destGithubFolder)) {
-        fs.mkdirSync(destGithubFolder, { recursive: true });
-        core.info("Created .github folder in workspace");
-      }
-
-      const { merged, conflicts } = mergeGithubFolder(sourceGithubFolder, destGithubFolder);
-
-      // Report results
-      if (conflicts.length > 0) {
-        core.error(`Found ${conflicts.length} file conflicts:`);
-        for (const conflict of conflicts) {
-          core.error(`  - ${conflict}`);
-        }
-        throw new Error(`Cannot merge .github folder from ${owner}/${repo}@${ref}: ${conflicts.length} file(s) conflict with existing files`);
-      }
-
-      if (merged > 0) {
-        core.info(`Successfully merged ${merged} file(s) from ${owner}/${repo}@${ref}`);
-      } else {
-        core.info("No new files to merge");
-      }
-    } finally {
-      // Clean up temporary directory
-      if (pathExists(tempDir)) {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-        core.info("Cleaned up temporary directory");
-      }
-    }
-
-    core.info("Remote agent .github folder merge completed successfully");
+    core.info("Remote .github folder merge completed successfully");
   } catch (error) {
     const errorMessage = getErrorMessage(error);
-    core.setFailed(`Failed to merge remote agent .github folder: ${errorMessage}`);
+    core.setFailed(`Failed to merge remote .github folder: ${errorMessage}`);
   }
 }
 
@@ -305,5 +358,6 @@ module.exports = {
   getAllFiles,
   sparseCheckoutGithubFolder,
   mergeGithubFolder,
+  mergeRepositoryGithubFolder,
   main,
 };
