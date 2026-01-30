@@ -39,7 +39,6 @@ func TestCommandGroupAssignments(t *testing.T) {
 		// Analysis Commands
 		{name: "logs command in analysis group", commandName: "logs", expectedGroup: "analysis", shouldHaveGroup: true},
 		{name: "audit command in analysis group", commandName: "audit", expectedGroup: "analysis", shouldHaveGroup: true},
-		{name: "campaign command in analysis group", commandName: "campaign", expectedGroup: "analysis", shouldHaveGroup: true},
 
 		// Utilities
 		{name: "mcp-server command in utilities group", commandName: "mcp-server", expectedGroup: "utilities", shouldHaveGroup: true},
