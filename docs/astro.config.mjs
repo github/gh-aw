@@ -192,7 +192,7 @@ export default defineConfig({
 				{
 						label: 'Campaigns',
 					items: [
-						{ label: 'Campaign Orchestration', link: '/guides/campaigns/' },
+						{ label: 'About Campaigns', link: '/guides/campaigns/' },
 						{ label: 'Getting Started', link: '/guides/campaigns/getting-started/' },
 					],
 				},
