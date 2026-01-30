@@ -434,3 +434,65 @@ func TestPushWorkflowFiles_WithStagedFiles(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "staged files")
 }
+
+func TestCollectWorkflowFiles_AlwaysRecompiles(t *testing.T) {
+	// Test that workflows are always recompiled, even when frontmatter hash matches
+	tmpDir := t.TempDir()
+
+	// Create a workflow file
+	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
+	workflowContent := `---
+name: Test Workflow
+engine: copilot
+on: workflow_dispatch
+---
+# Test Workflow
+This is a test workflow.
+`
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	require.NoError(t, err)
+
+	// Compute the correct hash for this workflow
+	cache := parser.NewImportCache("")
+	correctHash, err := parser.ComputeFrontmatterHashFromFile(workflowPath, cache)
+	require.NoError(t, err)
+	require.NotEmpty(t, correctHash)
+
+	// Create a lock file with the CORRECT hash (matching)
+	lockFilePath := filepath.Join(tmpDir, "test-workflow.lock.yml")
+	lockContent := fmt.Sprintf(`# frontmatter-hash: %s
+
+name: Test Workflow
+"on": workflow_dispatch
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "test"
+`, correctHash)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	// Record the modification time of the lock file before collection
+	lockStatBefore, err := os.Stat(lockFilePath)
+	require.NoError(t, err)
+	timeBefore := lockStatBefore.ModTime()
+
+	// Sleep to ensure modification time would change if file is rewritten
+	time.Sleep(10 * time.Millisecond)
+
+	// Collect workflow files (which should always trigger recompilation)
+	files, err := collectWorkflowFiles(workflowPath, false)
+	require.NoError(t, err)
+	assert.Len(t, files, 2, "Should collect workflow .md and .lock.yml files")
+
+	// Verify the lock file was recompiled (modification time should be newer)
+	lockStatAfter, err := os.Stat(lockFilePath)
+	require.NoError(t, err)
+	timeAfter := lockStatAfter.ModTime()
+
+	// The lock file should have been recompiled even though the hash matched
+	assert.True(t, timeAfter.After(timeBefore),
+		"Lock file should be recompiled even when frontmatter hash matches (always recompile behavior)")
+}
