@@ -133,7 +133,7 @@ This is the main workflow content.`,
 			// - Imported content IS in the lock file (inlined)
 			// - Main workflow content is NOT in lock file (runtime-imported)
 			// So we check lock file for imported content and runtime-import macro
-			
+
 			// Verify imported content is in the lock file (inlined)
 			importedExpected := []string{"# Common Setup", "This is common setup content"}
 			for _, expected := range importedExpected {
@@ -241,7 +241,7 @@ This is the main workflow content.`
 	// With the new approach:
 	// - Imported content (from frontmatter imports) → inlined in lock file
 	// - Main workflow content (including @include expansion) → runtime-imported
-	
+
 	// Verify imported content is in lock file (inlined)
 	if !strings.Contains(lockContent, "# Imported Content") {
 		t.Error("Imported content from frontmatter imports should be inlined in lock file")
@@ -347,7 +347,7 @@ This is the main workflow content.`
 	if !strings.Contains(lockContent, "More imported content here") {
 		t.Error("Expected imported content to be present in lock file")
 	}
-	
+
 	// With new approach, main workflow content is runtime-imported (not inlined)
 	if !strings.Contains(lockContent, "{{#runtime-import") {
 		t.Error("Expected runtime-import macro in lock file")
