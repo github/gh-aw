@@ -166,3 +166,7 @@ test-script-mode.lock.yml
 # Test metrics patterns workflow (temporary validation file)
 .github/workflows/test-metrics-patterns.md
 .github/workflows/test-metrics-patterns.lock.yml
+
+# Generated markdown body files (runtime-import feature)
+# These are generated from the main .md workflow files
+*.body.md

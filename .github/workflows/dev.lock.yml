@@ -535,17 +535,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Build, Test, and Add Poem
-          
-          Build and test the gh-aw project, then add a single line poem to poems.txt.
-          
-          **Requirements:**
-          1. Run `make build` to build the binary (this handles Go module downloads automatically)
-          2. Run `make test` to run the test suite
-          3. Report any failures with details about what went wrong
-          4. If all steps pass, create a file called poems.txt with a single line poem
-          5. Create a pull request with the poem
-          
+          {{#runtime-import workflows/dev.body.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
