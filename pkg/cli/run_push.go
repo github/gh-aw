@@ -41,49 +41,49 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 	// Check if lock file needs recompilation
 	lockFilePath := stringutil.MarkdownToLockFile(absWorkflowPath)
 	runPushLog.Printf("Checking lock file: %s", lockFilePath)
-	needsRecompile := false
 
+	// Always recompile, but check and log hash status for observability
 	if _, err := os.Stat(lockFilePath); err == nil {
 		runPushLog.Printf("Lock file exists: %s", lockFilePath)
-		// Lock file exists - check frontmatter hash
-		runPushLog.Print("Checking frontmatter hash")
+		// Check frontmatter hash for observability
+		runPushLog.Print("Checking frontmatter hash for observability")
 		if hashMismatch, err := checkFrontmatterHashMismatch(absWorkflowPath, lockFilePath); err != nil {
 			runPushLog.Printf("Error checking frontmatter hash: %v", err)
 			// Don't fail, just log the error
 		} else if hashMismatch {
-			needsRecompile = true
-			runPushLog.Print("Lock file is outdated: frontmatter hash mismatch")
+			runPushLog.Print("Lock file frontmatter hash changed (will recompile)")
 			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (frontmatter changed), recompiling workflow..."))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Frontmatter hash changed, recompiling workflow..."))
 			}
 		} else {
-			runPushLog.Printf("Lock file is up-to-date (frontmatter hash matches)")
+			runPushLog.Print("Lock file frontmatter hash unchanged (will still recompile)")
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflow..."))
+			}
 		}
 	} else if os.IsNotExist(err) {
-		// Lock file doesn't exist - needs compilation
-		needsRecompile = true
+		// Lock file doesn't exist
 		runPushLog.Printf("Lock file not found: %s", lockFilePath)
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Lock file not found, compiling workflow..."))
 		}
 	} else {
 		runPushLog.Printf("Error checking lock file: %v", err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling workflow..."))
+		}
 	}
 
-	// Recompile if needed
-	if needsRecompile {
-		runPushLog.Printf("Recompilation needed for %s", absWorkflowPath)
-		if err := recompileWorkflow(absWorkflowPath, verbose); err != nil {
-			runPushLog.Printf("Failed to recompile workflow: %v", err)
-			return nil, fmt.Errorf("failed to recompile workflow: %w", err)
-		}
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
-		}
-		runPushLog.Printf("Recompilation completed successfully")
-	} else {
-		runPushLog.Printf("Recompilation not needed")
+	// Always recompile (hash check is for observability only)
+	runPushLog.Printf("Always recompiling workflow: %s", absWorkflowPath)
+	if err := recompileWorkflow(absWorkflowPath, verbose); err != nil {
+		runPushLog.Printf("Failed to recompile workflow: %v", err)
+		return nil, fmt.Errorf("failed to recompile workflow: %w", err)
 	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
+	}
+	runPushLog.Printf("Recompilation completed successfully")
 
 	// Add the corresponding .lock.yml file
 	if _, err := os.Stat(lockFilePath); err == nil {
@@ -149,14 +149,19 @@ func recompileWorkflow(workflowPath string, verbose bool) error {
 	return nil
 }
 
-// checkLockFileStatus checks if a lock file is missing or outdated and returns status info
+// checkLockFileStatus checks if a lock file is missing or outdated and returns status info.
+// Note: This is used for display/warning purposes only. The actual compilation decision
+// is made in collectWorkflowFiles, which always recompiles regardless of hash status.
 type LockFileStatus struct {
 	Missing  bool
 	Outdated bool
 	LockPath string
 }
 
-// checkLockFileStatus checks the status of a workflow's lock file
+// checkLockFileStatus checks the status of a workflow's lock file.
+// This function is used to determine whether to show warnings to the user about
+// outdated lock files. It does NOT control whether recompilation happens -
+// collectWorkflowFiles always recompiles regardless of the hash status.
 func checkLockFileStatus(workflowPath string) (*LockFileStatus, error) {
 	runPushLog.Printf("Checking lock file status for: %s", workflowPath)
 
@@ -589,6 +594,8 @@ func pushWorkflowFiles(workflowName string, files []string, refOverride string, 
 // checkFrontmatterHashMismatch checks if the frontmatter hash in the lock file
 // matches the recomputed hash from the workflow file.
 // Returns true if there's a mismatch (lock file is stale), false if they match.
+// Note: This is used for logging/observability only. The compilation decision
+// is made by collectWorkflowFiles, which always recompiles regardless of hash status.
 func checkFrontmatterHashMismatch(workflowPath, lockFilePath string) (bool, error) {
 	runPushLog.Printf("Checking frontmatter hash for %s", workflowPath)
 
