@@ -4,7 +4,7 @@ description: Example campaign workflows with worker patterns and idempotency
 sidebar:
   badge: { text: 'Examples', variant: 'note' }
 banner:
-  content: '<strong>⚠️ Experimental:</strong> Campaign features are still experimental and subject to change.'
+  content: '<strong>⚠️ Experimental:</strong> This feature is under active development and may change or behave unpredictably.'
 ---
 
 Example campaigns demonstrating worker coordination, standardized contracts, and idempotent execution patterns.
