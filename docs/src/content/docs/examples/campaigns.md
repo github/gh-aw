@@ -192,5 +192,4 @@ The campaign discovers these via tracker labels without controlling execution.
 ## Further reading
 
 - [Campaign guides](/gh-aw/guides/campaigns/) - Setup and configuration
-- [Campaign specs](/gh-aw/guides/campaigns/specs/) - Configuration reference
 - [Safe outputs](/gh-aw/reference/safe-outputs/) - dispatch_workflow configuration
