@@ -193,8 +193,10 @@ jobs:
           GH_AW_REPOSITORY_IMPORTS: '["github/github-deep-research-agent@main"]'
         with:
           script: |
-            const script = require('./actions/setup/js/merge_remote_agent_github_folder.cjs');
-            return script.main();
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/merge_remote_agent_github_folder.cjs');
+            await main();
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       - name: Setup jq utilities directory

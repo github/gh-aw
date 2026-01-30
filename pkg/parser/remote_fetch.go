@@ -83,17 +83,17 @@ func isRepositoryImport(importPath string) bool {
 	if strings.HasPrefix(pathWithoutRef, "shared/") {
 		return false
 	}
-	
+
 	// Additional validation: check if it looks like a valid owner/repo format
 	// GitHub identifiers can't start with numbers, must be alphanumeric with hyphens/underscores
 	owner := parts[0]
 	repo := parts[1]
-	
+
 	// Basic validation - ensure they're not empty and don't look like file extensions
 	if owner == "" || repo == "" {
 		return false
 	}
-	
+
 	// Reject if repo part looks like a file extension (ends with .md, .yaml, etc.)
 	if strings.Contains(repo, ".") {
 		return false

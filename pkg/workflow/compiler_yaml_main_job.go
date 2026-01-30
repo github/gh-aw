@@ -64,8 +64,10 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 
 		yaml.WriteString("        with:\n")
 		yaml.WriteString("          script: |\n")
-		yaml.WriteString("            const script = require('./actions/setup/js/merge_remote_agent_github_folder.cjs');\n")
-		yaml.WriteString("            return script.main();\n")
+		yaml.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
+		yaml.WriteString("            setupGlobals(core, github, context, exec, io);\n")
+		yaml.WriteString("            const { main } = require('/opt/gh-aw/actions/merge_remote_agent_github_folder.cjs');\n")
+		yaml.WriteString("            await main();\n")
 	}
 
 	// Add automatic runtime setup steps if needed
