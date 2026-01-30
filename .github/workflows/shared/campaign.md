@@ -1,5 +1,5 @@
 ---
-# Shared safe-outputs defaults for campaign coordinators.
+# Shared safe-outputs defaults for campaign orchestator.
 # Intended to be included via frontmatter `imports:`.
 # Workflows may override any specific safe-output type by defining it at top-level.
 
@@ -12,13 +12,13 @@ safe-outputs:
     max: 5
     assignees: copilot
 ---
-# Campaign Coordinator Core Rules
+# Campaign Orchestrator Core Rules
 
-These are generic coordinator rules.
+These are generic orchestrator rules.
 
 ## Operating Model
 
-- The coordinator coordinates a single campaign: discover state, decide deterministically, apply minimal writes, and report.
+- The orchestrator coordinates a single campaign: discover state, decide deterministically, apply minimal writes, and report.
 - Delegate repo/code changes (PRs, commits) to worker workflows unless the campaign explicitly grants direct repo authority.
 - The GitHub Project board (when used) is the authoritative campaign state; do not invent state.
 
