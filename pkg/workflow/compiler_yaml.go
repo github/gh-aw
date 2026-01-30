@@ -120,9 +120,16 @@ func (c *Compiler) generateWorkflowBody(yaml *strings.Builder, data *WorkflowDat
 	// Note: GitHub Actions doesn't support workflow-level if conditions
 	// The workflow_run safety check is added to individual jobs instead
 
-	// Always write empty permissions at the top level
-	// Agent permissions are applied only to the agent job
-	yaml.WriteString("permissions: {}\n\n")
+	// Write workflow-level permissions
+	// For workflows with explicit permissions and risky triggers, use explicit permissions at workflow level
+	// Otherwise, use empty permissions and apply permissions at job level
+	if data.Permissions != "" && data.Permissions != "permissions: {}" && c.hasRiskyTriggers(data.On) {
+		// Use explicit permissions from frontmatter at workflow level for risky triggers
+		yaml.WriteString(data.Permissions + "\n\n")
+	} else {
+		// Use empty permissions at workflow level, agent permissions applied at job level
+		yaml.WriteString("permissions: {}\n\n")
+	}
 
 	yaml.WriteString(data.Concurrency + "\n\n")
 	yaml.WriteString(data.RunName + "\n\n")

@@ -48,7 +48,11 @@ name: "Resource Summarizer Agent"
         required: true
         type: string
 
-permissions: {}
+permissions:
+  contents: read
+  discussions: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"

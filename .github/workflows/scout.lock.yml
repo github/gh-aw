@@ -65,7 +65,10 @@ name: "Scout"
         description: Research topic or question
         required: true
 
-permissions: {}
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"

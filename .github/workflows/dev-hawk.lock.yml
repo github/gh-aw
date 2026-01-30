@@ -36,7 +36,10 @@ name: "Dev Hawk"
     workflows:
     - Dev
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

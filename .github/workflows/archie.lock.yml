@@ -38,7 +38,11 @@ name: "Archie"
     - edited
     - reopened
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"

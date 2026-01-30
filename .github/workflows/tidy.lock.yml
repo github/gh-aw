@@ -39,7 +39,10 @@ name: "Tidy"
   - cron: "0 7 * * *"
   workflow_dispatch: null
 
-permissions: {}
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   cancel-in-progress: true

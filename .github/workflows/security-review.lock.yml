@@ -32,7 +32,13 @@ name: "Security Review Agent 🔒"
     - created
     - edited
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
+  discussions: read
+  issues: read
+  pull-requests: read
+  security-events: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"
