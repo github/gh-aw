@@ -553,14 +553,14 @@ function wrapExpressionsInTemplateConditionals(content) {
 function extractAndReplacePlaceholders(content) {
   // Pattern to match {{#if ${{ expression }} }} where expression needs to be extracted
   const pattern = /\{\{#if\s+\$\{\{\s*(.*?)\s*\}\}\s*\}\}/g;
-  
+
   return content.replace(pattern, (match, expr) => {
     const trimmed = expr.trim();
-    
+
     // Generate placeholder name from expression
     // Convert dots and special chars to underscores and uppercase
     const placeholder = generatePlaceholderName(trimmed);
-    
+
     // Return the conditional with placeholder
     return `{{#if __${placeholder}__ }}`;
   });
@@ -574,13 +574,13 @@ function extractAndReplacePlaceholders(content) {
 function generatePlaceholderName(expr) {
   // Check if it's a simple property access chain (e.g., github.event.issue.number)
   const simplePattern = /^[a-zA-Z][a-zA-Z0-9_.]*$/;
-  
+
   if (simplePattern.test(expr)) {
     // Convert dots to underscores and uppercase
     // e.g., "github.event.issue.number" -> "GH_AW_GITHUB_EVENT_ISSUE_NUMBER"
     return "GH_AW_" + expr.replace(/\./g, "_").toUpperCase();
   }
-  
+
   // For boolean literals, use special placeholders
   if (expr === "true") {
     return "GH_AW_TRUE";
@@ -591,7 +591,7 @@ function generatePlaceholderName(expr) {
   if (expr === "null") {
     return "GH_AW_NULL";
   }
-  
+
   // For complex expressions or unknown variables, create a generic placeholder
   // Replace non-alphanumeric characters with underscores
   const sanitized = expr.replace(/[^a-zA-Z0-9_]/g, "_").toUpperCase();
@@ -714,7 +714,7 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Wrap expressions in template conditionals
   // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
   content = wrapExpressionsInTemplateConditionals(content);
-  
+
   // Extract and replace GitHub expressions in template conditionals with placeholders
   // This transforms {{#if ${{ expression }} }} to {{#if __GH_AW_PLACEHOLDER__ }}
   content = extractAndReplacePlaceholders(content);

@@ -108,7 +108,7 @@ ${{ needs.activation.outputs.text }}
 			t.Errorf("Compiled workflow should contain placeholder expression in GitHub context: %s", expectedExpr)
 		}
 	}
-	
+
 	// Verify that the main workflow content is loaded via runtime-import
 	// Template conditionals in the user's markdown (like needs.activation.outputs.text)
 	// are processed at runtime by the JavaScript runtime_import helper
@@ -283,7 +283,7 @@ Steps expression - will be wrapped.
 	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__ }}") {
 		t.Error("GitHub context should contain placeholder for github.event.issue.number")
 	}
-	
+
 	// Verify that the main workflow content is loaded via runtime-import
 	// Template conditionals in the user's markdown (like steps, true/false literals, etc.)
 	// are processed at runtime by the JavaScript runtime_import helper
