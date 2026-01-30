@@ -11,16 +11,22 @@ var healthMetricsLog = logger.New("cli:health_metrics")
 
 // WorkflowHealth represents health metrics for a single workflow
 type WorkflowHealth struct {
-	WorkflowName string        `json:"workflow_name" console:"header:Workflow"`
-	TotalRuns    int           `json:"total_runs" console:"-"`
-	SuccessCount int           `json:"success_count" console:"-"`
-	FailureCount int           `json:"failure_count" console:"-"`
-	SuccessRate  float64       `json:"success_rate" console:"-"`
-	DisplayRate  string        `json:"-" console:"header:Success Rate"`
-	Trend        string        `json:"trend" console:"header:Trend"`
-	AvgDuration  time.Duration `json:"avg_duration" console:"-"`
-	DisplayDur   string        `json:"-" console:"header:Avg Duration"`
-	BelowThresh  bool          `json:"below_threshold" console:"-"`
+	WorkflowName  string        `json:"workflow_name" console:"header:Workflow"`
+	TotalRuns     int           `json:"total_runs" console:"-"`
+	SuccessCount  int           `json:"success_count" console:"-"`
+	FailureCount  int           `json:"failure_count" console:"-"`
+	SuccessRate   float64       `json:"success_rate" console:"-"`
+	DisplayRate   string        `json:"-" console:"header:Success Rate"`
+	Trend         string        `json:"trend" console:"header:Trend"`
+	AvgDuration   time.Duration `json:"avg_duration" console:"-"`
+	DisplayDur    string        `json:"-" console:"header:Avg Duration"`
+	TotalTokens   int           `json:"total_tokens" console:"-"`
+	AvgTokens     int           `json:"avg_tokens" console:"-"`
+	DisplayTokens string        `json:"-" console:"header:Avg Tokens"`
+	TotalCost     float64       `json:"total_cost" console:"-"`
+	AvgCost       float64       `json:"avg_cost" console:"-"`
+	DisplayCost   string        `json:"-" console:"header:Avg Cost ($)"`
+	BelowThresh   bool          `json:"below_threshold" console:"-"`
 }
 
 // HealthSummary represents aggregated health metrics across all workflows
@@ -61,10 +67,12 @@ func CalculateWorkflowHealth(workflowName string, runs []WorkflowRun, threshold 
 
 	if len(runs) == 0 {
 		return WorkflowHealth{
-			WorkflowName: workflowName,
-			DisplayRate:  "N/A",
-			Trend:        "→",
-			DisplayDur:   "N/A",
+			WorkflowName:  workflowName,
+			DisplayRate:   "N/A",
+			Trend:         "→",
+			DisplayDur:    "N/A",
+			DisplayTokens: "-",
+			DisplayCost:   "-",
 		}
 	}
 
@@ -72,6 +80,8 @@ func CalculateWorkflowHealth(workflowName string, runs []WorkflowRun, threshold 
 	successCount := 0
 	failureCount := 0
 	var totalDuration time.Duration
+	var totalTokens int
+	var totalCost float64
 
 	for _, run := range runs {
 		if run.Conclusion == "success" {
@@ -80,6 +90,8 @@ func CalculateWorkflowHealth(workflowName string, runs []WorkflowRun, threshold 
 			failureCount++
 		}
 		totalDuration += run.Duration
+		totalTokens += run.TokenUsage
+		totalCost += run.EstimatedCost
 	}
 
 	totalRuns := len(runs)
@@ -94,29 +106,45 @@ func CalculateWorkflowHealth(workflowName string, runs []WorkflowRun, threshold 
 		avgDuration = totalDuration / time.Duration(totalRuns)
 	}
 
+	// Calculate average tokens and cost
+	avgTokens := 0
+	avgCost := 0.0
+	if totalRuns > 0 {
+		avgTokens = totalTokens / totalRuns
+		avgCost = totalCost / float64(totalRuns)
+	}
+
 	// Calculate trend
 	trend := calculateTrend(runs)
 
 	// Format display values
 	displayRate := fmt.Sprintf("%.0f%%  (%d/%d)", successRate, successCount, totalRuns)
 	displayDur := formatDuration(avgDuration)
+	displayTokens := formatTokens(avgTokens)
+	displayCost := formatCost(avgCost)
 
 	belowThreshold := successRate < threshold
 
 	health := WorkflowHealth{
-		WorkflowName: workflowName,
-		TotalRuns:    totalRuns,
-		SuccessCount: successCount,
-		FailureCount: failureCount,
-		SuccessRate:  successRate,
-		DisplayRate:  displayRate,
-		Trend:        trend.String(),
-		AvgDuration:  avgDuration,
-		DisplayDur:   displayDur,
-		BelowThresh:  belowThreshold,
+		WorkflowName:  workflowName,
+		TotalRuns:     totalRuns,
+		SuccessCount:  successCount,
+		FailureCount:  failureCount,
+		SuccessRate:   successRate,
+		DisplayRate:   displayRate,
+		Trend:         trend.String(),
+		AvgDuration:   avgDuration,
+		DisplayDur:    displayDur,
+		TotalTokens:   totalTokens,
+		AvgTokens:     avgTokens,
+		DisplayTokens: displayTokens,
+		TotalCost:     totalCost,
+		AvgCost:       avgCost,
+		DisplayCost:   displayCost,
+		BelowThresh:   belowThreshold,
 	}
 
-	healthMetricsLog.Printf("Health calculated: workflow=%s, successRate=%.2f%%, trend=%s", workflowName, successRate, trend.String())
+	healthMetricsLog.Printf("Health calculated: workflow=%s, successRate=%.2f%%, trend=%s, avgCost=$%.3f", workflowName, successRate, trend.String(), avgCost)
 
 	return health
 }
@@ -245,4 +273,29 @@ func GroupRunsByWorkflow(runs []WorkflowRun) map[string][]WorkflowRun {
 		grouped[run.WorkflowName] = append(grouped[run.WorkflowName], run)
 	}
 	return grouped
+}
+
+// formatTokens formats token count in a human-readable format
+func formatTokens(tokens int) string {
+	if tokens == 0 {
+		return "-"
+	}
+	if tokens < 1000 {
+		return fmt.Sprintf("%d", tokens)
+	}
+	if tokens < 1000000 {
+		return fmt.Sprintf("%.1fK", float64(tokens)/1000)
+	}
+	return fmt.Sprintf("%.1fM", float64(tokens)/1000000)
+}
+
+// formatCost formats cost in a human-readable format
+func formatCost(cost float64) string {
+	if cost == 0 {
+		return "-"
+	}
+	if cost < 0.001 {
+		return "< 0.001"
+	}
+	return fmt.Sprintf("%.3f", cost)
 }

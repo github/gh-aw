@@ -282,3 +282,75 @@ func TestTrendDirectionString(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatTokens(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   int
+		expected string
+	}{
+		{
+			name:     "zero tokens",
+			tokens:   0,
+			expected: "-",
+		},
+		{
+			name:     "small tokens",
+			tokens:   500,
+			expected: "500",
+		},
+		{
+			name:     "thousands",
+			tokens:   5000,
+			expected: "5.0K",
+		},
+		{
+			name:     "millions",
+			tokens:   2500000,
+			expected: "2.5M",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatTokens(tt.tokens)
+			assert.Equal(t, tt.expected, result, "Formatted tokens should match")
+		})
+	}
+}
+
+func TestFormatCost(t *testing.T) {
+	tests := []struct {
+		name     string
+		cost     float64
+		expected string
+	}{
+		{
+			name:     "zero cost",
+			cost:     0.0,
+			expected: "-",
+		},
+		{
+			name:     "very small cost",
+			cost:     0.0001,
+			expected: "< 0.001",
+		},
+		{
+			name:     "small cost",
+			cost:     0.123,
+			expected: "0.123",
+		},
+		{
+			name:     "large cost",
+			cost:     5.678,
+			expected: "5.678",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatCost(tt.cost)
+			assert.Equal(t, tt.expected, result, "Formatted cost should match")
+		})
+	}
+}
