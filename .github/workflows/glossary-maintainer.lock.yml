@@ -26,7 +26,7 @@
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
 #
-# frontmatter-hash: f8bc8cfd89bb47fa7dd9145e186102e5121e4c2e137de92240d93788d8fb073d
+# frontmatter-hash: b26c0b64cc9fd43f7069ca22bdc1735bacf35b24e9bc8ce075abab87e65704bc
 
 name: "Glossary Maintainer"
 "on":
@@ -111,6 +111,18 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
+      - name: Merge remote .github folder
+        if: ${{ always() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          GH_AW_AGENT_FILE: ".github/agents/technical-doc-writer.agent.md"
+          GH_AW_AGENT_IMPORT_SPEC: "../agents/technical-doc-writer.agent.md"
+        with:
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/merge_remote_agent_github_folder.cjs');
+            await main();
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       # Cache memory file share configuration from frontmatter processed below

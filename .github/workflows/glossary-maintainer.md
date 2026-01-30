@@ -15,7 +15,6 @@ permissions:
 
 engine:
   id: copilot
-  agent: technical-doc-writer
 
 network:
   allowed:

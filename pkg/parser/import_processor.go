@@ -182,6 +182,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	labelsSet := make(map[string]bool)   // Set for deduplicating labels
 	var caches []string                  // Track cache configurations (appended in order)
 	var jobsBuilder strings.Builder      // Track jobs from imported YAML workflows
+	var agentFile string                 // Track custom agent file
+	var agentImportSpec string           // Track agent import specification for remote imports
 	var repositoryImports []string       // Track repository-only imports for .github folder merging
 	importInputs := make(map[string]any) // Aggregated input values from all imports
 
@@ -273,6 +275,49 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 
 		// Add to processing order
 		processedOrder = append(processedOrder, item.importPath)
+
+		// Check if this is a custom agent file (any markdown file under .github/agents)
+		isAgentFile := strings.Contains(item.fullPath, "/.github/agents/") && strings.HasSuffix(strings.ToLower(item.fullPath), ".md")
+		if isAgentFile {
+			if agentFile != "" {
+				// Multiple agent files found - error
+				log.Printf("Multiple agent files found: %s and %s", agentFile, item.importPath)
+				return nil, fmt.Errorf("multiple agent files found in imports: '%s' and '%s'. Only one agent file is allowed per workflow", agentFile, item.importPath)
+			}
+			// Extract relative path from repository root (from .github/ onwards)
+			// This ensures the path works at runtime with $GITHUB_WORKSPACE
+			if idx := strings.Index(item.fullPath, "/.github/"); idx >= 0 {
+				agentFile = item.fullPath[idx+1:] // +1 to skip the leading slash
+			} else {
+				agentFile = item.fullPath
+			}
+			log.Printf("Found agent file: %s (resolved to: %s)", item.fullPath, agentFile)
+
+			// Store the original import specification for remote agents
+			// This allows runtime detection and .github folder merging
+			agentImportSpec = item.importPath
+			log.Printf("Agent import specification: %s", agentImportSpec)
+
+			// For agent files, only extract markdown content
+			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
+			if err != nil {
+				return nil, fmt.Errorf("failed to process markdown from agent file '%s': %w", item.fullPath, err)
+			}
+			if markdownContent != "" {
+				markdownBuilder.WriteString(markdownContent)
+				// Add blank line separator between imported files
+				if !strings.HasSuffix(markdownContent, "\n\n") {
+					if strings.HasSuffix(markdownContent, "\n") {
+						markdownBuilder.WriteString("\n")
+					} else {
+						markdownBuilder.WriteString("\n\n")
+					}
+				}
+			}
+
+			// Agent files don't have nested imports, skip to next item
+			continue
+		}
 
 		// Check if this is a YAML workflow file (not .lock.yml)
 		if isYAMLWorkflowFile(item.fullPath) {
@@ -539,8 +584,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedCaches:        caches,
 		MergedJobs:          jobsBuilder.String(),
 		ImportedFiles:       topologicalOrder,
-		AgentFile:           "", // Deprecated - use engine.agent instead
-		AgentImportSpec:     "", // Deprecated - use engine.agent instead
+		AgentFile:           agentFile,
+		AgentImportSpec:     agentImportSpec,
 		RepositoryImports:   repositoryImports,
 		ImportInputs:        importInputs,
 	}, nil

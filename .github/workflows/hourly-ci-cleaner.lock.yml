@@ -25,7 +25,7 @@
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
 #
-# frontmatter-hash: 1280dbf699516baf7eae2f813fa86e525617086f6cd1e3957cc2126a727e182a
+# frontmatter-hash: cf34c9ca048904e350b43974103be2dc6b03a96ca98d7459e8ce4c281e8d185e
 
 name: "CI Cleaner"
 "on":
@@ -113,6 +113,18 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
+      - name: Merge remote .github folder
+        if: ${{ always() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          GH_AW_AGENT_FILE: ".github/agents/ci-cleaner.agent.md"
+          GH_AW_AGENT_IMPORT_SPEC: "../agents/ci-cleaner.agent.md"
+        with:
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/merge_remote_agent_github_folder.cjs');
+            await main();
       - name: Setup Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
