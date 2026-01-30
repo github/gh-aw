@@ -304,19 +304,19 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		// Check if this is a YAML workflow file (not .lock.yml)
 		if isYAMLWorkflowFile(item.fullPath) {
 			log.Printf("Detected YAML workflow file: %s", item.fullPath)
-			
+
 			// Process YAML workflow import to extract jobs and services
 			jobsJSON, servicesJSON, err := processYAMLWorkflowImport(item.fullPath)
 			if err != nil {
 				return nil, fmt.Errorf("failed to process YAML workflow '%s': %w", item.importPath, err)
 			}
-			
+
 			// Append jobs to merged jobs
 			if jobsJSON != "" && jobsJSON != "{}" {
 				jobsBuilder.WriteString(jobsJSON + "\n")
 				log.Printf("Added jobs from YAML workflow: %s", item.importPath)
 			}
-			
+
 			// Append services to merged services (services from YAML are already in JSON format)
 			// Need to convert to YAML format for consistency with other services
 			if servicesJSON != "" && servicesJSON != "{}" {
@@ -331,7 +331,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 					}
 				}
 			}
-			
+
 			// YAML workflows don't have nested imports or markdown content, skip to next item
 			continue
 		}

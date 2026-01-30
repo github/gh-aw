@@ -91,12 +91,11 @@ This workflow imports a YAML workflow and adds additional jobs.`
 			lines = append(lines, line)
 		}
 	}
-	
+
 	// Since we might have multiple JSON objects on separate lines, merge them
 	for _, line := range lines {
 		// Split by newlines in case there are multiple JSON objects
 		for _, jsonLine := range []string{line} {
-			jsonLine = jsonLine
 			if jsonLine == "" || jsonLine == "{}" {
 				continue
 			}
@@ -113,16 +112,16 @@ This workflow imports a YAML workflow and adds additional jobs.`
 	assert.Contains(t, allJobs, "lint", "Should contain lint job from YAML workflow")
 	assert.Contains(t, allJobs, "test", "Should contain test job from YAML workflow")
 	assert.Contains(t, allJobs, "build", "Should contain build job from YAML workflow")
-	
+
 	// Verify job details
 	lintJob, ok := allJobs["lint"].(map[string]any)
 	require.True(t, ok, "lint job should be a map")
 	assert.Equal(t, "ubuntu-latest", lintJob["runs-on"], "lint job should have correct runs-on")
-	
+
 	testJob, ok := allJobs["test"].(map[string]any)
 	require.True(t, ok, "test job should be a map")
 	assert.Equal(t, "ubuntu-latest", testJob["runs-on"], "test job should have correct runs-on")
-	
+
 	// Verify job dependencies
 	if needs, ok := testJob["needs"].(string); ok {
 		assert.Equal(t, "lint", needs, "test job should depend on lint")
@@ -186,7 +185,7 @@ This workflow imports a YAML workflow with services.`
 
 	// Verify that jobs were imported
 	assert.NotEmpty(t, importsResult.MergedJobs, "Should have merged jobs from YAML workflow")
-	
+
 	// Verify that services were imported
 	assert.NotEmpty(t, importsResult.MergedServices, "Should have merged services from YAML workflow")
 	assert.Contains(t, importsResult.MergedServices, "db-test_postgres", "Should contain prefixed postgres service")
