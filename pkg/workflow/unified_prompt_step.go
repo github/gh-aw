@@ -551,7 +551,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 
 		// Check if this chunk is a runtime-import macro
 		if strings.HasPrefix(chunk, "{{#runtime-import ") && strings.HasSuffix(chunk, "}}") {
-			// This is a runtime-import macro - write it directly without heredoc
+			// This is a runtime-import macro - write it using heredoc for safe escaping
 			unifiedPromptLog.Print("Detected runtime-import macro, writing directly")
 
 			// Close heredoc if open before writing runtime-import macro
@@ -561,12 +561,15 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 			}
 
 			// Write the macro directly with proper indentation
+			// Write the macro using a heredoc to avoid potential escaping issues
 			if isFirstContent {
-				yaml.WriteString("          echo '" + chunk + "' > \"$GH_AW_PROMPT\"\n")
+				yaml.WriteString("          cat << 'PROMPT_EOF' > \"$GH_AW_PROMPT\"\n")
 				isFirstContent = false
 			} else {
-				yaml.WriteString("          echo '" + chunk + "' >> \"$GH_AW_PROMPT\"\n")
+				yaml.WriteString("          cat << 'PROMPT_EOF' >> \"$GH_AW_PROMPT\"\n")
 			}
+			yaml.WriteString("          " + chunk + "\n")
+			yaml.WriteString("          PROMPT_EOF\n")
 			continue
 		}
 

@@ -675,7 +675,9 @@ jobs:
           
           
           PROMPT_EOF
-          echo '{{#runtime-import workflows/copilot-pr-merged-report.md}}' >> "$GH_AW_PROMPT"
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import workflows/copilot-pr-merged-report.md}}
+          PROMPT_EOF
       - name: Validate prompt placeholders
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt

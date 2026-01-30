@@ -1004,7 +1004,9 @@ jobs:
           
           
           PROMPT_EOF
-          echo '{{#runtime-import workflows/deep-report.md}}' >> "$GH_AW_PROMPT"
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import workflows/deep-report.md}}
+          PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:

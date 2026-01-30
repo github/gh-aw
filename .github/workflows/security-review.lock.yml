@@ -675,7 +675,9 @@ jobs:
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
           PROMPT_EOF
-          echo '{{#runtime-import workflows/security-review.md}}' >> "$GH_AW_PROMPT"
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import workflows/security-review.md}}
+          PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
