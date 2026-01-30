@@ -479,4 +479,109 @@ describe("create_project_status_update", () => {
     expect(mockGithub.graphql).toHaveBeenCalledTimes(3);
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("falling back to projectsV2 list search"));
   });
+
+  it("should use default project URL from GH_AW_PROJECT_URL when message.project is missing", async () => {
+    // Set default project URL in environment
+    const defaultProjectUrl = "https://github.com/orgs/test-org/projects/42";
+    process.env.GH_AW_PROJECT_URL = defaultProjectUrl;
+
+    mockGithub.graphql
+      .mockResolvedValueOnce({
+        // First call: direct project query by number
+        organization: {
+          projectV2: {
+            id: "PVT_test123",
+            number: 42,
+            title: "Test Project",
+            url: defaultProjectUrl,
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        // Second call: create status update
+        createProjectV2StatusUpdate: {
+          statusUpdate: {
+            id: "PVTSU_test456",
+            body: "Default project status",
+            bodyHTML: "<p>Default project status</p>",
+            startDate: "2025-01-01",
+            targetDate: "2025-12-31",
+            status: "ON_TRACK",
+            createdAt: "2025-01-06T12:00:00Z",
+          },
+        },
+      });
+
+    const handler = await main({ max: 10 });
+
+    const messageWithoutProject = {
+      body: "Default project status",
+      status: "ON_TRACK",
+      start_date: "2025-01-01",
+      target_date: "2025-12-31",
+    };
+
+    const result = await handler(messageWithoutProject, {});
+
+    expect(result.success).toBe(true);
+    expect(result.status_update_id).toBe("PVTSU_test456");
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+
+    // Cleanup
+    delete process.env.GH_AW_PROJECT_URL;
+  });
+
+  it("should prioritize message.project over GH_AW_PROJECT_URL when both are present", async () => {
+    // Set default project URL in environment (should be ignored)
+    process.env.GH_AW_PROJECT_URL = "https://github.com/orgs/test-org/projects/999";
+
+    const messageProjectUrl = "https://github.com/orgs/test-org/projects/42";
+
+    mockGithub.graphql
+      .mockResolvedValueOnce({
+        // First call: direct project query by number
+        organization: {
+          projectV2: {
+            id: "PVT_test789",
+            number: 42,
+            title: "Test Project",
+            url: messageProjectUrl,
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        // Second call: create status update
+        createProjectV2StatusUpdate: {
+          statusUpdate: {
+            id: "PVTSU_test789",
+            body: "Message project status",
+            bodyHTML: "<p>Message project status</p>",
+            startDate: "2025-01-01",
+            targetDate: "2025-12-31",
+            status: "ON_TRACK",
+            createdAt: "2025-01-06T12:00:00Z",
+          },
+        },
+      });
+
+    const handler = await main({ max: 10 });
+
+    const messageWithProject = {
+      project: messageProjectUrl,
+      body: "Message project status",
+      status: "ON_TRACK",
+      start_date: "2025-01-01",
+      target_date: "2025-12-31",
+    };
+
+    const result = await handler(messageWithProject, {});
+
+    expect(result.success).toBe(true);
+    expect(result.status_update_id).toBe("PVTSU_test789");
+    // Should not use default from environment
+    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+
+    // Cleanup
+    delete process.env.GH_AW_PROJECT_URL;
+  });
 });

@@ -1017,29 +1017,40 @@ async function main(config = {}) {
     }
 
     try {
-      // Validate required project field
-      if (!message.project || typeof message.project !== "string" || message.project.trim() === "") {
-        const errorMsg = 'Missing required "project" field in update_project message. The "project" field must be a full GitHub project URL (e.g., "https://github.com/orgs/myorg/projects/42").';
-        core.error(errorMsg);
+      // Get default project URL from environment if available
+      const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
 
-        // Provide helpful context based on content_type
-        if (message.content_type === "draft_issue") {
-          core.error('For draft_issue content_type, you must include: {"project": "https://...", "content_type": "draft_issue", "draft_title": "...", "fields": {...}}');
-        } else if (message.content_type === "issue" || message.content_type === "pull_request") {
-          core.error(`For ${message.content_type} content_type, you must include: {"project": "https://...", "content_type": "${message.content_type}", "content_number": 123, "fields": {...}}`);
+      // Validate project field - can use default from frontmatter if available
+      let effectiveProjectUrl = message.project;
+
+      // If no project field in message, try to use default from frontmatter
+      if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
+        if (defaultProjectUrl) {
+          core.info(`Using default project URL from frontmatter: ${defaultProjectUrl}`);
+          effectiveProjectUrl = defaultProjectUrl;
+        } else {
+          const errorMsg =
+            'Missing required "project" field in update_project message. The "project" field must be a full GitHub project URL (e.g., "https://github.com/orgs/myorg/projects/42"), or configure a default project URL in the workflow frontmatter.';
+          core.error(errorMsg);
+
+          // Provide helpful context based on content_type
+          if (message.content_type === "draft_issue") {
+            core.error('For draft_issue content_type, you must include: {"project": "https://...", "content_type": "draft_issue", "draft_title": "...", "fields": {...}}');
+          } else if (message.content_type === "issue" || message.content_type === "pull_request") {
+            core.error(`For ${message.content_type} content_type, you must include: {"project": "https://...", "content_type": "${message.content_type}", "content_number": 123, "fields": {...}}`);
+          }
+
+          return {
+            success: false,
+            error: errorMsg,
+          };
         }
-
-        return {
-          success: false,
-          error: errorMsg,
-        };
       }
 
       // Validation passed - increment processed count
       processedCount++;
 
       // Resolve temporary project ID if present
-      let effectiveProjectUrl = message.project;
 
       if (effectiveProjectUrl && typeof effectiveProjectUrl === "string") {
         // Strip # prefix if present

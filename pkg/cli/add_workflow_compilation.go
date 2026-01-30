@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/stringutil"
 	"github.com/githubnext/gh-aw/pkg/workflow"
 )
+
+var addWorkflowCompilationLog = logger.New("cli:add_workflow_compilation")
 
 // updateWorkflowTitle updates the H1 title in workflow content by appending a number.
 // This is used when creating multiple numbered copies of a workflow.
@@ -36,6 +39,8 @@ func compileWorkflow(filePath string, verbose bool, quiet bool, engineOverride s
 // compileWorkflowWithRefresh compiles a workflow file with optional stop time refresh.
 // This function handles the compilation process and ensures .gitattributes is updated.
 func compileWorkflowWithRefresh(filePath string, verbose bool, quiet bool, engineOverride string, refreshStopTime bool) error {
+	addWorkflowCompilationLog.Printf("Compiling workflow: file=%s, refresh_stop_time=%v, engine=%s", filePath, refreshStopTime, engineOverride)
+
 	// Create compiler with auto-detected version and action mode
 	compiler := workflow.NewCompiler(
 		workflow.WithVerbose(verbose),
@@ -45,8 +50,11 @@ func compileWorkflowWithRefresh(filePath string, verbose bool, quiet bool, engin
 	compiler.SetRefreshStopTime(refreshStopTime)
 	compiler.SetQuiet(quiet)
 	if err := CompileWorkflowWithValidation(compiler, filePath, verbose, false, false, false, false, false); err != nil {
+		addWorkflowCompilationLog.Printf("Compilation failed: %v", err)
 		return err
 	}
+
+	addWorkflowCompilationLog.Print("Compilation completed successfully")
 
 	// Ensure .gitattributes marks .lock.yml files as generated
 	if err := ensureGitAttributes(); err != nil {
@@ -70,6 +78,8 @@ func compileWorkflowWithTracking(filePath string, verbose bool, quiet bool, engi
 // compileWorkflowWithTrackingAndRefresh compiles a workflow, tracks generated files, and optionally refreshes stop time.
 // This function ensures that the file tracker records all files created or modified during compilation.
 func compileWorkflowWithTrackingAndRefresh(filePath string, verbose bool, quiet bool, engineOverride string, tracker *FileTracker, refreshStopTime bool) error {
+	addWorkflowCompilationLog.Printf("Compiling workflow with tracking: file=%s, refresh_stop_time=%v", filePath, refreshStopTime)
+
 	// Generate the expected lock file path
 	lockFile := stringutil.MarkdownToLockFile(filePath)
 
@@ -78,6 +88,8 @@ func compileWorkflowWithTrackingAndRefresh(filePath string, verbose bool, quiet 
 	if _, err := os.Stat(lockFile); err == nil {
 		lockFileExists = true
 	}
+
+	addWorkflowCompilationLog.Printf("Lock file %s exists: %v", lockFile, lockFileExists)
 
 	// Check if .gitattributes exists before ensuring it
 	gitRoot, err := findGitRoot()

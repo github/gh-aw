@@ -41,11 +41,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      contents: read
     outputs:
       ci_needs_fix: ${{ steps.ci_check.outputs.ci_needs_fix }}
       ci_status: ${{ steps.ci_check.outputs.ci_status }}
       ci_run_id: ${{ steps.ci_check.outputs.ci_run_id }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check last CI workflow run status on main branch
         id: ci_check
         env:
@@ -122,9 +125,17 @@ When CI fails on the main branch, automatically diagnose and fix the issues by:
 - **CI Status**: ${{ needs.check_ci_status.outputs.ci_status }}
 - **CI Run ID**: ${{ needs.check_ci_status.outputs.ci_run_id }}
 
-## Your Task
+## First: Check CI Status
 
-The CI workflow has failed on the main branch. Follow the instructions from the ci-cleaner agent to:
+**CRITICAL**: Before starting any work, check the CI Status value above:
+
+- **If CI Status is "success"**: The CI is passing. **Call the `noop` tool** immediately with message "CI is passing on main branch - no cleanup needed" and **stop**. Do not run any commands or make any changes.
+
+- **If CI Status is "failure"** or anything else: The CI workflow has failed. Proceed with the cleanup tasks below.
+
+## Your Task (Only if CI Status is "failure")
+
+Follow the instructions from the ci-cleaner agent to:
 
 1. **Format sources** - Run `make fmt` to format all code
 2. **Run linters** - Run `make lint` and fix any issues
