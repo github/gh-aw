@@ -7,23 +7,19 @@ banner:
   content: '<strong>⚠️ Experimental:</strong> This feature is under active development and may change or behave unpredictably.'
 ---
 
-## Campaigns in one line
-
-**Campaigns coordinate multiple autonomous agents working toward a shared goal, with built-in progress tracking via GitHub Projects.**
-
 ## What are Agentic Campaigns?
 
-Agentic Campaigns are workflows that coordinate autonomous agents across one or more repositories to drive progress toward a shared goal and make that progress easy to track.
+Agentic Campaigns are workflows that coordinate work across one or more repositories to drive progress toward a shared goal and make that progress easy to track.
 
-They run on a schedule and use:
-- `imports` to include standard agent coordination rules from `shared/campaign.md`
-- `project` to optionally track work with automatic [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2) integration
+They run on a schedule and include:
+- **Natural language coordination** with defaults being imported from `shared/campaign.md`
+- **Progress tracking** with optional automatic [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2)
 
 ## Getting Started
 
 To create your first campaign workflow with step-by-step instructions, see the [Getting Started guide](/gh-aw/guides/campaigns/getting-started/).
 
-## Agent Coordination Pattern
+## How it works
 
 The `shared/campaign.md` import provides:
 
@@ -33,19 +29,4 @@ The `shared/campaign.md` import provides:
 
 ## When should this just be a workflow?
 
-Use this decision table to determine if you need a campaign (agent coordination) or just a regular workflow:
-
-| **Scenario** | **Use Campaign** | **Use Regular Workflow** |
-|--------------|------------------|--------------------------|
-| **Work spans multiple repos** | ✅ Yes - coordinate across repos | ❌ No - unless each repo is independent |
-| **Need central progress tracking** | ✅ Yes - GitHub Projects integration | ❌ No - unless simple status updates suffice |
-| **Coordinating multiple agents** | ✅ Yes - agent coordination pattern | ❌ No - single agent is simpler |
-| **Systematic, recurring work** | ✅ Yes - scheduled discovery + updates | ⚠️ Maybe - simple schedules work too |
-| **Team visibility required** | ✅ Yes - shared project board | ❌ No - notifications may be enough |
-| **One-off automation task** | ❌ No - too much overhead | ✅ Yes - regular workflow is simpler |
-| **Simple trigger → action** | ❌ No - over-engineered | ✅ Yes - regular workflow is cleaner |
-| **No progress tracking needed** | ❌ No - unnecessary complexity | ✅ Yes - keep it simple |
-
 **Rule of thumb:** If you're not tracking work items in a GitHub Project or coordinating multiple agents, you probably just need a regular workflow.
-
-
