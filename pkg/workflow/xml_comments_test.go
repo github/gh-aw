@@ -219,6 +219,10 @@ End`,
 func TestGeneratePromptRemovesXMLComments(t *testing.T) {
 	compiler := NewCompiler()
 
+	// Note: With runtime-import, generatePrompt no longer inlines markdown content
+	// Instead, it creates a body file and uses a runtime-import macro
+	// XML comments are now removed at runtime by the runtime_import.cjs helper
+	// This test verifies that generatePrompt creates the runtime-import macro
 	data := &WorkflowData{
 		MarkdownContent: `# Workflow Title
 
@@ -238,26 +242,11 @@ Final content.`,
 
 	output := yaml.String()
 
-	// Check that XML comments are not present in the generated output
-	if strings.Contains(output, "<!-- This comment should be removed from the prompt -->") {
-		t.Error("Expected single-line XML comment to be removed from prompt generation")
-	}
-
-	if strings.Contains(output, "<!-- Another comment") {
-		t.Error("Expected multi-line XML comment to be removed from prompt generation")
-	}
-
-	// Check that regular content is still present
-	if !strings.Contains(output, "# Workflow Title") {
-		t.Error("Expected regular markdown content to be preserved")
-	}
-
-	if !strings.Contains(output, "This is some content.") {
-		t.Error("Expected regular content to be preserved")
-	}
-
-	if !strings.Contains(output, "Final content.") {
-		t.Error("Expected final content to be preserved")
+	// With runtime-import, the output should contain the runtime-import macro
+	// The actual markdown content (with XML comments) will be in the body file
+	// and XML comments will be removed by runtime_import.cjs at runtime
+	if !strings.Contains(output, "{{#runtime-import") {
+		t.Error("Expected runtime-import macro in prompt generation output")
 	}
 }
 
