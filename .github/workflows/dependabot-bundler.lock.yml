@@ -21,7 +21,11 @@
 #
 # Bundles Dependabot security alert updates per package.json into a single PR
 #
+<<<<<<< HEAD
 # frontmatter-hash: eeac041d9a8178458b75de402a95084305cd4223dedf6efe751ebab12344995b
+=======
+# frontmatter-hash: 1dd6cc7c9962aaa5316fdd2810c4fb20038cdf5e8fdb214c11fc7cf3638d22be
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Dependabot Bundler"
 "on":

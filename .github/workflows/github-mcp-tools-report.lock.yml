@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 296fd51fdaa66256d388289443204776f66d271378f6877a8e846d4496d98395
+=======
+# frontmatter-hash: 439193bd0c4d851f9f721b7b838033514ebec6c850c0fce734105eee1128a978
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "GitHub MCP Remote Server Tools Report Generator"
 "on":

@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/jqschema.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 3af03c7703173285f6eef88a0a700f31070745e5de88e104b014f787dc985622
+=======
+# frontmatter-hash: 926e367da3549dc867793fd39b2cec2f45141e1965ee40c8fc19991d3e1daa1c
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Issue Arborist"
 "on":

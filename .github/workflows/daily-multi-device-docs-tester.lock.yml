@@ -26,7 +26,11 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 7681ba45183ccda7db283792a720fbb7147df241929c749f2b974930fa5f6a23
+=======
+# frontmatter-hash: 7388dc9bd0314ca66e583246496c7da2941c3a29647f8ca6a24754a14eb7e2fd
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Multi-Device Docs Tester"
 "on":

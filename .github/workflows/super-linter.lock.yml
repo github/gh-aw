@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 1b48c9be70b62068a3b63c54b7a65a49838328395bc8623b3fa36a42e4d144f1
+=======
+# frontmatter-hash: b06ddd65028a412ab6d4f25f86c35952cf7e0721404d27a951ff9ef3375098e1
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Super Linter Report"
 "on":

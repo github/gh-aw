@@ -27,7 +27,11 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: ee9386967bffccb49643a644fee9978865cbc5abc3f4d5c4933a7f3e3af52aa5
+=======
+# frontmatter-hash: 2751387799d272739cc0a30c375cc639aa9e3efec20c34d39c40ed6cea4eddce
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Project Performance Summary Generator (Using Safe Inputs)"
 "on":

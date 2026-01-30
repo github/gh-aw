@@ -21,7 +21,11 @@
 #
 # Automatically fixes code scanning alerts by creating pull requests with remediation
 #
+<<<<<<< HEAD
 # frontmatter-hash: dad55f7391c8c404404112b7253f481a6ee751fbee4cd7bdb0ff42b2df16c857
+=======
+# frontmatter-hash: e49a1f82ecc93e6f9f77815249f7ec9639065aea7378336c1441ecd3cf5f53d8
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Code Scanning Fixer"
 "on":

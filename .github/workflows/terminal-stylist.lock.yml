@@ -21,7 +21,11 @@
 #
 # Analyzes and improves console output styling and formatting in the codebase
 #
+<<<<<<< HEAD
 # frontmatter-hash: 7214a2bc86141c38b4ae48d75ceb09f1594b2c6b251eb38d5ff937dce187307b
+=======
+# frontmatter-hash: dd340d17463593d7957590bdb062cd6d95aeb45aa866a995bc96e19da25535d1
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Terminal Stylist"
 "on":

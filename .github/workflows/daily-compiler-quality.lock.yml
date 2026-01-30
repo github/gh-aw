@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 6d7d5e3dc7749cbd7be0f75e08c326bc9e1e5ec2252b00d465989bc107249189
+=======
+# frontmatter-hash: 94fec2c480f21827010a301a82e15760f11b041afa2329ebed184762415f6937
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Compiler Quality Check"
 "on":

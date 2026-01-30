@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/mcp/brave.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 11b6569796497104a4ffe7017c192dbb99403074a55fb49970f1e00879fc9df7
+=======
+# frontmatter-hash: 0e9b75b324f13aaa2b67b23c217b4fbac9af83fa540baafd140046fb7de6ac6c
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Brave Web Search Agent"
 "on":

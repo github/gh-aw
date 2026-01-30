@@ -21,7 +21,11 @@
 #
 # Collects daily performance metrics for the agent ecosystem and stores them in repo-memory
 #
+<<<<<<< HEAD
 # frontmatter-hash: 3a3b44f95e18534ba8834110dd53223622386b33dbbe63bb3fbd77771c4203da
+=======
+# frontmatter-hash: 5836a147452f25d1a4b0404ada814d2c6d5982a5996d65b079c7228332fdd0b4
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Metrics Collector - Infrastructure Agent"
 "on":

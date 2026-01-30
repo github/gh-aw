@@ -20,7 +20,11 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
+<<<<<<< HEAD
 # frontmatter-hash: 57d50221e4f1610c1c50a6ecfc27f7363f052f1d70ad3c41bc2c08a3c1fc2d50
+=======
+# frontmatter-hash: 03fd0a994e06b42084704136f9f8e3202d46e8a939fc247deb57b240d554d624
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Auto-Assign Issue"
 "on":

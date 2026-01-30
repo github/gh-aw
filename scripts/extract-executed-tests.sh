@@ -19,14 +19,17 @@ fi
 
 # Find all JSON test result files and extract test names
 # Look for lines with "Action":"run" and extract the "Test" field
+# Strip subtest names (everything after the first '/') to get only top-level test names
 # Process each file separately to handle cases where files might be empty or have no matches
 temp_file=$(mktemp)
 find "$TEST_RESULT_DIR" -name "*.json" -type f | while read -r file; do
   if [ -s "$file" ]; then
     # File exists and is not empty
+    # Extract test names and strip subtest suffixes
     grep '"Action":"run"' "$file" 2>/dev/null | \
       grep -o '"Test":"[^"]*"' | \
-      sed 's/"Test":"\([^"]*\)"/\1/' >> "$temp_file" || true
+      sed 's/"Test":"\([^"]*\)"/\1/' | \
+      sed 's/\/.*//' >> "$temp_file" || true
   fi
 done
 

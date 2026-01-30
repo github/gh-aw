@@ -21,7 +21,11 @@
 #
 # Smoke test to validate common development tools are available in the agent container
 #
+<<<<<<< HEAD
 # frontmatter-hash: f413405daf4223a217204205a0f64677fb27652012fe5c4992b58b05bbe07068
+=======
+# frontmatter-hash: 73bbeaa7d42d79aea2c72f01819e08cff7b6d57946deca7bcea3b6dd6d4dfe0d
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Agent Container Smoke Test"
 "on":

@@ -21,7 +21,11 @@
 #
 # Automated security guard that reviews every PR for changes that could weaken security posture, only commenting when concrete evidence of security concerns exists
 #
+<<<<<<< HEAD
 # frontmatter-hash: 0abc1d559b62ad55f74cbdccb8fe88254d98767c9283dc1f7164ae69db0d26a7
+=======
+# frontmatter-hash: b167db6665e7aa8a4d6b32c86c432458e40d599042b4cf8158a337bba6ac56d9
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Security Guard Agent 🛡️"
 "on":

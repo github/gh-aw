@@ -26,7 +26,11 @@
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: b7f9825d2b2eac476adba7c09292d06b2424f2269af205e49ff3dcb2f5ec2b9c
+=======
+# frontmatter-hash: a1c886feb061184228effea853ed0221a5ee355e4dbdee009ecc70382a1495d2
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Copilot Token Consumption Report"
 "on":

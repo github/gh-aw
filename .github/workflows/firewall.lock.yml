@@ -21,7 +21,11 @@
 #
 # Tests network firewall functionality and validates security rules for workflow network access
 #
+<<<<<<< HEAD
 # frontmatter-hash: 67eb4793a9e2bcf132e533dfcd06353b670e94e5a5886cf5e0ca9e4beea0e0c3
+=======
+# frontmatter-hash: 56edc0e8db25a86ca8243c28fbd9e7c7657d22ab360e2d12666319f459c2470f
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Firewall Test Agent"
 "on":

@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: f6a44937f2a7eca78ba4d7bfddf2a0297f7d4ba5aa68c44bbb543e6048ff0b7d
+=======
+# frontmatter-hash: 26f91d3ce05af2d655b9ef6bb8f42bfe948102a5f65155943222f52c7f8c6c4f
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":

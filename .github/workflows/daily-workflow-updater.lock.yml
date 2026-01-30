@@ -21,7 +21,11 @@
 #
 # Automatically updates GitHub Actions versions and creates a PR if changes are detected
 #
+<<<<<<< HEAD
 # frontmatter-hash: d551f28ceadef89a0e31b6187d2cb112ca30cf0ed801e04622871672204896a1
+=======
+# frontmatter-hash: 27cfd31164c457dc0ca5597246798ed900e25a2a0285623ca440375be07c2b8a
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Workflow Updater"
 "on":

@@ -27,7 +27,11 @@
 #     - shared/jqschema.md
 #     - shared/safe-output-app.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 22744db9c8112f85e849a412ff97c4fe0acdd066c6122c6485e5840d5d989ecc
+=======
+# frontmatter-hash: 9ea630c8e1bc63e4e7e45c6e3a12c2421cde3c3ef3e0cc269b3306e1e366960e
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Changeset Generator"
 "on":

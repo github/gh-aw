@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 4311be366dd5a18adda175f20b1775ffd0b2b89d038a846089d4d5f7ac979270
+=======
+# frontmatter-hash: 485c38edcb493a45be4774a86bc91fe5c42bc1262931cf86f8f65671c05536c8
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Lockfile Statistics Analysis Agent"
 "on":

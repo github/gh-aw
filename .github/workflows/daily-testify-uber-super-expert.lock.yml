@@ -26,7 +26,11 @@
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 7789b8c56aeef4cc8ab5c4c7333b859f13f3238981d8d2099cb31574c20ec5de
+=======
+# frontmatter-hash: 6ad3ead374cf4902841addecfdeb51e5b624379ca2273604736c54bfecdfa938
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Testify Uber Super Expert"
 "on":

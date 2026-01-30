@@ -27,7 +27,11 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: d1427559cc5353295c28738e109a1fce091c6bea95c56c96e62faad24f5488a8
+=======
+# frontmatter-hash: 8c462f93d1a7960ec983db08be604ccb6f19db4ff095b6dfabcaca4a7e0fdcbd
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "The Daily Repository Chronicle"
 "on":

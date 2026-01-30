@@ -26,7 +26,11 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: fd0ae6b159fb5c8baa8f72bee13acf53f509ec957fa8fe2736d3190de477d10b
+=======
+# frontmatter-hash: a4ae24fc3bc6975db6ef78428171d35617265e93b808ea0b5e05547ffd216ddc
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Discussion Task Miner - Code Quality Improvement Agent"
 "on":

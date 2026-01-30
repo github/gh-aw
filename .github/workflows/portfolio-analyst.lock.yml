@@ -28,7 +28,11 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: f143843938bd86cd0b342010630df28c01f4db169bcc3bd1f47b199a9c547312
+=======
+# frontmatter-hash: aa463a1cea171b24c39bc76355db0a34171871c918e209c937b9ae68b093d80d
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Automated Portfolio Analyst"
 "on":

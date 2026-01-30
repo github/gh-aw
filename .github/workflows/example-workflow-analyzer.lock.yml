@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 93295515786d1207b452d0f8936a6b9bed076272b736255cb6113b2de296ad2b
+=======
+# frontmatter-hash: 1294828a73bbe084b16000e1b1dc62b18492f7cf54bdf68d00f8bee1740462aa
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Weekly Workflow Analysis"
 "on":

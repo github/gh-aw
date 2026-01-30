@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/actions-ai-inference.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 69774219d16d7799c131e1e6a7e25154e97a6e6b9aed850707d44ca371c70d54
+=======
+# frontmatter-hash: 4051f5fb6737791f686f8374543fed60f008bf3d984f440e2e6421eb3e8ddf99
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Issue Classifier"
 "on":

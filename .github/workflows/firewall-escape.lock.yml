@@ -21,7 +21,11 @@
 #
 # Security testing to find escape paths in the AWF (Agent Workflow Firewall)
 #
+<<<<<<< HEAD
 # frontmatter-hash: 7b1d7afdd14b9b29e3e96f5dcb4abf36da884056280e4a0b1a7a2cbf8c1c1801
+=======
+# frontmatter-hash: e4a621b4a4e31613069bf36aa83352a81af6074e60c220dbef44cc165a553f7d
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "The Great Escapi"
 "on":

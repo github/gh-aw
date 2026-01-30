@@ -29,7 +29,11 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 6831c89b72f58c2b9eb566f9c31de6b4454467abf4a5b039ae8f02e18ad5a07d
+=======
+# frontmatter-hash: ee119e142d32114da4d78c1680be2b0b19bfa37805ed4f17b2c8b0a2d916bdf6
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Issues Report Generator"
 "on":

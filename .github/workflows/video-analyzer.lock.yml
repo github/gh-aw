@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/ffmpeg.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 80352bf9485ea027d465816db834c5f660a2d8d2c4794e6bec08479ff1cf7fe1
+=======
+# frontmatter-hash: d512ce0e2f51c1bc7e76b6cb685ba28c1244302b5e4e3b40e034c0c9780f54be
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Video Analysis Agent"
 "on":

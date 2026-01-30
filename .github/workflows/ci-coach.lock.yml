@@ -28,7 +28,11 @@
 #     - shared/ci-data-analysis.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 75843f00a2a033badd31938fcd079b95861a32c6c7327e035f8ea88bbbc99a3b
+=======
+# frontmatter-hash: 37debf9531eccaba8b13fe825e9a389d9714c49a1c061be31ff4f65879bc77af
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "CI Optimization Coach"
 "on":

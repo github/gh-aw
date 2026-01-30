@@ -21,7 +21,11 @@
 #
 # Generates project plans and task breakdowns when invoked with /plan command in issues or PRs
 #
+<<<<<<< HEAD
 # frontmatter-hash: f1b88e379c4c29d787d6c066a2b2da69d4536f184047d66e61676a1891103555
+=======
+# frontmatter-hash: fdff89cc107503dd382f2b93962b00c7948e7bb61e40b24b4e3d1124606f9b31
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Plan Command"
 "on":

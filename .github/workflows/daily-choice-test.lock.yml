@@ -21,7 +21,11 @@
 #
 # Daily test workflow using Claude with custom safe-output job containing choice inputs
 #
+<<<<<<< HEAD
 # frontmatter-hash: 52d890a7923db2ecbc9642455add381295d70b671a63016c10ab25b0f4eb0c66
+=======
+# frontmatter-hash: 25c10a9513c46bf2aa1211d6a8df5f3c1a02452904d7a8aa676d4f57c9a9eadf
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Choice Type Test"
 "on":

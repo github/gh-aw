@@ -21,7 +21,11 @@
 #
 # Build and test this project
 #
+<<<<<<< HEAD
 # frontmatter-hash: 40c93c970ba80713cbac40d208a52de7e3d6132fa57e9f8b34b57f3e171880bb
+=======
+# frontmatter-hash: d6ca2e42daf4350f15bf9d60b93f14a88b2c69dedca6aef250dfaad5bcb3a255
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Dev"
 "on":

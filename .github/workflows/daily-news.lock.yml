@@ -29,7 +29,11 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 6b647dd1b6b1f616748fcdd2eb0cbd90905e7cd33f2fbd842e22a86c9b663f9c
+=======
+# frontmatter-hash: 86a94694e181dcd320fca0c94a9741351ceee11df3215ee35224fb1555fdaaf3
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily News"
 "on":

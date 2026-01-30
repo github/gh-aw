@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 548447aae6016b223b580b77b818fc196cbb60e400d61633824fdee094638081
+=======
+# frontmatter-hash: 2a381a522726687e9c0859c069204d1ec5e2ca00419e1fb85cf3f162871d493b
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Observability Report for AWF Firewall and MCP Gateway"
 "on":

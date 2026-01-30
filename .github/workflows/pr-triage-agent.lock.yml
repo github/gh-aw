@@ -21,7 +21,11 @@
 #
 # Automates PR categorization, risk assessment, and prioritization for agent-created pull requests
 #
+<<<<<<< HEAD
 # frontmatter-hash: fe101623693b16788e2a848b50bcc0faf9080bf20b3f82f2ae1a600d5806ee1d
+=======
+# frontmatter-hash: d91877b7275fa6bbf184f93a4b539a5afaf67f42edb97cac9985204aa5c6b699
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "PR Triage Agent"
 "on":

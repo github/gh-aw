@@ -21,7 +21,11 @@
 #
 # Generates Mermaid diagrams to visualize issue and pull request relationships when invoked with the /archie command
 #
+<<<<<<< HEAD
 # frontmatter-hash: cdd55f38603d8d1093ceab972d4e649fead0ebff3863473f79b82c1a13967880
+=======
+# frontmatter-hash: 015d29ea8befa819aa4e6001c22058933005f86dea9cf2e63901b7713d17ba70
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Archie"
 "on":

@@ -21,7 +21,11 @@
 #
 # Inspects the gh-aw CLI to identify inconsistencies, typos, bugs, or documentation gaps by running commands and analyzing output
 #
+<<<<<<< HEAD
 # frontmatter-hash: 13c58ac188da5c094247dee91143b62e16032c76e3b58b70b95e3f9cff86a725
+=======
+# frontmatter-hash: 8582e2f173e5808d835497592faaff4a4915b9a2d153129aeb795f099c2393b8
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "CLI Consistency Checker"
 "on":

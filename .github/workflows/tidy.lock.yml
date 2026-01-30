@@ -21,7 +21,11 @@
 #
 # Automatically formats and tidies code files (Go, JS, TypeScript) when code changes are pushed or on command
 #
+<<<<<<< HEAD
 # frontmatter-hash: 2c01e12d18fa9ff85a98627174b1fc230923d95ca84d684ef18c9c4f60efd192
+=======
+# frontmatter-hash: be1680264134bde1b6b249cf02dd4166156334ff42f3d5a349e0e2217401f2aa
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Tidy"
 "on":

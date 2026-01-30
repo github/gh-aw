@@ -28,7 +28,11 @@
 #     - shared/reporting.md
 #     - shared/weekly-issues-data-fetch.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 0a968cdd8571742f3f224e7eb7d48f1c19d401084463e8aa777a4e25cf185b80
+=======
+# frontmatter-hash: 4cf779ed85963c2f1773e91527b8b4ef3309fe2d9f8211dd23305bfe02a85197
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "DeepReport - Intelligence Gathering Agent"
 "on":

@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/mcp/markitdown.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 33de2e9c25fdef3c67c1c11a14742d7dc5fa45c5a3c7bc059b3431364a74ab0f
+=======
+# frontmatter-hash: ccb5f8678bdc6a01174836554c542f01379a9040b68e474bed17b0b877cfdb3f
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Resource Summarizer Agent"
 "on":

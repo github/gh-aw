@@ -40,7 +40,11 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: a8a78ce7c16367ffc0d7a9cd73ac1eb55ec91e64677983b7ab1542b2fe12342d
+=======
+# frontmatter-hash: 0e1df28021fc91f732d087a74aeb4fecbae6cf117b7f6e70f30a2f69d1547782
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "MCP Inspector Agent"
 "on":

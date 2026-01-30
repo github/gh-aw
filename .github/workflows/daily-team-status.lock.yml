@@ -31,7 +31,11 @@
 #   Imports:
 #     - githubnext/agentics/workflows/shared/reporting.md@d3422bf940923ef1d43db5559652b8e1e71869f3
 #
+<<<<<<< HEAD
 # frontmatter-hash: 4e045e4984846ec518f3ee0a2c4052ca4022fdb5afc0d70013e07c7e7cbad3cc
+=======
+# frontmatter-hash: 528b2ad45bffd25a0846735b2c26a5a14c3f4ac6b2927650393bd4246f76186d
+>>>>>>> origin/copilot/compute-frontmatter-hash
 #
 # Effective stop-time: 2026-02-09 04:24:39
 

@@ -27,7 +27,11 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 4a870cf6f235ecd3cd07fcf429e1021bd46ebaf034bf4a29cd3a5f8e5e1abeb9
+=======
+# frontmatter-hash: 03a6c17a9d86bd63b67326da21f6e2b81cc8280d5decac35aab56a80d9166429
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily Code Metrics and Trend Tracking Agent"
 "on":

@@ -27,7 +27,11 @@
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 089fde4bd014dd1190d348edbd7caab3482bd6e866458ea9b5c29ee680fcafb6
+=======
+# frontmatter-hash: ddfec13fddda42d0af2f4d921752762576d0aba55905831c3ddd0a17b2d21968
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Organization Health Report"
 "on":

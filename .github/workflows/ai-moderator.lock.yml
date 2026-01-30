@@ -20,7 +20,11 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
+<<<<<<< HEAD
 # frontmatter-hash: bfb4c3c3583d81ab5c9fd91c9b5b5ef8fff1f35561bdc9c8aea915ad00f39639
+=======
+# frontmatter-hash: f6f98e51c5cf9323bd82e980e3c9e44ddfed5efda169381d7d4ceb3fce01b42b
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "AI Moderator"
 "on":

@@ -26,7 +26,11 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: a7d2760a8638e975f097f5e1f1876b09ca98d03e0a1fb2b0884e9ac99d2116e2
+=======
+# frontmatter-hash: e3d4918222f198a0bb276a7d944b159be1032472217bfecc7244c9cfed928a6f
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Delight"
 "on":

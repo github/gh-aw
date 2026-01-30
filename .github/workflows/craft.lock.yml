@@ -21,7 +21,11 @@
 #
 # Generates new agentic workflow markdown files based on user requests when invoked with /craft command
 #
+<<<<<<< HEAD
 # frontmatter-hash: c7c8d4763a4f7c1efcd4a30fa4de870931e6a317acb00cf7303a50e9a4280be9
+=======
+# frontmatter-hash: f501dc5c88abe7dae3ad69fc54f484e99ab61aff2b77dd3614c1f7b831dda5ab
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Workflow Craft Agent"
 "on":

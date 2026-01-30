@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 2604506b5bf8b9005d55f3dd40b775f315e4772f1a50a911975fa67401929f34
+=======
+# frontmatter-hash: db9712b4cc54cb78e2bc355e0ee6bdbbaab2edeb53c7e4b2ec1179d11ef81872
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Auto-Triage Issues"
 "on":

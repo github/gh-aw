@@ -21,7 +21,11 @@
 #
 # Security-focused AI agent that reviews pull requests to identify changes that could weaken security posture or extend AWF boundaries
 #
+<<<<<<< HEAD
 # frontmatter-hash: 083dddc2b84c0415aaa770e71efaacbd4929ef234aed66def712e373a7f18bf6
+=======
+# frontmatter-hash: 2b7628a70053d2a23c03421a01a2731ae1d2b9a72754a9ae2e5fb81a4f93490a
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Security Review Agent 🔒"
 "on":

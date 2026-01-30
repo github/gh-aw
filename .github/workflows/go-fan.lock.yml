@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 4a287113ba75bdfc45b31cb500131315bd89ad5ceeed0818d63ca5fc91b01191
+=======
+# frontmatter-hash: 4a3fd7492665a9878f2c74b830ee4739c6d5e320408909218ada5c90c8d92666
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Go Fan"
 "on":

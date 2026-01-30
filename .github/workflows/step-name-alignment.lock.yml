@@ -21,7 +21,11 @@
 #
 # Scans step names in .lock.yml files and aligns them with step intent and project glossary
 #
+<<<<<<< HEAD
 # frontmatter-hash: e2b3fe6d4156f005c31b28a46ea6fb89bcebafafa54a86bdba8ef3f9994043c4
+=======
+# frontmatter-hash: 82df55100fda3aab5ba79648230c4aa57b5513d53370fd7a711d4211ece2e627
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Step Name Alignment"
 "on":

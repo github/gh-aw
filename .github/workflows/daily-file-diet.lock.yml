@@ -26,7 +26,11 @@
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: d41e6931ce95fdeb5cbba703e6190615e9b0c1cdda54919939837fc10c4b8d46
+=======
+# frontmatter-hash: e4f6154988b9e0f16d2e24a2a6b9f6cd7e52e96946bf7c05bd890f5685d963cb
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Daily File Diet"
 "on":

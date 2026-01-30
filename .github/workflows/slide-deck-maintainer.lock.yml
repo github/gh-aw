@@ -21,7 +21,11 @@
 #
 # Maintains the gh-aw slide deck by scanning repository content and detecting layout issues using Playwright
 #
+<<<<<<< HEAD
 # frontmatter-hash: c1a57d980f091bb6c2059eebc527a666c0612f2d2fdea4fe099b2c7ae6eb4279
+=======
+# frontmatter-hash: 0b94bffdcda194b965cb311da894997cee562ba9fb7b398c6d2ebf26dc80a68f
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Slide Deck Maintainer"
 "on":

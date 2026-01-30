@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 7076141937eda200dafac9c7dbc72252ac813260c29fb349bbf8af7f4976f045
+=======
+# frontmatter-hash: 4638083dd591640ad2758c916660492c741b8dd8b62e09eb8ee2cb8e10e79474
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Repository Quality Improvement Agent"
 "on":

@@ -27,7 +27,11 @@
 #     - shared/trends.md
 #     - shared/charts-with-trending.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 1baa12a349e4d738659764301b82b1df418d694c572059205330274e6f676998
+=======
+# frontmatter-hash: a26448aaec64e9a9f82e5a144d56cff6b0b65f73a8f7465d1b8ed431f8d05f69
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Python Data Visualization Generator"
 "on":

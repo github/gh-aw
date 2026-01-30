@@ -21,7 +21,11 @@
 #
 # Daily analysis of recent commits and merged PRs for breaking CLI changes
 #
+<<<<<<< HEAD
 # frontmatter-hash: b3746e3191067877b71178e979138b655f35bdbb2de2ab75c772c7974ad38428
+=======
+# frontmatter-hash: 0b7a726d490ac8829c0f19a708adf32afe57c3eb6a5dd3356ddf1786d99734b6
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Breaking Change Checker"
 "on":

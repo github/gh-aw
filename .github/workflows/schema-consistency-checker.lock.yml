@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 49a11a8926dad7b90455b99fa5f51d9e59c1a37170c9be455621e0165da543f7
+=======
+# frontmatter-hash: af602ff04b6bc5956ee0f8b8e7ccf912aebaa1c68cd7ee29a787a8150546b4db
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Schema Consistency Checker"
 "on":

@@ -21,7 +21,11 @@
 #
 # Automatically merges the main branch into pull request branches when invoked with /mergefest command
 #
+<<<<<<< HEAD
 # frontmatter-hash: 6566d52f897bc2816ed3b49372724534bcc9db8453ad9b4df28cb66deea41a80
+=======
+# frontmatter-hash: 3ca51a58b52a4f0b89cd6a591f0e482ad8fa3ec2f6dd5963b6c0103a4fed6c8b
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "Mergefest"
 "on":

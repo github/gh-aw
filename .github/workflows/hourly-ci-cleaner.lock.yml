@@ -25,7 +25,11 @@
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 934aec8ddaa719dee289b8a57a9d2bd55e7a129872af22b187af3129fe64f5f3
+=======
+# frontmatter-hash: d3496d5656780e0932080295b3d933438d4095dd7291d7ba7286811a8c973128
+>>>>>>> origin/copilot/compute-frontmatter-hash
 
 name: "CI Cleaner"
 "on":
