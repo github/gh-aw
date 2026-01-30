@@ -12,7 +12,8 @@ banner:
 **Prerequisites:**
 - Repository with GitHub Agentic Workflows installed
 - GitHub Actions enabled
-- A GitHub Projects board (or create one during setup)
+- (Optional) GitHub Projects V2 board for tracking campaign progress
+
 
 **Create a campaign workflow:**
 
@@ -34,9 +35,6 @@ imports:
 ---
 
 # My Campaign
-
-- Project URL: https://github.com/orgs/myorg/projects/1
-- Campaign ID: my-campaign
 
 Your campaign instructions here...
 ```
@@ -66,9 +64,9 @@ git push
 
 The `imports: [shared/campaign.md]` includes standard agent coordination rules and safe-output defaults.
 
-## Example: Dependabot Burner (the smallest useful campaign)
+## Example: Dependabot Burner
 
-The [Dependabot Burner workflow](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/dependabot-burner.md) is **the smallest useful campaign** - it demonstrates the essential campaign pattern with minimal complexity:
+The [Dependabot Burner workflow](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/dependabot-burner.md) is a small but useful campaign - it demonstrates the essential campaign pattern with minimal complexity:
 
 ```yaml
 ---
@@ -84,12 +82,10 @@ permissions:
 
 imports:
   - shared/campaign.md
+
+project: https://github.com/orgs/githubnext/projects/144
 ---
-
 # Dependabot Burner
-
-- Project URL: https://github.com/orgs/githubnext/projects/144
-- Campaign ID: dependabot-burner
 
 - Find all open Dependabot PRs and add them to the project.
 - Create bundle issues for each runtime + manifest file.
@@ -97,15 +93,10 @@ imports:
 ```
 
 Key features:
-- **Imports coordination** - Uses `shared/campaign.md` for standard rules
+- **Imports orchestration** - Uses `shared/campaign.md` for standard rules
 - **Scheduled execution** - Runs daily to process new Dependabot PRs
 - **Smart discovery** - Only runs if matching PRs exist (`skip-if-no-match`)
 - **Project tracking** - Adds discovered items to GitHub Projects board
-
-## More Examples
-
-For a complete campaign workflow example, see:
-- [Security Scanner Campaign](/gh-aw/examples/campaigns/security-scanner/) - Demonstrates vulnerability scanning with safe-output limits
 
 ## How it works
 
