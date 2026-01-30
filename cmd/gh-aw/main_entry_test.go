@@ -347,7 +347,8 @@ func TestMainFunctionExecutionPath(t *testing.T) {
 		cmd.Dir = "."
 
 		// This should run successfully (exit code 0) even if no workflows found
-		output, err := cmd.Output()
+		// Use CombinedOutput to capture both stdout and stderr (version now outputs to stderr)
+		output, err := cmd.CombinedOutput()
 		if err != nil {
 			// Check if it's just a non-zero exit (which is okay for some commands)
 			if exitError, ok := err.(*exec.ExitError); ok {
