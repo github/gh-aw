@@ -670,12 +670,15 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 }
 
 /**
- * Processes all runtime-import macros in the content
+ * Processes all runtime-import macros in the content recursively
  * @param {string} content - The markdown content containing runtime-import macros
  * @param {string} workspaceDir - The GITHUB_WORKSPACE directory path
+ * @param {Set<string>} [importedFiles] - Set of already imported files (for recursion tracking)
+ * @param {Map<string, string>} [importCache] - Cache of imported file contents (for deduplication)
+ * @param {Array<string>} [importStack] - Stack of currently importing files (for circular dependency detection)
  * @returns {Promise<string>} - Content with runtime-import macros replaced by file/URL contents
  */
-async function processRuntimeImports(content, workspaceDir) {
+async function processRuntimeImports(content, workspaceDir, importedFiles = new Set(), importCache = new Map(), importStack = []) {
   // Pattern to match {{#runtime-import filepath}} or {{#runtime-import? filepath}}
   // Captures: optional flag (?), whitespace, filepath/URL (which may include :startline-endline)
   const pattern = /\{\{#runtime-import(\?)?[ \t]+([^\}]+?)\}\}/g;
@@ -717,24 +720,51 @@ async function processRuntimeImports(content, workspaceDir) {
   }
 
   // Process all imports sequentially (to handle async URLs)
-  const importedFiles = new Set();
-
   for (const matchData of matches) {
     const { fullMatch, filepathOrUrl, optional, startLine, endLine, filepathWithRange } = matchData;
 
-    // Check for circular/duplicate imports
-    if (importedFiles.has(filepathWithRange)) {
-      core.warning(`File/URL ${filepathWithRange} is imported multiple times, which may indicate a circular reference`);
+    // Check if this file is already in the import cache
+    if (importCache.has(filepathWithRange)) {
+      // Reuse cached content
+      const cachedContent = importCache.get(filepathWithRange);
+      if (cachedContent !== undefined) {
+        processedContent = processedContent.replace(fullMatch, cachedContent);
+        core.info(`Reusing cached content for ${filepathWithRange}`);
+        continue;
+      }
     }
-    importedFiles.add(filepathWithRange);
+
+    // Check for circular dependencies
+    if (importStack.includes(filepathWithRange)) {
+      const cycle = [...importStack, filepathWithRange].join(" -> ");
+      throw new Error(`Circular dependency detected: ${cycle}`);
+    }
+
+    // Add to import stack for circular dependency detection
+    importStack.push(filepathWithRange);
 
     try {
-      const importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine);
+      // Import the file content
+      let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine);
+      
+      // Recursively process any runtime-import macros in the imported content
+      if (importedContent && /\{\{#runtime-import/.test(importedContent)) {
+        core.info(`Recursively processing runtime-imports in ${filepathWithRange}`);
+        importedContent = await processRuntimeImports(importedContent, workspaceDir, importedFiles, importCache, [...importStack]);
+      }
+      
+      // Cache the fully processed content
+      importCache.set(filepathWithRange, importedContent);
+      importedFiles.add(filepathWithRange);
+      
       // Replace the macro with the imported content
       processedContent = processedContent.replace(fullMatch, importedContent);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       throw new Error(`Failed to process runtime import for ${filepathWithRange}: ${errorMessage}`);
+    } finally {
+      // Remove from import stack
+      importStack.pop();
     }
   }
 

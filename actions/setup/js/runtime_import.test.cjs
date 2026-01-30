@@ -289,10 +289,11 @@ describe("runtime_import", () => {
           const result = await processRuntimeImports("No imports here", tempDir);
           expect(result).toBe("No imports here");
         }),
-        it("should warn about duplicate imports", async () => {
-          (fs.writeFileSync(path.join(githubDir, "import.md"), "Content"),
-            await processRuntimeImports("{{#runtime-import import.md}}\n{{#runtime-import import.md}}", tempDir),
-            expect(core.warning).toHaveBeenCalledWith("File/URL import.md is imported multiple times, which may indicate a circular reference"));
+        it("should reuse cached content for duplicate imports", async () => {
+          fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
+          const result = await processRuntimeImports("{{#runtime-import import.md}}\n{{#runtime-import import.md}}", tempDir);
+          expect(result).toBe("Content\nContent");
+          expect(core.info).toHaveBeenCalledWith("Reusing cached content for import.md");
         }),
         it("should handle macros with extra whitespace", async () => {
           fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
@@ -642,6 +643,108 @@ describe("runtime_import", () => {
           const result = await processRuntimeImport("comment-expr.md", false, tempDir);
           expect(result).toContain("Actor: testuser");
           expect(result).not.toContain("<!-- Comment -->");
+        });
+      });
+
+      describe("recursive imports", () => {
+        it("should recursively process runtime-import macros in imported files", async () => {
+          // Create a chain: main.md -> level1.md -> level2.md
+          fs.writeFileSync(path.join(githubDir, "level2.md"), "Level 2 content");
+          fs.writeFileSync(path.join(githubDir, "level1.md"), "Level 1 before\n{{#runtime-import level2.md}}\nLevel 1 after");
+          fs.writeFileSync(path.join(githubDir, "main.md"), "Main before\n{{#runtime-import level1.md}}\nMain after");
+
+          const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
+          expect(result).toBe("Main before\nLevel 1 before\nLevel 2 content\nLevel 1 after\nMain after");
+          expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Recursively processing runtime-imports in main.md"));
+          expect(core.info).toHaveBeenCalledWith(expect.stringContaining("Recursively processing runtime-imports in level1.md"));
+        });
+
+        it("should handle multiple recursive imports at different levels", async () => {
+          // Create: main.md -> [a.md, b.md] and a.md -> shared.md
+          fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
+          fs.writeFileSync(path.join(githubDir, "a.md"), "A before\n{{#runtime-import shared.md}}\nA after");
+          fs.writeFileSync(path.join(githubDir, "b.md"), "B content");
+          fs.writeFileSync(path.join(githubDir, "main.md"), "{{#runtime-import a.md}}\n---\n{{#runtime-import b.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
+          expect(result).toBe("A before\nShared content\nA after\n---\nB content");
+        });
+
+        it("should cache imported files and reuse them in recursive processing", async () => {
+          // Create: main.md -> [a.md, b.md] where both import shared.md
+          fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
+          fs.writeFileSync(path.join(githubDir, "a.md"), "A: {{#runtime-import shared.md}}");
+          fs.writeFileSync(path.join(githubDir, "b.md"), "B: {{#runtime-import shared.md}}");
+          fs.writeFileSync(path.join(githubDir, "main.md"), "{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
+          expect(result).toBe("A: Shared content\nB: Shared content");
+          // shared.md should be cached after first import
+          expect(core.info).toHaveBeenCalledWith("Reusing cached content for shared.md");
+        });
+
+        it("should detect circular dependencies", async () => {
+          // Create circular dependency: a.md -> b.md -> a.md
+          fs.writeFileSync(path.join(githubDir, "a.md"), "A content\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(githubDir, "b.md"), "B content\n{{#runtime-import a.md}}");
+
+          await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> a.md");
+        });
+
+        it("should detect self-referencing circular dependencies", async () => {
+          // Create self-referencing file: self.md -> self.md
+          fs.writeFileSync(path.join(githubDir, "self.md"), "Self content\n{{#runtime-import self.md}}");
+
+          await expect(processRuntimeImports("{{#runtime-import self.md}}", tempDir)).rejects.toThrow("Circular dependency detected: self.md -> self.md");
+        });
+
+        it("should detect complex circular dependencies", async () => {
+          // Create circular dependency: a.md -> b.md -> c.md -> a.md
+          fs.writeFileSync(path.join(githubDir, "a.md"), "A content\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(githubDir, "b.md"), "B content\n{{#runtime-import c.md}}");
+          fs.writeFileSync(path.join(githubDir, "c.md"), "C content\n{{#runtime-import a.md}}");
+
+          await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> c.md -> a.md");
+        });
+
+        it("should handle recursive imports with optional files", async () => {
+          // Create: main.md -> exists.md -> optional-missing.md (optional)
+          fs.writeFileSync(path.join(githubDir, "exists.md"), "Exists before\n{{#runtime-import? optional-missing.md}}\nExists after");
+          fs.writeFileSync(path.join(githubDir, "main.md"), "Main\n{{#runtime-import exists.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
+          expect(result).toBe("Main\nExists before\n\nExists after");
+          expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: optional-missing.md");
+        });
+
+        it("should process expressions in recursively imported files", async () => {
+          // Create recursive imports with expressions
+          fs.writeFileSync(path.join(githubDir, "inner.md"), "Actor: ${{ github.actor }}");
+          fs.writeFileSync(path.join(githubDir, "outer.md"), "Outer\n{{#runtime-import inner.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import outer.md}}", tempDir);
+          expect(result).toBe("Outer\nActor: testuser");
+        });
+
+        it("should remove XML comments from recursively imported files", async () => {
+          // Create recursive imports with XML comments
+          fs.writeFileSync(path.join(githubDir, "inner.md"), "Inner <!-- comment --> text");
+          fs.writeFileSync(path.join(githubDir, "outer.md"), "Outer <!-- comment -->\n{{#runtime-import inner.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import outer.md}}", tempDir);
+          expect(result).toBe("Outer \nInner  text");
+        });
+
+        it("should handle deep nesting of imports", async () => {
+          // Create a deep chain: level1 -> level2 -> level3 -> level4 -> level5
+          fs.writeFileSync(path.join(githubDir, "level5.md"), "Level 5");
+          fs.writeFileSync(path.join(githubDir, "level4.md"), "Level 4\n{{#runtime-import level5.md}}");
+          fs.writeFileSync(path.join(githubDir, "level3.md"), "Level 3\n{{#runtime-import level4.md}}");
+          fs.writeFileSync(path.join(githubDir, "level2.md"), "Level 2\n{{#runtime-import level3.md}}");
+          fs.writeFileSync(path.join(githubDir, "level1.md"), "Level 1\n{{#runtime-import level2.md}}");
+
+          const result = await processRuntimeImports("{{#runtime-import level1.md}}", tempDir);
+          expect(result).toBe("Level 1\nLevel 2\nLevel 3\nLevel 4\nLevel 5");
         });
       });
     }));
