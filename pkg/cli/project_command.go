@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/console"
@@ -17,12 +19,15 @@ var projectLog = logger.New("cli:project")
 
 // ProjectConfig holds configuration for creating a GitHub Project
 type ProjectConfig struct {
-	Title       string // Project title
-	Owner       string // Owner login (user or org)
-	OwnerType   string // "user" or "org"
-	Description string // Project description (note: not currently supported by GitHub Projects V2 API during creation)
-	Repo        string // Repository to link project to (optional, format: owner/repo)
-	Verbose     bool   // Verbose output
+	Title             string // Project title
+	Owner             string // Owner login (user or org)
+	OwnerType         string // "user" or "org"
+	Description       string // Project description (note: not currently supported by GitHub Projects V2 API during creation)
+	Repo              string // Repository to link project to (optional, format: owner/repo)
+	Verbose           bool   // Verbose output
+	WithCampaignSetup bool   // Whether to create standard campaign views and fields
+	CreateViews       bool   // Whether to create views
+	CreateFields      bool   // Whether to create custom fields
 }
 
 // NewProjectCommand creates the project command
@@ -67,25 +72,38 @@ Token Requirements:
   Set GH_AW_PROJECT_GITHUB_TOKEN environment variable or configure your gh CLI
   with a token that has the required permissions.
 
+Campaign Setup:
+  Use --with-campaign-setup to automatically create:
+  - Standard views (Progress Board, Task Tracker, Campaign Roadmap)
+  - Custom fields (Campaign Id, Worker Workflow, Target Repo, Priority, Size, dates)
+  - Enhanced Status field with "Review Required" option
+
 Examples:
   gh aw project new "My Project" --owner @me                      # Create user project
   gh aw project new "Team Board" --owner myorg                    # Create org project  
-  gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo`,
+  gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo
+  gh aw project new "Campaign Q1" --owner myorg --with-campaign-setup  # With campaign views/fields`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner, _ := cmd.Flags().GetString("owner")
 			link, _ := cmd.Flags().GetString("link")
 			verbose, _ := cmd.Flags().GetBool("verbose")
+			withCampaignSetup, _ := cmd.Flags().GetBool("with-campaign-setup")
+			createViews, _ := cmd.Flags().GetBool("views")
+			createFields, _ := cmd.Flags().GetBool("fields")
 
 			if owner == "" {
 				return fmt.Errorf("--owner flag is required. Use '@me' for current user or specify org name")
 			}
 
 			config := ProjectConfig{
-				Title:   args[0],
-				Owner:   owner,
-				Repo:    link,
-				Verbose: verbose,
+				Title:             args[0],
+				Owner:             owner,
+				Repo:              link,
+				Verbose:           verbose,
+				WithCampaignSetup: withCampaignSetup,
+				CreateViews:       createViews,
+				CreateFields:      createFields,
 			}
 
 			return RunProjectNew(cmd.Context(), config)
@@ -94,6 +112,9 @@ Examples:
 
 	cmd.Flags().StringP("owner", "o", "", "Project owner: '@me' for current user or organization name (required)")
 	cmd.Flags().StringP("link", "l", "", "Repository to link project to (format: owner/repo)")
+	cmd.Flags().Bool("with-campaign-setup", false, "Create standard campaign views and custom fields")
+	cmd.Flags().Bool("views", false, "Create standard project views (Progress Board, Task Tracker, Roadmap)")
+	cmd.Flags().Bool("fields", false, "Create standard custom fields (Campaign Id, Worker, Priority, etc.)")
 	_ = cmd.MarkFlagRequired("owner")
 
 	return cmd
@@ -146,6 +167,37 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to link project to repository: %v", err)))
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Project linked to repository"))
+		}
+	}
+
+	// Create views and fields if requested
+	projectURL, _ := project["url"].(string)
+	projectNumber, _ := project["number"].(float64)
+
+	if config.WithCampaignSetup || config.CreateViews {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
+		if err := createStandardViews(ctx, projectURL, config.Verbose); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create views: %v", err)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created standard views"))
+		}
+	}
+
+	if config.WithCampaignSetup || config.CreateFields {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating custom fields..."))
+		if err := createStandardFields(ctx, projectURL, int(projectNumber), config.Owner, config.Verbose); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create fields: %v", err)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created custom fields"))
+		}
+	}
+
+	if config.WithCampaignSetup {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Enhancing Status field..."))
+		if err := ensureStatusOption(ctx, projectURL, "Review Required", config.Verbose); err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Status field: %v", err)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Added 'Review Required' status option"))
 		}
 	}
 
@@ -336,4 +388,425 @@ func escapeGraphQLString(s string) string {
 	s = strings.ReplaceAll(s, "\r", "\\r")
 	s = strings.ReplaceAll(s, "\t", "\\t")
 	return s
+}
+
+// projectURLInfo contains parsed project URL information
+type projectURLInfo struct {
+	scope         string // "users" or "orgs"
+	ownerLogin    string
+	projectNumber int
+}
+
+// parseProjectURL parses a GitHub Project V2 URL
+func parseProjectURL(projectURL string) (projectURLInfo, error) {
+	// Extract scope, owner, and project number from URL
+	// Expected format: https://github.com/orgs/myorg/projects/123 or https://github.com/users/myuser/projects/123
+	parts := strings.Split(projectURL, "/")
+	if len(parts) < 6 {
+		return projectURLInfo{}, fmt.Errorf("invalid project URL format")
+	}
+
+	var scope, ownerLogin, numberStr string
+	for i, part := range parts {
+		if part == "orgs" || part == "users" {
+			if i+2 < len(parts) && parts[i+2] == "projects" && i+3 < len(parts) {
+				scope = part
+				ownerLogin = parts[i+1]
+				numberStr = parts[i+3]
+				break
+			}
+		}
+	}
+
+	if scope == "" {
+		return projectURLInfo{}, fmt.Errorf("invalid project URL: could not find orgs/users segment")
+	}
+
+	projectNumber, err := strconv.Atoi(numberStr)
+	if err != nil {
+		return projectURLInfo{}, fmt.Errorf("invalid project number: %w", err)
+	}
+
+	return projectURLInfo{
+		scope:         scope,
+		ownerLogin:    ownerLogin,
+		projectNumber: projectNumber,
+	}, nil
+}
+
+// createStandardViews creates the standard campaign views
+func createStandardViews(ctx context.Context, projectURL string, verbose bool) error {
+	projectLog.Print("Creating standard views")
+	console.LogVerbose(verbose, "Creating standard project views...")
+
+	info, err := parseProjectURL(projectURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse project URL: %w", err)
+	}
+
+	views := []struct {
+		name   string
+		layout string
+	}{
+		{name: "Progress Board", layout: "board"},
+		{name: "Task Tracker", layout: "table"},
+		{name: "Campaign Roadmap", layout: "roadmap"},
+	}
+
+	for _, view := range views {
+		if err := createView(ctx, info, view.name, view.layout, verbose); err != nil {
+			return fmt.Errorf("failed to create view %q (%s): %w", view.name, view.layout, err)
+		}
+		console.LogVerbose(verbose, fmt.Sprintf("Created view: %s (%s)", view.name, view.layout))
+	}
+
+	return nil
+}
+
+// createView creates a single project view
+func createView(ctx context.Context, info projectURLInfo, name, layout string, verbose bool) error {
+	projectLog.Printf("Creating view: name=%s, layout=%s", name, layout)
+
+	var path string
+	if info.scope == "orgs" {
+		path = fmt.Sprintf("/orgs/%s/projectsV2/%d/views", info.ownerLogin, info.projectNumber)
+	} else {
+		path = fmt.Sprintf("/users/%s/projectsV2/%d/views", info.ownerLogin, info.projectNumber)
+	}
+
+	_, err := workflow.RunGH(
+		fmt.Sprintf("Creating view %s...", name),
+		"api",
+		"--method", "POST",
+		path,
+		"-H", "Accept: application/vnd.github+json",
+		"-H", "X-GitHub-Api-Version: 2022-11-28",
+		"-f", "name="+name,
+		"-f", "layout="+layout,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create view: %w", err)
+	}
+
+	return nil
+}
+
+// createStandardFields creates the standard campaign fields
+func createStandardFields(ctx context.Context, projectURL string, projectNumber int, owner string, verbose bool) error {
+	projectLog.Print("Creating standard fields")
+	console.LogVerbose(verbose, "Creating custom fields...")
+
+	// Define required fields
+	// Note: We use "Target Repo" instead of "Repository" because GitHub has a built-in
+	// REPOSITORY field type that conflicts with custom field creation
+	fields := []struct {
+		name     string
+		dataType string
+		options  []string // For SINGLE_SELECT fields
+	}{
+		{"Campaign Id", "TEXT", nil},
+		{"Worker Workflow", "TEXT", nil},
+		{"Target Repo", "TEXT", nil},
+		{"Priority", "SINGLE_SELECT", []string{"High", "Medium", "Low"}},
+		{"Size", "SINGLE_SELECT", []string{"Small", "Medium", "Large"}},
+		{"Start Date", "DATE", nil},
+		{"End Date", "DATE", nil},
+	}
+
+	// Create each field
+	for _, field := range fields {
+		if err := createField(ctx, projectNumber, owner, field.name, field.dataType, field.options, verbose); err != nil {
+			return fmt.Errorf("failed to create field '%s': %w", field.name, err)
+		}
+		console.LogVerbose(verbose, fmt.Sprintf("Created field: %s", field.name))
+	}
+
+	return nil
+}
+
+// createField creates a single field in the project
+func createField(ctx context.Context, projectNumber int, owner, name, dataType string, options []string, verbose bool) error {
+	projectLog.Printf("Creating field: name=%s, type=%s", name, dataType)
+
+	args := []string{
+		"project", "field-create", fmt.Sprintf("%d", projectNumber),
+		"--owner", owner,
+		"--name", name,
+		"--data-type", dataType,
+	}
+
+	// Add options for SINGLE_SELECT fields
+	if dataType == "SINGLE_SELECT" && len(options) > 0 {
+		for _, option := range options {
+			args = append(args, "--single-select-options", option)
+		}
+	}
+
+	_, err := workflow.RunGH(fmt.Sprintf("Creating field %s...", name), args...)
+	if err != nil {
+		return fmt.Errorf("failed to create field: %w", err)
+	}
+
+	return nil
+}
+
+// ensureStatusOption ensures a status option exists in the project's Status field
+func ensureStatusOption(ctx context.Context, projectURL, optionName string, verbose bool) error {
+	projectLog.Printf("Ensuring Status option: %s", optionName)
+	console.LogVerbose(verbose, fmt.Sprintf("Adding '%s' status option...", optionName))
+
+	info, err := parseProjectURL(projectURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse project URL: %w", err)
+	}
+
+	// Get the Status field information
+	statusField, err := getStatusField(ctx, info, verbose)
+	if err != nil {
+		return fmt.Errorf("failed to get Status field: %w", err)
+	}
+
+	// Check if the option already exists and is properly ordered
+	updatedOptions, changed := ensureSingleSelectOptionBefore(
+		statusField.options,
+		singleSelectOption{Name: optionName, Color: "BLUE", Description: "Needs review before moving to Done"},
+		"Done",
+	)
+
+	if !changed {
+		console.LogVerbose(verbose, fmt.Sprintf("Status option already present and ordered: %s", optionName))
+		return nil
+	}
+
+	// Update the field with new options
+	if err := updateSingleSelectFieldOptions(ctx, statusField.fieldID, updatedOptions, verbose); err != nil {
+		return fmt.Errorf("failed to update Status field: %w", err)
+	}
+
+	console.LogVerbose(verbose, fmt.Sprintf("Status option added before 'Done': %s", optionName))
+	return nil
+}
+
+// singleSelectOption represents a single-select field option
+type singleSelectOption struct {
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Description string `json:"description,omitempty"`
+}
+
+// statusFieldInfo contains information about the Status field
+type statusFieldInfo struct {
+	projectID string
+	fieldID   string
+	options   []singleSelectOption
+}
+
+// getStatusField retrieves the Status field information for a project
+func getStatusField(ctx context.Context, info projectURLInfo, verbose bool) (statusFieldInfo, error) {
+	var query string
+	var jqProjectID, jqFields string
+
+	if info.scope == "orgs" {
+		query = fmt.Sprintf(`query {
+			organization(login: "%s") {
+				projectV2(number: %d) {
+					id
+					fields(first: 100) {
+						nodes {
+							... on ProjectV2SingleSelectField {
+								id
+								name
+								options { name color description }
+							}
+						}
+					}
+				}
+			}
+		}`, escapeGraphQLString(info.ownerLogin), info.projectNumber)
+		jqProjectID = ".data.organization.projectV2.id"
+		jqFields = ".data.organization.projectV2.fields.nodes"
+	} else {
+		query = fmt.Sprintf(`query {
+			user(login: "%s") {
+				projectV2(number: %d) {
+					id
+					fields(first: 100) {
+						nodes {
+							... on ProjectV2SingleSelectField {
+								id
+								name
+								options { name color description }
+							}
+						}
+					}
+				}
+			}
+		}`, escapeGraphQLString(info.ownerLogin), info.projectNumber)
+		jqProjectID = ".data.user.projectV2.id"
+		jqFields = ".data.user.projectV2.fields.nodes"
+	}
+
+	// Get project ID
+	projectIDOutput, err := workflow.RunGH("Getting project info...", "api", "graphql", "-f", fmt.Sprintf("query=%s", query), "--jq", jqProjectID)
+	if err != nil {
+		return statusFieldInfo{}, fmt.Errorf("failed to get project ID: %w", err)
+	}
+	projectID := strings.TrimSpace(string(projectIDOutput))
+
+	// Get fields
+	fieldsOutput, err := workflow.RunGH("Getting project fields...", "api", "graphql", "-f", fmt.Sprintf("query=%s", query), "--jq", jqFields)
+	if err != nil {
+		return statusFieldInfo{}, fmt.Errorf("failed to get project fields: %w", err)
+	}
+
+	// Parse fields to find Status field
+	var fields []map[string]any
+	if err := json.Unmarshal(fieldsOutput, &fields); err != nil {
+		return statusFieldInfo{}, fmt.Errorf("failed to parse fields: %w", err)
+	}
+
+	for _, field := range fields {
+		if fieldName, ok := field["name"].(string); ok && fieldName == "Status" {
+			fieldID, _ := field["id"].(string)
+			if fieldID == "" {
+				continue
+			}
+
+			// Parse options
+			var options []singleSelectOption
+			if optionsData, ok := field["options"].([]any); ok {
+				for _, optData := range optionsData {
+					if optMap, ok := optData.(map[string]any); ok {
+						opt := singleSelectOption{
+							Name:  getString(optMap, "name"),
+							Color: getString(optMap, "color"),
+						}
+						if desc := getString(optMap, "description"); desc != "" {
+							opt.Description = desc
+						}
+						options = append(options, opt)
+					}
+				}
+			}
+
+			return statusFieldInfo{
+				projectID: projectID,
+				fieldID:   fieldID,
+				options:   options,
+			}, nil
+		}
+	}
+
+	return statusFieldInfo{}, fmt.Errorf("Status field not found in project")
+}
+
+// getString safely extracts a string value from a map
+func getString(m map[string]any, key string) string {
+	if val, ok := m[key].(string); ok {
+		return val
+	}
+	return ""
+}
+
+// ensureSingleSelectOptionBefore ensures an option exists before a specific option
+func ensureSingleSelectOptionBefore(options []singleSelectOption, desired singleSelectOption, beforeName string) ([]singleSelectOption, bool) {
+	var existing *singleSelectOption
+	without := make([]singleSelectOption, 0, len(options))
+
+	// Find if the desired option already exists and collect other options
+	for _, opt := range options {
+		if opt.Name == desired.Name {
+			if existing == nil {
+				copyOpt := opt
+				existing = &copyOpt
+			}
+			continue
+		}
+		without = append(without, opt)
+	}
+
+	// Determine what to insert
+	toInsert := desired
+	if existing != nil {
+		toInsert = *existing
+		toInsert.Color = desired.Color
+		if desired.Description != "" {
+			toInsert.Description = desired.Description
+		}
+	}
+
+	// Find insertion point (before the specified option)
+	insertAt := len(without)
+	for i, opt := range without {
+		if opt.Name == beforeName {
+			insertAt = i
+			break
+		}
+	}
+
+	// Build the updated list with the option inserted
+	withInserted := make([]singleSelectOption, 0, len(without)+1)
+	withInserted = append(withInserted, without[:insertAt]...)
+	withInserted = append(withInserted, toInsert)
+	withInserted = append(withInserted, without[insertAt:]...)
+
+	// Check if anything changed
+	return withInserted, !singleSelectOptionsEqual(options, withInserted)
+}
+
+// singleSelectOptionsEqual checks if two option slices are equal
+func singleSelectOptionsEqual(a, b []singleSelectOption) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// updateSingleSelectFieldOptions updates a single-select field's options
+func updateSingleSelectFieldOptions(ctx context.Context, fieldID string, options []singleSelectOption, verbose bool) error {
+	projectLog.Print("Updating single-select field options")
+
+	mutation := `mutation($input: UpdateProjectV2FieldInput!) {
+		updateProjectV2Field(input: $input) {
+			projectV2Field {
+				... on ProjectV2SingleSelectField {
+					name
+					options { name }
+				}
+			}
+		}
+	}`
+
+	variables := map[string]any{
+		"input": map[string]any{
+			"fieldId":             fieldID,
+			"singleSelectOptions": options,
+		},
+	}
+
+	requestBody := map[string]any{
+		"query":     mutation,
+		"variables": variables,
+	}
+
+	requestJSON, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal GraphQL request: %w", err)
+	}
+
+	// Use ExecGH to create command and pipe input
+	cmd := workflow.ExecGH("api", "graphql", "--input", "-")
+	cmd.Stdin = bytes.NewReader(requestJSON)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to update field options: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
 }
