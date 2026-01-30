@@ -1,67 +1,105 @@
 ---
 title: Getting started
-description: Quick start guide for creating and launching agentic campaigns
-banner:
-  content: '<strong>⚠️ Deprecated:</strong> The <code>.campaign.md</code> file format is deprecated. Use the <code>project</code> field in workflow frontmatter instead.'
+description: Quick start guide for creating campaign workflows
 ---
 
-:::caution[File format deprecated]
-This guide describes the deprecated `.campaign.md` file format. For current project tracking, use the `project` field in workflow frontmatter. See [Project Tracking](/gh-aw/reference/frontmatter/#project-tracking-project).
-:::
-
-Create your first campaign using the custom agent in GitHub Copilot Chat. The agent generates a Project board, campaign spec, and orchestrator workflow based on your goal description.
+This guide shows how to create a campaign workflow that coordinates work across repositories.
 
 ## Prerequisites
 
 - Repository with GitHub Agentic Workflows installed
-- GitHub Copilot access
-- Write access to create pull requests and merge them
 - GitHub Actions enabled
+- A GitHub Projects board (or create one during setup)
 
-## Create a campaign
+## Create a campaign workflow
 
-1. **Open Copilot Chat** in your repository
-2. **Describe your campaign** using `/agent`:
-   ```
-   /agent create campaign: Burn down all open code security alerts, 
-   prioritizing file-write alerts first
-   ```
-3. **Wait for the agent** - A pull request appears with your campaign configuration
-4. **Review the PR** - Verify the generated Project, spec, and orchestrator
-5. **Merge the PR** when ready
-6. **Run the orchestrator** from the Actions tab to start the campaign
+1. **Create a new workflow file** at `.github/workflows/my-campaign.md`:
 
-## Generated files
+```yaml wrap
+---
+name: My Campaign
+on:
+  schedule: daily
+  workflow_dispatch:
 
-The pull request creates three components:
+permissions:
+  issues: read
+  pull-requests: read
 
-**Project board** - GitHub Project for tracking campaign progress with custom fields and views.
+imports:
+  - shared/campaign.md
+---
 
-**Campaign spec** - Configuration file at `.github/workflows/<id>.campaign.md` defining campaign configuration (project URL, workflows, scope, governance). The markdown body contains narrative goals and success criteria.
+# My Campaign
 
-**Orchestrator workflow** - Compiled workflow at `.github/workflows/<id>.campaign.lock.yml` that executes the campaign logic.
+- Project URL: https://github.com/orgs/myorg/projects/1
+- Campaign ID: my-campaign
 
-## Campaign execution
+Your campaign instructions here...
+```
 
-The orchestrator runs on the configured schedule (daily by default):
+2. **Set up authentication** for project access:
 
-1. Dispatches worker workflows via `workflow_dispatch` (if configured)
-2. Discovers issues and pull requests created by workers
-3. Updates the Project board with new items
-4. Posts a status update summarizing progress
+```bash
+gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN --value "YOUR_PROJECT_TOKEN"
+```
 
-See [Campaign lifecycle](/gh-aw/guides/campaigns/lifecycle/) for execution details.
+See [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) for token setup.
+
+3. **Compile the workflow**:
+
+```bash
+gh aw compile
+```
+
+4. **Commit and push**:
+
+```bash
+git add .github/workflows/my-campaign.md
+git add .github/workflows/my-campaign.lock.yml
+git commit -m "Add my campaign workflow"
+git push
+```
+
+## How it works
+
+The campaign workflow:
+
+1. Imports standard orchestration rules from `shared/campaign.md`
+2. Runs on schedule to discover work items
+3. Processes items according to your instructions
+4. Updates the GitHub Project board with progress
+5. Reports status via project status updates
+
+## Campaign orchestration
+
+The `imports: [shared/campaign.md]` provides:
+
+- **Safe-output defaults**: Pre-configured limits for project operations
+- **Execution phases**: Discover → Decide → Write → Report
+- **Best practices**: Deterministic execution, pagination budgets, cursor management
+- **Project integration**: Standard field mappings and status updates
+
+## Example: Dependabot Burner
+
+See the [Dependabot Burner](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/dependabot-burner.md) workflow for a complete example:
+
+- Discovers open Dependabot PRs
+- Creates bundle issues for upgrades
+- Tracks everything in a GitHub Project
+- Runs daily with smart conditional execution
 
 ## Best practices
 
-Start with focused scope:
-- Define one clear objective
-- Include 1-3 worker workflows maximum
-- Set conservative governance limits (e.g., 10 project updates per run)
+- **Use imports** - Include `shared/campaign.md` for standard orchestration
+- **Define campaign ID** - Include a clear Campaign ID in your workflow
+- **Specify project URL** - Document the GitHub Projects board URL
+- **Test manually** - Use `workflow_dispatch` trigger to test before scheduling
+- **Monitor progress** - Check your project board to see tracked items
 
-Configure worker triggers:
-- Workers should accept `workflow_dispatch` only
-- Remove cron schedules, push, and pull_request triggers
-- Let the orchestrator control execution timing
+## Next Steps
 
-See [Campaign specs](/gh-aw/guides/campaigns/specs/) for configuration options.
+- [Campaign Orchestration](/gh-aw/guides/campaigns/) - Overview and patterns
+- [Project Tracking Example](/gh-aw/examples/project-tracking/) - Complete configuration reference
+- [Safe Outputs](/gh-aw/reference/safe-outputs/) - Available project operations
+- [Trigger Events](/gh-aw/reference/triggers/) - Workflow trigger options

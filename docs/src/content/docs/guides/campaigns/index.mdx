@@ -1,103 +1,100 @@
 ---
 title: About Campaigns
-description: Coordinate agentic workflows toward one goal, tracked in GitHub Projects.
+description: Coordinate workflows to track progress in GitHub Projects using standard orchestration patterns.
 sidebar:
-  label: About Campaigns
-banner:
-  content: '<strong>Do not use.</strong> Campaigns are still incomplete and may produce unreliable or unintended results.'
+  label: Campaigns
 ---
 
 ## What are Agentic Campaigns?
 
-**[Agentic campaigns](/gh-aw/reference/glossary/#agentic-campaign)** are initiatives that coordinate multiple [agentic workflows](/gh-aw/reference/glossary/#agentic-workflow) toward a shared goal.
+Agentic Campaigns are workflows that coordinate autonomous agents across one or more repositories to drive progress toward a shared goal and make that progress easy to track.
 
-When you need to roll out changes across many repositories—like upgrading dependencies, fixing security issues, or standardizing configurations—campaigns provide the orchestration layer you need to do that efficiently.
+They run on a schedule and use:
+- `imports` to include standard campaign orchestration from `shared/campaign.md`
+- `project` to optionally track work with automatic [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2) integration
 
-They run on a schedule to work through repositories systematically, dispatch workers in batches to control load and avoid rate limits, and track all progress centrally in [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2).
+## Quick Start
 
-You get complete visibility into what's done, what's in progress, and what's blocked—all in one place.
+Add `project` and `imports` to your workflow frontmatter:
 
-## When to use Campaigns
-
-Choose a campaign when you need coordination across repos or multiple workflows, with progress tracked in one place.
-
-- **Coordinate multiple worker workflows** that each do part of the job
-- **Work across many repositories** (using campaign scope)
-- **Track progress in one place** (a single [GitHub Project](/gh-aw/reference/glossary/#github-projects-projects-v2))
-- **Roll out changes in batches across repos** (repeatable runs with per-run limits and central tracking)
-
-**Don't need a campaign?** A single scheduled workflow is simpler if you're just automating work in one repository.
-
-**Not sure?** Start with one repository and one worker workflow, then scale up once you see how it works.
-
-## Campaign Specs
-
-To create a campaign, you write a single markdown file:
-
-- `.github/workflows/<id>.campaign.md`
-
-That file has two parts:
-
-- **[Frontmatter](/gh-aw/reference/glossary/#frontmatter)**: the configuration ([GitHub Project URL](/gh-aw/reference/glossary/#github-projects-projects-v2), scope, worker list, governance limits)
-- **Markdown body**: the narrative (objective, KPIs, prioritization, constraints)
-
-Here’s a small example:
-
-```markdown wrap
+```yaml wrap
 ---
-id: dependency-upgrades
-project-url: "https://github.com/orgs/ORG/projects/1"
-scope:
-  - "org:ORG"
-workflows:
-  - dependency-scanner
-  - dependency-upgrader
+name: Dependabot Burner
+on:
+  schedule: daily
+  workflow_dispatch:
+
+imports:
+  - shared/campaign.md
 ---
 
-# Dependency Upgrades
+# Dependabot Burner
 
-Upgrade dependencies across repos.
+- Project URL: https://github.com/orgs/myorg/projects/1
+- Campaign ID: dependabot-burner
+
+Find all open Dependabot PRs and add them to the project.
 ```
 
-See: [Campaign specs](/gh-aw/guides/campaigns/specs/).
+The `imports: [shared/campaign.md]` includes standard campaign orchestration rules and safe-output defaults.
 
-## From markdown to GitHub Actions
+## Campaign Orchestration Pattern
 
-Just like regular workflows, campaigns get compiled:
+The `shared/campaign.md` import provides:
 
-- You run `gh aw compile`
-- The compiler produces a **[workflow lock file](/gh-aw/reference/glossary/#workflow-lock-file-lockyml)** (`.lock.yml`) that GitHub Actions runs
+- **Safe-output defaults** - Pre-configured limits for project updates, issues, and status updates
+- **Orchestration rules** - Best practices for discovery, deterministic execution, and reporting
+- **Project integration** - Standard patterns for tracking work in GitHub Projects
 
-This is the same idea as [compilation](/gh-aw/reference/glossary/#compilation) for normal workflows: you edit human-friendly markdown, GitHub Actions runs the compiled YAML.
+## When to Use Campaigns
 
-## Orchestrator + workers (who does what)
+Use the campaign pattern when you need:
 
-Campaigns split responsibilities on purpose:
+- **Coordinated work** - Manage related tasks across multiple repositories
+- **Progress visibility** - Track all work items in a central project board
+- **Systematic execution** - Discover, process, and update work items on a schedule
+- **Team coordination** - Share progress with stakeholders through project updates
 
-- **Orchestrator (generated from the spec)**
-  - Runs on a schedule
-  - Coordinates and decides what to do next
-  - Uses **[safe outputs](/gh-aw/reference/glossary/#safe-outputs)** to dispatch worker workflows
-- **Workers (you provide these)**
-  - Are normal agentic workflows triggered via [`workflow_dispatch`](/gh-aw/reference/glossary/#workflow_dispatch)
-  - Do the actual GitHub writes (issues/PRs/Projects/comments) using their own safe outputs
+**Don't need orchestration?** A simple workflow without `imports` is simpler if you just need basic project tracking.
 
-## What you’ll see in GitHub
+## Example: Dependabot Burner
 
-When a campaign is working, you’ll usually see:
+The [Dependabot Burner workflow](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/dependabot-burner.md) demonstrates the campaign pattern:
 
-- A compiled workflow named `<id>.campaign.lock.yml` in `.github/workflows/`
-- A GitHub Project filling up with issues/PRs created by workers
-- Tracking labels on those issues/PRs like `z_campaign_<id>`
-- Optional [labels](/gh-aw/reference/glossary/#labels) you can use to group and filter related workflows
-- Worker workflow runs that create PRs and move items through statuses
+```yaml
+---
+name: Dependabot Burner
+on:
+  schedule: daily
+  skip-if-no-match: 'is:pr is:open author:app/dependabot'
+  workflow_dispatch:
 
-If you want the full execution story, see: [Campaign lifecycle](/gh-aw/guides/campaigns/lifecycle/).
+permissions:
+  issues: read
+  pull-requests: read
 
-## Next steps
+imports:
+  - shared/campaign.md
+---
 
-- [Getting started](/gh-aw/guides/campaigns/getting-started/) – step-by-step tutorial
-- [Creating campaigns](/gh-aw/guides/campaigns/creating-campaigns/) – issue-based or CLI creation
-- [Campaign specs](/gh-aw/guides/campaigns/specs/) – configuration reference
-- [Campaign Lifecycle](/gh-aw/guides/campaigns/lifecycle/) – execution model
-- [CLI commands](/gh-aw/guides/campaigns/cli-commands/) – command reference
+# Dependabot Burner
+
+- Project URL: https://github.com/orgs/githubnext/projects/144
+- Campaign ID: dependabot-burner
+
+- Find all open Dependabot PRs and add them to the project.
+- Create bundle issues for each runtime + manifest file.
+- Add bundle issues to the project and assign to Copilot.
+```
+
+Key features:
+- **Imports orchestration** - Uses `shared/campaign.md` for standard rules
+- **Scheduled execution** - Runs daily to process new Dependabot PRs
+- **Smart discovery** - Only runs if matching PRs exist (`skip-if-no-match`)
+- **Project tracking** - Adds discovered items to GitHub Projects board
+
+## Next Steps
+
+- [Getting Started](/gh-aw/guides/campaigns/getting-started/) - Create your first campaign
+- [Project Tracking Example](/gh-aw/examples/project-tracking/) - Complete guide with examples
+- [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Project operations documentation
