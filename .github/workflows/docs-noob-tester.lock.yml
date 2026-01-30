@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/docs-server-lifecycle.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 67eb66e0a29570f07c1140396a35709948551b446b6f1456a7a95439b79ed700
-=======
-# frontmatter-hash: 11f4f5a72817701a0d90f39b1691da621dd6d11e216bd21a8c44983aced8c7b0
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: ac67eac1acfe7e7afd4cdb226c40e550b4648c7af72a15a0d109f1fa99fd1b71
 
 name: "Documentation Noob Tester"
 "on":

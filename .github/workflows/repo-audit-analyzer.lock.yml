@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 6236e58d5d8ae55ab833f8c7c66b2cedd0be5173e3c7b12bc7955175864f5489
-=======
-# frontmatter-hash: 2659477c070404899203468fb6bb090da58876a9ae9549433149f7c33a86efbc
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: cc50882ca55c17b5c7b704ea757239c75fdb0eceeed3bc80d3e169ad070aa0d4
 
 name: "Repo Audit Analyzer"
 "on":

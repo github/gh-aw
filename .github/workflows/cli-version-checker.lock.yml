@@ -26,11 +26,7 @@
 #     - shared/jqschema.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: f594c15f28fbcabd31b26524425d904f5a8edf3b96749424cc415cc51cd9afac
-=======
-# frontmatter-hash: 26146423d72999f2e7b14d54a5b82531b94916d452cf7de715035b577e4993bb
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 61c834432ae30ab801ab129f945ab921deeb3e60ae79a9bd76823054ae6bb8f6
 
 name: "CLI Version Checker"
 "on":

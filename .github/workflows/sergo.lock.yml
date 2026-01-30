@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: f8aac337c639f2e151710154324aead5c3eba38780793e007da685ab1147d93a
-=======
-# frontmatter-hash: 9ac0e0f11a8e7cd7d380d8dda53f4509c00ce9b51b0b8eedde439af5dba62fc3
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 8f01fa814847be3443774fdca82be5a0f327e6395542018da85d70564a499e6d
 
 name: "Sergo - Serena Go Expert"
 "on":

@@ -26,11 +26,7 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: f18a98c70aa9fba1a16170e3b14b2bfe3da4eb768558e16be3947750bf4a7dfd
-=======
-# frontmatter-hash: 951d6b14eb5e5f15ac91f542015d7952870cc98a358503beb8c9b04d4a5b1436
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 0af18caf46fc676440e7d57267d3c1e56bf8599c86eeacccf2c1c1db94e231cf
 
 name: "Static Analysis Report"
 "on":

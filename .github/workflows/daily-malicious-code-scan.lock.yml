@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 9ef5a190e66044ff4734f10294f74d594f7efd80322e97f2172389c69eceea5e
-=======
-# frontmatter-hash: 0ed5126932345e21a15dcb346107bbd90c3006c0d67984a0df391903357bfdf6
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: e120ebaa2321ddacc10642b876944f4222e1fadc469d2c5810887759d963cdbd
 
 name: "Daily Malicious Code Scan Agent"
 "on":

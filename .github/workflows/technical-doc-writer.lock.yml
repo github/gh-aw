@@ -26,11 +26,7 @@
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 942827bca7bdab22d4bf69f0abfba268c8151b123088bbb7cba866fef71fbfae
-=======
-# frontmatter-hash: 85aadaed61598bade07ebcb6f5e10cafe7b542c04ae1ef1dbb50276a26d02024
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 47d674da3c35f9e7f63dac57443175e49f621a9c2db98bc102bd9cc523beba42
 
 name: "Rebuild the documentation after making changes"
 "on":

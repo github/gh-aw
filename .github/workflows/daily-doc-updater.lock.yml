@@ -21,11 +21,7 @@
 #
 # Automatically reviews and updates documentation to ensure accuracy and completeness
 #
-<<<<<<< HEAD
-# frontmatter-hash: 3f6304b379ed16507ea491d2163565d06462bb495062effb2181548be678afff
-=======
-# frontmatter-hash: a4155e3e926fa321ad278d62c069c7b06d34c95a44e8f4b6f492ed57ef93c407
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 8c16feacfb13f81ad7ee07ab9f3a136bd1b28503bbac63820d1b088cf20f0844
 
 name: "Daily Documentation Updater"
 "on":

@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 5655add3a7aa964810ed3a07031e7426d8ca235cc07981f0f92d9280bf81c108
-=======
-# frontmatter-hash: bdb7eae3cf57e1d69e5ecb529a1ff14fd41faec323e9563d0ad4a08d30faae10
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: da700d7bcb871839c8d466fcd31ee7cbf761d8b427117eb93d6ab11988f7afc6
 
 name: "Typist - Go Type Analysis"
 "on":

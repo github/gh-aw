@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 06f481ec4cf8b7f389f4577d153cdcc1609562c2f2090e72e48eaebcd33b2884
-=======
-# frontmatter-hash: d1501ffb81093ca177c8b42281daa7ccc3f04c07c8807d62fa715d0f0a0aec3b
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: e771efa6f0ed29b35feb64c21d592d440b1b7077283867f529fbcfe6bbac80a0
 
 name: "Dictation Prompt Generator"
 "on":

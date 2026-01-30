@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 9e4a347370fbb9002d58ad078676c2a58cefdbcf41e3a009d25da9a344ffb943
-=======
-# frontmatter-hash: 387388e695c1ee6aa664e95e69288af8a3846cbc558bff7338b9403ce6a754d7
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 986e1b5221f4a5886978228455430a880a39c0defc2db9fdd3695df0a1a0b298
 
 name: "Blog Auditor"
 "on":

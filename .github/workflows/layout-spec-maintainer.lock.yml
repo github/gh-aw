@@ -21,11 +21,7 @@
 #
 # Maintains scratchpad/layout.md with patterns of file paths, folder names, and artifact names used in lock.yml files
 #
-<<<<<<< HEAD
-# frontmatter-hash: 6a435f914a0036dc8c07623f25e82f998cdc5ff063e765b5160e3f2b816dc278
-=======
-# frontmatter-hash: 27e36182f58ce2b5c3a404a383f7d7cd9ee0cfcbbe5aaf0e06ac7531ae1ca918
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 6834fde6ebb42d8a76896dc0de573b565f0b06845a5ad3988f8ff49d4310f6b6
 
 name: "Layout Specification Maintainer"
 "on":

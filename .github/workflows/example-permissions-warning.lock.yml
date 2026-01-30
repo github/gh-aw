@@ -21,11 +21,7 @@
 #
 # Example workflow demonstrating proper permission provisioning and security best practices
 #
-<<<<<<< HEAD
-# frontmatter-hash: e6656e5450950dc6eb20d65c3e637d1db5143fa19839f3092e640b46d1b39f8c
-=======
-# frontmatter-hash: 365fa1392b34315f98a23edaf85a2836be5f49da8ca914034703776c7652f16f
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: df8006991fac0d3fc8b5388450a14f225a29beef48c48b0acd05e87aae7490f3
 
 name: "Example: Properly Provisioned Permissions"
 "on":

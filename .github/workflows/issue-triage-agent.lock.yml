@@ -24,11 +24,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 22504bfbc0ed8c1ce12f7e69349f907357316c39387c81134afd31265eef00db
-=======
-# frontmatter-hash: 0f395e928a165f2c73d90785361cb402ddf6136f889e5af55756d35d8400310e
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: f242547385e4769d7d4e325ba329636b83806d455f10a2679a6a5ce4c5ed7d4a
 
 name: "Issue Triage Agent"
 "on":

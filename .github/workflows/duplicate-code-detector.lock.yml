@@ -21,11 +21,7 @@
 #
 # Identifies duplicate code patterns across the codebase and suggests refactoring opportunities
 #
-<<<<<<< HEAD
-# frontmatter-hash: 3525d5d5786e42592a9000110fadba8a66a2c0088b8dc7388976f06633cbdea6
-=======
-# frontmatter-hash: 1c6f9735ea14ce1b489ee7d65cf5300d3aad52635262e5084bf12b5e8fb7976f
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 5e515ff4e646a874b1f9be3fa43e0e4ee84255f8f82ab9b18ad07ded2fd5788e
 
 name: "Duplicate Code Detector"
 "on":

@@ -21,11 +21,7 @@
 #
 # Automated cleanup policy for stale draft pull requests to reduce clutter and improve triage efficiency
 #
-<<<<<<< HEAD
-# frontmatter-hash: affc98a8f1b30303a5c6858b1633daa80e807cc1ca06d4330b8957f0221ce76d
-=======
-# frontmatter-hash: 20eadb06b80445f7764222f10ceae6e1820825c85dcd6c5f182aa672a3d77adb
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 241983ac5b62adc59c85d9b897f491d7dc66a1ecf30f2b502aa0c9f3c8959c99
 
 name: "Draft PR Cleanup"
 "on":

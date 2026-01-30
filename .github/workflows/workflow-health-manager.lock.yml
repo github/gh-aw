@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 6c18de0923f1a94b298f53e31a0f75b916b50d64c035d08352494046d82313e6
-=======
-# frontmatter-hash: b2b3c8587eba858b2322ec8ad7d394ac05f0aff0c24e9731bf5efe608a6999df
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 72698c3755b52cbd995601ad913e22e73c0399deb76fac1806a5a296cb77ad3f
 
 name: "Workflow Health Manager - Meta-Orchestrator"
 "on":

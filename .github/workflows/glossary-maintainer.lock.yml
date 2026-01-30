@@ -26,11 +26,7 @@
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: d063faa44925fdcf16960ccd39231cd7d61ec5e6f5e0acfe33d36ae504d5752e
-=======
-# frontmatter-hash: 12e151bb32c88aace815b1e433c35f962e007266e496dc0ee0e13f243f9af1cc
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 305ecf5c5653e9f6765d09c9a839c3126737f3363883b5f254c847d3787a15f0
 
 name: "Glossary Maintainer"
 "on":

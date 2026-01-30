@@ -27,11 +27,7 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 0db8fa17e89478dbec7829a5898a9af7fbf906550b06593ee5c26b277c33c3da
-=======
-# frontmatter-hash: b44586c6f7baae370b704cc204de68e9b05968d289171fbdb7df580d97e37eba
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: f4d2db79dc4c4317fe00afa487f58b3b18f569b910175e7f53c9ea328b44742d
 
 name: "Daily Safe Output Tool Optimizer"
 "on":

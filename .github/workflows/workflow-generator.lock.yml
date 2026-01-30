@@ -21,11 +21,7 @@
 #
 # Workflow generator that updates issue status and assigns to Copilot agent for workflow design
 #
-<<<<<<< HEAD
-# frontmatter-hash: b397bf863829a461d214dd0e4b3a6ecfc1530fec8ec77e2d57f677bba4a2b761
-=======
-# frontmatter-hash: c51f5733ba602c02a74915997f26ef3f13ce5c78ca9d45ba134cd62ed4541c4f
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 497dda8b3ff5fe229aba4e406285d097456457e9637d192b1e5abeb7048f2cd0
 
 name: "Workflow Generator"
 "on":

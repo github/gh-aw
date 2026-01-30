@@ -26,11 +26,7 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 86521cea18ce238dcb4fcfb18f0acc5db1c6d49fd0523fcb22d0d674b0e31b61
-=======
-# frontmatter-hash: 1c3be1fa50bdb17de4c97d037a4d3e8017ec5843866d566116319444b2b33fba
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 9d547808b6953d9f842f45018e0fe98cde0e32d8e386081b70d5ac5b6351adc2
 
 name: "Basic Research Agent"
 "on":

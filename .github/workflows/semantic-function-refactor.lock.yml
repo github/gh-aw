@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 766f1572a05760f3ffba202288f1643355b63859f3a1b5e61c6e7eba1339ded0
-=======
-# frontmatter-hash: 09840c0a0c854bb24d6c720732444ef64e44a45960a62b6d2b11f51064e2071b
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 282e44b445aea861c6920f64308d5f5f2bf35df4a87f591bffb5274b873ae918
 
 name: "Semantic Function Refactoring"
 "on":

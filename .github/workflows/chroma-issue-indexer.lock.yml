@@ -24,11 +24,7 @@
 #   Imports:
 #     - shared/mcp/chroma.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 61dc3a42ac708476433905e946a266013ed8196b2daa6b2ee95040b780b09089
-=======
-# frontmatter-hash: 4d7827c4a794302b760c1da67b55d35ceb5a7b4f1052bbd51883f61f8b3ffaf8
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 53ebdbcdd783041f10df8601cbe9c793eb41e8c7d2e51b1eed17e882d6cd10c2
 
 name: "Chroma Issue Indexer"
 "on":

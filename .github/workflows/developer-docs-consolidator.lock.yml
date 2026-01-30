@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: be147377a7cc3e677135e83e6506f95e852ab625d1bc8f3191773c1d2b5ba365
-=======
-# frontmatter-hash: 3fed16d8dcc009347053191dd7c64a358f5befa9da2d010dfa1eb95da4336103
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 160c37639a2038af4626a6c813af78dae95c03d9c9ade299606f47938fb3f47e
 
 name: "Developer Documentation Consolidator"
 "on":

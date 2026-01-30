@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 290062d65c852c03a3df7c1d3c9ce5f160964b1a1ae629e26a324421441fd2ce
-=======
-# frontmatter-hash: cb548c943c7b9a962340bf9a69df71966aabde30f668290635831f65d0a30978
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 8359b757b44da6f85dfd1444a2e9cbcabe098f99ddc347798ee295efec4934aa
 
 name: "Workflow Skill Extractor"
 "on":

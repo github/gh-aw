@@ -27,11 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: d0e792663fe352cbdd2d8ec2696d902aaa3a75abfffd10f014bc99f3278447c9
-=======
-# frontmatter-hash: 120ff5aa6f61654fd3b2d2bc6f12ab21ff69314f507b8d04d4d84cc91a8eeee7
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: dff2ad12ead55ffae9a02905b85e6cdb01ecd0aa8cf1c1997545cc40731c6d23
 
 name: "Weekly Issue Summary"
 "on":

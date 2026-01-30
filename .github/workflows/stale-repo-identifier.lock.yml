@@ -27,11 +27,7 @@
 #     - shared/python-dataviz.md
 #     - shared/trending-charts-simple.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 1b3090bac6816d3df61814f269e01fae00a174f8c6ea128e4cf5868910049e78
-=======
-# frontmatter-hash: 54cf98f5e8541c2b157f0344cfc7d076b62468210ef30b9ac31782805ea60c2e
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: aaa5cd7c47c85d27368061d960a4b50d66c72bb729ee0e6207a34cb1c413c0c5
 
 name: "Stale Repository Identifier"
 "on":

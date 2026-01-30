@@ -26,11 +26,7 @@
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 63a603541f09bc7c755fd6581ebc4123d82474d97b28f31b6a82fa70948384a2
-=======
-# frontmatter-hash: 4529a5e421f5465025b4881f8b015faf63246749b0df9313d51205dcd4c7ad16
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 216c6399151ad05ad9769e06781c9de53370c38f242e475eaa58cd259f0467ab
 
 name: "Artifacts Summary"
 "on":

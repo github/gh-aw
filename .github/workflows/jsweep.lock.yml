@@ -21,11 +21,7 @@
 #
 # Daily JavaScript unbloater that cleans one .cjs file per day, prioritizing files with @ts-nocheck to enable type checking
 #
-<<<<<<< HEAD
-# frontmatter-hash: 3a81e6389532670109ede7eedfc46bc0c6b0de610a697409949d4b8e5e0deaf9
-=======
-# frontmatter-hash: 0c457544570e7ee3c4eea6fbd582af7ebd6b6e9d953e0fb202c442be911995b9
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 1d20dece4c3c4e23f84c072b4c8e96fed9d9e54aa2dfc2914b6e85b25b8a93bd
 
 name: "jsweep - JavaScript Unbloater"
 "on":

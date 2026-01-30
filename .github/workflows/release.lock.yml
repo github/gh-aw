@@ -21,11 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-<<<<<<< HEAD
-# frontmatter-hash: 8c6cbbadd533a134db7c4e7c2541ccede1bc11ab6cd56be65590b458069af71d
-=======
-# frontmatter-hash: cb3a75d4bd11d32fed7ecec4e2ed9d69cadd50dff900a69a37f30d81c9f6435d
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 61cd5919e4a9168e5e53ad4c5d67eab468fd290245af0698bb313801fd9422ea
 
 name: "Release"
 "on":

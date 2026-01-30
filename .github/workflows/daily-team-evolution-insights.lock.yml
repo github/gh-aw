@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 9773a52e0f7e0c5acc770cdc335a2191b24e47a33e3f697bc4fef41b7787b1f4
-=======
-# frontmatter-hash: 372a310945dc86f1f3233e870032a8a92d0b818ddba6de9da01e40aef8590685
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 4a14d9dfc64e944a4e89ce706b18688f761c9198aaa71aec34fdf05141a477ba
 
 name: "Daily Team Evolution Insights"
 "on":

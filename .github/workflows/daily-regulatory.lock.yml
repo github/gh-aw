@@ -26,11 +26,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 1b70ee0d6422a7f009f8c78d0895cc4aad8e48b43a004a7bacdc118d2b5ebf88
-=======
-# frontmatter-hash: e3dde6308f8f6a8003e6cffd6e60186a0eebcf5c3dd6ef732c14047be55f7272
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: cced0cf11f3322eb6deb437b0897b85237cec94be7ef10fd8feb5f7b5b857105
 
 name: "Daily Regulatory Report Generator"
 "on":

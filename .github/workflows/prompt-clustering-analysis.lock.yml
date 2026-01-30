@@ -29,11 +29,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: c859d92030244c07a557fd200ef3c73c803fe2c0713e12e82a9c8a693f8cd497
-=======
-# frontmatter-hash: 94e8b7d4a31c1add97bb5f86074adf4f136c9359970d3feb7289c0b9126bcd48
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 7ff780548291f14b415a970578fd4781a76798ace53e79704bc2f1ea5baacab1
 
 name: "Copilot Agent Prompt Clustering Analysis"
 "on":

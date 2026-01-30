@@ -20,11 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-<<<<<<< HEAD
-# frontmatter-hash: 62132bc14c8ed0d3aaf7b9dcca3ac814d9a63f1bfada7ba11847553cc8e0b6eb
-=======
-# frontmatter-hash: f139a43ff48a301f54707322e2e521b26a170fcb5a980aea503e3208fe76c6de
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 17111a06918b41b9cdd0e8687b6c9c58aab605e18de07994666d99b327903a7c
 
 name: "Example: Custom Error Patterns"
 "on":

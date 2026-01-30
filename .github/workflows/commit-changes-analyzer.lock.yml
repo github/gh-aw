@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: d8f7267a2dbc98aaa7e421432d78bc1c85f3eb4b2612fefa1c0b396a599d9e8c
-=======
-# frontmatter-hash: 7273d1dac52a6e7b78268ee9945cae07060c239fd7c4f77cae8ef98551fe711a
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 4d12638a9c666f522d8f4bf9680463a415b48ef4a091683b2743882ef1b5b326
 
 name: "Commit Changes Analyzer"
 "on":

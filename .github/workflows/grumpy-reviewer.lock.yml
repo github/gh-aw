@@ -21,11 +21,7 @@
 #
 # Performs critical code review with a focus on edge cases, potential bugs, and code quality issues
 #
-<<<<<<< HEAD
-# frontmatter-hash: c40a877db4e2ebc337f2355c3add0b07e7a68bf31f84706b527081d7ab40e183
-=======
-# frontmatter-hash: 577b72ebdeac99362910c4e60205f31448d4ee3ce16fd0fb22aa48a99e12a581
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 3fb2fb0f7e8e382e1e29876c81b889188c600154622c8ed7cd0dff1c8465d5c4
 
 name: "Grumpy Code Reviewer 🔥"
 "on":

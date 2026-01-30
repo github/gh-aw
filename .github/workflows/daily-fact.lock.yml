@@ -21,11 +21,7 @@
 #
 # Posts a daily poetic verse about the gh-aw project to a discussion thread
 #
-<<<<<<< HEAD
-# frontmatter-hash: 5a53c301d60e11e0fe55fec93e8120f2552d047559c82f3792fb625153369940
-=======
-# frontmatter-hash: 99ce14d2830dd90d609d4121ca440bc76d6a71d55326ca5505b6215fd0330b6e
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: cac9a942ac19b4755145f387166ded35d9f027ac54ca3d0ac5a499d6ef506cc2
 
 name: "Daily Fact About gh-aw"
 "on":

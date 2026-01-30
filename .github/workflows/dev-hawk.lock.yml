@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/mcp/gh-aw.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 7cdb7c65d30b82df2ab2a9cfde7772b5b3240598c4704b530e7686219ebac5ae
-=======
-# frontmatter-hash: ae6d05bf8b4d385e9497e3b044654218c0e7917b04e9d48592c7c1c7c85a29f6
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 439aeb6c73a92f5494ee9f280b1b10ad6d55b83610828aa2b10bcb988e584d9b
 
 name: "Dev Hawk"
 "on":

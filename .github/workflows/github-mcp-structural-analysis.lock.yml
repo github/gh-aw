@@ -26,11 +26,7 @@
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 206fdf50d32f4a1b1355c4e1a808ba5cc06268ce9bed6e59e41c2d55f2a0de97
-=======
-# frontmatter-hash: ee9a3581029d602e394dcd8699d70a938601b9b8b7859d434de4fef3bb26fbe5
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: f6428c24a41ec183b27e83b997f60872d8836a071b8e621d3d135ae86320bfb0
 
 name: "GitHub MCP Structural Analysis"
 "on":

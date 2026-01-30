@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/mcp/semgrep.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: f23975a25ced3adfdbe77e62ebc2eb1f74153770b29fad61c2453b10cbbc2c11
-=======
-# frontmatter-hash: 4e08950c236218944ef052b13a3dce0146df4659ad184f5de3179d527ca52832
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 3007032cd0660f72cacfde84473e48e48822d941bcd9b99d4dab2afd7b97475f
 
 name: "Daily Semgrep Scan"
 "on":

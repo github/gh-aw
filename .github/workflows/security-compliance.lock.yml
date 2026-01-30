@@ -21,11 +21,7 @@
 #
 # Fix critical vulnerabilities before audit deadline with full tracking and reporting
 #
-<<<<<<< HEAD
-# frontmatter-hash: 91f89166c3979fbad8d4f52d665ea1adcc67663232f7c41430e504a5d18c375f
-=======
-# frontmatter-hash: 7b9aa47d712b5b6821a8c488d2bea75910660759aac729f7e9154afbd0064e61
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 6138ff35adcecfe524ca42a4db94d2ee02445e6e3357ea72474af2515fff950c
 
 name: "Security Compliance Campaign"
 "on":

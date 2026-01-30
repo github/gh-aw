@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: de2da58f32e442ae200a576b8723fc8a3f5e1691d3f523b6b6c44c3fa91ecd78
-=======
-# frontmatter-hash: f6e954630541face4dacf0f9ec576ed8bac4f3c00e0429f0801edca571b33df4
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 95eddd302f640516a6b220749217abce3b305cd17373b89ac25f33d8dd989c8c
 
 name: "Agent Persona Explorer"
 "on":

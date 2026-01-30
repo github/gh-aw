@@ -28,11 +28,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 5a33c6936d9cddc1c14c689bb7424308a78226b3a957b8b898a7dd285b559968
-=======
-# frontmatter-hash: 236030bd23fde6fec97260bea090ca8c76218489b77664660396e09fddfacdfb
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 2de18867cab546763ae700ebaf84b09b7f2d7121287b03c3b17dfbb5511e12a0
 
 name: "Agentic Workflow Audit Agent"
 "on":

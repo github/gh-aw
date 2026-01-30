@@ -26,11 +26,7 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: a126e06dd5b8c89bbdf3bcf8d9609b1f54b439c02f202c3ca247716715bd5e54
-=======
-# frontmatter-hash: 1a998664a36d846f6150aa646cefb2a27fbd96f8c7f947d7ab3135f47cb2d91a
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 13e4cca0e9b279a5235a467c7a415ff5631c975d39c701600bbaf1c0b891550e
 
 name: "Documentation Unbloat"
 "on":

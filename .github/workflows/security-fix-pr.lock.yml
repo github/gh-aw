@@ -21,11 +21,7 @@
 #
 # Identifies and automatically fixes code security issues by creating autofixes via GitHub Code Scanning
 #
-<<<<<<< HEAD
-# frontmatter-hash: d2473461abc72e72948b2a4d5f126afb086fd20776b303ab175078e6cd0ddc0b
-=======
-# frontmatter-hash: bb3d08f7e7a7bd881f5421da10e3fb17aeebe6357b1997b5bf557bfb26e82af6
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 96789f8acb4874de351edbee76d00776c2419f2eb40538b9be55667db8b10d4a
 
 name: "Security Fix PR"
 "on":

@@ -27,11 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 067254184b05a318743f31d5d3dbb48a19ac9ecbd43be8ca9f936e2a77e5c676
-=======
-# frontmatter-hash: a3663fd33b834b8f3d697bd8a65106ac671008f9031ee14bd3d9b4e90ac54658
->>>>>>> origin/copilot/compute-frontmatter-hash
+# frontmatter-hash: 32ebe3405efecb2060c5bb3ec67dd7dc6f0887e98e37a4454208f4daf7505afe
 
 name: "Daily Firewall Logs Collector and Reporter"
 "on":
