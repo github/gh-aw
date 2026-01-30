@@ -54,7 +54,7 @@ on:
 ```
 
 The worker:
-1. Receives dispatch from orchestrator
+1. Receives dispatch from coordinator
 2. Scans for vulnerabilities
 3. Generates deterministic key: `campaign-{id}-{repo}-{vuln_id}`
 4. Checks for existing PR with that key
