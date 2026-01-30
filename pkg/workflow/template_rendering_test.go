@@ -63,7 +63,7 @@ Normal content here.
 		t.Fatalf("Failed to compile workflow: %v", err)
 	}
 
-	// Read the compiled workflow
+	// Read the compiled workflow (lock file)
 	lockFile := stringutil.MarkdownToLockFile(testFile)
 	compiledYAML, err := os.ReadFile(lockFile)
 	if err != nil {
@@ -72,7 +72,7 @@ Normal content here.
 
 	compiledStr := string(compiledYAML)
 
-	// Verify the interpolation and template rendering step is present
+	// Verify the interpolation and template rendering step is present in lock file
 	if !strings.Contains(compiledStr, "- name: Interpolate variables and render templates") {
 		t.Error("Compiled workflow should contain interpolation and template rendering step")
 	}
@@ -81,26 +81,40 @@ Normal content here.
 		t.Error("Interpolation and template rendering step should use github-script action")
 	}
 
-	// Verify that GitHub expressions are replaced with placeholders
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__ }}") {
-		t.Error("Compiled workflow should contain placeholder for github.event.issue.number expression")
+	// Read the body file which now contains the markdown content
+	bodyFile := strings.TrimSuffix(testFile, ".md") + ".body.md"
+	bodyContent, err := os.ReadFile(bodyFile)
+	if err != nil {
+		t.Fatalf("Failed to read body file: %v", err)
 	}
 
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_GITHUB_ACTOR__ }}") {
-		t.Error("Compiled workflow should contain placeholder for github.actor expression")
+	bodyStr := string(bodyContent)
+
+	// Verify that GitHub expressions are replaced with placeholders in the body file
+	// Note: With runtime-import, expressions in the body file are processed at runtime,
+	// so we should check for the original expressions or runtime-import macro in lock file
+	if !strings.Contains(compiledStr, "{{#runtime-import") {
+		t.Error("Compiled workflow should contain runtime-import macro")
 	}
 
-	// Verify that literal values are also replaced with placeholders
-	// true and false literals get normalized to __GH_AW_TRUE__ and __GH_AW_FALSE__
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_TRUE__ }}") {
-		t.Error("Compiled workflow should contain placeholder for literal true")
+	// Verify the body file contains the template conditionals
+	if !strings.Contains(bodyStr, "{{#if github.event.issue.number}}") {
+		t.Error("Body file should contain conditional for github.event.issue.number expression")
 	}
 
-	if !strings.Contains(compiledStr, "{{#if __GH_AW_FALSE__ }}") {
-		t.Error("Compiled workflow should contain placeholder for literal false")
+	if !strings.Contains(bodyStr, "{{#if github.actor}}") {
+		t.Error("Body file should contain conditional for github.actor expression")
 	}
 
-	// Verify the setupGlobals helper is used
+	if !strings.Contains(bodyStr, "{{#if true}}") {
+		t.Error("Body file should contain conditional for literal true")
+	}
+
+	if !strings.Contains(bodyStr, "{{#if false}}") {
+		t.Error("Body file should contain conditional for literal false")
+	}
+
+	// Verify the setupGlobals helper is used in lock file
 	if !strings.Contains(compiledStr, "const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs')") {
 		t.Error("Template rendering step should use setupGlobals helper")
 	}
