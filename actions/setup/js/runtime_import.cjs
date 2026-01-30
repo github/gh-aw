@@ -746,17 +746,17 @@ async function processRuntimeImports(content, workspaceDir, importedFiles = new 
     try {
       // Import the file content
       let importedContent = await processRuntimeImport(filepathOrUrl, optional, workspaceDir, startLine, endLine);
-      
+
       // Recursively process any runtime-import macros in the imported content
       if (importedContent && /\{\{#runtime-import/.test(importedContent)) {
         core.info(`Recursively processing runtime-imports in ${filepathWithRange}`);
         importedContent = await processRuntimeImports(importedContent, workspaceDir, importedFiles, importCache, [...importStack]);
       }
-      
+
       // Cache the fully processed content
       importCache.set(filepathWithRange, importedContent);
       importedFiles.add(filepathWithRange);
-      
+
       // Replace the macro with the imported content
       processedContent = processedContent.replace(fullMatch, importedContent);
     } catch (error) {
