@@ -81,6 +81,11 @@ async function main(config = {}) {
     throw new Error("base_branch configuration is required");
   }
 
+  // Extract triggering issue number from context (for auto-linking PRs to issues)
+  const triggeringIssueNumber = context.payload?.issue?.number && !context.payload?.issue?.pull_request
+    ? context.payload.issue.number
+    : undefined;
+
   // Check if we're in staged mode
   const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
 
@@ -327,6 +332,17 @@ async function main(config = {}) {
 
     // Remove duplicate title from description if it starts with a header matching the title
     processedBody = removeDuplicateTitleFromDescription(title, processedBody);
+
+    // Auto-add "Fixes #N" closing keyword if triggered from an issue and not already present.
+    // This ensures the triggering issue is auto-closed when the PR is merged.
+    // Agents are instructed to include this but don't reliably do so.
+    if (triggeringIssueNumber) {
+      const hasClosingKeyword = /(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+#\d+/i.test(processedBody);
+      if (!hasClosingKeyword) {
+        processedBody = processedBody.trimEnd() + `\n\nFixes #${triggeringIssueNumber}`;
+        core.info(`Auto-added "Fixes #${triggeringIssueNumber}" closing keyword to PR body`);
+      }
+    }
 
     let bodyLines = processedBody.split("\n");
     let branchName = pullRequestItem.branch ? pullRequestItem.branch.trim() : null;
