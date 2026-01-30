@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
-# frontmatter-hash: f48a2486883d4faf3c46ee14f5e3450b6041dacb562f4a308be433ab5d29f941
+# frontmatter-hash: 2842bc3a24e0847295cb86ca5ea29b168c880b7e5b3d64049c545181ae2c7dfa
 
 name: "Dependabot Burner"
 "on":
@@ -167,12 +167,12 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created. Assignees [copilot] will be automatically assigned.",
+              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 5 issue(s) can be created.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -1465,7 +1465,6 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":100}}"
-          GH_AW_ASSIGN_COPILOT: "true"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
           GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
         with:
@@ -1481,25 +1480,12 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
-          GH_AW_ASSIGN_COPILOT: "true"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"max\":5},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
-            await main();
-      - name: Assign copilot to created issues
-        if: steps.process_safe_outputs.outputs.issues_to_assign_copilot != ''
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          GH_AW_ISSUES_TO_ASSIGN_COPILOT: ${{ steps.process_safe_outputs.outputs.issues_to_assign_copilot }}
-        with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/assign_copilot_to_created_issues.cjs');
             await main();
 
