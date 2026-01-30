@@ -45,13 +45,13 @@ func TestErrorCollectorAdd_FailFast(t *testing.T) {
 
 	// First error should be returned immediately
 	result := collector.Add(err1)
-	assert.Error(t, result, "Should return error immediately in fail-fast mode")
+	require.Error(t, result, "Should return error immediately in fail-fast mode")
 	assert.Equal(t, err1, result, "Should return the exact error")
 	assert.False(t, collector.HasErrors(), "Should not collect errors in fail-fast mode")
 
 	// Second error should also be returned immediately
 	result = collector.Add(err2)
-	assert.Error(t, result, "Should return error immediately in fail-fast mode")
+	require.Error(t, result, "Should return error immediately in fail-fast mode")
 	assert.Equal(t, err2, result, "Should return the exact error")
 }
 
@@ -63,16 +63,16 @@ func TestErrorCollectorAdd_Aggregate(t *testing.T) {
 
 	// Add errors should not return them
 	result := collector.Add(err1)
-	assert.NoError(t, result, "Should not return error in aggregate mode")
+	require.NoError(t, result, "Should not return error in aggregate mode")
 	assert.True(t, collector.HasErrors(), "Should have errors")
 	assert.Equal(t, 1, collector.Count(), "Should have 1 error")
 
 	result = collector.Add(err2)
-	assert.NoError(t, result, "Should not return error in aggregate mode")
+	require.NoError(t, result, "Should not return error in aggregate mode")
 	assert.Equal(t, 2, collector.Count(), "Should have 2 errors")
 
 	result = collector.Add(err3)
-	assert.NoError(t, result, "Should not return error in aggregate mode")
+	require.NoError(t, result, "Should not return error in aggregate mode")
 	assert.Equal(t, 3, collector.Count(), "Should have 3 errors")
 }
 
@@ -80,7 +80,7 @@ func TestErrorCollectorAdd_NilError(t *testing.T) {
 	collector := NewErrorCollector(false)
 
 	result := collector.Add(nil)
-	assert.NoError(t, result, "Should handle nil error")
+	require.NoError(t, result, "Should handle nil error")
 	assert.False(t, collector.HasErrors(), "Should not have errors")
 	assert.Equal(t, 0, collector.Count(), "Should have zero count")
 }
@@ -99,7 +99,7 @@ func TestErrorCollectorError_SingleError(t *testing.T) {
 	_ = collector.Add(err1)
 	result := collector.Error()
 
-	assert.Error(t, result, "Should return error")
+	require.Error(t, result, "Should return error")
 	assert.Equal(t, err1, result, "Should return the single error as-is")
 }
 
@@ -125,14 +125,14 @@ func TestErrorCollectorError_MultipleErrors(t *testing.T) {
 
 func TestFormatAggregatedError_NoError(t *testing.T) {
 	result := FormatAggregatedError(nil, "validation")
-	assert.NoError(t, result, "Should handle nil error")
+	require.NoError(t, result, "Should handle nil error")
 }
 
 func TestFormatAggregatedError_SingleError(t *testing.T) {
 	err := fmt.Errorf("single error")
 	result := FormatAggregatedError(err, "validation")
 
-	assert.Error(t, result, "Should return error")
+	require.Error(t, result, "Should return error")
 	assert.Equal(t, err, result, "Should return single error unchanged")
 }
 
@@ -256,7 +256,7 @@ func TestErrorCollectorIntegration(t *testing.T) {
 					assert.Contains(t, errStr, expected, "Should contain expected error message")
 				}
 			} else {
-				assert.NoError(t, err, "Should not have error")
+				require.NoError(t, err, "Should not have error")
 			}
 
 			assert.Equal(t, tt.expectCount, collector.Count(), "Error count should match")
