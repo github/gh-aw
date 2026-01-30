@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: dfaa2c80303deac493d82ad1edad6972528123009ee63a20f5f3927a0c002287
+# frontmatter-hash: 904d6a0e4bdd3c1e32ebade47d867afda1b12c171f792edbca0627e4b919921e
 
 name: "Developer Documentation Consolidator"
 "on":
