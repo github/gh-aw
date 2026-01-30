@@ -172,18 +172,17 @@ func TestProjectNewCommandFlags(t *testing.T) {
 	linkFlag := cmd.Flags().Lookup("link")
 	require.NotNil(t, linkFlag, "Should have --link flag")
 
-	// Check campaign setup flags
+	// Check campaign setup flag
 	campaignFlag := cmd.Flags().Lookup("with-campaign-setup")
 	require.NotNil(t, campaignFlag, "Should have --with-campaign-setup flag")
 	assert.Equal(t, "bool", campaignFlag.Value.Type(), "Campaign setup flag should be boolean")
 
+	// Verify removed flags don't exist
 	viewsFlag := cmd.Flags().Lookup("views")
-	require.NotNil(t, viewsFlag, "Should have --views flag")
-	assert.Equal(t, "bool", viewsFlag.Value.Type(), "Views flag should be boolean")
+	assert.Nil(t, viewsFlag, "Should not have --views flag")
 
 	fieldsFlag := cmd.Flags().Lookup("fields")
-	require.NotNil(t, fieldsFlag, "Should have --fields flag")
-	assert.Equal(t, "bool", fieldsFlag.Value.Type(), "Fields flag should be boolean")
+	assert.Nil(t, fieldsFlag, "Should not have --fields flag")
 }
 
 func TestParseProjectURL(t *testing.T) {
@@ -402,24 +401,14 @@ func TestProjectConfigWithCampaignSetup(t *testing.T) {
 			description: "Should have campaign setup enabled",
 		},
 		{
-			name: "with views only",
+			name: "without campaign setup",
 			config: ProjectConfig{
-				Title:       "Project with Views",
-				Owner:       "myorg",
-				OwnerType:   "org",
-				CreateViews: true,
+				Title:             "Basic Project",
+				Owner:             "myorg",
+				OwnerType:         "org",
+				WithCampaignSetup: false,
 			},
-			description: "Should have views enabled",
-		},
-		{
-			name: "with fields only",
-			config: ProjectConfig{
-				Title:        "Project with Fields",
-				Owner:        "myorg",
-				OwnerType:    "org",
-				CreateFields: true,
-			},
-			description: "Should have fields enabled",
+			description: "Should have campaign setup disabled",
 		},
 	}
 
@@ -431,12 +420,8 @@ func TestProjectConfigWithCampaignSetup(t *testing.T) {
 			// Verify flag settings
 			if tt.config.WithCampaignSetup {
 				assert.True(t, tt.config.WithCampaignSetup, "Campaign setup should be enabled")
-			}
-			if tt.config.CreateViews {
-				assert.True(t, tt.config.CreateViews, "Create views should be enabled")
-			}
-			if tt.config.CreateFields {
-				assert.True(t, tt.config.CreateFields, "Create fields should be enabled")
+			} else {
+				assert.False(t, tt.config.WithCampaignSetup, "Campaign setup should be disabled")
 			}
 		})
 	}

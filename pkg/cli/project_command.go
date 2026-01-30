@@ -26,8 +26,6 @@ type ProjectConfig struct {
 	Repo              string // Repository to link project to (optional, format: owner/repo)
 	Verbose           bool   // Verbose output
 	WithCampaignSetup bool   // Whether to create standard campaign views and fields
-	CreateViews       bool   // Whether to create views
-	CreateFields      bool   // Whether to create custom fields
 }
 
 // NewProjectCommand creates the project command
@@ -79,18 +77,16 @@ Campaign Setup:
   - Enhanced Status field with "Review Required" option
 
 Examples:
-  gh aw project new "My Project" --owner @me                      # Create user project
-  gh aw project new "Team Board" --owner myorg                    # Create org project  
-  gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link to repo
-  gh aw project new "Campaign Q1" --owner myorg --with-campaign-setup  # With campaign views/fields`,
+  gh aw project new "My Project" --owner @me                           # Create user project
+  gh aw project new "Team Board" --owner myorg                         # Create org project  
+  gh aw project new "Bugs" --owner myorg --link myorg/myrepo           # Create and link to repo
+  gh aw project new "Campaign Q1" --owner myorg --with-campaign-setup  # With campaign setup`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner, _ := cmd.Flags().GetString("owner")
 			link, _ := cmd.Flags().GetString("link")
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			withCampaignSetup, _ := cmd.Flags().GetBool("with-campaign-setup")
-			createViews, _ := cmd.Flags().GetBool("views")
-			createFields, _ := cmd.Flags().GetBool("fields")
 
 			if owner == "" {
 				return fmt.Errorf("--owner flag is required. Use '@me' for current user or specify org name")
@@ -102,8 +98,6 @@ Examples:
 				Repo:              link,
 				Verbose:           verbose,
 				WithCampaignSetup: withCampaignSetup,
-				CreateViews:       createViews,
-				CreateFields:      createFields,
 			}
 
 			return RunProjectNew(cmd.Context(), config)
@@ -113,8 +107,6 @@ Examples:
 	cmd.Flags().StringP("owner", "o", "", "Project owner: '@me' for current user or organization name (required)")
 	cmd.Flags().StringP("link", "l", "", "Repository to link project to (format: owner/repo)")
 	cmd.Flags().Bool("with-campaign-setup", false, "Create standard campaign views and custom fields")
-	cmd.Flags().Bool("views", false, "Create standard project views (Progress Board, Task Tracker, Roadmap)")
-	cmd.Flags().Bool("fields", false, "Create standard custom fields (Campaign Id, Worker, Priority, etc.)")
 	_ = cmd.MarkFlagRequired("owner")
 
 	return cmd
@@ -182,16 +174,14 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	}
 	projectNumber := int(projectNumberFloat)
 
-	if config.WithCampaignSetup || config.CreateViews {
+	if config.WithCampaignSetup {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
 		if err := createStandardViews(ctx, projectURL, config.Verbose); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create views: %v", err)))
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Created standard views"))
 		}
-	}
 
-	if config.WithCampaignSetup || config.CreateFields {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating custom fields..."))
 		if err := createStandardFields(ctx, projectURL, projectNumber, config.Owner, config.Verbose); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create fields: %v", err)))
