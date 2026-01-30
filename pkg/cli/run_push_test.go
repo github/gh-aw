@@ -3,12 +3,14 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -300,6 +302,87 @@ on: workflow_dispatch
 	// Note: We can't actually test recompilation here without a full compilation setup,
 	// but we can verify the detection logic works
 	// The actual compilation would happen in an integration test
+}
+
+func TestCollectWorkflowFiles_WithFrontmatterHashMismatch(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create a workflow file
+	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
+	workflowContent := `---
+name: Test Workflow
+engine: copilot
+on: workflow_dispatch
+---
+# Test Workflow
+This is a test workflow.
+Use env variable: ${{ env.MY_VAR }}
+`
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	require.NoError(t, err)
+
+	// Compute the correct hash for this workflow
+	cache := parser.NewImportCache("")
+	correctHash, err := parser.ComputeFrontmatterHashFromFile(workflowPath, cache)
+	require.NoError(t, err)
+	require.NotEmpty(t, correctHash)
+
+	// Create a lock file with an incorrect hash (simulating stale frontmatter)
+	lockFilePath := filepath.Join(tmpDir, "test-workflow.lock.yml")
+	wrongHash := "0000000000000000000000000000000000000000000000000000000000000000"
+	lockContent := fmt.Sprintf(`# frontmatter-hash: %s
+
+name: Test Workflow
+"on": workflow_dispatch
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "test"
+`, wrongHash)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	require.NoError(t, err)
+
+	// Make the lock file slightly newer than the workflow file
+	// This ensures we're testing hash comparison, not mtime comparison
+	time.Sleep(100 * time.Millisecond)
+	futureTime := time.Now().Add(1 * time.Hour)
+	err = os.Chtimes(lockFilePath, futureTime, futureTime)
+	require.NoError(t, err)
+
+	// Verify the lock file is newer (mtime check would pass)
+	mdStat, err := os.Stat(workflowPath)
+	require.NoError(t, err)
+	lockStat, err := os.Stat(lockFilePath)
+	require.NoError(t, err)
+	assert.True(t, lockStat.ModTime().After(mdStat.ModTime()), "Lock file should be newer than workflow file for this test")
+
+	// Test the hash mismatch detection
+	mismatch, err := checkFrontmatterHashMismatch(workflowPath, lockFilePath)
+	require.NoError(t, err)
+	assert.True(t, mismatch, "Should detect hash mismatch")
+
+	// Now test with matching hash
+	lockContentCorrect := fmt.Sprintf(`# frontmatter-hash: %s
+
+name: Test Workflow
+"on": workflow_dispatch
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "test"
+`, correctHash)
+	err = os.WriteFile(lockFilePath, []byte(lockContentCorrect), 0644)
+	require.NoError(t, err)
+
+	// Test that matching hash is detected
+	mismatch, err = checkFrontmatterHashMismatch(workflowPath, lockFilePath)
+	require.NoError(t, err)
+	assert.False(t, mismatch, "Should not detect mismatch when hashes match")
 }
 
 func TestPushWorkflowFiles_WithStagedFiles(t *testing.T) {

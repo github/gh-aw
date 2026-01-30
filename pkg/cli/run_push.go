@@ -50,12 +50,25 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 			runPushLog.Printf("Comparing modification times - md: %v, lock: %v", mdStat.ModTime(), lockStat.ModTime())
 			if mdStat.ModTime().After(lockStat.ModTime()) {
 				needsRecompile = true
-				runPushLog.Printf("Lock file is outdated (md: %v, lock: %v)", mdStat.ModTime(), lockStat.ModTime())
+				runPushLog.Printf("Lock file is outdated by mtime (md: %v, lock: %v)", mdStat.ModTime(), lockStat.ModTime())
 				if verbose {
-					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file, recompiling workflow..."))
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (mtime), recompiling workflow..."))
 				}
 			} else {
-				runPushLog.Printf("Lock file is up-to-date")
+				// Modification times are ok, also check frontmatter hash
+				runPushLog.Print("Modification times match, checking frontmatter hash")
+				if hashMismatch, err := checkFrontmatterHashMismatch(absWorkflowPath, lockFilePath); err != nil {
+					runPushLog.Printf("Error checking frontmatter hash: %v", err)
+					// Don't fail, just log the error
+				} else if hashMismatch {
+					needsRecompile = true
+					runPushLog.Print("Lock file is outdated: frontmatter hash mismatch")
+					if verbose {
+						fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Detected outdated lock file (frontmatter changed), recompiling workflow..."))
+					}
+				} else {
+					runPushLog.Printf("Lock file is up-to-date (mtime and frontmatter hash match)")
+				}
 			}
 		}
 	} else if os.IsNotExist(err) {
@@ -585,4 +598,56 @@ func pushWorkflowFiles(workflowName string, files []string, refOverride string, 
 
 	runPushLog.Print("Push completed successfully")
 	return nil
+}
+
+// checkFrontmatterHashMismatch checks if the frontmatter hash in the lock file
+// matches the recomputed hash from the workflow file.
+// Returns true if there's a mismatch (lock file is stale), false if they match.
+func checkFrontmatterHashMismatch(workflowPath, lockFilePath string) (bool, error) {
+	runPushLog.Printf("Checking frontmatter hash for %s", workflowPath)
+
+	// Read lock file to extract existing hash
+	lockContent, err := os.ReadFile(lockFilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read lock file: %w", err)
+	}
+
+	// Extract hash from lock file
+	existingHash := extractHashFromLockFile(string(lockContent))
+	if existingHash == "" {
+		runPushLog.Print("No frontmatter-hash found in lock file")
+		// No hash in lock file - consider it stale to regenerate with hash
+		return true, nil
+	}
+	runPushLog.Printf("Existing hash from lock file: %s", existingHash)
+
+	// Compute current hash from workflow file
+	cache := parser.NewImportCache("")
+	currentHash, err := parser.ComputeFrontmatterHashFromFile(workflowPath, cache)
+	if err != nil {
+		return false, fmt.Errorf("failed to compute frontmatter hash: %w", err)
+	}
+	runPushLog.Printf("Current hash from workflow: %s", currentHash)
+
+	// Compare hashes
+	mismatch := existingHash != currentHash
+	if mismatch {
+		runPushLog.Printf("Hash mismatch: existing=%s, current=%s", existingHash, currentHash)
+	} else {
+		runPushLog.Print("Hashes match")
+	}
+
+	return mismatch, nil
+}
+
+// extractHashFromLockFile extracts the frontmatter-hash from a lock file content
+func extractHashFromLockFile(content string) string {
+	// Look for: # frontmatter-hash: <hash>
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if len(line) > 20 && line[:20] == "# frontmatter-hash: " {
+			return strings.TrimSpace(line[20:])
+		}
+	}
+	return ""
 }
