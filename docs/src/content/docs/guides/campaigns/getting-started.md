@@ -1,6 +1,8 @@
 ---
 title: Getting started
 description: Quick start guide for creating campaign workflows
+banner:
+  content: '<strong>⚠️ Experimental:</strong> Campaign features are still experimental and subject to change.'
 ---
 
 This guide shows how to create a campaign workflow that coordinates work across repositories.
