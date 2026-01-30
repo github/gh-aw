@@ -8,6 +8,15 @@
 
 set -e
 
+# Timing helper functions
+print_timing() {
+  local start_time=$1
+  local label=$2
+  local end_time=$(date +%s%3N)
+  local duration=$((end_time - start_time))
+  echo "⏱️  TIMING: $label took ${duration}ms"
+}
+
 # Required environment variables:
 # - MCP_GATEWAY_DOCKER_COMMAND: Container image to run (required)
 # - MCP_GATEWAY_API_KEY: API key for gateway authentication (required for converter scripts)
@@ -47,9 +56,15 @@ if ! echo "$MCP_GATEWAY_DOCKER_COMMAND" | grep -qE -- '--network'; then
   exit 1
 fi
 
+# Start overall timing
+SCRIPT_START_TIME=$(date +%s%3N)
+
 # Read MCP configuration from stdin
 echo "Reading MCP configuration from stdin..."
+CONFIG_READ_START=$(date +%s%3N)
 MCP_CONFIG=$(cat)
+print_timing $CONFIG_READ_START "Configuration read from stdin"
+echo ""
 
 # Log the configuration for debugging
 echo "-------START MCP CONFIG-----------"
@@ -58,6 +73,7 @@ echo "-------END MCP CONFIG-----------"
 echo ""
 
 # Validate configuration is valid JSON
+CONFIG_VALIDATION_START=$(date +%s%3N)
 if ! echo "$MCP_CONFIG" | jq empty 2>/tmp/gh-aw/mcp-config/jq-error.log; then
   echo "ERROR: Configuration is not valid JSON"
   echo ""
@@ -98,6 +114,7 @@ if ! echo "$MCP_CONFIG" | jq -e '.gateway.apiKey' >/dev/null 2>&1; then
 fi
 
 echo "Configuration validated successfully"
+print_timing $CONFIG_VALIDATION_START "Configuration validation"
 echo ""
 
 # Set MCP_GATEWAY_LOG_DIR environment variable for use by the gateway
@@ -107,6 +124,7 @@ export MCP_GATEWAY_LOG_DIR="/tmp/gh-aw/mcp-logs/"
 echo "Starting gateway with container: $MCP_GATEWAY_DOCKER_COMMAND"
 echo "Full docker command: $MCP_GATEWAY_DOCKER_COMMAND"
 echo ""
+GATEWAY_START_TIME=$(date +%s%3N)
 # Note: MCP_GATEWAY_DOCKER_COMMAND is the full docker command with all flags, mounts, and image
 # Pass MCP_GATEWAY_LOG_DIR to the container via -e flag
 echo "$MCP_CONFIG" | MCP_GATEWAY_LOG_DIR="$MCP_GATEWAY_LOG_DIR" $MCP_GATEWAY_DOCKER_COMMAND \
@@ -114,6 +132,7 @@ echo "$MCP_CONFIG" | MCP_GATEWAY_LOG_DIR="$MCP_GATEWAY_LOG_DIR" $MCP_GATEWAY_DOC
 
 GATEWAY_PID=$!
 echo "Gateway started with PID: $GATEWAY_PID"
+print_timing $GATEWAY_START_TIME "Gateway container launch"
 echo "Verifying gateway process is running..."
 if ps -p $GATEWAY_PID > /dev/null 2>&1; then
   echo "Gateway process confirmed running (PID: $GATEWAY_PID)"
@@ -153,6 +172,7 @@ echo ""
 # Note: Gateway may take 40-50 seconds when starting multiple MCP servers
 # (e.g., serena alone takes ~22 seconds to start)
 echo "Waiting for gateway to be ready..."
+HEALTH_CHECK_START=$(date +%s%3N)
 # Use localhost for health check since:
 # 1. This script runs on the host (not in a container)
 # 2. The gateway uses --network host, so it's accessible on localhost
@@ -185,6 +205,7 @@ fi
 
 if [ "$HTTP_CODE" = "200" ] && [ -n "$HEALTH_RESPONSE" ]; then
   echo "Gateway is ready!"
+  print_timing $HEALTH_CHECK_START "Health check wait"
 else
   echo ""
   echo "ERROR: Gateway failed to become ready"
@@ -218,6 +239,7 @@ echo ""
 
 # Wait for gateway output (rewritten configuration)
 echo "Reading gateway output configuration..."
+OUTPUT_WAIT_START=$(date +%s%3N)
 WAIT_ATTEMPTS=10
 WAIT_ATTEMPT=0
 while [ $WAIT_ATTEMPT -lt $WAIT_ATTEMPTS ]; do
@@ -230,6 +252,8 @@ while [ $WAIT_ATTEMPT -lt $WAIT_ATTEMPTS ]; do
     sleep 1
   fi
 done
+print_timing $OUTPUT_WAIT_START "Gateway output wait"
+echo ""
 
 # Verify output was written
 if [ ! -s /tmp/gh-aw/mcp-config/gateway-output.json ]; then
@@ -260,6 +284,7 @@ fi
 
 # Convert gateway output to agent-specific format
 echo "Converting gateway configuration to agent format..."
+CONFIG_CONVERT_START=$(date +%s%3N)
 export MCP_GATEWAY_OUTPUT=/tmp/gh-aw/mcp-config/gateway-output.json
 
 # Validate MCP_GATEWAY_API_KEY is set (required by converter scripts)
@@ -307,10 +332,12 @@ case "$ENGINE_TYPE" in
     cat /home/runner/.copilot/mcp-config.json
     ;;
 esac
+print_timing $CONFIG_CONVERT_START "Configuration conversion"
 echo ""
 
 # Check MCP server functionality
 echo "Checking MCP server functionality..."
+MCP_CHECK_START=$(date +%s%3N)
 if [ -f /opt/gh-aw/actions/check_mcp_servers.sh ]; then
   echo "Running MCP server checks..."
   # Store check diagnostic logs in /tmp/gh-aw/mcp-logs/start-gateway.log for artifact upload
@@ -327,6 +354,7 @@ if [ -f /opt/gh-aw/actions/check_mcp_servers.sh ]; then
     exit 1
   fi
   set +o pipefail
+  print_timing $MCP_CHECK_START "MCP server connectivity checks"
 else
   echo "WARNING: MCP server check script not found at /opt/gh-aw/actions/check_mcp_servers.sh"
   echo "Skipping MCP server functionality checks"
@@ -347,6 +375,9 @@ echo "MCP gateway is running:"
 echo "  - From host: http://localhost:${MCP_GATEWAY_PORT}"
 echo "  - From containers: http://${MCP_GATEWAY_DOMAIN}:${MCP_GATEWAY_PORT}"
 echo "Gateway PID: $GATEWAY_PID"
+
+print_timing $SCRIPT_START_TIME "Overall gateway startup"
+echo ""
 
 # Output PID as GitHub Actions step output for use in cleanup
 echo "gateway-pid=$GATEWAY_PID" >> $GITHUB_OUTPUT

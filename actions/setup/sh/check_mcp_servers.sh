@@ -11,6 +11,15 @@
 
 set -e
 
+# Timing helper functions
+print_timing() {
+  local start_time=$1
+  local label=$2
+  local end_time=$(date +%s%3N)
+  local duration=$((end_time - start_time))
+  echo "⏱️  TIMING: $label took ${duration}ms"
+}
+
 # Usage: check_mcp_servers.sh GATEWAY_CONFIG_PATH GATEWAY_URL GATEWAY_API_KEY
 #
 # Arguments:
@@ -31,10 +40,14 @@ GATEWAY_CONFIG_PATH="$1"
 GATEWAY_URL="$2"
 GATEWAY_API_KEY="$3"
 
+# Start overall timing
+SCRIPT_START_TIME=$(date +%s%3N)
+
 echo "Checking MCP servers..."
 echo ""
 
 # Validate configuration file exists
+CONFIG_VALIDATION_START=$(date +%s%3N)
 if [ ! -f "$GATEWAY_CONFIG_PATH" ]; then
   echo "ERROR: Gateway configuration file not found: $GATEWAY_CONFIG_PATH" >&2
   exit 1
@@ -60,6 +73,9 @@ if [ -z "$SERVER_NAMES" ]; then
   exit 0
 fi
 
+print_timing $CONFIG_VALIDATION_START "Configuration validation"
+echo ""
+
 # Track overall results
 SERVERS_CHECKED=0
 SERVERS_SUCCEEDED=0
@@ -73,6 +89,7 @@ MAX_RETRIES=3
 # Iterate through each server
 while IFS= read -r SERVER_NAME; do
   SERVERS_CHECKED=$((SERVERS_CHECKED + 1))
+  SERVER_START_TIME=$(date +%s%3N)
   
   # Extract server configuration
   SERVER_CONFIG=$(echo "$MCP_SERVERS" | jq -r ".\"$SERVER_NAME\"" 2>/dev/null)
@@ -173,9 +190,13 @@ while IFS= read -r SERVER_NAME; do
     SERVERS_FAILED=$((SERVERS_FAILED + 1))
   fi
   
+  print_timing $SERVER_START_TIME "Server check for $SERVER_NAME"
+  echo ""
+  
 done <<< "$SERVER_NAMES"
 
 # Print summary
+print_timing $SCRIPT_START_TIME "Overall MCP server checks"
 echo ""
 if [ $SERVERS_FAILED -gt 0 ]; then
   echo "ERROR: $SERVERS_FAILED of $SERVERS_CHECKED server(s) failed connectivity check"
