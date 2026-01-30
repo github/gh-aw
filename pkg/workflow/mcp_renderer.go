@@ -524,6 +524,10 @@ type JSONMCPConfigOptions struct {
 	// GatewayConfig is an optional gateway configuration to include in the MCP config
 	// When set, adds a "gateway" section with port and apiKey for awmg to use
 	GatewayConfig *MCPGatewayRuntimeConfig
+	// SkipGatewayStartup when true, writes the MCP config file directly instead of
+	// piping to start_mcp_gateway.sh. This is used when sandbox is disabled and
+	// MCP servers should run as local stdio processes without the gateway.
+	SkipGatewayStartup bool
 }
 
 // GitHubMCPDockerOptions defines configuration for GitHub MCP Docker rendering
@@ -835,9 +839,19 @@ func RenderJSONMCPConfig(
 	generatedConfig := configBuilder.String()
 
 	// Write the configuration to the YAML output
-	yaml.WriteString("          cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh\n")
-	yaml.WriteString(generatedConfig)
-	yaml.WriteString("          MCPCONFIG_EOF\n")
+	if options.SkipGatewayStartup {
+		// When sandbox is disabled, write the MCP config file directly without starting the gateway
+		// MCP servers will be configured as local stdio processes
+		fmt.Fprintf(yaml, "          cat > %s << 'MCPCONFIG_EOF'\n", options.ConfigPath)
+		yaml.WriteString(generatedConfig)
+		yaml.WriteString("          MCPCONFIG_EOF\n")
+		mcpRendererLog.Print("MCP config written directly (sandbox disabled, no gateway)")
+	} else {
+		// Normal case: pipe config to the gateway script which starts the MCP gateway
+		yaml.WriteString("          cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh\n")
+		yaml.WriteString(generatedConfig)
+		yaml.WriteString("          MCPCONFIG_EOF\n")
+	}
 
 	// Note: Post-EOF commands are no longer needed since we pipe directly to the gateway script
 	return nil

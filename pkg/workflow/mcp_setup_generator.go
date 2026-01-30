@@ -655,7 +655,44 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 		// Render MCP config - this will pipe directly to the gateway script
 		engine.RenderMCPConfig(yaml, tools, mcpTools, workflowData)
+	} else if len(mcpTools) > 0 {
+		// Sandbox is disabled but MCP tools are configured
+		// Generate MCP config directly without starting the gateway
+		mcpSetupGeneratorLog.Print("Sandbox disabled with MCP tools - generating MCP config without gateway")
+
+		yaml.WriteString("      - name: Write MCP configuration\n")
+		yaml.WriteString("        id: write-mcp-config\n")
+
+		// Collect all MCP-related environment variables for the step
+		mcpEnvVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
+		if len(mcpEnvVars) > 0 {
+			yaml.WriteString("        env:\n")
+			envVarNames := make([]string, 0, len(mcpEnvVars))
+			for envVarName := range mcpEnvVars {
+				envVarNames = append(envVarNames, envVarName)
+			}
+			sort.Strings(envVarNames)
+			for _, envVarName := range envVarNames {
+				envVarValue := mcpEnvVars[envVarName]
+				fmt.Fprintf(yaml, "          %s: %s\n", envVarName, envVarValue)
+			}
+		}
+
+		yaml.WriteString("        run: |\n")
+		yaml.WriteString("          set -eo pipefail\n")
+
+		// Render MCP config with SkipGatewayStartup=true
+		// Use type assertion to check if engine supports RenderMCPConfigWithoutGateway
+		type noGatewayRenderer interface {
+			RenderMCPConfigWithoutGateway(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData)
+		}
+		if ngr, ok := engine.(noGatewayRenderer); ok {
+			ngr.RenderMCPConfigWithoutGateway(yaml, tools, mcpTools, workflowData)
+		} else {
+			// Fallback: use RenderMCPConfig with sandbox disabled
+			// The gateway config will be nil and SkipGatewayStartup behavior depends on renderer
+			mcpSetupGeneratorLog.Print("Engine does not support RenderMCPConfigWithoutGateway, using RenderMCPConfig")
+			engine.RenderMCPConfig(yaml, tools, mcpTools, workflowData)
+		}
 	}
-	// Note: When sandbox is disabled, gateway config will be nil and MCP config will be generated
-	// without the gateway section. The engine's RenderMCPConfig handles both cases.
 }

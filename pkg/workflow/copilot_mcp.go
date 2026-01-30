@@ -31,9 +31,48 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 	gatewayConfig := buildMCPGatewayConfig(workflowData)
 
 	// Use shared JSON MCP config renderer with unified renderer methods
-	options := JSONMCPConfigOptions{
-		ConfigPath:    "/home/runner/.copilot/mcp-config.json",
-		GatewayConfig: gatewayConfig,
+	options := e.buildCopilotMCPConfigOptions(createRenderer, gatewayConfig, workflowData, false)
+
+	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
+}
+
+// RenderMCPConfigWithoutGateway generates MCP server configuration for Copilot CLI
+// without starting the MCP gateway. This is used when sandbox is disabled and
+// MCP servers should be configured as local stdio processes.
+func (e *CopilotEngine) RenderMCPConfigWithoutGateway(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) {
+	copilotMCPLog.Printf("Rendering MCP config without gateway for Copilot engine: mcpTools=%d", len(mcpTools))
+
+	// Create the directory first
+	yaml.WriteString("          mkdir -p /home/runner/.copilot\n")
+
+	// Create unified renderer with Copilot-specific options
+	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
+		return NewMCPConfigRenderer(MCPRendererOptions{
+			IncludeCopilotFields: true,
+			InlineArgs:           true,
+			Format:               "json",
+			IsLast:               isLast,
+		})
+	}
+
+	// No gateway config when sandbox is disabled
+	options := e.buildCopilotMCPConfigOptions(createRenderer, nil, workflowData, true)
+
+	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
+}
+
+// buildCopilotMCPConfigOptions creates the JSONMCPConfigOptions for Copilot engine
+// This shared helper avoids code duplication between RenderMCPConfig and RenderMCPConfigWithoutGateway
+func (e *CopilotEngine) buildCopilotMCPConfigOptions(
+	createRenderer func(isLast bool) *MCPConfigRendererUnified,
+	gatewayConfig *MCPGatewayRuntimeConfig,
+	workflowData *WorkflowData,
+	skipGatewayStartup bool,
+) JSONMCPConfigOptions {
+	return JSONMCPConfigOptions{
+		ConfigPath:         "/home/runner/.copilot/mcp-config.json",
+		GatewayConfig:      gatewayConfig,
+		SkipGatewayStartup: skipGatewayStartup,
 		Renderers: MCPToolRenderers{
 			RenderGitHub: func(yaml *strings.Builder, githubTool any, isLast bool, workflowData *WorkflowData) {
 				renderer := createRenderer(isLast)
@@ -75,8 +114,6 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 			return toolName != "cache-memory"
 		},
 	}
-
-	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
 }
 
 // renderCopilotMCPConfigWithContext generates custom MCP server configuration for Copilot CLI
