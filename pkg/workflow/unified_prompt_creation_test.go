@@ -800,8 +800,11 @@ Actor: ${{ github.actor }}`
 	assert.Less(t, playwrightPos, systemClosePos, "Playwright should be before system tag closes")
 
 	// Verify user prompt is after system tags
-	userPromptPos := strings.Index(lockStr, "# Test Workflow")
-	assert.Less(t, systemClosePos, userPromptPos, "User prompt should come after system tag closes")
+	// With runtime-import, the actual content is in the original workflow file
+	// The lock file should contain the runtime-import macro after system tags
+	runtimeImportPos := strings.Index(lockStr, "{{#runtime-import")
+	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
+	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should come after system tag closes")
 
 	// Verify expressions are handled
 	assert.Contains(t, lockStr, "GH_AW_GITHUB_REPOSITORY:", "Should have repository env var")
@@ -842,9 +845,12 @@ Do something simple.`
 	assert.Contains(t, lockStr, "temp_folder_prompt.md", "Should have temp folder prompt")
 
 	// User prompt should be after system tags
+	// With runtime-import, the actual content is in the original workflow file
+	// The lock file should contain the runtime-import macro after system tags
 	systemClosePos := strings.Index(lockStr, "</system>")
-	userPromptPos := strings.Index(lockStr, "# Simple Task")
-	assert.Less(t, systemClosePos, userPromptPos, "User prompt should be after system tags")
+	runtimeImportPos := strings.Index(lockStr, "{{#runtime-import")
+	assert.Greater(t, runtimeImportPos, -1, "Should contain runtime-import macro")
+	assert.Less(t, systemClosePos, runtimeImportPos, "Runtime-import macro should be after system tags")
 }
 
 // TestUnifiedPromptCreation_SafeOutputsOnly tests workflow with only safe-outputs

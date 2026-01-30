@@ -219,6 +219,9 @@ End`,
 func TestGeneratePromptRemovesXMLComments(t *testing.T) {
 	compiler := NewCompiler()
 
+	// Note: With the hybrid runtime-import approach, workflows without imports use runtime-import
+	// which means generatePrompt emits a runtime-import macro, not inline content
+	// XML comments are removed at runtime by runtime_import.cjs
 	data := &WorkflowData{
 		MarkdownContent: `# Workflow Title
 
@@ -231,6 +234,8 @@ that spans multiple lines
 should also be removed -->
 
 Final content.`,
+		ImportedFiles: []string{}, // No imports, so will use runtime-import
+		ImportInputs:  nil,
 	}
 
 	var yaml strings.Builder
@@ -238,26 +243,10 @@ Final content.`,
 
 	output := yaml.String()
 
-	// Check that XML comments are not present in the generated output
-	if strings.Contains(output, "<!-- This comment should be removed from the prompt -->") {
-		t.Error("Expected single-line XML comment to be removed from prompt generation")
-	}
-
-	if strings.Contains(output, "<!-- Another comment") {
-		t.Error("Expected multi-line XML comment to be removed from prompt generation")
-	}
-
-	// Check that regular content is still present
-	if !strings.Contains(output, "# Workflow Title") {
-		t.Error("Expected regular markdown content to be preserved")
-	}
-
-	if !strings.Contains(output, "This is some content.") {
-		t.Error("Expected regular content to be preserved")
-	}
-
-	if !strings.Contains(output, "Final content.") {
-		t.Error("Expected final content to be preserved")
+	// With runtime-import (no imports), the output should contain the runtime-import macro
+	// XML comments will be removed at runtime by runtime_import.cjs
+	if !strings.Contains(output, "{{#runtime-import") {
+		t.Error("Expected runtime-import macro in prompt generation output for workflow without imports")
 	}
 }
 
@@ -337,6 +326,7 @@ This is a normal-sized workflow that should compile successfully.`
 	}
 
 	// Test that oversized content now compiles successfully with chunking
+	// Note: Add imports to trigger inlining (runtime-import is only used for workflows without imports)
 	longContent := "---\n" +
 		"on:\n" +
 		"  issues:\n" +
@@ -350,9 +340,21 @@ This is a normal-sized workflow that should compile successfully.`
 		"  github:\n" +
 		"    toolsets: [issues]\n" +
 		"engine: claude\n" +
+		"imports:\n" +
+		"  - shared/dummy.md\n" +
 		"---\n\n" +
 		"# Very Long Workflow\n\n" +
 		strings.Repeat("This is a very long line that will be repeated many times to test the chunking functionality in GitHub Actions prompt generation.\n", 400)
+
+	// Create shared directory and dummy import file
+	sharedDir := filepath.Join(tmpDir, "shared")
+	if err := os.Mkdir(sharedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dummyFile := filepath.Join(sharedDir, "dummy.md")
+	if err := os.WriteFile(dummyFile, []byte("# Dummy\n\nDummy content.\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	longFile := filepath.Join(tmpDir, "long-workflow.md")
 	if err := os.WriteFile(longFile, []byte(longContent), 0644); err != nil {
@@ -385,12 +387,18 @@ This is a normal-sized workflow that should compile successfully.`
 		t.Error("Expected 'Create prompt with built-in context' step in generated workflow")
 	}
 
+	// Normal workflow (no imports) should use runtime-import
+	if !strings.Contains(normalLockString, "{{#runtime-import") {
+		t.Error("Normal workflow without imports should use runtime-import")
+	}
+
+	// Long workflow (with imports) should be inlined and chunked
 	// Chunking is implemented by emitting more heredoc blocks for large content,
 	// not by generating old "Append prompt (part N)" steps.
 	normalHeredocCount := strings.Count(normalLockString, "cat << 'PROMPT_EOF'")
 	longHeredocCount := strings.Count(lockString, "cat << 'PROMPT_EOF'")
 	if longHeredocCount <= normalHeredocCount {
-		t.Errorf("Expected long workflow to have more heredoc blocks than normal (normal=%d, long=%d)", normalHeredocCount, longHeredocCount)
+		t.Errorf("Expected long workflow with imports to have more heredoc blocks than normal (normal=%d, long=%d)", normalHeredocCount, longHeredocCount)
 	}
 }
 
