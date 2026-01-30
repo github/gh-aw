@@ -253,12 +253,12 @@ const AgenticCampaignLabel = "agentic-campaign"
 const CampaignLabelPrefix = "z_campaign_"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.22"
+const DefaultClaudeCodeVersion Version = "2.1.25"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // WARNING: UPGRADING COPILOT CLI REQUIRES A FULL INTEGRATION TEST RUN TO ENSURE COMPATIBILITY.
-const DefaultCopilotVersion Version = "0.0.397"
+const DefaultCopilotVersion Version = "0.0.399"
 
 // DefaultCopilotDetectionModel is the default model for the Copilot engine when used in the detection job
 // Updated to gpt-5.1-codex-mini after gpt-5-mini deprecation on 2026-01-17
@@ -328,7 +328,7 @@ const DefaultSandboxRuntimeVersion Version = "0.0.32"
 const DefaultPlaywrightMCPVersion Version = "0.0.61"
 
 // DefaultPlaywrightBrowserVersion is the default version of the Playwright browser Docker image
-const DefaultPlaywrightBrowserVersion Version = "v1.58.0"
+const DefaultPlaywrightBrowserVersion Version = "v1.58.1"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.24.0"
