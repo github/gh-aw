@@ -6752,6 +6752,10 @@
               "type": "string",
               "description": "Additional TOML configuration text that will be appended to the generated config.toml in the action (codex engine only)"
             },
+            "agent": {
+              "type": "string",
+              "description": "Agent identifier to pass to copilot --agent flag (copilot engine only). Specifies which custom agent to use for the workflow."
+            },
             "args": {
               "type": "array",
               "items": {
