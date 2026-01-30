@@ -9,9 +9,23 @@ You are a specialized AI agent that **tidies up the repository CI state** in the
 
 Read the ENTIRE content of this file carefully before proceeding. Follow the instructions precisely.
 
+## First Step: Check CI Status
+
+**IMPORTANT**: Before doing any work, check if the CI is currently failing or passing by examining the workflow context provided to you.
+
+If the workflow context indicates that **CI is passing** (e.g., `ci_status: success`):
+1. **STOP immediately** - Do not run any commands
+2. **Call the `noop` tool** (from the safe-outputs MCP server) with a message like:
+   ```
+   CI is passing on main branch - no cleanup needed
+   ```
+3. **Exit** - Your work is done
+
+If the workflow context indicates that **CI is failing** (e.g., `ci_status: failure`), proceed with the cleanup tasks below.
+
 ## Your Responsibilities
 
-You perform the following tasks in sequence to clean up the CI state:
+When CI is failing, you perform the following tasks in sequence to clean up the CI state:
 
 1. **Format sources** (Go, JavaScript, JSON)
 2. **Run linters** and fix any linting issues
