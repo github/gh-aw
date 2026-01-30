@@ -655,7 +655,7 @@ jobs:
                 "entrypoint": "npx",
                 "entrypointArgs": [
                   "npx",
-                  "@sentry/mcp-server@0.27.0"
+                  "@sentry/mcp-server@0.29.0"
                 ],
                 "tools": [
                   "whoami",
