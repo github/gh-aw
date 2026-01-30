@@ -7,12 +7,14 @@ sidebar:
 
 Agentic workflows consist of two distinct parts with different editing requirements: the **YAML frontmatter** (configuration) and the **markdown body** (AI instructions). Understanding when changes require recompilation helps you iterate quickly and efficiently.
 
+See [Authoring Workflows with AI](/gh-aw/setup/agentic-authoring/) for guidance on creating workflows with AI assistance.
+
 ## Overview
 
 Workflow files (`.md`) are compiled into GitHub Actions workflow files (`.lock.yml`). The compilation process:
 
 - **Embeds frontmatter** directly into the lock file (changes require recompilation)
-- **References the markdown body** at runtime via `{{#runtime-import}}` macro (changes do NOT require recompilation)
+- **Loads the markdown body** at runtime from the source file (changes do NOT require recompilation)
 
 This design allows you to quickly iterate on AI instructions without recompilation while maintaining strict control over security-sensitive configuration.
 
@@ -109,28 +111,6 @@ Any changes to the frontmatter configuration between `---` markers:
 - **Timeout** (`timeout-minutes:`): Maximum execution time
 - **Roles** (`roles:`): Permission requirements for actors
 
-### Recompilation Workflow
-
-```bash
-# 1. Clone repository locally
-git clone https://github.com/your-org/your-repo.git
-cd your-repo
-
-# 2. Edit the frontmatter in .github/workflows/my-workflow.md
-vim .github/workflows/my-workflow.md
-
-# 3. Recompile the workflow
-gh aw compile my-workflow
-
-# 4. Review changes
-git diff .github/workflows/my-workflow.lock.yml
-
-# 5. Commit and push
-git add .github/workflows/my-workflow.md .github/workflows/my-workflow.lock.yml
-git commit -m "Update workflow configuration"
-git push origin main
-```
-
 ### Example: Adding a Tool (Requires Recompilation)
 
 **Before**:
@@ -197,80 +177,6 @@ Run this command: ${{ github.event.comment.body }}
 ```
 
 Use `needs.activation.outputs.text` for sanitized user input instead.
-
-## Best Practices
-
-### Development Workflow
-
-1. **Start with markdown**: Write and refine AI instructions on GitHub.com
-2. **Add configuration**: When you need tools or permissions, edit frontmatter locally and recompile
-3. **Iterate rapidly**: Continue refining instructions without recompilation
-4. **Test thoroughly**: Trigger workflows to validate both instruction quality and configuration
-
-### When to Edit on GitHub.com
-
-- ✅ Refining AI instructions and task descriptions
-- ✅ Adding examples or clarifying existing guidance
-- ✅ Fixing typos or improving formatting
-- ✅ Adjusting conditional logic in instructions
-- ✅ Updating output templates
-
-### When to Edit Locally
-
-- ✅ Adding or removing tools
-- ✅ Changing triggers or permissions
-- ✅ Modifying network access rules
-- ✅ Updating safe output configuration
-- ✅ Adding imports or custom jobs
-
-### Version Control
-
-**Always commit both files**:
-- `.github/workflows/my-workflow.md` (source)
-- `.github/workflows/my-workflow.lock.yml` (compiled)
-
-This ensures:
-- Transparency: Lock files show actual GitHub Actions that run
-- Auditability: Changes to compiled workflows are visible in git history
-- Reproducibility: Anyone can see the exact configuration
-
-## Troubleshooting
-
-### Changes Not Taking Effect
-
-**Problem**: Edited markdown body but workflow still uses old instructions.
-
-**Solution**: Verify the lock file contains `{{#runtime-import workflows/my-workflow.md}}`. If not, recompile to update to the latest compilation format:
-
-```bash
-gh aw compile my-workflow
-```
-
-### Compilation Errors
-
-**Problem**: `gh aw compile` fails with validation errors.
-
-**Solution**: Check frontmatter syntax:
-- YAML indentation (use 2 spaces)
-- Required fields present
-- Valid values for enums
-- Matching quotes and brackets
-
-Enable verbose mode for detailed errors:
-```bash
-gh aw compile my-workflow --verbose
-```
-
-### Lock File Out of Sync
-
-**Problem**: Lock file and markdown file seem mismatched.
-
-**Solution**: Always recompile after frontmatter changes:
-```bash
-gh aw compile my-workflow
-git add .github/workflows/my-workflow.lock.yml
-git commit -m "Recompile workflow after configuration change"
-```
 
 ## Quick Reference
 
