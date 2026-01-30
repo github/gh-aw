@@ -22,11 +22,15 @@
 //	    collector := NewErrorCollector(failFast)
 //
 //	    if err := validateThing1(config); err != nil {
-//	        collector.Add(err)
+//	        if returnErr := collector.Add(err); returnErr != nil {
+//	            return returnErr // Fail-fast mode
+//	        }
 //	    }
 //
 //	    if err := validateThing2(config); err != nil {
-//	        collector.Add(err)
+//	        if returnErr := collector.Add(err); returnErr != nil {
+//	            return returnErr // Fail-fast mode
+//	        }
 //	    }
 //
 //	    return collector.Error()
@@ -108,6 +112,31 @@ func (c *ErrorCollector) Error() error {
 	}
 
 	return errors.Join(c.errors...)
+}
+
+// FormattedError returns the aggregated error with a formatted header showing the count
+// Returns nil if no errors were collected
+// This method is preferred over Error() + FormatAggregatedError for better accuracy
+func (c *ErrorCollector) FormattedError(category string) error {
+	if len(c.errors) == 0 {
+		return nil
+	}
+
+	errorAggregationLog.Printf("Formatting %d errors for category: %s", len(c.errors), category)
+
+	if len(c.errors) == 1 {
+		return c.errors[0]
+	}
+
+	// Build formatted error with count header
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Found %d %s errors:", len(c.errors), category)
+	for _, err := range c.errors {
+		sb.WriteString("\n  • ")
+		sb.WriteString(err.Error())
+	}
+
+	return fmt.Errorf("%s", sb.String())
 }
 
 // FormatAggregatedError formats aggregated errors with a summary header

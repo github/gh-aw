@@ -274,7 +274,7 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 
 	strictModeValidationLog.Printf("Strict mode validation completed: error_count=%d", collector.Count())
 
-	return FormatAggregatedError(collector.Error(), "strict mode")
+	return collector.FormattedError("strict mode")
 }
 
 // validateStrictFirewall requires firewall to be enabled in strict mode for copilot and codex engines

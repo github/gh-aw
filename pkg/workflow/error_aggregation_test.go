@@ -263,3 +263,78 @@ func TestErrorCollectorIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestErrorCollectorFormattedError tests the FormattedError method
+func TestErrorCollectorFormattedError(t *testing.T) {
+	tests := []struct {
+		name          string
+		errors        []error
+		category      string
+		expectError   bool
+		shouldContain []string
+	}{
+		{
+			name:        "no errors",
+			errors:      []error{},
+			category:    "validation",
+			expectError: false,
+		},
+		{
+			name:          "single error (no formatting)",
+			errors:        []error{fmt.Errorf("single error")},
+			category:      "validation",
+			expectError:   true,
+			shouldContain: []string{"single error"},
+		},
+		{
+			name:        "multiple errors with formatted header",
+			errors:      []error{fmt.Errorf("error 1"), fmt.Errorf("error 2"), fmt.Errorf("error 3")},
+			category:    "validation",
+			expectError: true,
+			shouldContain: []string{
+				"Found 3 validation errors:",
+				"error 1",
+				"error 2",
+				"error 3",
+			},
+		},
+		{
+			name:        "errors with newlines preserved",
+			errors:      []error{fmt.Errorf("error with\nmultiple\nlines"), fmt.Errorf("simple error")},
+			category:    "test",
+			expectError: true,
+			shouldContain: []string{
+				"Found 2 test errors:",
+				"error with",
+				"multiple",
+				"lines",
+				"simple error",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			collector := NewErrorCollector(false)
+
+			// Add all errors
+			for _, err := range tt.errors {
+				_ = collector.Add(err)
+			}
+
+			// Get the formatted error
+			err := collector.FormattedError(tt.category)
+
+			if tt.expectError {
+				require.Error(t, err, "Should have formatted error")
+				errStr := err.Error()
+
+				for _, expected := range tt.shouldContain {
+					assert.Contains(t, errStr, expected, "Should contain expected text")
+				}
+			} else {
+				require.NoError(t, err, "Should not have error")
+			}
+		})
+	}
+}
