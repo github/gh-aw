@@ -15,21 +15,21 @@ var orchestratorToolsLog = logger.New("workflow:compiler_orchestrator_tools")
 
 // toolsProcessingResult holds the results of tools and markdown processing
 type toolsProcessingResult struct {
-	tools               map[string]any
-	runtimes            map[string]any
-	toolsTimeout        int
-	toolsStartupTimeout int
-	markdownContent     string
-	importedMarkdown    string // imported markdown from frontmatter imports (separate from main body)
+	tools                map[string]any
+	runtimes             map[string]any
+	toolsTimeout         int
+	toolsStartupTimeout  int
+	markdownContent      string
+	importedMarkdown     string // imported markdown from frontmatter imports (separate from main body)
 	mainWorkflowMarkdown string // main workflow markdown without imports (for runtime-import)
-	allIncludedFiles    []string
-	workflowName        string
-	frontmatterName     string
-	needsTextOutput     bool
-	trackerID           string
-	safeOutputs         *SafeOutputsConfig
-	secretMasking       *SecretMaskingConfig
-	parsedFrontmatter   *FrontmatterConfig
+	allIncludedFiles     []string
+	workflowName         string
+	frontmatterName      string
+	needsTextOutput      bool
+	trackerID            string
+	safeOutputs          *SafeOutputsConfig
+	secretMasking        *SecretMaskingConfig
+	parsedFrontmatter    *FrontmatterConfig
 }
 
 // processToolsAndMarkdown processes tools configuration, runtimes, and markdown content.

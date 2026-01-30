@@ -553,7 +553,7 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 		if strings.HasPrefix(chunk, "{{#runtime-import ") && strings.HasSuffix(chunk, "}}") {
 			// This is a runtime-import macro - write it directly without heredoc
 			unifiedPromptLog.Print("Detected runtime-import macro, writing directly")
-			
+
 			// Close heredoc if open before writing runtime-import macro
 			if inHeredoc {
 				yaml.WriteString("          PROMPT_EOF\n")
