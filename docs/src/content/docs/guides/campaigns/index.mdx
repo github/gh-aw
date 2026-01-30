@@ -1,103 +1,114 @@
 ---
-title: About Campaigns
-description: Coordinate agentic workflows toward one goal, tracked in GitHub Projects.
+title: Project Tracking with Campaigns
+description: Track workflow progress in GitHub Projects using coordinated agentic workflows.
 sidebar:
-  label: About Campaigns
-banner:
-  content: '<strong>Do not use.</strong> Campaigns are still incomplete and may produce unreliable or unintended results.'
+  label: Campaigns
 ---
 
-## What are Agentic Campaigns?
+## What are Campaigns?
 
-**[Agentic campaigns](/gh-aw/reference/glossary/#agentic-campaign)** are initiatives that coordinate multiple [agentic workflows](/gh-aw/reference/glossary/#agentic-workflow) toward a shared goal.
+Campaigns enable workflows to automatically track their progress in [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2). This is useful when you need to coordinate multiple workflows or track work across repositories.
 
-When you need to roll out changes across many repositories—like upgrading dependencies, fixing security issues, or standardizing configurations—campaigns provide the orchestration layer you need to do that efficiently.
+## Quick Start
 
-They run on a schedule to work through repositories systematically, dispatch workers in batches to control load and avoid rate limits, and track all progress centrally in [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2).
+Add the `project` field to your workflow frontmatter to enable project tracking:
 
-You get complete visibility into what's done, what's in progress, and what's blocked—all in one place.
-
-## When to use Campaigns
-
-Choose a campaign when you need coordination across repos or multiple workflows, with progress tracked in one place.
-
-- **Coordinate multiple worker workflows** that each do part of the job
-- **Work across many repositories** (using campaign scope)
-- **Track progress in one place** (a single [GitHub Project](/gh-aw/reference/glossary/#github-projects-projects-v2))
-- **Roll out changes in batches across repos** (repeatable runs with per-run limits and central tracking)
-
-**Don't need a campaign?** A single scheduled workflow is simpler if you're just automating work in one repository.
-
-**Not sure?** Start with one repository and one worker workflow, then scale up once you see how it works.
-
-## Campaign Specs
-
-To create a campaign, you write a single markdown file:
-
-- `.github/workflows/<id>.campaign.md`
-
-That file has two parts:
-
-- **[Frontmatter](/gh-aw/reference/glossary/#frontmatter)**: the configuration ([GitHub Project URL](/gh-aw/reference/glossary/#github-projects-projects-v2), scope, worker list, governance limits)
-- **Markdown body**: the narrative (objective, KPIs, prioritization, constraints)
-
-Here’s a small example:
-
-```markdown wrap
+```yaml wrap
 ---
-id: dependency-upgrades
-project-url: "https://github.com/orgs/ORG/projects/1"
-scope:
-  - "org:ORG"
-workflows:
-  - dependency-scanner
-  - dependency-upgrader
+on:
+  schedule:
+    - cron: "0 0 * * *"
+project: https://github.com/orgs/myorg/projects/1
+safe-outputs:
+  create-issue:
+    max: 5
 ---
 
-# Dependency Upgrades
+# Dependency Upgrade Campaign
 
-Upgrade dependencies across repos.
+Scan for outdated dependencies and create issues to track upgrades.
+
+1. Check for outdated dependencies
+2. Create issues for each outdated package
+3. Issues are automatically added to the project board
 ```
 
-See: [Campaign specs](/gh-aw/guides/campaigns/specs/).
+This automatically enables project management capabilities like adding items, updating fields, and posting status updates.
 
-## From markdown to GitHub Actions
+## When to Use Project Tracking
 
-Just like regular workflows, campaigns get compiled:
+Use the `project` field when you need:
 
-- You run `gh aw compile`
-- The compiler produces a **[workflow lock file](/gh-aw/reference/glossary/#workflow-lock-file-lockyml)** (`.lock.yml`) that GitHub Actions runs
+- **Progress visibility** - Track workflow-created items in a central project board
+- **Status updates** - Automatically update item status as work progresses
+- **Team coordination** - Share workflow progress with stakeholders
+- **Multi-repo tracking** - Monitor work across multiple repositories
 
-This is the same idea as [compilation](/gh-aw/reference/glossary/#compilation) for normal workflows: you edit human-friendly markdown, GitHub Actions runs the compiled YAML.
+**Don't need project tracking?** A simple workflow without the `project` field is simpler if you don't need centralized tracking.
 
-## Orchestrator + workers (who does what)
+## Configuration
 
-Campaigns split responsibilities on purpose:
+### Simple Configuration
 
-- **Orchestrator (generated from the spec)**
-  - Runs on a schedule
-  - Coordinates and decides what to do next
-  - Uses **[safe outputs](/gh-aw/reference/glossary/#safe-outputs)** to dispatch worker workflows
-- **Workers (you provide these)**
-  - Are normal agentic workflows triggered via [`workflow_dispatch`](/gh-aw/reference/glossary/#workflow_dispatch)
-  - Do the actual GitHub writes (issues/PRs/Projects/comments) using their own safe outputs
+Use just a project URL:
 
-## What you’ll see in GitHub
+```yaml
+project: https://github.com/orgs/myorg/projects/1
+```
 
-When a campaign is working, you’ll usually see:
+### Advanced Configuration
 
-- A compiled workflow named `<id>.campaign.lock.yml` in `.github/workflows/`
-- A GitHub Project filling up with issues/PRs created by workers
-- Tracking labels on those issues/PRs like `z_campaign_<id>`
-- Optional [labels](/gh-aw/reference/glossary/#labels) you can use to group and filter related workflows
-- Worker workflow runs that create PRs and move items through statuses
+Customize behavior with additional options:
 
-If you want the full execution story, see: [Campaign lifecycle](/gh-aw/guides/campaigns/lifecycle/).
+```yaml
+project:
+  url: https://github.com/orgs/myorg/projects/1
+  scope:
+    - owner/repo1
+    - owner/repo2
+    - org:myorg
+  max-updates: 50
+  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
+```
 
-## Next steps
+See the [Project Tracking example](/gh-aw/examples/project-tracking/) for complete configuration details.
 
-- [Getting started](/gh-aw/guides/campaigns/getting-started/) – step-by-step tutorial
-- [Creating campaigns](/gh-aw/guides/campaigns/creating-campaigns/) – issue-based or CLI creation
-- [Campaign specs](/gh-aw/guides/campaigns/specs/) – configuration reference
-- [Campaign Lifecycle](/gh-aw/guides/campaigns/lifecycle/) – execution model
-- [CLI commands](/gh-aw/guides/campaigns/cli-commands/) – command reference
+## How It Works
+
+When you add the `project` field:
+
+1. **Automatic safe-outputs** - The compiler adds `update-project` and `create-project-status-update` safe-outputs
+2. **Project operations** - Your workflow can add items, update fields, and post status updates
+3. **Token configuration** - Uses your configured token (or creates one with `gh aw secrets set`)
+
+## Worker Workflows
+
+You can coordinate multiple workflows by having them all use the same project URL:
+
+```yaml
+# worker-1.md
+---
+on:
+  workflow_dispatch:
+project: https://github.com/orgs/myorg/projects/1
+---
+# Worker 1: Creates issues
+```
+
+```yaml
+# worker-2.md
+---
+on:
+  workflow_dispatch:
+project: https://github.com/orgs/myorg/projects/1
+---
+# Worker 2: Creates PRs
+```
+
+Both workers will automatically track their items in the same project board.
+
+## Next Steps
+
+- [Project Tracking Example](/gh-aw/examples/project-tracking/) - Complete guide with examples
+- [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Project operations documentation
+- [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) - Token setup guide

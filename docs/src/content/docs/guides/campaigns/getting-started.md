@@ -1,67 +1,105 @@
 ---
 title: Getting started
-description: Quick start guide for creating and launching agentic campaigns
-banner:
-  content: '<strong>⚠️ Deprecated:</strong> The <code>.campaign.md</code> file format is deprecated. Use the <code>project</code> field in workflow frontmatter instead.'
+description: Quick start guide for creating workflows with project tracking
 ---
 
-:::caution[File format deprecated]
-This guide describes the deprecated `.campaign.md` file format. For current project tracking, use the `project` field in workflow frontmatter. See [Project Tracking](/gh-aw/reference/frontmatter/#project-tracking-project).
-:::
-
-Create your first campaign using the custom agent in GitHub Copilot Chat. The agent generates a Project board, campaign spec, and orchestrator workflow based on your goal description.
+This guide shows how to create a workflow with project tracking enabled.
 
 ## Prerequisites
 
 - Repository with GitHub Agentic Workflows installed
-- GitHub Copilot access
-- Write access to create pull requests and merge them
 - GitHub Actions enabled
+- A GitHub Projects board (or create one during setup)
 
-## Create a campaign
+## Create a workflow with project tracking
 
-1. **Open Copilot Chat** in your repository
-2. **Describe your campaign** using `/agent`:
-   ```
-   /agent create campaign: Burn down all open code security alerts, 
-   prioritizing file-write alerts first
-   ```
-3. **Wait for the agent** - A pull request appears with your campaign configuration
-4. **Review the PR** - Verify the generated Project, spec, and orchestrator
-5. **Merge the PR** when ready
-6. **Run the orchestrator** from the Actions tab to start the campaign
+1. **Create a new workflow file** at `.github/workflows/dependency-scanner.md`:
 
-## Generated files
+```yaml wrap
+---
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # Weekly on Monday
+project: https://github.com/orgs/myorg/projects/1
+safe-outputs:
+  create-issue:
+    max: 10
+---
 
-The pull request creates three components:
+# Dependency Scanner
 
-**Project board** - GitHub Project for tracking campaign progress with custom fields and views.
+Scan for outdated dependencies and create tracking issues.
 
-**Campaign spec** - Configuration file at `.github/workflows/<id>.campaign.md` defining campaign configuration (project URL, workflows, scope, governance). The markdown body contains narrative goals and success criteria.
+## Task
 
-**Orchestrator workflow** - Compiled workflow at `.github/workflows/<id>.campaign.lock.yml` that executes the campaign logic.
+1. Check for outdated npm packages
+2. Create an issue for each outdated package
+3. The issue will be automatically added to the project board
+```
 
-## Campaign execution
+2. **Set up authentication** for project access:
 
-The orchestrator runs on the configured schedule (daily by default):
+```bash
+gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN --value "YOUR_PROJECT_TOKEN"
+```
 
-1. Dispatches worker workflows via `workflow_dispatch` (if configured)
-2. Discovers issues and pull requests created by workers
-3. Updates the Project board with new items
-4. Posts a status update summarizing progress
+See [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) for token setup.
 
-See [Campaign lifecycle](/gh-aw/guides/campaigns/lifecycle/) for execution details.
+3. **Compile the workflow**:
+
+```bash
+gh aw compile
+```
+
+4. **Commit and push**:
+
+```bash
+git add .github/workflows/dependency-scanner.md
+git add .github/workflows/dependency-scanner.lock.yml
+git commit -m "Add dependency scanner workflow"
+git push
+```
+
+## How it works
+
+When the workflow runs:
+
+1. The AI agent analyzes your repository for outdated dependencies
+2. Creates issues for packages that need updating
+3. Each issue is automatically added to your GitHub Project
+4. The project board updates with the new items
+
+## Coordinating multiple workflows
+
+You can create additional workflows that share the same project:
+
+```yaml wrap
+# .github/workflows/dependency-updater.md
+---
+on:
+  workflow_dispatch:
+project: https://github.com/orgs/myorg/projects/1
+safe-outputs:
+  create-pull-request:
+    max: 5
+---
+
+# Dependency Updater
+
+Create PRs to update dependencies based on project issues.
+```
+
+Both workflows will track their items in the same project board.
 
 ## Best practices
 
-Start with focused scope:
-- Define one clear objective
-- Include 1-3 worker workflows maximum
-- Set conservative governance limits (e.g., 10 project updates per run)
+- **Start small** - Begin with one workflow and add more as needed
+- **Set conservative limits** - Use `max-updates: 10` in project config to start
+- **Test manually** - Use `workflow_dispatch` trigger to test before scheduling
+- **Monitor progress** - Check your project board to see tracked items
 
-Configure worker triggers:
-- Workers should accept `workflow_dispatch` only
-- Remove cron schedules, push, and pull_request triggers
-- Let the orchestrator control execution timing
+## Next steps
 
-See [Campaign specs](/gh-aw/guides/campaigns/specs/) for configuration options.
+- [Project Tracking Example](/gh-aw/examples/project-tracking/) - Complete configuration reference
+- [Safe Outputs](/gh-aw/reference/safe-outputs/) - Available project operations
+- [Trigger Events](/gh-aw/reference/triggers/) - Workflow trigger options
