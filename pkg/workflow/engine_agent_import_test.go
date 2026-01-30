@@ -9,7 +9,32 @@ import (
 	"testing"
 )
 
-// TestCopilotEngineWithAgentFromImports tests that copilot engine includes --agent flag when agent file is imported
+// TestCopilotEngineWithAgentFromEngineConfig tests that copilot engine includes --agent flag when specified in engine.agent
+func TestCopilotEngineWithAgentFromEngineConfig(t *testing.T) {
+	engine := NewCopilotEngine()
+	workflowData := &WorkflowData{
+		Name: "test-workflow",
+		EngineConfig: &EngineConfig{
+			ID:    "copilot",
+			Agent: "my-custom-agent",
+		},
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+
+	if len(steps) != 1 {
+		t.Fatalf("Expected 1 execution step, got %d", len(steps))
+	}
+
+	stepContent := strings.Join([]string(steps[0]), "\n")
+
+	// Copilot CLI expects agent identifier
+	if !strings.Contains(stepContent, `--agent my-custom-agent`) {
+		t.Errorf("Expected '--agent my-custom-agent' in copilot command, got:\n%s", stepContent)
+	}
+}
+
+// TestCopilotEngineWithAgentFromImports tests backward compatibility - copilot engine includes --agent flag when agent file is imported
 func TestCopilotEngineWithAgentFromImports(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
@@ -31,6 +56,35 @@ func TestCopilotEngineWithAgentFromImports(t *testing.T) {
 	// Copilot CLI expects agent identifier (filename without extension), not full path
 	if !strings.Contains(stepContent, `--agent test-agent`) {
 		t.Errorf("Expected '--agent test-agent' in copilot command, got:\n%s", stepContent)
+	}
+}
+
+// TestCopilotEngineAgentPriority tests that engine.agent takes priority over AgentFile
+func TestCopilotEngineAgentPriority(t *testing.T) {
+	engine := NewCopilotEngine()
+	workflowData := &WorkflowData{
+		Name: "test-workflow",
+		EngineConfig: &EngineConfig{
+			ID:    "copilot",
+			Agent: "explicit-agent",
+		},
+		AgentFile: ".github/agents/import-agent.md",
+	}
+
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+
+	if len(steps) != 1 {
+		t.Fatalf("Expected 1 execution step, got %d", len(steps))
+	}
+
+	stepContent := strings.Join([]string(steps[0]), "\n")
+
+	// Should use explicit agent from engine.agent, not the one from imports
+	if !strings.Contains(stepContent, `--agent explicit-agent`) {
+		t.Errorf("Expected '--agent explicit-agent' in copilot command, got:\n%s", stepContent)
+	}
+	if strings.Contains(stepContent, `--agent import-agent`) {
+		t.Errorf("Did not expect '--agent import-agent' when engine.agent is set, got:\n%s", stepContent)
 	}
 }
 

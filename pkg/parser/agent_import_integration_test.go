@@ -8,8 +8,9 @@ import (
 	"testing"
 )
 
-// TestAgentImportWithToolsArray verifies that importing custom agent files
-// with tools as an array (GitHub Copilot format) works correctly in the full import flow
+// TestAgentImportWithToolsArray verifies that importing files from .github/agents/
+// are now treated as regular imports (not special agent files).
+// Agent identification is now done via engine.agent field instead.
 func TestAgentImportWithToolsArray(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -87,31 +88,21 @@ This workflow imports a custom agent with array-format tools.`
 		t.Fatalf("ProcessImportsFromFrontmatterWithManifest() error = %v, want nil", err)
 	}
 
-	// Verify that the agent file was detected and stored
-	if result.AgentFile == "" {
-		t.Errorf("Expected AgentFile to be set, got empty string")
+	// Verify that AgentFile is NOT set (deprecated - agent files no longer automatically detected)
+	if result.AgentFile != "" {
+		t.Errorf("Expected AgentFile to be empty (deprecated), got %q", result.AgentFile)
 	}
 
-	expectedAgentPath := ".github/agents/feature-flag-remover.agent.md"
-	if result.AgentFile != expectedAgentPath {
-		t.Errorf("AgentFile = %q, want %q", result.AgentFile, expectedAgentPath)
-	}
-
-	// Verify that markdown was extracted from the agent file
+	// Verify that markdown was extracted from the imported file (treated as regular import now)
 	if result.MergedMarkdown == "" {
-		t.Errorf("Expected MergedMarkdown to contain agent markdown content")
-	}
-
-	// Verify that tools were NOT merged from the agent file (they're in array format)
-	// Agent tools should be ignored during import processing
-	if result.MergedTools != "" && result.MergedTools != "{}\n" {
-		t.Errorf("MergedTools should be empty for agent files, got: %q", result.MergedTools)
+		t.Errorf("Expected MergedMarkdown to contain markdown content from import")
 	}
 }
 
-// TestMultipleAgentImportsError verifies that importing multiple agent files
-// results in an error as only one agent file is allowed per workflow
-func TestMultipleAgentImportsError(t *testing.T) {
+// TestMultipleAgentImportsNoError verifies that importing multiple files from .github/agents/
+// no longer causes an error (they are treated as regular imports now).
+// Use engine.agent field to specify the agent ID instead.
+func TestMultipleAgentImportsNoError(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Create .github/agents directory
@@ -138,7 +129,7 @@ func TestMultipleAgentImportsError(t *testing.T) {
 		t.Fatalf("Failed to write agent2 file: %v", err)
 	}
 
-	// Process imports with multiple agent files - should error
+	// Process imports with multiple agent files - should NOT error (treated as regular imports)
 	frontmatter := map[string]any{
 		"on": "issues",
 		"imports": []string{
@@ -147,13 +138,18 @@ func TestMultipleAgentImportsError(t *testing.T) {
 		},
 	}
 
-	_, err := ProcessImportsFromFrontmatterWithManifest(frontmatter, workflowsDir, nil)
-	if err == nil {
-		t.Errorf("Expected error when importing multiple agent files, got nil")
+	result, err := ProcessImportsFromFrontmatterWithManifest(frontmatter, workflowsDir, nil)
+	if err != nil {
+		t.Errorf("Expected no error when importing multiple files from .github/agents/, got: %v", err)
 	}
 
-	// Verify error message mentions multiple agent files
-	if err != nil && err.Error() == "" {
-		t.Errorf("Error message is empty")
+	// Verify that AgentFile is NOT set (deprecated)
+	if result.AgentFile != "" {
+		t.Errorf("Expected AgentFile to be empty (deprecated), got %q", result.AgentFile)
+	}
+
+	// Verify that markdown was extracted from both imported files
+	if result.MergedMarkdown == "" {
+		t.Errorf("Expected MergedMarkdown to contain markdown content from imports")
 	}
 }
