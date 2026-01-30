@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 2398f942b8c80bc7965e59054328839f2869bf5c3e5575b423440c3088629751
+# frontmatter-hash: 62132bc14c8ed0d3aaf7b9dcca3ac814d9a63f1bfada7ba11847553cc8e0b6eb
 
 name: "Example: Custom Error Patterns"
 "on":

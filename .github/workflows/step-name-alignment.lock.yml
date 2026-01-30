@@ -21,7 +21,7 @@
 #
 # Scans step names in .lock.yml files and aligns them with step intent and project glossary
 #
-# frontmatter-hash: 740be3b1aee795faa1a3153c551fca67420bd77f3d3da0319f4ebe66e7224926
+# frontmatter-hash: e2b3fe6d4156f005c31b28a46ea6fb89bcebafafa54a86bdba8ef3f9994043c4
 
 name: "Step Name Alignment"
 "on":

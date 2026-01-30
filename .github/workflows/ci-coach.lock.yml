@@ -28,7 +28,7 @@
 #     - shared/ci-data-analysis.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: d483bb395ca89dc1568f0103a49c809e6c58abfb808b2a957ba96e83203f1412
+# frontmatter-hash: 75843f00a2a033badd31938fcd079b95861a32c6c7327e035f8ea88bbbc99a3b
 
 name: "CI Optimization Coach"
 "on":

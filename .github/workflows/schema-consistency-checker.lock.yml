@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 65b6633c6f991e952990df0f6a8c6a035b1eb459f1145cda3ca4fc2f9a2a6b79
+# frontmatter-hash: 49a11a8926dad7b90455b99fa5f51d9e59c1a37170c9be455621e0165da543f7
 
 name: "Schema Consistency Checker"
 "on":

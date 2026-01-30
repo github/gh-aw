@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 9febc8abcf988eaf2e23c5603b517ab4150ae88d5ffe273e2d178527a56d11a7
+# frontmatter-hash: 2604506b5bf8b9005d55f3dd40b775f315e4772f1a50a911975fa67401929f34
 
 name: "Auto-Triage Issues"
 "on":

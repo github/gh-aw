@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: e00e71abf31c5dd65496a2fffebb3fb86c52f6b38765ce799da08acb06ec4467
+# frontmatter-hash: 9ef5a190e66044ff4734f10294f74d594f7efd80322e97f2172389c69eceea5e
 
 name: "Daily Malicious Code Scan Agent"
 "on":

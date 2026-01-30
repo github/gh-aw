@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 7fcc1e31c78077296d6a071c4430d29eac090c908f9b5bf50be6549bcd4f0795
+# frontmatter-hash: 6d7d5e3dc7749cbd7be0f75e08c326bc9e1e5ec2252b00d465989bc107249189
 
 name: "Daily Compiler Quality Check"
 "on":

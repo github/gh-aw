@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/docs-server-lifecycle.md
 #
-# frontmatter-hash: b6d25a5bb65ef869e447f2a2e8b3b8ca9a8dc89ab95b1c6ace53feae82270d52
+# frontmatter-hash: 67eb66e0a29570f07c1140396a35709948551b446b6f1456a7a95439b79ed700
 
 name: "Documentation Noob Tester"
 "on":

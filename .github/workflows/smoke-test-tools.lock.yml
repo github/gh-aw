@@ -21,7 +21,7 @@
 #
 # Smoke test to validate common development tools are available in the agent container
 #
-# frontmatter-hash: 854bc9afc7da67e6014e02a9cefa584571dd2fcc7bc28da457dfa6af34ab63f3
+# frontmatter-hash: f413405daf4223a217204205a0f64677fb27652012fe5c4992b58b05bbe07068
 
 name: "Agent Container Smoke Test"
 "on":

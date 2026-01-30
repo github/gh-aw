@@ -26,7 +26,7 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: dd06c2d6bf54089940969f60344199b363b9f77338f1dd986df05735c8478f6b
+# frontmatter-hash: 8997e89bf0af8b3565622ef01e6d9d8d0d302fd0eda0ae8ccdc3e9ee787a8bb3
 
 name: "Workflow Normalizer"
 "on":
