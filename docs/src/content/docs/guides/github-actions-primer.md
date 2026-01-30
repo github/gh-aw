@@ -1,0 +1,457 @@
+---
+title: GitHub Actions Primer
+description: A comprehensive guide to understanding GitHub Actions, from its history and core concepts to testing workflows and comparing with agentic workflows
+sidebar:
+  order: 1
+---
+
+This guide introduces GitHub Actions—GitHub's native automation platform—and explains how it forms the foundation for agentic workflows. Understanding GitHub Actions helps you leverage its capabilities effectively while appreciating the enhanced security and AI-powered features that agentic workflows provide.
+
+## What is GitHub Actions?
+
+**GitHub Actions** is GitHub's integrated automation platform that enables you to build, test, and deploy code directly from your repository. It allows you to automate workflows in response to repository events, schedules, or manual triggers—all defined in YAML files stored in your repository.
+
+### Brief History
+
+GitHub Actions launched in **November 2019** as GitHub's answer to the growing need for built-in CI/CD (Continuous Integration/Continuous Deployment) capabilities within the development platform. Before Actions, developers relied on external services like Travis CI, CircleCI, or Jenkins that required separate configuration and maintenance.
+
+**Key milestones in GitHub Actions evolution:**
+
+- **2019**: Initial release with workflow automation and CI/CD capabilities
+- **2020**: Added Docker container actions and improved marketplace
+- **2021**: Expanded to include deployment environments and reusable workflows
+- **2022**: Introduced larger runners, deployment protection rules, and enhanced security features
+- **2023**: Added OpenID Connect (OIDC) support for secure cloud deployments
+- **2024-2026**: Integration with AI agents and Model Context Protocol (MCP) servers
+
+Today, GitHub Actions processes billions of workflow runs monthly and has become the de facto standard for automating GitHub-based development workflows.
+
+## Core Concepts
+
+Understanding these fundamental concepts is essential for working with both traditional GitHub Actions and agentic workflows.
+
+### Workflows
+
+A **workflow** is an automated process defined in a YAML file stored in your repository's `.github/workflows/` directory. Each workflow consists of one or more jobs that execute when triggered by specific events.
+
+**Example workflow file** (`.github/workflows/ci.yml`):
+
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: npm test
+```
+
+**Key characteristics:**
+- Must be stored in `.github/workflows/` directory on the **main** or **default branch** to be active
+- Define triggers (events), jobs, and execution environments
+- Can be manually triggered, scheduled, or event-driven
+- Are versioned alongside your code
+
+### Jobs
+
+A **job** is a set of steps that execute on the same runner (virtual machine). Jobs run in parallel by default but can be configured to run sequentially with dependencies.
+
+**Job example:**
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run build
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test
+```
+
+**Job characteristics:**
+- Each job runs in a fresh virtual machine or container
+- Jobs can depend on other jobs using `needs:`
+- Results can be shared between jobs using artifacts
+- Default timeout is 360 minutes (6 hours)
+
+### Steps
+
+**Steps** are individual tasks within a job. They run sequentially and can execute commands, run scripts, or use pre-built actions from the GitHub Marketplace.
+
+**Types of steps:**
+
+```yaml
+steps:
+  # Action step - uses a pre-built action
+  - uses: actions/checkout@v4
+  
+  # Run step - executes a shell command
+  - name: Install dependencies
+    run: npm install
+  
+  # Multi-line script
+  - name: Build and test
+    run: |
+      npm run build
+      npm test
+      
+  # Action with inputs
+  - uses: actions/setup-node@v4
+    with:
+      node-version: '20'
+```
+
+**Step characteristics:**
+- Execute in order within a job
+- Share the same filesystem and environment
+- Can pass data between steps using outputs
+- Failed steps stop job execution by default
+
+## Security Model
+
+GitHub Actions implements a comprehensive security model designed to protect your repositories, secrets, and infrastructure.
+
+### Workflow Storage and Execution
+
+> [!CAUTION]
+> Workflows **must** be stored in the `.github/workflows/` directory on the **default branch** (typically `main`) or other protected branches to be active and trusted.
+
+**Why workflows require main branch storage:**
+
+1. **Code Review**: Changes to workflows undergo the same review process as code changes
+2. **Audit Trail**: Git history provides a complete record of workflow modifications
+3. **Privilege Escalation Prevention**: Prevents attackers from modifying workflows in feature branches to access secrets
+4. **Trust Boundary**: The default branch represents reviewed, trusted automation code
+
+**Branch protection for workflows:**
+
+```yaml
+# Workflows on main branch can access secrets
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Has access to production secrets"
+```
+
+### Permission Model
+
+GitHub Actions uses the **principle of least privilege** with explicit permission declarations:
+
+```yaml
+permissions:
+  contents: read        # Read repository contents
+  issues: write        # Create/modify issues
+  pull-requests: write # Create/modify PRs
+  
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Job has specified permissions only"
+```
+
+**Default permissions:**
+- Fork pull requests: **read-only** to repository contents
+- Repository workflows: Configurable in repository settings
+- Recommended: Explicitly declare all required permissions
+
+### Secret Management
+
+**Secrets** are encrypted environment variables stored at the repository, organization, or environment level:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to production
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: ./deploy.sh
+```
+
+**Secret security features:**
+- Encrypted at rest using GitHub's infrastructure
+- Never exposed in logs (automatically redacted)
+- Only accessible to workflows on default/protected branches
+- Scoped by environment for additional protection
+
+## Testing and Debugging Workflows
+
+Unlike code that can be tested locally, workflows require a GitHub Actions environment. GitHub provides several mechanisms for testing and debugging.
+
+### Testing from Branches with workflow_dispatch
+
+The **`workflow_dispatch`** trigger allows manual workflow execution from any branch, making it invaluable for development and testing:
+
+```yaml
+name: Test Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      debug:
+        description: 'Enable debug logging'
+        required: false
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Testing in ${{ inputs.environment }}"
+      - run: echo "Debug mode: ${{ inputs.debug }}"
+```
+
+**Using workflow_dispatch for testing:**
+
+1. **Create test workflow** with `workflow_dispatch` trigger in a feature branch
+2. **Push to your branch** - the workflow file is now visible in the Actions tab
+3. **Navigate to Actions** tab in GitHub repository
+4. **Select your workflow** from the left sidebar
+5. **Click "Run workflow"** dropdown on the right
+6. **Choose your branch** and provide input values
+7. **Click "Run workflow"** button to execute
+
+> [!TIP]
+> Enable debug logging for workflow runs by setting repository secrets:
+> - `ACTIONS_STEP_DEBUG: true` - Enables step debug logging
+> - `ACTIONS_RUNNER_DEBUG: true` - Enables runner diagnostic logging
+
+**Limitations of branch-based testing:**
+- Cannot access repository secrets from feature branches (security restriction)
+- Must use `workflow_dispatch` - event triggers don't activate on non-default branches
+- Workflow must exist on the branch you're testing
+
+### Debugging Workflow Runs
+
+**Viewing workflow logs:**
+
+1. Navigate to the **Actions** tab in your repository
+2. Click the workflow run to view details
+3. Click a job to see individual step logs
+4. Click a step to expand detailed output
+
+**Debug logging commands:**
+
+```yaml
+steps:
+  - name: Debug context
+    run: |
+      echo "::debug::Debugging workflow context"
+      echo "::notice::This is a notice"
+      echo "::warning::This is a warning"
+      echo "::error::This is an error"
+  
+  - name: Debug environment
+    run: |
+      echo "GitHub event: ${{ github.event_name }}"
+      echo "Actor: ${{ github.actor }}"
+      printenv | sort
+```
+
+**Interactive debugging with tmate:**
+
+For complex debugging scenarios, use the `tmate` action to SSH into the runner:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  
+  - name: Setup tmate session
+    uses: mxschmitt/action-tmate@v3
+    if: ${{ failure() }}
+```
+
+## Agentic Workflows vs Traditional GitHub Actions
+
+While agentic workflows compile to GitHub Actions YAML and run on the same infrastructure, they introduce significant enhancements in security, simplicity, and AI-powered decision-making.
+
+### Comparison Table
+
+| Feature | Traditional GitHub Actions | Agentic Workflows |
+|---------|----------------------------|-------------------|
+| **Definition Language** | YAML with explicit steps | Natural language markdown |
+| **Complexity** | Requires YAML expertise, API knowledge | Describe intent in plain English |
+| **Decision Making** | Fixed if-then logic | AI-powered contextual decisions |
+| **Security Model** | Token-based with broad permissions | Sandboxed with safe-outputs |
+| **Write Operations** | Direct API access with `GITHUB_TOKEN` | Sanitized through safe-output validation |
+| **Network Access** | Unrestricted by default | Allowlisted domains only |
+| **Execution Environment** | Standard runner VM | Enhanced sandbox with MCP isolation |
+| **Tool Integration** | Manual action selection | MCP server automatic tool discovery |
+| **Testing** | `workflow_dispatch` on branches | Same, plus local compilation |
+| **Auditability** | Standard workflow logs | Enhanced with agent reasoning logs |
+
+### Enhanced Sandboxing in Agentic Workflows
+
+Agentic workflows implement **defense-in-depth security** beyond standard GitHub Actions:
+
+```mermaid
+flowchart TB
+    subgraph Traditional["Traditional GitHub Actions"]
+        A1["Workflow File (.yml)"]
+        A2["Runner VM"]
+        A3["Steps with $GITHUB_TOKEN"]
+        A4["Direct API Access"]
+        
+        A1 --> A2
+        A2 --> A3
+        A3 --> A4
+    end
+    
+    subgraph Agentic["Agentic Workflows"]
+        B1["Workflow File (.md)"]
+        B2["Compiled Lock File (.lock.yml)"]
+        B3["Agent Sandbox"]
+        B4["MCP Gateway"]
+        B5["Network Firewall"]
+        B6["Safe Outputs Job"]
+        B7["Sanitized API Access"]
+        
+        B1 --> B2
+        B2 --> B3
+        B3 --> B4
+        B4 --> B5
+        B3 --> B6
+        B6 --> B7
+    end
+```
+
+**Agentic workflow security enhancements:**
+
+1. **Agent Sandbox**: AI agent runs with **read-only** permissions by default
+2. **MCP Gateway**: Controls tool access and filters communications
+3. **Network Firewall**: Blocks all egress except explicitly allowlisted domains
+4. **Safe Outputs**: Agent writes are buffered, validated, and sanitized before execution
+5. **Secret Redaction**: Automatic removal of credentials from agent outputs
+6. **Tool Allowlisting**: Only explicitly permitted tools are available to the agent
+
+### Example: Issue Triage
+
+**Traditional GitHub Actions** (explicit YAML steps):
+
+```yaml
+name: Issue Triage
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check if bug report
+        id: check
+        run: |
+          if echo "${{ github.event.issue.body }}" | grep -i "bug"; then
+            echo "is_bug=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Add bug label
+        if: steps.check.outputs.is_bug == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['bug']
+            });
+```
+
+**Agentic Workflow** (natural language):
+
+```markdown
+---
+on:
+  issues:
+    types: [opened]
+permissions: read-all
+safe-outputs:
+  add-label:
+  add-comment:
+---
+# Issue Triage
+
+Analyze the issue content and:
+- Add appropriate labels (bug, feature, documentation)
+- Ask for clarification if the issue is unclear
+- Suggest related issues if similar problems exist
+```
+
+**Key differences:**
+
+- **Agentic approach**: Describes **intent** rather than exact steps
+- **AI decision-making**: Agent determines appropriate labels based on content understanding
+- **Safe-outputs**: Labels and comments validated before posting
+- **Adaptability**: Handles edge cases without explicit programming
+- **Sandboxing**: Agent cannot directly modify issues—all changes go through safe-output validation
+
+### When to Use Each Approach
+
+**Use Traditional GitHub Actions when:**
+- Fixed, deterministic workflows (build, test, deploy)
+- Performance-critical operations (large-scale builds)
+- Existing YAML workflows that work well
+- Simple automation without context analysis
+
+**Use Agentic Workflows when:**
+- Natural language processing of issues, PRs, or comments
+- Context-aware decision-making required
+- Complex triage, analysis, or research tasks
+- Want to describe intent rather than implementation
+- Need enhanced security for AI-powered operations
+
+## Next Steps
+
+Now that you understand GitHub Actions fundamentals, explore how agentic workflows build upon this foundation:
+
+- **[Quick Start](/gh-aw/setup/quick-start/)** - Create your first agentic workflow
+- **[Security Best Practices](/gh-aw/guides/security/)** - Deep dive into agentic security model
+- **[Safe Outputs](/gh-aw/reference/safe-outputs/)** - Learn about validated GitHub operations
+- **[Workflow Structure](/gh-aw/reference/workflow-structure/)** - Understand markdown workflow syntax
+- **[Examples](/gh-aw/examples/scheduled/research-planning/)** - Real-world agentic workflow patterns
+
+## Additional Resources
+
+**GitHub Actions Documentation:**
+- [GitHub Actions Documentation](https://docs.github.com/en/actions) - Official reference
+- [Workflow Syntax](https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions) - Complete YAML reference
+- [Actions Marketplace](https://github.com/marketplace?type=actions) - Pre-built actions
+- [Security Hardening](https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions) - Security best practices
+
+**Agentic Workflows:**
+- [Architecture Overview](/gh-aw/introduction/architecture/) - Detailed security architecture
+- [Glossary](/gh-aw/reference/glossary/) - Key terms and concepts
+- [Agentics Collection](https://github.com/githubnext/agentics) - Example workflows
