@@ -275,10 +275,11 @@ Examples:
 			FailFast:               failFast,
 		}
 		if _, err := cli.CompileWorkflows(cmd.Context(), config); err != nil {
-			errMsg := err.Error()
-			// Check if error is already formatted (contains suggestions or starts with ✗)
-			if strings.Contains(errMsg, "Suggestions:") || strings.HasPrefix(errMsg, "✗") {
-				return fmt.Errorf("%s", errMsg)
+			// Format validation error for better user experience
+			// The main function will detect the ✗ prefix and print it without double formatting
+			if !jsonOutput {
+				// Return a new error with formatted message so main() can print it
+				return fmt.Errorf("%s", cli.FormatValidationError(err))
 			}
 			return err
 		}
