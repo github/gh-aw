@@ -3415,6 +3415,10 @@
             "description": "Simple tool string for basic tool configuration"
           },
           {
+            "type": "boolean",
+            "description": "Boolean flag to enable or disable a tool (e.g., safety-prompt: true)"
+          },
+          {
             "type": "object",
             "description": "MCP server configuration object",
             "properties": {
