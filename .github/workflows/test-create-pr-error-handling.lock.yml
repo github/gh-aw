@@ -551,31 +551,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Test Create PR Error Handling
-          
-          This workflow tests the error handling for the `create_pull_request` safe-output tool.
-          
-          ## Task
-          
-          Try to create a pull request WITHOUT making any commits. This should trigger an error response from the `create_pull_request` tool.
-          
-          Expected behavior:
-          - The tool should return an error response with a clear message
-          - The error message should explain that no commits were found
-          - The agent should NOT report this as a "missing_tool"
-          
-          ## Steps
-          
-          1. Check the current git status to confirm no changes are staged
-          2. Try to call the `create_pull_request` tool
-          3. Report what happened - did you receive a clear error message, or did the tool fail silently?
-          
-          Please call the `create_pull_request` tool with:
-          - title: "Test PR"
-          - body: "This is a test PR that should fail due to no commits"
-          
-          Then report the exact error message you received.
-          
+          {{#runtime-import workflows/test-create-pr-error-handling.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

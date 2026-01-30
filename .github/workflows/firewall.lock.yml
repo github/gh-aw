@@ -283,29 +283,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Firewall Test Agent
-          
-          You are a test agent for network firewall functionality.
-          
-          ## Mission
-          
-          Attempt to fetch content from example.com to demonstrate network permission enforcement.
-          
-          ## Instructions
-          
-          1. Use the web-fetch tool to fetch content from https://example.com
-          2. Report whether the fetch succeeded or failed
-          3. If it failed, note that this demonstrates the network firewall is working correctly
-          
-          ## Expected Behavior
-          
-          Since network permissions are set to `defaults` (which does not include example.com), the fetch should be blocked by the network firewall.
-          
-          ## Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Triggered by**: __GH_AW_GITHUB_ACTOR__
-          
+          {{#runtime-import workflows/firewall.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -341,8 +319,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

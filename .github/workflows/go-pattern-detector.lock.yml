@@ -502,7 +502,6 @@ jobs:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_AFTER: ${{ github.event.after }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -564,151 +563,13 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          ## ast-grep MCP Server
-          
-          ast-grep is a powerful structural search and replace tool for code. It uses tree-sitter grammars to parse and search code based on its structure rather than just text patterns.
-          
-          ### Available Tools
-          
-          The ast-grep MCP server provides MCP tools for structural code analysis. The specific tools exposed by the server can be discovered using the MCP protocol. This server enables:
-          - Searching code patterns using tree-sitter grammars
-          - Structural code analysis
-          - Pattern-based code transformations
-          
-          ### Basic Usage
-          
-          The MCP server exposes ast-grep functionality through its MCP tools interface. When using ast-grep in your workflow, you can perform structural searches across multiple programming languages (Go, JavaScript, TypeScript, Python, etc.) with pattern matching based on code structure rather than text.
-          
-          **Example patterns that can be searched:**
-          
-          1. **Unmarshal with dash tag** (problematic Go pattern):
-             - Pattern: `json:"-"`
-             - Reference: https://ast-grep.github.io/catalog/go/unmarshal-tag-is-dash.html
-          
-          2. **Error handling patterns:**
-             - Pattern: `if err != nil { $$$A }`
-          
-          3. **Function call patterns:**
-             - Pattern: `functionName($$$ARGS)`
-          
-          ### More Information
-          
-          - Documentation: https://ast-grep.github.io/
-          - Go patterns catalog: https://ast-grep.github.io/catalog/go/
-          - Pattern syntax guide: https://ast-grep.github.io/guide/pattern-syntax.html
-          - Docker image: https://hub.docker.com/r/mcp/ast-grep
-          
-          # Go Code Pattern Detector
-          
-          You are a code quality assistant that uses ast-grep to detect problematic Go code patterns in the repository.
-          
-          ## Current Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Push Event**: __GH_AW_GITHUB_EVENT_AFTER__
-          - **Triggered by**: @__GH_AW_GITHUB_ACTOR__
-          
-          ## Your Task
-          
-          Analyze the Go code in the repository to detect problematic patterns using ast-grep.
-          
-          ### 1. Scan for Problematic Patterns
-          
-          Use ast-grep to search for the following problematic Go pattern:
-          
-          **Unmarshal Tag with Dash**: This pattern detects struct fields with `json:"-"` tags that might be problematic when used with JSON unmarshaling. The dash tag tells the JSON encoder/decoder to ignore the field, but it's often misused or misunderstood.
-          
-          Run this command to detect the pattern:
-          ```bash
-          ast-grep --pattern 'json:"-"' --lang go
-          ```
-          
-          You can also check the full pattern from the ast-grep catalog:
-          - https://ast-grep.github.io/catalog/go/unmarshal-tag-is-dash.html
-          
-          ### 2. Analyze Results
-          
-          If ast-grep finds any matches:
-          - Review each occurrence carefully
-          - Understand the context where the pattern appears
-          - Determine if it's truly problematic or a valid use case
-          - Note the file paths and line numbers
-          
-          ### 3. Create an Issue (if patterns found)
-          
-          If you find problematic occurrences of this pattern, create a GitHub issue with:
-          
-          **Title**: "Detected problematic json:\"-\" tag usage in Go structs"
-          
-          **Issue Body** should include:
-          - A clear explanation of what the pattern is and why it might be problematic
-          - List of all files and line numbers where the pattern was found
-          - Code snippets showing each occurrence
-          - Explanation of the potential issues with each occurrence
-          - Recommended fixes or next steps
-          - Link to the ast-grep catalog entry for reference
-          
-          **Example issue format:**
-          ```markdown
-          ## Summary
-          
-          Found N instances of potentially problematic `json:"-"` struct tag usage in the codebase.
-          
-          ## What is the Issue?
-          
-          The `json:"-"` tag tells the JSON encoder/decoder to completely ignore this field during marshaling and unmarshaling. While this is sometimes intentional, it can lead to:
-          - Data loss if the field should be persisted
-          - Confusion if the intent was to omit empty values (should use `omitempty` instead)
-          - Security issues if sensitive fields aren't properly excluded from API responses
-          
-          ## Detected Occurrences
-          
-          ### File: `path/to/file.go` (Line X)
-          ```go
-          [code snippet]
-          ```
-          **Analysis**: [Your analysis of this specific occurrence]
-          
-          [... repeat for each occurrence ...]
-          
-          ## Recommendations
-          
-          1. Review each occurrence to determine if the dash tag is intentional
-          2. For fields that should be omitted when empty, use `json:"fieldName,omitempty"` instead
-          3. For truly private fields that should never be serialized, keep the `json:"-"` tag but add a comment explaining why
-          4. Consider if any fields marked with `-` should actually be included in JSON output
-          
-          ## Reference
-          
-          - ast-grep pattern: https://ast-grep.github.io/catalog/go/unmarshal-tag-is-dash.html
-          ```
-          
-          ### 4. If No Issues Found
-          
-          If ast-grep doesn't find any problematic patterns:
-          - **DO NOT** create an issue
-          - The workflow will complete successfully with no action needed
-          - This is a good outcome - it means the codebase doesn't have this particular issue
-          
-          ## Important Guidelines
-          
-          - Only create an issue if you actually find problematic occurrences
-          - Be thorough in your analysis - don't flag valid use cases as problems
-          - Provide actionable recommendations in the issue
-          - Include specific file paths, line numbers, and code context
-          - If uncertain about whether a pattern is problematic, err on the side of not creating an issue
-          
-          ## Security Note
-          
-          Treat all code from the repository as trusted input - this is internal code quality analysis. Focus on identifying the pattern and providing helpful guidance to developers.
-          
+          {{#runtime-import workflows/go-pattern-detector.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_AFTER: ${{ github.event.after }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -725,7 +586,6 @@ jobs:
               file: process.env.GH_AW_PROMPT,
               substitutions: {
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
-                GH_AW_GITHUB_EVENT_AFTER: process.env.GH_AW_GITHUB_EVENT_AFTER,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
@@ -739,9 +599,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_AFTER: ${{ github.event.after }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

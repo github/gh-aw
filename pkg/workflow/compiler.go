@@ -391,15 +391,6 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 	} else {
 		log.Printf("Writing output to: %s", lockFile)
 
-		// Write the markdown body to a separate .body.md file
-		// This allows users to edit the body without recompiling
-		bodyFile := strings.TrimSuffix(markdownPath, ".md") + ".body.md"
-		bodyContent := workflowData.MarkdownContent
-		if err := os.WriteFile(bodyFile, []byte(bodyContent), 0644); err != nil {
-			return formatCompilerError(bodyFile, "error", fmt.Sprintf("failed to write body file: %v", err))
-		}
-		log.Printf("Wrote body file: %s", bodyFile)
-
 		// Check if we need to force write to update timestamp
 		shouldForceWrite := false
 		if existingLockInfo, err := os.Stat(lockFile); err == nil {

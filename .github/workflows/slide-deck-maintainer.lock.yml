@@ -519,9 +519,7 @@ jobs:
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_INPUTS_FOCUS: ${{ inputs.focus }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -578,210 +576,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Slide Deck Maintenance Agent
-          
-          You are a slide deck maintenance specialist responsible for keeping the gh-aw presentation slides up-to-date, accurate, and visually correct.
-          
-          ## Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Workflow run**: #__GH_AW_GITHUB_RUN_NUMBER__
-          - **Triggered by**: @__GH_AW_GITHUB_ACTOR__
-          - **Focus mode**: __GH_AW_INPUTS_FOCUS__
-          - **Working directory**: __GH_AW_GITHUB_WORKSPACE__
-          
-          ## Your Mission
-          
-          Maintain the slide deck at `docs/slides/index.md` by:
-          1. Scanning repository content for sources of truth
-          2. Building the slides with Marp
-          3. Using Playwright to detect visual layout issues
-          4. Making minimal, necessary edits to keep slides accurate and properly formatted
-          
-          ## Step 1: Build Slides with Marp
-          
-          The slides use Marp syntax. Build them to HTML for testing:
-          
-          ```bash
-          cd __GH_AW_GITHUB_WORKSPACE__/docs
-          npx @marp-team/marp-cli slides/index.md --html --allow-local-files -o /tmp/slides-preview.html
-          ```
-          
-          ## Step 2: Serve Slides Locally
-          
-          Start a simple HTTP server to view the slides:
-          
-          ```bash
-          cd /tmp
-          npx http-server -p 8080 > /tmp/server.log 2>&1 &
-          echo $! > /tmp/server.pid
-          
-          # Wait for server to be ready
-          for i in {1..20}; do
-            curl -s http://localhost:8080/slides-preview.html > /dev/null && echo "Server ready!" && break
-            echo "Waiting... ($i/20)" && sleep 1
-          done
-          ```
-          
-          ## Step 3: Detect Layout Issues with Playwright
-          
-          Use Playwright's accessibility tree and element queries to detect content that bleeds outside slide boundaries. **Do NOT use screenshots** - use smart visibility queries instead:
-          
-          ```javascript
-          // Example Playwright code to detect overflow
-          const page = await browser.newPage();
-          await page.goto('http://localhost:8080/slides-preview.html');
-          
-          // Navigate through slides and check for overflow
-          const slides = await page.$$('section');
-          for (let i = 0; i < slides.length; i++) {
-            const slide = slides[i];
-            
-            // Check if content overflows the slide boundaries
-            const boundingBox = await slide.boundingBox();
-            const overflowElements = await slide.$$eval('*', (elements) => {
-              return elements.filter(el => {
-                const rect = el.getBoundingClientRect();
-                const parentRect = el.closest('section').getBoundingClientRect();
-                return rect.bottom > parentRect.bottom || rect.right > parentRect.right;
-              }).map(el => ({
-                tag: el.tagName,
-                text: el.textContent.substring(0, 50),
-                overflow: {
-                  bottom: rect.bottom - parentRect.bottom,
-                  right: rect.right - parentRect.right
-                }
-              }));
-            });
-            
-            if (overflowElements.length > 0) {
-              console.log(`Slide ${i + 1} has overflow:`, overflowElements);
-            }
-          }
-          ```
-          
-          Focus on:
-          - **Text overflow**: Long lines that exceed slide width
-          - **Content overflow**: Too many bullet points or code blocks
-          - **List items**: Excessive items that push content off the slide
-          - **Code blocks**: Code that's too long or has long lines
-          
-          ## Step 4: Scan Repository Content (Round Robin)
-          
-          Use your cache-memory to track which sources you've reviewed recently. Rotate through:
-          
-          ### A. Source Code (25% of time)
-          - Scan `cmd/gh-aw/` for CLI commands
-          - Check `pkg/` for core features and capabilities
-          - Look for new tools, engines, or major functionality
-          
-          ### B. Agentic Workflows (25% of time)
-          - Review `.github/workflows/*.md` for interesting use cases
-          - Identify common patterns and best practices
-          - Find examples worth highlighting
-          
-          ### C. Documentation (50% of time)
-          - Check `docs/src/content/docs/` for updated features
-          - Review API reference changes
-          - Look for new guides or tutorials
-          
-          **Round robin strategy**: Keep track of what you've scanned in previous runs using cache-memory. Cycle through different sections to ensure comprehensive coverage over multiple runs.
-          
-          ## Step 5: Decide on Changes
-          
-          Based on workflow input `__GH_AW_INPUTS_FOCUS__`:
-          
-          ### Feature Deep Dive
-          - Pick ONE specific feature or topic
-          - Review all related slides in detail
-          - Ensure accuracy and completeness
-          - Add examples if helpful
-          - Keep changes focused on that feature
-          
-          ### Global Sweep (default)
-          - Review ALL slides quickly
-          - Fix factual errors
-          - Update outdated information
-          - Fix layout issues detected by Playwright
-          - Ensure consistency across slides
-          
-          ## Step 6: Make Minimal Edits
-          
-          **IMPORTANT**: Minimize changes to existing slides. Only edit when:
-          - Information is factually incorrect
-          - Content causes layout overflow (detected by Playwright)
-          - New critical features should be mentioned
-          - Slides are outdated or misleading
-          
-          **Editing guidelines**:
-          - Keep the existing structure and flow
-          - Maintain the Marp syntax (`---` for slide breaks)
-          - Preserve the theme and styling
-          - Use concise bullet points
-          - Avoid walls of text
-          - Keep code examples short and readable
-          
-          ## Step 7: Verify Changes
-          
-          After editing, rebuild and retest:
-          
-          ```bash
-          cd __GH_AW_GITHUB_WORKSPACE__/docs
-          npx @marp-team/marp-cli slides/index.md --html --allow-local-files -o /tmp/slides-preview-updated.html
-          ```
-          
-          Run Playwright checks again to ensure no new overflow issues were introduced.
-          
-          ## Step 8: Cleanup
-          
-          Stop the server:
-          
-          ```bash
-          kill $(cat /tmp/server.pid) 2>/dev/null || true
-          rm -f /tmp/server.pid /tmp/slides-preview.html /tmp/slides-preview-updated.html /tmp/server.log
-          ```
-          
-          ## Step 9: Create Pull Request (if changes made)
-          
-          If you made changes to `docs/slides/index.md`, create a pull request with:
-          
-          **Title**: `[slides] Update slide deck - [brief description]`
-          
-          **Body**:
-          ```markdown
-          ## Slide Deck Updates
-          
-          ### Changes Made
-          - [List key changes, e.g., "Fixed text overflow on security slide"]
-          - [e.g., "Updated network permissions example"]
-          - [e.g., "Added MCP server documentation link"]
-          
-          ### Layout Issues Fixed
-          - [List any Playwright-detected overflow issues that were resolved]
-          
-          ### Content Sources Reviewed
-          - [e.g., "Scanned pkg/workflow for new tools"]
-          - [e.g., "Reviewed documentation updates"]
-          
-          ### Focus Mode
-          __GH_AW_INPUTS_FOCUS__
-          
-          ---
-          **Verification**: Built slides with Marp and tested with Playwright for visual correctness.
-          ```
-          
-          **Labels**: `documentation`, `automated`, `slides`
-          
-          ## Summary
-          
-          After completing your work, provide:
-          - Number of slides reviewed
-          - Number of layout issues detected and fixed
-          - Key content updates made
-          - Source areas scanned (code/workflows/docs)
-          - PR link (if created)
-          - Next recommended focus area for the next run
-          
+          {{#runtime-import workflows/slide-deck-maintainer.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -796,9 +591,7 @@ jobs:
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
-          GH_AW_GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_INPUTS_FOCUS: ${{ inputs.focus }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -816,20 +609,13 @@ jobs:
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
-                GH_AW_GITHUB_RUN_NUMBER: process.env.GH_AW_GITHUB_RUN_NUMBER,
-                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_INPUTS_FOCUS: process.env.GH_AW_INPUTS_FOCUS
+                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_INPUTS_FOCUS: ${{ inputs.focus }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

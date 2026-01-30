@@ -479,7 +479,6 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL: ${{ github.event.inputs.commit_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -539,306 +538,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          ## Report Structure Guidelines
-          
-          ### 1. Header Levels
-          **Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy.**
-          
-          When creating GitHub issues or discussions:
-          - Use `###` (h3) for main sections (e.g., "### Test Summary")
-          - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
-          - Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
-          
-          ### 2. Progressive Disclosure
-          **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
-          
-          Use collapsible sections for:
-          - Verbose details (full test logs, raw data)
-          - Secondary information (minor warnings, extra context)
-          - Per-item breakdowns when there are many items
-          
-          Always keep critical information visible (summary, critical issues, key metrics).
-          
-          ### 3. Report Structure Pattern
-          
-          1. **Overview**: 1-2 paragraphs summarizing key findings
-          2. **Critical Information**: Show immediately (summary stats, critical issues)
-          3. **Details**: Use `<details><summary><b>Section Name</b></summary>` for expanded content
-          4. **Context**: Add helpful metadata (workflow run, date, trigger)
-          
-          ### Design Principles (Airbnb-Inspired)
-          
-          Reports should:
-          - **Build trust through clarity**: Most important info immediately visible
-          - **Exceed expectations**: Add helpful context like trends, comparisons
-          - **Create delight**: Use progressive disclosure to reduce overwhelm
-          - **Maintain consistency**: Follow patterns across all reports
-          
-          ### Example Report Structure
-          
-          ```markdown
-          ### Summary
-          - Key metric 1: value
-          - Key metric 2: value
-          - Status: ✅/⚠️/❌
-          
-          ### Critical Issues
-          [Always visible - these are important]
-          
-          <details>
-          <summary><b>View Detailed Results</b></summary>
-          
-          [Comprehensive details, logs, traces]
-          
-          </details>
-          
-          <details>
-          <summary><b>View All Warnings</b></summary>
-          
-          [Minor issues and potential problems]
-          
-          </details>
-          
-          ### Recommendations
-          [Actionable next steps - keep visible]
-          ```
-          
-          ## Workflow Run References
-          
-          - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
-          - Include up to 3 most relevant run URLs at end under `**References:**`
-          - Do NOT add footer attribution (system adds automatically)
-          
-          # Commit Changes Analyzer
-          
-          Analyze and provide a comprehensive description of all changes in the repository since a given commit.
-          
-          ## Mission
-          
-          Generate a detailed developer-focused report analyzing all changes in the repository since the commit specified in the input URL.
-          
-          ## Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Commit URL**: __GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL__
-          - **Triggered by**: __GH_AW_GITHUB_ACTOR__
-          
-          ## Task
-          
-          Your task is to analyze all changes since the specified commit and create a comprehensive report for developers on the team.
-          
-          ### 1. Extract Commit SHA from URL
-          
-          Parse the commit URL provided in the input to extract:
-          - Repository owner and name (validate it matches current repo)
-          - Commit SHA
-          
-          The URL format is typically: `https://github.com/OWNER/REPO/commit/SHA`
-          
-          ### 2. Validate the Commit
-          
-          Before proceeding, verify:
-          - The commit SHA exists in the repository
-          - The repository in the URL matches the current repository
-          - The commit is an ancestor of the current HEAD (can trace history from current to that commit)
-          
-          Use bash commands like:
-          ```bash
-          # Verify commit exists
-          git cat-file -t <SHA>
-          
-          # Check if commit is ancestor
-          git merge-base --is-ancestor <SHA> HEAD
-          ```
-          
-          ### 3. Analyze Changes
-          
-          Collect comprehensive information about all changes since the specified commit:
-          
-          #### File Changes
-          - **Files added**: List all new files with brief description of purpose
-          - **Files modified**: List changed files with summary of modifications
-          - **Files deleted**: List removed files
-          - **Files renamed/moved**: Track file movements
-          - **Binary files changed**: Note any binary file changes
-          
-          Use commands like:
-          ```bash
-          # Get list of changed files with status
-          git diff --name-status <SHA>..HEAD
-          
-          # Get detailed statistics
-          git diff --stat <SHA>..HEAD
-          
-          # Get number of commits
-          git rev-list --count <SHA>..HEAD
-          ```
-          
-          #### Commit Analysis
-          - **Number of commits** since the specified commit
-          - **Commit authors** and their contribution counts
-          - **Commit timeline**: First and most recent commit dates
-          - **Commit messages**: Extract key themes and patterns
-          
-          Use commands like:
-          ```bash
-          # List commits with authors
-          git log --pretty=format:"%h - %an, %ar : %s" <SHA>..HEAD
-          
-          # Count commits by author
-          git shortlog -s -n <SHA>..HEAD
-          
-          # Get commit timeline
-          git log --pretty=format:"%ai" <SHA>..HEAD | head -1  # Most recent
-          git log --pretty=format:"%ai" <SHA>..HEAD | tail -1  # Oldest in range
-          ```
-          
-          #### Code Impact Analysis
-          - **Lines added**: Total lines of code added
-          - **Lines removed**: Total lines of code removed
-          - **Net change**: Overall code delta
-          - **Language breakdown**: Changes by file type/language
-          - **Largest changes**: Files with most modifications
-          
-          Use commands like:
-          ```bash
-          # Detailed diff statistics
-          git diff --numstat <SHA>..HEAD
-          
-          # Count by file extension
-          git diff --name-only <SHA>..HEAD | sed 's/.*\.//' | sort | uniq -c | sort -rn
-          ```
-          
-          #### Functional Areas Affected
-          Analyze which parts of the codebase were touched:
-          - **Package/module changes**: Which packages/directories had changes
-          - **Configuration changes**: Any config file updates
-          - **Documentation changes**: README, docs, comments
-          - **Test changes**: New or modified tests
-          - **Build/CI changes**: Workflow, Makefile, build script changes
-          
-          ### 4. GitHub Integration Analysis
-          
-          Use GitHub tools to enrich the analysis:
-          - **Associated Pull Requests**: Find PRs that include commits in this range
-          - **Issues referenced**: Extract issue numbers from commit messages
-          - **Release context**: Check if any releases occurred in this range
-          
-          Example GitHub tool usage:
-          ```
-          Use list_commits to get commit details
-          Use search_issues or search_pull_requests to find related items
-          Use list_releases to check for releases in the timeframe
-          ```
-          
-          ### 5. Generate Developer Report
-          
-          Create a comprehensive markdown report with the following sections:
-          
-          #### Executive Summary
-          - Brief overview of the change scope
-          - Time period covered
-          - Number of commits and authors involved
-          - High-level impact assessment
-          
-          #### Detailed Changes
-          
-          **Files Changed Summary**
-          - Breakdown by change type (added/modified/deleted/renamed)
-          - Statistics table with counts and percentages
-          
-          **Code Impact**
-          - Lines added/removed/changed
-          - Net code growth/reduction
-          - Language/file type breakdown
-          
-          **Commit History**
-          - Total commits in range
-          - Top contributors with commit counts
-          - Timeline (date range)
-          - Commit message themes/patterns
-          
-          **Functional Areas**
-          - List of affected packages/modules
-          - Configuration changes
-          - Documentation updates
-          - Test coverage changes
-          - CI/CD modifications
-          
-          **Notable Changes**
-          - Largest file changes (top 10)
-          - New files of significance
-          - Deleted files worth noting
-          - Breaking changes or major refactors
-          
-          **Related Work**
-          - Associated pull requests (if found)
-          - Referenced issues
-          - Related releases
-          
-          #### Developer Notes
-          - Potential migration concerns
-          - Breaking changes to be aware of
-          - New dependencies or tools introduced
-          - Recommended review areas for code reviewers
-          
-          ### 6. Output Format
-          
-          Create a GitHub discussion with:
-          - **Title**: "Changes Analysis: Since commit [short-SHA] - [current date]"
-          - **Category**: "dev" (for development discussions)
-          - **Body**: Your complete analysis report in well-formatted markdown
-          
-          Use proper markdown formatting:
-          - Tables for statistics
-          - Code blocks for examples
-          - Bullet lists for file changes
-          - Emphasis for important items
-          - Links to commits, PRs, issues where relevant
-          
-          ## Guidelines
-          
-          - **Be thorough**: This is for developers who need detailed information
-          - **Be accurate**: Verify all data before including it
-          - **Be organized**: Use clear sections and formatting
-          - **Be actionable**: Highlight things developers need to know
-          - **Include context**: Don't just list changes, explain their significance
-          - **Handle errors gracefully**: If the commit URL is invalid or commit doesn't exist, explain the issue clearly
-          - **Use relative references**: When mentioning commits, include both short SHA and subject line
-          - **Link to GitHub**: Include links to relevant commits, PRs, files when helpful
-          
-          ## Security
-          
-          - Validate that the commit SHA from the URL is a valid git SHA format
-          - Ensure the repository in the URL matches the current repository
-          - Don't execute any code files during analysis
-          - Focus on metadata and diffs, not file contents unless relevant
-          
-          ## Examples of Good Analysis
-          
-          When describing a commit:
-          - ✅ `abc1234 - Refactor parser to use streaming approach (reduces memory by 40%)`
-          - ❌ `abc1234 - parser changes`
-          
-          When listing files:
-          - ✅ `pkg/parser/stream.go - New streaming parser implementation to handle large files`
-          - ❌ `pkg/parser/stream.go - added`
-          
-          When describing impact:
-          - ✅ `Breaking change: CLI flag --output renamed to --format (affects all users)`
-          - ❌ `CLI changes made`
-          
-          ## Error Handling
-          
-          If any of these conditions occur, explain clearly in the discussion:
-          - Invalid commit URL format
-          - Commit SHA not found in repository
-          - Repository mismatch between URL and current repo
-          - Commit is not an ancestor of HEAD
-          - No commits found in the range (commit is already at HEAD)
-          
-          Make the error message helpful so the user knows how to correct the input.
-          
+          {{#runtime-import workflows/commit-changes-analyzer.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -847,7 +547,6 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL: ${{ github.event.inputs.commit_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -864,7 +563,6 @@ jobs:
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
-                GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL: process.env.GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
@@ -876,9 +574,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_INPUTS_COMMIT_URL: ${{ github.event.inputs.commit_url }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

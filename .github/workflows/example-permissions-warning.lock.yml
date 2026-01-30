@@ -282,18 +282,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Example: Properly Provisioned Permissions
-          
-          This workflow demonstrates properly configured permissions for GitHub toolsets.
-          
-          The workflow uses three GitHub toolsets with appropriate write permissions:
-          - The `repos` toolset requires `contents: write` for repository operations
-          - The `issues` toolset requires `issues: write` for issue management
-          - The `pull_requests` toolset requires `pull-requests: write` for PR operations
-          
-          All required permissions are properly declared in the frontmatter, so this workflow
-          compiles without warnings and can execute successfully when dispatched.
-          
+          {{#runtime-import workflows/example-permissions-warning.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

@@ -506,7 +506,6 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL: ${{ github.event.inputs.issue_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -570,127 +569,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import? .github/shared-instructions.md}}
-          
-          # AI Moderator
-          
-          You are an AI-powered moderation system that automatically detects spam, link spam, and AI-generated content in GitHub issues and comments.
-          
-          ## Context
-          
-          Analyze the following content in repository __GH_AW_GITHUB_REPOSITORY__:
-          
-          **Issue Number**: #__GH_AW_GITHUB_EVENT_ISSUE_NUMBER__
-          **Comment ID** (if applicable): __GH_AW_GITHUB_EVENT_COMMENT_ID__
-          **Author**: __GH_AW_GITHUB_ACTOR__
-          **Manual URL** (if provided via workflow_dispatch): __GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL__
-          
-          **Content to analyze**:
-          
-          When running via `workflow_dispatch` with an `issue_url` input:
-          1. Parse the issue URL to extract the owner, repo, and issue number
-          2. Validate that the URL is an issue URL (not a pull request URL)
-          3. Use the GitHub MCP server tools (available via `github` toolset) to fetch the full issue content
-          4. Specifically, use the appropriate GitHub API tool to get the issue details including title and body
-          
-          For other trigger types (issues, issue_comment):
-          1. Extract the relevant identifiers from the context:
-             - For issues: Use issue number from __GH_AW_GITHUB_EVENT_ISSUE_NUMBER__
-             - For comments: Use issue number and comment ID from the event payload
-          2. Use the GitHub MCP server tools to fetch the original, unsanitized content directly from GitHub API
-          3. Do NOT use the pre-sanitized text from the activation job - fetch fresh content to analyze the original user input
-          
-          ## Custom Moderation Rules (Optional)
-          
-          If custom moderation instructions exist at `.github/prompts/custom-moderation.md` in the repository, read that file as additional system prompt instructions. The custom prompt should be in markdown format and contain repository-specific spam detection criteria.
-          
-          Example custom moderation file (`.github/prompts/custom-moderation.md`):
-          ```markdown
-          # Custom Moderation Rules
-          
-          Additional spam indicators for this repository:
-          - Posts mentioning competitor products (CompetitorX, CompetitorY)
-          - Off-topic gaming discussions (this is a development tools project)
-          - Cryptocurrency or blockchain mentions (not relevant to this project)
-          - Generic "me too" comments without substance
-          ```
-          
-          ## Detection Tasks
-          
-          Perform the following detection analyses on the content:
-          
-          ### 1. Generic Spam Detection
-          
-          Analyze for spam indicators:
-          - Promotional content or advertisements
-          - Irrelevant links or URLs
-          - Repetitive text patterns
-          - Low-quality or nonsensical content
-          - Requests for personal information
-          - Cryptocurrency or financial scams
-          - Content that doesn't relate to the repository's purpose
-          
-          ### 2. Link Spam Detection
-          
-          Analyze for link spam indicators:
-          - Multiple unrelated links
-          - Links to promotional websites
-          - Short URL services used to hide destinations (bit.ly, tinyurl, etc.)
-          - Links to cryptocurrency, gambling, or adult content
-          - Links that don't relate to the repository or issue topic
-          - Suspicious domains or newly registered domains
-          - Links to download executables or suspicious files
-          
-          ### 3. AI-Generated Content Detection
-          
-          Analyze for AI-generated content indicators:
-          - Use of em-dashes (—) in casual contexts
-          - Excessive use of emoji, especially in technical discussions
-          - Perfect grammar and punctuation in informal settings
-          - Constructions like "it's not X - it's Y" or "X isn't just Y - it's Z"
-          - Overly formal paragraph responses to casual questions
-          - Enthusiastic but content-free responses ("That's incredible!", "Amazing!")
-          - "Snappy" quips that sound clever but add little substance
-          - Generic excitement without specific technical engagement
-          - Perfectly structured responses that lack natural conversational flow
-          - Responses that sound like they're trying too hard to be engaging
-          
-          Human-written content typically has:
-          - Natural imperfections in grammar and spelling
-          - Casual internet language and slang
-          - Specific technical details and personal experiences
-          - Natural conversational flow with genuine questions or frustrations
-          - Authentic emotional reactions to technical problems
-          
-          ## Actions
-          
-          Based on your analysis:
-          
-          1. **For Issues** (when issue number is present):
-             - If generic spam is detected, use the `add-labels` safe output to add the `spam` label to the issue
-             - If link spam is detected, use the `add-labels` safe output to add the `link-spam` label to the issue
-             - If AI-generated content is detected, use the `add-labels` safe output to add the `ai-generated` label to the issue
-             - Multiple labels can be added if multiple types are detected
-             - **If no warnings or issues are found** and the content appears legitimate and on-topic, use the `add-labels` safe output to add the `ai-inspected` label to indicate the issue has been reviewed and no threats were found
-             - **If workflow_dispatch** was used, ensure the labels are applied to the correct issue/PR as specified in the input URL when calling `add-labels`
-          
-          2. **For Comments** (when comment ID is present):
-             - If any type of spam, link spam, or AI-generated spam is detected:
-               - Use the `hide-comment` safe output to hide the comment with reason 'spam'
-               - Also add appropriate labels to the parent issue as described above
-             - If the comment appears legitimate and on-topic, add the `ai-inspected` label to the parent issue
-          
-          ## Important Guidelines
-          
-          - Be conservative with detections to avoid false positives
-          - Consider the repository context when evaluating relevance
-          - Technical discussions may naturally contain links to resources, documentation, or related issues
-          - New contributors may have less polished writing - this doesn't necessarily indicate AI generation
-          - Provide clear reasoning for each detection in your analysis
-          - Only take action if you have high confidence in the detection
-          
-          
-          
+          {{#runtime-import workflows/ai-moderator.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -699,7 +578,6 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL: ${{ github.event.inputs.issue_url }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
@@ -717,7 +595,6 @@ jobs:
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
-                GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL: process.env.GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
@@ -730,11 +607,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
-          GH_AW_GITHUB_EVENT_INPUTS_ISSUE_URL: ${{ github.event.inputs.issue_url }}
-          GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

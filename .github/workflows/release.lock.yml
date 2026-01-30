@@ -498,7 +498,6 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID: ${{ needs.release.outputs.release_id }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -553,147 +552,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Release Highlights Generator
-          
-          Generate an engaging release highlights summary for **__GH_AW_GITHUB_REPOSITORY__** release `${RELEASE_TAG}`.
-          
-          **Release ID**: __GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID__
-          
-          ## Data Available
-          
-          All data is pre-fetched in `/tmp/gh-aw/release-data/`:
-          - `current_release.json` - Release metadata (tag, name, dates, existing body)
-          - `pull_requests.json` - PRs merged between `${PREV_RELEASE_TAG}` and `${RELEASE_TAG}` (empty array if first release)
-          - `CHANGELOG.md` - Full changelog for context (if exists)
-          - `docs_files.txt` - Available documentation files for linking
-          
-          ## Output Requirements
-          
-          Create a **"🌟 Release Highlights"** section that:
-          - Is concise and scannable (users grasp key changes in 30 seconds)
-          - Uses professional, enthusiastic tone (not overly casual)
-          - Categorizes changes logically (features, fixes, docs, breaking changes)
-          - Links to relevant documentation where helpful
-          - Focuses on user impact (why changes matter, not just what changed)
-          
-          ## Workflow
-          
-          ### 1. Load Data
-          
-          ```bash
-          # View release metadata
-          cat /tmp/gh-aw/release-data/current_release.json | jq
-          
-          # List PRs (empty if first release)
-          cat /tmp/gh-aw/release-data/pull_requests.json | jq -r '.[] | "- #\(.number): \(.title) by @\(.author.login)"'
-          
-          # Check CHANGELOG context
-          head -100 /tmp/gh-aw/release-data/CHANGELOG.md 2>/dev/null || echo "No CHANGELOG"
-          
-          # View available docs
-          cat /tmp/gh-aw/release-data/docs_files.txt
-          ```
-          
-          ### 2. Categorize & Prioritize
-          
-          Group PRs by category (omit categories with no items):
-          - **✨ New Features** - User-facing capabilities
-          - **🐛 Bug Fixes** - Issue resolutions
-          - **⚡ Performance** - Speed/efficiency improvements
-          - **📚 Documentation** - Guide/reference updates
-          - **⚠️ Breaking Changes** - Requires user action (ALWAYS list first if present)
-          - **🔧 Internal** - Refactoring, dependencies (usually omit from highlights)
-          
-          ### 3. Write Highlights
-          
-          Structure:
-          ```markdown
-          ## 🌟 Release Highlights
-          
-          [1-2 sentence summary of the release theme/focus]
-          
-          ### ⚠️ Breaking Changes
-          [If any - list FIRST with migration guidance]
-          
-          ### ✨ What's New
-          [Top 3-5 features with user benefit, link docs when relevant]
-          
-          ### 🐛 Bug Fixes & Improvements
-          [Notable fixes - focus on user impact]
-          
-          ### 📚 Documentation
-          [Only if significant doc additions/improvements]
-          
-          ---
-          For complete details, see [CHANGELOG](https://github.com/githubnext/gh-aw/blob/main/CHANGELOG.md).
-          ```
-          
-          **Writing Guidelines:**
-          - Lead with benefits: "GitHub MCP now supports remote mode" not "Added remote mode"
-          - Be specific: "Reduced compilation time by 40%" not "Faster compilation"
-          - Skip internal changes unless they have user impact
-          - Use docs links: `[Learn more](https://githubnext.github.io/gh-aw/path/)`
-          - Keep breaking changes prominent with action items
-          
-          ### 4. Handle Special Cases
-          
-          **First Release** (no `${PREV_RELEASE_TAG}`):
-          ```markdown
-          ## 🎉 First Release
-          
-          Welcome to the inaugural release! This version includes [core capabilities].
-          
-          ### Key Features
-          [List primary features with brief descriptions]
-          ```
-          
-          **Maintenance Release** (no user-facing changes):
-          ```markdown
-          ## 🔧 Maintenance Release
-          
-          Dependency updates and internal improvements to keep things running smoothly.
-          ```
-          
-          ## Output Format
-          
-          **CRITICAL**: You MUST call the `update_release` MCP tool to update the release with the generated highlights.
-          
-          **HOW TO CALL THE TOOL:**
-          
-          The `update_release` tool is an **MCP (Model Context Protocol) tool**, not a bash command or file operation.
-          
-          **✅ CORRECT - Call the MCP tool directly:**
-          
-          ```
-          safeoutputs/update_release(
-            tag="v0.38.1",
-            operation="prepend",
-            body="## 🌟 Release Highlights\n\n[Your complete markdown highlights here]"
-          )
-          ```
-          
-          **❌ INCORRECT - DO NOT:**
-          - Write JSON files manually (e.g., `/tmp/gh-aw/safeoutputs/update_release_001.json`)
-          - Use bash to simulate tool calls
-          - Create scripts that write to outputs.jsonl
-          - Use any file operations - the MCP tool handles everything
-          
-          **Required Parameters:**
-          - `tag` - Release tag from `${RELEASE_TAG}` environment variable (e.g., "v0.38.1")
-          - `operation` - Must be `"prepend"` to add before existing notes
-          - `body` - Complete markdown content (include all formatting, emojis, links)
-          
-          **IMPORTANT**: The tool is accessed via the MCP gateway as `safeoutputs/update_release`. When you call this tool, the MCP server automatically writes to `/opt/gh-aw/safeoutputs/outputs.jsonl`.
-          
-          **WARNING**: If you don't call the MCP tool properly, the release notes will NOT be updated!
-          
-          **Documentation Base URLs:**
-          - User docs: `https://githubnext.github.io/gh-aw/`
-          - Reference: `https://githubnext.github.io/gh-aw/reference/`
-          - Setup: `https://githubnext.github.io/gh-aw/setup/`
-          
-          Verify paths exist in `docs_files.txt` before linking.
-          
+          {{#runtime-import workflows/release.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -707,7 +566,6 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
-          GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID: ${{ needs.release.outputs.release_id }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -723,16 +581,13 @@ jobs:
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
-                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID: process.env.GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID
+                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_NEEDS_RELEASE_OUTPUTS_RELEASE_ID: ${{ needs.release.outputs.release_id }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

@@ -493,6 +493,30 @@ async function processUrlImport(url, optional, startLine, endLine) {
 }
 
 /**
+ * Wraps bare GitHub expressions in template conditionals with ${{ }}
+ * Transforms {{#if expression}} to {{#if ${{ expression }} }} if not already wrapped
+ * @param {string} content - The markdown content
+ * @returns {string} - Content with expressions wrapped
+ */
+function wrapExpressionsInTemplateConditionals(content) {
+  // Pattern to match {{#if expression}} where expression is not already wrapped in ${{ }}
+  // This regex captures the entire {{#if ...}} block
+  const pattern = /\{\{#if\s+((?:\$\{\{[^\}]*\}\}|[^\}])*?)\s*\}\}/g;
+
+  return content.replace(pattern, (match, expr) => {
+    const trimmed = expr.trim();
+
+    // If already wrapped in ${{ }}, return as-is
+    if (trimmed.startsWith("${{") && trimmed.endsWith("}}")) {
+      return match;
+    }
+
+    // Wrap the expression
+    return `{{#if \${{ ${trimmed} }} }}`;
+  });
+}
+
+/**
  * Reads and processes a file or URL for runtime import
  * @param {string} filepathOrUrl - The path to the file (relative to GITHUB_WORKSPACE) or URL to import
  * @param {boolean} optional - Whether the import is optional (true for {{#runtime-import? filepath}})
@@ -605,6 +629,10 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
   // Remove XML comments
   content = removeXMLComments(content);
 
+  // Wrap expressions in template conditionals
+  // This handles {{#if expression}} where expression is not already wrapped in ${{ }}
+  content = wrapExpressionsInTemplateConditionals(content);
+
   // Process GitHub Actions expressions (validate and render safe ones)
   if (hasGitHubActionsMacros(content)) {
     content = processExpressions(content, `File ${filepath}`);
@@ -694,4 +722,5 @@ module.exports = {
   isSafeExpression,
   evaluateExpression,
   processExpressions,
+  wrapExpressionsInTemplateConditionals,
 };

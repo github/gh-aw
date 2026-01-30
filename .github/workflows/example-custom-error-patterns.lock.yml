@@ -284,18 +284,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Example: Custom Error Patterns
-          
-          This workflow demonstrates how to define custom error patterns on any agentic engine. 
-          Custom error patterns help detect project-specific error formats in agent logs.
-          
-          ## Features
-          
-          - Works with any engine (Copilot, Claude, Codex, Custom)
-          - Can be imported from shared workflows
-          - Merged with engine's built-in error patterns
-          - Useful for project-specific error filtering
-          
+          {{#runtime-import workflows/example-custom-error-patterns.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

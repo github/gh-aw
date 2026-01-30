@@ -120,46 +120,32 @@ This is the main workflow content.`,
 				t.Fatalf("Unexpected error compiling workflow: %v", err)
 			}
 
-			// Read the generated body file which contains the markdown content
-			bodyFile := strings.TrimSuffix(testFile, ".md") + ".body.md"
-			bodyContent, err := os.ReadFile(bodyFile)
-			if err != nil {
-				t.Fatalf("Failed to read generated body file: %v", err)
-			}
-
-			bodyStr := string(bodyContent)
-
-			// Read the lock file to verify runtime-import macro
+			// Read the generated lock file
 			lockFile := stringutil.MarkdownToLockFile(testFile)
-			lockContent, err := os.ReadFile(lockFile)
+			content, err := os.ReadFile(lockFile)
 			if err != nil {
 				t.Fatalf("Failed to read generated lock file: %v", err)
 			}
 
-			lockStr := string(lockContent)
+			lockContent := string(content)
 
-			// Verify runtime-import macro is in lock file
-			if !strings.Contains(lockStr, "{{#runtime-import") {
-				t.Errorf("%s: Lock file should contain runtime-import macro", tt.description)
-			}
-
-			// Verify all expected content is in the body file (not lock file)
+			// Verify all expected content is in the prompt
 			for _, expected := range tt.expectedInPrompt {
-				if !strings.Contains(bodyStr, expected) {
-					t.Errorf("%s: Expected to find '%s' in body file but it was not found", tt.description, expected)
+				if !strings.Contains(lockContent, expected) {
+					t.Errorf("%s: Expected to find '%s' in lock file but it was not found", tt.description, expected)
 				}
 			}
 
-			// Verify ordering in body file
+			// Verify ordering
 			if tt.expectedOrderBefore != "" && tt.expectedOrderAfter != "" {
-				beforeIdx := strings.Index(bodyStr, tt.expectedOrderBefore)
-				afterIdx := strings.Index(bodyStr, tt.expectedOrderAfter)
+				beforeIdx := strings.Index(lockContent, tt.expectedOrderBefore)
+				afterIdx := strings.Index(lockContent, tt.expectedOrderAfter)
 
 				if beforeIdx == -1 {
-					t.Errorf("%s: Expected to find '%s' in body file", tt.description, tt.expectedOrderBefore)
+					t.Errorf("%s: Expected to find '%s' in lock file", tt.description, tt.expectedOrderBefore)
 				}
 				if afterIdx == -1 {
-					t.Errorf("%s: Expected to find '%s' in body file", tt.description, tt.expectedOrderAfter)
+					t.Errorf("%s: Expected to find '%s' in lock file", tt.description, tt.expectedOrderAfter)
 				}
 				if beforeIdx != -1 && afterIdx != -1 && beforeIdx >= afterIdx {
 					t.Errorf("%s: Expected '%s' to come before '%s' but found it at position %d vs %d",
@@ -228,30 +214,16 @@ This is the main workflow content.`
 		t.Fatalf("Unexpected error compiling workflow: %v", err)
 	}
 
-	// Read the generated body file which contains the markdown content
-	bodyFile := strings.TrimSuffix(testFile, ".md") + ".body.md"
-	bodyContent, err := os.ReadFile(bodyFile)
-	if err != nil {
-		t.Fatalf("Failed to read generated body file: %v", err)
-	}
-
-	bodyStr := string(bodyContent)
-
-	// Read the lock file to verify runtime-import macro
+	// Read the generated lock file
 	lockFile := stringutil.MarkdownToLockFile(testFile)
-	lockContent, err := os.ReadFile(lockFile)
+	content, err := os.ReadFile(lockFile)
 	if err != nil {
 		t.Fatalf("Failed to read generated lock file: %v", err)
 	}
 
-	lockStr := string(lockContent)
+	lockContent := string(content)
 
-	// Verify runtime-import macro is in lock file
-	if !strings.Contains(lockStr, "{{#runtime-import") {
-		t.Error("Lock file should contain runtime-import macro")
-	}
-
-	// Verify all content is present in body file
+	// Verify all content is present
 	expectedContents := []string{
 		"# Imported Content",
 		"This comes from frontmatter imports",
@@ -262,20 +234,20 @@ This is the main workflow content.`
 	}
 
 	for _, expected := range expectedContents {
-		if !strings.Contains(bodyStr, expected) {
-			t.Errorf("Expected to find '%s' in body file but it was not found", expected)
+		if !strings.Contains(lockContent, expected) {
+			t.Errorf("Expected to find '%s' in lock file but it was not found", expected)
 		}
 	}
 
-	// Verify ordering in body file:
+	// Verify ordering:
 	// - imported content should come before main workflow heading (it's prepended)
 	// - included content appears after main workflow heading (it's expanded in-place where @include directive was)
-	importedIdx := strings.Index(bodyStr, "# Imported Content")
-	includedIdx := strings.Index(bodyStr, "# Included Content")
-	mainIdx := strings.Index(bodyStr, "# Main Workflow")
+	importedIdx := strings.Index(lockContent, "# Imported Content")
+	includedIdx := strings.Index(lockContent, "# Included Content")
+	mainIdx := strings.Index(lockContent, "# Main Workflow")
 
 	if importedIdx == -1 || includedIdx == -1 || mainIdx == -1 {
-		t.Fatal("Failed to find all expected content sections in body file")
+		t.Fatal("Failed to find all expected content sections")
 	}
 
 	if importedIdx >= mainIdx {
@@ -349,24 +321,38 @@ This is the main workflow content.`
 		t.Fatalf("Unexpected error compiling workflow: %v", err)
 	}
 
-	// Read the generated body file which contains the markdown content
-	bodyFile := strings.TrimSuffix(testFile, ".md") + ".body.md"
-	bodyContent, err := os.ReadFile(bodyFile)
+	// Read the generated lock file
+	lockFile := stringutil.MarkdownToLockFile(testFile)
+	content, err := os.ReadFile(lockFile)
 	if err != nil {
-		t.Fatalf("Failed to read generated body file: %v", err)
+		t.Fatalf("Failed to read generated lock file: %v", err)
 	}
 
-	bodyStr := string(bodyContent)
+	lockContent := string(content)
 
-	// Note: XML comments ARE present in the body file but will be removed by runtime-import helper at runtime
-	// Verify the actual content is present in body file
-	if !strings.Contains(bodyStr, "This is important imported content") {
-		t.Error("Expected imported content to be present in body file")
+	// Verify XML comments are NOT present in the actual prompt content
+	// The prompt is written after "Create prompt" step
+	promptSectionStart := strings.Index(lockContent, "Create prompt")
+	if promptSectionStart == -1 {
+		t.Fatal("Could not find 'Create prompt' section in lock file")
 	}
-	if !strings.Contains(bodyStr, "More imported content here") {
-		t.Error("Expected imported content to be present in body file")
+	promptSection := lockContent[promptSectionStart:]
+
+	if strings.Contains(promptSection, "<!-- This is an XML comment") {
+		t.Error("XML comment should not appear in actual prompt content")
 	}
-	if !strings.Contains(bodyStr, "# Main Workflow") {
-		t.Error("Expected main workflow heading to be present in body file")
+	if strings.Contains(promptSection, "Multi-line XML comment") {
+		t.Error("Multi-line XML comment should not appear in actual prompt content")
+	}
+
+	// Verify that actual content IS present (not removed along with comments)
+	if !strings.Contains(lockContent, "This is important imported content") {
+		t.Error("Expected imported content to be present in lock file")
+	}
+	if !strings.Contains(lockContent, "More imported content here") {
+		t.Error("Expected imported content to be present in lock file")
+	}
+	if !strings.Contains(lockContent, "# Main Workflow") {
+		t.Error("Expected main workflow heading to be present in lock file")
 	}
 }

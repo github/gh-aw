@@ -510,22 +510,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Daily Choice Type Test
-          
-          This workflow tests the choice type functionality in safe-output jobs with Claude.
-          
-          ## Task
-          
-          Use the `test_environment` tool to configure a test deployment. Choose:
-          1. An environment: staging or production
-          2. A test type: smoke, integration, or e2e
-          
-          Make your selection based on the day of the week:
-          - Monday/Wednesday/Friday: Use "staging" environment with "smoke" tests
-          - Tuesday/Thursday: Use "production" environment with "integration" tests
-          
-          Provide a brief explanation of why you chose this configuration.
-          
+          {{#runtime-import workflows/daily-choice-test.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

@@ -1065,14 +1065,12 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME: ${{ github.event.inputs.poem_theme }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -1131,119 +1129,7 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          ## Report Structure Guidelines
-          
-          ### 1. Header Levels
-          **Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy.**
-          
-          When creating GitHub issues or discussions:
-          - Use `###` (h3) for main sections (e.g., "### Test Summary")
-          - Use `####` (h4) for subsections (e.g., "#### Device-Specific Results")
-          - Never use `##` (h2) or `#` (h1) in reports - these are reserved for titles
-          
-          ### 2. Progressive Disclosure
-          **Wrap detailed test results in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
-          
-          Use collapsible sections for:
-          - Verbose details (full test logs, raw data)
-          - Secondary information (minor warnings, extra context)
-          - Per-item breakdowns when there are many items
-          
-          Always keep critical information visible (summary, critical issues, key metrics).
-          
-          ### 3. Report Structure Pattern
-          
-          1. **Overview**: 1-2 paragraphs summarizing key findings
-          2. **Critical Information**: Show immediately (summary stats, critical issues)
-          3. **Details**: Use `<details><summary><b>Section Name</b></summary>` for expanded content
-          4. **Context**: Add helpful metadata (workflow run, date, trigger)
-          
-          ### Design Principles (Airbnb-Inspired)
-          
-          Reports should:
-          - **Build trust through clarity**: Most important info immediately visible
-          - **Exceed expectations**: Add helpful context like trends, comparisons
-          - **Create delight**: Use progressive disclosure to reduce overwhelm
-          - **Maintain consistency**: Follow patterns across all reports
-          
-          ### Example Report Structure
-          
-          ```markdown
-          ### Summary
-          - Key metric 1: value
-          - Key metric 2: value
-          - Status: ✅/⚠️/❌
-          
-          ### Critical Issues
-          [Always visible - these are important]
-          
-          <details>
-          <summary><b>View Detailed Results</b></summary>
-          
-          [Comprehensive details, logs, traces]
-          
-          </details>
-          
-          <details>
-          <summary><b>View All Warnings</b></summary>
-          
-          [Minor issues and potential problems]
-          
-          </details>
-          
-          ### Recommendations
-          [Actionable next steps - keep visible]
-          ```
-          
-          ## Workflow Run References
-          
-          - Format run IDs as links: `[§12345](https://github.com/owner/repo/actions/runs/12345)`
-          - Include up to 3 most relevant run URLs at end under `**References:**`
-          - Do NOT add footer attribution (system adds automatically)
-          
-          # Poem Bot - A Creative Agentic Workflow
-          
-          You are the **Poem Bot**, a creative AI agent that creates original poetry about the text in context.
-          
-          ## Current Context
-          
-          - **Repository**: __GH_AW_GITHUB_REPOSITORY__
-          - **Actor**: __GH_AW_GITHUB_ACTOR__
-          - **Theme**: __GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME__
-          - **Content**: "__GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT__"
-          
-          ## Your Mission
-          
-          Create an original poem about the content provided in the context. The poem should:
-          
-          1. **Be creative and original** - No copying existing poems
-          2. **Reference the context** - Include specific details from the triggering event
-          3. **Match the tone** - Adjust style based on the content
-          4. **Use technical metaphors** - Blend coding concepts with poetic imagery
-          
-          ## Poetic Forms to Choose From
-          
-          - **Haiku** (5-7-5 syllables): For quick, contemplative moments
-          - **Limerick** (AABBA): For playful, humorous situations  
-          - **Sonnet** (14 lines): For complex, important topics
-          - **Free Verse**: For experimental or modern themes
-          - **Couplets**: For simple, clear messages
-          
-          ## Output Actions
-          
-          Use the safe-outputs capabilities to:
-          
-          1. **Create an issue** with your poem
-          2. **Add a comment** to the triggering item (if applicable)
-          3. **Apply labels** based on the poem's theme and style
-          4. **Create a pull request** with a poetry file (for code-related events)
-          5. **Add review comments** with poetic insights (for PR events)
-          6. **Update issues** with additional verses when appropriate
-          
-          ## Begin Your Poetic Journey!
-          
-          Examine the current context and create your masterpiece! Let your digital creativity flow through the universal language of poetry.
-          
+          {{#runtime-import workflows/poem-bot.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -1254,14 +1140,12 @@ jobs:
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
           GH_AW_GITHUB_EVENT_COMMENT_ID: ${{ github.event.comment.id }}
           GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: ${{ github.event.discussion.number }}
-          GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME: ${{ github.event.inputs.poem_theme }}
           GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -1275,24 +1159,18 @@ jobs:
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
                 GH_AW_GITHUB_EVENT_COMMENT_ID: process.env.GH_AW_GITHUB_EVENT_COMMENT_ID,
                 GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER: process.env.GH_AW_GITHUB_EVENT_DISCUSSION_NUMBER,
-                GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME: process.env.GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME,
                 GH_AW_GITHUB_EVENT_ISSUE_NUMBER: process.env.GH_AW_GITHUB_EVENT_ISSUE_NUMBER,
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
                 GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
-                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT,
-                GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: process.env.GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT
+                GH_AW_IS_PR_COMMENT: process.env.GH_AW_IS_PR_COMMENT
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_ACTOR: ${{ github.actor }}
-          GH_AW_GITHUB_EVENT_INPUTS_POEM_THEME: ${{ github.event.inputs.poem_theme }}
-          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_AW_NEEDS_ACTIVATION_OUTPUTS_TEXT: ${{ needs.activation.outputs.text }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
