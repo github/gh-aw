@@ -311,7 +311,7 @@ func (jm *JobManager) renderJob(job *Job) string {
 		fmt.Fprintf(&yaml, "    %s\n", job.Concurrency)
 	}
 
-	// Add timeout_minutes if specified
+	// Add timeout-minutes if specified
 	if job.TimeoutMinutes > 0 {
 		fmt.Fprintf(&yaml, "    timeout-minutes: %d\n", job.TimeoutMinutes)
 	}

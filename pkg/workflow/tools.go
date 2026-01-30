@@ -143,7 +143,7 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 	}
 
 	if data.TimeoutMinutes == "" {
-		data.TimeoutMinutes = fmt.Sprintf("timeout_minutes: %d", int(constants.DefaultAgenticWorkflowTimeout/time.Minute))
+		data.TimeoutMinutes = fmt.Sprintf("timeout-minutes: %d", int(constants.DefaultAgenticWorkflowTimeout/time.Minute))
 	}
 
 	if data.RunsOn == "" {

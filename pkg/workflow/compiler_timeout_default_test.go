@@ -46,19 +46,6 @@ engine: copilot
 			expectedTimeout: 30,
 			description:     "When timeout-minutes is explicitly specified, that value should be used",
 		},
-		{
-			name: "deprecated timeout_minutes specified - should use that value",
-			frontmatter: `---
-on: workflow_dispatch
-permissions:
-  contents: read
-timeout_minutes: 45
-engine: copilot
-strict: false
----`,
-			expectedTimeout: 45,
-			description:     "When deprecated timeout_minutes is specified, that value should be used",
-		},
 	}
 
 	for _, tt := range tests {
@@ -167,10 +154,10 @@ func TestSchemaDocumentationMatchesConstant(t *testing.T) {
 			expectedText, schemaPath, int(constants.DefaultAgenticWorkflowTimeout/time.Minute))
 	}
 
-	// Count occurrences - should appear at least twice (timeout-minutes and timeout_minutes deprecated)
+	// Count occurrences - should appear exactly once (only timeout-minutes, timeout_minutes removed)
 	occurrences := strings.Count(string(schemaContent), expectedText)
-	if occurrences < 2 {
-		t.Errorf("Expected to find at least 2 occurrences of %q in schema (for timeout-minutes and timeout_minutes fields), but found %d",
+	if occurrences != 1 {
+		t.Errorf("Expected to find exactly 1 occurrence of %q in schema (for timeout-minutes field only), but found %d",
 			expectedText, occurrences)
 	}
 }

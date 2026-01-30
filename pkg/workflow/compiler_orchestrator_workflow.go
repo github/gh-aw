@@ -2,10 +2,8 @@ package workflow
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/goccy/go-yaml"
@@ -145,15 +143,8 @@ func (c *Compiler) extractYAMLSections(frontmatter map[string]any, workflowData 
 	workflowData.Features = c.extractFeatures(frontmatter)
 	workflowData.If = c.extractIfCondition(frontmatter)
 
-	// Prefer timeout-minutes (new) over timeout_minutes (deprecated)
+	// Extract timeout-minutes (canonical form)
 	workflowData.TimeoutMinutes = c.extractTopLevelYAMLSection(frontmatter, "timeout-minutes")
-	if workflowData.TimeoutMinutes == "" {
-		workflowData.TimeoutMinutes = c.extractTopLevelYAMLSection(frontmatter, "timeout_minutes")
-		if workflowData.TimeoutMinutes != "" {
-			// Emit deprecation warning
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Field 'timeout_minutes' is deprecated. Please use 'timeout-minutes' instead to follow GitHub Actions naming convention."))
-		}
-	}
 
 	workflowData.RunsOn = c.extractTopLevelYAMLSection(frontmatter, "runs-on")
 	workflowData.Environment = c.extractTopLevelYAMLSection(frontmatter, "environment")

@@ -251,7 +251,7 @@ func TestValidProperties_NotRejected(t *testing.T) {
 				"tools": map[string]any{
 					"github": nil,
 				},
-				"timeout_minutes": 10,
+				"timeout-minutes": 10,
 				"runs-on":         "ubuntu-latest",
 				"safe-outputs": map[string]any{
 					"create-issue": nil,

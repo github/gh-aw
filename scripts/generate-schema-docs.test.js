@@ -124,16 +124,16 @@ for (const ref of allRefs) {
   }
 }
 
-// Test 9: Verify that deprecated fields are excluded from output
+// Test 9: Verify that deprecated fields are excluded from output and schema
 allPassed &= assertNotContains(output, "timeout_minutes:", "Deprecated field timeout_minutes should NOT be in output");
 
 allPassed &= assertContains(output, "timeout-minutes:", "Non-deprecated field timeout-minutes should be in output");
 
-// Verify the schema actually has the deprecated field (sanity check)
-if (schema.properties && schema.properties.timeout_minutes && schema.properties.timeout_minutes.deprecated === true) {
-  console.log("✓ PASS: Schema has timeout_minutes marked as deprecated");
+// Verify the schema does NOT have the deprecated field (it was removed completely)
+if (schema.properties && !schema.properties.timeout_minutes) {
+  console.log("✓ PASS: Schema does not have timeout_minutes field (removed completely)");
 } else {
-  console.error("❌ FAIL: Schema should have timeout_minutes marked as deprecated");
+  console.error("❌ FAIL: Schema should NOT have timeout_minutes field");
   allPassed = false;
 }
 

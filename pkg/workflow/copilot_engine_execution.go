@@ -547,9 +547,8 @@ COPILOT_CLI_INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"
 
 	// Add timeout at step level (GitHub Actions standard)
 	if workflowData.TimeoutMinutes != "" {
-		// Strip both possible prefixes (timeout_minutes or timeout-minutes)
-		timeoutValue := strings.TrimPrefix(workflowData.TimeoutMinutes, "timeout_minutes: ")
-		timeoutValue = strings.TrimPrefix(timeoutValue, "timeout-minutes: ")
+		// Strip timeout-minutes prefix
+		timeoutValue := strings.TrimPrefix(workflowData.TimeoutMinutes, "timeout-minutes: ")
 		stepLines = append(stepLines, fmt.Sprintf("        timeout-minutes: %s", timeoutValue))
 	} else {
 		stepLines = append(stepLines, fmt.Sprintf("        timeout-minutes: %d", int(constants.DefaultAgenticWorkflowTimeout/time.Minute))) // Default timeout for agentic workflows

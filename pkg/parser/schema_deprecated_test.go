@@ -12,25 +12,18 @@ func TestGetMainWorkflowDeprecatedFields(t *testing.T) {
 		t.Fatalf("GetMainWorkflowDeprecatedFields() error = %v", err)
 	}
 
-	// Check that timeout_minutes is in the list
+	// Check that timeout_minutes is NOT in the list (it was removed from schema completely)
+	// Users should use the timeout-minutes-migration codemod to migrate their workflows
 	found := false
 	for _, field := range deprecatedFields {
 		if field.Name == "timeout_minutes" {
 			found = true
-			// Check that it has a replacement suggestion
-			if field.Replacement == "" {
-				t.Errorf("Expected timeout_minutes to have a replacement suggestion, got empty string")
-			}
-			// Check that replacement is timeout-minutes
-			if field.Replacement != "timeout-minutes" {
-				t.Errorf("Expected replacement 'timeout-minutes', got '%s'", field.Replacement)
-			}
 			break
 		}
 	}
 
-	if !found {
-		t.Error("Expected timeout_minutes to be in the deprecated fields list")
+	if found {
+		t.Error("timeout_minutes should NOT be in the deprecated fields list (removed from schema)")
 	}
 }
 
