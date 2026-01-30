@@ -417,7 +417,7 @@ Manage campaign definitions. See [Agentic Campaigns Guide](/gh-aw/guides/campaig
 
 **Options:** `--json`
 
-Alternative: create an issue with the `create-agentic-campaign` label to trigger automated campaign creation ([docs](/gh-aw/guides/campaigns/getting-started/)).
+Alternative: create an issue with the `create-agentic-campaign` label to trigger automated campaign creation ([docs](/gh-aw/guides/campaigns/)).
 
 ### Management
 
