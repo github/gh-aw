@@ -21,7 +21,7 @@
 #
 # Analyzes and improves console output styling and formatting in the codebase
 #
-# frontmatter-hash: 7602d95af063bd283bfe268982c69e61309b99e24e86c0dfdf0f177ded9c2375
+# frontmatter-hash: dccad1547d74038d1dba9c0bac9e816f8e8142abe94f1b605247b490472972c2
 
 name: "Terminal Stylist"
 "on":

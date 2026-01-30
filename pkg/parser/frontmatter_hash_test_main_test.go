@@ -37,5 +37,11 @@ func getGitVersion() string {
 	}
 
 	version := strings.TrimSpace(string(output))
+
+	// Strip the -dirty suffix for test consistency
+	// The lock files are compiled with a clean version, but tests may run
+	// with uncommitted changes (the lock files themselves)
+	version = strings.TrimSuffix(version, "-dirty")
+
 	return version
 }

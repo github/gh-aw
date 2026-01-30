@@ -21,7 +21,7 @@
 #
 # Automatically fixes code scanning alerts by creating pull requests with remediation
 #
-# frontmatter-hash: 92ad1418add58c4037c057e62b84608d89bf4c4382eaf16c86bf8ac04010f983
+# frontmatter-hash: 9fa8a48d8d7488ae742d7f0287babd0578d0c119003b72eac77dc9f02c072117
 
 name: "Code Scanning Fixer"
 "on":

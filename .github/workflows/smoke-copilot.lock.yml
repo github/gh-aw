@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e2299e0ec48deadab9cb4a272f7441c1fc291d5acb9f84c0752b5f40f780f4c4
+# frontmatter-hash: 35ad1acf3ae6cbed8077664ad990562fb49b8757740ceb9e3b071e200d631ac8
 
 name: "Smoke Copilot"
 "on":

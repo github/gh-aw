@@ -21,7 +21,7 @@
 #
 # Automatically updates GitHub Actions versions and creates a PR if changes are detected
 #
-# frontmatter-hash: 4505d723ce5af39b3a7cbb4da399031a04101311e0a19a6a31202d063ede7390
+# frontmatter-hash: da35d8fabd221d197c95fb5b7cd11cdff33d5876993dc36ea5e63e123ca77dcf
 
 name: "Daily Workflow Updater"
 "on":

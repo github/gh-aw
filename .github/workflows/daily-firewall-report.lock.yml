@@ -27,7 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 3ea1067dbac606e6b51a45151e031528fe406676074585a9f7157fa2135a6007
+# frontmatter-hash: d81b39fe22cf6fd1fb25f96d7685f22903b0ef104cce03c157bb9a5c67ade7cd
 
 name: "Daily Firewall Logs Collector and Reporter"
 "on":

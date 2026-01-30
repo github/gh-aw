@@ -27,7 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: fd68677ea56b86414a4830040f6b759258aea8c599187b0397c47a25d42b43be
+# frontmatter-hash: 6c192b654d10c1c207ffa80eb5b097ca1ac58cffa93193760f9f3baa187da332
 
 name: "Daily Project Performance Summary Generator (Using Safe Inputs)"
 "on":

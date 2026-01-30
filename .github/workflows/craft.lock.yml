@@ -21,7 +21,7 @@
 #
 # Generates new agentic workflow markdown files based on user requests when invoked with /craft command
 #
-# frontmatter-hash: f5b274435b950d0410f0b4d74604bcf2c2b9be6471f5bc29a6339bde30d3969f
+# frontmatter-hash: 94c4cebd662cb5261359eea982e1c15c50e5017e8837dcff65ca3f502403c9b4
 
 name: "Workflow Craft Agent"
 "on":

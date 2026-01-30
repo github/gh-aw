@@ -21,7 +21,7 @@
 #
 # Bundles Dependabot security alert updates per package.json into a single PR
 #
-# frontmatter-hash: a0cb5813e9225eba3869785958d544324c99316215bc774d075184f77263b751
+# frontmatter-hash: 855e943e6e488b795a601b668204050d736a9b77fb82a58a05c0198e79691b0c
 
 name: "Dependabot Bundler"
 "on":

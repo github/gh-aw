@@ -21,7 +21,7 @@
 #
 # Security-focused AI agent that reviews pull requests to identify changes that could weaken security posture or extend AWF boundaries
 #
-# frontmatter-hash: 74c2cd84b241adb0270b20204b3d7487a60df84abb7e2fa9eeda7781ccd984e2
+# frontmatter-hash: d411fc80886ef0dd8cfb3fdd9be2360cca25260f34bcc1c9f649b68d54c9d17f
 
 name: "Security Review Agent 🔒"
 "on":
