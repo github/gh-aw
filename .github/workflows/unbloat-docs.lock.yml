@@ -26,7 +26,7 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: c614d97c5c8fc8950ec660bf36857928b13201cda1a8aa25771420f7e1debeed
+# frontmatter-hash: 1a998664a36d846f6150aa646cefb2a27fbd96f8c7f947d7ab3135f47cb2d91a
 
 name: "Documentation Unbloat"
 "on":

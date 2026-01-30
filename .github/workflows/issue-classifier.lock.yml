@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/actions-ai-inference.md
 #
-# frontmatter-hash: 0b14e04ee3d9ab34de7c8ea1b98ab041ef442f892c844a176361732d176970d2
+# frontmatter-hash: 4051f5fb6737791f686f8374543fed60f008bf3d984f440e2e6421eb3e8ddf99
 
 name: "Issue Classifier"
 "on":

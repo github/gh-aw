@@ -21,7 +21,7 @@
 #
 # Checks for Go module and NPM dependency updates and analyzes Dependabot PRs for compatibility and breaking changes
 #
-# frontmatter-hash: 474e3010a2ebc5c2c5ec6abb35af521f1e7a3dcf84059de970ca46a749e63e7c
+# frontmatter-hash: bd5a23176132165bab1ed7a1077d06d569d82b287537764cb7769989cfe0cb37
 
 name: "Dependabot Dependency Checker"
 "on":
