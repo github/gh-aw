@@ -480,7 +480,7 @@ jobs:
 	timeBefore := lockStatBefore.ModTime()
 
 	// Sleep to ensure modification time would change if file is rewritten
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// Collect workflow files (which should always trigger recompilation)
 	files, err := collectWorkflowFiles(workflowPath, false)

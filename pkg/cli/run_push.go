@@ -19,7 +19,9 @@ import (
 var runPushLog = logger.New("cli:run_push")
 
 // collectWorkflowFiles collects the workflow .md file, its corresponding .lock.yml file,
-// and the transitive closure of all imported files
+// and the transitive closure of all imported files.
+// Note: This function always recompiles the workflow to ensure the lock file is up-to-date,
+// regardless of the frontmatter hash status.
 func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 	runPushLog.Printf("Collecting files for workflow: %s", workflowPath)
 
@@ -38,7 +40,7 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 	files[absWorkflowPath] = true
 	runPushLog.Printf("Added workflow file: %s", absWorkflowPath)
 
-	// Check if lock file needs recompilation
+	// Check lock file and log hash status for observability
 	lockFilePath := stringutil.MarkdownToLockFile(absWorkflowPath)
 	runPushLog.Printf("Checking lock file: %s", lockFilePath)
 
