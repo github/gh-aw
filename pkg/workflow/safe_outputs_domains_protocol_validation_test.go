@@ -163,7 +163,8 @@ func TestValidateSafeOutputsAllowedDomainsWithProtocol(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSafeOutputsAllowedDomains(tt.config)
+			c := NewCompiler()
+			err := c.validateSafeOutputsAllowedDomains(tt.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateSafeOutputsAllowedDomains() error = %v, wantErr %v", err, tt.wantErr)
 			}

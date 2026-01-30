@@ -185,13 +185,13 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 
 	// Validate safe-outputs allowed-domains configuration
 	log.Printf("Validating safe-outputs allowed-domains")
-	if err := validateSafeOutputsAllowedDomains(workflowData.SafeOutputs); err != nil {
+	if err := c.validateSafeOutputsAllowedDomains(workflowData.SafeOutputs); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error())
 	}
 
 	// Validate network allowed domains configuration
 	log.Printf("Validating network allowed domains")
-	if err := validateNetworkAllowedDomains(workflowData.NetworkPermissions); err != nil {
+	if err := c.validateNetworkAllowedDomains(workflowData.NetworkPermissions); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error())
 	}
 

@@ -11,12 +11,14 @@ import (
 var safeOutputsDomainsValidationLog = logger.New("workflow:safe_outputs_domains_validation")
 
 // validateNetworkAllowedDomains validates the allowed domains in network configuration
-func validateNetworkAllowedDomains(network *NetworkPermissions) error {
+func (c *Compiler) validateNetworkAllowedDomains(network *NetworkPermissions) error {
 	if network == nil || len(network.Allowed) == 0 {
 		return nil
 	}
 
 	safeOutputsDomainsValidationLog.Printf("Validating %d network allowed domains", len(network.Allowed))
+
+	collector := NewErrorCollector(c.failFast)
 
 	for i, domain := range network.Allowed {
 		// Skip ecosystem identifiers - they don't need domain pattern validation
@@ -25,11 +27,14 @@ func validateNetworkAllowedDomains(network *NetworkPermissions) error {
 		}
 
 		if err := validateDomainPattern(domain); err != nil {
-			return fmt.Errorf("network.allowed[%d]: %w", i, err)
+			wrappedErr := fmt.Errorf("network.allowed[%d]: %w", i, err)
+			if returnErr := collector.Add(wrappedErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
 		}
 	}
 
-	return nil
+	return collector.Error()
 }
 
 // isEcosystemIdentifier checks if a domain string is actually an ecosystem identifier
@@ -50,20 +55,25 @@ func isEcosystemIdentifier(domain string) bool {
 var domainPattern = regexp.MustCompile(`^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 
 // validateSafeOutputsAllowedDomains validates the allowed-domains configuration in safe-outputs
-func validateSafeOutputsAllowedDomains(config *SafeOutputsConfig) error {
+func (c *Compiler) validateSafeOutputsAllowedDomains(config *SafeOutputsConfig) error {
 	if config == nil || len(config.AllowedDomains) == 0 {
 		return nil
 	}
 
 	safeOutputsDomainsValidationLog.Printf("Validating %d allowed domains", len(config.AllowedDomains))
 
+	collector := NewErrorCollector(c.failFast)
+
 	for i, domain := range config.AllowedDomains {
 		if err := validateDomainPattern(domain); err != nil {
-			return fmt.Errorf("safe-outputs.allowed-domains[%d]: %w", i, err)
+			wrappedErr := fmt.Errorf("safe-outputs.allowed-domains[%d]: %w", i, err)
+			if returnErr := collector.Add(wrappedErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
 		}
 	}
 
-	return nil
+	return collector.Error()
 }
 
 // validateDomainPattern validates a single domain pattern

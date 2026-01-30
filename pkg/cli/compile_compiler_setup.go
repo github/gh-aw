@@ -93,6 +93,7 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 	compiler := workflow.NewCompiler(
 		workflow.WithVerbose(config.Verbose),
 		workflow.WithEngineOverride(config.EngineOverride),
+		workflow.WithFailFast(config.FailFast),
 	)
 	compileCompilerSetupLog.Print("Created compiler instance")
 
