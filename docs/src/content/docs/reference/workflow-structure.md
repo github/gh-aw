@@ -49,6 +49,13 @@ When you run the `compile` command you generate the lock file.
 gh aw compile
 ```
 
+## Editing Workflows
+
+> [!TIP]
+> The **markdown body** is loaded at runtime and can be edited directly on GitHub.com without recompilation. Only **frontmatter changes** require recompilation.
+
+See [Editing Workflows](/gh-aw/guides/editing-workflows/) for complete guidance on when recompilation is needed.
+
 ## Best Practices
 
 - Use descriptive names: `issue-responder.md`, `pr-reviewer.md`
@@ -59,6 +66,7 @@ gh aw compile
 
 ## Related Documentation
 
+- [Editing Workflows](/gh-aw/guides/editing-workflows/) - When to recompile vs edit directly
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Configuration options for workflows
 - [Markdown](/gh-aw/reference/markdown/) - The main markdown content of workflows
 - [Imports](/gh-aw/reference/imports/) - Modularizing workflows with includes

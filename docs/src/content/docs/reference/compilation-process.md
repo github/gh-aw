@@ -236,6 +236,9 @@ Pre-activation runs checks sequentially. Any failure sets `activated=false`, pre
 | `gh aw compile --purge` | Remove orphaned `.lock.yml` files |
 | `gh aw compile --output /path/to/output` | Custom output directory |
 
+> [!TIP]
+> Compilation is only required when changing **frontmatter configuration**. The **markdown body** (AI instructions) is loaded at runtime and can be edited without recompilation. See [Editing Workflows](/gh-aw/guides/editing-workflows/) for details.
+
 ## Debugging Compilation
 
 **Enable verbose logging**: `DEBUG=workflow:* gh aw compile my-workflow --verbose` shows job creation, action pin resolutions, tool configurations, and MCP setups.
@@ -273,6 +276,7 @@ Pre-activation runs checks sequentially. Any failure sets `activated=false`, pre
 
 ## Related Documentation
 
+- [Editing Workflows](/gh-aw/guides/editing-workflows/) - When to recompile vs edit directly
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - All configuration options
 - [Tools Reference](/gh-aw/reference/tools/) - Tool configuration guide
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Output processing

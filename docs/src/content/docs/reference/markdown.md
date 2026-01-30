@@ -5,7 +5,7 @@ sidebar:
   order: 300
 ---
 
-The markdown is the most important part of your agentic workflow, and should describe its intended operation. The markdown follows the frontmatter. For example:
+The markdown body is the most important part of your agentic workflow, containing natural language instructions for the AI agent. The markdown follows the frontmatter and is loaded at runtime, allowing you to edit instructions directly on GitHub.com without recompilation. For example:
 
 ```aw wrap
 ---
@@ -91,8 +91,16 @@ Avoid over-complexity (keep instructions focused), assuming knowledge (explain p
 
 Agentic markdown supports GitHub Actions expression substitutions and conditional templating for content. See [Templating and Substitutions](/gh-aw/reference/templating/) for details.
 
+## Editing and Iteration
+
+> [!TIP]
+> The markdown body is loaded at runtime from the original `.md` file. You can edit instructions directly on GitHub.com and changes take effect immediately without recompiling the workflow.
+
+This design enables rapid iteration on AI instructions while maintaining strict compilation requirements for security-sensitive frontmatter configuration. See [Editing Workflows](/gh-aw/guides/editing-workflows/) for complete guidance on when recompilation is needed versus when you can edit directly.
+
 ## Related Documentation
 
+- [Editing Workflows](/gh-aw/guides/editing-workflows/) - When to recompile vs edit directly
 - [Workflow Structure](/gh-aw/reference/workflow-structure/) - Overall workflow file organization
 - [Frontmatter](/gh-aw/reference/frontmatter/) - YAML configuration options
 - [Security Notes](/gh-aw/guides/security/) - Comprehensive security guidance

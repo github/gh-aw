@@ -10,6 +10,14 @@ sidebar:
 
 ## Capabilities
 
+### Can I edit workflows directly on GitHub.com without recompiling?
+
+Yes! The **markdown body** (AI instructions) is loaded at runtime and can be edited directly on GitHub.com or in any editor. Changes take effect on the next workflow run without recompilation.
+
+However, **frontmatter configuration** (tools, permissions, triggers, network rules) is embedded in the compiled workflow and requires recompilation when changed. Run `gh aw compile my-workflow` after editing frontmatter.
+
+See [Editing Workflows](/gh-aw/guides/editing-workflows/) for complete guidance on when recompilation is needed.
+
 ### What's the difference between agentic workflows and regular GitHub Actions workflows?
 
 Agentic workflows are a special type of GitHub Actions workflow that use AI agentic processing to interpret natural language instructions and make decisions. Key differences include
