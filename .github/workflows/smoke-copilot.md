@@ -57,6 +57,32 @@ safe-outputs:
       allowed: [smoke-copilot]
     remove-labels:
       allowed: [smoke]
+    jobs:
+      send-slack-message:
+        description: "Send a message to Slack (stub for testing)"
+        runs-on: ubuntu-latest
+        output: "Slack message stub executed!"
+        inputs:
+          message:
+            description: "The message to send"
+            required: true
+            type: string
+        permissions:
+          contents: read
+        steps:
+          - name: Stub Slack message
+            run: |
+              echo "🎭 This is a stub - not sending to Slack"
+              if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
+                MESSAGE=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "send_slack_message") | .message')
+                echo "Would send to Slack: $MESSAGE"
+                echo "### 📨 Slack Message Stub" >> "$GITHUB_STEP_SUMMARY"
+                echo "**Message:** $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "No agent output found"
+              fi
     messages:
       append-only-comments: true
       footer: "> 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*"
@@ -103,6 +129,8 @@ strict: true
    - Mention the pull request author and any assignees
 
 3. Use the `add_comment` tool to add a **fun and creative comment** to the latest discussion (using the `discussion_number` you extracted in step 7) - be playful and entertaining in your comment
+
+4. Use the `send_slack_message` tool to send a brief summary message (e.g., "Smoke test ${{ github.run_id }}: All tests passed! ✅")
 
 If all tests pass:
 - Use the `add_labels` safe-output tool to add the label `smoke-copilot` to the pull request

@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 2dfb5f132c36d9731b398510ececd2112c57fa149902587efc8b37daa906fb42
+# frontmatter-hash: 03287cfbe1294562ef5b8725e9699bc26f7cdcec7d957147989c87ce10f5060a
 
 name: "Smoke Copilot"
 "on":
@@ -231,7 +231,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-copilot"],"max":3},"create_issue":{"expires":2,"group":true,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3}}
+          {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-copilot"],"max":3},"create_issue":{"expires":2,"group":true,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3},"send-slack-message":{"description":"Send a message to Slack (stub for testing)","inputs":{"message":{"default":null,"description":"The message to send","required":true,"type":"string"}},"output":"Slack message stub executed!"}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -409,6 +409,23 @@ jobs:
                 "type": "object"
               },
               "name": "missing_data"
+            },
+            {
+              "description": "Send a message to Slack (stub for testing)",
+              "inputSchema": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "description": "The message to send",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "type": "object"
+              },
+              "name": "send_slack_message"
             }
           ]
           EOF
@@ -1561,6 +1578,7 @@ jobs:
       - agent
       - detection
       - safe_outputs
+      - send_slack_message
       - update_cache_memory
     if: (always()) && (needs.agent.result != 'skipped')
     runs-on: ubuntu-slim
@@ -1922,6 +1940,40 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/safe_output_handler_manager.cjs');
             await main();
+
+  send_slack_message:
+    needs:
+      - agent
+      - detection
+    if: >
+      ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'send_slack_message'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download agent output artifact
+        continue-on-error: true
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: agent-output
+          path: /opt/gh-aw/safe-jobs/
+      - name: Setup Safe Job Environment Variables
+        run: |
+          find "/opt/gh-aw/safe-jobs/" -type f -print
+          echo "GH_AW_AGENT_OUTPUT=/opt/gh-aw/safe-jobs/agent_output.json" >> "$GITHUB_ENV"
+      - name: Stub Slack message
+        run: |
+          echo "🎭 This is a stub - not sending to Slack"
+          if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
+            MESSAGE=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "send_slack_message") | .message')
+            echo "Would send to Slack: $MESSAGE"
+            echo "### 📨 Slack Message Stub" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Message:** $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No agent output found"
+          fi
 
   update_cache_memory:
     needs:
