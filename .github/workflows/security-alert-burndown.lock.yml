@@ -1472,6 +1472,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1},\"update_project\":{\"max\":100}}"
           GH_AW_ASSIGN_COPILOT: "true"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
+          GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
         with:
           github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
           script: |
