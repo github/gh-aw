@@ -10,19 +10,37 @@ import (
 
 var parallelInstallLog = logger.New("workflow:parallel_installation")
 
+// CLIInstallMethod defines how a CLI should be installed
+type CLIInstallMethod string
+
+const (
+	CLIInstallMethodScript   CLIInstallMethod = "script"   // Use installer script from URL
+	CLIInstallMethodNpm      CLIInstallMethod = "npm"      // Use npm install
+	CLIInstallMethodDownload CLIInstallMethod = "download" // Direct binary download
+)
+
+// CLIInstallInfo contains information about how to install a CLI
+type CLIInstallInfo struct {
+	Method      CLIInstallMethod // Installation method
+	Version     string           // Version to install
+	PackageName string           // NPM package name (for npm method)
+	ScriptURL   string           // Installer script URL (for script method)
+	BinaryURL   string           // Binary download URL (for download method)
+	VerifyCmd   string           // Command to verify installation (e.g., "copilot --version")
+}
+
 // ParallelInstallConfig holds configuration for parallel installation
 type ParallelInstallConfig struct {
-	AWFVersion     string   // AWF binary version to install (empty to skip)
-	CopilotVersion string   // Copilot CLI version to install (empty to skip)
-	ClaudeVersion  string   // Claude Code CLI version to install (empty to skip)
-	DockerImages   []string // Docker images to download (empty to skip)
+	AWFVersion   string          // AWF binary version to install (empty to skip)
+	CLIInfo      *CLIInstallInfo // CLI installation info (nil to skip)
+	DockerImages []string        // Docker images to download (empty to skip)
 }
 
 // generateParallelInstallationStep generates a single step that installs dependencies in parallel
 // This parallelizes AWF binary installation, CLI installation, and Docker image downloads
 // to reduce sequential execution time by 8-12 seconds.
 func generateParallelInstallationStep(config ParallelInstallConfig) GitHubActionStep {
-	if config.AWFVersion == "" && config.CopilotVersion == "" && config.ClaudeVersion == "" && len(config.DockerImages) == 0 {
+	if config.AWFVersion == "" && config.CLIInfo == nil && len(config.DockerImages) == 0 {
 		parallelInstallLog.Print("No parallel installations configured, skipping")
 		return GitHubActionStep([]string{})
 	}
@@ -32,10 +50,7 @@ func generateParallelInstallationStep(config ParallelInstallConfig) GitHubAction
 	if config.AWFVersion != "" {
 		operationCount++
 	}
-	if config.CopilotVersion != "" {
-		operationCount++
-	}
-	if config.ClaudeVersion != "" {
+	if config.CLIInfo != nil {
 		operationCount++
 	}
 	if len(config.DockerImages) > 0 {
@@ -57,14 +72,34 @@ func generateParallelInstallationStep(config ParallelInstallConfig) GitHubAction
 		stepLines = append(stepLines, fmt.Sprintf("            --awf %s \\", config.AWFVersion))
 	}
 
-	// Add Copilot installation argument
-	if config.CopilotVersion != "" {
-		stepLines = append(stepLines, fmt.Sprintf("            --copilot %s \\", config.CopilotVersion))
-	}
-
-	// Add Claude installation argument
-	if config.ClaudeVersion != "" {
-		stepLines = append(stepLines, fmt.Sprintf("            --claude %s \\", config.ClaudeVersion))
+	// Add CLI installation arguments based on method
+	if config.CLIInfo != nil {
+		switch config.CLIInfo.Method {
+		case CLIInstallMethodScript:
+			// Pass script URL and version
+			stepLines = append(stepLines, fmt.Sprintf("            --cli-script %s \\", config.CLIInfo.ScriptURL))
+			if config.CLIInfo.Version != "" {
+				stepLines = append(stepLines, fmt.Sprintf("            --cli-version %s \\", config.CLIInfo.Version))
+			}
+			if config.CLIInfo.VerifyCmd != "" {
+				stepLines = append(stepLines, fmt.Sprintf("            --cli-verify %q \\", config.CLIInfo.VerifyCmd))
+			}
+		case CLIInstallMethodNpm:
+			// Pass npm package and version
+			stepLines = append(stepLines, fmt.Sprintf("            --cli-npm %s \\", config.CLIInfo.PackageName))
+			if config.CLIInfo.Version != "" {
+				stepLines = append(stepLines, fmt.Sprintf("            --cli-version %s \\", config.CLIInfo.Version))
+			}
+			if config.CLIInfo.VerifyCmd != "" {
+				stepLines = append(stepLines, fmt.Sprintf("            --cli-verify %q \\", config.CLIInfo.VerifyCmd))
+			}
+		case CLIInstallMethodDownload:
+			// Pass binary URL
+			stepLines = append(stepLines, fmt.Sprintf("            --cli-download %s \\", config.CLIInfo.BinaryURL))
+			if config.CLIInfo.VerifyCmd != "" {
+				stepLines = append(stepLines, fmt.Sprintf("            --cli-verify %q \\", config.CLIInfo.VerifyCmd))
+			}
+		}
 	}
 
 	// Add Docker images argument
@@ -89,7 +124,7 @@ func generateParallelInstallationStep(config ParallelInstallConfig) GitHubAction
 // ShouldUseParallelInstallation determines if parallel installation should be used
 // based on the workflow configuration. Parallel installation is used when:
 // - AWF binary needs to be installed (firewall enabled)
-// - CLI needs to be installed (Copilot or Claude)
+// - CLI needs to be installed (Copilot, Claude, or Codex)
 // - Docker images need to be downloaded
 // - SRT is NOT enabled (SRT has sequential dependencies)
 func ShouldUseParallelInstallation(workflowData *WorkflowData, engine CodingAgentEngine) bool {
@@ -104,17 +139,18 @@ func ShouldUseParallelInstallation(workflowData *WorkflowData, engine CodingAgen
 	}
 
 	// Use parallel installation if firewall is enabled (AWF binary needed)
-	// and we're installing a CLI (Copilot or Claude)
+	// and we're installing a CLI (Copilot, Claude, or Codex)
 	if isFirewallEnabled(workflowData) {
 		engineID := engine.GetID()
-		if engineID == "copilot" || engineID == "claude" {
+		if engineID == "copilot" || engineID == "claude" || engineID == "codex" {
 			return true
 		}
 	}
 
 	// Also use parallel if we have Docker images to download
 	dockerImages := collectDockerImages(workflowData.Tools, workflowData)
-	if len(dockerImages) > 0 && (isFirewallEnabled(workflowData) || engine.GetID() == "copilot" || engine.GetID() == "claude") {
+	engineID := engine.GetID()
+	if len(dockerImages) > 0 && (isFirewallEnabled(workflowData) || engineID == "copilot" || engineID == "claude" || engineID == "codex") {
 		return true
 	}
 
@@ -140,7 +176,7 @@ func GetParallelInstallConfig(workflowData *WorkflowData, engine CodingAgentEngi
 		}
 	}
 
-	// Get CLI version based on engine
+	// Get CLI installation info based on engine
 	engineID := engine.GetID()
 	switch engineID {
 	case "copilot":
@@ -150,14 +186,35 @@ func GetParallelInstallConfig(workflowData *WorkflowData, engine CodingAgentEngi
 		}
 		// Only use parallel if installing globally (not for SRT local installation)
 		if !isSRTEnabled(workflowData) {
-			config.CopilotVersion = version
+			config.CLIInfo = &CLIInstallInfo{
+				Method:    CLIInstallMethodScript,
+				Version:   version,
+				ScriptURL: "https://raw.githubusercontent.com/github/copilot-cli/main/install.sh",
+				VerifyCmd: "copilot --version",
+			}
 		}
 	case "claude":
 		version := string(constants.DefaultClaudeCodeVersion)
 		if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
 			version = workflowData.EngineConfig.Version
 		}
-		config.ClaudeVersion = version
+		config.CLIInfo = &CLIInstallInfo{
+			Method:      CLIInstallMethodNpm,
+			Version:     version,
+			PackageName: "@anthropic-ai/claude-code",
+			VerifyCmd:   "claude-code --version",
+		}
+	case "codex":
+		version := string(constants.DefaultCodexVersion)
+		if workflowData.EngineConfig != nil && workflowData.EngineConfig.Version != "" {
+			version = workflowData.EngineConfig.Version
+		}
+		config.CLIInfo = &CLIInstallInfo{
+			Method:      CLIInstallMethodNpm,
+			Version:     version,
+			PackageName: "@openai/codex",
+			VerifyCmd:   "codex --version",
+		}
 	}
 
 	// Get Docker images

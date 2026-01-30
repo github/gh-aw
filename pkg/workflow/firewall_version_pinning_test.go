@@ -97,6 +97,9 @@ func TestCopilotEngineFirewallInstallation(t *testing.T) {
 		if config.AWFVersion != string(constants.DefaultFirewallVersion) {
 			t.Errorf("Expected AWF version %s, got %s", string(constants.DefaultFirewallVersion), config.AWFVersion)
 		}
+		if config.CLIInfo == nil {
+			t.Error("Parallel installation should include CLI info for Copilot")
+		}
 
 		// Generate the parallel installation step to verify it contains AWF installation
 		parallelStep := generateParallelInstallationStep(config)
@@ -113,6 +116,10 @@ func TestCopilotEngineFirewallInstallation(t *testing.T) {
 		// Verify it includes --awf flag
 		if !strings.Contains(parallelStepStr, "--awf") {
 			t.Error("Parallel installation should include --awf flag")
+		}
+		// Verify it includes CLI installation flags
+		if !strings.Contains(parallelStepStr, "--cli-") {
+			t.Error("Parallel installation should include CLI installation flags")
 		}
 	})
 

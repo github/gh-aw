@@ -75,8 +75,27 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		return []GitHubActionStep{}
 	}
 
-	// Use base installation steps (secret validation + npm install)
-	steps := GetBaseInstallationSteps(EngineInstallConfig{
+	// Check if parallel installation will be used
+	useParallel := isFirewallEnabled(workflowData)
+
+	if useParallel {
+		// When using parallel installation, only return secret validation step
+		// CLI installation will be handled by the parallel installation step
+		codexEngineLog.Print("Using parallel installation, only adding secret validation")
+		
+		var steps []GitHubActionStep
+		secretValidation := GenerateMultiSecretValidationStep(
+			[]string{"CODEX_API_KEY", "OPENAI_API_KEY"},
+			"Codex",
+			"https://githubnext.github.io/gh-aw/reference/engines/#openai-codex",
+		)
+		steps = append(steps, secretValidation)
+		return steps
+	}
+
+	// Sequential installation (no firewall): use base installation steps (secret validation + npm install)
+	codexEngineLog.Print("Using sequential installation")
+	return GetBaseInstallationSteps(EngineInstallConfig{
 		Secrets:    []string{"CODEX_API_KEY", "OPENAI_API_KEY"},
 		DocsURL:    "https://githubnext.github.io/gh-aw/reference/engines/#openai-codex",
 		NpmPackage: "@openai/codex",
@@ -84,24 +103,6 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		Name:       "Codex",
 		CliName:    "codex",
 	}, workflowData)
-
-	// Add AWF installation step if firewall is enabled
-	if isFirewallEnabled(workflowData) {
-		firewallConfig := getFirewallConfig(workflowData)
-		agentConfig := getAgentConfig(workflowData)
-		var awfVersion string
-		if firewallConfig != nil {
-			awfVersion = firewallConfig.Version
-		}
-
-		// Install AWF binary (or skip if custom command is specified)
-		awfInstall := generateAWFInstallationStep(awfVersion, agentConfig)
-		if len(awfInstall) > 0 {
-			steps = append(steps, awfInstall)
-		}
-	}
-
-	return steps
 }
 
 // GetDeclaredOutputFiles returns the output files that Codex may produce

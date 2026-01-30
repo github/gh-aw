@@ -127,8 +127,15 @@ jobs:
           package-manager-cache: false
       - name: Install Codex
         run: npm install -g --silent @openai/codex@0.92.0
-      - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.11.2
+      - name: Install dependencies in parallel
+        run: |
+          # Install dependencies in parallel to reduce setup time
+          # This parallelizes AWF binary, CLI, and Docker image downloads
+          bash /opt/gh-aw/actions/install_parallel_setup.sh \
+            --awf v0.11.2 \
+            --cli-npm @openai/codex \
+            --cli-version 0.92.0 \
+            --cli-verify "codex --version"
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:
@@ -139,8 +146,6 @@ jobs:
           script: |
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
-      - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/githubnext/gh-aw-mcpg:v0.0.84
       - name: Start MCP gateway
         id: start-mcp-gateway
         env:

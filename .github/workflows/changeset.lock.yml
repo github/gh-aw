@@ -179,21 +179,15 @@ jobs:
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
-        with:
-          node-version: '24'
-          package-manager-cache: false
-      - name: Install Codex
-        run: npm install -g --silent @openai/codex@0.92.0
-      - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.11.2
       - name: Install dependencies in parallel
         run: |
           # Install dependencies in parallel to reduce setup time
           # This parallelizes AWF binary, CLI, and Docker image downloads
           bash /opt/gh-aw/actions/install_parallel_setup.sh \
             --awf v0.11.2 \
+            --cli-npm @openai/codex \
+            --cli-version 0.92.0 \
+            --cli-verify "codex --version" \
             --docker ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown

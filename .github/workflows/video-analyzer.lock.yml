@@ -157,7 +157,9 @@ jobs:
           # This parallelizes AWF binary, CLI, and Docker image downloads
           bash /opt/gh-aw/actions/install_parallel_setup.sh \
             --awf v0.11.2 \
-            --copilot 0.0.397 \
+            --cli-script https://raw.githubusercontent.com/github/copilot-cli/main/install.sh \
+            --cli-version 0.0.397 \
+            --cli-verify "copilot --version" \
             --docker ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown

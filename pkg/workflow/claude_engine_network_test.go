@@ -62,8 +62,8 @@ func TestClaudeEngineNetworkPermissions(t *testing.T) {
 		if config.AWFVersion == "" {
 			t.Error("Parallel installation should include AWF version")
 		}
-		if config.ClaudeVersion == "" {
-			t.Error("Parallel installation should include Claude version")
+		if config.CLIInfo == nil {
+			t.Error("Parallel installation should include CLI info")
 		}
 	})
 
@@ -234,6 +234,9 @@ func TestNetworkPermissionsIntegration(t *testing.T) {
 		parallelConfig := GetParallelInstallConfig(workflowData, engine)
 		if parallelConfig.AWFVersion == "" {
 			t.Error("Parallel installation config should include AWF version")
+		}
+		if parallelConfig.CLIInfo == nil {
+			t.Error("Parallel installation should include CLI info")
 		}
 
 		// Get execution steps

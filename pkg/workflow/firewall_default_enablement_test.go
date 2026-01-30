@@ -196,6 +196,9 @@ func TestCopilotFirewallDefaultIntegration(t *testing.T) {
 		if config.AWFVersion == "" {
 			t.Error("Parallel installation config should include AWF version")
 		}
+		if config.CLIInfo == nil {
+			t.Error("Parallel installation should include CLI info")
+		}
 
 		// Generate the parallel installation step to verify it contains AWF
 		parallelStep := generateParallelInstallationStep(config)
@@ -203,6 +206,9 @@ func TestCopilotFirewallDefaultIntegration(t *testing.T) {
 
 		if !strings.Contains(parallelStepStr, "--awf") || !strings.Contains(parallelStepStr, "install_parallel_setup.sh") {
 			t.Error("Expected AWF installation to be included in parallel installation step")
+		}
+		if !strings.Contains(parallelStepStr, "--cli-") {
+			t.Error("Expected CLI installation to be included in parallel installation step")
 		}
 	})
 

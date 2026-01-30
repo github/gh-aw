@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Install dependencies in parallel to reduce sequential execution time
-# Usage: install_parallel_setup.sh [--awf VERSION] [--copilot VERSION] [--claude VERSION] [--docker IMAGE1 IMAGE2 ...]
+# Usage: install_parallel_setup.sh [OPTIONS]
 #
 # This script parallelizes independent setup operations:
 # - AWF binary installation (if --awf is specified)
-# - Copilot CLI installation (if --copilot is specified)  
-# - Claude Code CLI installation (if --claude is specified)
+# - CLI installation via script, npm, or download (if --cli-* is specified)
 # - Docker image downloads (if --docker is specified)
+#
+# Options:
+#   --awf VERSION           Install AWF binary with version VERSION
+#   --cli-script URL        Install CLI using installer script from URL
+#   --cli-npm PACKAGE       Install CLI using npm install -g PACKAGE
+#   --cli-download URL      Install CLI by downloading binary from URL
+#   --cli-version VERSION   Version for CLI installation (optional)
+#   --cli-verify CMD        Command to verify CLI installation (optional)
+#   --docker IMAGE...       Download Docker images (space-separated list)
 #
 # All operations run in parallel using background jobs, with proper error handling
 # that preserves exit codes from failed jobs.
@@ -15,8 +23,12 @@ set -euo pipefail
 
 # Parse arguments
 AWF_VERSION=""
-COPILOT_VERSION=""
-CLAUDE_VERSION=""
+CLI_METHOD=""
+CLI_SCRIPT_URL=""
+CLI_NPM_PACKAGE=""
+CLI_DOWNLOAD_URL=""
+CLI_VERSION=""
+CLI_VERIFY_CMD=""
 DOCKER_IMAGES=()
 
 while [[ $# -gt 0 ]]; do
@@ -25,12 +37,27 @@ while [[ $# -gt 0 ]]; do
       AWF_VERSION="$2"
       shift 2
       ;;
-    --copilot)
-      COPILOT_VERSION="$2"
+    --cli-script)
+      CLI_METHOD="script"
+      CLI_SCRIPT_URL="$2"
       shift 2
       ;;
-    --claude)
-      CLAUDE_VERSION="$2"
+    --cli-npm)
+      CLI_METHOD="npm"
+      CLI_NPM_PACKAGE="$2"
+      shift 2
+      ;;
+    --cli-download)
+      CLI_METHOD="download"
+      CLI_DOWNLOAD_URL="$2"
+      shift 2
+      ;;
+    --cli-version)
+      CLI_VERSION="$2"
+      shift 2
+      ;;
+    --cli-verify)
+      CLI_VERIFY_CMD="$2"
       shift 2
       ;;
     --docker)
@@ -43,7 +70,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "ERROR: Unknown option: $1"
-      echo "Usage: $0 [--awf VERSION] [--copilot VERSION] [--claude VERSION] [--docker IMAGE1 IMAGE2 ...]"
+      echo "Usage: $0 [--awf VERSION] [--cli-script URL | --cli-npm PACKAGE | --cli-download URL] [--cli-version VERSION] [--cli-verify CMD] [--docker IMAGE1 IMAGE2 ...]"
       exit 1
       ;;
   esac
@@ -69,29 +96,78 @@ if [ -n "$AWF_VERSION" ]; then
   JOB_NAMES+=("AWF binary")
 fi
 
-# Start Copilot CLI installation in background if requested
-if [ -n "$COPILOT_VERSION" ]; then
-  echo "Starting Copilot CLI installation (version: $COPILOT_VERSION)..."
-  {
-    bash /opt/gh-aw/actions/install_copilot_cli.sh "$COPILOT_VERSION"
-    exit $?
-  } &
-  PIDS+=($!)
-  JOB_NAMES+=("Copilot CLI")
-fi
-
-# Start Claude Code CLI installation in background if requested
-if [ -n "$CLAUDE_VERSION" ]; then
-  echo "Starting Claude Code CLI installation (version: $CLAUDE_VERSION)..."
-  {
-    # Claude is installed via npm, so we use a temporary Node.js setup
-    # Note: Node.js should already be set up before this script is called
-    npm install -g "@anthropic-ai/claude-code@$CLAUDE_VERSION"
-    claude-code --version
-    exit $?
-  } &
-  PIDS+=($!)
-  JOB_NAMES+=("Claude Code CLI")
+# Start CLI installation in background if requested
+if [ -n "$CLI_METHOD" ]; then
+  case "$CLI_METHOD" in
+    script)
+      echo "Starting CLI installation via script (URL: $CLI_SCRIPT_URL)..."
+      {
+        # Download installer script
+        INSTALLER_TEMP="/tmp/cli-install-$$.sh"
+        curl -fsSL "$CLI_SCRIPT_URL" -o "$INSTALLER_TEMP"
+        
+        # Execute the installer with version if specified
+        if [ -n "$CLI_VERSION" ]; then
+          sudo VERSION="$CLI_VERSION" bash "$INSTALLER_TEMP"
+        else
+          sudo bash "$INSTALLER_TEMP"
+        fi
+        
+        # Cleanup
+        rm -f "$INSTALLER_TEMP"
+        
+        # Verify installation if command provided
+        if [ -n "$CLI_VERIFY_CMD" ]; then
+          eval "$CLI_VERIFY_CMD"
+        fi
+        
+        exit $?
+      } &
+      PIDS+=($!)
+      JOB_NAMES+=("CLI (script)")
+      ;;
+    npm)
+      echo "Starting CLI installation via npm (package: $CLI_NPM_PACKAGE)..."
+      {
+        # Install via npm
+        if [ -n "$CLI_VERSION" ]; then
+          npm install -g "${CLI_NPM_PACKAGE}@${CLI_VERSION}"
+        else
+          npm install -g "$CLI_NPM_PACKAGE"
+        fi
+        
+        # Verify installation if command provided
+        if [ -n "$CLI_VERIFY_CMD" ]; then
+          eval "$CLI_VERIFY_CMD"
+        fi
+        
+        exit $?
+      } &
+      PIDS+=($!)
+      JOB_NAMES+=("CLI (npm)")
+      ;;
+    download)
+      echo "Starting CLI installation via direct download (URL: $CLI_DOWNLOAD_URL)..."
+      {
+        # Download binary
+        CLI_TEMP="/tmp/cli-binary-$$"
+        curl -fsSL "$CLI_DOWNLOAD_URL" -o "$CLI_TEMP"
+        
+        # Make executable and install
+        chmod +x "$CLI_TEMP"
+        sudo mv "$CLI_TEMP" /usr/local/bin/
+        
+        # Verify installation if command provided
+        if [ -n "$CLI_VERIFY_CMD" ]; then
+          eval "$CLI_VERIFY_CMD"
+        fi
+        
+        exit $?
+      } &
+      PIDS+=($!)
+      JOB_NAMES+=("CLI (download)")
+      ;;
+  esac
 fi
 
 # Start Docker image downloads in background if requested

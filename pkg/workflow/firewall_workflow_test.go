@@ -62,8 +62,8 @@ func TestFirewallWorkflowNetworkConfiguration(t *testing.T) {
 		if config.AWFVersion == "" {
 			t.Error("Parallel installation should include AWF version")
 		}
-		if config.ClaudeVersion == "" {
-			t.Error("Parallel installation should include Claude version")
+		if config.CLIInfo == nil {
+			t.Error("Parallel installation should include CLI info")
 		}
 	})
 
