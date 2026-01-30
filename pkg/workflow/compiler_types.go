@@ -394,6 +394,7 @@ type WorkflowData struct {
 	AI                   string        // "claude" or "codex" (for backwards compatibility)
 	EngineConfig         *EngineConfig // Extended engine configuration
 	AgentFile            string        // Path to custom agent file (from imports)
+	AgentImportSpec      string        // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	StopTime             string
 	SkipIfMatch          *SkipIfMatchConfig   // skip-if-match configuration with query and max threshold
 	SkipIfNoMatch        *SkipIfNoMatchConfig // skip-if-no-match configuration with query and min threshold

@@ -35,6 +35,21 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
+	// Add merge remote agent .github folder step if agent is imported from remote repository
+	if data.AgentFile != "" && data.AgentImportSpec != "" {
+		compilerYamlLog.Printf("Adding merge remote agent .github folder step for agent: %s (spec: %s)", data.AgentFile, data.AgentImportSpec)
+		yaml.WriteString("      - name: Merge remote agent .github folder\n")
+		yaml.WriteString("        if: ${{ always() }}\n")
+		fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/github-script"))
+		yaml.WriteString("        env:\n")
+		fmt.Fprintf(yaml, "          GH_AW_AGENT_FILE: \"%s\"\n", data.AgentFile)
+		fmt.Fprintf(yaml, "          GH_AW_AGENT_IMPORT_SPEC: \"%s\"\n", data.AgentImportSpec)
+		yaml.WriteString("        with:\n")
+		yaml.WriteString("          script: |\n")
+		yaml.WriteString("            const script = require('./actions/setup/js/merge_remote_agent_github_folder.cjs');\n")
+		yaml.WriteString("            return script.main();\n")
+	}
+
 	// Add automatic runtime setup steps if needed
 	// This detects runtimes from custom steps and MCP configs
 	runtimeRequirements := DetectRuntimeRequirements(data)

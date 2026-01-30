@@ -32,6 +32,7 @@ type ImportsResult struct {
 	MergedCaches        []string // Merged cache configurations from all imports (appended in order)
 	ImportedFiles       []string // List of imported file paths (for manifest)
 	AgentFile           string   // Path to custom agent file (if imported)
+	AgentImportSpec     string   // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	// ImportInputs uses map[string]any because input values can be different types (string, number, boolean).
 	// This is parsed from YAML frontmatter where the structure is dynamic and not known at compile time.
 	// This is an appropriate use of 'any' for dynamic YAML/JSON data.
@@ -178,6 +179,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	labelsSet := make(map[string]bool)   // Set for deduplicating labels
 	var caches []string                  // Track cache configurations (appended in order)
 	var agentFile string                 // Track custom agent file
+	var agentImportSpec string           // Track agent import specification for remote imports
 	importInputs := make(map[string]any) // Aggregated input values from all imports
 
 	// Seed the queue with initial imports
@@ -260,6 +262,11 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 				agentFile = item.fullPath
 			}
 			log.Printf("Found agent file: %s (resolved to: %s)", item.fullPath, agentFile)
+			
+			// Store the original import specification for remote agents
+			// This allows runtime detection and .github folder merging
+			agentImportSpec = item.importPath
+			log.Printf("Agent import specification: %s", agentImportSpec)
 
 			// For agent files, only extract markdown content
 			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
@@ -512,6 +519,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedCaches:        caches,
 		ImportedFiles:       topologicalOrder,
 		AgentFile:           agentFile,
+		AgentImportSpec:     agentImportSpec,
 		ImportInputs:        importInputs,
 	}, nil
 }
