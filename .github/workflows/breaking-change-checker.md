@@ -21,6 +21,7 @@ tools:
   edit:
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[breaking-change] "
     labels: [breaking-change, automated-analysis, cookie]
     assignees: copilot

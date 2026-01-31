@@ -22,6 +22,7 @@ network:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[step-names] "
     labels: [maintenance, step-naming, cookie]
 

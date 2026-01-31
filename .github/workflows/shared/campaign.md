@@ -9,6 +9,7 @@ safe-outputs:
   create-project-status-update:
     max: 1
   create-issue:
+    expires: 2d
     max: 5
 ---
 # Campaign Orchestrator

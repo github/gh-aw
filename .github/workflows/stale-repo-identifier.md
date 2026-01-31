@@ -33,6 +33,7 @@ network:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[Stale Repository] "
     labels: [stale-repository, automated-analysis, cookie]
     max: 10

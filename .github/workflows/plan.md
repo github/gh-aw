@@ -16,6 +16,7 @@ tools:
     toolsets: [default, discussions]
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[plan] "
     labels: [plan, ai-generated, cookie]
     max: 5  # Maximum 5 sub-issues per group

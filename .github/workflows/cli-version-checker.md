@@ -22,6 +22,7 @@ tools:
   edit:
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[ca] "
     labels: [automation, dependencies, cookie]
 timeout-minutes: 45

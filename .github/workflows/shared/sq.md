@@ -73,6 +73,7 @@ permissions:
   contents: read
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[data-analysis] "
 ---
 

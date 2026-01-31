@@ -27,6 +27,7 @@ engine: copilot
 
 safe-outputs:
   create-issue:
+    expires: 2d
     max: 100  # 1 epic + vulnerability tasks
     labels: [security, campaign-tracker, cookie]
     group: true

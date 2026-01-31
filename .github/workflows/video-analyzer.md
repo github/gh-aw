@@ -23,6 +23,7 @@ tools:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[video-analysis] "
     labels: [automation, video-processing, cookie]
     max: 1

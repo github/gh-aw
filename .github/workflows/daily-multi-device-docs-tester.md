@@ -36,6 +36,7 @@ tools:
 safe-outputs:
   upload-asset:
   create-issue:
+    expires: 2d
     labels: [cookie]
 
 network:

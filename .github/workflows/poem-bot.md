@@ -58,6 +58,7 @@ safe-outputs:
   
   # Issue creation with custom prefix and labels
   create-issue:
+    expires: 2d
     title-prefix: "[🎭 POEM-BOT] "
     labels: [poetry, automation, ai-generated]
     max: 2

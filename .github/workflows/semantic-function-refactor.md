@@ -21,6 +21,7 @@ safe-outputs:
     target: "*"
     max: 10
   create-issue:
+    expires: 2d
     title-prefix: "[refactor] "
     labels: [refactoring, code-quality, automated-analysis, cookie]
     max: 1

@@ -20,6 +20,7 @@ imports:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[testify-expert] "
     labels: [testing, code-quality, automated-analysis, cookie]
     max: 1

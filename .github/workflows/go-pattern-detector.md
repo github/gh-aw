@@ -54,6 +54,7 @@ imports:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[ast-grep] "
     labels: [code-quality, ast-grep, cookie]
     max: 1

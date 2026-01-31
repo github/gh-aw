@@ -11,6 +11,7 @@ permissions:
   pull-requests: read
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[linter] "
     labels: [automation, code-quality, cookie]
 engine: copilot

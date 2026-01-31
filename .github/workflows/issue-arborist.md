@@ -54,6 +54,7 @@ steps:
       cat /tmp/gh-aw/issues-data/issues-schema.json | jq .
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[Parent] "
     max: 5
     group: true

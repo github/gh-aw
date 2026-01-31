@@ -21,6 +21,7 @@ tools:
     toolsets: [default, issues]
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[performance] "
     labels: [performance, automation, cookie]
     max: 3

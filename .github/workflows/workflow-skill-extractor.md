@@ -33,6 +33,7 @@ safe-outputs:
     max: 1
     close-older-discussions: true
   create-issue:
+    expires: 2d
     title-prefix: "[refactoring] "
     labels: [refactoring, shared-component, improvement, cookie]
     max: 3

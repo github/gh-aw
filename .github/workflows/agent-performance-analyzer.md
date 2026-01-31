@@ -20,6 +20,7 @@ imports:
   - shared/reporting.md
 safe-outputs:
   create-issue:
+    expires: 2d
     max: 5
     group: true
     labels: [cookie]

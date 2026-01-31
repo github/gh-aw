@@ -13,6 +13,7 @@ tools:
   serena: ["go"]
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[duplicate-code] "
     labels: [code-quality, automated-analysis, cookie]
     assignees: copilot

@@ -25,6 +25,7 @@ steps:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[safeoutputs] "
     labels: [bug, safe-outputs, tool-improvement, automated-analysis, cookie]
     max: 1

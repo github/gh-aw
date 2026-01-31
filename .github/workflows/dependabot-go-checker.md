@@ -23,6 +23,7 @@ safe-outputs:
     target: "*"
     max: 20
   create-issue:
+    expires: 2d
     title-prefix: "[deps]"
     labels: [dependencies, go, cookie]
     max: 10

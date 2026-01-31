@@ -28,6 +28,7 @@ engine:
 
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[CI Failure Doctor] "
     labels: [cookie]
   add-comment:

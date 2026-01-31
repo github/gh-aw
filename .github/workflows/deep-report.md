@@ -32,6 +32,7 @@ safe-outputs:
     max: 1
     close-older-discussions: true
   create-issue:
+    expires: 2d
     title-prefix: "[deep-report] "
     labels: [automation, improvement, quick-win, cookie]
     max: 3

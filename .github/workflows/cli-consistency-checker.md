@@ -19,6 +19,7 @@ tools:
     - "*"
 safe-outputs:
   create-issue:
+    expires: 2d
     title-prefix: "[cli-consistency] "
     labels: [automation, cli, documentation, cookie]
     max: 6  # 1 parent + 5 sub-issues

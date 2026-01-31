@@ -27,6 +27,7 @@ safe-outputs:
     max: 1
     close-older-discussions: true
   create-issue:
+    expires: 2d
     labels: [delight, cookie]
     max: 2
     group: true

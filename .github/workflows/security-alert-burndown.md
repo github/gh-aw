@@ -18,6 +18,7 @@ safe-outputs:
   update-project:
     max: 100
   create-issue:
+    expires: 2d
     max: 1
     title-prefix: "[campaign]"
     assignees: copilot
