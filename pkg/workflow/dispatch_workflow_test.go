@@ -93,9 +93,9 @@ This workflow dispatches to ci workflow.
 	assert.NoError(t, err, "Validation should succeed - ci workflow should be found in .github/workflows")
 }
 
-// TestDispatchWorkflowSameDirectoryPriority tests that workflows in the same directory
-// take priority over workflows in .github/workflows
-func TestDispatchWorkflowSameDirectoryPriority(t *testing.T) {
+// TestDispatchWorkflowOnlySearchesGithubWorkflows tests that workflows are only
+// searched in .github/workflows, not in the same directory as the current workflow
+func TestDispatchWorkflowOnlySearchesGithubWorkflows(t *testing.T) {
 	tmpDir := t.TempDir()
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
@@ -123,7 +123,7 @@ jobs:
 	err = os.WriteFile(workflowsTestFile, []byte(workflowsTestWorkflow), 0644)
 	require.NoError(t, err, "Failed to write workflows test workflow")
 
-	// Create a workflow with the same name in .github/aw
+	// Create a workflow with the same name in .github/aw (should be ignored)
 	awTestWorkflow := `name: Test (aw)
 on:
   workflow_dispatch:
@@ -162,14 +162,16 @@ This workflow dispatches to test workflow.
 	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
-	// Test that findWorkflowFile finds the one in aw directory first
+	// Test that findWorkflowFile finds the one in .github/workflows only (not .github/aw)
 	fileResult, err := findWorkflowFile("test", dispatcherFile)
 	require.NoError(t, err, "findWorkflowFile should succeed")
 	assert.True(t, fileResult.lockExists, "Lock file should exist")
 
-	// Verify it found the aw version (same directory)
-	assert.Contains(t, fileResult.lockPath, filepath.Join(".github", "aw", "test.lock.yml"),
-		"Should find workflow in same directory first")
+	// Verify it found the workflows version (not aw version)
+	assert.Contains(t, fileResult.lockPath, filepath.Join(".github", "workflows", "test.lock.yml"),
+		"Should find workflow in .github/workflows only")
+	assert.NotContains(t, fileResult.lockPath, filepath.Join(".github", "aw", "test.lock.yml"),
+		"Should NOT find workflow in same directory")
 }
 
 // TestDispatchWorkflowNotFound tests error handling when workflow is not found

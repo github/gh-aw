@@ -898,7 +898,7 @@ func generateDispatchWorkflowTool(workflowName string, workflowInputs map[string
 	toolName := stringutil.NormalizeSafeOutputIdentifier(workflowName)
 
 	// Build the description
-	description := fmt.Sprintf("Dispatch the '%s' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in the same repository.", workflowName)
+	description := fmt.Sprintf("Dispatch the '%s' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository.", workflowName)
 
 	// Build input schema properties
 	properties := make(map[string]any)
