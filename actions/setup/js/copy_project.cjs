@@ -133,14 +133,16 @@ async function getProjectId(scope, ownerLogin, projectNumber) {
 /**
  * Copy a project using the copyProjectV2 mutation
  * @param {object} output - Safe output entry
- * @param {string} defaultSourceProject - Default source project URL from config
- * @param {string} defaultTargetOwner - Default target owner from config
  * @returns {Promise<{ projectId: string, projectTitle: string, projectUrl: string }>}
  */
-async function copyProject(output, defaultSourceProject, defaultTargetOwner) {
+async function copyProject(output) {
+  // Use environment variables as defaults if fields are not provided
+  const defaultSourceProject = process.env.GH_AW_COPY_PROJECT_SOURCE;
+  const defaultTargetOwner = process.env.GH_AW_COPY_PROJECT_TARGET_OWNER;
+
   const { sourceProject, owner, title, includeDraftIssues } = output;
 
-  // Use provided values or fall back to defaults from config
+  // Use provided values or fall back to defaults
   const effectiveSourceProject = sourceProject || defaultSourceProject;
   const effectiveOwner = owner || defaultTargetOwner;
 
@@ -296,7 +298,7 @@ async function main(config = {}) {
 
     try {
       // Process the copy_project message
-      const projectResult = await copyProject(message, defaultSourceProject, defaultTargetOwner);
+      const projectResult = await copyProject(message);
 
       // Set step outputs
       core.setOutput("project_id", projectResult.projectId);
