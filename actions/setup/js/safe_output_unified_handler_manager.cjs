@@ -14,7 +14,6 @@
  * The @actions/github package is installed at runtime via setup.sh to enable Octokit instantiation.
  */
 
-const { getOctokit } = require("@actions/github");
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, normalizeTemporaryId, loadTemporaryIdMap } = require("./temporary_id.cjs");
@@ -22,38 +21,7 @@ const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
-
-const DEFAULT_AGENTIC_CAMPAIGN_LABEL = "agentic-campaign";
-
-/**
- * Normalize campaign IDs to the same label format used by campaign discovery.
- * Mirrors actions/setup/js/campaign_discovery.cjs.
- * @param {string} campaignId
- * @returns {string}
- */
-function formatCampaignLabel(campaignId) {
-  return `z_campaign_${String(campaignId)
-    .toLowerCase()
-    .replace(/[_\s]+/g, "-")}`;
-}
-
-/**
- * Get campaign labels implied by environment variables.
- * Returns the generic "agentic-campaign" label and the campaign-specific "z_campaign_<id>" label.
- * @returns {{enabled: boolean, labels: string[]}}
- */
-function getCampaignLabelsFromEnv() {
-  const campaignId = String(process.env.GH_AW_CAMPAIGN_ID || "").trim();
-
-  if (!campaignId) {
-    return { enabled: false, labels: [] };
-  }
-
-  // Only use the new z_campaign_ format, no legacy support
-  const labels = [DEFAULT_AGENTIC_CAMPAIGN_LABEL, formatCampaignLabel(campaignId)];
-
-  return { enabled: true, labels };
-}
+const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
 
 /**
  * Merge labels with trimming + case-insensitive de-duplication.
@@ -235,6 +203,9 @@ function setupProjectGitHubClient() {
   }
 
   core.info("Setting up separate Octokit client for project handlers with GH_AW_PROJECT_GITHUB_TOKEN");
+
+  // Lazy-load @actions/github only when needed (may not be installed for workflows without project safe outputs)
+  const { getOctokit } = require("@actions/github");
   const octokit = getOctokit(projectToken);
 
   return octokit;
