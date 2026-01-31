@@ -4,7 +4,7 @@ This document describes the output size guardrail implemented for the MCP server
 
 ## Problem
 
-When using the MCP server to fetch workflow logs, the output can become very large, especially when:
+When using the MCP server to fetch workflow logs, the output can exceed GitHub's API limits, especially when:
 - Fetching logs for many workflow runs
 - Runs contain extensive tool usage data
 - Multiple workflows are being analyzed

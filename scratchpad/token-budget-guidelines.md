@@ -59,7 +59,7 @@ Prevents workflows from running indefinitely due to unexpected loops or delays.
 ---
 timeout-minutes: 180  # 3 hours - research workflows
 timeout-minutes: 45   # 45 minutes - CI cleanup workflows
-timeout-minutes: 20   # 20 minutes - simple automation
+timeout-minutes: 20   # 20 minutes - single-step automation
 ---
 ```
 

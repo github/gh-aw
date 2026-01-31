@@ -138,7 +138,7 @@ java --version
 dotnet --version
 ```
 
-Or run a comprehensive check:
+Or run validation checks for all required tools:
 
 ```bash
 for tool in bash git jq yq curl gh node python3 go java dotnet; do

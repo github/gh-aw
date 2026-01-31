@@ -661,7 +661,7 @@ type ToolConfig interface {
 - Only one implementation exists and no others are planned
 - The data structure itself is the interface (use structs)
 - It adds indirection without benefit
-- A simple function would suffice
+- A single-purpose function returning one type would suffice
 
 ### Interface Best Practices
 

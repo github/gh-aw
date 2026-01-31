@@ -203,7 +203,7 @@ Interactive debugging session for issue #${{ inputs.issue_number }}
 
 **Lesson for gh-aw**: Provide "Quick Start" templates that abstract complexity:
 ```bash
-gh aw init simple-issue-responder
+gh aw init basic-issue-responder
 # Generates pre-configured workflow with sensible defaults
 ```
 
@@ -720,7 +720,7 @@ gh aw init daily-report --template mdflow
 #### 4. **Better Error Messages**
 - Learn from mdflow's simplicity
 - Show "did you mean?" suggestions
-- Explain validation failures clearly
+- Explain validation failures with specific error codes and context
 
 **Example**:
 ```
@@ -1113,14 +1113,14 @@ class LRUCache<K, V> {
 Local Execution (mdflow):
   Cold start:    50-100ms
   Warm start:    10-20ms
-  Total (simple): ~1 second
-  
+  Total (minimal config): ~1 second
+
 CI/CD Execution (gh-aw):
   Compilation:   1-2 seconds
   Queue time:    0-60 seconds
   Cold start:    10-30 seconds
   Execution:     30-300 seconds
-  Total (simple): ~1-5 minutes
+  Total (minimal config): ~1-5 minutes
 ```
 
 ---
@@ -1462,7 +1462,7 @@ func TestImportParsing(t *testing.T) {
         expected []string
     }{
         {
-            name:     "simple import",
+            name:     "single_file_import",
             input:    "imports: [file1.md]",
             expected: []string{"file1.md"},
         },

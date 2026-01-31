@@ -48,7 +48,7 @@ For user-facing documentation, see [docs/](../docs/).
 When adding new specifications:
 
 1. Document implementation details with file paths
-2. Mark status clearly: ✅ Implemented, 🚧 In Progress, or 📋 Planned
+2. Mark status with standard icons: ✅ Implemented, 🚧 In Progress, or 📋 Planned
 3. Provide code samples and usage patterns
 4. Link to test files
 5. Update this README's table

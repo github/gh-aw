@@ -2,7 +2,7 @@
 
 ## Overview
 
-**jsonschema-go** is Google's official Go library for working with JSON Schema, providing comprehensive support for schema creation, validation, and type inference. The library fully implements the JSON Schema Draft 2020-12 specification with no external dependencies beyond the Go standard library.
+**jsonschema-go** is Google's official Go library for working with JSON Schema, supporting schema creation, validation, and type inference per JSON Schema Draft 2020-12 specification. The library fully implements the JSON Schema Draft 2020-12 specification with no external dependencies beyond the Go standard library.
 
 **Key Characteristics:**
 - Zero external dependencies (only Go stdlib)
@@ -187,7 +187,7 @@ While not officially released, upstream development suggests:
 
 4. **Testing Coverage**
    - ✅ Comprehensive test coverage for schema generation
-   - ✅ Tests for simple, nested, and array types
+   - ✅ Tests for scalar types, nested objects, and array elements
    - 💡 Could add validation tests for schema correctness
 
 ### General Code Improvements
@@ -243,7 +243,7 @@ tool := &mcp.Tool{
    - Consider `*string` vs `string` based on nullability needs
 
 3. **Avoid Complex Types When Possible**
-   - Prefer simple Go types that map clearly to JSON Schema
+   - Use built-in Go types with direct JSON Schema mappings
    - Use structs for complex objects rather than maps
    - Document any custom type mappings
 

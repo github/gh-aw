@@ -5,7 +5,7 @@ applyTo: "**/*"
 
 # Developer Instructions
 
-This document consolidates development guidelines, architectural patterns, and implementation standards for GitHub Agentic Workflows. It provides comprehensive guidance for contributing to the codebase while maintaining consistency, security, and code quality.
+This document consolidates development guidelines, architectural patterns, and implementation standards for GitHub Agentic Workflows. It provides guidance for contributing to the codebase while maintaining consistency, security, and code quality.
 
 ## Table of Contents
 
@@ -725,4 +725,4 @@ For detailed specifications, see individual files in `scratchpad/`:
 
 ---
 
-**Last Updated**: 2026-01-30
+**Last Updated**: 2026-01-31

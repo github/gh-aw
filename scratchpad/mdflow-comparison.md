@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document provides a comprehensive comparison between mdflow's syntax and GitHub Agentic Workflows (gh-aw) syntax. Both projects enable AI-driven automation through markdown files, but they target different use cases and have different design philosophies.
+This document provides a detailed syntax comparison between mdflow and GitHub Agentic Workflows (gh-aw). Both projects enable AI-driven automation through markdown files, but they target different use cases and have different design philosophies.
 
 ### Key Differences at a Glance
 
