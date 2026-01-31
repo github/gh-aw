@@ -287,7 +287,7 @@ Discover available tools from the safeoutputs MCP server.
 
 **Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
 
-**Note**: If you have no other safe output actions to perform, call the "noop" tool to provide a status message indicating completion or that no actions are needed.
+**Note**: If you made no other safe output tool calls during this workflow execution, call the "noop" tool to provide a status message indicating completion or that no actions were needed.
 </instructions>
 </safe-outputs>`
 			sections = append(sections, PromptSection{
