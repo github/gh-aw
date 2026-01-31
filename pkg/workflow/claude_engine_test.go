@@ -122,8 +122,8 @@ func TestClaudeEngine(t *testing.T) {
 		t.Errorf("Expected --permission-mode bypassPermissions in CLI args: %s", stepContent)
 	}
 
-	if !strings.Contains(stepContent, "--output-format json") {
-		t.Errorf("Expected --output-format json in CLI args: %s", stepContent)
+	if !strings.Contains(stepContent, "--output-format stream-json") {
+		t.Errorf("Expected --output-format stream-json in CLI args: %s", stepContent)
 	}
 
 	if !strings.Contains(stepContent, "ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}") {

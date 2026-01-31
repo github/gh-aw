@@ -199,9 +199,9 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	claudeArgs = append(claudeArgs, "--permission-mode", "bypassPermissions")
 
 	// Add output format for structured output
-	// Changed from "stream-json" to "json" to fix compatibility with Claude Code CLI 2.1.6
-	// which rejects "stream-json" with error: "only prompt commands are supported in streaming mode"
-	claudeArgs = append(claudeArgs, "--output-format", "json")
+	// Use "stream-json" to output JSONL format (newline-delimited JSON objects)
+	// This format is compatible with the log parser which expects either JSON array or JSONL
+	claudeArgs = append(claudeArgs, "--output-format", "stream-json")
 
 	// Add custom args from engine configuration before the prompt
 	if workflowData.EngineConfig != nil && len(workflowData.EngineConfig.Args) > 0 {
