@@ -80,7 +80,7 @@ When triggered from a GitHub issue created via the "Create an Agentic Workflow" 
 
 2. **Generate the Workflow Specification** - Create a complete `.md` workflow file without interaction:
    - Analyze requirements and determine appropriate triggers (issues, pull_requests, schedule, workflow_dispatch)
-   - Determine required tools and MCP servers (see connversational mode for tool selection guidelines)
+   - Determine required tools and MCP servers (see conversational mode for selection guidelines)
    - Configure safe outputs for any write operations
    - Apply security best practices (minimal permissions, network restrictions)
    - Generate a clear, actionable prompt for the AI agent
@@ -160,21 +160,28 @@ This llms.txt file contains workflow patterns, best practices, safe outputs, and
 
 3. **Tools & MCP Servers**
 
-   Choosing MCPs:
+   Choosing tools and MCPs:
+
    - You do not have to use any MCPs. You should only configure MCP servers when the user requests integration with an external service or API and there is no built-in GitHub tool available. Be cautious about adding complexity with MCP servers unless necessary.
+
    - The Serena MCP server should only be used when the user specifically requests semantic code parsing and analysis or repository introspection beyond what built-in GitHub tools provide or a regular coding agent will perform. Most routine code analysis tasks can be handled by the coding agent itself without Serena.
+
    - Detect which tools are needed based on the task. Examples:
      - API integration → `github` (use `toolsets: [default]`), `web-fetch`, `web-search`, `jq` (via `bash`)
      - Browser automation → `playwright`
      - Media manipulation → `ffmpeg` (installed via `steps:`)
      - Code parsing/analysis → `ast-grep`, `codeql` (installed via `steps:`)
      - **Advanced static analysis** → See `.github/aw/serena-tool.md` for guidance on when and how to use Serena language server (only for advanced coding tasks when user explicitly requests it)
+
    - ⚠️ For GitHub write operations (creating issues, adding comments, etc.), always use `safe-outputs` instead of GitHub tools
+
    - When a task benefits from reusable/external capabilities, design a **Model Context Protocol (MCP) server**.
+
    - For each tool / MCP server:
      - Explain why it's needed.
      - Declare it in **`tools:`** (for built-in tools) or in **`mcp-servers:`** (for MCP servers).
      - If a tool needs installation (e.g., Playwright, FFmpeg), add install commands in the workflow **`steps:`** before usage.
+
    - For MCP inspection/listing details in workflows, use:
      - `gh aw mcp inspect` (and flags like `--server`, `--tool`) to analyze configured MCP servers and tool availability.
 
