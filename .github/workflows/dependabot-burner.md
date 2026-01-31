@@ -3,8 +3,8 @@ name: Dependabot Burner
 description: Burns down open Dependabot pull requests.
 
 on:
-  schedule: daily
-  skip-if-no-match: 'is:pr is:open author:app/dependabot'
+  #schedule: daily
+  #skip-if-no-match: 'is:pr is:open author:app/dependabot'
   workflow_dispatch:
 
 permissions:
