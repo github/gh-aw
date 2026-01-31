@@ -147,11 +147,9 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	// Check if any project-handler-manager-supported types are enabled
 	// These types require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately
 	hasProjectHandlerManagerTypes := data.SafeOutputs.CreateProjects != nil ||
-		data.SafeOutputs.CreateProjectStatusUpdates != nil ||
-		data.SafeOutputs.UpdateProjects != nil ||
 		data.SafeOutputs.CopyProjects != nil
 
-	// 1. Project Handler Manager step (processes create_project, update_project, copy_project, etc.)
+	// 1. Project Handler Manager step (processes create_project, copy_project, etc.)
 	// These types require GH_AW_PROJECT_GITHUB_TOKEN and must be processed separately from the main handler manager
 	// This runs FIRST to ensure projects exist before issues/PRs are created and potentially added to them
 	if hasProjectHandlerManagerTypes {
@@ -168,12 +166,6 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		// Note: Projects v2 cannot use GITHUB_TOKEN; it requires a PAT or GitHub App token
 		// The permissions here are for workflow-level permissions, actual API calls use GH_AW_PROJECT_GITHUB_TOKEN
 		if data.SafeOutputs.CreateProjects != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.UpdateProjects != nil {
 			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
 		}
 		if data.SafeOutputs.CopyProjects != nil {

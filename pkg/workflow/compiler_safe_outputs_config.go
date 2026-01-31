@@ -444,32 +444,6 @@ var projectHandlerRegistry = map[string]handlerBuilder{
 		}
 		return builder.Build()
 	},
-	"create_project_status_update": func(cfg *SafeOutputsConfig) map[string]any {
-		if cfg.CreateProjectStatusUpdates == nil {
-			return nil
-		}
-		c := cfg.CreateProjectStatusUpdates
-		return newHandlerConfigBuilder().
-			AddIfPositive("max", c.Max).
-			AddIfNotEmpty("github-token", c.GitHubToken).
-			Build()
-	},
-	"update_project": func(cfg *SafeOutputsConfig) map[string]any {
-		if cfg.UpdateProjects == nil {
-			return nil
-		}
-		c := cfg.UpdateProjects
-		builder := newHandlerConfigBuilder().
-			AddIfPositive("max", c.Max).
-			AddIfNotEmpty("github-token", c.GitHubToken)
-		if len(c.Views) > 0 {
-			builder.AddDefault("views", c.Views)
-		}
-		if len(c.FieldDefinitions) > 0 {
-			builder.AddDefault("field_definitions", c.FieldDefinitions)
-		}
-		return builder.Build()
-	},
 	"copy_project": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CopyProjects == nil {
 			return nil
@@ -523,7 +497,7 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 }
 
 // addProjectHandlerManagerConfigEnvVar adds the GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
-// containing JSON configuration for project-related safe output handlers (create_project, create_project_status_update).
+// containing JSON configuration for project-related safe output handlers (create_project, copy_project).
 // These handlers require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately from the main handler manager.
 func (c *Compiler) addProjectHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs == nil {

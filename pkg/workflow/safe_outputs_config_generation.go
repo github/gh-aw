@@ -285,18 +285,6 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 
 			safeOutputsConfig["missing_data"] = missingDataConfig
 		}
-		if data.SafeOutputs.UpdateProjects != nil {
-			safeOutputsConfig["update_project"] = generateMaxConfig(
-				data.SafeOutputs.UpdateProjects.Max,
-				10, // default max
-			)
-		}
-		if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-			safeOutputsConfig["create_project_status_update"] = generateMaxConfig(
-				data.SafeOutputs.CreateProjectStatusUpdates.Max,
-				10, // default max
-			)
-		}
 		if data.SafeOutputs.CopyProjects != nil {
 			safeOutputsConfig["copy_project"] = generateMaxConfig(
 				data.SafeOutputs.CopyProjects.Max,
@@ -649,12 +637,6 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	}
 	if data.SafeOutputs.HideComment != nil {
 		enabledTools["hide_comment"] = true
-	}
-	if data.SafeOutputs.UpdateProjects != nil {
-		enabledTools["update_project"] = true
-	}
-	if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-		enabledTools["create_project_status_update"] = true
 	}
 	if data.SafeOutputs.CopyProjects != nil {
 		enabledTools["copy_project"] = true

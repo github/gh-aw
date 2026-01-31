@@ -32,12 +32,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.CreateAgentSessions = agentSessionConfig
 			}
 
-			// Handle update-project (smart project board management)
-			updateProjectConfig := c.parseUpdateProjectConfig(outputMap)
-			if updateProjectConfig != nil {
-				config.UpdateProjects = updateProjectConfig
-			}
-
 			// Handle copy-project
 			copyProjectConfig := c.parseCopyProjectsConfig(outputMap)
 			if copyProjectConfig != nil {
@@ -48,12 +42,6 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			createProjectConfig := c.parseCreateProjectsConfig(outputMap)
 			if createProjectConfig != nil {
 				config.CreateProjects = createProjectConfig
-			}
-
-			// Handle create-project-status-update (project status updates)
-			createProjectStatusUpdateConfig := c.parseCreateProjectStatusUpdateConfig(outputMap)
-			if createProjectStatusUpdateConfig != nil {
-				config.CreateProjectStatusUpdates = createProjectStatusUpdateConfig
 			}
 
 			// Handle create-discussion
