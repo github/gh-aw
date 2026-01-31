@@ -62,7 +62,7 @@ jobs:
       - name: Check workflow file timestamps
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_WORKFLOW_FILE: "functional-programming-enhancer.lock.yml"
+          GH_AW_WORKFLOW_FILE: "functional-enhancer.lock.yml"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
@@ -618,7 +618,7 @@ jobs:
           
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/functional-programming-enhancer.md}}
+          {{#runtime-import workflows/functional-enhancer.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -1152,7 +1152,7 @@ jobs:
     env:
       GH_AW_ENGINE_ID: "claude"
       GH_AW_TRACKER_ID: "functional-enhancer"
-      GH_AW_WORKFLOW_ID: "functional-programming-enhancer"
+      GH_AW_WORKFLOW_ID: "functional-enhancer"
       GH_AW_WORKFLOW_NAME: "Functional Enhancer"
     outputs:
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
