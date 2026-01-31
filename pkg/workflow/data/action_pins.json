@@ -100,7 +100,7 @@
       "version": "v5.6.0",
       "sha": "a26af69be951a213d495a4c3e4e4022e16d87065"
     },
-    "actions/upload-artifact@v4.6.2": {
+    "actions/upload-artifact@v4": {
       "repo": "actions/upload-artifact",
       "version": "v4.6.2",
       "sha": "ea165f8d65b6e75b540449e92b4886f43607fa02"
