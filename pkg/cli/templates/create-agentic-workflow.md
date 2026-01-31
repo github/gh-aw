@@ -14,32 +14,17 @@ Your job is to help the user create secure and valid **agentic workflows** in th
 
 **Create workflows as a single markdown file at `.github/workflows/<workflow-id>.md`:**
 
-<<<<<<< Updated upstream
 The workflow file consists of two parts:
+
 1. **YAML frontmatter** (between `---` markers): Configuration that requires recompilation when changed
 2. **Markdown body** (after frontmatter): Agent instructions that can be edited WITHOUT recompilation
 
 ### Editing Without Recompilation
-=======
-### File 1: `.github/agentics/<workflow-id>.md` (MARKDOWN BODY - Agent Prompt)
-
-- **Purpose**: Contains ALL agent instructions, guidelines, and prompt content
-- **Editability**: Can be edited to change agent behavior WITHOUT recompiling
-- **Changes**: Take effect IMMEDIATELY on the next workflow run
-- **Content**: Complete agent prompt with instructions, guidelines, examples
-
-### File 2: `.github/workflows/<workflow-id>.md` (FRONTMATTER + IMPORT - Configuration)
-
-- **Purpose**: Contains YAML frontmatter with configuration + runtime-import reference
-- **Editability**: Requires recompilation with `gh aw compile <workflow-id>` after changes
-- **Changes**: Only for configuration (triggers, tools, permissions, etc.)
-- **Content**: YAML frontmatter only + `{{#runtime-import agentics/<workflow-id>.md}}`
->>>>>>> Stashed changes
 
 **Key Feature**: The markdown body is loaded at runtime, allowing you to edit agent instructions directly on GitHub.com or in any editor without recompiling. Changes take effect on the next workflow run.
 
-<<<<<<< Updated upstream
 **What you can edit without recompilation**:
+
 - Agent instructions, task descriptions, guidelines
 - Context explanations and background information
 - Output formatting templates
@@ -47,23 +32,11 @@ The workflow file consists of two parts:
 - Documentation and clarifications
 
 **What requires recompilation** (YAML frontmatter changes):
+
 - Triggers, permissions, tools, network rules
 - Safe outputs, safe inputs, runtimes
 - Engine selection, timeout settings
 - Any configuration between `---` markers
-=======
-**Benefits of the two-file approach**:
-
-1. **Rapid iteration**: Users can improve prompts without recompiling
-2. **Clear separation**: Configuration vs. behavior are clearly separated
-3. **Faster feedback**: Prompt changes take effect on next run (no compile wait)
-4. **Better organization**: Each file has a single, clear purpose
-
-**Remember**: 
-
-- Prompt/behavior changes → Edit `.github/agentics/<workflow-id>.md` (no recompile)
-- Configuration changes → Edit `.github/workflows/<workflow-id>.md` (recompile required)
->>>>>>> Stashed changes
 
 ## Two Modes of Operation
 
@@ -383,57 +356,11 @@ When you successfully complete your work:
 ```
 
 **Key points**:
-<<<<<<< Updated upstream
+
 - Complete YAML frontmatter with all configuration (between `---` markers)
 - Markdown body with all agent instructions (after frontmatter)
 - Users can edit the markdown body to change agent behavior without recompilation
 - Changes to frontmatter require recompilation with `gh aw compile <workflow-id>`
-=======
-
-- Create `.github/agentics/` directory if it doesn't exist
-- Include header comments explaining the file purpose
-- Put ALL agent instructions here - this is the complete prompt
-- Users can edit this file to change agent behavior without recompilation
-
-#### Step 3.3: Create the Workflow File (Frontmatter + Import)
-
-**File**: `.github/workflows/<workflow-id>.md`
-
-This file contains ONLY the YAML frontmatter and a runtime-import reference.
-
-**Structure**:
-
-```markdown
----
-description: <Brief description of what this workflow does>
-on:
-  issues:
-    types: [opened, edited]
-roles: read  # Allow any authenticated user to trigger (important for issue triage)
-permissions:
-  contents: read
-  issues: read
-tools:
-  github:
-    toolsets: [default]
-safe-outputs:
-  add-comment:
-    max: 1
-  missing-tool:
-    create-issue: true
----
-
-{{#runtime-import agentics/<workflow-id>.md}}
-```
-
-**Key points**:
-
-- Complete YAML frontmatter with all configuration
-- NO markdown content except the runtime-import macro
-- The runtime-import reference loads the prompt from the agentics file
-- Changes to frontmatter require recompilation
-- Changes to the imported agentics file do NOT require recompilation
->>>>>>> Stashed changes
 
 **Note**: This example omits `workflow_dispatch:` (auto-added by compiler), `timeout-minutes:` (has sensible default), and `engine:` (Copilot is default). The `roles: read` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage.
 
@@ -452,23 +379,12 @@ If compilation fails with syntax errors:
 
 ### Step 5: Create a Pull Request
 
-<<<<<<< Updated upstream
 Create a PR with both files:
+
 1. **`.github/workflows/<workflow-id>.md`** - Workflow file with frontmatter and markdown body
    - Edit frontmatter to change configuration (requires recompilation with `gh aw compile <workflow-id>`)
    - Edit markdown body to change agent behavior (no recompilation needed)
 2. **`.github/workflows/<workflow-id>.lock.yml`** - Compiled workflow
-=======
-Create a PR with all three files:
-
-1. **`.github/agentics/<workflow-id>.md`** - Agent prompt (MARKDOWN BODY)
-   - Can be edited to change agent behavior without recompilation
-   - Changes take effect on next workflow run
-2. **`.github/workflows/<workflow-id>.md`** - Workflow configuration (FRONTMATTER + IMPORT)
-   - Contains YAML frontmatter and runtime-import reference
-   - Requires recompilation when frontmatter changes
-3. **`.github/workflows/<workflow-id>.lock.yml`** - Compiled workflow
->>>>>>> Stashed changes
    - Generated by `gh aw compile <workflow-id>`
    - Auto-updated when workflow file changes
 
