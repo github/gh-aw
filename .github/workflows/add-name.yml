@@ -1,0 +1,13 @@
+name: Add Name
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name to add'
+        required: true
+        type: string
+jobs:
+  add-name:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Adding name ${{ inputs.name }}"

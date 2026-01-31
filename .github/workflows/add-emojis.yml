@@ -1,0 +1,13 @@
+name: Add Emojis
+on:
+  workflow_dispatch:
+    inputs:
+      emojis:
+        description: 'Emojis to add'
+        required: false
+        type: string
+jobs:
+  add-emojis:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Adding emojis ${{ inputs.emojis }}"
