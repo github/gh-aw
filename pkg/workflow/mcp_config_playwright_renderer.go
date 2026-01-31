@@ -1,3 +1,61 @@
+// Package workflow provides Playwright MCP server configuration and Docker setup.
+//
+// Playwright MCP Server
+//
+// This file handles the configuration and rendering of the Playwright MCP server,
+// which provides AI agents with browser automation capabilities through the
+// Model Context Protocol (MCP). Playwright enables agents to interact with
+// web pages, take screenshots, extract content, and perform accessibility testing.
+//
+// Key responsibilities:
+//   - Generating Playwright MCP server configuration
+//   - Managing Docker container setup for Playwright
+//   - Handling allowed domains for browser navigation
+//   - Processing custom Playwright arguments
+//   - Extracting and managing domain secrets from expressions
+//   - Rendering configuration for different AI engines
+//
+// Container configuration:
+// Playwright runs in a Docker container using the official Microsoft Playwright
+// MCP image (mcr.microsoft.com/playwright/mcp). The container is configured with:
+//   - --init flag for proper signal handling
+//   - --network host for network access
+//   - Volume mounts for log storage
+//   - Output directory for screenshots and artifacts
+//
+// Domain restrictions:
+// For security, Playwright is restricted to specific allowed domains configured
+// in the workflow frontmatter. These domains are passed via:
+//   - --allowed-hosts: Domains the browser can navigate to
+//   - --allowed-origins: Domains that can be used as origins
+//
+// Expression handling:
+// When allowed_domains contains GitHub Actions expressions like ${{ secrets.DOMAIN }},
+// these are extracted and made available as environment variables. The actual
+// secret values are resolved at runtime and passed to the Playwright container.
+//
+// Engine compatibility:
+// The renderer supports multiple AI engines with engine-specific formatting:
+//   - Copilot: Includes "type" field, inline args
+//   - Claude/Custom: Multi-line args, simplified format
+//   - All engines: Same core configuration structure
+//
+// Related files:
+//   - mcp_playwright_config.go: Playwright configuration types and parsing
+//   - mcp_renderer.go: Main MCP renderer that calls this function
+//   - mcp_setup_generator.go: Includes Playwright in setup sequence
+//
+// Example configuration:
+//   tools:
+//     playwright:
+//       version: v1.41.0
+//       allowed_domains:
+//         - github.com
+//         - api.github.com
+//         - ${{ secrets.CUSTOM_DOMAIN }}
+//       custom_args:
+//         - --debug
+//         - --timeout=30000
 package workflow
 
 import (

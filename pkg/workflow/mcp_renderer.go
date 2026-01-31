@@ -1,3 +1,77 @@
+// Package workflow provides YAML rendering for MCP server configurations.
+//
+// MCP Configuration Renderer
+//
+// This file implements the unified MCP configuration renderer that generates
+// YAML configuration for various MCP servers across different AI engines
+// (Copilot, Claude, Codex, Custom). It provides a consistent interface for
+// rendering MCP configurations while handling engine-specific format requirements.
+//
+// Key responsibilities:
+//   - Unified rendering interface for all MCP server types
+//   - Engine-specific format handling (JSON-like vs TOML-like)
+//   - GitHub MCP server configuration (local Docker and remote hosted)
+//   - Playwright MCP server configuration
+//   - Safe-outputs and safe-inputs MCP server configuration
+//   - Agentic-workflows MCP server configuration
+//   - Cache-memory MCP server configuration
+//   - Serena MCP server configuration
+//   - Custom HTTP and stdio MCP server configuration
+//
+// Renderer architecture:
+// The renderer uses the MCPConfigRendererUnified struct with MCPRendererOptions
+// to configure engine-specific behaviors:
+//   - IncludeCopilotFields: Add "type" and "tools" fields for Copilot
+//   - InlineArgs: Render args inline (Copilot) vs multi-line (Claude/Custom)
+//   - Format: "json" for JSON-like or "toml" for TOML-like output
+//   - IsLast: Control trailing commas in rendered configuration
+//
+// Supported MCP server types:
+//   - GitHub: Local (Docker) or remote (hosted) GitHub API access
+//   - Playwright: Browser automation with domain restrictions
+//   - Safe-outputs: Controlled output storage for AI agents
+//   - Safe-inputs: Custom tool execution with secret passthrough
+//   - Cache-memory: Memory/knowledge base management
+//   - Agentic-workflows: Workflow execution via gh-aw extension
+//   - Serena: Local search functionality
+//   - Custom HTTP: User-defined HTTP-based MCP servers
+//   - Custom stdio: User-defined stdio-based MCP servers
+//
+// Engine-specific rendering:
+//   - Copilot: JSON format with "type" and "tools" fields, inline args
+//   - Claude: JSON format without Copilot fields, multi-line args
+//   - Codex: TOML format for MCP configuration
+//   - Custom: Same as Claude (JSON, multi-line args)
+//
+// Configuration structure:
+// All MCP servers follow the MCP Gateway Specification v1.0.0:
+//   - HTTP servers: type, url, headers
+//   - Stdio servers: type, container, entrypoint, entrypointArgs, mounts, env
+//
+// Variable resolution:
+// The renderer handles two types of variable syntax:
+//   - Shell variables: $VAR or ${VAR} - resolved by shell before gateway
+//   - Gateway variables: ${VAR} in JSON - resolved by gateway at runtime
+//
+// Copilot-specific features:
+// Copilot uses backslash-escaped variables (\${VAR}) for proper MCP passthrough
+// and includes additional fields required by the Copilot MCP specification.
+//
+// Related files:
+//   - mcp_github_config.go: GitHub MCP server configuration
+//   - mcp_config_playwright_renderer.go: Playwright-specific rendering
+//   - mcp_config_builtin.go: Built-in MCP server rendering
+//   - mcp_config_custom.go: Custom MCP server rendering
+//   - mcp_setup_generator.go: Calls renderer for configuration generation
+//
+// Example usage:
+//   renderer := NewMCPConfigRenderer(MCPRendererOptions{
+//       IncludeCopilotFields: true,
+//       InlineArgs: true,
+//       Format: "json",
+//       IsLast: false,
+//   })
+//   renderer.RenderGitHubMCP(yaml, githubTool, workflowData)
 package workflow
 
 import (

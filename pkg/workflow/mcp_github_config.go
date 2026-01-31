@@ -1,3 +1,66 @@
+// Package workflow provides GitHub MCP server configuration and toolset management.
+//
+// GitHub MCP Server Configuration
+//
+// This file manages the configuration of the GitHub MCP server, which provides
+// AI agents with access to GitHub's API through the Model Context Protocol (MCP).
+// It handles both local (Docker-based) and remote (hosted) deployment modes.
+//
+// Key responsibilities:
+//   - Extracting GitHub tool configuration from workflow frontmatter
+//   - Managing GitHub MCP server modes (local Docker vs remote hosted)
+//   - Handling GitHub authentication tokens (custom, default, GitHub App)
+//   - Managing read-only and lockdown security modes
+//   - Expanding and managing GitHub toolsets (repos, issues, pull_requests, etc.)
+//   - Handling allowed tool lists for fine-grained access control
+//   - Determining Docker image versions for local mode
+//   - Generating automatic lockdown detection steps
+//   - Managing GitHub App token minting and invalidation
+//
+// GitHub MCP modes:
+//   - Local (default): Runs GitHub MCP server in Docker container
+//   - Remote: Uses hosted GitHub MCP service
+//
+// Security features:
+//   - Read-only mode: Prevents write operations (default: true)
+//   - Lockdown mode: Restricts access to current repository only
+//   - Automatic lockdown: Enables lockdown for private repositories
+//   - Allowed tools: Restricts available GitHub API operations
+//
+// GitHub toolsets:
+//   - default/action-friendly: Standard toolsets safe for GitHub Actions
+//   - repos, issues, pull_requests, discussions, search, code_scanning
+//   - secret_scanning, labels, releases, milestones, projects, gists
+//   - teams, actions, packages (requires specific permissions)
+//   - users (excluded from action-friendly due to token limitations)
+//
+// Token precedence:
+//  1. GitHub App token (minted from app configuration)
+//  2. Custom github-token from tool configuration
+//  3. Top-level github-token from frontmatter
+//  4. Default GITHUB_TOKEN secret
+//
+// Automatic lockdown detection:
+// When lockdown is not explicitly set, a step is generated to automatically
+// enable lockdown for private repositories while keeping it disabled for
+// public repositories. This provides security by default without hindering
+// open source workflows.
+//
+// Related files:
+//   - mcp_renderer.go: Renders GitHub MCP configuration to YAML
+//   - mcp_environment.go: Manages GitHub MCP environment variables
+//   - mcp_setup_generator.go: Generates GitHub MCP setup steps
+//   - safe_outputs_app.go: GitHub App token minting helpers
+//
+// Example configuration:
+//   tools:
+//     github:
+//       mode: remote                    # or "local" for Docker
+//       github-token: ${{ secrets.PAT }}
+//       read-only: true
+//       lockdown: true                  # or omit for automatic detection
+//       toolsets: [repos, issues, pull_requests]
+//       allowed: [get_repo, list_issues, get_pull_request]
 package workflow
 
 import (

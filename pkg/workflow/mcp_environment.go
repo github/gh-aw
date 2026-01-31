@@ -1,3 +1,47 @@
+// Package workflow provides environment variable management for MCP server execution.
+//
+// MCP Environment Variables
+//
+// This file is responsible for collecting and managing all environment variables
+// required by MCP servers during workflow execution. Environment variables are
+// used to pass configuration, authentication tokens, and runtime settings to
+// MCP servers running in the gateway.
+//
+// Key responsibilities:
+//   - Collecting MCP-related environment variables from workflow configuration
+//   - Managing GitHub MCP server tokens (custom, default, and GitHub App tokens)
+//   - Handling safe-outputs and safe-inputs environment variables
+//   - Processing Playwright domain secrets
+//   - Extracting secrets from HTTP MCP server headers
+//   - Managing agentic-workflows GITHUB_TOKEN
+//
+// Environment variable categories:
+//   - GitHub MCP: GITHUB_MCP_SERVER_TOKEN, GITHUB_MCP_LOCKDOWN
+//   - Safe Outputs: GH_AW_SAFE_OUTPUTS_*, GH_AW_ASSETS_*
+//   - Safe Inputs: GH_AW_SAFE_INPUTS_PORT, GH_AW_SAFE_INPUTS_API_KEY
+//   - Serena: GH_AW_SERENA_PORT (local mode only)
+//   - Playwright: Domain secrets from allowed_domains expressions
+//   - HTTP MCP: Custom secrets from headers and env sections
+//
+// Token precedence for GitHub MCP:
+//  1. GitHub App token (if app configuration exists)
+//  2. Custom github-token from tool configuration
+//  3. Top-level github-token from frontmatter
+//  4. Default GITHUB_TOKEN secret
+//
+// The environment variables collected here are passed to both the
+// "Start MCP gateway" step and the "MCP Gateway" step to ensure
+// MCP servers have access to necessary configuration and secrets.
+//
+// Related files:
+//   - mcp_setup_generator.go: Uses collected env vars in gateway setup
+//   - mcp_github_config.go: GitHub-specific token and configuration
+//   - safe_outputs.go: Safe outputs configuration
+//   - safe_inputs.go: Safe inputs configuration
+//
+// Example usage:
+//   envVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
+//   // Returns map[string]string with all required environment variables
 package workflow
 
 import (
