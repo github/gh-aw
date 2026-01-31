@@ -28,6 +28,7 @@ Today's agents analyze higher-level concerns and long-term health:
 
 - **[Go Fan](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer that analyzes direct dependencies  
 - **[Typist](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/typist.md?plain=1)** - Analyzes Go type usage patterns to improve type safety  
+- **[Functional Programming Enhancer](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md?plain=1)** - Applies moderate functional programming techniques for clarity and safety  
 - **[Repository Quality Improver](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/repository-quality-improver.md?plain=1)** - Takes a holistic view of code quality and suggests improvements  
 
 ### Go Fan: The Dependency Enthusiast 🐹
@@ -62,6 +63,24 @@ Typist creates discussions rather than issues because type safety improvements o
 
 Today's hybrid languages like Go, C# and F# support both strong and dynamic typing. Seeing strong typing as arising from continuous improvement area is a particularly novel insight: rather than enforcing strict typing upfront, we can develop quickly with flexibility, then let autonomous agents like Typist trail behind, strengthening type safety over time.
 
+### Functional Programming Enhancer: The Pragmatic Purist 🔄
+
+The **Functional Programming Enhancer** systematically identifies opportunities to apply moderate, tasteful functional programming techniques to improve code clarity, safety, and maintainability. Unlike dogmatic functional approaches, this workflow balances pragmatism with functional purity.
+
+The workflow focuses on seven key patterns: immutability (making data immutable where there's no existing mutation), functional initialization (using composite literals and declarative patterns), transformative operations (leveraging map/filter/reduce approaches), functional options pattern (using option functions for flexible configuration), avoiding shared mutable state (eliminating global variables), pure functions (extracting calculations from side effects), and reusable logic wrappers (creating higher-order functions for retry, logging, caching).
+
+The enhancement process follows a structured approach. During discovery, it searches for variables that could be immutable, imperative loops that could be transformative, initialization anti-patterns, constructors that could use functional options, shared mutable state (global variables and mutexes), functions with side effects that could be pure, and repeated logic patterns that could use wrappers.
+
+For each opportunity, it scores by safety improvement (reduces mutation risk), clarity improvement (makes code more readable), testability improvement (makes code easier to test), and risk level (lower risk gets higher priority). Using Serena for deep analysis, it understands full context, identifies dependencies and side effects, verifies no hidden mutations, and designs specific improvements.
+
+Implementation examples include converting mutable initialization to immutable patterns (using composite literals instead of incremental building), transforming constructors to use functional options (allowing extensible APIs without breaking changes), eliminating global state through explicit parameter passing, extracting pure functions from impure code (separating calculations from I/O), and creating reusable wrappers like `Retry[T]` with exponential backoff, `WithTiming[T]` for performance logging, and `Memoize[K,V]` for caching expensive computations.
+
+The workflow applies principles of immutability first (variables are immutable unless mutation is necessary), declarative over imperative (initialization expresses "what" not "how"), transformative over iterative (data transformations use functional patterns), explicit parameters (pass dependencies rather than using globals), pure over impure (separate calculations from side effects), and composition over complexity (build behavior from simple wrappers).
+
+What makes this workflow particularly effective is its pragmatism. It doesn't force functional purity at the cost of clarity. Go's simple, imperative style is respected - sometimes a for-loop is clearer than a functional helper. The workflow only adds abstraction where it genuinely improves code, focusing on low-risk changes like converting `var x T; x = value` to `x := value`, using composite literals, and extracting pure helper functions.
+
+The result is code that's safer (reduced mutation surface area), more testable (pure functions need no mocks), more maintainable (functional patterns are easier to reason about), and more extensible (functional options allow API evolution). The workflow runs on a schedule (Tuesday and Thursday mornings), systematically improving functional patterns across the entire codebase over time.
+
 ### Repository Quality Improver: The Holistic Analyst
 
 The **Repository Quality Improver** takes the widest view of any workflow we've discussed. Rather than focusing on a specific aspect (simplicity, refactoring, styling, types), it selects a *focus area* each day and analyzes the repository from that perspective.
@@ -78,9 +97,9 @@ The Repository Quality Improver looks for these cross-cutting concerns that don'
 
 ## The Power of Holistic Improvement
 
-Together, these workflows complete the autonomous improvement picture. Go Fan ensures our dependencies stay fresh and well-used, Typist systematically strengthens type safety, and Repository Quality Improver maintains overall coherence.
+Together, these workflows complete the autonomous improvement picture. Go Fan ensures our dependencies stay fresh and well-used, Typist systematically strengthens type safety, Functional Programming Enhancer applies moderate functional techniques for clarity and safety, and Repository Quality Improver maintains overall coherence.
 
-Combined with our earlier workflows covering simplicity, refactoring, and style, we now have agents that continuously improve code at every level: the Terminal Stylist ensures beautiful output at the line level, Code Simplifier removes complexity at the function level, Semantic Function Refactor improves organization at the file level, Go Pattern Detector enforces consistency at the pattern level, Typist strengthens type safety at the type level, Go Fan optimizes dependencies at the module level, and Repository Quality Improver maintains coherence at the repository level.
+Combined with our earlier workflows covering simplicity, refactoring, and style, we now have agents that continuously improve code at every level: the Terminal Stylist ensures beautiful output at the line level, Code Simplifier removes complexity at the function level, Semantic Function Refactor improves organization at the file level, Go Pattern Detector enforces consistency at the pattern level, Functional Programming Enhancer applies functional patterns for clarity and safety, Typist strengthens type safety at the type level, Go Fan optimizes dependencies at the module level, and Repository Quality Improver maintains coherence at the repository level.
 
 This is the future of code quality: not periodic cleanup sprints, but continuous autonomous improvement across every dimension simultaneously.
 
@@ -98,6 +117,12 @@ gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/go-
 
 ```bash
 gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/typist.md
+```
+
+**Functional Programming Enhancer:**
+
+```bash
+gh aw add https://github.com/githubnext/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md
 ```
 
 **Repository Quality Improver:**
