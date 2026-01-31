@@ -9,6 +9,7 @@ import (
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 	"github.com/githubnext/gh-aw/pkg/types"
 )
 
@@ -316,10 +317,8 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 		case "env":
 			if renderer.Format == "toml" {
 				fmt.Fprintf(yaml, "%senv = { ", renderer.IndentLevel)
-				envKeys := make([]string, 0, len(mcpConfig.Env))
-				for key := range mcpConfig.Env {
-					envKeys = append(envKeys, key)
-				}
+				// Using functional helper to extract map keys
+				envKeys := sliceutil.MapToSlice(mcpConfig.Env)
 				sort.Strings(envKeys)
 				for i, envKey := range envKeys {
 					if i > 0 {
@@ -390,10 +389,8 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 			// TOML format for HTTP headers (Codex style)
 			if len(mcpConfig.Headers) > 0 {
 				fmt.Fprintf(yaml, "%shttp_headers = { ", renderer.IndentLevel)
-				headerKeys := make([]string, 0, len(mcpConfig.Headers))
-				for key := range mcpConfig.Headers {
-					headerKeys = append(headerKeys, key)
-				}
+				// Using functional helper to extract map keys
+				headerKeys := sliceutil.MapToSlice(mcpConfig.Headers)
 				sort.Strings(headerKeys)
 				for i, headerKey := range headerKeys {
 					if i > 0 {
@@ -409,10 +406,8 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 				comma = ""
 			}
 			fmt.Fprintf(yaml, "%s\"headers\": {\n", renderer.IndentLevel)
-			headerKeys := make([]string, 0, len(mcpConfig.Headers))
-			for key := range mcpConfig.Headers {
-				headerKeys = append(headerKeys, key)
-			}
+			// Using functional helper to extract map keys
+			headerKeys := sliceutil.MapToSlice(mcpConfig.Headers)
 			sort.Strings(headerKeys)
 			for headerIndex, headerKey := range headerKeys {
 				headerComma := ","
