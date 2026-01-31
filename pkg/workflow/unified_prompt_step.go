@@ -286,6 +286,8 @@ To create or modify GitHub resources (issues, discussions, pull requests, etc.),
 Discover available tools from the safeoutputs MCP server.
 
 **Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
+
+**Note**: If you have no other safe output actions to perform, call the "noop" tool to provide a status message indicating completion or that no actions are needed.
 </instructions>
 </safe-outputs>`
 			sections = append(sections, PromptSection{
