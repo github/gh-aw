@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 36841d7adc44ab7c99505b33f4d1113ef59368bb97402809d58f67dfb21cee0a
+# frontmatter-hash: 955a84fff7ccabae05d43d2d19f374f23fbab1f92936115dd01210d0b25616e8
 
 name: "Functional Pragmatist"
 "on":
@@ -896,7 +896,7 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_NOOP_MAX: 1
           GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
-          GH_AW_TRACKER_ID: "functional-enhancer"
+          GH_AW_TRACKER_ID: "functional-pragmatist"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -910,7 +910,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
-          GH_AW_TRACKER_ID: "functional-enhancer"
+          GH_AW_TRACKER_ID: "functional-pragmatist"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -924,7 +924,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
-          GH_AW_TRACKER_ID: "functional-enhancer"
+          GH_AW_TRACKER_ID: "functional-pragmatist"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
@@ -941,7 +941,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
-          GH_AW_TRACKER_ID: "functional-enhancer"
+          GH_AW_TRACKER_ID: "functional-pragmatist"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -959,7 +959,7 @@ jobs:
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
-          GH_AW_TRACKER_ID: "functional-enhancer"
+          GH_AW_TRACKER_ID: "functional-pragmatist"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.result }}
         with:
@@ -1091,7 +1091,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_AW_ENGINE_ID: "copilot"
-      GH_AW_TRACKER_ID: "functional-enhancer"
+      GH_AW_TRACKER_ID: "functional-pragmatist"
       GH_AW_WORKFLOW_ID: "functional-pragmatist"
       GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
     outputs:

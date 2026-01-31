@@ -11,7 +11,7 @@ permissions:
   issues: read
   pull-requests: read
 
-tracker-id: functional-enhancer
+tracker-id: functional-pragmatist
 
 network:
   allowed:
