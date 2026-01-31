@@ -149,17 +149,15 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 		}
 	}
 
-	// Determine the lock file name based on the workflow source
-	var lockFileName string
-	var lockFilePath string
-
 	// Normalize workflow ID to handle both \"workflow-name\" and \".github/workflows/workflow-name.md\" formats
 	normalizedID := normalizeWorkflowID(workflowIdOrName)
 
-	if repoOverride != "" {
-		// For remote repositories, construct lock file name from normalized ID
-		lockFileName = normalizedID + ".lock.yml"
-	} else {
+	// Construct lock file name from normalized ID (same for both local and remote)
+	lockFileName := normalizedID + ".lock.yml"
+
+	// For local workflows, validate the workflow exists and check for lock file
+	var lockFilePath string
+	if repoOverride == "" {
 		// For local workflows, validate the workflow exists locally
 		workflowsDir := getWorkflowsDir()
 
@@ -167,9 +165,6 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 		if err != nil {
 			return fmt.Errorf("failed to find workflow in local .github/workflows: %w", err)
 		}
-
-		// For local workflows, construct lock file name from normalized ID
-		lockFileName = normalizedID + ".lock.yml"
 
 		// Check if the lock file exists in .github/workflows
 		lockFilePath = filepath.Join(".github/workflows", lockFileName)

@@ -12,6 +12,7 @@ import (
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 	"github.com/goccy/go-yaml"
 )
 
@@ -92,15 +93,12 @@ func jobDependsOnAgent(jobConfig map[string]any) bool {
 // getCustomJobsDependingOnPreActivation returns custom job names that explicitly depend on pre_activation.
 // These jobs run after pre_activation but before activation, and activation should depend on them.
 func (c *Compiler) getCustomJobsDependingOnPreActivation(customJobs map[string]any) []string {
-	var jobNames []string
-	for jobName, jobConfig := range customJobs {
+	return sliceutil.FilterMapKeys(customJobs, func(jobName string, jobConfig any) bool {
 		if configMap, ok := jobConfig.(map[string]any); ok {
-			if jobDependsOnPreActivation(configMap) {
-				jobNames = append(jobNames, jobName)
-			}
+			return jobDependsOnPreActivation(configMap)
 		}
-	}
-	return jobNames
+		return false
+	})
 }
 
 // getReferencedCustomJobs returns custom job names that are referenced in the given content.
@@ -109,17 +107,13 @@ func (c *Compiler) getReferencedCustomJobs(content string, customJobs map[string
 	if content == "" || customJobs == nil {
 		return nil
 	}
-	var referencedJobs []string
-	for jobName := range customJobs {
-		// Check for patterns like "needs.job_name." which covers:
-		// - needs.job_name.outputs.X
-		// - ${{ needs.job_name.outputs.X }}
-		// - needs.job_name.result
-		if strings.Contains(content, fmt.Sprintf("needs.%s.", jobName)) {
-			referencedJobs = append(referencedJobs, jobName)
-		}
-	}
-	return referencedJobs
+	// Check for patterns like "needs.job_name." which covers:
+	// - needs.job_name.outputs.X
+	// - ${{ needs.job_name.outputs.X }}
+	// - needs.job_name.result
+	return sliceutil.FilterMapKeys(customJobs, func(jobName string, _ any) bool {
+		return strings.Contains(content, fmt.Sprintf("needs.%s.", jobName))
+	})
 }
 
 // buildJobs creates all jobs for the workflow and adds them to the job manager
