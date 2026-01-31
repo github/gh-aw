@@ -1035,8 +1035,6 @@ async function main() {
     const temporaryIdMapJson = JSON.stringify(processingResult.temporaryIdMap);
     core.setOutput("temporary_id_map", temporaryIdMapJson);
     core.info(`Exported unified temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
-    core.setOutput("temporary_project_map", temporaryProjectMapJson);
-    core.info(`Exported temporary project map with ${Object.keys(processingResult.temporaryProjectMap || {}).length} mapping(s)`);
 
     // Export processed count for consistency with project handler
     core.setOutput("processed_count", successCount);

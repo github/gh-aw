@@ -267,12 +267,13 @@ function formatDate(date) {
  * Returns a message handler function that processes individual create_project_status_update messages
  * @param {Object} config - Handler configuration
  * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
- * @type {HandlerFactoryFunction}
+ * @returns {Promise<Function>} Message handler function
  */
 async function main(config = {}, githubClient = null) {
   const maxCount = config.max || 10;
 
   // Use the provided github client, or fall back to the global github object
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
 
   if (!github) {

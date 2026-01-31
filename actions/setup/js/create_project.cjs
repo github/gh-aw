@@ -296,6 +296,7 @@ async function main(config = {}, githubClient = null) {
 
   // Use the provided github client, or fall back to the global github object
   // The global github object is available when running via github-script action
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
 
   if (!github) {

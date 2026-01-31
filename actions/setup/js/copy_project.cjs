@@ -269,6 +269,7 @@ async function main(config = {}, githubClient = null) {
   const defaultTargetOwner = config.target_owner || "";
 
   // Use the provided github client, or fall back to the global github object
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
 
   if (!github) {
