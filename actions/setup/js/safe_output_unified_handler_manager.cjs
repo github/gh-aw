@@ -348,12 +348,16 @@ function collectMissingMessages(messages) {
 
 /**
  * Process all messages from agent output in the order they appear
- * Dispatches each message to the appropriate handler while maintaining shared state (temporary ID map and temporary project map)
+ * Dispatches each message to the appropriate handler while maintaining shared state (unified temporary ID map)
  * Tracks outputs created with unresolved temporary IDs and generates synthetic updates after resolution
+ *
+ * The unified temporary ID map stores both issue/PR references and project URLs:
+ * - Issue/PR: temporary_id -> {repo: string, number: number}
+ * - Project: temporary_id -> {projectUrl: string}
  *
  * @param {Map<string, Function>} messageHandlers - Map of message handler functions
  * @param {Array<Object>} messages - Array of safe output messages
- * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, temporaryProjectMap: Object, outputsWithUnresolvedIds: Array<any>, missings: Object}>}
+ * @returns {Promise<{success: boolean, results: Array<any>, temporaryIdMap: Object, outputsWithUnresolvedIds: Array<any>, missings: Object}>}
  */
 async function processMessages(messageHandlers, messages) {
   const results = [];
@@ -364,14 +368,11 @@ async function processMessages(messageHandlers, messages) {
   // Collect missing_tool and missing_data messages first
   const missings = collectMissingMessages(messages);
 
-  // Initialize shared temporary ID map
+  // Initialize unified temporary ID map
   // This will be populated by handlers as they create entities with temporary IDs
-  /** @type {Map<string, {repo: string, number: number}>} */
+  // Stores both issue/PR references ({repo, number}) and project URLs ({projectUrl})
+  /** @type {Map<string, {repo?: string, number?: number, projectUrl?: string}>} */
   const temporaryIdMap = new Map();
-
-  // Build a temporary project ID map as we process create_project messages
-  // This maps temporary_id to project URLs for project-related handlers
-  const temporaryProjectMap = new Map();
 
   // Load existing temporary ID map from environment (if provided from previous step)
   const existingTempIdMap = loadTemporaryIdMap();
@@ -445,13 +446,15 @@ async function processMessages(messageHandlers, messages) {
       const isProjectHandler = PROJECT_RELATED_TYPES.has(messageType);
 
       let result;
+      // Convert Map to plain object for handler - both handler types use the same unified map
+      const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
+
       if (isProjectHandler) {
-        // Project handlers receive: (message, temporaryProjectMap, temporaryIdMap)
-        const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
-        result = await messageHandler(message, temporaryProjectMap, resolvedTemporaryIds);
+        // Project handlers receive: (message, temporaryIdMap, temporaryIdMap)
+        // Note: Both parameters receive the same unified map for simplicity
+        result = await messageHandler(message, temporaryIdMap, resolvedTemporaryIds);
       } else {
         // Regular handlers receive: (message, resolvedTemporaryIds)
-        const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
         result = await messageHandler(message, resolvedTemporaryIds);
       }
 
@@ -487,7 +490,7 @@ async function processMessages(messageHandlers, messages) {
         continue;
       }
 
-      // If handler returned a temp ID mapping, add it to our map
+      // If handler returned a temp ID mapping for issue/PR, add it to our unified map
       if (result && result.temporaryId && result.repo && result.number) {
         const normalizedTempId = normalizeTemporaryId(result.temporaryId);
         temporaryIdMap.set(normalizedTempId, {
@@ -497,9 +500,12 @@ async function processMessages(messageHandlers, messages) {
         core.info(`Registered temporary ID: ${result.temporaryId} -> ${result.repo}#${result.number}`);
       }
 
-      // If this was a create_project, store the project mapping
+      // If this was a create_project, store the project URL in the unified map
       if (messageType === "create_project" && result && result.projectUrl && message.temporary_id) {
-        temporaryProjectMap.set(message.temporary_id.toLowerCase(), result.projectUrl);
+        const normalizedTempId = normalizeTemporaryId(message.temporary_id);
+        temporaryIdMap.set(normalizedTempId, {
+          projectUrl: result.projectUrl,
+        });
         core.info(`✓ Stored project mapping: ${message.temporary_id} -> ${result.projectUrl}`);
       }
 
@@ -655,15 +661,13 @@ async function processMessages(messageHandlers, messages) {
   }
 
   // Return outputs with unresolved IDs for synthetic update processing
-  // Convert temporaryIdMap and temporaryProjectMap to plain objects for serialization
+  // Convert unified temporaryIdMap to plain object for serialization
   const temporaryIdMapObj = Object.fromEntries(temporaryIdMap);
-  const temporaryProjectMapObj = Object.fromEntries(temporaryProjectMap);
 
   return {
     success: true,
     results,
     temporaryIdMap: temporaryIdMapObj,
-    temporaryProjectMap: temporaryProjectMapObj,
     outputsWithUnresolvedIds,
     missings,
   };
@@ -917,7 +921,6 @@ async function main() {
       core.info("No agent output available - nothing to process");
       // Set empty outputs for downstream steps
       core.setOutput("temporary_id_map", "{}");
-      core.setOutput("temporary_project_map", "{}");
       core.setOutput("processed_count", 0);
       return;
     }
@@ -932,7 +935,6 @@ async function main() {
       core.info("No handlers loaded - nothing to process");
       // Set empty outputs for downstream steps
       core.setOutput("temporary_id_map", "{}");
-      core.setOutput("temporary_project_map", "{}");
       core.setOutput("processed_count", 0);
       return;
     }
@@ -984,8 +986,11 @@ async function main() {
       const noHandlerTypes = [...new Set(skippedNoHandlerResults.map(r => r.type))];
       core.info(`  Types: ${noHandlerTypes.join(", ")}`);
     }
-    core.info(`Temporary IDs registered: ${Object.keys(processingResult.temporaryIdMap).length}`);
-    core.info(`Temporary project IDs registered: ${Object.keys(processingResult.temporaryProjectMap || {}).length}`);
+
+    // Count different types of temporary IDs in the unified map
+    const issueIds = Object.values(processingResult.temporaryIdMap).filter(v => v.repo && v.number);
+    const projectIds = Object.values(processingResult.temporaryIdMap).filter(v => v.projectUrl);
+    core.info(`Temporary IDs registered: ${Object.keys(processingResult.temporaryIdMap).length} (${issueIds.length} issue/PR, ${projectIds.length} project)`);
     core.info(`Synthetic updates: ${syntheticUpdateCount}`);
 
     if (failureCount > 0) {
@@ -995,13 +1000,11 @@ async function main() {
       core.warning(`${skippedNoHandlerResults.length} message(s) were skipped because no handler was loaded. Check your workflow's safe-outputs configuration.`);
     }
 
-    // Export temporary ID map as output for downstream steps (e.g., assign_to_agent)
+    // Export unified temporary ID map as output for downstream steps
+    // This map contains both issue/PR references and project URLs
     const temporaryIdMapJson = JSON.stringify(processingResult.temporaryIdMap);
     core.setOutput("temporary_id_map", temporaryIdMapJson);
-    core.info(`Exported temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
-
-    // Export temporary project map as output for use in update_issue, etc.
-    const temporaryProjectMapJson = JSON.stringify(processingResult.temporaryProjectMap || {});
+    core.info(`Exported unified temporary ID map with ${Object.keys(processingResult.temporaryIdMap).length} mapping(s)`);
     core.setOutput("temporary_project_map", temporaryProjectMapJson);
     core.info(`Exported temporary project map with ${Object.keys(processingResult.temporaryProjectMap || {}).length} mapping(s)`);
 

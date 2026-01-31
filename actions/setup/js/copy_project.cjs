@@ -281,11 +281,11 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single copy_project message
    * @param {Object} message - The copy_project message to process
-   * @param {Map} temporaryProjectMap - Map of temporary project IDs to project URLs
-   * @param {Object} temporaryIdMap - Map of temporary issue IDs to issue numbers
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
    * @returns {Promise<Object>} Result with success/error status and project details
    */
-  return async function handleCopyProject(message, temporaryProjectMap, temporaryIdMap = {}) {
+  return async function handleCopyProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping copy_project: max count of ${maxCount} reached`);

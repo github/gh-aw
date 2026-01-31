@@ -313,11 +313,11 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single create_project message
    * @param {Object} message - The create_project message to process
-   * @param {Map} temporaryProjectMap - Map of temporary project IDs to project URLs (populated by this handler)
-   * @param {Object} temporaryIdMap - Map of temporary issue IDs to issue numbers
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
    * @returns {Promise<Object>} Result with success/error status
    */
-  return async function handleCreateProject(message, temporaryProjectMap, temporaryIdMap = {}) {
+  return async function handleCreateProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping create_project: max count of ${maxCount} reached`);
