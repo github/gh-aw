@@ -281,7 +281,8 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single copy_project message
    * @param {Object} message - The copy_project message to process
-   * @param {Object} resolvedTemporaryIds - Map of temporary IDs (unused for copy_project)
+   * @param {Map} temporaryProjectMap - Map of temporary project IDs to project URLs
+   * @param {Object} temporaryIdMap - Map of temporary issue IDs to issue numbers
    * @returns {Promise<Object>} Result with success/error status and project details
    */
   return async function handleCopyProject(message, temporaryProjectMap, temporaryIdMap = {}) {

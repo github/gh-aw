@@ -31,7 +31,7 @@ safe-outputs:
     expires: 2d
     title-prefix: "[CI Failure Doctor] "
     labels: [cookie]
-  add-comment:
+  add-comment: {}
   messages:
     footer: "> 🩺 *Diagnosis provided by [{workflow_name}]({run_url})*"
     run-started: "🏥 CI Doctor reporting for duty! [{workflow_name}]({run_url}) is examining the patient on this {event_type}..."
