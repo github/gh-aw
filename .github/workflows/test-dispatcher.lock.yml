@@ -153,7 +153,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"dispatch_workflow":{"max":1,"workflows":["test-workflow"]},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"dispatch_workflow":{"max":1,"workflow_files":{"test-workflow":".yml"},"workflows":["test-workflow"]},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [

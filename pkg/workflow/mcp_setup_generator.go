@@ -110,6 +110,10 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		mcpTools = append(mcpTools, "safe-inputs")
 	}
 
+	// Populate dispatch-workflow file mappings before generating config
+	// This ensures workflow_files is available in the config.json
+	populateDispatchWorkflowFiles(workflowData, c.markdownPath)
+
 	// Generate safe-outputs configuration once to avoid duplicate computation
 	var safeOutputConfig string
 	if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
