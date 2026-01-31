@@ -86,8 +86,17 @@ function attachHandlers(tools, handlers) {
  */
 function registerPredefinedTools(server, tools, config, registerTool, normalizeTool) {
   tools.forEach(tool => {
+    // Check if this is a regular tool matching a config key
     if (Object.keys(config).find(configKey => normalizeTool(configKey) === tool.name)) {
       registerTool(server, tool);
+      return;
+    }
+
+    // Check if this is a dispatch_workflow tool (has _workflow_name metadata)
+    // These tools are dynamically generated with workflow-specific names
+    if (tool._workflow_name && config.dispatch_workflow) {
+      registerTool(server, tool);
+      return;
     }
   });
 }

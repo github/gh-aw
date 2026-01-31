@@ -165,6 +165,60 @@ describe("safe_outputs_tools_loader", () => {
 
       expect(result[0].handler).toBeUndefined();
     });
+
+    it("should attach dispatch_workflow handler for tools with _workflow_name", () => {
+      const tools = [
+        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
+      ];
+      const defaultHandler = vi.fn(type => vi.fn());
+      const handlers = {
+        createPullRequestHandler: vi.fn(),
+        pushToPullRequestBranchHandler: vi.fn(),
+        uploadAssetHandler: vi.fn(),
+        defaultHandler: defaultHandler,
+      };
+
+      const result = attachHandlers(tools, handlers);
+
+      // Handler should be attached
+      expect(result[0].handler).toBeDefined();
+      expect(typeof result[0].handler).toBe("function");
+      
+      // Call the handler to verify it uses dispatch_workflow type
+      const mockArgs = { test_param: "value" };
+      result[0].handler(mockArgs);
+      
+      // Verify defaultHandler was called with dispatch_workflow type
+      expect(defaultHandler).toHaveBeenCalledWith("dispatch_workflow");
+    });
+
+    it("should include workflow_name in dispatch_workflow handler args", () => {
+      const tools = [
+        { name: "ci_workflow", description: "CI workflow", _workflow_name: "ci" },
+      ];
+      const mockHandlerFunction = vi.fn();
+      const defaultHandler = vi.fn(() => mockHandlerFunction);
+      const handlers = {
+        createPullRequestHandler: vi.fn(),
+        pushToPullRequestBranchHandler: vi.fn(),
+        uploadAssetHandler: vi.fn(),
+        defaultHandler: defaultHandler,
+      };
+
+      const result = attachHandlers(tools, handlers);
+
+      // Call the handler
+      const mockArgs = { input1: "value1" };
+      result[0].handler(mockArgs);
+      
+      // Verify the handler function was called with workflow_name
+      expect(mockHandlerFunction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflow_name: "ci",
+          input1: "value1",
+        })
+      );
+    });
   });
 
   describe("registerPredefinedTools", () => {
@@ -209,6 +263,70 @@ describe("safe_outputs_tools_loader", () => {
       registerPredefinedTools(mockServer, tools, config, registerTool, normalizeTool);
 
       expect(registerTool).not.toHaveBeenCalled();
+    });
+
+    it("should register dispatch_workflow tools with _workflow_name metadata", () => {
+      const tools = [
+        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
+        { name: "ci_workflow", description: "CI workflow", _workflow_name: "ci" },
+        { name: "other_tool", description: "Other tool" },
+      ];
+      const config = {
+        dispatch_workflow: {
+          workflows: ["test-workflow", "ci"],
+          max: 2,
+        },
+      };
+      const registerTool = vi.fn();
+      const normalizeTool = name => name.replace(/-/g, "_");
+
+      registerPredefinedTools(mockServer, tools, config, registerTool, normalizeTool);
+
+      // Should register both dispatch_workflow tools
+      expect(registerTool).toHaveBeenCalledTimes(2);
+      expect(registerTool).toHaveBeenCalledWith(mockServer, tools[0]);
+      expect(registerTool).toHaveBeenCalledWith(mockServer, tools[1]);
+      // Should NOT register the tool without _workflow_name
+      expect(registerTool).not.toHaveBeenCalledWith(mockServer, tools[2]);
+    });
+
+    it("should not register dispatch_workflow tools when dispatch_workflow is not in config", () => {
+      const tools = [
+        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
+      ];
+      const config = {
+        create_issue: true,
+      };
+      const registerTool = vi.fn();
+      const normalizeTool = name => name.replace(/-/g, "_");
+
+      registerPredefinedTools(mockServer, tools, config, registerTool, normalizeTool);
+
+      // Should not register dispatch_workflow tool when config doesn't include it
+      expect(registerTool).not.toHaveBeenCalled();
+    });
+
+    it("should register both regular and dispatch_workflow tools", () => {
+      const tools = [
+        { name: "create_pull_request", description: "Create PR" },
+        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
+      ];
+      const config = {
+        create_pull_request: true,
+        dispatch_workflow: {
+          workflows: ["test-workflow"],
+          max: 1,
+        },
+      };
+      const registerTool = vi.fn();
+      const normalizeTool = name => name.replace(/-/g, "_");
+
+      registerPredefinedTools(mockServer, tools, config, registerTool, normalizeTool);
+
+      // Should register both the regular tool and dispatch_workflow tool
+      expect(registerTool).toHaveBeenCalledTimes(2);
+      expect(registerTool).toHaveBeenCalledWith(mockServer, tools[0]);
+      expect(registerTool).toHaveBeenCalledWith(mockServer, tools[1]);
     });
   });
 
