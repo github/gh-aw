@@ -17,7 +17,11 @@ set -e
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-/opt/gh-aw/actions}"
 
+# Get safe-outputs flag from input (default: false)
+SAFE_OUTPUTS_ENABLED="${INPUT_SAFE_OUTPUTS:-false}"
+
 echo "Copying activation files to ${DESTINATION}"
+echo "Safe-outputs support: ${SAFE_OUTPUTS_ENABLED}"
 
 # Create destination directory if it doesn't exist
 mkdir -p "${DESTINATION}"
@@ -263,34 +267,38 @@ fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 
-# Install @actions/github package in the destination directory for project handler support
+# Install @actions/github package ONLY if safe-outputs flag is enabled
 # This package is needed by the unified handler manager to create separate Octokit clients
 # for project operations that require GH_AW_PROJECT_GITHUB_TOKEN
-echo "Installing @actions/github package in ${DESTINATION}..."
-cd "${DESTINATION}"
+if [ "${SAFE_OUTPUTS_ENABLED}" = "true" ]; then
+  echo "Safe-outputs enabled - installing @actions/github package in ${DESTINATION}..."
+  cd "${DESTINATION}"
 
-# Check if npm is available
-if ! command -v npm &> /dev/null; then
-  echo "::error::npm is not available. Cannot install @actions/github package."
-  exit 1
-fi
+  # Check if npm is available
+  if ! command -v npm &> /dev/null; then
+    echo "::error::npm is not available. Cannot install @actions/github package."
+    exit 1
+  fi
 
-# Create a minimal package.json if it doesn't exist
-if [ ! -f "package.json" ]; then
-  echo '{"private": true}' > package.json
-fi
+  # Create a minimal package.json if it doesn't exist
+  if [ ! -f "package.json" ]; then
+    echo '{"private": true}' > package.json
+  fi
 
-# Install @actions/github package
-npm install --no-save --loglevel=error @actions/github@^7.0.0 2>&1 | grep -v "npm WARN" || true
-if [ -d "node_modules/@actions/github" ]; then
-  echo "✓ Successfully installed @actions/github package"
+  # Install @actions/github package
+  npm install --no-save --loglevel=error @actions/github@^7.0.0 2>&1 | grep -v "npm WARN" || true
+  if [ -d "node_modules/@actions/github" ]; then
+    echo "✓ Successfully installed @actions/github package"
+  else
+    echo "::error::Failed to install @actions/github package"
+    exit 1
+  fi
+
+  # Return to original directory
+  cd - > /dev/null
 else
-  echo "::error::Failed to install @actions/github package"
-  exit 1
+  echo "Safe-outputs not enabled - skipping @actions/github installation"
 fi
-
-# Return to original directory
-cd - > /dev/null
 
 # Set output
 if [ -n "${GITHUB_OUTPUT}" ]; then
