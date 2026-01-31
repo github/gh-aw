@@ -65,6 +65,12 @@ func (c *Compiler) applyProjectSafeOutputs(frontmatter map[string]any, existingS
 		projectSafeOutputsLog.Print("update-project already configured, preserving existing configuration")
 	}
 
+	// Enforce top-level project URL on update-project (security: stay within scope)
+	if safeOutputs.UpdateProjects != nil {
+		safeOutputs.UpdateProjects.Project = projectURL
+		projectSafeOutputsLog.Printf("Enforcing top-level project URL on update-project: %s", projectURL)
+	}
+
 	// Configure create-project-status-update if not already configured
 	if safeOutputs.CreateProjectStatusUpdates == nil {
 		projectSafeOutputsLog.Printf("Adding create-project-status-update safe-output (max: %d)", maxStatusUpdates)
@@ -75,6 +81,18 @@ func (c *Compiler) applyProjectSafeOutputs(frontmatter map[string]any, existingS
 		}
 	} else {
 		projectSafeOutputsLog.Print("create-project-status-update already configured, preserving existing configuration")
+	}
+
+	// Enforce top-level project URL on create-project-status-update (security: stay within scope)
+	if safeOutputs.CreateProjectStatusUpdates != nil {
+		safeOutputs.CreateProjectStatusUpdates.Project = projectURL
+		projectSafeOutputsLog.Printf("Enforcing top-level project URL on create-project-status-update: %s", projectURL)
+	}
+
+	// Enforce top-level project URL on copy-project as source-project (security: stay within scope)
+	if safeOutputs.CopyProjects != nil {
+		safeOutputs.CopyProjects.SourceProject = projectURL
+		projectSafeOutputsLog.Printf("Enforcing top-level project URL on copy-project source-project: %s", projectURL)
 	}
 
 	return safeOutputs

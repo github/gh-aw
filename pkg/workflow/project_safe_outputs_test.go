@@ -119,3 +119,82 @@ func TestProjectConfigIntegration(t *testing.T) {
 	// Check create-project-status-update configuration
 	assert.Equal(t, 1, result.CreateProjectStatusUpdates.Max, "CreateProjectStatusUpdates max should match")
 }
+
+func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
+	compiler := NewCompiler()
+	projectURL := "https://github.com/orgs/myorg/projects/42"
+
+	tests := []struct {
+		name                string
+		frontmatter         map[string]any
+		existingSafeOutputs *SafeOutputsConfig
+		expectEnforcement   bool
+	}{
+		{
+			name: "enforces project URL on newly created configs",
+			frontmatter: map[string]any{
+				"project": projectURL,
+			},
+			existingSafeOutputs: nil,
+			expectEnforcement:   true,
+		},
+		{
+			name: "enforces project URL on existing configs",
+			frontmatter: map[string]any{
+				"project": projectURL,
+			},
+			existingSafeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 25},
+					Project:              "https://github.com/orgs/different/projects/99", // Should be overridden
+				},
+				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3},
+					Project:              "https://github.com/orgs/different/projects/99", // Should be overridden
+				},
+			},
+			expectEnforcement: true,
+		},
+		{
+			name: "enforces project URL on copy-project",
+			frontmatter: map[string]any{
+				"project": projectURL,
+			},
+			existingSafeOutputs: &SafeOutputsConfig{
+				CopyProjects: &CopyProjectsConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
+					SourceProject:        "https://github.com/orgs/different/projects/88", // Should be overridden
+				},
+			},
+			expectEnforcement: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := compiler.applyProjectSafeOutputs(tt.frontmatter, tt.existingSafeOutputs)
+
+			if tt.expectEnforcement {
+				require.NotNil(t, result, "Safe outputs should be created")
+
+				// Verify update-project has enforced project URL
+				if result.UpdateProjects != nil {
+					assert.Equal(t, projectURL, result.UpdateProjects.Project,
+						"update-project.project should be enforced to top-level project URL")
+				}
+
+				// Verify create-project-status-update has enforced project URL
+				if result.CreateProjectStatusUpdates != nil {
+					assert.Equal(t, projectURL, result.CreateProjectStatusUpdates.Project,
+						"create-project-status-update.project should be enforced to top-level project URL")
+				}
+
+				// Verify copy-project has enforced source-project URL
+				if result.CopyProjects != nil {
+					assert.Equal(t, projectURL, result.CopyProjects.SourceProject,
+						"copy-project.source-project should be enforced to top-level project URL")
+				}
+			}
+		})
+	}
+}
