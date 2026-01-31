@@ -27,7 +27,7 @@
 #
 # frontmatter-hash: a3a882e5b432319e495ef33cf6b175688127dabd81d90624999492b6100b7384
 
-name: "Functional Enhancer"
+name: "Functional Pragmatist"
 "on":
   schedule:
   - cron: "0 9 * * 2,4"
@@ -38,7 +38,7 @@ permissions: {}
 concurrency:
   group: "gh-aw-${{ github.workflow }}"
 
-run-name: "Functional Enhancer"
+run-name: "Functional Pragmatist"
 
 jobs:
   activation:
@@ -62,7 +62,7 @@ jobs:
       - name: Check workflow file timestamps
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_WORKFLOW_FILE: "functional-enhancer.lock.yml"
+          GH_AW_WORKFLOW_FILE: "functional-pragmatist.lock.yml"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
@@ -442,7 +442,7 @@ jobs:
               model: process.env.GH_AW_MODEL_AGENT_CLAUDE || "",
               version: "",
               agent_version: "2.1.27",
-              workflow_name: "Functional Enhancer",
+              workflow_name: "Functional Pragmatist",
               experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
@@ -618,7 +618,7 @@ jobs:
           
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import workflows/functional-enhancer.md}}
+          {{#runtime-import workflows/functional-pragmatist.md}}
           PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -940,7 +940,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_NOOP_MAX: 1
-          GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+          GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
           GH_AW_TRACKER_ID: "functional-enhancer"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -954,7 +954,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+          GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
           GH_AW_TRACKER_ID: "functional-enhancer"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -968,7 +968,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+          GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
           GH_AW_TRACKER_ID: "functional-enhancer"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
@@ -985,7 +985,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+          GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
           GH_AW_TRACKER_ID: "functional-enhancer"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
@@ -1003,7 +1003,7 @@ jobs:
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+          GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
           GH_AW_TRACKER_ID: "functional-enhancer"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.result }}
@@ -1056,7 +1056,7 @@ jobs:
       - name: Setup threat detection
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          WORKFLOW_NAME: "Functional Enhancer"
+          WORKFLOW_NAME: "Functional Pragmatist"
           WORKFLOW_DESCRIPTION: "Identifies opportunities to apply moderate functional programming techniques systematically - immutability, functional options, pure functions, reducing mutation and reusable logic wrappers"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
@@ -1152,8 +1152,8 @@ jobs:
     env:
       GH_AW_ENGINE_ID: "claude"
       GH_AW_TRACKER_ID: "functional-enhancer"
-      GH_AW_WORKFLOW_ID: "functional-enhancer"
-      GH_AW_WORKFLOW_NAME: "Functional Enhancer"
+      GH_AW_WORKFLOW_ID: "functional-pragmatist"
+      GH_AW_WORKFLOW_NAME: "Functional Pragmatist"
     outputs:
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
