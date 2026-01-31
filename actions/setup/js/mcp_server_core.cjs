@@ -467,6 +467,69 @@ function registerTool(server, tool) {
 }
 
 /**
+ * Calculate Levenshtein distance between two strings
+ * @param {string} a - First string
+ * @param {string} b - Second string
+ * @returns {number} Edit distance
+ */
+function levenshteinDistance(a, b) {
+  const matrix = [];
+
+  // Initialize first column
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+
+  // Initialize first row
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill in the rest of the matrix
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Find similar tool names from available tools
+ * @param {string} requestedTool - The tool name that was requested
+ * @param {Object} availableTools - Object of available tools
+ * @param {number} maxSuggestions - Maximum number of suggestions to return
+ * @returns {Array<{name: string, distance: number}>} Array of similar tool names with distances
+ */
+function findSimilarTools(requestedTool, availableTools, maxSuggestions = 3) {
+  const normalizedRequested = normalizeTool(requestedTool);
+  const suggestions = [];
+
+  // Calculate distance for each available tool
+  for (const toolName of Object.keys(availableTools)) {
+    const distance = levenshteinDistance(normalizedRequested, toolName);
+    suggestions.push({ name: toolName, distance });
+  }
+
+  // Sort by distance (closest first) and take top N
+  suggestions.sort((a, b) => a.distance - b.distance);
+
+  // Only return suggestions that are reasonably similar
+  // (distance <= half the length of the requested tool name + 3)
+  const maxDistance = Math.floor(normalizedRequested.length / 2) + 3;
+  return suggestions.filter(s => s.distance <= maxDistance).slice(0, maxSuggestions);
+}
+
+/**
  * Normalize a tool name (convert dashes to underscores, lowercase)
  * @param {string} name - The tool name to normalize
  * @returns {string} Normalized tool name
@@ -530,9 +593,18 @@ async function handleRequest(server, request, defaultHandler) {
       }
       const tool = server.tools[normalizeTool(name)];
       if (!tool) {
+        // Find similar tools to suggest
+        const similarTools = findSimilarTools(name, server.tools);
+        let errorMessage = `Tool '${name}' not found`;
+
+        if (similarTools.length > 0) {
+          const suggestions = similarTools.map(s => s.name).join(", ");
+          errorMessage += `. Did you mean one of these: ${suggestions}?`;
+        }
+
         throw {
           code: -32602,
-          message: `Tool '${name}' not found`,
+          message: errorMessage,
         };
       }
 
@@ -649,7 +721,16 @@ async function handleMessage(server, req, defaultHandler) {
       }
       const tool = server.tools[normalizeTool(name)];
       if (!tool) {
-        server.replyError(id, -32601, `Tool not found: ${name} (${normalizeTool(name)})`);
+        // Find similar tools to suggest
+        const similarTools = findSimilarTools(name, server.tools);
+        let errorMessage = `Tool not found: ${name} (${normalizeTool(name)})`;
+
+        if (similarTools.length > 0) {
+          const suggestions = similarTools.map(s => s.name).join(", ");
+          errorMessage += `. Did you mean one of these: ${suggestions}?`;
+        }
+
+        server.replyError(id, -32601, errorMessage);
         return;
       }
 
@@ -744,4 +825,6 @@ module.exports = {
   processReadBuffer,
   start,
   loadToolHandlers,
+  findSimilarTools,
+  levenshteinDistance,
 };

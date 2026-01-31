@@ -905,4 +905,165 @@ echo "result=$INPUT_MY_INPUT" >> $GITHUB_OUTPUT
       expect(resultContent.outputs.result).toBe("test-value");
     });
   });
+
+  describe("levenshteinDistance", () => {
+    it("should calculate correct distance for identical strings", async () => {
+      const { levenshteinDistance } = await import("./mcp_server_core.cjs");
+      expect(levenshteinDistance("test", "test")).toBe(0);
+    });
+
+    it("should calculate correct distance for single character change", async () => {
+      const { levenshteinDistance } = await import("./mcp_server_core.cjs");
+      expect(levenshteinDistance("cat", "bat")).toBe(1);
+      expect(levenshteinDistance("cat", "cut")).toBe(1);
+    });
+
+    it("should calculate correct distance for insertions/deletions", async () => {
+      const { levenshteinDistance } = await import("./mcp_server_core.cjs");
+      expect(levenshteinDistance("cat", "ca")).toBe(1);
+      expect(levenshteinDistance("cat", "cats")).toBe(1);
+    });
+
+    it("should calculate correct distance for multiple changes", async () => {
+      const { levenshteinDistance } = await import("./mcp_server_core.cjs");
+      expect(levenshteinDistance("cat", "dog")).toBe(3);
+    });
+  });
+
+  describe("findSimilarTools", () => {
+    it("should find tools with typos", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = {
+        add_comment: {},
+        add_name: {},
+        missing_tool: {},
+      };
+
+      const similar = findSimilarTools("add_comentt", tools, 3);
+      expect(similar.length).toBeGreaterThan(0);
+      expect(similar[0].name).toBe("add_comment");
+      expect(similar[0].distance).toBeLessThanOrEqual(2);
+    });
+
+    it("should find tools with dashes normalized", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = {
+        dispatch_workflow: {},
+        add_comment: {},
+      };
+
+      const similar = findSimilarTools("dispatch-workflow", tools, 3);
+      expect(similar.length).toBeGreaterThan(0);
+      expect(similar[0].name).toBe("dispatch_workflow");
+      expect(similar[0].distance).toBe(0); // Should match exactly after normalization
+    });
+
+    it("should return empty array for completely different names", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = {
+        short: {},
+      };
+
+      const similar = findSimilarTools("verylongdifferenttoolname", tools, 3);
+      expect(similar.length).toBe(0); // Distance too large
+    });
+
+    it("should limit results to maxSuggestions", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = {
+        tool_a: {},
+        tool_b: {},
+        tool_c: {},
+        tool_d: {},
+        tool_e: {},
+      };
+
+      const similar = findSimilarTools("tool_x", tools, 2);
+      expect(similar.length).toBeLessThanOrEqual(2);
+    });
+
+    it("should sort by distance (closest first)", async () => {
+      const { findSimilarTools } = await import("./mcp_server_core.cjs");
+      const tools = {
+        add_name: {},
+        add_comment: {},
+        missing_tool: {},
+      };
+
+      const similar = findSimilarTools("add_nam", tools, 3);
+      expect(similar.length).toBeGreaterThan(0);
+      expect(similar[0].name).toBe("add_name");
+      expect(similar[0].distance).toBe(1);
+    });
+  });
+
+  describe("tool not found error with suggestions", () => {
+    it("should suggest similar tools when tool is not found", async () => {
+      const { createServer, registerTool, handleMessage } = await import("./mcp_server_core.cjs");
+      const server = createServer({ name: "test-server", version: "1.0.0" });
+
+      // Register some tools
+      registerTool(server, {
+        name: "add_comment",
+        description: "Add comment",
+        inputSchema: { type: "object", properties: {} },
+        handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+      });
+      registerTool(server, {
+        name: "add_name",
+        description: "Add name",
+        inputSchema: { type: "object", properties: {} },
+        handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+      });
+
+      const results = [];
+      server.writeMessage = msg => results.push(msg);
+      server.replyResult = (id, result) => results.push({ jsonrpc: "2.0", id, result });
+      server.replyError = (id, code, message) => results.push({ jsonrpc: "2.0", id, error: { code, message } });
+
+      // Try to call a tool that doesn't exist but is similar
+      await handleMessage(server, {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "add_comentt", arguments: {} },
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].error).toBeDefined();
+      expect(results[0].error.message).toContain("not found");
+      expect(results[0].error.message).toContain("Did you mean one of these");
+      expect(results[0].error.message).toContain("add_comment");
+    });
+
+    it("should not suggest tools if none are similar", async () => {
+      const { createServer, registerTool, handleMessage } = await import("./mcp_server_core.cjs");
+      const server = createServer({ name: "test-server", version: "1.0.0" });
+
+      registerTool(server, {
+        name: "x",
+        description: "Test",
+        inputSchema: { type: "object", properties: {} },
+        handler: () => ({ content: [{ type: "text", text: "ok" }] }),
+      });
+
+      const results = [];
+      server.writeMessage = msg => results.push(msg);
+      server.replyResult = (id, result) => results.push({ jsonrpc: "2.0", id, result });
+      server.replyError = (id, code, message) => results.push({ jsonrpc: "2.0", id, error: { code, message } });
+
+      // Try to call a completely different tool
+      await handleMessage(server, {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "completelydifferenttoolname", arguments: {} },
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].error).toBeDefined();
+      expect(results[0].error.message).toContain("not found");
+      expect(results[0].error.message).not.toContain("Did you mean");
+    });
+  });
 });
