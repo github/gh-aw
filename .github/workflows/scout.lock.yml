@@ -183,6 +183,15 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           persist-credentials: false
+      - name: Checkout repository import github/github-deep-research-agent@main
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          repository: github/github-deep-research-agent
+          ref: main
+          path: /tmp/gh-aw/repo-imports/github-github-deep-research-agent-main
+          sparse-checkout: |
+            .github/
+          persist-credentials: false
       - name: Merge remote .github folder
         if: ${{ always() }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0

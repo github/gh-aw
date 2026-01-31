@@ -36,6 +36,21 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
+	// Add checkout steps for repository imports
+	// Each repository import needs to be checked out into a temporary folder
+	// so the merge script can copy files from it
+	if len(data.RepositoryImports) > 0 {
+		compilerYamlLog.Printf("Adding checkout steps for %d repository imports", len(data.RepositoryImports))
+		c.generateRepositoryImportCheckouts(yaml, data.RepositoryImports)
+	}
+
+	// Add checkout step for legacy agent import (if present)
+	// This handles the older import format where a specific agent file is imported
+	if data.AgentFile != "" && data.AgentImportSpec != "" {
+		compilerYamlLog.Printf("Adding checkout step for legacy agent import: %s", data.AgentImportSpec)
+		c.generateLegacyAgentImportCheckout(yaml, data.AgentImportSpec)
+	}
+
 	// Add merge remote .github folder step for repository imports or agent imports
 	needsGithubMerge := (len(data.RepositoryImports) > 0) || (data.AgentFile != "" && data.AgentImportSpec != "")
 	if needsGithubMerge {
@@ -487,4 +502,111 @@ func (c *Compiler) addCustomStepsWithRuntimeInsertion(yaml *strings.Builder, cus
 
 		i++
 	}
+}
+
+// generateRepositoryImportCheckouts generates checkout steps for repository imports
+// Each repository is checked out into a temporary folder at /tmp/gh-aw/repo-imports/<owner>-<repo>-<sanitized-ref>
+// This allows the merge script to copy files from pre-checked-out folders instead of doing git operations
+func (c *Compiler) generateRepositoryImportCheckouts(yaml *strings.Builder, repositoryImports []string) {
+	for _, repoImport := range repositoryImports {
+		compilerYamlLog.Printf("Generating checkout step for repository import: %s", repoImport)
+		
+		// Parse the import spec to extract owner, repo, and ref
+		// Format: owner/repo@ref or owner/repo
+		owner, repo, ref := parseRepositoryImportSpec(repoImport)
+		if owner == "" || repo == "" {
+			compilerYamlLog.Printf("Warning: failed to parse repository import: %s", repoImport)
+			continue
+		}
+		
+		// Generate a sanitized directory name for the checkout
+		// Use a consistent format: owner-repo-ref
+		sanitizedRef := sanitizeRefForPath(ref)
+		checkoutPath := fmt.Sprintf("/tmp/gh-aw/repo-imports/%s-%s-%s", owner, repo, sanitizedRef)
+		
+		// Generate the checkout step
+		yaml.WriteString(fmt.Sprintf("      - name: Checkout repository import %s/%s@%s\n", owner, repo, ref))
+		fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/checkout"))
+		yaml.WriteString("        with:\n")
+		yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
+		yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
+		yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+		yaml.WriteString("          sparse-checkout: |\n")
+		yaml.WriteString("            .github/\n")
+		yaml.WriteString("          persist-credentials: false\n")
+		
+		compilerYamlLog.Printf("Added checkout step: %s/%s@%s -> %s", owner, repo, ref, checkoutPath)
+	}
+}
+
+// parseRepositoryImportSpec parses a repository import specification
+// Format: owner/repo@ref or owner/repo (defaults to "main" if no ref)
+// Returns: owner, repo, ref
+func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
+	// Remove section reference if present (file.md#Section)
+	cleanSpec := importSpec
+	if idx := strings.Index(importSpec, "#"); idx != -1 {
+		cleanSpec = importSpec[:idx]
+	}
+	
+	// Split on @ to get path and ref
+	parts := strings.Split(cleanSpec, "@")
+	pathPart := parts[0]
+	ref = "main" // default ref
+	if len(parts) > 1 {
+		ref = parts[1]
+	}
+	
+	// Parse path: owner/repo
+	slashParts := strings.Split(pathPart, "/")
+	if len(slashParts) != 2 {
+		return "", "", ""
+	}
+	
+	owner = slashParts[0]
+	repo = slashParts[1]
+	
+	return owner, repo, ref
+}
+
+// generateLegacyAgentImportCheckout generates a checkout step for legacy agent imports
+// Legacy format: owner/repo/path/to/file.md@ref
+// This checks out the entire repository (not just .github folder) since the file could be anywhere
+func (c *Compiler) generateLegacyAgentImportCheckout(yaml *strings.Builder, agentImportSpec string) {
+	compilerYamlLog.Printf("Generating checkout step for legacy agent import: %s", agentImportSpec)
+	
+	// Parse the import spec to extract owner, repo, and ref
+	owner, repo, ref := parseRepositoryImportSpec(agentImportSpec)
+	if owner == "" || repo == "" {
+		compilerYamlLog.Printf("Warning: failed to parse legacy agent import spec: %s", agentImportSpec)
+		return
+	}
+	
+	// Generate a sanitized directory name for the checkout
+	sanitizedRef := sanitizeRefForPath(ref)
+	checkoutPath := fmt.Sprintf("/tmp/gh-aw/repo-imports/%s-%s-%s", owner, repo, sanitizedRef)
+	
+	// Generate the checkout step
+	yaml.WriteString(fmt.Sprintf("      - name: Checkout agent import %s/%s@%s\n", owner, repo, ref))
+	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/checkout"))
+	yaml.WriteString("        with:\n")
+	yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
+	yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
+	yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+	yaml.WriteString("          sparse-checkout: |\n")
+	yaml.WriteString("            .github/\n")
+	yaml.WriteString("          persist-credentials: false\n")
+	
+	compilerYamlLog.Printf("Added legacy agent checkout step: %s/%s@%s -> %s", owner, repo, ref, checkoutPath)
+}
+
+// sanitizeRefForPath sanitizes a git ref for use in a file path
+// Replaces characters that are problematic in file paths with safe alternatives
+func sanitizeRefForPath(ref string) string {
+	// Replace slashes with dashes (for refs like "feature/my-branch")
+	sanitized := strings.ReplaceAll(ref, "/", "-")
+	// Replace other problematic characters
+	sanitized = strings.ReplaceAll(sanitized, ":", "-")
+	sanitized = strings.ReplaceAll(sanitized, "\\", "-")
+	return sanitized
 }
