@@ -189,7 +189,7 @@ Create multiple instances of the new output type to verify rate limiting and tar
 
 ### For Repository Hygiene
 
-1. **Don't merge dev.md changes**: The dev.md file should remain a simple, reusable test harness
+1. **Don't merge dev.md changes**: The dev.md file should remain a minimal test harness with no feature-specific logic
 2. **Reset dev.md after testing**: Restore it to the default configuration
 3. **Focus PR changes on the actual feature**: Keep test changes separate from feature implementation
 

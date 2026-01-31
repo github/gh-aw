@@ -914,7 +914,7 @@ jobs:
 ### Audit Logging
 
 ```yaml
-# Enable comprehensive logging
+# Enable structured audit logging
 steps:
   - name: Audit action
     run: |

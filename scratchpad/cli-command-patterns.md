@@ -252,7 +252,7 @@ Reserve these short flags for consistent meanings:
 ### Flag Naming
 
 - Use **kebab-case** for flag names: `--output-dir`, `--run-id`
-- Use descriptive names that clearly indicate purpose
+- Use descriptive names that indicate purpose with noun phrases and conventional prefixes
 - Avoid abbreviations unless universally understood
 
 ### Flag Validation

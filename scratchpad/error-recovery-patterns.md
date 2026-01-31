@@ -49,7 +49,7 @@ fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 - **ALWAYS** use `fmt.Fprintln(os.Stderr, ...)` or `fmt.Fprintf(os.Stderr, ...)` for CLI logging
 - **NEVER** use `fmt.Println()` or `fmt.Printf()` directly - all output should go to stderr
 - Use console formatting helpers with `os.Stderr` for consistent styling
-- For simple messages without console formatting: `fmt.Fprintf(os.Stderr, "message\n")`
+- For plain text messages without ANSI formatting: `fmt.Fprintf(os.Stderr, "message\n")`
 - **Exception**: JSON output goes to stdout, all other output to stderr
 
 **Available console formatters:**

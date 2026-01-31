@@ -10,7 +10,7 @@
 
 ## Overview
 
-This document provides an analysis of the default GitHub Actions Ubuntu runner image (`ubuntu-latest`, currently Ubuntu 24.04) and guidance for creating Docker images that mimic its environment. The runner image is a comprehensive development environment with pre-installed tools, runtimes, databases, and build systems commonly used in CI/CD pipelines.
+This document provides an analysis of the default GitHub Actions Ubuntu runner image (`ubuntu-latest`, currently Ubuntu 24.04) and guidance for creating Docker images that mimic its environment. The runner image is a development environment with 200+ pre-installed tools including runtimes, databases, and build systems commonly used in CI/CD pipelines.
 
 **Key Features**:
 - Multiple language runtimes (Node.js, Python, Ruby, Go, Java, PHP, Rust)

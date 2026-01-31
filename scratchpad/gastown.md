@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-This document maps concepts from Steve Yegge's **Gastown** multi-agent orchestrator to **GitHub Agentic Workflows** (gh-aw). Gastown provides a robust system for managing multiple AI coding agents with persistent state, structured handoffs, and crash recovery. While the two systems have different architectural approaches, understanding Gastown's patterns can inform gh-aw's evolution toward multi-agent coordination, persistent state management, and workflow composition.
+This document maps concepts from Steve Yegge's **Gastown** multi-agent orchestrator to **GitHub Agentic Workflows** (gh-aw). Gastown provides a multi-agent orchestration system with persistent state management, structured handoffs, and crash recovery mechanisms. While the two systems have different architectural approaches, understanding Gastown's patterns can inform gh-aw's evolution toward multi-agent coordination, persistent state management, and workflow composition.
 
 ### Key Insight
 

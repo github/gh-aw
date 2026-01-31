@@ -178,7 +178,7 @@ The following changes are **not breaking** and typically require:
 ### When Making CLI Changes
 
 1. **Check the decision tree** before implementing changes
-2. **Document breaking changes** clearly in the changeset
+2. **Document breaking changes** in the changeset with deprecation notice, migration path, and timeline
 3. **Provide migration guidance** for users affected by breaking changes
 4. **Consider backward compatibility** - can you add an alias instead of renaming?
 5. **Use deprecation warnings** for at least one minor release before removal

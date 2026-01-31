@@ -177,7 +177,7 @@ Use GitHub MCP to access PR files and repository context.
 **Key Benefits**:
 - Runs automatically on GitHub events
 - Sandboxed, secure execution
-- Team-wide automation (not just one developer)
+- Supports multi-user repository automation
 - Audit trail via GitHub Actions logs
 - Integration with Issues, PRs, Discussions
 
@@ -945,7 +945,7 @@ User: "ultrawork - Refactor authentication to use OAuth2"
 - Explore: Finds similar OAuth patterns in codebase
 - Todo Enforcer: Ensures all subtasks complete
 
-# Output: Production-ready code, comprehensive tests, documentation
+# Output: Code passing validation, tests meeting coverage targets, documentation generated
 ```
 
 **Key Features**:
@@ -1458,7 +1458,7 @@ Use oh-my-opencode with gh-aw integration:
 - "Implement authentication system with UI and backend"
 - "Debug complex race condition with Oracle agent"
 - "Migrate codebase from JavaScript to TypeScript"
-- "Add comprehensive tests across entire project"
+- "Implement test coverage meeting 80%+ threshold across all modules"
 
 ### 13.2 When to Choose GitHub Agentic Workflows
 
@@ -1643,7 +1643,7 @@ oh-my-opencode and GitHub Agentic Workflows represent two complementary approach
 - Use **oh-my-opencode** when you need full-featured local development with AI agents as teammates
 - Use **gh-aw** when you need secure, auditable automation for team/org workflows
 
-**Together, they provide a comprehensive AI-powered development stack**:
+**Together, they provide an integrated AI development automation stack**:
 - Rapid local development (oh-my-opencode)
 - Safe CI/CD automation (gh-aw)
 - Clear separation of concerns

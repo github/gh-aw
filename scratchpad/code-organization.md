@@ -101,7 +101,7 @@ The codebase exhibits several well-organized patterns that should be emulated:
 **Why it works**:
 - Tests are co-located with implementation
 - Clear test purpose from filename
-- Encourages comprehensive testing
+- Supports test coverage requirements
 - Separates integration from unit tests
 
 ## File Organization Principles
@@ -214,7 +214,7 @@ The following files are justified despite their size due to domain complexity:
 ### Recommended Sizes
 
 - **Small files**: 50-200 lines
-  - Utilities, simple features, helpers
+  - Utilities, single-purpose functions, helper methods
   - Examples: `args.go` (65 lines), `artifacts.go` (60 lines)
 
 - **Medium files**: 200-500 lines
