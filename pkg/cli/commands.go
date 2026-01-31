@@ -49,6 +49,9 @@ var debugWorkflowPromptTemplate string
 //go:embed templates/upgrade-agentic-workflows.md
 var upgradeAgenticWorkflowsPromptTemplate string
 
+//go:embed templates/serena-tool.md
+var serenaToolTemplate string
+
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
 	version = v

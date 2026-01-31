@@ -246,6 +246,16 @@ func initializeBasicRepository(verbose bool) error {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created upgrade workflows prompt"))
 	}
 
+	// Write Serena tool documentation
+	initLog.Print("Writing Serena tool documentation")
+	if err := ensureSerenaTool(verbose, false); err != nil {
+		initLog.Printf("Failed to write Serena tool documentation: %v", err)
+		return fmt.Errorf("failed to write Serena tool documentation: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
+	}
+
 	return nil
 }
 
@@ -562,6 +572,16 @@ func InitRepository(verbose bool, mcp bool, campaign bool, tokens bool, engine s
 	}
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created upgrade workflows prompt"))
+	}
+
+	// Write Serena tool documentation
+	initLog.Print("Writing Serena tool documentation")
+	if err := ensureSerenaTool(verbose, false); err != nil {
+		initLog.Printf("Failed to write Serena tool documentation: %v", err)
+		return fmt.Errorf("failed to write Serena tool documentation: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
 	}
 
 	// Configure MCP if requested

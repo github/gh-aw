@@ -227,6 +227,12 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update upgrade workflow prompt: %v", err)))
 	}
 
+	// Update Serena tool documentation
+	if err := ensureSerenaTool(verbose, false); err != nil {
+		fixLog.Printf("Failed to update Serena tool documentation: %v", err)
+		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Serena tool documentation: %v", err)))
+	}
+
 	// Delete old agent files if write flag is set
 	if write {
 		fixLog.Print("Deleting old agent files")
