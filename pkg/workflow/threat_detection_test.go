@@ -790,9 +790,14 @@ func TestSetupScriptReferencesPromptFile(t *testing.T) {
 		t.Error("Expected setup script to call setupGlobals")
 	}
 
-	// Verify main() is awaited
-	if !strings.Contains(script, "await main(templateContent)") {
-		t.Error("Expected setup script to await main(templateContent)")
+	// Verify main() is awaited without parameters (template is read from file)
+	if !strings.Contains(script, "await main()") {
+		t.Error("Expected setup script to await main() without parameters")
+	}
+
+	// Verify template content is NOT passed as parameter (now read from file)
+	if strings.Contains(script, "templateContent") {
+		t.Error("Expected setup script to NOT pass templateContent parameter (should read from file)")
 	}
 }
 
