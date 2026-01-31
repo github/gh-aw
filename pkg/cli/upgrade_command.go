@@ -300,6 +300,12 @@ func updateAgentFiles(verbose bool) error {
 		return fmt.Errorf("failed to update upgrade workflows prompt: %w", err)
 	}
 
+	// Update Serena tool documentation
+	if err := ensureSerenaTool(verbose, false); err != nil {
+		upgradeLog.Printf("Failed to update Serena tool documentation: %v", err)
+		return fmt.Errorf("failed to update Serena tool documentation: %w", err)
+	}
+
 	// Upgrade copilot-setup-steps.yml version
 	actionMode := workflow.DetectActionMode(GetVersion())
 	if err := upgradeCopilotSetupSteps(verbose, actionMode, GetVersion()); err != nil {

@@ -212,6 +212,18 @@ func ensureUpgradeAgenticWorkflowsPrompt(verbose bool, skipInstructions bool) er
 	)
 }
 
+// ensureSerenaTool ensures that .github/aw/serena-tool.md contains the Serena language server tool documentation
+func ensureSerenaTool(verbose bool, skipInstructions bool) error {
+	return ensureFileMatchesTemplate(
+		filepath.Join(".github", "aw"),
+		"serena-tool.md",
+		serenaToolTemplate,
+		"Serena tool documentation",
+		verbose,
+		skipInstructions,
+	)
+}
+
 // deleteSetupAgenticWorkflowsAgent deletes the setup-agentic-workflows.agent.md file if it exists
 func deleteSetupAgenticWorkflowsAgent(verbose bool) error {
 	gitRoot, err := findGitRoot()

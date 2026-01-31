@@ -162,11 +162,8 @@ tools:
 - **Always use `safe-outputs` instead** for any GitHub write operations
 - **Do NOT recommend `mode: remote`** for GitHub tools - it requires additional configuration
 
-**General tools (Serena language server)**:
-```yaml
-tools:
-  serena: ["go"]  # Update with the repository's programming language
-```
+**Advanced static analysis tools**:
+For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
 
 ⚠️ **IMPORTANT - Default Tools**: 
 - **`edit` and `bash` are enabled by default** when sandboxing is active (no need to add explicitly)
