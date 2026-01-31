@@ -202,23 +202,18 @@ This test validates that command conditions check the correct body field for eac
 				t.Fatalf("Failed to read lock file: %v", err)
 			}
 
-			// Normalize whitespace for pattern matching - YAML formatting can split
-			// expressions across multiple lines, so we collapse all whitespace
-			// (including newlines) into single spaces for reliable matching
-			normalizedContent := strings.Join(strings.Fields(string(lockContent)), " ")
+			lockContentStr := string(lockContent)
 
 			// Check for expected patterns in the entire workflow
 			for _, expectedPattern := range tt.shouldContain {
-				normalizedPattern := strings.Join(strings.Fields(expectedPattern), " ")
-				if !strings.Contains(normalizedContent, normalizedPattern) {
+				if !strings.Contains(lockContentStr, expectedPattern) {
 					t.Errorf("Expected to find pattern '%s' in generated workflow", expectedPattern)
 				}
 			}
 
 			// Check for unexpected patterns
 			for _, unexpectedPattern := range tt.shouldNotContain {
-				normalizedUnexpected := strings.Join(strings.Fields(unexpectedPattern), " ")
-				if strings.Contains(normalizedContent, normalizedUnexpected) {
+				if strings.Contains(lockContentStr, unexpectedPattern) {
 					t.Errorf("Did not expect to find pattern '%s' in generated workflow", unexpectedPattern)
 				}
 			}

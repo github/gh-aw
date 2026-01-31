@@ -45,8 +45,7 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/security-review')) &&
+      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/security-review')) &&
       (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
       (contains(github.event.comment.body, '/security-review')))
     runs-on: ubuntu-slim

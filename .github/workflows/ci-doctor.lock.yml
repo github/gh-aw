@@ -25,7 +25,7 @@
 #
 # frontmatter-hash: 60a024446f9b09a310b0a78c3d5e00b4e4e489733862acc2c788bc525ec1ebc6
 #
-# Effective stop-time: 2026-03-01 15:52:28
+# Effective stop-time: 2026-02-09 04:24:18
 
 name: "CI Failure Doctor"
 "on":
@@ -50,9 +50,8 @@ jobs:
     needs: pre_activation
     # zizmor: ignore[dangerous-triggers] - workflow_run trigger is secured with role and fork validation
     if: >
-      (((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      (github.event.workflow_run.conclusion == 'failure')) && ((github.event_name != 'workflow_run') ||
-      ((github.event.workflow_run.repository.id == github.repository_id) &&
+      ((needs.pre_activation.outputs.activated == 'true') && (github.event.workflow_run.conclusion == 'failure')) &&
+      ((github.event_name != 'workflow_run') || ((github.event.workflow_run.repository.id == github.repository_id) &&
       (!(github.event.workflow_run.repository.fork))))
     runs-on: ubuntu-slim
     permissions:
@@ -1118,7 +1117,7 @@ jobs:
         id: check_stop_time
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_STOP_TIME: 2026-03-01 15:52:28
+          GH_AW_STOP_TIME: 2026-02-09 04:24:18
           GH_AW_WORKFLOW_NAME: "CI Failure Doctor"
         with:
           script: |

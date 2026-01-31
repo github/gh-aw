@@ -42,9 +42,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) && ((github.event_name != 'pull_request') ||
-      (github.event.pull_request.head.repo.id == github.repository_id)))
+      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.draft == false)) &&
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)))
     runs-on: ubuntu-slim
     permissions:
       contents: read

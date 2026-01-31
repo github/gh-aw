@@ -52,9 +52,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      (((github.event_name == 'issues') && ((github.event_name == 'issues') && (contains(github.event.issue.body, '/poem-bot')))) ||
-      (!(github.event_name == 'issues')))
+      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name == 'issues') && ((github.event_name == 'issues') &&
+      (contains(github.event.issue.body, '/poem-bot')))) || (!(github.event_name == 'issues')))
     runs-on: ubuntu-slim
     permissions:
       contents: read

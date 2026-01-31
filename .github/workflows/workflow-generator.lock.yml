@@ -40,9 +40,7 @@ run-name: "Workflow Generator"
 jobs:
   activation:
     needs: pre_activation
-    if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      (startsWith(github.event.issue.title, '[Workflow]'))
+    if: (needs.pre_activation.outputs.activated == 'true') && (startsWith(github.event.issue.title, '[Workflow]'))
     runs-on: ubuntu-slim
     permissions:
       contents: read

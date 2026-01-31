@@ -51,7 +51,7 @@ func TestReferencesCustomJobOutputs(t *testing.T) {
 		},
 		{
 			name:       "complex condition with custom job",
-			condition:  "((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) && (needs.ast_grep.outputs.found_patterns == 'true')",
+			condition:  "(needs.pre_activation.outputs.activated == 'true') && (needs.ast_grep.outputs.found_patterns == 'true')",
 			customJobs: map[string]any{"ast_grep": nil},
 			expected:   true,
 		},

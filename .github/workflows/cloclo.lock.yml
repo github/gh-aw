@@ -68,18 +68,15 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      ((((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request' ||
-      github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment') &&
-      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/cloclo')) || (github.event_name == 'issue_comment') &&
-      ((contains(github.event.comment.body, '/cloclo')) && (github.event.issue.pull_request == null)) ||
-      (github.event_name == 'issue_comment') &&
-      ((contains(github.event.comment.body, '/cloclo')) && (github.event.issue.pull_request != null)) ||
-      (github.event_name == 'pull_request_review_comment') &&
-      (contains(github.event.comment.body, '/cloclo')) || (github.event_name == 'pull_request') &&
-      (contains(github.event.pull_request.body, '/cloclo')) ||
-      (github.event_name == 'discussion') && (contains(github.event.discussion.body, '/cloclo')) ||
-      (github.event_name == 'discussion_comment') &&
+      (needs.pre_activation.outputs.activated == 'true') && ((((github.event_name == 'issues' || github.event_name == 'issue_comment' ||
+      github.event_name == 'pull_request' || github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' ||
+      github.event_name == 'discussion_comment') && ((github.event_name == 'issues') && (contains(github.event.issue.body, '/cloclo')) ||
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/cloclo')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/cloclo')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request_review_comment') && (contains(github.event.comment.body, '/cloclo')) ||
+      (github.event_name == 'pull_request') && (contains(github.event.pull_request.body, '/cloclo')) ||
+      (github.event_name == 'discussion') &&
+      (contains(github.event.discussion.body, '/cloclo')) || (github.event_name == 'discussion_comment') &&
       (contains(github.event.comment.body, '/cloclo')))) || (!(github.event_name == 'issues' || github.event_name == 'issue_comment' ||
       github.event_name == 'pull_request' || github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' ||
       github.event_name == 'discussion_comment'))) && ((github.event_name != 'issues') || ((github.event.action != 'labeled') ||

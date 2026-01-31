@@ -194,11 +194,7 @@ This workflow requires membership checks.
 			t.Error("Expected activation job to depend on pre_activation job")
 		}
 
-		// Verify activation job checks activated output (with skipped fallback for safe events)
-		// New format: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
-		if !strings.Contains(activationSection, "needs.pre_activation.result == 'skipped'") {
-			t.Error("Expected activation job to check if pre_activation was skipped (for safe events)")
-		}
+		// Verify activation job checks activated output
 		if !strings.Contains(activationSection, "needs.pre_activation.outputs.activated == 'true'") {
 			t.Error("Expected activation job to check pre_activation.outputs.activated")
 		}

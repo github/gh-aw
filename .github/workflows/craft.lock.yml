@@ -42,8 +42,7 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      ((needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')) &&
-      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/craft')))
+      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issues') && (contains(github.event.issue.body, '/craft')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
