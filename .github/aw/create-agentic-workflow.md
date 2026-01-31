@@ -248,23 +248,19 @@ When creating workflows that involve coding agents operating in large repositori
 
   Use this pattern when a workflow needs to process many independent units (packages, modules, directories, components) over time rather than all at once:
 
-  **Enable cache in frontmatter**:
+  **Enable cache-memory in frontmatter**:
 
   ```yaml
   tools:
-    cache:
-      enabled: true
-      keys:
-        - "last_processed_item"
-        - "processed_items"
+    cache-memory: true
   ```
 
   **In the workflow instructions**:
   1. **List all items** to process (e.g., find all packages/modules/directories)
-  2. **Read from cache** to determine what was processed last: `last_item=$(cache_get "last_processed_item")`
+  2. **Read from cache-memory** to determine what was processed last (the authoring agent should decide the data format and update the scheme to implement it)
   3. **Select next item** in round-robin fashion (next in list after last processed)
   4. **Process only that one item** - focus deeply rather than broadly
-  5. **Update cache** before finishing: `cache_set "last_processed_item" "$current_item"`
+  5. **Update cache-memory** before finishing with the current item state
   6. **Track processed items** to reset cycle: maintain a list of processed items and reset when all are done
 
   **Benefits**:
