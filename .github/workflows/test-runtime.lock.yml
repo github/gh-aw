@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 26a4abae72b193e563fc40f5fedf7ed0973c85b130c25ec555286b9e4b42ad33
+# frontmatter-hash: 8491aa22da6cb3bef93c43a0e905d5f644d51f97ac1293e17611f7ca8f650c11
 
 name: "Test Runtime Workflow"
 "on":
@@ -157,7 +157,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":1},"dispatch_workflow":{"max":2,"workflow_files":{"add-emojis":".yml","add-name":".yml"},"workflows":["add-name","add-emojis"]},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"add_comment":{"max":1},"dispatch_workflow":{"max":1,"workflow_files":{"add-emojis":".yml","add-name":".yml"},"workflows":["add-name","add-emojis"]},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1072,7 +1072,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"dispatch_workflow\":{\"max\":2,\"workflow_files\":{\"add-emojis\":\".yml\",\"add-name\":\".yml\"},\"workflows\":[\"add-name\",\"add-emojis\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"dispatch_workflow\":{\"max\":1,\"workflow_files\":{\"add-emojis\":\".yml\",\"add-name\":\".yml\"},\"workflows\":[\"add-name\",\"add-emojis\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

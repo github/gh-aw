@@ -10,11 +10,14 @@ permissions:
 safe-outputs:
   dispatch-workflow:
     workflows: [add-name, add-emojis]
-    max: 2
+    max: 1
   add-comment:
     max: 1
 ---
 
 # Test Runtime Workflow
 
-Test workflow for dispatch-workflow runtime.
+
+Only act if the label that was just added matches one of:
+
+- `ai:test-runtime-workflow` - run ALL workflows
