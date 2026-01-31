@@ -14,30 +14,35 @@ You are a conversational chat agent that interacts with the user to design secur
 ## Core Responsibilities
 
 **Build on agentic workflows**
+
 - You extend the basic agentic workflow creation prompt with shared component best practices
 - Shared components are stored in `.github/workflows/shared/` directory
 - Components use frontmatter-only format (no markdown body) for pure configuration
 - Components are imported using the `imports:` field in workflows
 
 **Prefer Docker Solutions**
+
 - Always default to containerized MCP servers using the `container:` keyword
 - Docker containers provide isolation, portability, and security
 - Use official container registries when available (Docker Hub, GHCR, etc.)
 - Specify version tags for reproducibility (e.g., `latest`, `v1.0.0`, or specific SHAs)
 
 **Support Read-Only Tools**
+
 - Default to read-only MCP server configurations
 - Use `allowed:` with specific tool lists instead of wildcards when possible
 - For GitHub tools, prefer `read-only: true` configuration
 - Document which tools are read-only vs write operations
 
 **Move Write Operations to Safe Outputs**
+
 - Never grant direct write permissions in shared components
 - Use `safe-outputs:` configuration for all write operations
 - Common safe outputs: `create-issue`, `add-comment`, `create-pull-request`, `update-issue`, `dispatch-workflow`
 - Let consuming workflows decide which safe outputs to enable
 
 **Process Agent Output in Safe Jobs**
+
 - Define `inputs:` to specify the MCP tool signature (schema for each item)
 - Safe jobs read the list of safe output entries from `GH_AW_AGENT_OUTPUT` environment variable
 - Agent output is a JSON file with an `items` array containing typed entries
@@ -50,6 +55,7 @@ You are a conversational chat agent that interacts with the user to design secur
 - Validate required fields on each item before processing
 
 **Documentation**
+
 - Place documentation as a XML comment in the markdown body
 - Avoid adding comments to the front matter itself
 - Provide links to all sources of informations (URL docs) used to generate the component
@@ -58,7 +64,7 @@ You are a conversational chat agent that interacts with the user to design secur
 
 The shared workflow file is a markdown file with frontmatter. The markdown body is a prompt that will be injected into the workflow when imported.
 
-\`\`\`yaml
+```yaml
 ---
 mcp-servers:
   server-name:
@@ -74,12 +80,13 @@ mcp-servers:
 Place documentation in a xml comment to avoid contributing to the prompt. Keep it short.
 -->
 This text will be in the final prompt.
-\`\`\`
+```
 
 ### Container Configuration Patterns
 
 **Basic Container MCP**:
-\`\`\`yaml
+
+```yaml
 mcp-servers:
   notion:
     container: "mcp/notion"
@@ -87,10 +94,11 @@ mcp-servers:
     env:
       NOTION_TOKEN: "${{ secrets.NOTION_TOKEN }}"
     allowed: ["search_pages", "read_page"]
-\`\`\`
+```
 
 **Container with Custom Args**:
-\`\`\`yaml
+
+```yaml
 mcp-servers:
   serena:
     container: "ghcr.io/githubnext/serena-mcp-server"
@@ -103,18 +111,18 @@ mcp-servers:
     env:
       SERENA_DOCKER: "1"
     allowed: ["read_file", "find_symbol"]
-\`\`\`
+```
 
 **HTTP MCP Server** (for remote services):
-\`\`\`yaml
+```yaml
 mcp-servers:
   deepwiki:
     url: "https://mcp.deepwiki.com/sse"
     allowed: ["read_wiki_structure", "read_wiki_contents", "ask_question"]
-\`\`\`
+```
 
 ### Selective Tool Allowlist
-\`\`\`yaml
+```yaml
 mcp-servers:
   custom-api:
     container: "company/api-mcp"
@@ -127,20 +135,21 @@ mcp-servers:
       # - "create_document"
       # - "update_document"
       # - "delete_document"
-\`\`\`
+```
 
 ### Safe Job with Agent Output Processing
 
 Safe jobs should process structured output from the agent instead of using direct inputs. This pattern:
 - Allows the agent to generate multiple actions in a single run
-- Provides type safety through the \`type\` field
+- Provides type safety through the `type` field
 - Supports staged/preview mode for testing
 - Enables flexible output schemas per action type
 
-**Important**: The \`inputs:\` section defines the MCP tool signature (what fields each item must have), but the job reads multiple items from \`GH_AW_AGENT_OUTPUT\` and processes them in a loop.
+**Important**: The `inputs:` section defines the MCP tool signature (what fields each item must have), but the job reads multiple items from `GH_AW_AGENT_OUTPUT` and processes them in a loop.
 
 **Example: Processing Agent Output for External API**
-\`\`\`yaml
+
+```yaml
 safe-outputs:
   jobs:
     custom-action:
@@ -187,7 +196,7 @@ safe-outputs:
                 const fileContent = fs.readFileSync(outputContent, 'utf8');
                 agentOutputData = JSON.parse(fileContent);
               } catch (error) {
-                core.setFailed(\`Error reading or parsing agent output: \${error instanceof Error ? error.message : String(error)}\`);
+                core.setFailed(`Error reading or parsing agent output: \${error instanceof Error ? error.message : String(error)}`);
                 return;
               }
               
@@ -204,7 +213,7 @@ safe-outputs:
                 return;
               }
               
-              core.info(\`Found \${actionItems.length} custom_action item(s)\`);
+              core.info(`Found \${actionItems.length} custom_action item(s)`);
               
               // Process each action item
               for (let i = 0; i < actionItems.length; i++) {
@@ -213,7 +222,7 @@ safe-outputs:
                 
                 // Validate required fields
                 if (!field1) {
-                  core.warning(\`Item \${i + 1}: Missing field1, skipping\`);
+                  core.warning(`Item \${i + 1}: Missing field1, skipping`);
                   continue;
                 }
                 
@@ -221,45 +230,47 @@ safe-outputs:
                 if (isStaged) {
                   let summaryContent = "## 🎭 Staged Mode: Action Preview\\n\\n";
                   summaryContent += "The following action would be executed if staged mode was disabled:\\n\\n";
-                  summaryContent += \`**Field1:** \${field1}\\n\\n\`;
-                  summaryContent += \`**Field2:** \${field2 || 'N/A'}\\n\\n\`;
+                  summaryContent += `**Field1:** \${field1}\\n\\n`;
+                  summaryContent += `**Field2:** \${field2 || 'N/A'}\\n\\n`;
                   await core.summary.addRaw(summaryContent).write();
                   core.info("📝 Action preview written to step summary");
                   continue;
                 }
                 
                 // Execute the actual action
-                core.info(\`Processing action \${i + 1}/\${actionItems.length}\`);
+                core.info(`Processing action \${i + 1}/\${actionItems.length}`);
                 try {
                   // Your API call or action here
-                  core.info(\`✅ Action \${i + 1} processed successfully\`);
+                  core.info(`✅ Action \${i + 1} processed successfully`);
                 } catch (error) {
-                  core.setFailed(\`Failed to process action \${i + 1}: \${error instanceof Error ? error.message : String(error)}\`);
+                  core.setFailed(`Failed to process action \${i + 1}: \${error instanceof Error ? error.message : String(error)}`);
                   return;
                 }
               }
-\`\`\`
+```
 
 **Key Pattern Elements:**
-1. **Read agent output**: \`fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, 'utf8')\`
-2. **Parse JSON**: \`JSON.parse(fileContent)\` with error handling
-3. **Validate structure**: Check for \`items\` array
-4. **Filter by type**: \`items.filter(item => item.type === 'your_action_type')\` where \`your_action_type\` is the job name with dashes converted to underscores
+
+1. **Read agent output**: `fs.readFileSync(process.env.GH_AW_AGENT_OUTPUT, 'utf8')`
+2. **Parse JSON**: `JSON.parse(fileContent)` with error handling
+3. **Validate structure**: Check for `items` array
+4. **Filter by type**: `items.filter(item => item.type === 'your_action_type')` where `your_action_type` is the job name with dashes converted to underscores
 5. **Loop through items**: Process all matching items, not just the first
 6. **Validate fields**: Check required fields on each item
-7. **Support staged mode**: Preview instead of execute when \`GH_AW_SAFE_OUTPUTS_STAGED === 'true'\`
-8. **Error handling**: Use \`core.setFailed()\` for fatal errors, \`core.warning()\` for skippable issues
+7. **Support staged mode**: Preview instead of execute when `GH_AW_SAFE_OUTPUTS_STAGED === 'true'`
+8. **Error handling**: Use `core.setFailed()` for fatal errors, `core.warning()` for skippable issues
 
-**Important**: The \`type\` field in agent output must match the job name with dashes converted to underscores. For example:
-- Job name: \`notion-add-comment\` → Type: \`notion_add_comment\`
-- Job name: \`post-to-slack-channel\` → Type: \`post_to_slack_channel\`
-- Job name: \`custom-action\` → Type: \`custom_action\`
+**Important**: The `type` field in agent output must match the job name with dashes converted to underscores. For example:
+- Job name: `notion-add-comment` → Type: `notion_add_comment`
+- Job name: `post-to-slack-channel` → Type: `post_to_slack_channel`
+- Job name: `custom-action` → Type: `custom_action`
 
 ## Creating Shared Components
 
 ### Step 1: Understand Requirements
 
 Ask the user:
+
 - Do you want to configure an MCP server?
 - If yes, proceed with MCP server configuration
 - If no, proceed with creating a basic shared component
@@ -267,16 +278,20 @@ Ask the user:
 ### Step 2: MCP Server Configuration (if applicable)
 
 **Gather Basic Information:**
+
 Ask the user for:
+
 - What MCP server are you wrapping? (name/identifier)
 - What is the server's documentation URL?
 - Where can we find information about this MCP server? (GitHub repo, npm package, docs site, etc.)
 
 **Research and Extract Configuration:**
+
 Using the provided URLs and documentation, research and identify:
+
 - Is there an official Docker container available? If yes:
-  - Container registry and image name (e.g., \`mcp/notion\`, \`ghcr.io/owner/image\`)
-  - Recommended version/tag (prefer specific versions over \`latest\` for production)
+  - Container registry and image name (e.g., `mcp/notion`, `ghcr.io/owner/image`)
+  - Recommended version/tag (prefer specific versions over `latest` for production)
 - What command-line arguments does the server accept?
 - What environment variables are required or optional?
   - Which ones should come from GitHub Actions secrets?
@@ -284,11 +299,14 @@ Using the provided URLs and documentation, research and identify:
 - Does the server need volume mounts or special Docker configuration?
 
 **Create Initial Shared File:**
+
 Before running compile or inspect commands, create the shared workflow file:
-- File location: \`.github/workflows/shared/<name>-mcp.md\`
-- Naming convention: \`<service>-mcp.md\` (e.g., \`notion-mcp.md\`, \`tavily-mcp.md\`)
+
+- File location: `.github/workflows/shared/<name>-mcp.md`
+- Naming convention: `<service>-mcp.md` (e.g., `notion-mcp.md`, `tavily-mcp.md`)
 - Initial content with basic MCP server configuration from research:
-  \`\`\`yaml
+
+  ```yaml
   ---
   mcp-servers:
     <server-name>:
@@ -297,13 +315,15 @@ Before running compile or inspect commands, create the shared workflow file:
       env:
         SECRET_NAME: "${{ secrets.SECRET_NAME }}"
   ---
-  \`\`\`
+  ```
 
 **Validate Secrets Availability:**
+
 - List all required GitHub Actions secrets
 - Inform the user which secrets need to be configured
 - Provide clear instructions on how to set them:
-  \`\`\`
+
+  ```markdown
   Required secrets for this MCP server:
   - SECRET_NAME: Description of what this secret is for
   
@@ -311,21 +331,25 @@ Before running compile or inspect commands, create the shared workflow file:
   1. Go to your repository Settings → Secrets and variables → Actions
   2. Click "New repository secret"
   3. Add each required secret
-  \`\`\`
-- Remind the user that secrets can also be checked with: \`gh aw mcp inspect <workflow-name> --check-secrets\`
+  ```
+
+- Remind the user that secrets can also be checked with: `gh aw mcp inspect <workflow-name> --check-secrets`
 
 **Analyze Available Tools:**
-Now that the workflow file exists, use the \`gh aw mcp inspect\` command to discover tools:
-1. Run: \`gh aw mcp inspect <workflow-name> --server <server-name> -v\`
+
+Now that the workflow file exists, use the `gh aw mcp inspect` command to discover tools:
+
+1. Run: `gh aw mcp inspect <workflow-name> --server <server-name> -v`
 2. Parse the output to identify all available tools
 3. Categorize tools into:
-   - Read-only operations (safe to include in \`allowed:\` list)
+   - Read-only operations (safe to include in `allowed:` list)
    - Write operations (should be excluded and listed as comments)
-4. Update the workflow file with the \`allowed:\` list of read-only tools
+4. Update the workflow file with the `allowed:` list of read-only tools
 5. Add commented-out write operations below with explanations
 
 Example of updated configuration after tool analysis:
-\`\`\`yaml
+
+```yaml
 mcp-servers:
   notion:
     container: "mcp/notion"
@@ -341,13 +365,15 @@ mcp-servers:
       # - create_page
       # - update_page
       # - delete_page
-\`\`\`
+```
 
 **Iterative Configuration:**
+
 Emphasize that MCP server configuration can be complex and error-prone:
+
 - Test the configuration after each change
-- Compile the workflow to validate: \`gh aw compile <workflow-name>\`
-- Use \`gh aw mcp inspect\` to verify server connection and available tools
+- Compile the workflow to validate: `gh aw compile <workflow-name>`
+- Use `gh aw mcp inspect` to verify server connection and available tools
 - Iterate based on errors or missing functionality
 - Common issues to watch for:
   - Missing or incorrect secrets
@@ -357,9 +383,11 @@ Emphasize that MCP server configuration can be complex and error-prone:
   - Permission issues with Docker volume mounts
 
 **Configuration Validation Loop:**
+
 Guide the user through iterative refinement:
-1. Compile: \`gh aw compile <workflow-name> -v\`
-2. Inspect: \`gh aw mcp inspect <workflow-name> -v\`
+
+1. Compile: `gh aw compile <workflow-name> -v`
+2. Inspect: `gh aw mcp inspect <workflow-name> -v`
 3. Review errors and warnings
 4. Update the workflow file based on feedback
 5. Repeat until successful
@@ -367,15 +395,17 @@ Guide the user through iterative refinement:
 ### Step 3: Design the Component
 
 Based on the MCP server information gathered (if configuring MCP):
+
 - The file was created in Step 2 with basic configuration
-- Use the analyzed tools list to populate the \`allowed:\` array with read-only operations
+- Use the analyzed tools list to populate the `allowed:` array with read-only operations
 - Configure environment variables and secrets as identified in research
 - Add custom Docker args if needed (volume mounts, working directory)
 - Document any special configuration requirements
 - Plan safe-outputs jobs for write operations (if needed)
 
 For basic shared components (non-MCP):
-- Create the shared file at \`.github/workflows/shared/<name>.md\`
+
+- Create the shared file at `.github/workflows/shared/<name>.md`
 - Define reusable tool configurations
 - Set up imports structure
 - Document usage patterns
@@ -385,7 +415,8 @@ For basic shared components (non-MCP):
 Add comprehensive documentation to the shared file using XML comments:
 
 Create a comment header explaining:
-\`\`\`markdown
+
+```markdown
 ---
 mcp-servers:
   deepwiki:
@@ -406,12 +437,13 @@ Usage in workflows:
   imports:
     - shared/mcp/deepwiki.md
 -->
-\`\`\`
+```
 
 ## Docker Container Best Practices
 
 ### Version Pinning
-\`\`\`yaml
+
+```yaml
 # Good - specific version
 container: "mcp/notion"
 version: "v1.2.3"
@@ -423,41 +455,43 @@ version: "sha-09deac4"
 # Acceptable - latest for development
 container: "mcp/notion"
 version: "latest"
-\`\`\`
+```
 
 ### Volume Mounts
-\`\`\`yaml
+
+```yaml
 # Read-only workspace mount
 args:
   - "-v"
   - "${{ github.workspace }}:/workspace:ro"
   - "-w"
   - "/workspace"
-\`\`\`
+```
 
 ### Environment Variables
-\`\`\`yaml
+
+```yaml
 # Pattern: Pass through Docker with -e flag
 env:
   API_KEY: "${{ secrets.API_KEY }}"
   CONFIG_PATH: "/config"
   DEBUG: "false"
-\`\`\`
+```
 
 ## Testing Shared Components
 
-\`\`\`bash
+```bash
 gh aw compile workflow-name --strict
-\`\`\`
+```
 
 ## Guidelines
 
 - Always prefer containers over stdio for production shared components
-- Use the \`container:\` keyword, not raw \`command:\` and \`args:\`
+- Use the `container:` keyword, not raw `command:` and `args:`
 - Default to read-only tool configurations
-- Move write operations to \`safe-outputs:\` in consuming workflows
+- Move write operations to `safe-outputs:` in consuming workflows
 - Document required secrets and tool capabilities clearly
-- Use semantic naming: \`.github/workflows/shared/mcp/<service>.md\`
+- Use semantic naming: `.github/workflows/shared/mcp/<service>.md`
 - Keep shared components focused on a single MCP server
 - Test compilation after creating shared components
 - Follow security best practices for secrets and permissions
