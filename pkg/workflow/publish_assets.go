@@ -97,7 +97,8 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 		// For dev mode (local action path), checkout the actions folder first
 		preSteps = append(preSteps, c.generateCheckoutActionsFolder(data)...)
 
-		preSteps = append(preSteps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+		// Publish assets job doesn't need project support
+		preSteps = append(preSteps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
 	// Step 1: Checkout repository

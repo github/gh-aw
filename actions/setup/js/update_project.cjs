@@ -1027,11 +1027,11 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single update_project message
    * @param {Object} message - The update_project message to process
-   * @param {Map<string, string>} temporaryProjectMap - Map of temporary project IDs to actual URLs
-   * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
    * @returns {Promise<Object>} Result with success/error status
    */
-  return async function handleUpdateProject(message, temporaryProjectMap, temporaryIdMap = new Map()) {
+  return async function handleUpdateProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping update_project: max count of ${maxCount} reached`);
@@ -1076,7 +1076,6 @@ async function main(config = {}) {
       processedCount++;
 
       // Resolve temporary project ID if present
-
       if (effectiveProjectUrl && typeof effectiveProjectUrl === "string") {
         // Strip # prefix if present
         const projectStr = effectiveProjectUrl.trim();
@@ -1084,10 +1083,11 @@ async function main(config = {}) {
 
         // Check if it's a temporary ID (aw_XXXXXXXXXXXX)
         if (/^aw_[0-9a-f]{12}$/i.test(projectWithoutHash)) {
-          const resolved = temporaryProjectMap.get(projectWithoutHash.toLowerCase());
-          if (resolved) {
-            core.info(`Resolved temporary project ID ${projectStr} to ${resolved}`);
-            effectiveProjectUrl = resolved;
+          // Look up in the unified temporaryIdMap
+          const resolved = temporaryIdMap.get(projectWithoutHash.toLowerCase());
+          if (resolved && resolved.projectUrl) {
+            core.info(`Resolved temporary project ID ${projectStr} to ${resolved.projectUrl}`);
+            effectiveProjectUrl = resolved.projectUrl;
           } else {
             throw new Error(`Temporary project ID '${projectStr}' not found. Ensure create_project was called before update_project.`);
           }
