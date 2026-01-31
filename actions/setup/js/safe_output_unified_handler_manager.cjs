@@ -934,10 +934,14 @@ async function main() {
     const configs = loadConfig();
     core.debug(`Configuration: regular=${JSON.stringify(Object.keys(configs.regular))}, project=${JSON.stringify(Object.keys(configs.project))}`);
 
-    // Setup separate Octokit client for project handlers if needed
+    // Setup separate Octokit client for project handlers ONLY if project types are configured
+    // This avoids unnecessary Octokit instantiation and token validation when not needed
     let projectOctokit = null;
     if (Object.keys(configs.project).length > 0) {
+      core.info("Project handler types detected - setting up separate Octokit client");
       projectOctokit = setupProjectGitHubClient();
+    } else {
+      core.debug("No project handler types configured - skipping project Octokit setup");
     }
 
     // Load agent output
