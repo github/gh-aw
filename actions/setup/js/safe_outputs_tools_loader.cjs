@@ -27,6 +27,16 @@ function loadTools(server) {
     server.debug(`Tools file read successfully, attempting to parse JSON`);
     const tools = JSON.parse(toolsFileContent);
     server.debug(`Successfully parsed ${tools.length} tools from file`);
+
+    // Log details about dispatch_workflow tools for debugging
+    const dispatchWorkflowTools = tools.filter(t => t._workflow_name);
+    if (dispatchWorkflowTools.length > 0) {
+      server.debug(`  Found ${dispatchWorkflowTools.length} dispatch_workflow tools:`);
+      dispatchWorkflowTools.forEach(t => {
+        server.debug(`    - ${t.name} (workflow: ${t._workflow_name})`);
+      });
+    }
+
     return tools;
   } catch (error) {
     server.debug(`Error reading tools file: ${getErrorMessage(error)}`);
