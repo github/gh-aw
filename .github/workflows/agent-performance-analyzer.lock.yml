@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 1a5add07403c04ac323f0d46e5732df0c9dedd3c5145b72ddda43dae416bc324
+# frontmatter-hash: f7ba17ae6c234dae7ffe7727c4e022446952056ce100a70cdf4c88b4512bb629
 
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":
@@ -200,7 +200,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":10},"create_discussion":{"expires":168,"max":2},"create_issue":{"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"add_comment":{"max":10},"create_discussion":{"expires":168,"max":2},"create_issue":{"expires":48,"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1346,7 +1346,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"expires\":168,\"max\":2},\"create_issue\":{\"group\":true,\"labels\":[\"cookie\"],\"max\":5},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":10},\"create_discussion\":{\"expires\":168,\"max\":2},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"cookie\"],\"max\":5},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

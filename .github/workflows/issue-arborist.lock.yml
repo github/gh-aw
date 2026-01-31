@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/jqschema.md
 #
-# frontmatter-hash: f65b8630d8da1e9da539ae7b1220033d52d9ed9eba8a1b37e8a842cb03a1f40d
+# frontmatter-hash: 2fbb2b30aa792184dec5c05292b9d2ffdca4324cafef26a4b70123866479c826
 
 name: "Issue Arborist"
 "on":
@@ -176,7 +176,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_discussion":{"expires":168,"max":1},"create_issue":{"group":true,"max":5},"link_sub_issue":{"max":50},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_discussion":{"expires":168,"max":1},"create_issue":{"expires":48,"group":true,"max":5},"link_sub_issue":{"max":50},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1203,7 +1203,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"Audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[Issue Arborist] \"},\"create_issue\":{\"group\":true,\"max\":5,\"title_prefix\":\"[Parent] \"},\"link_sub_issue\":{\"max\":50},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"Audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[Issue Arborist] \"},\"create_issue\":{\"expires\":48,\"group\":true,\"max\":5,\"title_prefix\":\"[Parent] \"},\"link_sub_issue\":{\"max\":50},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

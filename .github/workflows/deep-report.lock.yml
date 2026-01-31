@@ -28,7 +28,7 @@
 #     - shared/reporting.md
 #     - shared/weekly-issues-data-fetch.md
 #
-# frontmatter-hash: 01184a6177c0410bccf9f7358f44cf5b2ce8d7f79a465bae35bde77748dfb14c
+# frontmatter-hash: 6ee2f9512eec75167c5dc8c792424c723a5147d846c02bb3da48daa173ac45a8
 
 name: "DeepReport - Intelligence Gathering Agent"
 "on":
@@ -218,7 +218,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_discussion":{"expires":168,"max":1},"create_issue":{"group":true,"max":3},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
+          {"create_discussion":{"expires":168,"max":1},"create_issue":{"expires":48,"group":true,"max":3},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1536,7 +1536,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"reports\",\"close_older_discussions\":true,\"expires\":168,\"max\":1},\"create_issue\":{\"group\":true,\"labels\":[\"automation\",\"improvement\",\"quick-win\",\"cookie\"],\"max\":3,\"title_prefix\":\"[deep-report] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"reports\",\"close_older_discussions\":true,\"expires\":168,\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"automation\",\"improvement\",\"quick-win\",\"cookie\"],\"max\":3,\"title_prefix\":\"[deep-report] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

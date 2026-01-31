@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
-# frontmatter-hash: 655dfa6750abc34cbe9949b13307eaaf31a986ad38ecab6cb0255c2ab2df3158
+# frontmatter-hash: 38b0ad5430565f4152442d2397e3eb1d45abf9dbc7b123eee156dd25b2799037
 
 name: "Dependabot Burner"
 "on":
@@ -167,7 +167,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"expires":48,"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1357,7 +1357,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"max\":5},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

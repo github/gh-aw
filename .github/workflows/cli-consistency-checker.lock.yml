@@ -21,7 +21,7 @@
 #
 # Inspects the gh-aw CLI to identify inconsistencies, typos, bugs, or documentation gaps by running commands and analyzing output
 #
-# frontmatter-hash: 57da17ad6864cfab7198de57987a7d0f72d037aaff6f6abb01d632c64bf041dc
+# frontmatter-hash: d13dbdc2a7d699f7c0926196340c1111e4f173de0d5661b2878a388bc1bd5fef
 
 name: "CLI Consistency Checker"
 "on":
@@ -159,7 +159,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"group":true,"max":6},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":48,"group":true,"max":6},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1006,7 +1006,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"group\":true,\"labels\":[\"automation\",\"cli\",\"documentation\",\"cookie\"],\"max\":6,\"title_prefix\":\"[cli-consistency] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"automation\",\"cli\",\"documentation\",\"cookie\"],\"max\":6,\"title_prefix\":\"[cli-consistency] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: a970978fa32b6d3b04993533cbca485ce6bbd4efa7ee67873afacb12df17b99f
+# frontmatter-hash: 53bdcf5bfa526ed222aca60778b257254ab93a98ffe366bd11542ba9be577322
 
 name: "Super Linter Report"
 "on":
@@ -182,7 +182,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":48,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1114,7 +1114,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"automation\",\"code-quality\",\"cookie\"],\"max\":1,\"title_prefix\":\"[linter] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"labels\":[\"automation\",\"code-quality\",\"cookie\"],\"max\":1,\"title_prefix\":\"[linter] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

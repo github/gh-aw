@@ -21,7 +21,7 @@
 #
 # Generates project plans and task breakdowns when invoked with /plan command in issues or PRs
 #
-# frontmatter-hash: ab8a4fe978deccb568a6af2df6aa4ffca3282b1a37f6d107d44a9267b31b8048
+# frontmatter-hash: 345df14c463f1dddcf3c410e1382e182b37c6b9a6d66fda36b4c348d080352a9
 
 name: "Plan Command"
 "on":
@@ -193,7 +193,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"close_discussion":{"max":1,"required_category":"Ideas"},"create_issue":{"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"close_discussion":{"max":1,"required_category":"Ideas"},"create_issue":{"expires":48,"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1164,7 +1164,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":1},\"create_issue\":{\"group\":true,\"labels\":[\"plan\",\"ai-generated\",\"cookie\"],\"max\":5,\"title_prefix\":\"[plan] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"plan\",\"ai-generated\",\"cookie\"],\"max\":5,\"title_prefix\":\"[plan] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

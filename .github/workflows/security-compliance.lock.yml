@@ -21,7 +21,7 @@
 #
 # Fix critical vulnerabilities before audit deadline with full tracking and reporting
 #
-# frontmatter-hash: 43b89d03f7954f0e373a176735a41ad7f50978db4283319d36511dde71e067e9
+# frontmatter-hash: 314b05878ec7e997e4ae2f93a29daa3885c8dae8e4755174a590d3e5bf0acb87
 
 name: "Security Compliance Campaign"
 "on":
@@ -174,7 +174,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"group":true,"max":100},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":48,"group":true,"max":100},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1115,7 +1115,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"group\":true,\"labels\":[\"security\",\"campaign-tracker\",\"cookie\"],\"max\":100},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"security\",\"campaign-tracker\",\"cookie\"],\"max\":100},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

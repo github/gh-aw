@@ -26,7 +26,7 @@
 #     - shared/reporting.md
 #     - shared/safe-output-app.md
 #
-# frontmatter-hash: f185ec9666d67ff97e552d190ff847bafe95de163db66b0910f7e9ffbed70a46
+# frontmatter-hash: 3687bc9aff3f0f8510571312acbf7558c46448c763999e1ad64c675d3348b9e4
 
 name: "Daily File Diet"
 "on":
@@ -166,7 +166,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":48,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1202,7 +1202,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"refactoring\",\"code-health\",\"automated-analysis\",\"cookie\"],\"max\":1,\"title_prefix\":\"[file-diet] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"labels\":[\"refactoring\",\"code-health\",\"automated-analysis\",\"cookie\"],\"max\":1,\"title_prefix\":\"[file-diet] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ steps.safe-outputs-app-token.outputs.token }}
           script: |

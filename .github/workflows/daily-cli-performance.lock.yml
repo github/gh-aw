@@ -26,7 +26,7 @@
 #     - shared/go-make.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: eb8004d0cd209c564390b9ab798b7663dedbf717bbe1c23343a676793df96a72
+# frontmatter-hash: 851d537dfa3f33b22c99d4acb7984284ad1f35b759da4ebd7b570794a2a81446
 
 name: "Daily CLI Performance Agent"
 "on":
@@ -173,7 +173,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":5},"create_issue":{"group":true,"max":3},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"add_comment":{"max":5},"create_issue":{"expires":48,"group":true,"max":3},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1409,7 +1409,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":5},\"create_issue\":{\"group\":true,\"labels\":[\"performance\",\"automation\",\"cookie\"],\"max\":3,\"title_prefix\":\"[performance] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":5},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"performance\",\"automation\",\"cookie\"],\"max\":3,\"title_prefix\":\"[performance] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

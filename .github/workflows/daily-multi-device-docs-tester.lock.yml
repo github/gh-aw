@@ -26,7 +26,7 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: f7fbac522d88e59d1f3c9fd09668c70e4a89cdd5b8c1c1f7bcccc8708797b5d7
+# frontmatter-hash: 40ea4735c0bedebd0fac0b6929973ec25d6077eccc43afc23b4cab261967f989
 
 name: "Multi-Device Docs Tester"
 "on":
@@ -175,7 +175,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
+          {"create_issue":{"expires":48,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1324,7 +1324,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"cookie\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"labels\":[\"cookie\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

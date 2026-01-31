@@ -23,7 +23,7 @@
 #
 # Source: githubnext/agentics/workflows/ci-doctor.md@ea350161ad5dcc9624cf510f134c6a9e39a6f94d
 #
-# frontmatter-hash: cc92e5f42dcb7786c09439144562e538662820b59d2e49d8b23c79e75fce6037
+# frontmatter-hash: f430896914b2e4529a1543146065fc41191053493ec76f5f47c3ee9591b72221
 #
 # Effective stop-time: 2026-02-09 04:24:18
 
@@ -185,7 +185,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":1},"create_issue":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"add_comment":{"max":1},"create_issue":{"expires":48,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1134,7 +1134,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_issue\":{\"labels\":[\"cookie\"],\"max\":1,\"title_prefix\":\"[CI Failure Doctor] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_issue\":{\"expires\":48,\"labels\":[\"cookie\"],\"max\":1,\"title_prefix\":\"[CI Failure Doctor] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
