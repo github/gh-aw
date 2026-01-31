@@ -284,7 +284,7 @@ async function main(config = {}) {
    * @param {Object} resolvedTemporaryIds - Map of temporary IDs (unused for copy_project)
    * @returns {Promise<Object>} Result with success/error status and project details
    */
-  return async function handleCopyProject(message, resolvedTemporaryIds) {
+  return async function handleCopyProject(message, temporaryProjectMap, temporaryIdMap = {}) {
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping copy_project: max count of ${maxCount} reached`);

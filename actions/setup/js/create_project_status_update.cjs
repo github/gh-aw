@@ -284,7 +284,7 @@ async function main(config = {}) {
    * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
    * @returns {Promise<Object>} Result with success/error status and status update details
    */
-  return async function handleCreateProjectStatusUpdate(message, resolvedTemporaryIds) {
+  return async function handleCreateProjectStatusUpdate(message, temporaryProjectMap, temporaryIdMap = {}) {
     // Check if we've hit the max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping create-project-status-update: max count of ${maxCount} reached`);
