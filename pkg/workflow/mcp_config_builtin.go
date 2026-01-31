@@ -1,6 +1,6 @@
 // Package workflow provides built-in MCP server configuration rendering.
 //
-// Built-in MCP Servers
+// # Built-in MCP Servers
 //
 // This file implements rendering functions for gh-aw's built-in MCP servers:
 // safe-outputs, agentic-workflows, and their variations. These servers provide
@@ -69,29 +69,31 @@
 //   - safe_inputs.go: Safe-inputs configuration (similar pattern)
 //
 // Example safe-outputs config:
-//   {
-//     "safe_outputs": {
-//       "type": "http",
-//       "url": "http://host.docker.internal:$GH_AW_SAFE_OUTPUTS_PORT",
-//       "headers": {
-//         "Authorization": "$GH_AW_SAFE_OUTPUTS_API_KEY"
-//       }
-//     }
-//   }
+//
+//	{
+//	  "safe_outputs": {
+//	    "type": "http",
+//	    "url": "http://host.docker.internal:$GH_AW_SAFE_OUTPUTS_PORT",
+//	    "headers": {
+//	      "Authorization": "$GH_AW_SAFE_OUTPUTS_API_KEY"
+//	    }
+//	  }
+//	}
 //
 // Example agentic-workflows config:
-//   {
-//     "agentic_workflows": {
-//       "type": "stdio",
-//       "container": "alpine:3.20",
-//       "entrypoint": "/opt/gh-aw/gh-aw",
-//       "entrypointArgs": ["mcp-server"],
-//       "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", ...],
-//       "env": {
-//         "GITHUB_TOKEN": "$GITHUB_TOKEN"
-//       }
-//     }
-//   }
+//
+//	{
+//	  "agentic_workflows": {
+//	    "type": "stdio",
+//	    "container": "alpine:3.20",
+//	    "entrypoint": "/opt/gh-aw/gh-aw",
+//	    "entrypointArgs": ["mcp-server"],
+//	    "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", ...],
+//	    "env": {
+//	      "GITHUB_TOKEN": "$GITHUB_TOKEN"
+//	    }
+//	  }
+//	}
 package workflow
 
 import (

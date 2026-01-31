@@ -1,6 +1,6 @@
 // Package workflow provides Playwright MCP server configuration and Docker setup.
 //
-// Playwright MCP Server
+// # Playwright MCP Server
 //
 // This file handles the configuration and rendering of the Playwright MCP server,
 // which provides AI agents with browser automation capabilities through the
@@ -46,16 +46,17 @@
 //   - mcp_setup_generator.go: Includes Playwright in setup sequence
 //
 // Example configuration:
-//   tools:
-//     playwright:
-//       version: v1.41.0
-//       allowed_domains:
-//         - github.com
-//         - api.github.com
-//         - ${{ secrets.CUSTOM_DOMAIN }}
-//       custom_args:
-//         - --debug
-//         - --timeout=30000
+//
+//	tools:
+//	  playwright:
+//	    version: v1.41.0
+//	    allowed_domains:
+//	      - github.com
+//	      - api.github.com
+//	      - ${{ secrets.CUSTOM_DOMAIN }}
+//	    custom_args:
+//	      - --debug
+//	      - --timeout=30000
 package workflow
 
 import (

@@ -1,6 +1,6 @@
 // Package workflow provides constants for MCP gateway configuration.
 //
-// MCP Gateway Constants
+// # MCP Gateway Constants
 //
 // This file defines default values and constants used by the MCP gateway
 // throughout the workflow compilation process. These constants ensure

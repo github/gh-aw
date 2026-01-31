@@ -1,6 +1,6 @@
 // Package workflow provides GitHub Actions setup step generation for MCP servers.
 //
-// MCP Setup Generator
+// # MCP Setup Generator
 //
 // This file generates the complete setup sequence for MCP servers in GitHub Actions
 // workflows. It orchestrates the initialization of all MCP tools including built-in

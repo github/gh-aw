@@ -1,6 +1,6 @@
 // Package workflow provides environment variable management for MCP server execution.
 //
-// MCP Environment Variables
+// # MCP Environment Variables
 //
 // This file is responsible for collecting and managing all environment variables
 // required by MCP servers during workflow execution. Environment variables are
@@ -40,8 +40,9 @@
 //   - safe_inputs.go: Safe inputs configuration
 //
 // Example usage:
-//   envVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
-//   // Returns map[string]string with all required environment variables
+//
+//	envVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
+//	// Returns map[string]string with all required environment variables
 package workflow
 
 import (

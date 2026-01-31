@@ -82,9 +82,7 @@ async function main(config = {}) {
   }
 
   // Extract triggering issue number from context (for auto-linking PRs to issues)
-  const triggeringIssueNumber = context.payload?.issue?.number && !context.payload?.issue?.pull_request
-    ? context.payload.issue.number
-    : undefined;
+  const triggeringIssueNumber = context.payload?.issue?.number && !context.payload?.issue?.pull_request ? context.payload.issue.number : undefined;
 
   // Check if we're in staged mode
   const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";

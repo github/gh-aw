@@ -1,6 +1,6 @@
 // Package workflow provides GitHub MCP server configuration and toolset management.
 //
-// GitHub MCP Server Configuration
+// # GitHub MCP Server Configuration
 //
 // This file manages the configuration of the GitHub MCP server, which provides
 // AI agents with access to GitHub's API through the Model Context Protocol (MCP).
@@ -53,14 +53,15 @@
 //   - safe_outputs_app.go: GitHub App token minting helpers
 //
 // Example configuration:
-//   tools:
-//     github:
-//       mode: remote                    # or "local" for Docker
-//       github-token: ${{ secrets.PAT }}
-//       read-only: true
-//       lockdown: true                  # or omit for automatic detection
-//       toolsets: [repos, issues, pull_requests]
-//       allowed: [get_repo, list_issues, get_pull_request]
+//
+//	tools:
+//	  github:
+//	    mode: remote                    # or "local" for Docker
+//	    github-token: ${{ secrets.PAT }}
+//	    read-only: true
+//	    lockdown: true                  # or omit for automatic detection
+//	    toolsets: [repos, issues, pull_requests]
+//	    allowed: [get_repo, list_issues, get_pull_request]
 package workflow
 
 import (

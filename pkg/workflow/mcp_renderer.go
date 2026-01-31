@@ -1,6 +1,6 @@
 // Package workflow provides YAML rendering for MCP server configurations.
 //
-// MCP Configuration Renderer
+// # MCP Configuration Renderer
 //
 // This file implements the unified MCP configuration renderer that generates
 // YAML configuration for various MCP servers across different AI engines
@@ -65,13 +65,14 @@
 //   - mcp_setup_generator.go: Calls renderer for configuration generation
 //
 // Example usage:
-//   renderer := NewMCPConfigRenderer(MCPRendererOptions{
-//       IncludeCopilotFields: true,
-//       InlineArgs: true,
-//       Format: "json",
-//       IsLast: false,
-//   })
-//   renderer.RenderGitHubMCP(yaml, githubTool, workflowData)
+//
+//	renderer := NewMCPConfigRenderer(MCPRendererOptions{
+//	    IncludeCopilotFields: true,
+//	    InlineArgs: true,
+//	    Format: "json",
+//	    IsLast: false,
+//	})
+//	renderer.RenderGitHubMCP(yaml, githubTool, workflowData)
 package workflow
 
 import (

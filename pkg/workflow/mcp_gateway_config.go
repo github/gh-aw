@@ -1,6 +1,6 @@
 // Package workflow provides MCP gateway configuration management for agentic workflows.
 //
-// MCP Gateway Configuration
+// # MCP Gateway Configuration
 //
 // The MCP gateway acts as a proxy between AI engines and MCP servers, providing
 // protocol translation, connection management, and security features. This file
@@ -33,15 +33,16 @@
 //   - mcp_renderer.go: YAML rendering for MCP configurations
 //
 // Example gateway configuration:
-//   sandbox:
-//     mcp:
-//       container: githubnext/gh-aw-mcpg
-//       version: v0.0.12
-//       port: 80
-//       domain: host.docker.internal
-//       mounts:
-//         - /opt:/opt:ro
-//         - /tmp:/tmp:rw
+//
+//	sandbox:
+//	  mcp:
+//	    container: githubnext/gh-aw-mcpg
+//	    version: v0.0.12
+//	    port: 80
+//	    domain: host.docker.internal
+//	    mounts:
+//	      - /opt:/opt:ro
+//	      - /tmp:/tmp:rw
 package workflow
 
 import (

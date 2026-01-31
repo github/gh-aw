@@ -1,6 +1,6 @@
 // Package workflow provides utility functions for MCP configuration processing.
 //
-// MCP Configuration Utilities
+// # MCP Configuration Utilities
 //
 // This file contains helper functions for processing and transforming MCP
 // configuration data during workflow compilation. These utilities handle
@@ -36,9 +36,10 @@
 //   - safe_inputs.go: Safe inputs HTTP server configuration
 //
 // Example:
-//   // Before: http://localhost:3001
-//   // After:  http://host.docker.internal:3001
-//   url := rewriteLocalhostToDockerHost("http://localhost:3001")
+//
+//	// Before: http://localhost:3001
+//	// After:  http://host.docker.internal:3001
+//	url := rewriteLocalhostToDockerHost("http://localhost:3001")
 package workflow
 
 import (
