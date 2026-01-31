@@ -263,6 +263,35 @@ fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 
+# Install @actions/github package in the destination directory for project handler support
+# This package is needed by the unified handler manager to create separate Octokit clients
+# for project operations that require GH_AW_PROJECT_GITHUB_TOKEN
+echo "Installing @actions/github package in ${DESTINATION}..."
+cd "${DESTINATION}"
+
+# Check if npm is available
+if ! command -v npm &> /dev/null; then
+  echo "::error::npm is not available. Cannot install @actions/github package."
+  exit 1
+fi
+
+# Create a minimal package.json if it doesn't exist
+if [ ! -f "package.json" ]; then
+  echo '{"private": true}' > package.json
+fi
+
+# Install @actions/github package
+npm install --no-save --loglevel=error @actions/github@^7.0.0 2>&1 | grep -v "npm WARN" || true
+if [ -d "node_modules/@actions/github" ]; then
+  echo "✓ Successfully installed @actions/github package"
+else
+  echo "::error::Failed to install @actions/github package"
+  exit 1
+fi
+
+# Return to original directory
+cd - > /dev/null
+
 # Set output
 if [ -n "${GITHUB_OUTPUT}" ]; then
   echo "files_copied=${FILE_COUNT}" >> "${GITHUB_OUTPUT}"

@@ -1,7 +1,16 @@
 // @ts-check
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { loadConfig } from "./safe_output_unified_handler_manager.cjs";
+import { loadConfig, setupProjectGitHubClient } from "./safe_output_unified_handler_manager.cjs";
+
+// Mock @actions/github
+vi.mock("@actions/github", () => ({
+  getOctokit: vi.fn(() => ({
+    graphql: vi.fn(),
+    request: vi.fn(),
+    rest: {},
+  })),
+}));
 
 describe("Unified Safe Output Handler Manager", () => {
   beforeEach(() => {
@@ -87,6 +96,22 @@ describe("Unified Safe Output Handler Manager", () => {
 
       expect(config.regular).toHaveProperty("create_issue");
       expect(config.regular).not.toHaveProperty("create-issue");
+    });
+  });
+
+  describe("setupProjectGitHubClient", () => {
+    it("should throw error if GH_AW_PROJECT_GITHUB_TOKEN is not set", () => {
+      expect(() => setupProjectGitHubClient()).toThrow(/GH_AW_PROJECT_GITHUB_TOKEN environment variable is required/);
+    });
+
+    it("should create Octokit instance when token is provided", () => {
+      process.env.GH_AW_PROJECT_GITHUB_TOKEN = "test-project-token";
+
+      const octokit = setupProjectGitHubClient();
+
+      expect(octokit).toBeDefined();
+      expect(octokit).toHaveProperty("graphql");
+      expect(octokit).toHaveProperty("request");
     });
   });
 });
