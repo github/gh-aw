@@ -301,12 +301,6 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		permissions.Merge(NewPermissionsContentsReadSecurityEventsWrite())
 	}
 
-	// Note: Create Project Status Update is now handled by the handler manager
-	// The permissions are configured in the handler manager section above
-	if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-		permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-	}
-
 	// Note: Add Reviewer is now handled by the handler manager
 	// The outputs and permissions are configured in the handler manager section above
 	if data.SafeOutputs.AddReviewer != nil {

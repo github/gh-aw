@@ -4,10 +4,6 @@
 # Workflows may override any specific safe-output type by defining it at top-level.
 
 safe-outputs:
-  update-project:
-    max: 100
-  create-project-status-update:
-    max: 1
   create-issue:
     max: 5
 ---

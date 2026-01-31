@@ -1483,7 +1483,6 @@ This workflow imports jobs and safe-outputs.
 }
 
 // TestProjectSafeOutputsImport tests that project-related safe-output types can be imported from shared workflows
-// This specifically tests the fix for the bug where CreateProjectStatusUpdates was not being merged from imports
 func TestProjectSafeOutputsImport(t *testing.T) {
 	compiler := NewCompilerWithVersion("1.0.0")
 
@@ -1497,12 +1496,6 @@ func TestProjectSafeOutputsImport(t *testing.T) {
 	// This mimics the structure of shared/campaign.md
 	sharedWorkflow := `---
 safe-outputs:
-  update-project:
-    max: 100
-    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
-  create-project-status-update:
-    max: 1
-    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
   create-project:
     max: 5
     github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
@@ -1549,16 +1542,6 @@ This workflow uses the imported project safe-output configuration.
 	workflowData, err := compiler.ParseWorkflowFile("main.md")
 	require.NoError(t, err, "Failed to parse workflow")
 	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
-
-	// Verify update-project configuration was imported correctly
-	require.NotNil(t, workflowData.SafeOutputs.UpdateProjects, "UpdateProjects configuration should be imported")
-	assert.Equal(t, 100, workflowData.SafeOutputs.UpdateProjects.Max)
-	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.UpdateProjects.GitHubToken)
-
-	// Verify create-project-status-update configuration was imported correctly (the bug fix)
-	require.NotNil(t, workflowData.SafeOutputs.CreateProjectStatusUpdates, "CreateProjectStatusUpdates configuration should be imported")
-	assert.Equal(t, 1, workflowData.SafeOutputs.CreateProjectStatusUpdates.Max)
-	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CreateProjectStatusUpdates.GitHubToken)
 
 	// Verify create-project configuration was imported correctly
 	require.NotNil(t, workflowData.SafeOutputs.CreateProjects, "CreateProjects configuration should be imported")

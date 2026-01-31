@@ -584,17 +584,6 @@ func TestGenerateSafeOutputsConfig(t *testing.T) {
 			},
 			expectedKeys: []string{"noop"},
 		},
-		{
-			name: "update-project config",
-			workflowData: &WorkflowData{
-				SafeOutputs: &SafeOutputsConfig{
-					UpdateProjects: &UpdateProjectConfig{
-						BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 10},
-					},
-				},
-			},
-			expectedKeys: []string{"update_project"},
-		},
 	}
 
 	for _, tt := range tests {

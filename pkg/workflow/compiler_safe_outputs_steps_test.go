@@ -393,21 +393,6 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 			},
 		},
 		{
-			name: "project handler manager with create_project_status_update",
-			safeOutputs: &SafeOutputsConfig{
-				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
-					GitHubToken: "${{ secrets.PROJECTS_PAT }}",
-				},
-			},
-			checkContains: []string{
-				"name: Process Project-Related Safe Outputs",
-				"id: process_project_safe_outputs",
-				"GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG",
-				"GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}",
-				"github-token: ${{ secrets.PROJECTS_PAT }}",
-			},
-		},
-		{
 			name: "project handler manager without custom token uses default",
 			safeOutputs: &SafeOutputsConfig{
 				CreateProjects: &CreateProjectsConfig{
@@ -423,7 +408,7 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 		{
 			name: "project handler manager with project URL from frontmatter",
 			safeOutputs: &SafeOutputsConfig{
-				UpdateProjects: &UpdateProjectConfig{
+				CreateProjects: &CreateProjectsConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{
 						Max: 10,
 					},
