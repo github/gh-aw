@@ -25,11 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
 # frontmatter-hash: bd40f012f25775f1722e8a35296eaf3c1607a6d7ece0fd71a8809b93bb5c2814
-=======
-# frontmatter-hash: 878e4f95faf76dcbd2cb9fa47f1628ece34e71e9b605146a6a4c469a927b805d
->>>>>>> origin/main
 
 name: "Functional Programming Enhancer"
 "on":
