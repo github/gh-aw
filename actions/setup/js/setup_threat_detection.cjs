@@ -23,7 +23,8 @@ const { AGENT_OUTPUT_FILENAME } = require("./constants.cjs");
  */
 async function main() {
   // Read the threat detection template from file
-  const templatePath = path.join(__dirname, "../md/threat_detection.md");
+  // At runtime, markdown files are copied to /opt/gh-aw/prompts/ by the setup action
+  const templatePath = "/opt/gh-aw/prompts/threat_detection.md";
   if (!fs.existsSync(templatePath)) {
     core.setFailed(`Threat detection template not found at: ${templatePath}`);
     return;
