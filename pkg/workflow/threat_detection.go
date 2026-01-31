@@ -1,18 +1,13 @@
 package workflow
 
 import (
-	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
 
 var threatLog = logger.New("workflow:threat_detection")
-
-//go:embed prompts/threat_detection.md
-var defaultThreatDetectionPrompt string
 
 // ThreatDetectionConfig holds configuration for threat detection in agent output
 type ThreatDetectionConfig struct {
@@ -266,14 +261,14 @@ func (c *Compiler) buildThreatDetectionAnalysisStep(data *WorkflowData, mainJobN
 
 // buildSetupScriptRequire creates the setup script that requires the .cjs module
 func (c *Compiler) buildSetupScriptRequire() string {
-	// Build a simple require statement that calls the main function with the template
+	// Build a simple require statement that calls the main function
+	// The template is now read from file at runtime by the JavaScript module
 	script := `const { setupGlobals } = require('` + SetupActionDestination + `/setup_globals.cjs');
 setupGlobals(core, github, context, exec, io);
 const { main } = require('` + SetupActionDestination + `/setup_threat_detection.cjs');
-const templateContent = %s;
-await main(templateContent);`
+await main();`
 
-	return fmt.Sprintf(script, c.formatStringAsJavaScriptLiteral(defaultThreatDetectionPrompt))
+	return script
 }
 
 // buildEngineSteps creates the engine execution steps
@@ -419,14 +414,6 @@ func (c *Compiler) buildWorkflowContextEnvVars(data *WorkflowData) []string {
 		fmt.Sprintf("          WORKFLOW_NAME: %q\n", workflowName),
 		fmt.Sprintf("          WORKFLOW_DESCRIPTION: %q\n", workflowDescription),
 	}
-}
-
-// formatStringAsJavaScriptLiteral properly formats a Go string as a JavaScript template literal
-func (c *Compiler) formatStringAsJavaScriptLiteral(s string) string {
-	// Use template literals with proper escaping
-	escaped := strings.ReplaceAll(s, "`", "\\`")
-	escaped = strings.ReplaceAll(escaped, "${", "\\${")
-	return "`" + escaped + "`"
 }
 
 // buildResultsParsingScriptRequire creates the parsing script that requires the .cjs module

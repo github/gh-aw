@@ -6,9 +6,10 @@
  *
  * This module sets up the threat detection analysis by:
  * 1. Checking for existence of artifact files (prompt, agent output, patch)
- * 2. Creating a threat detection prompt from the embedded template
- * 3. Writing the prompt to a file for the AI engine to process
- * 4. Adding the rendered prompt to the workflow summary
+ * 2. Reading the threat detection prompt template from file
+ * 3. Creating a threat detection prompt from the template
+ * 4. Writing the prompt to a file for the AI engine to process
+ * 5. Adding the rendered prompt to the workflow summary
  */
 
 const fs = require("fs");
@@ -18,10 +19,16 @@ const { AGENT_OUTPUT_FILENAME } = require("./constants.cjs");
 
 /**
  * Main entry point for setting up threat detection
- * @param {string} templateContent - The threat detection prompt template
  * @returns {Promise<void>}
  */
-async function main(templateContent) {
+async function main() {
+  // Read the threat detection template from file
+  const templatePath = path.join(__dirname, "../md/threat_detection.md");
+  if (!fs.existsSync(templatePath)) {
+    core.setFailed(`Threat detection template not found at: ${templatePath}`);
+    return;
+  }
+  const templateContent = fs.readFileSync(templatePath, "utf-8");
   // Check if prompt file exists
   // The agent-artifacts artifact is downloaded to /tmp/gh-aw/threat-detection/
   // GitHub Actions preserves the directory structure from the uploaded artifact
