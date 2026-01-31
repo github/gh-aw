@@ -30,8 +30,10 @@ func HasSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool {
 	return enabled
 }
 
-// GetEnabledSafeOutputToolNames returns a list of enabled safe output tool names
-// that can be used in the prompt to inform the agent which tools are available
+// GetEnabledSafeOutputToolNames returns a list of enabled safe output tool names.
+// NOTE: Tool names should NOT be included in agent prompts. The agent should query
+// the MCP server to discover available tools. This function is used for generating
+// the tools.json file that the MCP server provides, and for diagnostic logging.
 func GetEnabledSafeOutputToolNames(safeOutputs *SafeOutputsConfig) []string {
 	tools := getEnabledSafeOutputToolNamesReflection(safeOutputs)
 

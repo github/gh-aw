@@ -72,6 +72,60 @@ func TestSafeOutputsPromptText_FollowsXMLFormat(t *testing.T) {
 	t.Skip("Safe outputs prompt is now generated dynamically based on enabled tools")
 }
 
+func TestSafeOutputsPrompt_NeverListsToolNames(t *testing.T) {
+	// CRITICAL: This test ensures tool names are NEVER listed in the safe outputs prompt.
+	// The agent must query the MCP server to discover available tools - listing them
+	// directly causes the agent to try accessing them before MCP setup is complete.
+	compiler := &Compiler{}
+	var yaml strings.Builder
+
+	// Create a config with multiple safe outputs enabled
+	safeOutputs := &SafeOutputsConfig{
+		CreateIssues:      &CreateIssuesConfig{},
+		AddComments:       &AddCommentsConfig{},
+		CreateDiscussions: &CreateDiscussionsConfig{},
+		UpdateIssues:      &UpdateIssuesConfig{},
+	}
+
+	data := &WorkflowData{
+		ParsedTools: NewTools(map[string]any{}),
+		SafeOutputs: safeOutputs,
+	}
+
+	compiler.generateUnifiedPromptStep(&yaml, data)
+	output := yaml.String()
+
+	// Verify safe outputs section exists
+	if !strings.Contains(output, "<safe-outputs>") {
+		t.Fatal("Expected safe outputs section in generated prompt")
+	}
+
+	// CRITICAL: Ensure tool names are NEVER listed in the prompt
+	forbiddenToolNames := []string{
+		"create_issue",
+		"add_comment",
+		"create_discussion",
+		"update_issue",
+		"update_pull_request",
+		"close_issue",
+		"close_pull_request",
+		"create_pull_request",
+		"add_labels",
+		"remove_labels",
+	}
+
+	for _, toolName := range forbiddenToolNames {
+		if strings.Contains(output, toolName) {
+			t.Errorf("CRITICAL: Safe outputs prompt must NOT list tool name %q. Agent should discover tools via MCP server query.", toolName)
+		}
+	}
+
+	// Verify the correct instruction is present
+	if !strings.Contains(output, "Discover available tools from the safeoutputs MCP server") {
+		t.Error("Expected prompt to instruct agent to query MCP server for tools")
+	}
+}
+
 // ============================================================================
 // Cache Memory Prompt Tests
 // ============================================================================
