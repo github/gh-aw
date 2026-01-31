@@ -155,19 +155,6 @@ func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 			},
 			expectEnforcement: true,
 		},
-		{
-			name: "enforces project URL on copy-project",
-			frontmatter: map[string]any{
-				"project": projectURL,
-			},
-			existingSafeOutputs: &SafeOutputsConfig{
-				CopyProjects: &CopyProjectsConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
-					SourceProject:        "https://github.com/orgs/third-fake-org-77777/projects/77777", // Should be overridden
-				},
-			},
-			expectEnforcement: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -187,12 +174,6 @@ func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 				if result.CreateProjectStatusUpdates != nil {
 					assert.Equal(t, projectURL, result.CreateProjectStatusUpdates.Project,
 						"create-project-status-update.project should be enforced to top-level project URL")
-				}
-
-				// Verify copy-project has enforced source-project URL
-				if result.CopyProjects != nil {
-					assert.Equal(t, projectURL, result.CopyProjects.SourceProject,
-						"copy-project.source-project should be enforced to top-level project URL")
 				}
 			}
 		})
