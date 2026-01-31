@@ -20,13 +20,14 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: b4e69dfbaa7af5780605fec90a8944b577d43f8ce050df666d19e7f79817bdd2
+# frontmatter-hash: 26a4abae72b193e563fc40f5fedf7ed0973c85b130c25ec555286b9e4b42ad33
 
 name: "Test Runtime Workflow"
 "on":
   issues:
     types:
     - labeled
+  workflow_dispatch:
 
 permissions: {}
 

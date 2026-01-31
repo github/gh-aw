@@ -1,7 +1,8 @@
 ---
-on: 
+on:
   issues:
     types: [labeled]
+  workflow_dispatch:
 engine: copilot
 permissions:
   contents: read
