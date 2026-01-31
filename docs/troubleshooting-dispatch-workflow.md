@@ -11,6 +11,19 @@ When using `dispatch-workflow` safe output configuration, the expected workflow 
 - Agent reports missing_tool with message about workflow dispatch tools not being available
 - Only standard safe output tools appear (missing_tool, missing_data, noop, add_comment)
 
+## New: Similar Tool Suggestions
+
+**As of PR #XXXX**, when an MCP tool is not found, the system now suggests similar available tools:
+
+```
+Tool 'dispatch-add-name' not found. Did you mean one of these: add_name, add_comment?
+```
+
+This helps identify:
+- Typos in tool names
+- Missing tool prefixes (e.g., forgot `safeoutputs-`)
+- Available alternatives
+
 ## Diagnostic Steps
 
 ### 1. Check MCP Server Logs
@@ -164,6 +177,7 @@ After applying fixes, verify tools are registered:
    Registered tool: add_name
    ```
 4. Verify tools appear in agent's available tools
+5. **New**: Check that similar tool suggestions appear when testing with typos
 
 ## Prevention
 
@@ -186,7 +200,10 @@ To prevent this issue:
    gh aw compile --validate .github/workflows/my-workflow.md
    ```
 
+5. **Test tool names**: The system will now suggest similar tools if you make a typo
+
 ## Related Issues
 
 - Issue #XXXX: dispatch_workflow tools not appearing in MCP tools
 - PR #XXXX: Enhanced diagnostic logging for dispatch_workflow registration
+- PR #XXXX: Added similar tool suggestions when tool not found
