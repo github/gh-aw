@@ -400,3 +400,60 @@ This workflow dispatches to different workflow types.
 	assert.Equal(t, ".yml", workflowFiles["yml-test"],
 		"yml-test extension should be in workflow_files")
 }
+
+// TestDispatchWorkflowValidationWithoutAgenticWorkflowsTool tests that dispatch-workflow
+// validation runs even when the agentic-workflows tool is not present
+func TestDispatchWorkflowValidationWithoutAgenticWorkflowsTool(t *testing.T) {
+	compiler := NewCompilerWithVersion("1.0.0")
+
+	tmpDir := t.TempDir()
+	awDir := filepath.Join(tmpDir, ".github", "aw")
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+
+	err := os.MkdirAll(awDir, 0755)
+	require.NoError(t, err, "Failed to create aw directory")
+	err = os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	// Create a dispatcher workflow WITHOUT the agentic-workflows tool
+	// This workflow references a non-existent workflow
+	dispatcherWorkflow := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  dispatch-workflow:
+    workflows:
+      - nonexistent
+    max: 1
+---
+
+# Dispatcher Workflow
+
+This workflow tries to dispatch to a non-existent workflow.
+No agentic-workflows tool is present.
+`
+	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	require.NoError(t, err, "Failed to write dispatcher workflow")
+
+	// Change to the aw directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	// Compile the workflow - should fail with validation error
+	err = compiler.CompileWorkflow(dispatcherFile)
+
+	// Check that compilation failed due to validation
+	require.Error(t, err, "Compilation should fail for non-existent workflow")
+	assert.Contains(t, err.Error(), "dispatch-workflow validation failed",
+		"Should fail with dispatch-workflow validation error")
+	assert.Contains(t, err.Error(), "not found",
+		"Error should mention workflow not found")
+	assert.Contains(t, err.Error(), "nonexistent",
+		"Error should mention the workflow name")
+}
