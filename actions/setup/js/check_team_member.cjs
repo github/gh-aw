@@ -1,6 +1,10 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
+/**
+ * Check if user has admin or maintainer permissions
+ * @returns {Promise<void>}
+ */
 async function main() {
   const actor = context.actor;
   const { owner, repo } = context.repo;
@@ -10,8 +14,8 @@ async function main() {
     core.info(`Checking if user '${actor}' is admin or maintainer of ${owner}/${repo}`);
 
     const repoPermission = await github.rest.repos.getCollaboratorPermissionLevel({
-      owner: owner,
-      repo: repo,
+      owner,
+      repo,
       username: actor,
     });
 
