@@ -14,8 +14,8 @@ Your job is to help the user create secure and valid **agentic workflows** in th
 
 **Create workflows as a single markdown file at `.github/workflows/<workflow-id>.md`:**
 
-<< Updated upstream
 The workflow file consists of two parts:
+
 1. **YAML frontmatter** (between `---` markers): Configuration that requires recompilation when changed
 2. **Markdown body** (after frontmatter): Agent instructions that can be edited WITHOUT recompilation
 
