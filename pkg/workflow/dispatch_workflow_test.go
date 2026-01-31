@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -368,14 +369,34 @@ This workflow dispatches to different workflow types.
 	workflowData, err := compiler.ParseWorkflowFile("dispatcher.md")
 	require.NoError(t, err, "Failed to parse workflow")
 
-	// Generate filtered tools JSON to populate WorkflowFiles
-	_, err = generateFilteredToolsJSON(workflowData, dispatcherFile)
-	require.NoError(t, err, "Failed to generate tools JSON")
+	// Populate workflow files (this is what the fix does)
+	populateDispatchWorkflowFiles(workflowData, dispatcherFile)
 
-	// Verify WorkflowFiles map has correct extensions
-	require.NotNil(t, workflowData.SafeOutputs.DispatchWorkflow.WorkflowFiles)
+	// Verify WorkflowFiles map has correct extensions after populate
+	require.NotNil(t, workflowData.SafeOutputs.DispatchWorkflow.WorkflowFiles,
+		"WorkflowFiles should be populated after populateDispatchWorkflowFiles")
 	assert.Equal(t, ".lock.yml", workflowData.SafeOutputs.DispatchWorkflow.WorkflowFiles["lock-test"],
 		"lock-test should use .lock.yml extension")
 	assert.Equal(t, ".yml", workflowData.SafeOutputs.DispatchWorkflow.WorkflowFiles["yml-test"],
 		"yml-test should use .yml extension")
+
+	// Generate safe outputs config to verify workflow_files is included
+	configJSON := generateSafeOutputsConfig(workflowData)
+	require.NotEmpty(t, configJSON, "Config JSON should not be empty")
+
+	// Parse config to verify workflow_files is present
+	var config map[string]any
+	err = json.Unmarshal([]byte(configJSON), &config)
+	require.NoError(t, err, "Config JSON should be valid")
+
+	dispatchWorkflowConfig, ok := config["dispatch_workflow"].(map[string]any)
+	require.True(t, ok, "dispatch_workflow should be in config")
+
+	workflowFiles, ok := dispatchWorkflowConfig["workflow_files"].(map[string]any)
+	require.True(t, ok, "workflow_files should be in dispatch_workflow config")
+
+	assert.Equal(t, ".lock.yml", workflowFiles["lock-test"],
+		"lock-test extension should be in workflow_files")
+	assert.Equal(t, ".yml", workflowFiles["yml-test"],
+		"yml-test extension should be in workflow_files")
 }
