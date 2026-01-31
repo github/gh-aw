@@ -52,8 +52,8 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 			githubDir := filepath.Dir(currentDir)
 			repoRoot := filepath.Dir(githubDir)
 			workflowsDir := filepath.Join(repoRoot, ".github", "workflows")
-			
-			return fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s or %s (tried .md, .lock.yml, and .yml extensions)", 
+
+			return fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s or %s (tried .md, .lock.yml, and .yml extensions)",
 				workflowName, currentDir, workflowsDir)
 		}
 
@@ -211,12 +211,12 @@ func isPathWithinDir(path, dir string) bool {
 
 // findWorkflowFileResult holds the result of finding a workflow file
 type findWorkflowFileResult struct {
-	mdPath   string
-	lockPath string
-	ymlPath  string
-	mdExists bool
+	mdPath     string
+	lockPath   string
+	ymlPath    string
+	mdExists   bool
 	lockExists bool
-	ymlExists bool
+	ymlExists  bool
 }
 
 // findWorkflowFile searches for a workflow file in multiple directories
@@ -224,15 +224,15 @@ type findWorkflowFileResult struct {
 // Returns paths and existence flags for .md, .lock.yml, and .yml files
 func findWorkflowFile(workflowName string, currentWorkflowPath string) (*findWorkflowFileResult, error) {
 	result := &findWorkflowFileResult{}
-	
+
 	// Get the current workflow's directory
 	currentDir := filepath.Dir(currentWorkflowPath)
-	
+
 	// Get repo root by going up from current directory
 	// Assume structure: <repo-root>/.github/workflows/file.md or <repo-root>/.github/aw/file.md
-	githubDir := filepath.Dir(currentDir)        // .github
-	repoRoot := filepath.Dir(githubDir)          // repo root
-	
+	githubDir := filepath.Dir(currentDir) // .github
+	repoRoot := filepath.Dir(githubDir)   // repo root
+
 	// Define search directories in priority order:
 	// 1. Same directory as current workflow (for workflows in the same location)
 	// 2. .github/workflows (standard GitHub Actions location)
@@ -240,24 +240,24 @@ func findWorkflowFile(workflowName string, currentWorkflowPath string) (*findWor
 		currentDir,
 		filepath.Join(repoRoot, ".github", "workflows"),
 	}
-	
+
 	// Try each directory until we find the workflow
 	for _, searchDir := range searchDirs {
 		// Build paths for this directory
 		mdPath := filepath.Clean(filepath.Join(searchDir, workflowName+".md"))
 		lockPath := filepath.Clean(filepath.Join(searchDir, workflowName+".lock.yml"))
 		ymlPath := filepath.Clean(filepath.Join(searchDir, workflowName+".yml"))
-		
+
 		// Validate paths are within the search directory (prevent path traversal)
 		if !isPathWithinDir(mdPath, searchDir) || !isPathWithinDir(lockPath, searchDir) || !isPathWithinDir(ymlPath, searchDir) {
 			continue // Skip this directory if path traversal detected
 		}
-		
+
 		// Check which files exist
 		mdExists := fileExists(mdPath)
 		lockExists := fileExists(lockPath)
 		ymlExists := fileExists(ymlPath)
-		
+
 		// If we found any file in this directory, use these paths
 		if mdExists || lockExists || ymlExists {
 			result.mdPath = mdPath
@@ -269,13 +269,13 @@ func findWorkflowFile(workflowName string, currentWorkflowPath string) (*findWor
 			return result, nil
 		}
 	}
-	
+
 	// No files found in any directory
 	// Return paths for the first search directory for error messages
 	searchDir := searchDirs[0]
 	result.mdPath = filepath.Clean(filepath.Join(searchDir, workflowName+".md"))
 	result.lockPath = filepath.Clean(filepath.Join(searchDir, workflowName+".lock.yml"))
 	result.ymlPath = filepath.Clean(filepath.Join(searchDir, workflowName+".yml"))
-	
+
 	return result, nil
 }

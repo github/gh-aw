@@ -383,12 +383,12 @@ var handlerRegistry = map[string]handlerBuilder{
 		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
 			AddStringSlice("workflows", c.Workflows)
-		
+
 		// Add workflow_files map if it has entries
 		if len(c.WorkflowFiles) > 0 {
 			builder.AddDefault("workflow_files", c.WorkflowFiles)
 		}
-		
+
 		return builder.Build()
 	},
 	"missing_tool": func(cfg *SafeOutputsConfig) map[string]any {
