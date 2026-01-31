@@ -201,11 +201,15 @@ describe("copyProject", () => {
         },
       });
 
-    const result = await copyProject({
-      sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-      owner: "targetorg",
-      title: "Copied Project",
-    });
+    const result = await copyProject(
+      {
+        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+        owner: "targetorg",
+        title: "Copied Project",
+      },
+      "",
+      ""
+    );
 
     expect(result).toEqual({
       projectId: "newProject123",
@@ -246,12 +250,16 @@ describe("copyProject", () => {
         },
       });
 
-    const result = await copyProject({
-      sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-      owner: "targetorg",
-      title: "Copied Project With Drafts",
-      includeDraftIssues: true,
-    });
+    const result = await copyProject(
+      {
+        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+        owner: "targetorg",
+        title: "Copied Project With Drafts",
+        includeDraftIssues: true,
+      },
+      "",
+      ""
+    );
 
     expect(result).toEqual({
       projectId: "newProject123",
@@ -295,11 +303,15 @@ describe("copyProject", () => {
         },
       });
 
-    const result = await copyProject({
-      sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-      owner: "targetuser",
-      title: "User Project",
-    });
+    const result = await copyProject(
+      {
+        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+        owner: "targetuser",
+        title: "User Project",
+      },
+      "",
+      ""
+    );
 
     expect(result.projectId).toBe("newProject123");
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Target owner ID (user)"));
@@ -307,28 +319,40 @@ describe("copyProject", () => {
 
   it("should throw error when source project is missing", async () => {
     await expect(
-      copyProject({
-        owner: "targetorg",
-        title: "Test",
-      })
+      copyProject(
+        {
+          owner: "targetorg",
+          title: "Test",
+        },
+        "",
+        ""
+      )
     ).rejects.toThrow(/sourceProject.*required/);
   });
 
   it("should throw error when owner is missing", async () => {
     await expect(
-      copyProject({
-        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-        title: "Test",
-      })
+      copyProject(
+        {
+          sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+          title: "Test",
+        },
+        "",
+        ""
+      )
     ).rejects.toThrow(/owner.*required/);
   });
 
   it("should throw error when title is missing", async () => {
     await expect(
-      copyProject({
-        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-        owner: "targetorg",
-      })
+      copyProject(
+        {
+          sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+          owner: "targetorg",
+        },
+        "",
+        ""
+      )
     ).rejects.toThrow(/title.*required/);
   });
 
@@ -345,11 +369,15 @@ describe("copyProject", () => {
       .mockRejectedValueOnce(new Error("User not found"));
 
     await expect(
-      copyProject({
-        sourceProject: "https://github.com/orgs/sourceorg/projects/42",
-        owner: "nonexistent",
-        title: "Test",
-      })
+      copyProject(
+        {
+          sourceProject: "https://github.com/orgs/sourceorg/projects/42",
+          owner: "nonexistent",
+          title: "Test",
+        },
+        "",
+        ""
+      )
     ).rejects.toThrow(/Failed to find owner/);
 
     // Verify that error details were logged
