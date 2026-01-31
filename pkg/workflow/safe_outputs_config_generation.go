@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/githubnext/gh-aw/pkg/stringutil"
@@ -681,31 +680,33 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	if data.SafeOutputs.DispatchWorkflow != nil && len(data.SafeOutputs.DispatchWorkflow.Workflows) > 0 {
 		safeOutputsConfigLog.Printf("Adding %d dispatch_workflow tools", len(data.SafeOutputs.DispatchWorkflow.Workflows))
 
-		// Get workflows directory from markdownPath
-		workflowsDir := filepath.Dir(markdownPath)
-
 		// Initialize WorkflowFiles map if not already initialized
 		if data.SafeOutputs.DispatchWorkflow.WorkflowFiles == nil {
 			data.SafeOutputs.DispatchWorkflow.WorkflowFiles = make(map[string]string)
 		}
 
 		for _, workflowName := range data.SafeOutputs.DispatchWorkflow.Workflows {
-			// Try to find the workflow file - priority: .lock.yml > .yml
-			// .lock.yml is used for compiled agentic workflows
-			// .yml is used for standard GitHub Actions workflows
-			lockFilePath := filepath.Join(workflowsDir, workflowName+".lock.yml")
-			ymlFilePath := filepath.Join(workflowsDir, workflowName+".yml")
+			// Find the workflow file in multiple locations
+			fileResult, err := findWorkflowFile(workflowName, markdownPath)
+			if err != nil {
+				safeOutputsConfigLog.Printf("Warning: error finding workflow %s: %v", workflowName, err)
+				// Continue with empty inputs
+				tool := generateDispatchWorkflowTool(workflowName, make(map[string]any))
+				filteredTools = append(filteredTools, tool)
+				continue
+			}
 
+			// Determine which file to use - priority: .lock.yml > .yml
 			var workflowPath string
 			var extension string
-			if fileExists(lockFilePath) {
-				workflowPath = lockFilePath
+			if fileResult.lockExists {
+				workflowPath = fileResult.lockPath
 				extension = ".lock.yml"
-			} else if fileExists(ymlFilePath) {
-				workflowPath = ymlFilePath
+			} else if fileResult.ymlExists {
+				workflowPath = fileResult.ymlPath
 				extension = ".yml"
 			} else {
-				safeOutputsConfigLog.Printf("Warning: workflow file not found for %s (tried %s and %s)", workflowName, lockFilePath, ymlFilePath)
+				safeOutputsConfigLog.Printf("Warning: workflow file not found for %s (only .md exists, needs compilation)", workflowName)
 				// Continue with empty inputs
 				tool := generateDispatchWorkflowTool(workflowName, make(map[string]any))
 				filteredTools = append(filteredTools, tool)
@@ -714,6 +715,7 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 
 			// Store the file extension for runtime use
 			data.SafeOutputs.DispatchWorkflow.WorkflowFiles[workflowName] = extension
+			safeOutputsConfigLog.Printf("Stored workflow file extension: %s -> %s", workflowName, extension)
 
 			// Extract workflow_dispatch inputs
 			workflowInputs, err := extractWorkflowDispatchInputs(workflowPath)
