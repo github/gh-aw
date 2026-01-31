@@ -150,7 +150,8 @@ func (c *Compiler) buildThreatDetectionSteps(data *WorkflowData, mainJobName str
 		// For dev mode (local action path), checkout the actions folder first
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 
-		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+		// Threat detection job doesn't need project support
+		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
 	// Step 1: Download agent artifacts

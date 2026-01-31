@@ -36,7 +36,8 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 	needsContentsRead := (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
 
-	steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+	// Pre-activation job doesn't need project support (no safe outputs processed here)
+	steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 
 	// Determine permissions for pre-activation job
 	var perms *Permissions
@@ -379,7 +380,8 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	// For dev mode (local action path), checkout the actions folder first
 	steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 
-	steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+	// Activation job doesn't need project support (no safe outputs processed here)
+	steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 
 	// Add timestamp check for lock file vs source file using GitHub API
 	// No checkout step needed - uses GitHub API to check commit times
@@ -614,7 +616,8 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		// For dev mode (local action path), checkout the actions folder first
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 
-		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+		// Main job doesn't need project support (no safe outputs processed here)
+		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
 	// Find custom jobs that depend on pre_activation - these are handled by the activation job

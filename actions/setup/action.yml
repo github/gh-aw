@@ -7,8 +7,8 @@ inputs:
     description: 'Destination directory for activation files (default: /opt/gh-aw/actions)'
     required: false
     default: '/opt/gh-aw/actions'
-  safe-outputs:
-    description: 'Enable safe-outputs support (installs @actions/github package for project handlers)'
+  safe-output-projects:
+    description: 'Enable safe-output-projects support (installs @actions/github package for project handlers)'
     required: false
     default: 'false'
 
@@ -23,7 +23,7 @@ runs:
       shell: bash
       env:
         INPUT_DESTINATION: ${{ inputs.destination }}
-        INPUT_SAFE_OUTPUTS: ${{ inputs.safe-outputs }}
+        INPUT_SAFE_OUTPUT_PROJECTS: ${{ inputs.safe-output-projects }}
       run: ${{ github.action_path }}/setup.sh
 
 branding:

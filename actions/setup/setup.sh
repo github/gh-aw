@@ -17,11 +17,11 @@ set -e
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-/opt/gh-aw/actions}"
 
-# Get safe-outputs flag from input (default: false)
-SAFE_OUTPUTS_ENABLED="${INPUT_SAFE_OUTPUTS:-false}"
+# Get safe-output-projects flag from input (default: false)
+SAFE_OUTPUT_PROJECTS_ENABLED="${INPUT_SAFE_OUTPUT_PROJECTS:-false}"
 
 echo "Copying activation files to ${DESTINATION}"
-echo "Safe-outputs support: ${SAFE_OUTPUTS_ENABLED}"
+echo "Safe-output-projects support: ${SAFE_OUTPUT_PROJECTS_ENABLED}"
 
 # Create destination directory if it doesn't exist
 mkdir -p "${DESTINATION}"
@@ -267,11 +267,11 @@ fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 
-# Install @actions/github package ONLY if safe-outputs flag is enabled
+# Install @actions/github package ONLY if safe-output-projects flag is enabled
 # This package is needed by the unified handler manager to create separate Octokit clients
 # for project operations that require GH_AW_PROJECT_GITHUB_TOKEN
-if [ "${SAFE_OUTPUTS_ENABLED}" = "true" ]; then
-  echo "Safe-outputs enabled - installing @actions/github package in ${DESTINATION}..."
+if [ "${SAFE_OUTPUT_PROJECTS_ENABLED}" = "true" ]; then
+  echo "Safe-output-projects enabled - installing @actions/github package in ${DESTINATION}..."
   cd "${DESTINATION}"
 
   # Check if npm is available
@@ -297,7 +297,7 @@ if [ "${SAFE_OUTPUTS_ENABLED}" = "true" ]; then
   # Return to original directory
   cd - > /dev/null
 else
-  echo "Safe-outputs not enabled - skipping @actions/github installation"
+  echo "Safe-output-projects not enabled - skipping @actions/github installation"
 fi
 
 # Set output

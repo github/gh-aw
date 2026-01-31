@@ -646,7 +646,8 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		// For dev mode (local action path), checkout the actions folder first
 		setupSteps = append(setupSteps, c.generateCheckoutActionsFolder(data)...)
 
-		setupSteps = append(setupSteps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+		// Cache restore job doesn't need project support
+		setupSteps = append(setupSteps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
 	// Prepend setup steps to all cache steps

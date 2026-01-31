@@ -564,7 +564,8 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		// For dev mode (local action path), checkout the actions folder first
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 
-		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+		// Repo memory job doesn't need project support
+		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
 	// Add checkout step to configure git (without checking out files)
