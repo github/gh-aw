@@ -13,8 +13,6 @@ permissions:
 
 tracker-id: functional-enhancer
 
-engine: claude
-
 network:
   allowed:
     - defaults
@@ -286,13 +284,30 @@ Focus on changes with high safety/clarity/testability scores and low risk.
 
 For the top 15-20 opportunities identified in Phase 1, use Serena for detailed analysis:
 
-#### 2.1 Understand Context
+#### 2.1 Understand Context and Verify Test Existence
 
 For each opportunity:
 - Read the full file context
 - Understand the function's purpose
 - Identify dependencies and side effects
-- Check if tests exist for this code
+- **Check if tests exist** - Use code search to find tests:
+  ```bash
+  # Find test file for pkg/path/file.go
+  ls pkg/path/file_test.go
+  
+  # Search for test functions covering this code
+  grep -n 'func Test.*FunctionName' pkg/path/file_test.go
+  
+  # Search for the function name in test files
+  grep -r 'FunctionName' pkg/path/*_test.go
+  ```
+- **Optional: Check test coverage** if you want quantitative verification:
+  ```bash
+  go test -cover ./pkg/path/
+  go test -coverprofile=coverage.out ./pkg/path/
+  go tool cover -func=coverage.out | grep FunctionName
+  ```
+- If tests are missing or insufficient, write tests FIRST before refactoring
 - Verify no hidden mutations
 - Analyze call sites for API compatibility
 
@@ -345,11 +360,38 @@ For each opportunity, design a specific improvement:
 
 #### 3.1 Create Functional Helpers (If Needed)
 
-If the codebase lacks functional utilities, consider adding them to a `pkg/functional/` or `pkg/sliceutil/` package:
+If the codebase lacks functional utilities, add them to `pkg/fp/` package:
+
+**IMPORTANT: Write tests FIRST using test-driven development:**
 
 ```go
-// Example helpers for common operations
-package sliceutil
+// pkg/fp/slice_test.go - Write tests first!
+package fp_test
+
+import (
+    "testing"
+    "github.com/githubnext/gh-aw/pkg/fp"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestMap(t *testing.T) {
+    input := []int{1, 2, 3}
+    result := fp.Map(input, func(x int) int { return x * 2 })
+    assert.Equal(t, []int{2, 4, 6}, result, "Map should double each element")
+}
+
+func TestFilter(t *testing.T) {
+    input := []int{1, 2, 3, 4}
+    result := fp.Filter(input, func(x int) bool { return x%2 == 0 })
+    assert.Equal(t, []int{2, 4}, result, "Filter should return even numbers")
+}
+```
+
+**Then implement the helpers:**
+
+```go
+// pkg/fp/slice.go - Example helpers for common operations
+package fp
 
 // Map transforms each element in a slice
 func Map[T, U any](slice []T, fn func(T) U) []U {
@@ -385,6 +427,8 @@ func Reduce[T, U any](slice []T, initial U, fn func(U, T) U) U {
 - They'll be used in multiple places (3+ usages)
 - They improve clarity over inline loops
 - The project doesn't already have similar utilities
+- **You write comprehensive tests first** (test-driven development)
+- Tests achieve >80% coverage for the new helpers
 
 #### 3.2 Apply Immutability Improvements
 
@@ -749,13 +793,48 @@ result := When(useCache, func() Data { return cache.Get(key) }, fetchFromDB(key)
 
 ### Phase 4: Validation
 
-#### 4.1 Run Tests
+#### 4.1 Verify Tests Exist BEFORE Changes
+
+Before refactoring any code, verify tests exist using code search:
+
+```bash
+# Find test file for the code you're refactoring
+ls pkg/affected/package/*_test.go
+
+# Search for test functions
+grep -n 'func Test' pkg/affected/package/*_test.go
+
+# Search for specific function/type names in tests
+grep -r 'FunctionName\|TypeName' pkg/affected/package/*_test.go
+```
+
+**Optional: Run coverage** for quantitative verification:
+```bash
+# Check current test coverage for the package
+go test -cover ./pkg/affected/package/
+
+# Get detailed coverage report
+go test -coverprofile=coverage.out ./pkg/affected/package/
+go tool cover -func=coverage.out
+```
+
+**If tests are missing or insufficient:** Write tests FIRST before refactoring.
+
+**Test-driven refactoring approach:**
+1. Search for existing tests (code search)
+2. Write tests for current behavior (if missing)
+3. Verify tests pass
+4. Refactor code
+5. Verify tests still pass
+6. Optionally verify coverage improved or stayed high
+
+#### 4.2 Run Tests After Changes
 
 After each set of changes, validate:
 
 ```bash
-# Run affected package tests
-go test -v ./pkg/affected/package/...
+# Run affected package tests with coverage
+go test -v -cover ./pkg/affected/package/...
 
 # Run full unit test suite
 make test-unit
@@ -766,7 +845,7 @@ If tests fail:
 - Revert changes that break functionality
 - Adjust approach and retry
 
-#### 4.2 Run Linters
+#### 4.3 Run Linters
 
 Ensure code quality:
 
@@ -776,7 +855,7 @@ make lint
 
 Fix any issues introduced by changes.
 
-#### 4.3 Manual Review
+#### 4.4 Manual Review
 
 For each changed file:
 - Read the changes in context
@@ -898,10 +977,13 @@ This PR applies moderate, tasteful functional/immutability techniques to improve
 ### Testing
 
 - ✅ All tests pass (`make test-unit`)
+- ✅ Test existence verified BEFORE refactoring (via code search)
+- ✅ Tests added for previously untested code
+- ✅ New helper functions in `pkg/fp/` have comprehensive test coverage
 - ✅ Linting passes (`make lint`)
 - ✅ No behavioral changes - functionality is identical
 - ✅ Manual review confirms clarity improvements
-- ✅ New pure functions have test coverage
+- ✅ Test-driven refactoring approach followed
 
 ### Review Focus
 
@@ -967,6 +1049,31 @@ Create the pull request using safe-outputs configuration:
 - Expires in 7 days if not merged
 
 ## Guidelines and Best Practices
+
+### Test-Driven Refactoring
+
+**CRITICAL: Always verify test coverage before refactoring:**
+
+```bash
+# Check coverage for package you're refactoring
+go test -cover ./pkg/path/to/package/
+```
+
+**Test-driven refactoring workflow:**
+1. **Check coverage** - Verify tests exist (minimum 60% coverage)
+2. **Write tests first** - If coverage is low, add tests for current behavior
+3. **Verify tests pass** - Green tests before refactoring
+4. **Refactor** - Make functional/immutability improvements
+5. **Verify tests pass** - Green tests after refactoring
+6. **Check coverage again** - Ensure coverage maintained or improved
+
+**For new helper functions (`pkg/fp/`):**
+- Write tests FIRST (test-driven development)
+- Aim for >80% test coverage
+- Include edge cases and error conditions
+- Use table-driven tests for multiple scenarios
+
+**Never refactor untested code without adding tests first!**
 
 ### Balance Pragmatism and Purity
 
@@ -1217,13 +1324,16 @@ func (s *Service) GetItems() []Item {
 
 A successful functional programming enhancement:
 
+- ✅ **Verifies tests exist first**: Uses code search to find tests before refactoring
+- ✅ **Writes tests first**: Adds tests for untested code before refactoring
 - ✅ **Improves immutability**: Reduces mutable state without forcing it
 - ✅ **Enhances initialization**: Makes data creation more declarative
 - ✅ **Clarifies transformations**: Makes data flow more explicit
 - ✅ **Uses functional options appropriately**: APIs are extensible and clear
 - ✅ **Eliminates shared mutable state**: Dependencies are explicit
 - ✅ **Extracts pure functions**: Calculations are testable and composable
-- ✅ **Adds reusable wrappers judiciously**: Cross-cutting concerns are DRY
+- ✅ **Adds reusable wrappers judiciously**: Cross-cutting concerns are DRY (in `pkg/fp/`)
+- ✅ **Tests new helpers thoroughly**: New `pkg/fp/` functions have >80% coverage
 - ✅ **Maintains readability**: Code is clearer, not more abstract
 - ✅ **Preserves behavior**: All tests pass, no functionality changes
 - ✅ **Applies tastefully**: Changes feel natural to Go code
@@ -1236,6 +1346,7 @@ Exit gracefully without creating a PR if:
 - No functional programming improvements are found
 - Codebase already follows strong functional patterns
 - Changes would reduce clarity or maintainability
+- **Insufficient tests** - Code to refactor has no tests and tests are too complex to add first
 - Tests fail after changes
 - Changes are too risky or complex
 
