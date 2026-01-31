@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 )
 
 var sandboxLog = logger.New("workflow:sandbox")
@@ -166,11 +167,8 @@ func generateSRTConfigJSON(workflowData *WorkflowData) (string, error) {
 		}
 	}
 
-	// Convert to slice
-	allowedDomains := make([]string, 0, len(domainMap))
-	for domain := range domainMap {
-		allowedDomains = append(allowedDomains, domain)
-	}
+	// Convert map keys to slice - using functional helper
+	allowedDomains := sliceutil.MapToSlice(domainMap)
 	SortStrings(allowedDomains)
 
 	srtConfig := &SandboxRuntimeConfig{

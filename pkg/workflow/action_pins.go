@@ -11,6 +11,7 @@ import (
 
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 )
 
 var actionPinsLog = logger.New("workflow:action_pins")
@@ -85,7 +86,7 @@ func getActionPins() []ActionPin {
 			actionPinsLog.Printf("Found %d key/version mismatches in action_pins.json", mismatchCount)
 		}
 
-		// Convert map to sorted slice
+		// Convert map values to slice - immutable initialization
 		pins := make([]ActionPin, 0, len(data.Entries))
 		for _, pin := range data.Entries {
 			pins = append(pins, pin)
@@ -109,16 +110,23 @@ func getActionPins() []ActionPin {
 	return cachedActionPins
 }
 
-// sortPinsByVersion sorts action pins by version in descending order (highest first)
-// Uses Go's standard library sort with custom comparison function
-func sortPinsByVersion(pins []ActionPin) {
-	sort.Slice(pins, func(i, j int) bool {
+// sortPinsByVersion sorts action pins by version in descending order (highest first).
+// This function returns a new sorted slice without modifying the input.
+// This is an immutable operation for better safety and clarity.
+func sortPinsByVersion(pins []ActionPin) []ActionPin {
+	// Create a copy to avoid mutating the input
+	result := make([]ActionPin, len(pins))
+	copy(result, pins)
+
+	sort.Slice(result, func(i, j int) bool {
 		// Strip 'v' prefix for comparison
-		v1 := strings.TrimPrefix(pins[i].Version, "v")
-		v2 := strings.TrimPrefix(pins[j].Version, "v")
+		v1 := strings.TrimPrefix(result[i].Version, "v")
+		v2 := strings.TrimPrefix(result[j].Version, "v")
 		// Return true if v1 > v2 to get descending order
 		return compareVersions(v1, v2) > 0
 	})
+
+	return result
 }
 
 // GetActionPin returns the pinned action reference for a given action repository
@@ -128,24 +136,21 @@ func sortPinsByVersion(pins []ActionPin) {
 func GetActionPin(actionRepo string) string {
 	actionPins := getActionPins()
 
-	// Find all pins matching the repo
-	var matchingPins []ActionPin
-	for _, pin := range actionPins {
-		if pin.Repo == actionRepo {
-			matchingPins = append(matchingPins, pin)
-		}
-	}
+	// Find all pins matching the repo - using functional filter
+	matchingPins := sliceutil.Filter(actionPins, func(pin ActionPin) bool {
+		return pin.Repo == actionRepo
+	})
 
 	if len(matchingPins) == 0 {
 		// If no pin exists, return empty string to signal that this action is not pinned
 		return ""
 	}
 
-	// Sort matching pins by version (descending - latest first)
-	sortPinsByVersion(matchingPins)
+	// Sort matching pins by version (descending - latest first) - immutable operation
+	sortedPins := sortPinsByVersion(matchingPins)
 
 	// Return the latest version (first after sorting)
-	latestPin := matchingPins[0]
+	latestPin := sortedPins[0]
 	return formatActionReference(actionRepo, latestPin.SHA, latestPin.Version)
 }
 
@@ -185,13 +190,10 @@ func GetActionPinWithData(actionRepo, version string, data *WorkflowData) (strin
 	actionPinsLog.Printf("Falling back to hardcoded pins for %s@%s", actionRepo, version)
 	actionPins := getActionPins()
 
-	// Find all pins matching the repo
-	var matchingPins []ActionPin
-	for _, pin := range actionPins {
-		if pin.Repo == actionRepo {
-			matchingPins = append(matchingPins, pin)
-		}
-	}
+	// Find all pins matching the repo - using functional filter
+	matchingPins := sliceutil.Filter(actionPins, func(pin ActionPin) bool {
+		return pin.Repo == actionRepo
+	})
 
 	if len(matchingPins) == 0 {
 		// No pins found for this repo, will handle below
@@ -199,8 +201,8 @@ func GetActionPinWithData(actionRepo, version string, data *WorkflowData) (strin
 	} else {
 		actionPinsLog.Printf("Found %d hardcoded pin(s) for %s", len(matchingPins), actionRepo)
 
-		// Sort matching pins by version (descending - highest first)
-		sortPinsByVersion(matchingPins)
+		// Sort matching pins by version (descending - highest first) - immutable operation
+		matchingPins = sortPinsByVersion(matchingPins)
 
 		// First, try to find an exact version match (for version tags)
 		for _, pin := range matchingPins {
@@ -228,13 +230,10 @@ func GetActionPinWithData(actionRepo, version string, data *WorkflowData) (strin
 		// Semver compatibility means respecting major version boundaries
 		// (e.g., v5 -> highest v5.x.x, not v6.x.x)
 		if !data.StrictMode && len(matchingPins) > 0 {
-			// Filter for semver-compatible pins (matching major version)
-			var compatiblePins []ActionPin
-			for _, pin := range matchingPins {
-				if isSemverCompatible(pin.Version, version) {
-					compatiblePins = append(compatiblePins, pin)
-				}
-			}
+			// Filter for semver-compatible pins (matching major version) - using functional filter
+			compatiblePins := sliceutil.Filter(matchingPins, func(pin ActionPin) bool {
+				return isSemverCompatible(pin.Version, version)
+			})
 
 			// If we found compatible pins, use the highest one (first after sorting)
 			// Otherwise fall back to the highest overall pin
@@ -417,21 +416,18 @@ func ApplyActionPinsToTypedSteps(steps []*WorkflowStep, data *WorkflowData) []*W
 func GetActionPinByRepo(repo string) (ActionPin, bool) {
 	actionPins := getActionPins()
 
-	// Find all pins matching the repo
-	var matchingPins []ActionPin
-	for _, pin := range actionPins {
-		if pin.Repo == repo {
-			matchingPins = append(matchingPins, pin)
-		}
-	}
+	// Find all pins matching the repo - using functional filter
+	matchingPins := sliceutil.Filter(actionPins, func(pin ActionPin) bool {
+		return pin.Repo == repo
+	})
 
 	if len(matchingPins) == 0 {
 		return ActionPin{}, false
 	}
 
-	// Sort matching pins by version (descending - latest first)
-	sortPinsByVersion(matchingPins)
+	// Sort matching pins by version (descending - latest first) - immutable operation
+	sortedPins := sortPinsByVersion(matchingPins)
 
 	// Return the latest version (first after sorting)
-	return matchingPins[0], true
+	return sortedPins[0], true
 }

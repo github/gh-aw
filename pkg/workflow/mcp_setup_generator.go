@@ -67,6 +67,7 @@ import (
 
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 )
 
 var mcpSetupGeneratorLog = logger.New("workflow:mcp_setup_generator")
@@ -329,10 +330,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		yaml.WriteString("        run: |\n")
 
 		// Generate individual tool files (sorted by name for stable code generation)
-		safeInputToolNames := make([]string, 0, len(workflowData.SafeInputs.Tools))
-		for toolName := range workflowData.SafeInputs.Tools {
-			safeInputToolNames = append(safeInputToolNames, toolName)
-		}
+		safeInputToolNames := sliceutil.MapToSlice(workflowData.SafeInputs.Tools)
 		sort.Strings(safeInputToolNames)
 
 		for _, toolName := range safeInputToolNames {
@@ -408,11 +406,8 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 		safeInputsSecrets := collectSafeInputsSecrets(workflowData.SafeInputs)
 		if len(safeInputsSecrets) > 0 {
-			// Sort env var names for consistent output
-			envVarNames := make([]string, 0, len(safeInputsSecrets))
-			for envVarName := range safeInputsSecrets {
-				envVarNames = append(envVarNames, envVarName)
-			}
+			// Sort env var names for consistent output - using functional helper
+			envVarNames := sliceutil.MapToSlice(safeInputsSecrets)
 			sort.Strings(envVarNames)
 
 			for _, envVarName := range envVarNames {
@@ -452,10 +447,8 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			yaml.WriteString("        env:\n")
 
 			// Sort environment variable names for consistent output
-			envVarNames := make([]string, 0, len(mcpEnvVars))
-			for envVarName := range mcpEnvVars {
-				envVarNames = append(envVarNames, envVarName)
-			}
+			// Using functional helper to extract map keys
+			envVarNames := sliceutil.MapToSlice(mcpEnvVars)
 			sort.Strings(envVarNames)
 
 			// Write environment variables in sorted order
@@ -522,10 +515,8 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 		// Add user-configured environment variables
 		if len(gatewayConfig.Env) > 0 {
-			envVarNames := make([]string, 0, len(gatewayConfig.Env))
-			for envVarName := range gatewayConfig.Env {
-				envVarNames = append(envVarNames, envVarName)
-			}
+			// Using functional helper to extract map keys
+			envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
 			sort.Strings(envVarNames)
 
 			for _, envVarName := range envVarNames {
@@ -612,10 +603,8 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			containerCmd += " -e GH_AW_SAFE_OUTPUTS_API_KEY"
 		}
 		if len(gatewayConfig.Env) > 0 {
-			envVarNames := make([]string, 0, len(gatewayConfig.Env))
-			for envVarName := range gatewayConfig.Env {
-				envVarNames = append(envVarNames, envVarName)
-			}
+			// Using functional helper to extract map keys
+			envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
 			sort.Strings(envVarNames)
 			for _, envVarName := range envVarNames {
 				containerCmd += " -e " + envVarName

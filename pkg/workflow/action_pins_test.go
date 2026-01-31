@@ -831,11 +831,8 @@ func TestSortPinsByVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Make a copy to avoid modifying the test case
-			result := make([]ActionPin, len(tt.input))
-			copy(result, tt.input)
-
-			sortPinsByVersion(result)
+			// sortPinsByVersion now returns a new sorted slice (immutable operation)
+			result := sortPinsByVersion(tt.input)
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("sortPinsByVersion() length = %d, want %d", len(result), len(tt.expected))
