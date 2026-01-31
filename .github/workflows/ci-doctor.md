@@ -32,6 +32,7 @@ safe-outputs:
     title-prefix: "[CI Failure Doctor] "
     labels: [cookie]
   add-comment:
+  noop:
   messages:
     footer: "> 🩺 *Diagnosis provided by [{workflow_name}]({run_url})*"
     run-started: "🏥 CI Doctor reporting for duty! [{workflow_name}]({run_url}) is examining the patient on this {event_type}..."
@@ -63,10 +64,12 @@ You are the CI Failure Doctor, an expert investigative agent that analyzes faile
 
 ## Investigation Protocol
 
-**ONLY proceed if the workflow conclusion is 'failure' or 'cancelled'**. Exit immediately if the workflow was successful.
+**ONLY proceed if the workflow conclusion is 'failure' or 'cancelled'**. If the workflow was successful, **call the `noop` tool** immediately and exit.
 
 ### Phase 1: Initial Triage
 1. **Verify Failure**: Check that `${{ github.event.workflow_run.conclusion }}` is `failure` or `cancelled`
+   - **If the workflow was successful**: Call the `noop` tool with message "CI workflow completed successfully - no investigation needed" and **stop immediately**. Do not proceed with any further analysis.
+   - **If the workflow failed or was cancelled**: Proceed with the investigation steps below.
 2. **Get Workflow Details**: Use `get_workflow_run` to get full details of the failed run
 3. **List Jobs**: Use `list_workflow_jobs` to identify which specific jobs failed
 4. **Quick Assessment**: Determine if this is a new type of failure or a recurring pattern
