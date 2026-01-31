@@ -36,6 +36,9 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
+	// Add Serena cache step if Serena tool is enabled
+	c.generateSerenaCacheStep(yaml, data, needsCheckout)
+
 	// Add checkout steps for repository imports
 	// Each repository import needs to be checked out into a temporary folder
 	// so the merge script can copy files from it
