@@ -34,7 +34,8 @@ func TestCopilotEngineWithAgentFromEngineConfig(t *testing.T) {
 	}
 }
 
-// TestCopilotEngineWithAgentFromImports tests backward compatibility - copilot engine includes --agent flag when agent file is imported
+// TestCopilotEngineWithAgentFromImports tests that agent imports do NOT set --agent flag
+// Agent imports only import markdown content, not agent configuration
 func TestCopilotEngineWithAgentFromImports(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
@@ -53,14 +54,14 @@ func TestCopilotEngineWithAgentFromImports(t *testing.T) {
 
 	stepContent := strings.Join([]string(steps[0]), "\n")
 
-	// Copilot CLI expects agent identifier (filename without extension), not full path
-	if !strings.Contains(stepContent, `--agent test-agent`) {
-		t.Errorf("Expected '--agent test-agent' in copilot command, got:\n%s", stepContent)
+	// Agent imports should NOT set --agent flag (only engine.agent does)
+	if strings.Contains(stepContent, `--agent`) {
+		t.Errorf("Did not expect '--agent' flag when only AgentFile is set (without engine.agent), got:\n%s", stepContent)
 	}
 }
 
-// TestCopilotEngineAgentPriority tests that engine.agent takes priority over AgentFile
-func TestCopilotEngineAgentPriority(t *testing.T) {
+// TestCopilotEngineAgentOnlyFromEngineConfig tests that --agent flag is only set by engine.agent
+func TestCopilotEngineAgentOnlyFromEngineConfig(t *testing.T) {
 	engine := NewCopilotEngine()
 	workflowData := &WorkflowData{
 		Name: "test-workflow",
@@ -79,10 +80,11 @@ func TestCopilotEngineAgentPriority(t *testing.T) {
 
 	stepContent := strings.Join([]string(steps[0]), "\n")
 
-	// Should use explicit agent from engine.agent, not the one from imports
+	// Should only use explicit agent from engine.agent
 	if !strings.Contains(stepContent, `--agent explicit-agent`) {
 		t.Errorf("Expected '--agent explicit-agent' in copilot command, got:\n%s", stepContent)
 	}
+	// Should not use agent from imports
 	if strings.Contains(stepContent, `--agent import-agent`) {
 		t.Errorf("Did not expect '--agent import-agent' when engine.agent is set, got:\n%s", stepContent)
 	}

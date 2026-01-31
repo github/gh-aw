@@ -73,22 +73,12 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		copilotArgs = append(copilotArgs, "--model", workflowData.EngineConfig.Model)
 	}
 
-	// Add --agent flag if specified in engine configuration or via imports
-	// Two orthogonal ways to specify agent:
-	// 1. engine.agent - explicit agent ID (takes priority)
-	// 2. AgentFile - from importing .github/agents/*.md files
-	var agentIdentifier string
+	// Add --agent flag if specified via engine.agent
+	// Note: Agent imports (.github/agents/*.md) still work for importing markdown content,
+	// but they do NOT automatically set the --agent flag. Only engine.agent controls the flag.
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Agent != "" {
-		// Use explicit agent ID from engine.agent field
-		agentIdentifier = workflowData.EngineConfig.Agent
+		agentIdentifier := workflowData.EngineConfig.Agent
 		copilotExecLog.Printf("Using agent from engine.agent: %s", agentIdentifier)
-	} else if workflowData.AgentFile != "" {
-		// Use agent from imports (.github/agents/*.md files)
-		agentIdentifier = ExtractAgentIdentifier(workflowData.AgentFile)
-		copilotExecLog.Printf("Using agent from imports: %s (identifier: %s)", workflowData.AgentFile, agentIdentifier)
-	}
-
-	if agentIdentifier != "" {
 		copilotArgs = append(copilotArgs, "--agent", agentIdentifier)
 	}
 
