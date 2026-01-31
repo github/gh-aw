@@ -111,6 +111,8 @@ function registerPredefinedTools(server, tools, config, registerTool, normalizeT
         registerTool(server, tool);
         return;
       } else {
+        // Note: Using server.debug() with "WARNING:" prefix since MCP server only provides
+        // debug and debugError methods. The prefix helps identify severity in logs.
         server.debug(`  WARNING: dispatch_workflow config is missing or falsy - tool will NOT be registered`);
         server.debug(`  Config keys: ${Object.keys(config).join(", ")}`);
         server.debug(`  config.dispatch_workflow value: ${JSON.stringify(config.dispatch_workflow)}`);
