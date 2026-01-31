@@ -167,9 +167,7 @@ describe("safe_outputs_tools_loader", () => {
     });
 
     it("should attach dispatch_workflow handler for tools with _workflow_name", () => {
-      const tools = [
-        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
-      ];
+      const tools = [{ name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" }];
       const defaultHandler = vi.fn(type => vi.fn());
       const handlers = {
         createPullRequestHandler: vi.fn(),
@@ -183,19 +181,17 @@ describe("safe_outputs_tools_loader", () => {
       // Handler should be attached
       expect(result[0].handler).toBeDefined();
       expect(typeof result[0].handler).toBe("function");
-      
+
       // Call the handler to verify it uses dispatch_workflow type
       const mockArgs = { test_param: "value" };
       result[0].handler(mockArgs);
-      
+
       // Verify defaultHandler was called with dispatch_workflow type
       expect(defaultHandler).toHaveBeenCalledWith("dispatch_workflow");
     });
 
     it("should include workflow_name in dispatch_workflow handler args", () => {
-      const tools = [
-        { name: "ci_workflow", description: "CI workflow", _workflow_name: "ci" },
-      ];
+      const tools = [{ name: "ci_workflow", description: "CI workflow", _workflow_name: "ci" }];
       const mockHandlerFunction = vi.fn();
       const defaultHandler = vi.fn(() => mockHandlerFunction);
       const handlers = {
@@ -210,7 +206,7 @@ describe("safe_outputs_tools_loader", () => {
       // Call the handler
       const mockArgs = { input1: "value1" };
       result[0].handler(mockArgs);
-      
+
       // Verify the handler function was called with workflow_name
       expect(mockHandlerFunction).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -291,9 +287,7 @@ describe("safe_outputs_tools_loader", () => {
     });
 
     it("should not register dispatch_workflow tools when dispatch_workflow is not in config", () => {
-      const tools = [
-        { name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" },
-      ];
+      const tools = [{ name: "test_workflow", description: "Test workflow", _workflow_name: "test-workflow" }];
       const config = {
         create_issue: true,
       };
