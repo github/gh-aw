@@ -4231,6 +4231,12 @@
                   "$ref": "#/$defs/github_token",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
                 },
+                "project": {
+                  "type": "string",
+                  "description": "Default project URL for update-project operations. When specified, safe output messages can omit the project field and will use this URL by default. Must be a valid GitHub Projects v2 URL. Overridden by explicit project field in safe output messages.",
+                  "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
+                  "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
+                },
                 "views": {
                   "type": "array",
                   "description": "Optional array of project views to create. Each view must have a name and layout. Views are created during project setup.",
@@ -4481,6 +4487,12 @@
                 "github-token": {
                   "$ref": "#/$defs/github_token",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified. Must have Projects: Read+Write permission."
+                },
+                "project": {
+                  "type": "string",
+                  "description": "Default project URL for status update operations. When specified, safe output messages can omit the project field and will use this URL by default. Must be a valid GitHub Projects v2 URL. Overridden by explicit project field in safe output messages.",
+                  "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
+                  "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 }
               },
               "additionalProperties": false,

@@ -239,13 +239,26 @@ func (c *Compiler) buildProjectHandlerManagerStep(data *WorkflowData) []string {
 	token := getEffectiveProjectGitHubToken(customToken, data.GitHubToken)
 	steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_GITHUB_TOKEN: %s\n", token))
 
-	// Add GH_AW_PROJECT_URL if project is configured in frontmatter
+	// Add GH_AW_PROJECT_URL if project is configured in frontmatter or safe-outputs config
 	// This provides a default project URL for update-project and create-project-status-update operations
 	// when target=context (or target not specified). Users can override by setting target=* and
 	// providing an explicit project field in the safe output message.
+	//
+	// Precedence: frontmatter project > update-project.project > create-project-status-update.project
+	var projectURL string
 	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.Project != nil && data.ParsedFrontmatter.Project.URL != "" {
-		consolidatedSafeOutputsStepsLog.Printf("Adding GH_AW_PROJECT_URL environment variable: %s", data.ParsedFrontmatter.Project.URL)
-		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", data.ParsedFrontmatter.Project.URL))
+		projectURL = data.ParsedFrontmatter.Project.URL
+		consolidatedSafeOutputsStepsLog.Printf("Using project URL from frontmatter: %s", projectURL)
+	} else if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
+		projectURL = data.SafeOutputs.UpdateProjects.Project
+		consolidatedSafeOutputsStepsLog.Printf("Using project URL from update-project config: %s", projectURL)
+	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.Project != "" {
+		projectURL = data.SafeOutputs.CreateProjectStatusUpdates.Project
+		consolidatedSafeOutputsStepsLog.Printf("Using project URL from create-project-status-update config: %s", projectURL)
+	}
+
+	if projectURL != "" {
+		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", projectURL))
 	}
 
 	// With section for github-token
