@@ -44,7 +44,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           set -o pipefail
-          go test -v -parallel=8 -timeout=3m -run='^Test' -tags '!integration' -coverprofile=coverage.out -json ./... | tee test-result-unit.json
+          go test -v -parallel=8 -timeout=3m -run='^Test' -tags '!integration' -coverprofile=coverage.out -json ./... > test-result-unit.json
           go tool cover -html=coverage.out -o coverage.html
 
       # Coverage reports for recent builds only - 7 days is sufficient for debugging recent changes
