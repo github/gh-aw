@@ -294,32 +294,22 @@ async function loadHandlers(configs, projectOctokit = null) {
           throw new Error(`Octokit instance is required for project handler ${type}. This is a configuration error - projectOctokit should be provided when project handlers are configured.`);
         }
 
-        // Temporarily set the global github object to the project Octokit
-        // This allows project handlers to use github.graphql, github.request, etc.
-        const originalGithub = global.github;
-        global.github = projectOctokit;
+        const handlerModule = require(handlerPath);
+        if (handlerModule && typeof handlerModule.main === "function") {
+          // Call the factory function with config AND the project Octokit client
+          const handlerConfig = configs.project[type] || {};
+          const messageHandler = await handlerModule.main(handlerConfig, projectOctokit);
 
-        try {
-          const handlerModule = require(handlerPath);
-          if (handlerModule && typeof handlerModule.main === "function") {
-            // Call the factory function with config to get the message handler
-            const handlerConfig = configs.project[type] || {};
-            const messageHandler = await handlerModule.main(handlerConfig);
-
-            if (typeof messageHandler !== "function") {
-              const error = new Error(`Handler ${type} main() did not return a function - expected a message handler function but got ${typeof messageHandler}`);
-              core.error(`✗ Fatal error loading handler ${type}: ${error.message}`);
-              throw error;
-            }
-
-            messageHandlers.set(type, messageHandler);
-            core.info(`✓ Loaded and initialized project handler for: ${type}`);
-          } else {
-            core.warning(`Handler module ${type} does not export a main function`);
+          if (typeof messageHandler !== "function") {
+            const error = new Error(`Handler ${type} main() did not return a function - expected a message handler function but got ${typeof messageHandler}`);
+            core.error(`✗ Fatal error loading handler ${type}: ${error.message}`);
+            throw error;
           }
-        } finally {
-          // Restore the original github object
-          global.github = originalGithub;
+
+          messageHandlers.set(type, messageHandler);
+          core.info(`✓ Loaded and initialized project handler for: ${type}`);
+        } else {
+          core.warning(`Handler module ${type} does not export a main function`);
         }
       } catch (error) {
         const errorMessage = getErrorMessage(error);
@@ -484,18 +474,9 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
       const resolvedTemporaryIds = Object.fromEntries(temporaryIdMap);
 
       if (isProjectHandler) {
-        // Project handlers need to use the project Octokit client
-        // Temporarily set the global github object to the project Octokit
-        const originalGithub = global.github;
-        global.github = projectOctokit;
-
-        try {
-          // Project handlers receive: (message, temporaryIdMap, resolvedTemporaryIds)
-          result = await messageHandler(message, temporaryIdMap, resolvedTemporaryIds);
-        } finally {
-          // Restore the original github object
-          global.github = originalGithub;
-        }
+        // Project handlers receive: (message, temporaryIdMap, resolvedTemporaryIds)
+        // Note: Project handlers already have the project Octokit bound during initialization
+        result = await messageHandler(message, temporaryIdMap, resolvedTemporaryIds);
       } else {
         // Regular handlers receive: (message, resolvedTemporaryIds)
         result = await messageHandler(message, resolvedTemporaryIds);

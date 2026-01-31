@@ -259,13 +259,21 @@ async function copyProject(output) {
  * @param {number} [config.max] - Maximum number of copy_project items to process
  * @param {string} [config.source_project] - Default source project URL
  * @param {string} [config.target_owner] - Default target owner
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
  * @returns {Promise<Function>} Message handler function
  */
-async function main(config = {}) {
+async function main(config = {}, githubClient = null) {
   // Extract configuration
   const maxCount = config.max || 10;
   const defaultSourceProject = config.source_project || "";
   const defaultTargetOwner = config.target_owner || "";
+
+  // Use the provided github client, or fall back to the global github object
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
 
   core.info(`Max count: ${maxCount}`);
   if (defaultSourceProject) {

@@ -265,10 +265,19 @@ function formatDate(date) {
 /**
  * Main handler factory for create_project_status_update
  * Returns a message handler function that processes individual create_project_status_update messages
+ * @param {Object} config - Handler configuration
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
  * @type {HandlerFactoryFunction}
  */
-async function main(config = {}) {
+async function main(config = {}, githubClient = null) {
   const maxCount = config.max || 10;
+
+  // Use the provided github client, or fall back to the global github object
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
 
   core.info(`Max count: ${maxCount}`);
 

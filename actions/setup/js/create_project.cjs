@@ -284,17 +284,23 @@ async function createProjectView(projectUrl, viewConfig) {
 /**
  * Main entry point - handler factory that returns a message handler function
  * @param {Object} config - Handler configuration
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
  * @returns {Promise<Function>} Message handler function
  */
-async function main(config = {}) {
+async function main(config = {}, githubClient = null) {
   // Extract configuration
   const defaultTargetOwner = config.target_owner || "";
   const maxCount = config.max || 1;
   const titlePrefix = config.title_prefix || "Campaign";
   const configuredViews = Array.isArray(config.views) ? config.views : [];
 
-  // The github object is already authenticated with the custom token via the
-  // github-token parameter set on the actions/github-script action
+  // Use the provided github client, or fall back to the global github object
+  // The global github object is available when running via github-script action
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
 
   if (defaultTargetOwner) {
     core.info(`Default target owner: ${defaultTargetOwner}`);
