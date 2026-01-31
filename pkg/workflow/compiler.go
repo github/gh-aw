@@ -292,12 +292,12 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 
 			return formatCompilerError(markdownPath, "error", message)
 		}
+	}
 
-		// Validate dispatch-workflow configuration
-		log.Print("Validating dispatch-workflow configuration")
-		if err := c.validateDispatchWorkflow(workflowData, markdownPath); err != nil {
-			return formatCompilerError(markdownPath, "error", fmt.Sprintf("dispatch-workflow validation failed: %v", err))
-		}
+	// Validate dispatch-workflow configuration (independent of agentic-workflows tool)
+	log.Print("Validating dispatch-workflow configuration")
+	if err := c.validateDispatchWorkflow(workflowData, markdownPath); err != nil {
+		return formatCompilerError(markdownPath, "error", fmt.Sprintf("dispatch-workflow validation failed: %v", err))
 	}
 
 	// Note: Markdown content size is now handled by splitting into multiple steps in generatePrompt
