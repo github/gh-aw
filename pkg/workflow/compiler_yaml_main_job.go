@@ -510,7 +510,7 @@ func (c *Compiler) addCustomStepsWithRuntimeInsertion(yaml *strings.Builder, cus
 func (c *Compiler) generateRepositoryImportCheckouts(yaml *strings.Builder, repositoryImports []string) {
 	for _, repoImport := range repositoryImports {
 		compilerYamlLog.Printf("Generating checkout step for repository import: %s", repoImport)
-		
+
 		// Parse the import spec to extract owner, repo, and ref
 		// Format: owner/repo@ref or owner/repo
 		owner, repo, ref := parseRepositoryImportSpec(repoImport)
@@ -518,23 +518,23 @@ func (c *Compiler) generateRepositoryImportCheckouts(yaml *strings.Builder, repo
 			compilerYamlLog.Printf("Warning: failed to parse repository import: %s", repoImport)
 			continue
 		}
-		
+
 		// Generate a sanitized directory name for the checkout
 		// Use a consistent format: owner-repo-ref
 		sanitizedRef := sanitizeRefForPath(ref)
 		checkoutPath := fmt.Sprintf("/tmp/gh-aw/repo-imports/%s-%s-%s", owner, repo, sanitizedRef)
-		
+
 		// Generate the checkout step
-		yaml.WriteString(fmt.Sprintf("      - name: Checkout repository import %s/%s@%s\n", owner, repo, ref))
+		fmt.Fprintf(yaml, "      - name: Checkout repository import %s/%s@%s\n", owner, repo, ref)
 		fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/checkout"))
 		yaml.WriteString("        with:\n")
-		yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
-		yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
-		yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+		fmt.Fprintf(yaml, "          repository: %s/%s\n", owner, repo)
+		fmt.Fprintf(yaml, "          ref: %s\n", ref)
+		fmt.Fprintf(yaml, "          path: %s\n", checkoutPath)
 		yaml.WriteString("          sparse-checkout: |\n")
 		yaml.WriteString("            .github/\n")
 		yaml.WriteString("          persist-credentials: false\n")
-		
+
 		compilerYamlLog.Printf("Added checkout step: %s/%s@%s -> %s", owner, repo, ref, checkoutPath)
 	}
 }
@@ -548,7 +548,7 @@ func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
 	if idx := strings.Index(importSpec, "#"); idx != -1 {
 		cleanSpec = importSpec[:idx]
 	}
-	
+
 	// Split on @ to get path and ref
 	parts := strings.Split(cleanSpec, "@")
 	pathPart := parts[0]
@@ -556,16 +556,16 @@ func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
 	if len(parts) > 1 {
 		ref = parts[1]
 	}
-	
+
 	// Parse path: owner/repo
 	slashParts := strings.Split(pathPart, "/")
 	if len(slashParts) != 2 {
 		return "", "", ""
 	}
-	
+
 	owner = slashParts[0]
 	repo = slashParts[1]
-	
+
 	return owner, repo, ref
 }
 
@@ -574,29 +574,29 @@ func parseRepositoryImportSpec(importSpec string) (owner, repo, ref string) {
 // This checks out the entire repository (not just .github folder) since the file could be anywhere
 func (c *Compiler) generateLegacyAgentImportCheckout(yaml *strings.Builder, agentImportSpec string) {
 	compilerYamlLog.Printf("Generating checkout step for legacy agent import: %s", agentImportSpec)
-	
+
 	// Parse the import spec to extract owner, repo, and ref
 	owner, repo, ref := parseRepositoryImportSpec(agentImportSpec)
 	if owner == "" || repo == "" {
 		compilerYamlLog.Printf("Warning: failed to parse legacy agent import spec: %s", agentImportSpec)
 		return
 	}
-	
+
 	// Generate a sanitized directory name for the checkout
 	sanitizedRef := sanitizeRefForPath(ref)
 	checkoutPath := fmt.Sprintf("/tmp/gh-aw/repo-imports/%s-%s-%s", owner, repo, sanitizedRef)
-	
+
 	// Generate the checkout step
-	yaml.WriteString(fmt.Sprintf("      - name: Checkout agent import %s/%s@%s\n", owner, repo, ref))
+	fmt.Fprintf(yaml, "      - name: Checkout agent import %s/%s@%s\n", owner, repo, ref)
 	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/checkout"))
 	yaml.WriteString("        with:\n")
-	yaml.WriteString(fmt.Sprintf("          repository: %s/%s\n", owner, repo))
-	yaml.WriteString(fmt.Sprintf("          ref: %s\n", ref))
-	yaml.WriteString(fmt.Sprintf("          path: %s\n", checkoutPath))
+	fmt.Fprintf(yaml, "          repository: %s/%s\n", owner, repo)
+	fmt.Fprintf(yaml, "          ref: %s\n", ref)
+	fmt.Fprintf(yaml, "          path: %s\n", checkoutPath)
 	yaml.WriteString("          sparse-checkout: |\n")
 	yaml.WriteString("            .github/\n")
 	yaml.WriteString("          persist-credentials: false\n")
-	
+
 	compilerYamlLog.Printf("Added legacy agent checkout step: %s/%s@%s -> %s", owner, repo, ref, checkoutPath)
 }
 
