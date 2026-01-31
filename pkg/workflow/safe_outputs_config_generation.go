@@ -715,7 +715,6 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 
 			// Store the file extension for runtime use
 			data.SafeOutputs.DispatchWorkflow.WorkflowFiles[workflowName] = extension
-			safeOutputsConfigLog.Printf("Stored workflow file extension: %s -> %s", workflowName, extension)
 
 			// Extract workflow_dispatch inputs
 			workflowInputs, err := extractWorkflowDispatchInputs(workflowPath)
