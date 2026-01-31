@@ -377,6 +377,59 @@ func TestRunWorkflowsOnGitHub(t *testing.T) {
 	}
 }
 
+func TestNormalizeWorkflowID(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "workflow ID without extension",
+			input:    "my-workflow",
+			expected: "my-workflow",
+		},
+		{
+			name:     "workflow ID with .md extension",
+			input:    "my-workflow.md",
+			expected: "my-workflow",
+		},
+		{
+			name:     "full path with .md extension",
+			input:    ".github/workflows/my-workflow.md",
+			expected: "my-workflow",
+		},
+		{
+			name:     "absolute path with .md extension",
+			input:    "/home/user/project/.github/workflows/my-workflow.md",
+			expected: "my-workflow",
+		},
+		{
+			name:     "relative path with .md extension",
+			input:    "../../.github/workflows/my-workflow.md",
+			expected: "my-workflow",
+		},
+		{
+			name:     "workflow with hyphens",
+			input:    ".github/workflows/agent-performance-analyzer.md",
+			expected: "agent-performance-analyzer",
+		},
+		{
+			name:     "workflow without path but with .md",
+			input:    "test-workflow.md",
+			expected: "test-workflow",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeWorkflowID(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeWorkflowID(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestAllCommandsExist(t *testing.T) {
 	// Create a minimal test environment to avoid expensive workflow compilation
 	tempDir := testutil.TempDir(t, "test-*")

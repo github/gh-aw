@@ -84,14 +84,14 @@ func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose 
 		}
 
 		workflowPath := filepath.Join(workflowsDir, entry.Name())
-		workflowName := strings.TrimSuffix(entry.Name(), ".md")
+		workflowName := normalizeWorkflowID(entry.Name())
 
 		// Filter by name if specified
 		if len(filterNames) > 0 {
 			matched := false
 			for _, filterName := range filterNames {
-				// Remove .md extension if present
-				filterName = strings.TrimSuffix(filterName, ".md")
+				// Normalize filter name to handle both "workflow" and "workflow.md" formats
+				filterName = normalizeWorkflowID(filterName)
 				if workflowName == filterName {
 					matched = true
 					break

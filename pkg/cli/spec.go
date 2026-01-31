@@ -178,7 +178,7 @@ func parseGitHubURL(spec string) (*WorkflowSpec, error) {
 			Version:  ref,
 		},
 		WorkflowPath: filePath,
-		WorkflowName: strings.TrimSuffix(filepath.Base(filePath), ".md"),
+		WorkflowName: normalizeWorkflowID(filePath),
 	}, nil
 }
 

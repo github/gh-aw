@@ -74,7 +74,7 @@ func toggleWorkflowsByNames(workflowNames []string, enable bool, repoOverride st
 		var allWorkflowNames []string
 		for _, file := range mdFiles {
 			base := filepath.Base(file)
-			name := strings.TrimSuffix(base, ".md")
+			name := normalizeWorkflowID(base)
 			allWorkflowNames = append(allWorkflowNames, name)
 		}
 
@@ -124,7 +124,7 @@ func toggleWorkflowsByNames(workflowNames []string, enable bool, repoOverride st
 		found := false
 		for _, file := range mdFiles {
 			base := filepath.Base(file)
-			name := strings.TrimSuffix(base, ".md")
+			name := normalizeWorkflowID(base)
 
 			// Check if this workflow matches the requested name
 			if name == workflowName {

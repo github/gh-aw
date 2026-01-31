@@ -264,7 +264,20 @@ func TestRunWorkflowOnGitHub_FlagCombinations(t *testing.T) {
 				false, // waitForCompletion
 				[]string{},
 				false, // verbose
-			false, // dryRun
+				false, // dryRun
+			)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				} else if len(tt.errorContains) > 0 {
+					// Check if error contains at least one of the acceptable messages
+					found := false
+					for _, msg := range tt.errorContains {
+						if strings.Contains(err.Error(), msg) {
+							found = true
+							break
+						}
 					}
 					if !found {
 						t.Errorf("Expected error to contain one of %v, but got: %s", tt.errorContains, err.Error())

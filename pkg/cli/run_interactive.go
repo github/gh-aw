@@ -122,7 +122,7 @@ func findRunnableWorkflows(verbose bool) ([]WorkflowOption, error) {
 		}
 
 		// Extract workflow name
-		name := strings.TrimSuffix(filepath.Base(mdFile), ".md")
+		name := normalizeWorkflowID(mdFile)
 
 		// Get workflow inputs
 		inputs, err := getWorkflowInputs(mdFile)
