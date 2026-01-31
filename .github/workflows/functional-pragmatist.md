@@ -35,11 +35,7 @@ tools:
   edit:
   bash:
     - "*"
-  cache:
-    enabled: true
-    keys:
-      - "last_processed_package"
-      - "processed_packages"
+  cache-memory: true
 
 timeout-minutes: 45
 strict: true
