@@ -1,7 +1,7 @@
 // @ts-check
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { loadConfig, setupProjectGitHubClient } from "./safe_output_unified_handler_manager.cjs";
+import { loadConfig } from "./safe_output_unified_handler_manager.cjs";
 
 describe("Unified Safe Output Handler Manager", () => {
   beforeEach(() => {
@@ -87,12 +87,6 @@ describe("Unified Safe Output Handler Manager", () => {
 
       expect(config.regular).toHaveProperty("create_issue");
       expect(config.regular).not.toHaveProperty("create-issue");
-    });
-  });
-
-  describe("setupProjectGitHubClient", () => {
-    it("should throw error if GH_AW_PROJECT_GITHUB_TOKEN is not set", () => {
-      expect(() => setupProjectGitHubClient()).toThrow(/GH_AW_PROJECT_GITHUB_TOKEN environment variable is required/);
     });
   });
 });

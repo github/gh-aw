@@ -6,13 +6,16 @@
  *
  * This module manages the dispatch of safe output messages to dedicated handlers.
  * It processes both regular and project-related safe outputs in a single step,
- * using the appropriate GitHub client (github object or Octokit) based on the handler type.
+ * using the github object from github-script context.
  *
- * Regular handlers use the `github` object from github-script (authenticated with GH_AW_GITHUB_TOKEN)
- * Project handlers use an Octokit instance (authenticated with GH_AW_PROJECT_GITHUB_TOKEN)
+ * Regular handlers use the `github` object authenticated with GH_AW_GITHUB_TOKEN
+ * Project handlers use the `github` object authenticated with GH_AW_PROJECT_GITHUB_TOKEN
+ *
+ * Note: When calling this handler for workflows with project-related safe outputs,
+ * ensure the github-script action is configured with the appropriate github-token
+ * (GH_AW_PROJECT_GITHUB_TOKEN for project operations, GH_AW_GITHUB_TOKEN for regular operations)
  */
 
-const { getOctokit } = require("@actions/github");
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { hasUnresolvedTemporaryIds, replaceTemporaryIdReferences, normalizeTemporaryId, loadTemporaryIdMap } = require("./temporary_id.cjs");
@@ -221,36 +224,13 @@ function loadConfig() {
 }
 
 /**
- * Setup GitHub client for project handlers using Octokit
- * Creates an Octokit instance with GH_AW_PROJECT_GITHUB_TOKEN
- * Also sets up the global `github` variable for project handlers
- * @returns {Object} Octokit instance
- */
-function setupProjectGitHubClient() {
-  const projectToken = process.env.GH_AW_PROJECT_GITHUB_TOKEN;
-  if (!projectToken) {
-    throw new Error("GH_AW_PROJECT_GITHUB_TOKEN environment variable is required for project-related safe outputs. " + "Configure a GitHub token with Projects permissions in your workflow secrets.");
-  }
-
-  core.info("Setting up Octokit client for project handlers");
-  const octokit = getOctokit(projectToken);
-
-  // Set up the global github object for project handlers to use
-  // This allows project handlers to use `github.graphql`, `github.request`, etc.
-  global.github = octokit;
-
-  return octokit;
-}
-
-/**
  * Load and initialize handlers for enabled safe output types
  * Calls each handler's factory function (main) to get message processors
- * Handles both regular handlers (using github from github-script) and project handlers (using Octokit)
+ * Handles both regular handlers and project handlers (both use the global github object)
  * @param {{regular: Object, project: Object}} configs - Safe outputs configuration for regular and project handlers
- * @param {Object} octokit - Octokit instance for project handlers (optional)
  * @returns {Promise<Map<string, Function>>} Map of type to message handler function
  */
-async function loadHandlers(configs, octokit = null) {
+async function loadHandlers(configs) {
   const messageHandlers = new Map();
 
   core.info("Loading and initializing safe output handlers based on configuration...");
@@ -286,15 +266,11 @@ async function loadHandlers(configs, octokit = null) {
     }
   }
 
-  // Load project handlers (using Octokit instance)
+  // Load project handlers (also using the github object from github-script context)
+  // Note: The github object should be authenticated with GH_AW_PROJECT_GITHUB_TOKEN when project handlers are used
   for (const [type, handlerPath] of Object.entries(PROJECT_HANDLER_MAP)) {
     if (configs.project[type]) {
       try {
-        // Ensure we have an Octokit instance for project handlers
-        if (!octokit) {
-          throw new Error(`Octokit instance is required for project handler ${type}`);
-        }
-
         const handlerModule = require(handlerPath);
         if (handlerModule && typeof handlerModule.main === "function") {
           // Call the factory function with config to get the message handler
@@ -930,10 +906,9 @@ async function main() {
     const configs = loadConfig();
     core.debug(`Configuration: regular=${JSON.stringify(Object.keys(configs.regular))}, project=${JSON.stringify(Object.keys(configs.project))}`);
 
-    // Setup Octokit for project handlers if needed
-    let octokit = null;
-    if (Object.keys(configs.project).length > 0) {
-      octokit = setupProjectGitHubClient();
+    // Validate project token if project handlers are configured
+    if (Object.keys(configs.project).length > 0 && !process.env.GH_AW_PROJECT_GITHUB_TOKEN) {
+      throw new Error("GH_AW_PROJECT_GITHUB_TOKEN environment variable is required for project-related safe outputs. " + "Configure a GitHub token with Projects permissions in your workflow secrets.");
     }
 
     // Load agent output
@@ -950,7 +925,8 @@ async function main() {
     core.info(`Found ${agentOutput.items.length} message(s) in agent output`);
 
     // Load and initialize handlers based on configuration (factory pattern)
-    const messageHandlers = await loadHandlers(configs, octokit);
+    // Both regular and project handlers use the global github object from github-script context
+    const messageHandlers = await loadHandlers(configs);
 
     if (messageHandlers.size === 0) {
       core.info("No handlers loaded - nothing to process");
@@ -1048,7 +1024,7 @@ async function main() {
   }
 }
 
-module.exports = { main, loadConfig, loadHandlers, processMessages, setupProjectGitHubClient };
+module.exports = { main, loadConfig, loadHandlers, processMessages };
 
 // Run main if this script is executed directly (not required as a module)
 if (require.main === module) {
