@@ -79,6 +79,7 @@ func TestRunWorkflowOnGitHub_InputValidation(t *testing.T) {
 				false, // waitForCompletion
 				tt.inputs,
 				false, // verbose
+				false, // dryRun
 			)
 
 			if tt.expectError {
@@ -115,6 +116,7 @@ func TestRunWorkflowOnGitHub_ContextCancellation(t *testing.T) {
 		false, // waitForCompletion
 		[]string{},
 		false, // verbose
+		false, // dryRun
 	)
 
 	if err == nil {
@@ -172,6 +174,7 @@ func TestRunWorkflowsOnGitHub_InputValidation(t *testing.T) {
 				false, // push
 				[]string{},
 				false, // verbose
+				false, // dryRun
 			)
 
 			if tt.expectError {
@@ -208,6 +211,7 @@ func TestRunWorkflowsOnGitHub_ContextCancellation(t *testing.T) {
 		false, // push
 		[]string{},
 		false, // verbose
+		false, // dryRun
 	)
 
 	if err == nil {
@@ -260,19 +264,7 @@ func TestRunWorkflowOnGitHub_FlagCombinations(t *testing.T) {
 				false, // waitForCompletion
 				[]string{},
 				false, // verbose
-			)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if len(tt.errorContains) > 0 {
-					// Check if error contains at least one of the acceptable messages
-					found := false
-					for _, msg := range tt.errorContains {
-						if strings.Contains(err.Error(), msg) {
-							found = true
-							break
-						}
+			false, // dryRun
 					}
 					if !found {
 						t.Errorf("Expected error to contain one of %v, but got: %s", tt.errorContains, err.Error())

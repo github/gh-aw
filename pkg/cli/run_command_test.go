@@ -136,10 +136,10 @@ func TestProgressFlagSignature(t *testing.T) {
 	// This is a compile-time check more than a runtime check
 
 	// RunWorkflowOnGitHub should NOT accept progress parameter anymore
-	_ = RunWorkflowOnGitHub(context.Background(), "test", false, "", "", "", false, false, false, false, []string{}, false)
+	_ = RunWorkflowOnGitHub(context.Background(), "test", false, "", "", "", false, false, false, false, []string{}, false, false)
 
 	// RunWorkflowsOnGitHub should NOT accept progress parameter anymore
-	_ = RunWorkflowsOnGitHub(context.Background(), []string{"test"}, 0, false, "", "", "", false, false, false, []string{}, false)
+	_ = RunWorkflowsOnGitHub(context.Background(), []string{"test"}, 0, false, "", "", "", false, false, false, []string{}, false, false)
 
 	// getLatestWorkflowRunWithRetry should NOT accept progress parameter anymore
 	_, _ = getLatestWorkflowRunWithRetry("test.lock.yml", "", false)
