@@ -38,6 +38,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -190,6 +193,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -295,6 +301,9 @@ jobs:
           else
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Verify dependencies
         run: go mod verify
@@ -480,6 +489,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -648,6 +660,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -719,6 +734,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -755,6 +773,9 @@ jobs:
           else
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Verify dependencies
         run: go mod verify
@@ -846,6 +867,9 @@ jobs:
           else
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Verify dependencies
         run: go mod verify
@@ -1204,6 +1228,9 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Download dependencies
+        run: go mod download
+
       - name: Verify dependencies
         run: go mod verify
 
@@ -1300,6 +1327,9 @@ jobs:
           else
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Download dependencies
+        run: go mod download
 
       - name: Verify dependencies
         run: go mod verify
