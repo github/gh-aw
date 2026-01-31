@@ -68,6 +68,17 @@ func isGHCLIAvailable() bool {
 	return cmd.Run() == nil
 }
 
+// normalizeWorkflowID extracts the workflow ID from a workflow identifier.
+// It handles both workflow IDs ("my-workflow") and full paths (".github/workflows/my-workflow.md").
+// Returns the workflow ID without .md extension.
+func normalizeWorkflowID(workflowIDOrPath string) string {
+	// Get the base filename if it's a path
+	basename := filepath.Base(workflowIDOrPath)
+
+	// Remove .md extension if present
+	return strings.TrimSuffix(basename, ".md")
+}
+
 // resolveWorkflowFile resolves a file or workflow name to an actual file path
 // Note: This function only looks for local workflows, not packages
 func resolveWorkflowFile(fileOrWorkflowName string, verbose bool) (string, error) {
