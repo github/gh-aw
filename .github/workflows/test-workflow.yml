@@ -6,6 +6,8 @@ on:
         description: 'Test parameter'
         type: string
         required: false
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
