@@ -1233,7 +1233,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

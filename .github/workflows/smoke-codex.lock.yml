@@ -1978,7 +1978,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"max\":1},\"hide_comment\":{\"max\":5},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1},\"remove_labels\":{\"allowed\":[\"smoke\"]}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-codex\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"max\":1},\"hide_comment\":{\"max\":5},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke\"]}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

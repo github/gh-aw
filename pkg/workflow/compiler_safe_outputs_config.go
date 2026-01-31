@@ -409,15 +409,9 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("max", c.Max).
 			Build()
 	},
-	"noop": func(cfg *SafeOutputsConfig) map[string]any {
-		if cfg.NoOp == nil {
-			return nil
-		}
-		c := cfg.NoOp
-		return newHandlerConfigBuilder().
-			AddIfPositive("max", c.Max).
-			Build()
-	},
+	// Note: "noop" is intentionally NOT included here because it is always processed
+	// by a dedicated standalone step (see notify_comment.go buildConclusionJob).
+	// Adding it to the handler manager would create duplicate configuration overhead.
 	"autofix_code_scanning_alert": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.AutofixCodeScanningAlert == nil {
 			return nil

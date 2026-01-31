@@ -1349,7 +1349,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"testing\",\"code-quality\",\"automated-analysis\",\"cookie\"],\"max\":1,\"title_prefix\":\"[testify-expert] \"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"labels\":[\"testing\",\"code-quality\",\"automated-analysis\",\"cookie\"],\"max\":1,\"title_prefix\":\"[testify-expert] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ steps.safe-outputs-app-token.outputs.token }}
           script: |

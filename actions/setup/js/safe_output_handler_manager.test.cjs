@@ -414,11 +414,11 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[0].success).toBe(true);
       expect(result.results[0].type).toBe("create_issue");
 
-      // Second message should be skipped (standalone step)
+      // Second message should be skipped (project handler step)
       expect(result.results[1].success).toBe(false);
       expect(result.results[1].type).toBe("update_project");
       expect(result.results[1].skipped).toBe(true);
-      expect(result.results[1].reason).toBe("Handled by standalone step");
+      expect(result.results[1].reason).toBe("Handled by project handler step");
 
       // Third message should also be skipped (standalone step)
       expect(result.results[2].success).toBe(false);
@@ -453,10 +453,15 @@ describe("Safe Output Handler Manager", () => {
 
       expect(result.success).toBe(true);
 
+      // Collect skipped project handler types
+      const skippedProjectResults = result.results.filter(r => r.skipped && r.reason === "Handled by project handler step");
+      const projectTypes = [...new Set(skippedProjectResults.map(r => r.type))];
+      expect(projectTypes).toEqual(expect.arrayContaining(["update_project"]));
+
       // Collect skipped standalone types
       const skippedStandaloneResults = result.results.filter(r => r.skipped && r.reason === "Handled by standalone step");
       const standaloneTypes = [...new Set(skippedStandaloneResults.map(r => r.type))];
-      expect(standaloneTypes).toEqual(expect.arrayContaining(["update_project", "create_agent_session"]));
+      expect(standaloneTypes).toEqual(expect.arrayContaining(["create_agent_session"]));
 
       // Collect skipped no-handler types
       const skippedNoHandlerResults = result.results.filter(r => !r.success && !r.skipped && r.error?.includes("No handler loaded"));

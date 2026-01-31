@@ -1313,7 +1313,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{}}"
           GH_AW_ASSIGN_COPILOT: "true"
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

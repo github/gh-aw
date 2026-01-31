@@ -1390,7 +1390,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":15},\"create_issue\":{\"expires\":24,\"group\":true,\"labels\":[\"cookie\"],\"max\":10},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1},\"update_issue\":{\"max\":5}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":15},\"create_issue\":{\"expires\":24,\"group\":true,\"labels\":[\"cookie\"],\"max\":10},\"missing_data\":{},\"missing_tool\":{},\"update_issue\":{\"max\":5}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
