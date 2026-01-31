@@ -126,7 +126,7 @@ func (c *AddInteractiveConfig) checkStatusAndOfferRun(ctx context.Context) error
 		if parsed != nil {
 			fmt.Fprintln(os.Stderr, "")
 
-			if err := RunSpecificWorkflowInteractively(ctx, parsed.WorkflowName, c.Verbose, c.EngineOverride, c.RepoOverride, "", false, false, false); err != nil {
+			if err := RunSpecificWorkflowInteractively(ctx, parsed.WorkflowName, c.Verbose, c.EngineOverride, c.RepoOverride, "", false, false, false, false); err != nil {
 				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to run workflow: %v", err)))
 				c.showFinalInstructions()
 				return nil

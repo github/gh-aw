@@ -13,6 +13,7 @@ import (
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
 	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/githubnext/gh-aw/pkg/sliceutil"
 	"github.com/githubnext/gh-aw/pkg/workflow"
 )
 
@@ -207,13 +208,9 @@ func getAvailableWorkflowNames() []string {
 		return nil
 	}
 
-	var names []string
-	for _, file := range mdFiles {
-		base := filepath.Base(file)
-		name := strings.TrimSuffix(base, ".md")
-		names = append(names, name)
-	}
-	return names
+	return sliceutil.Map(mdFiles, func(file string) string {
+		return strings.TrimSuffix(filepath.Base(file), ".md")
+	})
 }
 
 // suggestWorkflowNames returns up to 3 similar workflow names using fuzzy matching
@@ -240,11 +237,5 @@ func isWorkflowFile(filename string) bool {
 
 // filterWorkflowFiles filters out non-workflow files from a list of markdown files.
 func filterWorkflowFiles(files []string) []string {
-	var filtered []string
-	for _, file := range files {
-		if isWorkflowFile(file) {
-			filtered = append(filtered, file)
-		}
-	}
-	return filtered
+	return sliceutil.Filter(files, isWorkflowFile)
 }

@@ -20,7 +20,7 @@ import (
 var executionLog = logger.New("cli:run_workflow_execution")
 
 // RunWorkflowOnGitHub runs an agentic workflow on GitHub Actions
-func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bool, engineOverride string, repoOverride string, refOverride string, autoMergePRs bool, pushSecrets bool, push bool, waitForCompletion bool, inputs []string, verbose bool) error {
+func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bool, engineOverride string, repoOverride string, refOverride string, autoMergePRs bool, pushSecrets bool, push bool, waitForCompletion bool, inputs []string, verbose bool, dryRun bool) error {
 	executionLog.Printf("Starting workflow run: workflow=%s, enable=%v, engineOverride=%s, repo=%s, ref=%s, push=%v, wait=%v, inputs=%v", workflowIdOrName, enable, engineOverride, repoOverride, refOverride, push, waitForCompletion, inputs)
 
 	// Check context cancellation at the start
@@ -149,35 +149,22 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 		}
 	}
 
-	// Determine the lock file name based on the workflow source
-	var lockFileName string
-	var lockFilePath string
+	// Normalize workflow ID to handle both \"workflow-name\" and \".github/workflows/workflow-name.md\" formats
+	normalizedID := normalizeWorkflowID(workflowIdOrName)
 
-	if repoOverride != "" {
-		// For remote repositories, construct lock file name from markdown path
-		// This handles regular workflows, campaigns, and campaign orchestrators
-		mdPath := workflowIdOrName
-		if !strings.HasSuffix(mdPath, ".md") {
-			mdPath += ".md"
-		}
-		lockPath := getLockFilePath(mdPath)
-		lockFileName = filepath.Base(lockPath)
-	} else {
+	// Construct lock file name from normalized ID (same for both local and remote)
+	lockFileName := normalizedID + ".lock.yml"
+
+	// For local workflows, validate the workflow exists and check for lock file
+	var lockFilePath string
+	if repoOverride == "" {
 		// For local workflows, validate the workflow exists locally
 		workflowsDir := getWorkflowsDir()
 
-		_, _, err := readWorkflowFile(workflowIdOrName+".md", workflowsDir)
+		_, _, err := readWorkflowFile(normalizedID+".md", workflowsDir)
 		if err != nil {
 			return fmt.Errorf("failed to find workflow in local .github/workflows: %w", err)
 		}
-
-		// For local workflows, use getLockFilePath to handle campaigns properly
-		mdPath := workflowIdOrName
-		if !strings.HasSuffix(mdPath, ".md") {
-			mdPath += ".md"
-		}
-		lockPath := getLockFilePath(mdPath)
-		lockFileName = filepath.Base(lockPath)
 
 		// Check if the lock file exists in .github/workflows
 		lockFilePath = filepath.Join(".github/workflows", lockFileName)
@@ -185,7 +172,7 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 			executionLog.Printf("Lock file not found: %s (workflow must be compiled first)", lockFilePath)
 			suggestions := []string{
 				fmt.Sprintf("Run '%s compile' to compile all workflows", string(constants.CLIExtensionPrefix)),
-				fmt.Sprintf("Run '%s compile %s' to compile this specific workflow", string(constants.CLIExtensionPrefix), workflowIdOrName),
+				fmt.Sprintf("Run '%s compile %s' to compile this specific workflow", string(constants.CLIExtensionPrefix), normalizedID),
 			}
 			errMsg := console.FormatErrorWithSuggestions(
 				fmt.Sprintf("workflow lock file '%s' not found in .github/workflows", lockFileName),
@@ -395,6 +382,35 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 	// Record the start time for auto-merge PR filtering
 	workflowStartTime := time.Now()
 
+	// Handle dry-run mode: validate everything but skip actual execution
+	if dryRun {
+		if verbose {
+			var cmdParts []string
+			cmdParts = append(cmdParts, "gh workflow run", lockFileName)
+			if repoOverride != "" {
+				cmdParts = append(cmdParts, "--repo", repoOverride)
+			}
+			if ref != "" {
+				cmdParts = append(cmdParts, "--ref", ref)
+			}
+			if len(inputs) > 0 {
+				for _, input := range inputs {
+					cmdParts = append(cmdParts, "-f", input)
+				}
+			}
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Dry run mode - command that would be executed:"))
+			fmt.Fprintln(os.Stderr, console.FormatCommandMessage(strings.Join(cmdParts, " ")))
+		}
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("✓ Validation passed for workflow: %s (dry run - not executed)", lockFileName)))
+
+		// Restore workflow state if it was disabled and we enabled it
+		if enable && wasDisabled && workflowID != 0 {
+			restoreWorkflowState(workflowIdOrName, workflowID, repoOverride, verbose)
+		}
+
+		return nil
+	}
+
 	// Execute gh workflow run command and capture output
 	cmd := workflow.ExecGH(args...)
 
@@ -521,7 +537,7 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 }
 
 // RunWorkflowsOnGitHub runs multiple agentic workflows on GitHub Actions, optionally repeating a specified number of times
-func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, repeatCount int, enable bool, engineOverride string, repoOverride string, refOverride string, autoMergePRs bool, pushSecrets bool, push bool, inputs []string, verbose bool) error {
+func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, repeatCount int, enable bool, engineOverride string, repoOverride string, refOverride string, autoMergePRs bool, pushSecrets bool, push bool, inputs []string, verbose bool, dryRun bool) error {
 	if len(workflowNames) == 0 {
 		return fmt.Errorf("at least one workflow name or ID is required")
 	}
@@ -585,7 +601,7 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, repeatCou
 				fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Running workflow %d/%d: %s", i+1, len(workflowNames), workflowName)))
 			}
 
-			if err := RunWorkflowOnGitHub(ctx, workflowName, enable, engineOverride, repoOverride, refOverride, autoMergePRs, pushSecrets, push, waitForCompletion, inputs, verbose); err != nil {
+			if err := RunWorkflowOnGitHub(ctx, workflowName, enable, engineOverride, repoOverride, refOverride, autoMergePRs, pushSecrets, push, waitForCompletion, inputs, verbose, dryRun); err != nil {
 				return fmt.Errorf("failed to run workflow '%s': %w", workflowName, err)
 			}
 
@@ -598,7 +614,6 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, repeatCou
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Successfully triggered %d workflow(s)", len(workflowNames))))
 		return nil
 	}
-
 	// Execute workflows with optional repeat functionality
 	return ExecuteWithRepeat(RepeatOptions{
 		RepeatCount:   repeatCount,

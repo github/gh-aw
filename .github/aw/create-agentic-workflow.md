@@ -236,6 +236,46 @@ This llms.txt file contains workflow patterns, best practices, safe outputs, and
      - Present automation as a positive productivity tool used BY humans, not as independent actors or replacements
      - This is especially important for reporting/summary workflows (daily reports, chronicles, team status updates)
 
+## Best Practices
+
+### Improver Coding Agents in Large Repositories
+
+When creating workflows that involve coding agents operating in large repositories, follow these best practices to ensure efficiency and manageability:
+
+- 🔄 **For large repositories with multiple packages/components**, consider using the **round-robin processing pattern** with cache to ensure systematic coverage without overwhelming the codebase:
+
+  **Round-Robin Processing Pattern**:
+
+  Use this pattern when a workflow needs to process many independent units (packages, modules, directories, components) over time rather than all at once:
+
+  **Enable cache-memory in frontmatter**:
+
+  ```yaml
+  tools:
+    cache-memory: true
+  ```
+
+  **In the workflow instructions**:
+  1. **List all items** to process (e.g., find all packages/modules/directories)
+  2. **Read from cache-memory** to determine what was processed last (the authoring agent should decide the data format and update the scheme to implement it)
+  3. **Select next item** in round-robin fashion (next in list after last processed)
+  4. **Process only that one item** - focus deeply rather than broadly
+  5. **Update cache-memory** before finishing with the current item state
+  6. **Track processed items** to reset cycle: maintain a list of processed items and reset when all are done
+
+  **Benefits**:
+  - Systematic coverage of all components over multiple runs
+  - Smaller, focused changes that are easier to review
+  - Prevents overwhelming maintainers with massive PRs
+  - Natural rate limiting (one component per run)
+  - Progress survives across workflow runs
+
+  **Example use cases**:
+  - Refactoring workflows that process one package/module at a time
+  - Security audits that check one component per run
+  - Documentation updates for multiple services
+  - Dependency updates across microservices
+
 ## Issue Form Mode: Step-by-Step Workflow Creation
 
 When processing a GitHub issue created via the workflow creation form, follow these steps:

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/logger"
@@ -71,7 +70,7 @@ func ScanWorkflowsForMCP(workflowsDir string, serverFilter string, verbose bool)
 		}
 
 		if len(mcpConfigs) > 0 {
-			baseName := strings.TrimSuffix(filepath.Base(file), ".md")
+			baseName := normalizeWorkflowID(file)
 			mcpWorkflowScannerLog.Printf("Found MCP configuration in %s: %d servers", filepath.Base(file), len(mcpConfigs))
 			results = append(results, WorkflowMCPMetadata{
 				FilePath:    file,

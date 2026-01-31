@@ -318,7 +318,8 @@ Examples:
   gh aw run daily-perf-improver --enable-if-needed # Enable if disabled, run, then restore state
   gh aw run daily-perf-improver --auto-merge-prs # Auto-merge any PRs created during execution
   gh aw run daily-perf-improver -f name=value -f env=prod  # Pass workflow inputs
-  gh aw run daily-perf-improver --push  # Commit and push workflow files before running`,
+  gh aw run daily-perf-improver --push  # Commit and push workflow files before running
+  gh aw run daily-perf-improver --dry-run  # Validate without actually running`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repeatCount, _ := cmd.Flags().GetInt("repeat")
@@ -330,6 +331,7 @@ Examples:
 		pushSecrets, _ := cmd.Flags().GetBool("use-local-secrets")
 		inputs, _ := cmd.Flags().GetStringArray("raw-field")
 		push, _ := cmd.Flags().GetBool("push")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		if err := validateEngine(engineOverride); err != nil {
 			return err
@@ -353,10 +355,10 @@ Examples:
 				return fmt.Errorf("workflow inputs cannot be specified in interactive mode (they will be collected interactively)")
 			}
 
-			return cli.RunWorkflowInteractively(cmd.Context(), verboseFlag, repoOverride, refOverride, autoMergePRs, pushSecrets, push, engineOverride)
+			return cli.RunWorkflowInteractively(cmd.Context(), verboseFlag, repoOverride, refOverride, autoMergePRs, pushSecrets, push, engineOverride, dryRun)
 		}
 
-		return cli.RunWorkflowsOnGitHub(cmd.Context(), args, repeatCount, enable, engineOverride, repoOverride, refOverride, autoMergePRs, pushSecrets, push, inputs, verboseFlag)
+		return cli.RunWorkflowsOnGitHub(cmd.Context(), args, repeatCount, enable, engineOverride, repoOverride, refOverride, autoMergePRs, pushSecrets, push, inputs, verboseFlag, dryRun)
 	},
 }
 
@@ -538,6 +540,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 	runCmd.Flags().Bool("use-local-secrets", false, "Use local environment API key secrets for workflow execution (pushes and cleans up secrets in repository)")
 	runCmd.Flags().StringArrayP("raw-field", "F", []string{}, "Add a string parameter in key=value format (can be used multiple times)")
 	runCmd.Flags().Bool("push", false, "Commit and push workflow files (including transitive imports) before running")
+	runCmd.Flags().Bool("dry-run", false, "Validate workflow without actually triggering execution on GitHub Actions")
 	// Register completions for run command
 	runCmd.ValidArgsFunction = cli.CompleteWorkflowNames
 	cli.RegisterEngineFlagCompletion(runCmd)

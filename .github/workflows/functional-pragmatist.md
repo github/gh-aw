@@ -1,5 +1,5 @@
 ---
-name: Functional Enhancer
+name: Functional Pragmatist
 description: Identifies opportunities to apply moderate functional programming techniques systematically - immutability, functional options, pure functions, reducing mutation and reusable logic wrappers
 on:
   schedule:
@@ -11,9 +11,7 @@ permissions:
   issues: read
   pull-requests: read
 
-tracker-id: functional-enhancer
-
-engine: claude
+tracker-id: functional-pragmatist
 
 network:
   allowed:
@@ -36,13 +34,12 @@ tools:
     toolsets: [default]
   edit:
   bash:
-    - "find pkg -name '*.go' -type f"
-    - "grep -r 'var ' --include='*.go' pkg/"
-    - "grep -r 'make(' --include='*.go' pkg/"
-    - "grep -r 'range' --include='*.go' pkg/"
-    - "grep -r 'func New' --include='*.go' pkg/"
-    - "grep -r 'sync\\.' --include='*.go' pkg/"
-    - "grep -r 'global\\|Global' --include='*.go' pkg/"
+    - "*"
+  cache:
+    enabled: true
+    keys:
+      - "last_processed_package"
+      - "processed_packages"
 
 timeout-minutes: 45
 strict: true
@@ -69,19 +66,89 @@ You balance pragmatism with functional purity, focusing on improvements that enh
 - **Language**: Go
 - **Scope**: `pkg/` directory (core library code)
 
+## Round-Robin Package Processing Strategy
+
+**This workflow processes one Go package at a time** in a round-robin fashion to ensure systematic coverage without overwhelming the codebase with changes.
+
+### Package Selection Process
+
+1. **List all packages** in `pkg/` directory:
+   ```bash
+   find pkg -name '*.go' -type f | xargs dirname | sort -u
+   ```
+
+2. **Check cache** for last processed package:
+   ```bash
+   # Read from cache (tools.cache provides this)
+   last_package=$(cache_get "last_processed_package")
+   processed_list=$(cache_get "processed_packages")
+   ```
+
+3. **Select next package** using round-robin:
+   - If `last_processed_package` exists, select the next package in the list
+   - If we've processed all packages, start over from the beginning
+   - Skip packages with no `.go` files or only `_test.go` files
+
+4. **Update cache** after processing:
+   ```bash
+   # Write to cache for next run
+   cache_set "last_processed_package" "$current_package"
+   cache_set "processed_packages" "$updated_list"
+   ```
+
+### Package Processing Rules
+
+- **One package per run** - Focus deeply on a single package to maintain quality
+- **Systematic coverage** - Work through all packages in order before repeating
+- **Skip test-only packages** - Ignore packages containing only test files
+- **Reset after full cycle** - After processing all packages, reset and start over
+
+### Cache Keys
+
+- `last_processed_package` - String: The package path last processed (e.g., `pkg/cli`)
+- `processed_packages` - JSON array: List of packages processed in current cycle
+
+### Example Flow
+
+**Run 1**: Process `pkg/cli` → Cache: `{last: "pkg/cli", processed: ["pkg/cli"]}`
+**Run 2**: Process `pkg/workflow` → Cache: `{last: "pkg/workflow", processed: ["pkg/cli", "pkg/workflow"]}`
+**Run 3**: Process `pkg/parser` → Cache: `{last: "pkg/parser", processed: ["pkg/cli", "pkg/workflow", "pkg/parser"]}`
+...
+**Run N**: All packages processed → Reset cache and start over from `pkg/cli`
+
 ## Your Mission
 
-Perform a systematic analysis of the codebase to identify and implement functional/immutability improvements:
+**IMPORTANT: Process only ONE package per run** based on the round-robin strategy above.
+
+Perform a systematic analysis of the selected package to identify and implement functional/immutability improvements:
 
 ### Phase 1: Discovery - Identify Opportunities
 
-#### 1.1 Find Variables That Could Be Immutable
-
-Search for variables that are initialized and never modified:
+**FIRST: Determine which package to process using the round-robin strategy described above.**
 
 ```bash
-# Find all variable declarations
-find pkg -name '*.go' -type f -exec grep -l 'var ' {} \;
+# Get list of all packages
+all_packages=$(find pkg -name '*.go' -type f | xargs dirname | sort -u)
+
+# Get last processed package from cache
+last_package=$(cache_get "last_processed_package")
+
+# Determine next package to process
+# [Use round-robin logic to select next package]
+next_package="pkg/cli"  # Example - replace with actual selection
+
+echo "Processing package: $next_package"
+```
+
+**For the selected package only**, perform the following analysis:
+
+#### 1.1 Find Variables That Could Be Immutable
+
+Search for variables that are initialized and never modified in the selected package:
+
+```bash
+# Find all variable declarations IN THE SELECTED PACKAGE
+find $next_package -name '*.go' -type f -exec grep -l 'var ' {} \;
 ```
 
 Use Serena to analyze usage patterns:
@@ -286,13 +353,30 @@ Focus on changes with high safety/clarity/testability scores and low risk.
 
 For the top 15-20 opportunities identified in Phase 1, use Serena for detailed analysis:
 
-#### 2.1 Understand Context
+#### 2.1 Understand Context and Verify Test Existence
 
 For each opportunity:
 - Read the full file context
 - Understand the function's purpose
 - Identify dependencies and side effects
-- Check if tests exist for this code
+- **Check if tests exist** - Use code search to find tests:
+  ```bash
+  # Find test file for pkg/path/file.go
+  ls pkg/path/file_test.go
+  
+  # Search for test functions covering this code
+  grep -n 'func Test.*FunctionName' pkg/path/file_test.go
+  
+  # Search for the function name in test files
+  grep -r 'FunctionName' pkg/path/*_test.go
+  ```
+- **Optional: Check test coverage** if you want quantitative verification:
+  ```bash
+  go test -cover ./pkg/path/
+  go test -coverprofile=coverage.out ./pkg/path/
+  go tool cover -func=coverage.out | grep FunctionName
+  ```
+- If tests are missing or insufficient, write tests FIRST before refactoring
 - Verify no hidden mutations
 - Analyze call sites for API compatibility
 
@@ -345,11 +429,38 @@ For each opportunity, design a specific improvement:
 
 #### 3.1 Create Functional Helpers (If Needed)
 
-If the codebase lacks functional utilities, consider adding them to a `pkg/functional/` or `pkg/sliceutil/` package:
+If the codebase lacks functional utilities, add them to `pkg/fp/` package:
+
+**IMPORTANT: Write tests FIRST using test-driven development:**
 
 ```go
-// Example helpers for common operations
-package sliceutil
+// pkg/fp/slice_test.go - Write tests first!
+package fp_test
+
+import (
+    "testing"
+    "github.com/githubnext/gh-aw/pkg/fp"
+    "github.com/stretchr/testify/assert"
+)
+
+func TestMap(t *testing.T) {
+    input := []int{1, 2, 3}
+    result := fp.Map(input, func(x int) int { return x * 2 })
+    assert.Equal(t, []int{2, 4, 6}, result, "Map should double each element")
+}
+
+func TestFilter(t *testing.T) {
+    input := []int{1, 2, 3, 4}
+    result := fp.Filter(input, func(x int) bool { return x%2 == 0 })
+    assert.Equal(t, []int{2, 4}, result, "Filter should return even numbers")
+}
+```
+
+**Then implement the helpers:**
+
+```go
+// pkg/fp/slice.go - Example helpers for common operations
+package fp
 
 // Map transforms each element in a slice
 func Map[T, U any](slice []T, fn func(T) U) []U {
@@ -385,6 +496,8 @@ func Reduce[T, U any](slice []T, initial U, fn func(U, T) U) U {
 - They'll be used in multiple places (3+ usages)
 - They improve clarity over inline loops
 - The project doesn't already have similar utilities
+- **You write comprehensive tests first** (test-driven development)
+- Tests achieve >80% coverage for the new helpers
 
 #### 3.2 Apply Immutability Improvements
 
@@ -749,13 +862,48 @@ result := When(useCache, func() Data { return cache.Get(key) }, fetchFromDB(key)
 
 ### Phase 4: Validation
 
-#### 4.1 Run Tests
+#### 4.1 Verify Tests Exist BEFORE Changes
+
+Before refactoring any code, verify tests exist using code search:
+
+```bash
+# Find test file for the code you're refactoring
+ls pkg/affected/package/*_test.go
+
+# Search for test functions
+grep -n 'func Test' pkg/affected/package/*_test.go
+
+# Search for specific function/type names in tests
+grep -r 'FunctionName\|TypeName' pkg/affected/package/*_test.go
+```
+
+**Optional: Run coverage** for quantitative verification:
+```bash
+# Check current test coverage for the package
+go test -cover ./pkg/affected/package/
+
+# Get detailed coverage report
+go test -coverprofile=coverage.out ./pkg/affected/package/
+go tool cover -func=coverage.out
+```
+
+**If tests are missing or insufficient:** Write tests FIRST before refactoring.
+
+**Test-driven refactoring approach:**
+1. Search for existing tests (code search)
+2. Write tests for current behavior (if missing)
+3. Verify tests pass
+4. Refactor code
+5. Verify tests still pass
+6. Optionally verify coverage improved or stayed high
+
+#### 4.2 Run Tests After Changes
 
 After each set of changes, validate:
 
 ```bash
-# Run affected package tests
-go test -v ./pkg/affected/package/...
+# Run affected package tests with coverage
+go test -v -cover ./pkg/affected/package/...
 
 # Run full unit test suite
 make test-unit
@@ -766,7 +914,7 @@ If tests fail:
 - Revert changes that break functionality
 - Adjust approach and retry
 
-#### 4.2 Run Linters
+#### 4.3 Run Linters
 
 Ensure code quality:
 
@@ -776,7 +924,7 @@ make lint
 
 Fix any issues introduced by changes.
 
-#### 4.3 Manual Review
+#### 4.4 Manual Review
 
 For each changed file:
 - Read the changes in context
@@ -786,7 +934,36 @@ For each changed file:
 
 ### Phase 5: Create Pull Request
 
-#### 5.1 Determine If PR Is Needed
+#### 5.1 Update Cache
+
+After processing the package, update the cache:
+
+```bash
+# Update cache with processed package
+current_package="pkg/cli"  # The package you just processed
+processed_list=$(cache_get "processed_packages" || echo "[]")
+
+# Add current package to processed list
+updated_list=$(echo "$processed_list" | jq ". + [\"$current_package\"]"
+
+# Check if we've processed all packages - if so, reset
+all_packages=$(find pkg -name '*.go' -type f | xargs dirname | sort -u | wc -l)
+processed_count=$(echo "$updated_list" | jq 'length')
+
+if [ "$processed_count" -ge "$all_packages" ]; then
+  echo "Completed full cycle - resetting processed packages list"
+  cache_set "processed_packages" "[]"
+else
+  cache_set "processed_packages" "$updated_list"
+fi
+
+# Update last processed package
+cache_set "last_processed_package" "$current_package"
+
+echo "Next run will process the package after: $current_package"
+```
+
+#### 5.2 Determine If PR Is Needed
 
 Only create a PR if:
 - ✅ You made actual functional/immutability improvements
@@ -798,18 +975,21 @@ Only create a PR if:
 If no improvements were made, exit gracefully:
 
 ```
-✅ Codebase analyzed for functional/immutability opportunities.
+✅ Package [$current_package] analyzed for functional/immutability opportunities.
 No improvements found - code already follows good functional patterns.
+Next run will process: [$next_package]
 ```
 
-#### 5.2 Generate PR Description
+#### 5.3 Generate PR Description
 
 If creating a PR, use this structure:
 
 ```markdown
-## Functional/Immutability Enhancements
+## Functional/Immutability Enhancements - Package: `$current_package`
 
-This PR applies moderate, tasteful functional/immutability techniques to improve code clarity, safety, testability, and maintainability.
+This PR applies moderate, tasteful functional/immutability techniques to the **`$current_package`** package to improve code clarity, safety, testability, and maintainability.
+
+**Round-Robin Progress**: This is part of a systematic package-by-package refactoring. Next package to process: `$next_package`
 
 ### Summary of Changes
 
@@ -898,10 +1078,13 @@ This PR applies moderate, tasteful functional/immutability techniques to improve
 ### Testing
 
 - ✅ All tests pass (`make test-unit`)
+- ✅ Test existence verified BEFORE refactoring (via code search)
+- ✅ Tests added for previously untested code
+- ✅ New helper functions in `pkg/fp/` have comprehensive test coverage
 - ✅ Linting passes (`make lint`)
 - ✅ No behavioral changes - functionality is identical
 - ✅ Manual review confirms clarity improvements
-- ✅ New pure functions have test coverage
+- ✅ Test-driven refactoring approach followed
 
 ### Review Focus
 
@@ -955,18 +1138,43 @@ func ProcessOrder(order Order, db DB, log Logger) error  // Orchestration
 
 ---
 
-*Automated by Functional Immutability Enhancer - applying moderate functional/immutability techniques*
+*Automated by Functional Pragmatist - applying moderate functional/immutability techniques to `$current_package`*
 ```
 
-#### 5.3 Use Safe Outputs
+#### 5.4 Use Safe Outputs
 
 Create the pull request using safe-outputs configuration:
-- Title prefixed with `[fp-enhancer]`
+- Title prefixed with `[fp-enhancer]` and includes package name: `[fp-enhancer] Improve $current_package`
 - Labeled with `refactoring`, `functional-programming`, `code-quality`
 - Assigned to `copilot` for review
 - Expires in 7 days if not merged
 
 ## Guidelines and Best Practices
+
+### Test-Driven Refactoring
+
+**CRITICAL: Always verify test coverage before refactoring:**
+
+```bash
+# Check coverage for package you're refactoring
+go test -cover ./pkg/path/to/package/
+```
+
+**Test-driven refactoring workflow:**
+1. **Check coverage** - Verify tests exist (minimum 60% coverage)
+2. **Write tests first** - If coverage is low, add tests for current behavior
+3. **Verify tests pass** - Green tests before refactoring
+4. **Refactor** - Make functional/immutability improvements
+5. **Verify tests pass** - Green tests after refactoring
+6. **Check coverage again** - Ensure coverage maintained or improved
+
+**For new helper functions (`pkg/fp/`):**
+- Write tests FIRST (test-driven development)
+- Aim for >80% test coverage
+- Include edge cases and error conditions
+- Use table-driven tests for multiple scenarios
+
+**Never refactor untested code without adding tests first!**
 
 ### Balance Pragmatism and Purity
 
@@ -1217,13 +1425,18 @@ func (s *Service) GetItems() []Item {
 
 A successful functional programming enhancement:
 
+- ✅ **Processes one package at a time**: Uses round-robin strategy for systematic coverage
+- ✅ **Updates cache correctly**: Records processed package for next run
+- ✅ **Verifies tests exist first**: Uses code search to find tests before refactoring
+- ✅ **Writes tests first**: Adds tests for untested code before refactoring
 - ✅ **Improves immutability**: Reduces mutable state without forcing it
 - ✅ **Enhances initialization**: Makes data creation more declarative
 - ✅ **Clarifies transformations**: Makes data flow more explicit
 - ✅ **Uses functional options appropriately**: APIs are extensible and clear
 - ✅ **Eliminates shared mutable state**: Dependencies are explicit
 - ✅ **Extracts pure functions**: Calculations are testable and composable
-- ✅ **Adds reusable wrappers judiciously**: Cross-cutting concerns are DRY
+- ✅ **Adds reusable wrappers judiciously**: Cross-cutting concerns are DRY (in `pkg/fp/`)
+- ✅ **Tests new helpers thoroughly**: New `pkg/fp/` functions have >80% coverage
 - ✅ **Maintains readability**: Code is clearer, not more abstract
 - ✅ **Preserves behavior**: All tests pass, no functionality changes
 - ✅ **Applies tastefully**: Changes feel natural to Go code
@@ -1236,6 +1449,7 @@ Exit gracefully without creating a PR if:
 - No functional programming improvements are found
 - Codebase already follows strong functional patterns
 - Changes would reduce clarity or maintainability
+- **Insufficient tests** - Code to refactor has no tests and tests are too complex to add first
 - Tests fail after changes
 - Changes are too risky or complex
 
@@ -1245,10 +1459,17 @@ Your output MUST either:
 
 1. **If no improvements found**:
    ```
-   ✅ Codebase analyzed for functional programming opportunities.
+   ✅ Package [$current_package] analyzed for functional programming opportunities.
    No improvements found - code already follows good functional patterns.
+   Cache updated. Next run will process: [$next_package]
    ```
 
 2. **If improvements made**: Create a PR with the changes using safe-outputs
 
-Begin your functional/immutability  analysis now. Systematically identify opportunities for immutability, functional initialization, and transformative operations. Apply tasteful, moderate improvements that enhance clarity and safety while maintaining Go's pragmatic style.
+Begin your functional/immutability analysis now:
+
+1. **Determine which package to process** using the round-robin strategy
+2. **Update your focus** to that single package only  
+3. **Systematically identify opportunities** for immutability, functional initialization, and transformative operations
+4. **Apply tasteful, moderate improvements** that enhance clarity and safety while maintaining Go's pragmatic style
+5. **Update cache** with the processed package before finishing

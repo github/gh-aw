@@ -17,7 +17,7 @@ type handlerConfigBuilder struct {
 // newHandlerConfigBuilder creates a new handler config builder
 func newHandlerConfigBuilder() *handlerConfigBuilder {
 	return &handlerConfigBuilder{
-		config: make(map[string]any),
+		config: map[string]any{},
 	}
 }
 

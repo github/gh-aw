@@ -28,7 +28,7 @@ Today's agents analyze higher-level concerns and long-term health:
 
 - **[Go Fan](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer that analyzes direct dependencies  
 - **[Typist](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/typist.md?plain=1)** - Analyzes Go type usage patterns to improve type safety  
-- **[Functional Programming Enhancer](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md?plain=1)** - Applies moderate functional programming techniques for clarity and safety  
+- **[Functional Pragmatist](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md?plain=1)** - Applies moderate functional programming techniques for clarity and safety  
 - **[Repository Quality Improver](https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/repository-quality-improver.md?plain=1)** - Takes a holistic view of code quality and suggests improvements  
 
 ### Go Fan: The Dependency Enthusiast 🐹
@@ -63,9 +63,9 @@ Typist creates discussions rather than issues because type safety improvements o
 
 Today's hybrid languages like Go, C# and F# support both strong and dynamic typing. Seeing strong typing as arising from continuous improvement area is a particularly novel insight: rather than enforcing strict typing upfront, we can develop quickly with flexibility, then let autonomous agents like Typist trail behind, strengthening type safety over time.
 
-### Functional Programming Enhancer: The Pragmatic Purist 🔄
+### Functional Pragmatist: The Pragmatic Purist 🔄
 
-The **Functional Programming Enhancer** systematically identifies opportunities to apply moderate, tasteful functional programming techniques to improve code clarity, safety, and maintainability. Unlike dogmatic functional approaches, this workflow balances pragmatism with functional purity.
+The **Functional Pragmatist** systematically identifies opportunities to apply moderate, tasteful functional programming techniques to improve code clarity, safety, and maintainability. Unlike dogmatic functional approaches, this workflow balances pragmatism with functional purity.
 
 The workflow focuses on seven key patterns: immutability (making data immutable where there's no existing mutation), functional initialization (using composite literals and declarative patterns), transformative operations (leveraging map/filter/reduce approaches), functional options pattern (using option functions for flexible configuration), avoiding shared mutable state (eliminating global variables), pure functions (extracting calculations from side effects), and reusable logic wrappers (creating higher-order functions for retry, logging, caching).
 
@@ -97,9 +97,9 @@ The Repository Quality Improver looks for these cross-cutting concerns that don'
 
 ## The Power of Holistic Improvement
 
-Together, these workflows complete the autonomous improvement picture. Go Fan ensures our dependencies stay fresh and well-used, Typist systematically strengthens type safety, Functional Programming Enhancer applies moderate functional techniques for clarity and safety, and Repository Quality Improver maintains overall coherence.
+Together, these workflows complete the autonomous improvement picture. Go Fan ensures our dependencies stay fresh and well-used, Typist systematically strengthens type safety, Functional Pragmatist applies moderate functional techniques for clarity and safety, and Repository Quality Improver maintains overall coherence.
 
-Combined with our earlier workflows covering simplicity, refactoring, and style, we now have agents that continuously improve code at every level: the Terminal Stylist ensures beautiful output at the line level, Code Simplifier removes complexity at the function level, Semantic Function Refactor improves organization at the file level, Go Pattern Detector enforces consistency at the pattern level, Functional Programming Enhancer applies functional patterns for clarity and safety, Typist strengthens type safety at the type level, Go Fan optimizes dependencies at the module level, and Repository Quality Improver maintains coherence at the repository level.
+Combined with our earlier workflows covering simplicity, refactoring, and style, we now have agents that continuously improve code at every level: the Terminal Stylist ensures beautiful output at the line level, Code Simplifier removes complexity at the function level, Semantic Function Refactor improves organization at the file level, Go Pattern Detector enforces consistency at the pattern level, Functional Pragmatist applies functional patterns for clarity and safety, Typist strengthens type safety at the type level, Go Fan optimizes dependencies at the module level, and Repository Quality Improver maintains coherence at the repository level.
 
 This is the future of code quality: not periodic cleanup sprints, but continuous autonomous improvement across every dimension simultaneously.
 
@@ -119,7 +119,7 @@ gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/go-
 gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/typist.md
 ```
 
-**Functional Programming Enhancer:**
+**Functional Pragmatist:**
 
 ```bash
 gh aw add https://github.com/githubnext/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md

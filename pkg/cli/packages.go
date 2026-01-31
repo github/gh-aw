@@ -359,11 +359,11 @@ func listWorkflowsWithMetadata(repoSlug string, verbose bool) ([]WorkflowInfo, e
 		}
 
 		// Extract workflow ID (filename without extension)
-		workflowID := strings.TrimSuffix(filepath.Base(path), ".md")
+		workflowID := normalizeWorkflowID(path)
 
 		// For workflows in workflows/ directory, use simplified ID
 		if strings.HasPrefix(relPath, "workflows/") {
-			workflowID = strings.TrimSuffix(strings.TrimPrefix(relPath, "workflows/"), ".md")
+			workflowID = normalizeWorkflowID(strings.TrimPrefix(relPath, "workflows/"))
 		}
 
 		// Extract name and description from frontmatter
@@ -425,7 +425,7 @@ func extractWorkflowMetadata(filePath string) (name string, description string) 
 
 	// If still no name, use filename as fallback (handled by caller)
 	if name == "" {
-		name = strings.TrimSuffix(filepath.Base(filePath), ".md")
+		name = normalizeWorkflowID(filePath)
 	}
 
 	// Try to get description from frontmatter
@@ -761,7 +761,7 @@ func discoverWorkflowsInPackage(repoSlug, version string, verbose bool) ([]*Work
 				Version:  version,
 			},
 			WorkflowPath: relPath,
-			WorkflowName: strings.TrimSuffix(filepath.Base(relPath), ".md"),
+			WorkflowName: normalizeWorkflowID(relPath),
 		}
 
 		workflows = append(workflows, spec)

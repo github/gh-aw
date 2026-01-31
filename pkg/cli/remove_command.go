@@ -50,7 +50,7 @@ func RemoveWorkflows(pattern string, keepOrphans bool) error {
 		for _, file := range mdFiles {
 			workflowName, _ := extractWorkflowNameFromFile(file)
 			base := filepath.Base(file)
-			name := strings.TrimSuffix(base, ".md")
+			name := normalizeWorkflowID(base)
 			if workflowName != "" {
 				fmt.Fprintf(os.Stderr, "  %-20s - %s\n", name, workflowName)
 			} else {
@@ -64,7 +64,7 @@ func RemoveWorkflows(pattern string, keepOrphans bool) error {
 	// Find matching files by workflow name or filename
 	for _, file := range mdFiles {
 		base := filepath.Base(file)
-		filename := strings.TrimSuffix(base, ".md")
+		filename := normalizeWorkflowID(base)
 		workflowName, _ := extractWorkflowNameFromFile(file)
 
 		// Check if pattern matches filename or workflow name

@@ -25,7 +25,7 @@
 #
 # frontmatter-hash: 6ac011d9774d26b3ff8c046c3a49fabc613852278e2f10f1afdd11eca03a7cbb
 #
-# Effective stop-time: 2026-03-03 15:23:52
+# Effective stop-time: 2026-03-03 16:27:58
 
 name: "CI Failure Doctor"
 "on":
@@ -576,6 +576,8 @@ jobs:
           Discover available tools from the safeoutputs MCP server.
           
           **Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
+          
+          **Note**: If you made no other safe output tool calls during this workflow execution, call the "noop" tool to provide a status message indicating completion or that no actions were needed.
           </instructions>
           </safe-outputs>
           <github-context>
@@ -1075,7 +1077,7 @@ jobs:
         id: check_stop_time
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          GH_AW_STOP_TIME: 2026-03-03 15:23:52
+          GH_AW_STOP_TIME: 2026-03-03 16:27:58
           GH_AW_WORKFLOW_NAME: "CI Failure Doctor"
         with:
           script: |

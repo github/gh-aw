@@ -270,11 +270,11 @@ func validateRemoteWorkflow(workflowName string, repoOverride string, verbose bo
 		return fmt.Errorf("repository must be specified for remote workflow validation")
 	}
 
-	// Add .lock.yml extension if not present
-	lockFileName := workflowName
-	if !strings.HasSuffix(lockFileName, ".lock.yml") {
-		lockFileName += ".lock.yml"
-	}
+	// Normalize workflow ID to handle both "workflow-name" and ".github/workflows/workflow-name.md" formats
+	normalizedID := normalizeWorkflowID(workflowName)
+
+	// Add .lock.yml extension
+	lockFileName := normalizedID + ".lock.yml"
 
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Checking if workflow '%s' exists in repository '%s'...", lockFileName, repoOverride)))

@@ -86,7 +86,7 @@ func CompleteWorkflowNames(cmd *cobra.Command, args []string, toComplete string)
 	var workflows []string
 	for _, file := range mdFiles {
 		base := filepath.Base(file)
-		name := strings.TrimSuffix(base, ".md")
+		name := normalizeWorkflowID(base)
 		// Filter by prefix if toComplete is provided
 		if toComplete == "" || strings.HasPrefix(name, toComplete) {
 			desc := getWorkflowDescription(file)
