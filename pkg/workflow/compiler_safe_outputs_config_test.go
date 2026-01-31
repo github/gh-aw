@@ -632,8 +632,10 @@ func testBoolPtr(b bool) *bool {
 	return &b
 }
 
-// TestAutoEnabledHandlers tests that missing_tool, missing_data, and noop
-// are automatically enabled even when not explicitly configured
+// TestAutoEnabledHandlers tests that missing_tool and missing_data
+// are automatically enabled even when not explicitly configured.
+// Note: noop is NOT included here because it is always processed by a dedicated
+// standalone step (see notify_comment.go) and should never be in the handler manager config.
 func TestAutoEnabledHandlers(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -663,17 +665,6 @@ func TestAutoEnabledHandlers(t *testing.T) {
 			expectedKeys: []string{"missing_data"},
 		},
 		{
-			name: "noop auto-enabled",
-			safeOutputs: &SafeOutputsConfig{
-				NoOp: &NoOpConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: 1,
-					},
-				},
-			},
-			expectedKeys: []string{"noop"},
-		},
-		{
 			name: "all auto-enabled handlers together",
 			safeOutputs: &SafeOutputsConfig{
 				MissingTool: &MissingToolConfig{
@@ -686,13 +677,8 @@ func TestAutoEnabledHandlers(t *testing.T) {
 						Max: 5,
 					},
 				},
-				NoOp: &NoOpConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: 1,
-					},
-				},
 			},
-			expectedKeys: []string{"missing_tool", "missing_data", "noop"},
+			expectedKeys: []string{"missing_tool", "missing_data"},
 		},
 		{
 			name: "auto-enabled with other handlers",
@@ -705,13 +691,8 @@ func TestAutoEnabledHandlers(t *testing.T) {
 						Max: 5,
 					},
 				},
-				NoOp: &NoOpConfig{
-					BaseSafeOutputConfig: BaseSafeOutputConfig{
-						Max: 1,
-					},
-				},
 			},
-			expectedKeys: []string{"create_issue", "missing_tool", "noop"},
+			expectedKeys: []string{"create_issue", "missing_tool"},
 		},
 	}
 
