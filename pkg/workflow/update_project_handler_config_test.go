@@ -83,7 +83,7 @@ Test workflow
 	require.NoError(t, err, "Failed to read compiled output")
 
 	compiledStr := string(compiledContent)
-	
+
 	// Verify GH_AW_PROJECT_URL environment variable is set
 	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
 	require.Contains(t, compiledStr, "https://github.com/orgs/test-org/projects/123", "Expected project URL in environment variable")
