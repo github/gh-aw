@@ -35,7 +35,6 @@ tools:
   edit:
   bash:
     - "*"
-  cache-memory: true
 
 timeout-minutes: 45
 strict: true

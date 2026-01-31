@@ -25,7 +25,11 @@
 #   Imports:
 #     - shared/reporting.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 21090c53dba15c7084d0dad8af9686ca9e649f569b2b9e0910fbdefe20a88b3e
+=======
+# frontmatter-hash: 32464d9c07ea5d4669709a94c78136eff407abf4bb951a089193f7c16ecd8968
+>>>>>>> origin/main
 
 name: "Functional Pragmatist"
 "on":

@@ -265,10 +265,20 @@ function formatDate(date) {
 /**
  * Main handler factory for create_project_status_update
  * Returns a message handler function that processes individual create_project_status_update messages
- * @type {HandlerFactoryFunction}
+ * @param {Object} config - Handler configuration
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
+ * @returns {Promise<Function>} Message handler function
  */
-async function main(config = {}) {
+async function main(config = {}, githubClient = null) {
   const maxCount = config.max || 10;
+
+  // Use the provided github client, or fall back to the global github object
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
 
   core.info(`Max count: ${maxCount}`);
 
@@ -281,10 +291,11 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single create_project_status_update message
    * @param {Object} message - The create_project_status_update message to process
-   * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
    * @returns {Promise<Object>} Result with success/error status and status update details
    */
-  return async function handleCreateProjectStatusUpdate(message, resolvedTemporaryIds) {
+  return async function handleCreateProjectStatusUpdate(message, temporaryIdMap, resolvedTemporaryIds = {}) {
     // Check if we've hit the max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping create-project-status-update: max count of ${maxCount} reached`);
