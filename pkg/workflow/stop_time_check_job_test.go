@@ -85,12 +85,12 @@ This workflow has a stop-after configuration.
 			t.Error("Stop-time check should not be in agent job")
 		}
 
-		// Verify pre_activation job outputs "activated" as a direct expression combining both checks
+		// Verify pre_activation job outputs "success" as a direct expression combining both checks
 		// Since workflow_dispatch requires permission checks by default, AND has stop-time
 		// The expression builder adds parentheses around each condition
-		expectedActivated := "activated: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_stop_time.outputs.stop_time_ok == 'true') }}"
-		if !strings.Contains(lockContentStr, expectedActivated) {
-			t.Error("Expected pre_activation job to have combined 'activated' output expression")
+		expectedSuccess := "success: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_stop_time.outputs.stop_time_ok == 'true') }}"
+		if !strings.Contains(lockContentStr, expectedSuccess) {
+			t.Error("Expected pre_activation job to have combined 'success' output expression")
 		}
 
 		// Verify old jobs don't exist
@@ -194,10 +194,10 @@ This workflow requires membership checks.
 			t.Error("Expected activation job to depend on pre_activation job")
 		}
 
-		// Verify activation job checks activated output (with skipped fallback for safe events)
-		// New format: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
+		// Verify activation job uses the standard pattern with activated output check
+		// Format: (needs.pre_activation.result == 'skipped') || (needs.pre_activation.outputs.activated == 'true')
 		if !strings.Contains(activationSection, "needs.pre_activation.result == 'skipped'") {
-			t.Error("Expected activation job to check if pre_activation was skipped (for safe events)")
+			t.Error("Expected activation job to check if pre_activation was skipped")
 		}
 		if !strings.Contains(activationSection, "needs.pre_activation.outputs.activated == 'true'") {
 			t.Error("Expected activation job to check pre_activation.outputs.activated")
@@ -249,11 +249,11 @@ This workflow has both membership check and stop-after.
 			t.Error("Expected stop-time check in pre_activation job")
 		}
 
-		// Verify the activated output combines both membership and stop-time checks
+		// Verify the success output combines both membership and stop-time checks
 		// The expression builder adds parentheses around each condition
-		expectedActivated := "activated: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_stop_time.outputs.stop_time_ok == 'true') }}"
-		if !strings.Contains(lockContentStr, expectedActivated) {
-			t.Error("Expected activated output to combine both membership and stop-time checks")
+		expectedSuccess := "success: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_stop_time.outputs.stop_time_ok == 'true') }}"
+		if !strings.Contains(lockContentStr, expectedSuccess) {
+			t.Error("Expected success output to combine both membership and stop-time checks")
 		}
 
 		// Verify the structure: membership check happens before stop-time check

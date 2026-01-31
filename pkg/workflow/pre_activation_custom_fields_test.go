@@ -110,9 +110,9 @@ Test workflow with custom pre-activation outputs
 			t.Error("Expected custom output 'custom_output' to be present in pre_activation job")
 		}
 
-		// Verify the activated output is still present
-		if !strings.Contains(lockContentStr, "activated:") {
-			t.Error("Expected standard 'activated' output to still be present")
+		// Verify the success output is still present
+		if !strings.Contains(lockContentStr, "success:") {
+			t.Error("Expected standard 'success' output to still be present")
 		}
 	})
 
@@ -311,9 +311,9 @@ Test that both pre-activation and pre_activation are imported
 			t.Error("Expected 'underscore_status' output to be present")
 		}
 
-		// Verify the activated output is still present
-		if !strings.Contains(lockContentStr, "activated:") {
-			t.Error("Expected standard 'activated' output to still be present")
+		// Verify the success output is still present
+		if !strings.Contains(lockContentStr, "success:") {
+			t.Error("Expected standard 'success' output to still be present")
 		}
 	})
 }

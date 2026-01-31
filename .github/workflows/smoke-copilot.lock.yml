@@ -102,6 +102,9 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
+      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'smoke')))
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -1945,7 +1948,7 @@ jobs:
       - agent
       - detection
     if: >
-      ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'send_slack_message'))
+      (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'send_slack_message'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

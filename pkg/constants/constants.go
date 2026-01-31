@@ -526,6 +526,12 @@ const SkipCheckOkOutput = "skip_check_ok"
 const SkipNoMatchCheckOkOutput = "skip_no_match_check_ok"
 const CommandPositionOkOutput = "command_position_ok"
 const MatchedCommandOutput = "matched_command"
+
+// ActivatedOutput is the output name for job activation status.
+// The pre_activation job always emits this output to indicate whether the workflow should proceed.
+// When preActivationCanBeSkipped is true, other jobs (activation, agent) also emit this output
+// so downstream jobs can use always() && !cancelled() combined with checking this output.
+// When preActivationCanBeSkipped is false, only pre_activation emits this output.
 const ActivatedOutput = "activated"
 
 // Agentic engine name constants using EngineName type for type safety

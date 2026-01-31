@@ -597,7 +597,7 @@ func TestBuildCustomJobsActivationDependency(t *testing.T) {
 				Jobs: tt.jobs,
 			}
 
-			err := c.buildCustomJobs(data, tt.activationJobCreated)
+			err := c.buildCustomJobs(data, tt.activationJobCreated, false)
 			if err != nil {
 				t.Fatalf("%s: buildCustomJobs() error = %v", tt.description, err)
 			}

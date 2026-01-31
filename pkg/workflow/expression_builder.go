@@ -61,6 +61,21 @@ func BuildAnd(left ConditionNode, right ConditionNode) ConditionNode {
 	return &AndNode{Left: left, Right: right}
 }
 
+// BuildAlwaysNotCancelledAnd creates a condition with "always() && !cancelled() && (inner)" pattern.
+// This pattern ensures that jobs run even when upstream dependencies are skipped,
+// while still being cancelled if the workflow itself is cancelled.
+// This is critical for the activation and downstream jobs to run when pre_activation is skipped.
+func BuildAlwaysNotCancelledAnd(inner ConditionNode) ConditionNode {
+	alwaysFunc := BuildFunctionCall("always")
+	notCancelledFunc := &NotNode{
+		Child: BuildFunctionCall("cancelled"),
+	}
+	// always() && !cancelled()
+	alwaysNotCancelled := &AndNode{Left: alwaysFunc, Right: notCancelledFunc}
+	// always() && !cancelled() && (inner)
+	return &AndNode{Left: alwaysNotCancelled, Right: inner}
+}
+
 // BuildReactionCondition creates a condition tree for the add_reaction job
 func BuildReactionCondition() ConditionNode {
 	expressionBuilderLog.Print("Building reaction condition for multiple event types")
@@ -169,25 +184,18 @@ func BuildNotFromFork() *ComparisonNode {
 }
 
 func BuildSafeOutputType(outputType string) ConditionNode {
-	// Use !cancelled() && needs.agent.result != 'skipped' to properly handle workflow cancellation
-	// !cancelled() allows jobs to run when dependencies fail (for error reporting)
-	// needs.agent.result != 'skipped' prevents running when workflow is cancelled (dependencies get skipped)
-	notCancelledFunc := &NotNode{
-		Child: BuildFunctionCall("cancelled"),
-	}
+	// Use always() && !cancelled() && needs.agent.outputs.activated == 'true' pattern
+	// to properly handle workflow cancellation and upstream job skipping.
+	// always() ensures this job runs even if upstream jobs were skipped (but completed successfully)
+	// !cancelled() prevents running when the workflow itself is cancelled
+	// needs.agent.outputs.activated == 'true' ensures the agent job completed successfully
+	agentSuccess := BuildEquals(
+		BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", constants.AgentJobName, constants.ActivatedOutput)),
+		BuildStringLiteral("true"),
+	)
 
-	// Check that agent job was not skipped (happens when workflow is cancelled)
-	agentNotSkipped := &ComparisonNode{
-		Left:     BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
-		Operator: "!=",
-		Right:    BuildStringLiteral("skipped"),
-	}
-
-	// Combine !cancelled() with agent not skipped check
-	baseCondition := &AndNode{
-		Left:  notCancelledFunc,
-		Right: agentNotSkipped,
-	}
+	// Wrap with always() && !cancelled() && to handle skipped dependencies properly
+	baseCondition := BuildAlwaysNotCancelledAnd(agentSuccess)
 
 	// Always check that the output type is present in agent outputs
 	// This prevents the job from running when the agent didn't produce any outputs of this type

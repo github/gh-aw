@@ -103,6 +103,9 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      ((github.event_name == 'issue_comment') && ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/tidy')) &&
+      (github.event.issue.pull_request != null)))) || (!(github.event_name == 'issue_comment'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1243,14 +1246,14 @@ jobs:
           name: agent-artifacts
           path: /tmp/gh-aw/
       - name: Checkout repository
-        if: (((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))) || (((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')))
+        if: ((((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))) || ((((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')))
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           token: ${{ github.token }}
           persist-credentials: false
           fetch-depth: 1
       - name: Configure Git credentials
-        if: (((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))) || (((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')))
+        if: ((((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))) || ((((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')))
         env:
           REPO_NAME: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}

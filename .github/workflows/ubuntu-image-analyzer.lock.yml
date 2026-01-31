@@ -1134,14 +1134,14 @@ jobs:
           name: agent-artifacts
           path: /tmp/gh-aw/
       - name: Checkout repository
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
+        if: (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           token: ${{ github.token }}
           persist-credentials: false
           fetch-depth: 1
       - name: Configure Git credentials
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
+        if: (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
         env:
           REPO_NAME: ${{ github.repository }}
           SERVER_URL: ${{ github.server_url }}

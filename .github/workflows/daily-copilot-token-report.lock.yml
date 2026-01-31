@@ -1610,7 +1610,8 @@ jobs:
     needs:
       - agent
       - detection
-    if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'upload_asset'))
+    if: >
+      (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'upload_asset'))
     runs-on: ubuntu-slim
     permissions:
       contents: write

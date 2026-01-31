@@ -5,19 +5,22 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/githubnext/gh-aw/pkg/constants"
 )
 
 // TestBuildSafeOutputTypeWithCancelled verifies that BuildSafeOutputType properly handles workflow cancellation.
 //
 // Background:
-// - always() runs even when the workflow is cancelled (incorrect behavior)
-// - !cancelled() alone is insufficient (returns true when dependencies are skipped during cancellation)
-// - !cancelled() && needs.agent.result != 'skipped' is correct (prevents running when workflow is cancelled)
+// - always() ensures jobs run even when upstream dependencies are skipped (but completed successfully)
+// - !cancelled() prevents running when the workflow itself is cancelled
+// - needs.agent.outputs.activated == 'true' ensures the agent job completed successfully
 //
+// The combined pattern: always() && !cancelled() && needs.agent.outputs.activated == 'true'
 // This test ensures safe-output jobs:
 // 1. Run when dependencies succeed
-// 2. Run when dependencies fail (for error reporting)
-// 3. Skip when the workflow is cancelled (dependencies get skipped, not cancelled)
+// 2. Run when dependencies are skipped (but successful)
+// 3. Skip when the workflow is cancelled
 func TestBuildSafeOutputTypeWithCancelled(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -26,27 +29,29 @@ func TestBuildSafeOutputTypeWithCancelled(t *testing.T) {
 		unexpectedContains []string
 	}{
 		{
-			name:       "create_issue should use !cancelled() and agent not skipped with contains check",
+			name:       "create_issue should use always() && !cancelled() && activated pattern",
 			outputType: "create_issue",
 			expectedContains: []string{
+				"always()",
 				"!cancelled()",
-				"needs.agent.result != 'skipped'",
+				"needs." + string(constants.AgentJobName) + ".outputs." + constants.ActivatedOutput + " == 'true'",
 				"contains(needs.agent.outputs.output_types, 'create_issue')",
 			},
 			unexpectedContains: []string{
-				"always()",
+				"needs.agent.result != 'skipped'",
 			},
 		},
 		{
-			name:       "push-to-pull-request-branch should use !cancelled() and agent not skipped",
+			name:       "push-to-pull-request-branch should use always() && !cancelled() && activated pattern",
 			outputType: "push_to_pull_request_branch",
 			expectedContains: []string{
+				"always()",
 				"!cancelled()",
-				"needs.agent.result != 'skipped'",
+				"needs." + string(constants.AgentJobName) + ".outputs." + constants.ActivatedOutput + " == 'true'",
 				"contains(needs.agent.outputs.output_types, 'push_to_pull_request_branch')",
 			},
 			unexpectedContains: []string{
-				"always()",
+				"needs.agent.result != 'skipped'",
 			},
 		},
 	}

@@ -23,7 +23,7 @@ func TestBuildPreActivationJob_WithPermissionCheck(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, true)
+	job, _, err := compiler.buildPreActivationJob(workflowData, true, false)
 	require.NoError(t, err, "buildPreActivationJob should succeed with permission check")
 	require.NotNil(t, job)
 
@@ -31,7 +31,7 @@ func TestBuildPreActivationJob_WithPermissionCheck(t *testing.T) {
 	assert.NotNil(t, job.Outputs, "Job should have outputs")
 
 	// Check for activated output
-	_, hasActivated := job.Outputs["activated"]
+	_, hasActivated := job.Outputs[constants.ActivatedOutput]
 	assert.True(t, hasActivated, "Job should have 'activated' output")
 
 	// Check that steps contain membership check
@@ -49,7 +49,7 @@ func TestBuildPreActivationJob_WithoutPermissionCheck(t *testing.T) {
 		Command: []string{"test"},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, false)
+	job, _, err := compiler.buildPreActivationJob(workflowData, false, false)
 	require.NoError(t, err, "buildPreActivationJob should succeed without permission check")
 	require.NotNil(t, job)
 
@@ -69,7 +69,7 @@ func TestBuildPreActivationJob_WithStopTime(t *testing.T) {
 		StopTime: "2024-12-31T23:59:59Z",
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, false)
+	job, _, err := compiler.buildPreActivationJob(workflowData, false, false)
 	require.NoError(t, err, "buildPreActivationJob should succeed with stop-time")
 	require.NotNil(t, job)
 
@@ -122,7 +122,7 @@ func TestBuildPreActivationJob_WithReaction(t *testing.T) {
 				AIReaction: tt.reaction,
 			}
 
-			job, err := compiler.buildPreActivationJob(workflowData, false)
+			job, _, err := compiler.buildPreActivationJob(workflowData, false, false)
 			require.NoError(t, err)
 			require.NotNil(t, job)
 
@@ -171,7 +171,7 @@ func TestBuildPreActivationJob_WithCustomStepsAndOutputs(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, false)
+	job, _, err := compiler.buildPreActivationJob(workflowData, false, false)
 	require.NoError(t, err, "buildPreActivationJob should succeed with custom fields")
 	require.NotNil(t, job)
 
@@ -194,7 +194,7 @@ func TestBuildActivationJob_Basic(t *testing.T) {
 		MarkdownContent: "# Test\n\nContent",
 	}
 
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	require.NoError(t, err, "buildActivationJob should succeed")
 	require.NotNil(t, job)
 
@@ -212,7 +212,7 @@ func TestBuildActivationJob_WithPreActivation(t *testing.T) {
 		MarkdownContent: "# Test\n\nContent",
 	}
 
-	job, err := compiler.buildActivationJob(workflowData, true, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, true, true, "", "test.lock.yml")
 	require.NoError(t, err, "buildActivationJob should succeed with pre-activation")
 	require.NotNil(t, job)
 
@@ -232,7 +232,7 @@ func TestBuildActivationJob_WithReaction(t *testing.T) {
 		AIReaction:      "rocket",
 	}
 
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	require.NoError(t, err)
 	require.NotNil(t, job)
 
@@ -253,7 +253,7 @@ func TestBuildMainJob_Basic(t *testing.T) {
 		AI:              "copilot",
 	}
 
-	job, err := compiler.buildMainJob(workflowData, false)
+	job, err := compiler.buildMainJob(workflowData, false, false)
 	require.NoError(t, err, "buildMainJob should succeed")
 	require.NotNil(t, job)
 
@@ -272,7 +272,7 @@ func TestBuildMainJob_WithActivation(t *testing.T) {
 		AI:              "copilot",
 	}
 
-	job, err := compiler.buildMainJob(workflowData, true)
+	job, err := compiler.buildMainJob(workflowData, true, true)
 	require.NoError(t, err, "buildMainJob should succeed with activation")
 	require.NotNil(t, job)
 
@@ -293,7 +293,7 @@ func TestBuildMainJob_WithPermissions(t *testing.T) {
 		Permissions:     "contents: read\nissues: write",
 	}
 
-	job, err := compiler.buildMainJob(workflowData, false)
+	job, err := compiler.buildMainJob(workflowData, false, false)
 	require.NoError(t, err)
 	require.NotNil(t, job)
 
@@ -383,7 +383,7 @@ func TestBuildPreActivationJob_Integration(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, true)
+	job, _, err := compiler.buildPreActivationJob(workflowData, true, false)
 	require.NoError(t, err, "buildPreActivationJob should succeed with all features")
 	require.NotNil(t, job)
 
@@ -399,8 +399,8 @@ func TestBuildPreActivationJob_Integration(t *testing.T) {
 	assert.Contains(t, job.Permissions, "issues: write", "Should have issues write permission")
 	assert.Contains(t, job.Permissions, "pull-requests: write", "Should have PR write permission")
 
-	// Should have activated output
-	_, hasActivated := job.Outputs["activated"]
+	// Should have activated output (pre_activation always has it)
+	_, hasActivated := job.Outputs[constants.ActivatedOutput]
 	assert.True(t, hasActivated, "Should have activated output")
 }
 
@@ -415,7 +415,7 @@ func TestBuildActivationJob_WithWorkflowRunRepoSafety(t *testing.T) {
 	}
 
 	// Test with workflow_run repo safety enabled
-	job, err := compiler.buildActivationJob(workflowData, false, "workflow_run", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "workflow_run", "test.lock.yml")
 	require.NoError(t, err)
 	require.NotNil(t, job)
 
@@ -455,7 +455,7 @@ func TestBuildMainJob_EngineSpecific(t *testing.T) {
 				AI:              tt.engine,
 			}
 
-			job, err := compiler.buildMainJob(workflowData, false)
+			job, err := compiler.buildMainJob(workflowData, false, false)
 			require.NoError(t, err, "buildMainJob should succeed for engine %s", tt.engine)
 			require.NotNil(t, job)
 			assert.NotEmpty(t, job.Steps, "Should have steps for engine %s", tt.engine)

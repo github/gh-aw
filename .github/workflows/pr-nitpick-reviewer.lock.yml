@@ -126,6 +126,17 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      (github.event_name == 'issues') && (contains(github.event.issue.body, '/nit')) || (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/nit')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/nit')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request_review_comment') &&
+      (contains(github.event.comment.body, '/nit')) || (github.event_name == 'pull_request') &&
+      (contains(github.event.pull_request.body, '/nit')) ||
+      (github.event_name == 'discussion') && (contains(github.event.discussion.body, '/nit')) ||
+      (github.event_name == 'discussion_comment') &&
+      (contains(github.event.comment.body, '/nit'))
     runs-on: ubuntu-latest
     permissions:
       actions: read

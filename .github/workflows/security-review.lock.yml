@@ -107,6 +107,10 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/security-review')) &&
+      (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
+      (contains(github.event.comment.body, '/security-review'))
     runs-on: ubuntu-latest
     permissions:
       actions: read

@@ -1610,7 +1610,7 @@ jobs:
       - agent
       - detection
     if: >
-      ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'notion_add_comment'))
+      (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'notion_add_comment'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1740,7 +1740,7 @@ jobs:
       - agent
       - detection
     if: >
-      ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'post_to_slack_channel'))
+      (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'post_to_slack_channel'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

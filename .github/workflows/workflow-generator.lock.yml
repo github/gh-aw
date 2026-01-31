@@ -101,6 +101,7 @@ jobs:
 
   agent:
     needs: activation
+    if: startsWith(github.event.issue.title, '[Workflow]')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1221,7 +1222,7 @@ jobs:
             await main();
       - name: Assign To Agent
         id: assign_to_agent
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'assign_to_agent'))
+        if: (((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'assign_to_agent'))
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}

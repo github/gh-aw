@@ -116,6 +116,14 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      (github.event_name == 'issues') && (contains(github.event.issue.body, '/archie')) ||
+      (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/archie')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request') &&
+      (contains(github.event.pull_request.body, '/archie'))
     runs-on: ubuntu-latest
     permissions:
       actions: read

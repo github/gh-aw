@@ -53,6 +53,24 @@ func (c *Compiler) referencesCustomJobOutputs(condition string, customJobs map[s
 	return false
 }
 
+// hasRealCustomJobs checks if there are custom jobs other than pre-activation/pre_activation.
+// Custom jobs make the skip-pre-activation optimization too complex, so we disable it
+// when any real custom jobs are present.
+func (c *Compiler) hasRealCustomJobs(customJobs map[string]any) bool {
+	if customJobs == nil {
+		return false
+	}
+	for jobName := range customJobs {
+		// Skip pre-activation variants - these are handled specially
+		if jobName == string(constants.PreActivationJobName) || jobName == "pre-activation" {
+			continue
+		}
+		// Any other job is a "real" custom job
+		return true
+	}
+	return false
+}
+
 // jobDependsOnPreActivation checks if a job config has pre_activation as a dependency.
 func jobDependsOnPreActivation(jobConfig map[string]any) bool {
 	if needs, hasNeeds := jobConfig["needs"]; hasNeeds {
@@ -159,27 +177,30 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 
 	// Build pre-activation job if needed (combines membership checks, stop-time validation, skip-if-match check, skip-if-no-match check, and command position check)
 	var preActivationJobCreated bool
+	var preActivationCanBeSkipped bool
 	hasCommandTrigger := len(data.Command) > 0
+	hasRealCustomJobs := c.hasRealCustomJobs(data.Jobs)
 	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasCommandTrigger {
 		compilerJobsLog.Print("Building pre-activation job")
-		preActivationJob, err := c.buildPreActivationJob(data, needsPermissionCheck)
+		preActivationJob, canBeSkipped, err := c.buildPreActivationJob(data, needsPermissionCheck, hasRealCustomJobs)
 		if err != nil {
 			return fmt.Errorf("failed to build %s job: %w", constants.PreActivationJobName, err)
 		}
 		if err := c.jobManager.AddJob(preActivationJob); err != nil {
 			return fmt.Errorf("failed to add %s job: %w", constants.PreActivationJobName, err)
 		}
-		compilerJobsLog.Printf("Successfully added pre-activation job: %s", constants.PreActivationJobName)
+		compilerJobsLog.Printf("Successfully added pre-activation job: %s (canBeSkipped=%v)", constants.PreActivationJobName, canBeSkipped)
 		preActivationJobCreated = true
+		preActivationCanBeSkipped = canBeSkipped
 	}
 
 	// Build activation job if needed (preamble job that handles runtime conditions)
-	// If pre-activation job exists, activation job depends on it and checks the "activated" output
+	// If pre-activation job exists, activation job depends on it and checks the "success" output
 	var activationJobCreated bool
 
 	if c.isActivationJobNeeded() {
 		compilerJobsLog.Print("Building activation job")
-		activationJob, err := c.buildActivationJob(data, preActivationJobCreated, workflowRunRepoSafety, lockFilename)
+		activationJob, err := c.buildActivationJob(data, preActivationJobCreated, preActivationCanBeSkipped, workflowRunRepoSafety, lockFilename)
 		if err != nil {
 			return fmt.Errorf("failed to build activation job: %w", err)
 		}
@@ -192,7 +213,7 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 
 	// Build main workflow job
 	compilerJobsLog.Print("Building main job")
-	mainJob, err := c.buildMainJob(data, activationJobCreated)
+	mainJob, err := c.buildMainJob(data, activationJobCreated, preActivationCanBeSkipped)
 	if err != nil {
 		return fmt.Errorf("failed to build main job: %w", err)
 	}
@@ -210,7 +231,7 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 	if len(data.Jobs) > 0 {
 		compilerJobsLog.Printf("Building %d custom jobs from frontmatter", len(data.Jobs))
 	}
-	if err := c.buildCustomJobs(data, activationJobCreated); err != nil {
+	if err := c.buildCustomJobs(data, activationJobCreated, preActivationCanBeSkipped); err != nil {
 		return fmt.Errorf("failed to build custom jobs: %w", err)
 	}
 
@@ -292,8 +313,10 @@ func (c *Compiler) extractJobsFromFrontmatter(frontmatter map[string]any) map[st
 }
 
 // buildCustomJobs creates custom jobs defined in the frontmatter jobs section
-func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool) error {
-	compilerJobsLog.Printf("Building %d custom jobs", len(data.Jobs))
+// preActivationCanBeSkipped indicates whether the pre_activation job can be skipped via its "if" condition.
+// When false (custom jobs present), we don't need always() && !cancelled() patterns.
+func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool, preActivationCanBeSkipped bool) error {
+	compilerJobsLog.Printf("Building %d custom jobs (preActivationCanBeSkipped=%v)", len(data.Jobs), preActivationCanBeSkipped)
 	for jobName, jobConfig := range data.Jobs {
 		// Skip jobs.pre-activation (or pre_activation) as it's handled specially in buildPreActivationJob
 		if jobName == string(constants.PreActivationJobName) || jobName == "pre-activation" {
@@ -336,10 +359,46 @@ func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool
 				}
 			}
 
+			// Extract user-specified if condition
+			var userIfCondition string
 			if ifCond, hasIf := configMap["if"]; hasIf {
 				if ifStr, ok := ifCond.(string); ok {
-					job.If = c.extractExpressionFromIfString(ifStr)
+					userIfCondition = c.extractExpressionFromIfString(ifStr)
 				}
+			}
+
+			// If the job depends on activation (either explicitly or implicitly added above),
+			// we may need to add an "if" condition. The pattern depends on whether pre_activation can be skipped:
+			// - If preActivationCanBeSkipped: use always() && !cancelled() pattern to handle skipped jobs
+			// - Otherwise: no automatic "if" condition needed (GitHub Actions handles dependency failures)
+			dependsOnActivation := false
+			for _, need := range job.Needs {
+				if need == string(constants.ActivationJobName) {
+					dependsOnActivation = true
+					break
+				}
+			}
+
+			if dependsOnActivation && activationJobCreated && preActivationCanBeSkipped {
+				// When pre_activation can be skipped, use always() && !cancelled() pattern
+				activationSuccessCheck := BuildEquals(
+					BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.ActivationJobName), constants.ActivatedOutput)),
+					BuildStringLiteral("true"),
+				)
+				baseCondition := BuildAlwaysNotCancelledAnd(activationSuccessCheck)
+
+				if userIfCondition != "" {
+					// Combine with user's condition: always() && !cancelled() && activated && (user_condition)
+					userExpr := &ExpressionNode{Expression: userIfCondition}
+					combinedExpr := BuildAnd(baseCondition, userExpr)
+					job.If = combinedExpr.Render()
+				} else {
+					job.If = baseCondition.Render()
+				}
+				compilerJobsLog.Printf("Added always() && !cancelled() && activated condition to custom job '%s'", jobName)
+			} else if userIfCondition != "" {
+				// No activation dependency or pre_activation cannot be skipped, just use the user's condition
+				job.If = userIfCondition
 			}
 
 			// Extract permissions

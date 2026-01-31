@@ -94,10 +94,14 @@ This workflow runs on schedule and when issues are opened.
 		// Verify activation job handles skipped pre_activation
 		activationSection := extractJobSectionForSkipTest(lockContentStr, string(constants.ActivationJobName))
 		require.NotEmpty(t, activationSection, "Should have activation job")
+		assert.Contains(t, activationSection, "always()",
+			"activation should use always() to run even when pre_activation is skipped")
+		assert.Contains(t, activationSection, "!cancelled()",
+			"activation should check !cancelled() to respect workflow cancellation")
 		assert.Contains(t, activationSection, "needs.pre_activation.result == 'skipped'",
 			"activation should check if pre_activation was skipped")
-		assert.Contains(t, activationSection, "needs.pre_activation.outputs.activated == 'true'",
-			"activation should also check activated output for non-safe events")
+		assert.Contains(t, activationSection, "needs.pre_activation.outputs.success == 'true'",
+			"activation should also check success output for non-safe events")
 	})
 
 	t.Run("issue_workflow_does_not_skip_pre_activation", func(t *testing.T) {

@@ -44,12 +44,14 @@ func TestGetWorkflowStatuses(t *testing.T) {
 			statuses, err := getWorkflowStatuses(tt.pattern, tt.repoOverride, tt.verbose)
 
 			// Either succeeds or fails gracefully, but shouldn't panic
-			if err == nil {
-				assert.NotNil(t, statuses, "Statuses should not be nil on success")
-			} else {
+			// Note: statuses can be nil even on success (when workflow not found),
+			// so we only check that error handling is consistent
+			if err != nil {
 				// Error is acceptable in test environment without gh CLI setup
-				assert.Error(t, err, "Expected error without gh CLI")
+				assert.Nil(t, statuses, "Statuses should be nil on error")
 			}
+			// If err == nil, statuses may be nil (workflow not found) or non-nil (workflow found)
+			// Both are valid outcomes - the function completed without error
 		})
 	}
 }

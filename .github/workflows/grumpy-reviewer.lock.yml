@@ -106,6 +106,9 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/grumpy')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request_review_comment') && (contains(github.event.comment.body, '/grumpy'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

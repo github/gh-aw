@@ -419,7 +419,7 @@ func TestActivationJobWithMessages(t *testing.T) {
 	}
 
 	// Build the activation job
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	if err != nil {
 		t.Fatalf("Failed to build activation job: %v", err)
 	}
@@ -463,7 +463,7 @@ func TestActivationJobWithoutMessages(t *testing.T) {
 	}
 
 	// Build the activation job
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	if err != nil {
 		t.Fatalf("Failed to build activation job: %v", err)
 	}

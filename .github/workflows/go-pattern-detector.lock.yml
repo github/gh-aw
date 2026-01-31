@@ -74,7 +74,6 @@ jobs:
     needs:
       - activation
       - ast_grep
-    if: needs.ast_grep.outputs.found_patterns == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

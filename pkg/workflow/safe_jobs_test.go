@@ -227,8 +227,8 @@ func TestBuildSafeJobs(t *testing.T) {
 		t.Errorf("Expected needs %v, got %v", expectedNeeds, job.Needs)
 	}
 
-	// Check if condition - should now combine safe output type check with user condition
-	expectedIf := "(((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'deploy'))) && (github.event.issue.number)"
+	// Check if condition - should use always() && !cancelled() && activated pattern with user condition
+	expectedIf := "((((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'deploy'))) && (github.event.issue.number)"
 	if job.If != expectedIf {
 		t.Errorf("Expected if condition to be '%s', got '%s'", expectedIf, job.If)
 	}
@@ -331,8 +331,8 @@ func TestBuildSafeJobsWithoutCustomIfCondition(t *testing.T) {
 		break
 	}
 
-	// Check if condition - should only have safe output type check (no custom condition)
-	expectedIf := "((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'notify'))"
+	// Check if condition - should use always() && !cancelled() && activated pattern
+	expectedIf := "(((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'notify'))"
 	if job.If != expectedIf {
 		t.Errorf("Expected if condition to be '%s', got '%s'", expectedIf, job.If)
 	}
@@ -379,8 +379,8 @@ func TestBuildSafeJobsWithDashesInName(t *testing.T) {
 		t.Errorf("Expected job name to be 'send_notification', got '%s'", job.Name)
 	}
 
-	// Check if condition - should check for underscore version in output_types
-	expectedIf := "((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'send_notification'))"
+	// Check if condition - should use always() && !cancelled() && activated pattern
+	expectedIf := "(((always()) && (!cancelled())) && (needs.agent.outputs.activated == 'true')) && (contains(needs.agent.outputs.output_types, 'send_notification'))"
 	if job.If != expectedIf {
 		t.Errorf("Expected if condition to be '%s', got '%s'", expectedIf, job.If)
 	}

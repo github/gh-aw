@@ -151,6 +151,21 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      ((github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' || github.event_name == 'discussion_comment') &&
+      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/scout')) || (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/scout')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'issue_comment') &&
+      ((contains(github.event.comment.body, '/scout')) && (github.event.issue.pull_request != null)) ||
+      (github.event_name == 'pull_request_review_comment') &&
+      (contains(github.event.comment.body, '/scout')) || (github.event_name == 'pull_request') &&
+      (contains(github.event.pull_request.body, '/scout')) ||
+      (github.event_name == 'discussion') && (contains(github.event.discussion.body, '/scout')) ||
+      (github.event_name == 'discussion_comment') &&
+      (contains(github.event.comment.body, '/scout')))) || (!(github.event_name == 'issues' || github.event_name == 'issue_comment' ||
+      github.event_name == 'pull_request' || github.event_name == 'pull_request_review_comment' || github.event_name == 'discussion' ||
+      github.event_name == 'discussion_comment'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

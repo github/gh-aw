@@ -74,9 +74,9 @@ This workflow has a skip-if-no-match configuration.
 			t.Error("Expected check_skip_if_no_match step ID")
 		}
 
-		// Verify the activated output includes skip_no_match_check_ok condition
+		// Verify the success output includes skip_no_match_check_ok condition
 		if !strings.Contains(lockContentStr, "steps.check_skip_if_no_match.outputs.skip_no_match_check_ok") {
-			t.Error("Expected activated output to include skip_no_match_check_ok condition")
+			t.Error("Expected success output to include skip_no_match_check_ok condition")
 		}
 
 		// Verify skip-if-no-match is commented out in the frontmatter
@@ -135,11 +135,11 @@ This workflow has both stop-after and skip-if-no-match.
 			t.Error("Expected skip-if-no-match check to be present")
 		}
 
-		// Verify the activated output includes both conditions
+		// Verify the success output includes both conditions
 		if !strings.Contains(lockContentStr, "steps.check_membership.outputs.is_team_member == 'true'") ||
 			!strings.Contains(lockContentStr, "steps.check_stop_time.outputs.stop_time_ok == 'true'") ||
 			!strings.Contains(lockContentStr, "steps.check_skip_if_no_match.outputs.skip_no_match_check_ok == 'true'") {
-			t.Error("Expected activated output to include all three conditions")
+			t.Error("Expected success output to include all three conditions")
 		}
 	})
 
@@ -183,10 +183,10 @@ This workflow has skip-if-no-match but no role restrictions.
 			t.Error("Expected skip-if-no-match check to be present")
 		}
 
-		// Since there's no role check, activated should only depend on skip_no_match_check_ok
+		// Since there's no role check, success should only depend on skip_no_match_check_ok
 		// Note: There's still a membership check with default roles, so both will be present
 		if !strings.Contains(lockContentStr, "steps.check_skip_if_no_match.outputs.skip_no_match_check_ok") {
-			t.Error("Expected activated output to include skip_no_match_check_ok condition")
+			t.Error("Expected success output to include skip_no_match_check_ok condition")
 		}
 	})
 
@@ -239,7 +239,7 @@ This workflow uses object format with min parameter.
 
 		// Verify skip_no_match_check_ok condition is used
 		if !strings.Contains(lockContentStr, "steps.check_skip_if_no_match.outputs.skip_no_match_check_ok") {
-			t.Error("Expected activated output to include skip_no_match_check_ok condition")
+			t.Error("Expected success output to include skip_no_match_check_ok condition")
 		}
 	})
 
@@ -332,11 +332,11 @@ This workflow uses both skip-if-match and skip-if-no-match.
 
 		// Verify both output conditions are used
 		if !strings.Contains(lockContentStr, "steps.check_skip_if_match.outputs.skip_check_ok") {
-			t.Error("Expected activated output to include skip_check_ok condition")
+			t.Error("Expected success output to include skip_check_ok condition")
 		}
 
 		if !strings.Contains(lockContentStr, "steps.check_skip_if_no_match.outputs.skip_no_match_check_ok") {
-			t.Error("Expected activated output to include skip_no_match_check_ok condition")
+			t.Error("Expected success output to include skip_no_match_check_ok condition")
 		}
 	})
 }

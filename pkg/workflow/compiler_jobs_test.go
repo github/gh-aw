@@ -82,7 +82,7 @@ func TestBuildPreActivationJobWithPermissionCheck(t *testing.T) {
 		},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, true)
+	job, _, err := compiler.buildPreActivationJob(workflowData, true, false)
 	if err != nil {
 		t.Fatalf("buildPreActivationJob() returned error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestBuildPreActivationJobWithPermissionCheck(t *testing.T) {
 	}
 
 	// Check for activated output
-	if _, ok := job.Outputs["activated"]; !ok {
+	if _, ok := job.Outputs[constants.ActivatedOutput]; !ok {
 		t.Error("Expected 'activated' output")
 	}
 
@@ -117,7 +117,7 @@ func TestBuildPreActivationJobWithStopTime(t *testing.T) {
 		SafeOutputs: &SafeOutputsConfig{},
 	}
 
-	job, err := compiler.buildPreActivationJob(workflowData, false)
+	job, _, err := compiler.buildPreActivationJob(workflowData, false, false)
 	if err != nil {
 		t.Fatalf("buildPreActivationJob() returned error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestBuildActivationJob(t *testing.T) {
 		SafeOutputs: &SafeOutputsConfig{},
 	}
 
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	if err != nil {
 		t.Fatalf("buildActivationJob() returned error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestBuildActivationJobWithReaction(t *testing.T) {
 		SafeOutputs: &SafeOutputsConfig{},
 	}
 
-	job, err := compiler.buildActivationJob(workflowData, false, "", "test.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "test.lock.yml")
 	if err != nil {
 		t.Fatalf("buildActivationJob() returned error: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestBuildActivationJobCampaignOrchestratorFilename(t *testing.T) {
 	}
 
 	// Test with campaign orchestrator filename (with .g.)
-	job, err := compiler.buildActivationJob(workflowData, false, "", "example.campaign.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, false, "", "example.campaign.lock.yml")
 	if err != nil {
 		t.Fatalf("buildActivationJob() returned error: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestBuildMainJobWithActivation(t *testing.T) {
 		Permissions: "permissions:\n  contents: read",
 	}
 
-	job, err := compiler.buildMainJob(workflowData, true)
+	job, err := compiler.buildMainJob(workflowData, true, true)
 	if err != nil {
 		t.Fatalf("buildMainJob() returned error: %v", err)
 	}

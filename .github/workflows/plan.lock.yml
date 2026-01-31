@@ -105,6 +105,9 @@ jobs:
 
   agent:
     needs: activation
+    if: >
+      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/plan')) && (github.event.issue.pull_request == null)) ||
+      (github.event_name == 'discussion_comment') && (contains(github.event.comment.body, '/plan'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

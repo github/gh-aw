@@ -23,22 +23,24 @@ func containsRole(roles []string, role string) bool {
 }
 
 // buildPreActivationJob creates a unified pre-activation job that combines membership checks and stop-time validation.
-// This job exposes a single "activated" output that indicates whether the workflow should proceed.
-func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionCheck bool) (*Job, error) {
-	compilerActivationJobsLog.Printf("Building pre-activation job: needsPermissionCheck=%v, hasStopTime=%v", needsPermissionCheck, data.StopTime != "")
+// This job exposes a single "success" output that indicates whether the workflow should proceed.
+// Returns the job and a boolean indicating whether the job's "if" condition can cause it to be skipped.
+// When preActivationCanBeSkipped is true, downstream jobs must use always() && !cancelled() patterns.
+func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionCheck bool, hasRealCustomJobs bool) (*Job, bool, error) {
+	compilerActivationJobsLog.Printf("Building pre-activation job: needsPermissionCheck=%v, hasStopTime=%v, hasRealCustomJobs=%v", needsPermissionCheck, data.StopTime != "", hasRealCustomJobs)
 	var steps []string
 	var permissions string
 
 	// Extract custom steps and outputs from jobs.pre-activation if present
 	customSteps, customOutputs, err := c.extractPreActivationCustomFields(data.Jobs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract pre-activation custom fields: %w", err)
+		return nil, false, fmt.Errorf("failed to extract pre-activation custom fields: %w", err)
 	}
 
 	// Add setup step to copy activation scripts (required - no inline fallback)
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	if setupActionRef == "" {
-		return nil, fmt.Errorf("setup action reference is required but could not be resolved")
+		return nil, false, fmt.Errorf("setup action reference is required but could not be resolved")
 	}
 
 	// For dev mode (local action path), checkout the actions folder first
@@ -230,7 +232,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	if len(conditions) == 0 {
 		// This should never happen - it means pre-activation job was created without any checks
 		// If we reach this point, it's a developer error in the compiler logic
-		return nil, fmt.Errorf("developer error: pre-activation job created without permission check or stop-time configuration")
+		return nil, false, fmt.Errorf("developer error: pre-activation job created without permission check or stop-time configuration")
 	} else if len(conditions) == 1 {
 		// Single condition
 		activatedNode = conditions[0]
@@ -246,7 +248,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	activatedExpression := fmt.Sprintf("${{ %s }}", activatedNode.Render())
 
 	outputs := map[string]string{
-		"activated": activatedExpression,
+		constants.ActivatedOutput: activatedExpression,
 	}
 
 	// Add matched_command output if this is a command workflow
@@ -277,6 +279,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	// - skip-if-match: query-based skip applies to all events
 	// - skip-if-no-match: query-based skip applies to all events
 	// - custom steps: user-defined steps may have important logic
+	// - real custom jobs: having custom jobs makes skip patterns too complex
 	//
 	// Safe events that can skip pre_activation:
 	// - schedule: Triggered by cron, runs as the repository, not user-initiated
@@ -284,12 +287,17 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	// - workflow_dispatch: Can skip IF roles include "write" (which the default roles do)
 	//   because check_membership.cjs already short-circuits for workflow_dispatch when write is allowed
 	//
-	// When pre_activation is skipped, downstream jobs check for needs.pre_activation.result == 'skipped'
+	// When pre_activation is skipped, downstream jobs must use always() && !cancelled() patterns
+	// to check for needs.pre_activation.result == 'skipped'
 	canSkipForSafeEvents := c.skipPreActivationWithIfOptimization &&
 		data.StopTime == "" &&
 		data.SkipIfMatch == nil &&
 		data.SkipIfNoMatch == nil &&
-		len(customSteps) == 0
+		len(customSteps) == 0 &&
+		!hasRealCustomJobs // Disable skip optimization when there are custom jobs
+
+	// Track whether pre_activation can actually be skipped (for downstream job conditions)
+	preActivationCanBeSkipped := false
 
 	if canSkipForSafeEvents {
 		// Check if workflow_dispatch can also be skipped (when roles include "write")
@@ -303,10 +311,11 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		} else {
 			jobIfCondition = safeEventSkipCondition
 		}
+		preActivationCanBeSkipped = true
 		compilerActivationJobsLog.Printf("Pre-activation job can be skipped for safe events (rolesIncludeWrite=%v)", rolesIncludeWrite)
 	} else {
-		compilerActivationJobsLog.Printf("Pre-activation job cannot be skipped for safe events: hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCustomSteps=%v",
-			data.StopTime != "", data.SkipIfMatch != nil, data.SkipIfNoMatch != nil, len(customSteps) > 0)
+		compilerActivationJobsLog.Printf("Pre-activation job cannot be skipped for safe events: hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCustomSteps=%v, hasRealCustomJobs=%v",
+			data.StopTime != "", data.SkipIfMatch != nil, data.SkipIfNoMatch != nil, len(customSteps) > 0, hasRealCustomJobs)
 	}
 
 	job := &Job{
@@ -318,7 +327,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		Outputs:     outputs,
 	}
 
-	return job, nil
+	return job, preActivationCanBeSkipped, nil
 }
 
 // extractPreActivationCustomFields extracts custom steps and outputs from jobs.pre-activation field in frontmatter.
@@ -411,7 +420,9 @@ func (c *Compiler) extractPreActivationCustomFields(jobs map[string]any) ([]stri
 
 // buildActivationJob creates the activation job that handles timestamp checking, reactions, and locking.
 // This job depends on the pre-activation job if it exists, and runs before the main agent job.
-func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreated bool, workflowRunRepoSafety string, lockFilename string) (*Job, error) {
+// preActivationCanBeSkipped indicates whether the pre_activation job can be skipped via its "if" condition.
+// When true, the activation job must use always() && !cancelled() patterns to handle skipped pre_activation.
+func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreated bool, preActivationCanBeSkipped bool, workflowRunRepoSafety string, lockFilename string) (*Job, error) {
 	outputs := map[string]string{}
 	var steps []string
 
@@ -559,42 +570,72 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	customJobsBeforeActivation := c.getCustomJobsDependingOnPreActivation(data.Jobs)
 
 	if preActivationJobCreated {
-		// Activation job depends on pre-activation job and checks the "activated" output
+		// Activation job depends on pre-activation job and checks the "success" output
 		activationNeeds = []string{string(constants.PreActivationJobName)}
 
 		// Also depend on custom jobs that run after pre_activation but before activation
 		activationNeeds = append(activationNeeds, customJobsBeforeActivation...)
 
-		// Build activation condition:
-		// - If pre_activation was skipped (safe event like schedule/merge_group), proceed
-		// - Otherwise, check that pre_activation.outputs.activated == 'true'
-		preActivationSkipped := BuildEquals(
-			BuildPropertyAccess(fmt.Sprintf("needs.%s.result", string(constants.PreActivationJobName))),
-			BuildStringLiteral("skipped"),
-		)
-		preActivationActivated := BuildEquals(
-			BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.PreActivationJobName), constants.ActivatedOutput)),
-			BuildStringLiteral("true"),
-		)
-		// (pre_activation was skipped) OR (pre_activation.outputs.activated == 'true')
-		activatedExpr := BuildOr(preActivationSkipped, preActivationActivated)
+		if preActivationCanBeSkipped {
+			// When pre_activation CAN be skipped (via its "if" condition), we need to handle two cases:
+			// 1. pre_activation was skipped (safe event like schedule/merge_group) - proceed
+			// 2. pre_activation ran and succeeded (outputs.activated == 'true') - proceed
+			// We use always() && !cancelled() to ensure activation runs even when pre_activation is skipped
+			preActivationSkipped := BuildEquals(
+				BuildPropertyAccess(fmt.Sprintf("needs.%s.result", string(constants.PreActivationJobName))),
+				BuildStringLiteral("skipped"),
+			)
+			preActivationSuccess := BuildEquals(
+				BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.PreActivationJobName), constants.ActivatedOutput)),
+				BuildStringLiteral("true"),
+			)
+			// (pre_activation was skipped) OR (pre_activation.outputs.activated == 'true')
+			successExpr := BuildOr(preActivationSkipped, preActivationSuccess)
 
-		// If there are custom jobs before activation and the if condition references them,
-		// include that condition in the activation job's if clause
-		if data.If != "" && c.referencesCustomJobOutputs(data.If, data.Jobs) && len(customJobsBeforeActivation) > 0 {
-			// Include the custom job output condition in the activation job
-			unwrappedIf := stripExpressionWrapper(data.If)
-			ifExpr := &ExpressionNode{Expression: unwrappedIf}
-			combinedExpr := BuildAnd(activatedExpr, ifExpr)
-			activationCondition = combinedExpr.Render()
-		} else if data.If != "" && !c.referencesCustomJobOutputs(data.If, data.Jobs) {
-			// Include user's if condition that doesn't reference custom jobs
-			unwrappedIf := stripExpressionWrapper(data.If)
-			ifExpr := &ExpressionNode{Expression: unwrappedIf}
-			combinedExpr := BuildAnd(activatedExpr, ifExpr)
-			activationCondition = combinedExpr.Render()
+			// Wrap with always() && !cancelled() && to ensure downstream jobs run when pre_activation is skipped
+			alwaysNotCancelledExpr := BuildAlwaysNotCancelledAnd(successExpr)
+
+			// If there are custom jobs before activation and the if condition references them,
+			// include that condition in the activation job's if clause
+			if data.If != "" && c.referencesCustomJobOutputs(data.If, data.Jobs) && len(customJobsBeforeActivation) > 0 {
+				// Include the custom job output condition in the activation job
+				unwrappedIf := stripExpressionWrapper(data.If)
+				ifExpr := &ExpressionNode{Expression: unwrappedIf}
+				combinedExpr := BuildAnd(alwaysNotCancelledExpr, ifExpr)
+				activationCondition = combinedExpr.Render()
+			} else if data.If != "" && !c.referencesCustomJobOutputs(data.If, data.Jobs) {
+				// Include user's if condition that doesn't reference custom jobs
+				unwrappedIf := stripExpressionWrapper(data.If)
+				ifExpr := &ExpressionNode{Expression: unwrappedIf}
+				combinedExpr := BuildAnd(alwaysNotCancelledExpr, ifExpr)
+				activationCondition = combinedExpr.Render()
+			} else {
+				activationCondition = alwaysNotCancelledExpr.Render()
+			}
 		} else {
-			activationCondition = activatedExpr.Render()
+			// When pre_activation CANNOT be skipped, use the original pattern that handles both cases:
+			// 1. pre_activation was skipped - proceed (shouldn't happen but maintain compatibility)
+			// 2. pre_activation ran and succeeded (outputs.activated == 'true') - proceed
+			preActivationSkipped := BuildEquals(
+				BuildPropertyAccess(fmt.Sprintf("needs.%s.result", string(constants.PreActivationJobName))),
+				BuildStringLiteral("skipped"),
+			)
+			preActivationSuccess := BuildEquals(
+				BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.PreActivationJobName), constants.ActivatedOutput)),
+				BuildStringLiteral("true"),
+			)
+			// (pre_activation was skipped) OR (pre_activation.outputs.activated == 'true')
+			successExpr := BuildOr(preActivationSkipped, preActivationSuccess)
+
+			// Include user's if condition if present
+			if data.If != "" {
+				unwrappedIf := stripExpressionWrapper(data.If)
+				ifExpr := &ExpressionNode{Expression: unwrappedIf}
+				combinedExpr := BuildAnd(successExpr, ifExpr)
+				activationCondition = combinedExpr.Render()
+			} else {
+				activationCondition = successExpr.Render()
+			}
 		}
 	} else {
 		// No pre-activation check needed
@@ -644,6 +685,13 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 		environment = fmt.Sprintf("environment: %s", cleanManualApproval)
 	}
 
+	// Add activated output only when pre_activation can be skipped
+	// This output is used by downstream jobs with the always() && !cancelled() pattern
+	// When pre_activation cannot be skipped, downstream jobs just check activation.outputs.activated directly
+	if preActivationCanBeSkipped {
+		outputs[constants.ActivatedOutput] = "${{ 'true' }}"
+	}
+
 	job := &Job{
 		Name:                       string(constants.ActivationJobName),
 		If:                         activationCondition,
@@ -661,7 +709,9 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 
 // buildMainJob creates the main agent job that runs the AI agent with the configured engine and tools.
 // This job depends on the activation job if it exists, and handles the main workflow logic.
-func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (*Job, error) {
+// preActivationCanBeSkipped indicates whether the pre_activation job can be skipped via its "if" condition.
+// When true, downstream jobs must use always() && !cancelled() patterns.
+func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool, preActivationCanBeSkipped bool) (*Job, error) {
 	log.Printf("Building main job for workflow: %s", data.Name)
 	var steps []string
 
@@ -677,17 +727,56 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	// Find custom jobs that depend on pre_activation - these are handled by the activation job
 	customJobsBeforeActivation := c.getCustomJobsDependingOnPreActivation(data.Jobs)
 
-	var jobCondition = data.If
+	var jobCondition string
 	if activationJobCreated {
-		// If the if condition references custom jobs that run before activation,
-		// the activation job handles the condition, so clear it here
-		if c.referencesCustomJobOutputs(data.If, data.Jobs) && len(customJobsBeforeActivation) > 0 {
-			jobCondition = "" // Activation job handles this condition
-		} else if !c.referencesCustomJobOutputs(data.If, data.Jobs) {
-			jobCondition = "" // Main job depends on activation job, so no need for inline condition
+		if preActivationCanBeSkipped {
+			// When pre_activation CAN be skipped, agent job uses the always() && !cancelled() pattern
+			// to handle cases where upstream jobs might be skipped but still represent successful completion.
+			// The condition checks that activation job succeeded via its activated output.
+			activationSuccessCheck := BuildEquals(
+				BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.%s", string(constants.ActivationJobName), constants.ActivatedOutput)),
+				BuildStringLiteral("true"),
+			)
+
+			// Wrap with always() && !cancelled() && to handle skipped dependencies properly
+			agentCondition := BuildAlwaysNotCancelledAnd(activationSuccessCheck)
+
+			// If the if condition references custom jobs that run before activation,
+			// the activation job handles the condition, but we still need the base condition
+			if c.referencesCustomJobOutputs(data.If, data.Jobs) && len(customJobsBeforeActivation) > 0 {
+				// Activation job handles custom job conditions, agent just needs success check
+				jobCondition = agentCondition.Render()
+			} else if !c.referencesCustomJobOutputs(data.If, data.Jobs) && data.If != "" {
+				// Include user's if condition that doesn't reference custom jobs
+				unwrappedIf := stripExpressionWrapper(data.If)
+				ifExpr := &ExpressionNode{Expression: unwrappedIf}
+				combinedExpr := BuildAnd(agentCondition, ifExpr)
+				jobCondition = combinedExpr.Render()
+			} else {
+				// No extra conditions, just the always() && !cancelled() && activated pattern
+				jobCondition = agentCondition.Render()
+			}
+			// Note: If data.If references custom jobs that DON'T depend on pre_activation,
+			// we need to include them in the condition
+			if c.referencesCustomJobOutputs(data.If, data.Jobs) && len(customJobsBeforeActivation) == 0 {
+				// Custom jobs that don't depend on pre_activation, add their condition
+				unwrappedIf := stripExpressionWrapper(data.If)
+				ifExpr := &ExpressionNode{Expression: unwrappedIf}
+				combinedExpr := BuildAnd(&ExpressionNode{Expression: jobCondition}, ifExpr)
+				jobCondition = combinedExpr.Render()
+			}
+		} else {
+			// When pre_activation CANNOT be skipped, no "if" condition is needed on the agent job
+			// The agent job implicitly depends on activation succeeding through the "needs" dependency
+			// Include user's if condition if present (but not ones referencing custom jobs)
+			if data.If != "" && !c.referencesCustomJobOutputs(data.If, data.Jobs) {
+				jobCondition = data.If
+			}
+			// If data.If references custom jobs, don't add it here - it's handled by activation job
 		}
-		// Note: If data.If references custom jobs that DON'T depend on pre_activation,
-		// we keep the condition on the agent job
+	} else {
+		// No activation job, use the original condition if any
+		jobCondition = data.If
 	}
 
 	// Note: workflow_run repository safety check is applied exclusively to activation job
@@ -767,6 +856,12 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	outputs := map[string]string{
 		"model":                      "${{ steps.generate_aw_info.outputs.model }}",
 		"secret_verification_result": "${{ steps.validate-secret.outputs.verification_result }}",
+	}
+
+	// Add activated output only when pre_activation can be skipped
+	// This output is used by downstream jobs with the always() && !cancelled() pattern
+	if preActivationCanBeSkipped {
+		outputs[constants.ActivatedOutput] = "${{ 'true' }}"
 	}
 
 	// Add safe-output specific outputs if the workflow uses the safe-outputs feature
