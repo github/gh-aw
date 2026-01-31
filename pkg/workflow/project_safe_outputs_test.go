@@ -122,7 +122,7 @@ func TestProjectConfigIntegration(t *testing.T) {
 
 func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 	compiler := NewCompiler()
-	projectURL := "https://github.com/orgs/myorg/projects/42"
+	projectURL := "https://github.com/orgs/nonexistent-test-org-99999/projects/99999"
 
 	tests := []struct {
 		name                string
@@ -146,11 +146,11 @@ func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 			existingSafeOutputs: &SafeOutputsConfig{
 				UpdateProjects: &UpdateProjectConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 25},
-					Project:              "https://github.com/orgs/different/projects/99", // Should be overridden
+					Project:              "https://github.com/orgs/another-fake-org-88888/projects/88888", // Should be overridden
 				},
 				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3},
-					Project:              "https://github.com/orgs/different/projects/99", // Should be overridden
+					Project:              "https://github.com/orgs/another-fake-org-88888/projects/88888", // Should be overridden
 				},
 			},
 			expectEnforcement: true,
@@ -163,7 +163,7 @@ func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 			existingSafeOutputs: &SafeOutputsConfig{
 				CopyProjects: &CopyProjectsConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
-					SourceProject:        "https://github.com/orgs/different/projects/88", // Should be overridden
+					SourceProject:        "https://github.com/orgs/third-fake-org-77777/projects/77777", // Should be overridden
 				},
 			},
 			expectEnforcement: true,

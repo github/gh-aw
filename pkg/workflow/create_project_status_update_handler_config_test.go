@@ -214,7 +214,7 @@ engine: copilot
 safe-outputs:
   create-project-status-update:
     max: 1
-    project: "https://github.com/orgs/test-org/projects/456"
+    project: "https://github.com/orgs/nonexistent-test-org-67890/projects/88888"
 ---
 
 Test workflow
@@ -236,5 +236,5 @@ Test workflow
 
 	// Verify GH_AW_PROJECT_URL environment variable is set
 	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
-	require.Contains(t, compiledStr, "https://github.com/orgs/test-org/projects/456", "Expected project URL in environment variable")
+	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-67890/projects/88888", "Expected project URL in environment variable")
 }
