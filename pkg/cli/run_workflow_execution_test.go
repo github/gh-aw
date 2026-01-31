@@ -79,6 +79,7 @@ func TestRunWorkflowOnGitHub_InputValidation(t *testing.T) {
 				false, // waitForCompletion
 				tt.inputs,
 				false, // verbose
+				false, // dryRun
 			)
 
 			if tt.expectError {
@@ -115,6 +116,7 @@ func TestRunWorkflowOnGitHub_ContextCancellation(t *testing.T) {
 		false, // waitForCompletion
 		[]string{},
 		false, // verbose
+		false, // dryRun
 	)
 
 	if err == nil {
@@ -172,6 +174,7 @@ func TestRunWorkflowsOnGitHub_InputValidation(t *testing.T) {
 				false, // push
 				[]string{},
 				false, // verbose
+				false, // dryRun
 			)
 
 			if tt.expectError {
@@ -208,6 +211,7 @@ func TestRunWorkflowsOnGitHub_ContextCancellation(t *testing.T) {
 		false, // push
 		[]string{},
 		false, // verbose
+		false, // dryRun
 	)
 
 	if err == nil {
@@ -260,6 +264,7 @@ func TestRunWorkflowOnGitHub_FlagCombinations(t *testing.T) {
 				false, // waitForCompletion
 				[]string{},
 				false, // verbose
+				false, // dryRun
 			)
 
 			if tt.expectError {
