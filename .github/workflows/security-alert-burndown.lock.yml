@@ -564,8 +564,19 @@ jobs:
                   "type": "string",
                   "enum": [
                     "issue",
-                    "pull_request"
+                    "pull_request",
+                    "draft_issue"
                   ]
+                },
+                "draft_body": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "draft_title": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 256
                 },
                 "fields": {
                   "type": "object"
