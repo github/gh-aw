@@ -6,10 +6,9 @@
  *
  * This module manages the dispatch of project-related safe output messages to dedicated handlers.
  * It handles safe output types that require GH_AW_PROJECT_GITHUB_TOKEN:
- * - create_project
  * - copy_project
  *
- * Note: update_project and create_project_status_update are now handled by the unified
+ * Note: create_project, update_project and create_project_status_update are now handled by the unified
  * handler manager (safe_output_unified_handler_manager.cjs) and should NOT be processed here.
  *
  * These types are separated from the main handler manager because they require a different
@@ -27,11 +26,10 @@ const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
  * Maps safe output types to their handler module file paths
  * All these types require GH_AW_PROJECT_GITHUB_TOKEN
  *
- * Note: update_project and create_project_status_update are intentionally excluded
+ * Note: create_project, update_project and create_project_status_update are intentionally excluded
  * from this map as they are now handled by the unified handler manager.
  */
 const PROJECT_HANDLER_MAP = {
-  create_project: "./create_project.cjs",
   copy_project: "./copy_project.cjs",
 };
 
