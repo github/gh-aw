@@ -19,7 +19,7 @@ import (
 // NOTE: This test currently documents that the implementations differ.
 // The JavaScript implementation uses text-based parsing while Go uses full YAML parsing.
 // These tests will PASS once the JavaScript implementation is updated to match Go.
-// 
+//
 // See FRONTMATTER_HASH_SUMMARY.md for implementation status.
 func TestHashConsistency_GoAndJavaScript(t *testing.T) {
 	testCases := []struct {
@@ -168,12 +168,12 @@ steps:
 			assert.Equal(t, jsHash1, jsHash2, "JS hashes should be stable (same input → same output)")
 
 			// Cross-language validation: Go and JS should produce identical hashes
-			// 
+			//
 			// TODO: The JavaScript implementation currently uses text-based parsing
 			// which produces different hashes than the Go YAML-based implementation.
 			// Skip this assertion until JS is updated to match Go's approach.
 			// See FRONTMATTER_HASH_SUMMARY.md for implementation roadmap.
-			if false {  // Set to true when JS implementation matches Go
+			if false { // Set to true when JS implementation matches Go
 				assert.Equal(t, goHash1, jsHash1, "Go and JS must produce identical hashes for the same input")
 			}
 
@@ -249,7 +249,7 @@ Use ${{ env.TEST_VAR }} and ${{ vars.CONFIG }}
 
 		// Go and JS should match
 		// TODO: Skip for now until JS implementation is updated
-		if false {  // Set to true when JS implementation matches Go
+		if false { // Set to true when JS implementation matches Go
 			assert.Equal(t, goHashes[0], jsHashes[0], "Go and JS hashes should be identical")
 		}
 	}
@@ -328,7 +328,7 @@ labels:
 
 	// Cross-language validation
 	// TODO: Skip for now until JS implementation is updated
-	if false {  // Set to true when JS implementation matches Go
+	if false { // Set to true when JS implementation matches Go
 		assert.Equal(t, goHash1, jsHash1, "Go and JS should produce identical hashes with imports")
 	}
 
@@ -408,10 +408,10 @@ engine: copilot
 	} else {
 		t.Logf("⚠ JS: Different key ordering produces different hashes (text-based parsing limitation)")
 	}
-	
+
 	// Cross-language validation
 	// TODO: Skip for now until JS implementation is updated
-	if false {  // Set to true when JS implementation matches Go
+	if false { // Set to true when JS implementation matches Go
 		assert.Equal(t, goHash1, jsHash1, "Go and JS should produce same hash")
 		assert.Equal(t, jsHash1, jsHash2, "JS: Different key ordering should produce same hash")
 	}
@@ -424,7 +424,7 @@ engine: copilot
 		bothGoMatch := goHash1 == goHash2
 		bothJSMatch := jsHash1 == jsHash2
 		crossMatch := goHash1 == jsHash1
-		t.Logf("✓ Go hashes match: %v, JS hashes match: %v, Cross-language match: %v", 
+		t.Logf("✓ Go hashes match: %v, JS hashes match: %v, Cross-language match: %v",
 			bothGoMatch, bothJSMatch, crossMatch)
 	}
 }
