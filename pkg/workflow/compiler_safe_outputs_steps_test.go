@@ -338,8 +338,8 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
 			},
 		},
-		// Note: create_project and create_project_status_update are now handled by
-		// the project handler manager (buildProjectHandlerManagerStep), not the main handler manager
+		// Note: create_project is now handled by the unified handler manager,
+		// not the separate project handler manager
 	}
 
 	for _, tt := range tests {
@@ -373,11 +373,12 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 		checkContains     []string
 	}{
 		{
-			name: "project handler manager with create_project",
+			name: "project handler manager with copy_project",
 			safeOutputs: &SafeOutputsConfig{
-				CreateProjects: &CreateProjectsConfig{
-					GitHubToken: "${{ secrets.PROJECTS_PAT }}",
-					TargetOwner: "test-org",
+				CopyProjects: &CopyProjectsConfig{
+					GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
+					TargetOwner:   "test-org",
+					SourceProject: "https://github.com/orgs/source-org/projects/1",
 				},
 			},
 			checkContains: []string{
@@ -395,8 +396,9 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 		{
 			name: "project handler manager without custom token uses default",
 			safeOutputs: &SafeOutputsConfig{
-				CreateProjects: &CreateProjectsConfig{
-					TargetOwner: "test-org",
+				CopyProjects: &CopyProjectsConfig{
+					TargetOwner:   "test-org",
+					SourceProject: "https://github.com/orgs/source-org/projects/1",
 				},
 			},
 			checkContains: []string{
@@ -478,6 +480,8 @@ func TestStepOrderInConsolidatedJob(t *testing.T) {
 }
 
 // TestHandlerManagerOrderWithProjects tests that project handler manager comes before general handler manager
+// Note: create_project is now handled by the unified handler, so only copy_project requires
+// the project handler manager step.
 func TestHandlerManagerOrderWithProjects(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()
@@ -485,9 +489,10 @@ func TestHandlerManagerOrderWithProjects(t *testing.T) {
 	workflowData := &WorkflowData{
 		Name: "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{
-			CreateProjects: &CreateProjectsConfig{
-				GitHubToken: "${{ secrets.PROJECTS_PAT }}",
-				TargetOwner: "test-org",
+			CopyProjects: &CopyProjectsConfig{
+				GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
+				TargetOwner:   "test-org",
+				SourceProject: "https://github.com/orgs/source-org/projects/1",
 			},
 			CreateIssues: &CreateIssuesConfig{
 				TitlePrefix: "[Test] ",

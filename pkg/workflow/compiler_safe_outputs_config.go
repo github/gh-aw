@@ -422,8 +422,26 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", c.GitHubToken).
 			Build()
 	},
-	// Note: update_project and create_project_status_update are handled by the unified handler,
+	// Note: create_project, update_project and create_project_status_update are handled by the unified handler,
 	// not the separate project handler manager, so they are included in this registry.
+	"create_project": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.CreateProjects == nil {
+			return nil
+		}
+		c := cfg.CreateProjects
+		builder := newHandlerConfigBuilder().
+			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("target_owner", c.TargetOwner).
+			AddIfNotEmpty("title_prefix", c.TitlePrefix).
+			AddIfNotEmpty("github-token", c.GitHubToken)
+		if len(c.Views) > 0 {
+			builder.AddDefault("views", c.Views)
+		}
+		if len(c.FieldDefinitions) > 0 {
+			builder.AddDefault("field_definitions", c.FieldDefinitions)
+		}
+		return builder.Build()
+	},
 	"update_project": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.UpdateProjects == nil {
 			return nil
@@ -455,28 +473,10 @@ var handlerRegistry = map[string]handlerBuilder{
 }
 
 // projectHandlerRegistry maps project handler names to their builder functions
-// Note: As of recent changes, only create_project and copy_project are in this registry.
-// update_project and create_project_status_update have been moved to the main handlerRegistry
+// Note: As of recent changes, only copy_project is in this registry.
+// create_project, update_project and create_project_status_update have been moved to the main handlerRegistry
 // as they are now handled by the unified handler.
 var projectHandlerRegistry = map[string]handlerBuilder{
-	"create_project": func(cfg *SafeOutputsConfig) map[string]any {
-		if cfg.CreateProjects == nil {
-			return nil
-		}
-		c := cfg.CreateProjects
-		builder := newHandlerConfigBuilder().
-			AddIfPositive("max", c.Max).
-			AddIfNotEmpty("target_owner", c.TargetOwner).
-			AddIfNotEmpty("title_prefix", c.TitlePrefix).
-			AddIfNotEmpty("github-token", c.GitHubToken)
-		if len(c.Views) > 0 {
-			builder.AddDefault("views", c.Views)
-		}
-		if len(c.FieldDefinitions) > 0 {
-			builder.AddDefault("field_definitions", c.FieldDefinitions)
-		}
-		return builder.Build()
-	},
 	"copy_project": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CopyProjects == nil {
 			return nil
@@ -530,9 +530,9 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 }
 
 // addProjectHandlerManagerConfigEnvVar adds the GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
-// containing JSON configuration for project-related safe output handlers (create_project, copy_project).
+// containing JSON configuration for project-related safe output handlers (copy_project).
 // These handlers require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately from the main handler manager.
-// Note: update_project and create_project_status_update are now handled by the unified handler and are
+// Note: create_project, update_project and create_project_status_update are now handled by the unified handler and are
 // NOT included in this config.
 func (c *Compiler) addProjectHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs == nil {

@@ -1576,7 +1576,7 @@ gh aw logs --start-date -1mo         # Last month's runs
 gh aw logs --start-date -2w3d        # 2 weeks 3 days ago
 
 # Filter staged logs
-gw aw logs --no-staged               # ignore workflows with safe output staged true
+gh aw logs --no-staged               # ignore workflows with safe output staged true
 
 # Download to custom directory
 gh aw logs -o ./workflow-logs
