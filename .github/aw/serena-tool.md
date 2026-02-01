@@ -1,86 +1,173 @@
 # Serena Language Server Tool
 
-Serena is an **advanced static analysis tool** that provides deep code understanding through language server capabilities. It is designed for **advanced coding tasks** that require sophisticated code analysis.
+Serena is a **language service protocol (LSP) MCP server** for semantic code analysis. Use it ONLY when you need deep code understanding beyond text manipulation.
 
-## When to Use Serena
+## Quick Decision: Should I Use Serena?
 
-⚠️ **Important**: Serena should only be suggested when the user **explicitly requests advanced static analysis** for specific programming languages.
+**✅ YES - Use Serena when you need:**
+- Symbol navigation (find all usages of a function/type)
+- Call graph analysis across files
+- Semantic duplicate detection (not just text matching)
+- Refactoring analysis (functions in wrong files, extraction opportunities)
+- Type relationships and interface implementations
 
-**Appropriate use cases:**
-- Deep code refactoring requiring semantic understanding
-- Complex code transformations across multiple files
-- Advanced type checking and inference
-- Cross-file dependency analysis
-- Language-specific semantic analysis
+**❌ NO - Use simpler tools when:**
+- Searching text patterns → Use `grep`
+- Editing files → Use `edit` tool
+- Running commands → Use `bash`
+- Working with YAML/JSON/Markdown → Use `edit` tool
+- Simple file operations → Use `bash` or `create`
 
-**NOT recommended for:**
-- Simple file editing or text manipulation
-- Basic code generation
-- General workflow automation
-- Tasks that don't require deep code understanding
+**Rule of thumb**: If `grep` or `bash` can solve it in 1-2 commands, don't use Serena.
 
 ## Configuration
 
-When a user explicitly asks for advanced static analysis capabilities:
+Add to workflow frontmatter:
 
 ```yaml
 tools:
-  serena: ["<language>"]  # Specify the programming language(s)
+  serena: ["go"]  # Specify language(s): go, typescript, python, ruby, rust, java, cpp, csharp
 ```
 
-**Supported languages:**
-- `go`
-- `typescript`
-- `python`
-- `ruby`
-- `rust`
-- `java`
-- `cpp`
-- `csharp`
-- And many more (see `.serena/project.yml` for full list)
+Multi-language repositories:
+```yaml
+tools:
+  serena: ["go", "typescript"]  # First language is default fallback
+```
 
-## Detection and Usage
+## Available Serena Tools
 
-**To detect the repository's primary language:**
-1. Check file extensions in the repository
-2. Look for language-specific files:
-   - `go.mod` → Go
-   - `package.json` → TypeScript/JavaScript
-   - `requirements.txt` or `pyproject.toml` → Python
-   - `Cargo.toml` → Rust
-   - `pom.xml` or `build.gradle` → Java
-   - etc.
+### Navigation & Analysis
+- `find_symbol` - Search for symbols by name
+- `get_symbols_overview` - List all symbols in a file
+- `find_referencing_symbols` - Find where a symbol is used
+- `find_referencing_code_snippets` - Find code snippets using a symbol
+- `search_for_pattern` - Search for code patterns (regex)
 
-## Example Configuration
+### Code Editing
+- `read_file` - Read file with semantic context
+- `create_text_file` - Create/overwrite files
+- `insert_at_line` - Insert content at line number
+- `insert_before_symbol` / `insert_after_symbol` - Insert near symbols
+- `replace_lines` - Replace line range
+- `replace_symbol_body` - Replace symbol definition
+- `delete_lines` - Delete line range
+
+### Project Management
+- `activate_project` - **REQUIRED** - Activate Serena for workspace
+- `onboarding` - Analyze project structure
+- `restart_language_server` - Restart LSP if needed
+- `get_current_config` - View Serena configuration
+- `list_dir` - List directory contents
+
+## Usage Workflow
+
+### 1. Activate Serena First
+
+**Always call activate_project before other Serena tools:**
+
+```javascript
+// activate_project tool
+{
+  "path": "/home/runner/work/gh-aw/gh-aw"
+}
+```
+
+### 2. Combine with Other Tools
+
+**Best practice**: Use bash for discovery, Serena for analysis
 
 ```yaml
 tools:
-  serena: ["go"]  # For Go repositories requiring advanced static analysis
+  serena: ["go"]
+  bash:
+    - "find pkg -name '*.go' ! -name '*_test.go'"
+    - "cat go.mod"
+  github:
+    toolsets: [default]
 ```
 
-## User Interaction Pattern
+**Pattern**: 
+1. Use `bash` to list files
+2. Use Serena to analyze semantic structure
+3. Use `edit` to make changes
 
-When a user describes a task:
+### 3. Use Cache for Recurring Analysis
 
-1. **Analyze the request**: Does it require advanced static analysis?
-2. **If NO**: Use standard tools (bash, edit, etc.)
-3. **If YES**: Ask the user if they want to use Serena for advanced static analysis
-4. **Only add Serena** if the user explicitly confirms
+Track analysis state across runs:
 
-**Example conversation:**
+```yaml
+tools:
+  serena: ["go"]
+  cache-memory: true  # Store analysis history
+```
 
-User: "I need to refactor the authentication logic across multiple files with proper type safety"
+Load cache → Analyze new/changed files → Save results → Avoid redundant work
 
-Agent: "This task involves complex cross-file refactoring. Would you like me to use the Serena language server for advanced static analysis? This will provide deeper code understanding but adds complexity to the workflow."
+## Common Patterns
 
-User: "Yes, use Serena"
+### Pattern 1: Find All Function Usages
 
-Agent: *Adds `serena: ["go"]` to the workflow configuration*
+```
+1. Use find_symbol to locate function definition
+2. Use find_referencing_code_snippets to find call sites
+3. Analyze patterns
+```
 
-## Best Practices
+### Pattern 2: Code Quality Analysis
 
-- **Default to simpler tools** when possible
-- **Only suggest Serena** for genuinely complex analysis tasks
-- **Ask before adding** Serena to a workflow
-- **Explain the benefits** when suggesting Serena
-- **Consider the trade-offs** (added complexity vs. better analysis)
+```
+1. Use get_symbols_overview on multiple files
+2. Use find_symbol for similar function names
+3. Use search_for_pattern for duplicate logic
+4. Identify consolidation opportunities
+```
+
+### Pattern 3: Daily Code Analysis
+
+```
+1. Load previous state from cache-memory
+2. Select files using round-robin or priority
+3. Use Serena for semantic analysis
+4. Save findings to cache
+5. Generate improvement tasks
+```
+
+## Production Examples
+
+Workflows successfully using Serena:
+
+- **go-fan** (97.6% success) - Go module usage analysis with round-robin
+- **sergo** (94.4% success) - Daily code quality with 50/50 cached/new strategies
+- **semantic-function-refactor** - Function clustering and outlier detection
+- **daily-compiler-quality** - Rotating file analysis with cache tracking
+
+## Common Pitfalls
+
+❌ **Using Serena for non-code files** - Use `edit` for YAML/JSON/Markdown
+❌ **Forgetting activate_project** - Always call first
+❌ **Not combining with bash** - Use bash for file discovery
+❌ **Missing language configuration** - Must specify language(s)
+
+## Supported Languages
+
+Primary languages with full LSP features:
+- `go` (gopls)
+- `typescript` (TypeScript/JavaScript)
+- `python` (jedi/pyright)
+- `ruby` (solargraph)
+- `rust` (rust-analyzer)
+- `java`, `cpp`, `csharp`
+
+See `.serena/project.yml` for complete list (25+ languages).
+
+## Decision Tree
+
+```
+Task requires code semantics/structure?
+├─ NO → Use bash/edit/view
+└─ YES
+    ├─ Simple text search/replace? → Use grep/bash
+    ├─ Config/data files? → Use edit
+    └─ Symbol/structure/semantic patterns? → Use Serena ✅
+```
