@@ -351,12 +351,12 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 			},
 			parsedFrontmatter: &FrontmatterConfig{
 				Project: &ProjectConfig{
-					URL: "https://github.com/orgs/test-org/projects/123",
+					URL: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			checkContains: []string{
 				"name: Process Safe Outputs",
-				"GH_AW_PROJECT_URL: \"https://github.com/orgs/test-org/projects/123\"",
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/github-agentic-workflows/projects/1\"",
 			},
 		},
 		{
@@ -366,11 +366,11 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 					BaseSafeOutputConfig: BaseSafeOutputConfig{
 						Max: 5,
 					},
-					Project: "https://github.com/orgs/config-org/projects/456",
+					Project: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			checkContains: []string{
-				"GH_AW_PROJECT_URL: \"https://github.com/orgs/config-org/projects/456\"",
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/github-agentic-workflows/projects/1\"",
 			},
 		},
 		{
@@ -380,11 +380,11 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 					BaseSafeOutputConfig: BaseSafeOutputConfig{
 						Max: 1,
 					},
-					Project: "https://github.com/orgs/status-org/projects/789",
+					Project: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			checkContains: []string{
-				"GH_AW_PROJECT_URL: \"https://github.com/orgs/status-org/projects/789\"",
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/github-agentic-workflows/projects/1\"",
 			},
 		},
 		{
@@ -441,7 +441,7 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 				CopyProjects: &CopyProjectsConfig{
 					GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
 					TargetOwner:   "test-org",
-					SourceProject: "https://github.com/orgs/source-org/projects/1",
+					SourceProject: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			checkContains: []string{
@@ -461,7 +461,7 @@ func TestBuildProjectHandlerManagerStep(t *testing.T) {
 			safeOutputs: &SafeOutputsConfig{
 				CopyProjects: &CopyProjectsConfig{
 					TargetOwner:   "test-org",
-					SourceProject: "https://github.com/orgs/source-org/projects/1",
+					SourceProject: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			checkContains: []string{
@@ -555,7 +555,7 @@ func TestHandlerManagerOrderWithProjects(t *testing.T) {
 			CopyProjects: &CopyProjectsConfig{
 				GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
 				TargetOwner:   "test-org",
-				SourceProject: "https://github.com/orgs/source-org/projects/1",
+				SourceProject: "https://github.com/orgs/github-agentic-workflows/projects/1",
 			},
 			CreateIssues: &CreateIssuesConfig{
 				TitlePrefix: "[Test] ",
