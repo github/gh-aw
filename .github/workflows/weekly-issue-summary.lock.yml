@@ -27,7 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-# frontmatter-hash: 6ce6d330063080e2e8a1aec538e3bc82ecbac57830711e8378681e43f8dee39c
+# frontmatter-hash: c3c52e9e04cbe4e9736300c3dd41f6b89785ed3788d189a8b3f6a39a17bdbe19
 
 name: "Weekly Issue Summary"
 "on":
@@ -185,7 +185,7 @@ jobs:
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[Weekly Summary] \". Discussions will be created in category \"Audits\".",
+              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[Weekly Summary] \". Discussions will be created in category \"audits\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -1560,7 +1560,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"Audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[Weekly Summary] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[Weekly Summary] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

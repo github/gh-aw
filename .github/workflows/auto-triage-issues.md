@@ -27,7 +27,7 @@ safe-outputs:
     max: 10
   create-discussion:
     title-prefix: "[Auto-Triage] "
-    category: "Audits"
+    category: "audits"
     close-older-discussions: true
     max: 1
 timeout-minutes: 15

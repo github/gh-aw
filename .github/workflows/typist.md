@@ -18,7 +18,7 @@ imports:
 
 safe-outputs:
   create-discussion:
-    category: "General"
+    category: "general"
     max: 1
     close-older-discussions: true
 

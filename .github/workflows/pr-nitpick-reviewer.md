@@ -14,7 +14,7 @@ tools:
 safe-outputs:
   create-discussion:
     title-prefix: "[nitpick-report] "
-    category: "General"
+    category: "general"
     max: 1
   add-comment:
     max: 3

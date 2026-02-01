@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 67cd434395d3738bd286f64c7660f2690b0026fdcdcc9d23a790446e21c0b728
+# frontmatter-hash: 414a38b24789384a12a0d0e5c9eac413b8541947d2a796e160e86f735c479afa
 
 name: "Blog Auditor"
 "on":
@@ -174,7 +174,7 @@ jobs:
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[audit] \". Discussions will be created in category \"Audits\".",
+              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Title will be prefixed with \"[audit] \". Discussions will be created in category \"audits\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -1191,7 +1191,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"Audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[audit] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":168,\"max\":1,\"title_prefix\":\"[audit] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

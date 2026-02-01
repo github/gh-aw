@@ -19,7 +19,7 @@ tools:
 safe-outputs:
   create-discussion:
     expires: 7d
-    category: "General"
+    category: "general"
     title-prefix: "[observability] "
     max: 1
     close-older-discussions: true

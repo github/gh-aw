@@ -16,7 +16,7 @@ tools:
 safe-outputs:
   create-discussion:
     title-prefix: "[workflow-analysis] "
-    category: "Audits"
+    category: "audits"
     close-older-discussions: true
 timeout-minutes: 10
 imports:

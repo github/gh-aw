@@ -32,7 +32,7 @@ tools:
 safe-outputs:
   create-discussion:
     title-prefix: "[audit] "
-    category: "Audits"
+    category: "audits"
     max: 1
     close-older-discussions: true
 timeout-minutes: 10

@@ -21,7 +21,7 @@
 #
 # Analyzes and improves console output styling and formatting in the codebase
 #
-# frontmatter-hash: 21db27295faf0bbff9b82aa4e888b062ef01c2ec33f32b9659dbf27d3231cca8
+# frontmatter-hash: 6afa833dfe82649f22ff3cd588a1d9016ac8c6afa7dab3fed5fca5e5d5cede01
 
 name: "Terminal Stylist"
 "on":
@@ -162,7 +162,7 @@ jobs:
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
             {
-              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Discussions will be created in category \"General\".",
+              "description": "Create a GitHub discussion for announcements, Q\u0026A, reports, status updates, or community conversations. Use this for content that benefits from threaded replies, doesn't require task tracking, or serves as documentation. For actionable work items that need assignment and status tracking, use create_issue instead. CONSTRAINTS: Maximum 1 discussion(s) can be created. Discussions will be created in category \"general\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -993,7 +993,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"General\",\"close_older_discussions\":true,\"expires\":168,\"max\":1},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_discussion\":{\"category\":\"general\",\"close_older_discussions\":true,\"expires\":168,\"max\":1},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

@@ -62,7 +62,7 @@ safe-outputs:
     max: 50
   create-discussion:
     title-prefix: "[Issue Arborist] "
-    category: "Audits"
+    category: "audits"
     close-older-discussions: true
 timeout-minutes: 15
 ---

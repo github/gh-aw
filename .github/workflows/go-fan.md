@@ -28,7 +28,7 @@ imports:
 safe-outputs:
   create-discussion:
     title-prefix: "[go-fan] "
-    category: "General"
+    category: "general"
     max: 1
     close-older-discussions: true
 

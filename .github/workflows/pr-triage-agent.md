@@ -24,7 +24,7 @@ safe-outputs:
     max: 50
   create-discussion:
     max: 1
-    category: "General"
+    category: "general"
     title-prefix: "[PR Triage Report] "
   messages:
     run-started: "🔍 Starting PR triage analysis... [{workflow_name}]({run_url}) is categorizing and prioritizing agent-created PRs"

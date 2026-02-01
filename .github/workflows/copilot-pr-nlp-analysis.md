@@ -26,7 +26,7 @@ sandbox:
 safe-outputs:
   create-discussion:
     title-prefix: "[nlp-analysis] "
-    category: "audit"
+    category: "audits"
     max: 1
     close-older-discussions: true
 

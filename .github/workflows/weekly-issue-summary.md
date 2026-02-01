@@ -28,7 +28,7 @@ safe-outputs:
   upload-asset:
   create-discussion:
     title-prefix: "[Weekly Summary] "
-    category: "Audits"
+    category: "audits"
     close-older-discussions: true
 imports:
   - shared/reporting.md

@@ -67,7 +67,7 @@ safe-outputs:
   # Discussion creation for poem summaries and logs
   create-discussion:
     title-prefix: "[📜 POETRY] "
-    category: "General"
+    category: "general"
     labels: [poetry, automation, ai-generated]
     max: 2
     close-older-discussions: true

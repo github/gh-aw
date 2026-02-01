@@ -26,7 +26,7 @@ steps:
 safe-outputs:
   create-discussion:
     title-prefix: "[portfolio] "
-    category: "Audits"
+    category: "audits"
     close-older-discussions: true
   upload-asset:
 timeout-minutes: 20
