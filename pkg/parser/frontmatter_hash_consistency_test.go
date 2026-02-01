@@ -342,7 +342,9 @@ labels:
 }
 
 // TestHashConsistency_KeyOrdering validates that different key ordering
-// in frontmatter produces the same hash (canonical ordering).
+// in frontmatter produces different hashes (text-based approach).
+// With text-based parsing, the hash is based on the literal frontmatter text,
+// so reordering keys changes the hash.
 func TestHashConsistency_KeyOrdering(t *testing.T) {
 	tempDir := t.TempDir()
 	cache := NewImportCache("")
@@ -386,7 +388,9 @@ engine: copilot
 	goHash2, err := ComputeFrontmatterHashFromFile(file2, cache)
 	require.NoError(t, err, "Go should compute hash for file2")
 
-	assert.Equal(t, goHash1, goHash2, "Go: Different key ordering should produce same hash")
+	// Text-based approach: Different key ordering produces different text, thus different hashes
+	// This is expected behavior - the hash is based on the literal frontmatter text
+	assert.NotEqual(t, goHash1, goHash2, "Go (text-based): Different key ordering produces different hash")
 
 	// Compute hashes with JavaScript
 	jsHash1, err := computeHashViaNode(file1)
@@ -398,34 +402,34 @@ engine: copilot
 	jsHash2, err := computeHashViaNode(file2)
 	require.NoError(t, err, "JS should compute hash for file2")
 
-	// JavaScript implementation currently doesn't properly normalize key ordering in frontmatter text
-	// This is a known limitation of the text-based parsing approach
-	// For now, just log the results instead of asserting
+	// JavaScript implementation uses text-based parsing, so key ordering affects hash
 	t.Logf("JS hash for file 1: %s", jsHash1)
 	t.Logf("JS hash for file 2: %s", jsHash2)
 	if jsHash1 == jsHash2 {
 		t.Logf("✓ JS: Different key ordering produces same hash")
 	} else {
-		t.Logf("⚠ JS: Different key ordering produces different hashes (text-based parsing limitation)")
+		t.Logf("✓ JS: Different key ordering produces different hashes (expected with text-based parsing)")
 	}
 
-	// Cross-language validation
-	// TODO: Skip for now until JS implementation is updated
-	if false { // Set to true when JS implementation matches Go
-		assert.Equal(t, goHash1, jsHash1, "Go and JS should produce same hash")
-		assert.Equal(t, jsHash1, jsHash2, "JS: Different key ordering should produce same hash")
-	}
+	// Cross-language validation: Both Go and JS should match since both use text-based approach
+	assert.Equal(t, goHash1, jsHash1, "Go and JS should produce same hash for file 1")
+	assert.Equal(t, goHash2, jsHash2, "Go and JS should produce same hash for file 2")
+	assert.NotEqual(t, jsHash1, jsHash2, "JS: Different key ordering should produce different hash (text-based)")
 
 	t.Logf("✓ File 1 - Go: %s, JS: %s", goHash1, jsHash1)
 	t.Logf("✓ File 2 - Go: %s, JS: %s", goHash2, jsHash2)
-	if goHash1 == goHash2 && goHash2 == jsHash1 && jsHash1 == jsHash2 {
-		t.Logf("✓ All hashes identical - implementations are consistent!")
+
+	// Check consistency
+	goMatch := goHash1 != goHash2     // Different orderings should produce different hashes
+	jsMatch := jsHash1 != jsHash2     // Different orderings should produce different hashes
+	crossMatch1 := goHash1 == jsHash1 // Same ordering should match across languages
+	crossMatch2 := goHash2 == jsHash2 // Same ordering should match across languages
+
+	if goMatch && jsMatch && crossMatch1 && crossMatch2 {
+		t.Logf("✓ All checks pass - text-based implementations are consistent!")
 	} else {
-		bothGoMatch := goHash1 == goHash2
-		bothJSMatch := jsHash1 == jsHash2
-		crossMatch := goHash1 == jsHash1
-		t.Logf("✓ Go hashes match: %v, JS hashes match: %v, Cross-language match: %v",
-			bothGoMatch, bothJSMatch, crossMatch)
+		t.Logf("⚠ Go ordering-dependent: %v, JS ordering-dependent: %v, File 1 cross-match: %v, File 2 cross-match: %v",
+			goMatch, jsMatch, crossMatch1, crossMatch2)
 	}
 }
 

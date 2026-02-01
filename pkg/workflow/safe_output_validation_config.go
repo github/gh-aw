@@ -239,17 +239,19 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			// When provided, the update-project safe output applies a "z_campaign_<id>" label.
 			// This is part of the campaign tracking convention but not required for general use.
 			"campaign_id":    {Type: "string", Sanitize: true, MaxLength: 128},
-			"content_type":   {Type: "string", Enum: []string{"issue", "pull_request"}},
+			"content_type":   {Type: "string", Enum: []string{"issue", "pull_request", "draft_issue"}},
 			"content_number": {OptionalPositiveInteger: true},
 			"issue":          {OptionalPositiveInteger: true}, // Legacy
 			"pull_request":   {OptionalPositiveInteger: true}, // Legacy
+			"draft_title":    {Type: "string", Sanitize: true, MaxLength: 256},
+			"draft_body":     {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 			"fields":         {Type: "object"},
 		},
 	},
 	"create_project": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{
-			"title":      {Required: false, Type: "string", Sanitize: true, MaxLength: 256},
+			"title":      {Type: "string", Sanitize: true, MaxLength: 256},
 			"owner":      {Type: "string", Sanitize: true, MaxLength: 128},
 			"owner_type": {Type: "string", Enum: []string{"org", "user"}},
 			"item_url":   {Type: "string", Sanitize: true, MaxLength: 512, Pattern: "^https://github\\.com/[^/]+/[^/]+/issues/\\d+", PatternError: "must be a full GitHub issue URL (e.g., https://github.com/owner/repo/issues/123)"},
@@ -272,14 +274,9 @@ var ValidationConfig = map[string]TypeValidationConfig{
 // If enabledTypes is provided, returns only configs for the specified types
 func GetValidationConfigJSON(enabledTypes []string) (string, error) {
 	safeOutputValidationLog.Printf("Getting validation config JSON for %d types", len(enabledTypes))
-	var configToMarshal map[string]TypeValidationConfig
 
-	if len(enabledTypes) == 0 {
-		// Return all configs (backwards compatible)
-		safeOutputValidationLog.Print("Returning all validation configs")
-		configToMarshal = ValidationConfig
-	} else {
-		// Filter to only enabled types
+	configToMarshal := ValidationConfig
+	if len(enabledTypes) > 0 {
 		safeOutputValidationLog.Printf("Filtering validation configs to enabled types: %v", enabledTypes)
 		configToMarshal = make(map[string]TypeValidationConfig)
 		for _, typeName := range enabledTypes {
@@ -287,9 +284,10 @@ func GetValidationConfigJSON(enabledTypes []string) (string, error) {
 				configToMarshal[typeName] = config
 			}
 		}
+	} else {
+		safeOutputValidationLog.Print("Returning all validation configs")
 	}
 
-	// Use MarshalIndent for pretty-printed JSON to avoid merge issues
 	data, err := json.MarshalIndent(configToMarshal, "", "  ")
 	if err != nil {
 		safeOutputValidationLog.Printf("Failed to marshal validation config: %v", err)

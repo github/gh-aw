@@ -504,8 +504,8 @@
         },
         "content_type": {
           "type": "string",
-          "enum": ["issue", "pull_request"],
-          "description": "Type of content to add to the project board"
+          "enum": ["issue", "pull_request", "draft_issue"],
+          "description": "Type of content to add to the project board. Use 'issue' or 'pull_request' to add existing repo content, or 'draft_issue' to create a draft item inside the project."
         },
         "content_number": {
           "oneOf": [{ "type": "number" }, { "type": "string" }],
@@ -518,6 +518,14 @@
         "pull_request": {
           "oneOf": [{ "type": "number" }, { "type": "string" }],
           "description": "PR number (legacy field, use content_number instead)"
+        },
+        "draft_title": {
+          "type": "string",
+          "description": "Title for a Projects v2 draft issue. Required when content_type is 'draft_issue'."
+        },
+        "draft_body": {
+          "type": "string",
+          "description": "Optional body for a Projects v2 draft issue (markdown). Only used when content_type is 'draft_issue'."
         },
         "fields": {
           "type": "object",

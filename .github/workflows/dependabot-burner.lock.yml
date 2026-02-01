@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
-# frontmatter-hash: d450c954c557790fd2747a97adc633027ab85421d23765d3b50a6b92f92b4622
+# frontmatter-hash: f8ec5be315af99f2a29aab2b35194be259f7312eb2982fb063e157fe60cdedc8
 
 name: "Dependabot Burner"
 "on":
@@ -568,8 +568,19 @@ jobs:
                   "type": "string",
                   "enum": [
                     "issue",
-                    "pull_request"
+                    "pull_request",
+                    "draft_issue"
                   ]
+                },
+                "draft_body": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "draft_title": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 256
                 },
                 "fields": {
                   "type": "object"
@@ -1294,6 +1305,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"create_project_status_update\":{\"max\":1,\"project\":\"https://github.com/orgs/githubnext/projects/144\"},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":100,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
+          GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

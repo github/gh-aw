@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 6e6b463dc434c49e73882d3baddeea802a753fd71c093baec942a5b97da00f81
+# frontmatter-hash: c40d2a0d0dd4c9161859ac192c7e53b80b2feda2f1dd25e294c61b9d932eeccb
 
 name: "Test Project URL Default"
 "on":
@@ -487,8 +487,19 @@ jobs:
                   "type": "string",
                   "enum": [
                     "issue",
-                    "pull_request"
+                    "pull_request",
+                    "draft_issue"
                   ]
+                },
+                "draft_body": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "draft_title": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 256
                 },
                 "fields": {
                   "type": "object"
@@ -1177,6 +1188,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_project_status_update\":{\"max\":1,\"project\":\"https://github.com/orgs/\\u003cORG\\u003e/projects/\\u003cNUMBER\\u003e\"},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":5,\"project\":\"https://github.com/orgs/\\u003cORG\\u003e/projects/\\u003cNUMBER\\u003e\"}}"
+          GH_AW_PROJECT_URL: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

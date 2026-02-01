@@ -17,6 +17,13 @@ import (
 
 var frontmatterHashLog = logger.New("parser:frontmatter_hash")
 
+// FileReader is a function type that reads file content
+// This abstraction allows for different file reading strategies (disk, GitHub API, in-memory, etc.)
+type FileReader func(filePath string) ([]byte, error)
+
+// DefaultFileReader reads files from disk using os.ReadFile
+var DefaultFileReader FileReader = os.ReadFile
+
 // compilerVersion holds the gh-aw version for hash computation
 var compilerVersion = "dev"
 
@@ -248,18 +255,24 @@ func marshalSorted(data any) string {
 }
 
 // ComputeFrontmatterHashFromFile computes the frontmatter hash for a workflow file
-// including template expressions that reference env. or vars. from the markdown body
+// using text-based approach (no YAML parsing) to match JavaScript implementation
 func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string, error) {
+	return ComputeFrontmatterHashFromFileWithReader(filePath, cache, DefaultFileReader)
+}
+
+// ComputeFrontmatterHashFromFileWithReader computes the frontmatter hash for a workflow file
+// using a custom file reader function (e.g., for GitHub API, in-memory file system, etc.)
+func ComputeFrontmatterHashFromFileWithReader(filePath string, cache *ImportCache, fileReader FileReader) (string, error) {
 	frontmatterHashLog.Printf("Computing hash for file: %s", filePath)
 
-	// Read file content
-	content, err := os.ReadFile(filePath)
+	// Read file content using the provided file reader
+	content, err := fileReader(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Extract frontmatter
-	result, err := ExtractFrontmatterFromContent(string(content))
+	// Extract frontmatter and markdown as text (no YAML parsing)
+	frontmatterText, markdown, err := extractFrontmatterAndBodyText(string(content))
 	if err != nil {
 		return "", fmt.Errorf("failed to extract frontmatter: %w", err)
 	}
@@ -268,10 +281,10 @@ func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string
 	baseDir := filepath.Dir(filePath)
 
 	// Extract relevant template expressions from markdown body
-	relevantExpressions := extractRelevantTemplateExpressions(result.Markdown)
+	relevantExpressions := extractRelevantTemplateExpressions(markdown)
 
-	// Compute hash including template expressions
-	return ComputeFrontmatterHashWithExpressions(result.Frontmatter, baseDir, cache, relevantExpressions)
+	// Compute hash using text-based approach with custom file reader
+	return computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir, cache, relevantExpressions, fileReader)
 }
 
 // ComputeFrontmatterHashWithExpressions computes the hash including template expressions
@@ -340,6 +353,7 @@ func buildVersionInfo() map[string]string {
 // that reference env. or vars. contexts
 func extractRelevantTemplateExpressions(markdown string) []string {
 	var expressions []string
+	seen := make(map[string]bool)
 
 	// Regex to match ${{ ... }} expressions
 	expressionRegex := regexp.MustCompile(`\$\{\{(.*?)\}\}`)
@@ -355,9 +369,233 @@ func extractRelevantTemplateExpressions(markdown string) []string {
 		// Check if expression references env. or vars.
 		if strings.Contains(content, "env.") || strings.Contains(content, "vars.") {
 			// Store the full expression including ${{ }}
-			expressions = append(expressions, match[0])
+			expr := match[0]
+			// Deduplicate expressions
+			if !seen[expr] {
+				expressions = append(expressions, expr)
+				seen[expr] = true
+			}
 		}
 	}
 
+	// Sort for deterministic output
+	sort.Strings(expressions)
 	return expressions
+}
+
+// extractFrontmatterAndBodyText extracts frontmatter as raw text without parsing YAML
+// Returns: frontmatterText, markdownBody, error
+func extractFrontmatterAndBodyText(content string) (string, string, error) {
+	lines := strings.Split(content, "\n")
+
+	// Check if content starts with frontmatter delimiter
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		// No frontmatter
+		return "", content, nil
+	}
+
+	// Find end of frontmatter
+	endIndex := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			endIndex = i
+			break
+		}
+	}
+
+	if endIndex == -1 {
+		return "", "", fmt.Errorf("frontmatter not properly closed")
+	}
+
+	// Extract frontmatter text (lines between --- delimiters)
+	frontmatterText := strings.Join(lines[1:endIndex], "\n")
+
+	// Extract markdown body (everything after closing ---)
+	var markdown string
+	if endIndex+1 < len(lines) {
+		markdown = strings.Join(lines[endIndex+1:], "\n")
+	}
+
+	return frontmatterText, markdown, nil
+}
+
+// normalizeFrontmatterText normalizes frontmatter text for consistent hashing
+// Removes leading/trailing whitespace and normalizes line endings
+func normalizeFrontmatterText(text string) string {
+	// Normalize Windows line endings to Unix
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	// Trim leading and trailing whitespace
+	return strings.TrimSpace(normalized)
+}
+
+// extractImportsFromText extracts import paths from frontmatter text using simple text parsing
+// Only extracts array items under "imports:" key
+func extractImportsFromText(frontmatterText string) []string {
+	var imports []string
+	lines := strings.Split(frontmatterText, "\n")
+
+	inImports := false
+	baseIndent := 0
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		// Check if this is the imports: key
+		if strings.HasPrefix(trimmed, "imports:") {
+			inImports = true
+			// Find the base indentation (position of first non-whitespace character)
+			baseIndent = len(line) - len(strings.TrimLeft(line, " \t"))
+			continue
+		}
+
+		if inImports {
+			// Calculate current line's indentation
+			lineIndent := len(line) - len(strings.TrimLeft(line, " \t"))
+
+			// If indentation decreased or same level, we're out of the imports array
+			if lineIndent <= baseIndent && trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+				break
+			}
+
+			// Extract array item
+			if strings.HasPrefix(trimmed, "-") {
+				item := strings.TrimSpace(trimmed[1:])
+				// Remove quotes if present
+				item = strings.Trim(item, `"'`)
+				if item != "" {
+					imports = append(imports, item)
+				}
+			}
+		}
+	}
+
+	return imports
+}
+
+// processImportsTextBased processes imports from frontmatter using text-based parsing
+// Returns: importedFiles (list of import paths), importedFrontmatterTexts (list of frontmatter texts)
+func processImportsTextBased(frontmatterText, baseDir string, visited map[string]bool, fileReader FileReader) ([]string, []string, error) {
+	var importedFiles []string
+	var importedFrontmatterTexts []string
+
+	// Extract imports from frontmatter text
+	imports := extractImportsFromText(frontmatterText)
+
+	if len(imports) == 0 {
+		return importedFiles, importedFrontmatterTexts, nil
+	}
+
+	// Sort imports for deterministic processing
+	sortedImports := make([]string, len(imports))
+	copy(sortedImports, imports)
+	sort.Strings(sortedImports)
+
+	for _, importPath := range sortedImports {
+		// Resolve import path relative to base directory
+		fullPath := filepath.Join(baseDir, importPath)
+
+		// Skip if already visited (cycle detection)
+		if visited[fullPath] {
+			continue
+		}
+		visited[fullPath] = true
+
+		// Read imported file using the provided file reader
+		content, err := fileReader(fullPath)
+		if err != nil {
+			// Skip missing imports silently (matches JavaScript behavior)
+			continue
+		}
+
+		// Extract frontmatter text from imported file
+		importFrontmatterText, _, err := extractFrontmatterAndBodyText(string(content))
+		if err != nil {
+			// Skip files with invalid frontmatter
+			continue
+		}
+
+		// Add to imported files and texts
+		importedFiles = append(importedFiles, importPath)
+		importedFrontmatterTexts = append(importedFrontmatterTexts, importFrontmatterText)
+
+		// Recursively process imports in the imported file
+		importBaseDir := filepath.Dir(fullPath)
+		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader)
+		if err != nil {
+			// Continue processing other imports even if one fails
+			continue
+		}
+
+		// Add nested imports
+		importedFiles = append(importedFiles, nestedFiles...)
+		importedFrontmatterTexts = append(importedFrontmatterTexts, nestedTexts...)
+	}
+
+	return importedFiles, importedFrontmatterTexts, nil
+}
+
+// computeFrontmatterHashTextBasedWithReader computes the hash using text-based approach with custom file reader
+func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir string, cache *ImportCache, expressions []string, fileReader FileReader) (string, error) {
+	frontmatterHashLog.Print("Computing frontmatter hash using text-based approach")
+
+	// Process imports using text-based parsing with custom file reader
+	visited := make(map[string]bool)
+	importedFiles, importedFrontmatterTexts, err := processImportsTextBased(frontmatterText, baseDir, visited, fileReader)
+	if err != nil {
+		return "", fmt.Errorf("failed to process imports: %w", err)
+	}
+
+	// Build canonical representation from text
+	canonical := make(map[string]any)
+
+	// Add the main frontmatter text as-is (trimmed and normalized)
+	canonical["frontmatter-text"] = normalizeFrontmatterText(frontmatterText)
+
+	// Add sorted imported files list
+	if len(importedFiles) > 0 {
+		sortedImports := make([]string, len(importedFiles))
+		copy(sortedImports, importedFiles)
+		sort.Strings(sortedImports)
+		canonical["imports"] = sortedImports
+	}
+
+	// Add sorted imported frontmatter texts (concatenated with delimiter)
+	if len(importedFrontmatterTexts) > 0 {
+		// Normalize and sort all imported texts
+		normalizedTexts := make([]string, len(importedFrontmatterTexts))
+		for i, text := range importedFrontmatterTexts {
+			normalizedTexts[i] = normalizeFrontmatterText(text)
+		}
+		sort.Strings(normalizedTexts)
+		canonical["imported-frontmatters"] = strings.Join(normalizedTexts, "\n---\n")
+	}
+
+	// Add template expressions if present
+	if len(expressions) > 0 {
+		canonical["template-expressions"] = expressions
+	}
+
+	// Add version information
+	canonical["versions"] = buildVersionInfo()
+
+	// Serialize to canonical JSON
+	canonicalJSON, err := marshalCanonicalJSON(canonical)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal canonical JSON: %w", err)
+	}
+
+	frontmatterHashLog.Printf("Canonical JSON length: %d bytes", len(canonicalJSON))
+
+	// Compute SHA-256 hash
+	hash := sha256.Sum256([]byte(canonicalJSON))
+	hashHex := hex.EncodeToString(hash[:])
+
+	frontmatterHashLog.Printf("Computed hash: %s", hashHex)
+	return hashHex, nil
 }

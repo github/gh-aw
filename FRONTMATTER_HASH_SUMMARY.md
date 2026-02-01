@@ -221,6 +221,51 @@ Add `gh aw hash-diff <workflow1> <workflow2>` to compare frontmatter
 
 ## 📝 Technical Notes
 
+### File Reader Abstraction
+
+Both Go and JavaScript implementations now support custom file readers, enabling hash computation without requiring files on disk.
+
+**JavaScript Usage**:
+```javascript
+const { computeFrontmatterHash, createGitHubFileReader } = require('./frontmatter_hash_pure.cjs');
+
+// Option 1: Default file system reader (uses fs.readFileSync)
+const hash1 = await computeFrontmatterHash('workflow.md');
+
+// Option 2: Custom in-memory file system
+const mockFS = {
+  'workflow.md': '---\nengine: copilot\n---\nBody',
+};
+const customReader = async (path) => mockFS[path] || throw new Error('Not found');
+const hash2 = await computeFrontmatterHash('workflow.md', { fileReader: customReader });
+
+// Option 3: GitHub API file reader
+const githubReader = createGitHubFileReader(github, 'owner', 'repo', 'main');
+const hash3 = await computeFrontmatterHash('.github/workflows/ci.md', { fileReader: githubReader });
+```
+
+**Go Usage**:
+```go
+import "github.com/githubnext/gh-aw/pkg/parser"
+
+// Option 1: Default file system reader (uses os.ReadFile)
+hash1, err := parser.ComputeFrontmatterHashFromFile("workflow.md", cache)
+
+// Option 2: Custom file reader (in-memory, GitHub API, etc.)
+customReader := func(path string) ([]byte, error) {
+    // Custom implementation: in-memory map, HTTP API, etc.
+    return content, nil
+}
+hash2, err := parser.ComputeFrontmatterHashFromFileWithReader("workflow.md", cache, customReader)
+```
+
+### Use Cases
+
+1. **GitHub Actions Workflows**: Compute hash using GitHub API without checking out repository
+2. **Testing**: Use in-memory file systems for faster, isolated tests
+3. **Remote Validation**: Validate workflow hashes from remote sources
+4. **Caching**: Implement custom caching strategies in file reader
+
 ### JavaScript Full Implementation
 The current JavaScript implementation is simplified. For production use, consider:
 
@@ -248,6 +293,7 @@ The current JavaScript implementation is simplified. For production use, conside
 - Hash computation is fast (<10ms for typical workflows)
 - Minimal impact on compilation time
 - Could be parallelized for large repositories
+- Custom file readers can implement caching for better performance
 
 ## 🔗 Related Files
 
@@ -261,7 +307,8 @@ The current JavaScript implementation is simplified. For production use, conside
 
 **JavaScript Implementation**:
 - `/actions/setup/js/frontmatter_hash.cjs`
-- `/actions/setup/js/frontmatter_hash.test.cjs`
+- `/actions/setup/js/frontmatter_hash_pure.cjs`
+- `/actions/setup/js/frontmatter_hash_pure.test.cjs`
 
 **Import Processing** (used by hash computation):
 - `/pkg/parser/import_processor.go`
@@ -269,4 +316,4 @@ The current JavaScript implementation is simplified. For production use, conside
 
 ## ✅ Ready for Review
 
-The core implementation is complete and tested. The next phase (compiler and custom action integration) can proceed with confidence that the hash algorithm works correctly and produces deterministic output across both Go and JavaScript.
+The core implementation is complete and tested. The file reader abstraction allows for flexible hash computation without requiring files on disk. Both Go and JavaScript implementations support custom file readers for in-memory file systems, GitHub API access, and other custom sources. The next phase (compiler and custom action integration) can proceed with confidence that the hash algorithm works correctly and produces deterministic output across both Go and JavaScript.
