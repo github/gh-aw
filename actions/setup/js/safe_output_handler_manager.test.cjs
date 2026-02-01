@@ -395,14 +395,14 @@ describe("Safe Output Handler Manager", () => {
     it("should silently skip message types handled by standalone steps", async () => {
       const messages = [
         { type: "create_issue", title: "Issue" },
-        { type: "update_project", project: "https://github.com/orgs/myorg/projects/42" },
         { type: "create_agent_session", title: "Task" },
+        { type: "upload_asset", path: "file.txt" },
       ];
 
       const mockHandler = vi.fn().mockResolvedValue({ success: true });
 
       // Only create_issue handler is available
-      // update_project and create_agent_session are handled by standalone steps
+      // create_agent_session and upload_asset are handled by standalone steps
       const handlers = new Map([["create_issue", mockHandler]]);
 
       const result = await processMessages(handlers, messages);
@@ -414,32 +414,32 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[0].success).toBe(true);
       expect(result.results[0].type).toBe("create_issue");
 
-      // Second message should be skipped (project handler step)
+      // Second message should be skipped (standalone step)
       expect(result.results[1].success).toBe(false);
-      expect(result.results[1].type).toBe("update_project");
+      expect(result.results[1].type).toBe("create_agent_session");
       expect(result.results[1].skipped).toBe(true);
-      expect(result.results[1].reason).toBe("Handled by project handler step");
+      expect(result.results[1].reason).toBe("Handled by standalone step");
 
       // Third message should also be skipped (standalone step)
       expect(result.results[2].success).toBe(false);
-      expect(result.results[2].type).toBe("create_agent_session");
+      expect(result.results[2].type).toBe("upload_asset");
       expect(result.results[2].skipped).toBe(true);
       expect(result.results[2].reason).toBe("Handled by standalone step");
 
       // Should NOT have logged warnings for standalone step types
-      expect(core.warning).not.toHaveBeenCalledWith(expect.stringContaining("No handler loaded for message type 'update_project'"));
       expect(core.warning).not.toHaveBeenCalledWith(expect.stringContaining("No handler loaded for message type 'create_agent_session'"));
+      expect(core.warning).not.toHaveBeenCalledWith(expect.stringContaining("No handler loaded for message type 'upload_asset'"));
 
       // Should have logged debug messages
-      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining("update_project"));
       expect(core.debug).toHaveBeenCalledWith(expect.stringContaining("create_agent_session"));
+      expect(core.debug).toHaveBeenCalledWith(expect.stringContaining("upload_asset"));
     });
 
     it("should track skipped message types for logging", async () => {
       const messages = [
         { type: "create_issue", title: "Issue" },
-        { type: "update_project", project: "https://github.com/orgs/myorg/projects/42" },
         { type: "create_agent_session", title: "Task" },
+        { type: "upload_asset", path: "file.txt" },
         { type: "unknown_type", data: "test" },
         { type: "another_unknown", data: "test2" },
       ];
@@ -453,15 +453,10 @@ describe("Safe Output Handler Manager", () => {
 
       expect(result.success).toBe(true);
 
-      // Collect skipped project handler types
-      const skippedProjectResults = result.results.filter(r => r.skipped && r.reason === "Handled by project handler step");
-      const projectTypes = [...new Set(skippedProjectResults.map(r => r.type))];
-      expect(projectTypes).toEqual(expect.arrayContaining(["update_project"]));
-
       // Collect skipped standalone types
       const skippedStandaloneResults = result.results.filter(r => r.skipped && r.reason === "Handled by standalone step");
       const standaloneTypes = [...new Set(skippedStandaloneResults.map(r => r.type))];
-      expect(standaloneTypes).toEqual(expect.arrayContaining(["create_agent_session"]));
+      expect(standaloneTypes).toEqual(expect.arrayContaining(["create_agent_session", "upload_asset"]));
 
       // Collect skipped no-handler types
       const skippedNoHandlerResults = result.results.filter(r => !r.success && !r.skipped && r.error?.includes("No handler loaded"));

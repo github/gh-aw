@@ -157,13 +157,7 @@ const HANDLER_MAP = {
  * Other standalone types: assign_to_agent, create_agent_session, upload_asset, noop
  *   - Have dedicated processing steps with specialized logic
  */
-const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "create_project", "create_project_status_update", "update_project", "upload_asset", "noop"]);
-
-/**
- * Project-related message types that are handled by the unified handler
- * Used to provide more specific skip reasons
- */
-const PROJECT_RELATED_TYPES = new Set(["create_project", "create_project_status_update", "update_project"]);
+const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "upload_asset", "noop"]);
 
 /**
  * Load configuration for safe outputs
@@ -332,18 +326,14 @@ async function processMessages(messageHandlers, messages) {
     if (!messageHandler) {
       // Check if this message type is handled by a standalone step
       if (STANDALONE_STEP_TYPES.has(messageType)) {
-        // Determine the specific skip reason based on message type
-        const isProjectRelated = PROJECT_RELATED_TYPES.has(messageType);
-        const skipReason = isProjectRelated ? "Handled by project handler step" : "Handled by standalone step";
-
         // Silently skip - this is handled by a dedicated step
-        core.debug(`Message ${i + 1} (${messageType}) will be ${skipReason.toLowerCase()}`);
+        core.debug(`Message ${i + 1} (${messageType}) will be handled by standalone step`);
         results.push({
           type: messageType,
           messageIndex: i,
           success: false,
           skipped: true,
-          reason: skipReason,
+          reason: "Handled by standalone step",
         });
         continue;
       }
@@ -866,7 +856,6 @@ async function main() {
     const successCount = processingResult.results.filter(r => r.success).length;
     const failureCount = processingResult.results.filter(r => !r.success && !r.deferred && !r.skipped).length;
     const deferredCount = processingResult.results.filter(r => r.deferred).length;
-    const skippedProjectResults = processingResult.results.filter(r => r.skipped && r.reason === "Handled by project handler step");
     const skippedStandaloneResults = processingResult.results.filter(r => r.skipped && r.reason === "Handled by standalone step");
     const skippedNoHandlerResults = processingResult.results.filter(r => !r.success && !r.skipped && r.error?.includes("No handler loaded"));
 
@@ -876,11 +865,6 @@ async function main() {
     core.info(`Failed: ${failureCount}`);
     if (deferredCount > 0) {
       core.info(`Deferred: ${deferredCount}`);
-    }
-    if (skippedProjectResults.length > 0) {
-      core.info(`Skipped (project handler step): ${skippedProjectResults.length}`);
-      const projectTypes = [...new Set(skippedProjectResults.map(r => r.type))];
-      core.info(`  Types: ${projectTypes.join(", ")}`);
     }
     if (skippedStandaloneResults.length > 0) {
       core.info(`Skipped (standalone step): ${skippedStandaloneResults.length}`);
