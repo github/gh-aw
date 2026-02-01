@@ -45,13 +45,7 @@ function extractTemporaryIdReferences(message) {
   }
 
   // Check direct ID reference fields
-  const idFields = [
-    "parent_issue_number",
-    "sub_issue_number",
-    "issue_number",
-    "discussion_number",
-    "pull_request_number",
-  ];
+  const idFields = ["parent_issue_number", "sub_issue_number", "issue_number", "discussion_number", "pull_request_number"];
 
   for (const field of idFields) {
     const value = message[field];
@@ -59,7 +53,7 @@ function extractTemporaryIdReferences(message) {
       // Strip # prefix if present
       const valueStr = String(value).trim();
       const valueWithoutHash = valueStr.startsWith("#") ? valueStr.substring(1) : valueStr;
-      
+
       if (isTemporaryId(valueWithoutHash)) {
         tempIds.add(normalizeTemporaryId(valueWithoutHash));
       }
@@ -113,7 +107,7 @@ function getCreatedTemporaryId(message) {
 function buildDependencyGraph(messages) {
   /** @type {Map<number, Set<number>>} */
   const dependencies = new Map();
-  
+
   /** @type {Map<string, number>} */
   const providers = new Map();
 
@@ -121,22 +115,19 @@ function buildDependencyGraph(messages) {
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     const createdId = getCreatedTemporaryId(message);
-    
+
     if (createdId !== null) {
       if (providers.has(createdId)) {
         // Duplicate temporary ID - this is a problem
         // We'll let the handler deal with this, but note it
         if (typeof core !== "undefined") {
-          core.warning(
-            `Duplicate temporary_id '${createdId}' at message indices ${providers.get(createdId)} and ${i}. ` +
-            `Only the first occurrence will be used.`
-          );
+          core.warning(`Duplicate temporary_id '${createdId}' at message indices ${providers.get(createdId)} and ${i}. ` + `Only the first occurrence will be used.`);
         }
       } else {
         providers.set(createdId, i);
       }
     }
-    
+
     // Initialize dependencies set for this message
     dependencies.set(i, new Set());
   }
@@ -145,11 +136,11 @@ function buildDependencyGraph(messages) {
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     const referencedIds = extractTemporaryIdReferences(message);
-    
+
     // For each temporary ID this message references, find the provider
     for (const tempId of referencedIds) {
       const providerIndex = providers.get(tempId);
-      
+
       if (providerIndex !== undefined) {
         // This message depends on the provider message
         const deps = dependencies.get(i);
@@ -269,7 +260,7 @@ function topologicalSort(messages, dependencies) {
           const currentDegree = inDegree.get(other);
           if (currentDegree !== undefined) {
             inDegree.set(other, currentDegree - 1);
-            
+
             // If all dependencies satisfied, add to queue
             if (inDegree.get(other) === 0) {
               queue.push(other);
@@ -288,12 +279,9 @@ function topologicalSort(messages, dependencies) {
         unsorted.push(i);
       }
     }
-    
+
     if (typeof core !== "undefined") {
-      core.warning(
-        `Topological sort incomplete: ${sorted.length}/${messages.length} messages sorted. ` +
-        `Messages ${unsorted.join(", ")} may be part of a dependency cycle.`
-      );
+      core.warning(`Topological sort incomplete: ${sorted.length}/${messages.length} messages sorted. ` + `Messages ${unsorted.join(", ")} may be part of a dependency cycle.`);
     }
   }
 
@@ -320,10 +308,7 @@ function sortSafeOutputMessages(messages) {
 
   if (typeof core !== "undefined") {
     const messagesWithDeps = Array.from(dependencies.entries()).filter(([_, deps]) => deps.size > 0);
-    core.info(
-      `Dependency analysis: ${providers.size} message(s) create temporary IDs, ` +
-      `${messagesWithDeps.length} message(s) have dependencies`
-    );
+    core.info(`Dependency analysis: ${providers.size} message(s) create temporary IDs, ` + `${messagesWithDeps.length} message(s) have dependencies`);
   }
 
   // Check for cycles
@@ -335,10 +320,7 @@ function sortSafeOutputMessages(messages) {
         const tempId = getCreatedTemporaryId(msg);
         return `${i} (${msg.type}${tempId ? `, creates ${tempId}` : ""})`;
       });
-      core.warning(
-        `Dependency cycle detected in safe output messages: ${cycleMessages.join(" -> ")}. ` +
-        `Temporary IDs may not resolve correctly. Messages will be processed in original order.`
-      );
+      core.warning(`Dependency cycle detected in safe output messages: ${cycleMessages.join(" -> ")}. ` + `Temporary IDs may not resolve correctly. Messages will be processed in original order.`);
     }
     // Return original order if there's a cycle
     return messages;
@@ -354,10 +336,7 @@ function sortSafeOutputMessages(messages) {
     // Check if order changed
     const orderChanged = sortedIndices.some((idx, i) => idx !== i);
     if (orderChanged) {
-      core.info(
-        `Topological sort reordered ${messages.length} message(s) to resolve temporary ID dependencies. ` +
-        `New order: [${sortedIndices.join(", ")}]`
-      );
+      core.info(`Topological sort reordered ${messages.length} message(s) to resolve temporary ID dependencies. ` + `New order: [${sortedIndices.join(", ")}]`);
     } else {
       core.info(`Topological sort: Messages already in optimal order (no reordering needed)`);
     }

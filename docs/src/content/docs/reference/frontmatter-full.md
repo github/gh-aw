@@ -2157,6 +2157,13 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+    # Default project URL for update-project operations. When specified, safe output
+    # messages can omit the project field and will use this URL by default. Must be a
+    # valid GitHub Projects v2 URL. Overridden by explicit project field in safe
+    # output messages.
+    # (optional)
+    project: "example-value"
+
     # Optional array of project views to create. Each view must have a name and
     # layout. Views are created during project setup.
     # (optional)
@@ -2348,6 +2355,13 @@ safe-outputs:
     # if specified. Must have Projects: Read+Write permission.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # Default project URL for status update operations. When specified, safe output
+    # messages can omit the project field and will use this URL by default. Must be a
+    # valid GitHub Projects v2 URL. Overridden by explicit project field in safe
+    # output messages.
+    # (optional)
+    project: "example-value"
 
   # Option 2: Enable project status updates with default configuration (max=1)
   create-project-status-update: null
