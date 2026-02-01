@@ -239,35 +239,6 @@ network:
     - "api.example.com"    # Custom domain
 ```
 
-### Project Tracking (`project:`)
-
-Automatically enables project board management operations for tracking workflow-created items. See [Project Tracking](/gh-aw/examples/project-tracking/) for complete documentation.
-
-```yaml wrap
-# Simple format - just the URL (quotes optional)
-project: https://github.com/orgs/github/projects/123
-
-# With placeholder values (quotes recommended for angle brackets)
-project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
-
-# Full configuration with custom settings
-project:
-  url: https://github.com/orgs/github/projects/123
-  scope:
-    - owner/repo1
-    - org:myorg
-  max-updates: 50
-  max-status-updates: 2
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-```
-
-> [!NOTE]
-> Quotes are optional for plain URLs but recommended when using placeholder values with angle brackets (`<ORG>`, `<NUMBER>`) to ensure proper YAML parsing.
-
-When configured, automatically enables:
-- **update-project** - Add items to projects, update fields (status, priority, etc.)
-- **create-project-status-update** - Post status updates to project boards
-
 ### Safe Inputs (`safe-inputs:`)
 
 Enables defining custom MCP tools inline using JavaScript or shell scripts. See [Safe Inputs](/gh-aw/reference/safe-inputs/) for complete documentation on creating custom tools with controlled secret access.

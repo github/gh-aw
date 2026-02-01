@@ -341,18 +341,17 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 			},
 		},
 		{
-			name: "handler manager with project URL from frontmatter",
+			name: "handler manager with project URL from update-project config",
 			safeOutputs: &SafeOutputsConfig{
 				UpdateProjects: &UpdateProjectConfig{
 					BaseSafeOutputConfig: BaseSafeOutputConfig{
 						Max: 5,
 					},
+					Project: "https://github.com/orgs/github-agentic-workflows/projects/1",
 				},
 			},
 			parsedFrontmatter: &FrontmatterConfig{
-				Project: &ProjectConfig{
-					URL: "https://github.com/orgs/github-agentic-workflows/projects/1",
-				},
+				Engine: "copilot",
 			},
 			checkContains: []string{
 				"name: Process Safe Outputs",

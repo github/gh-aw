@@ -1,69 +1,79 @@
 ---
 title: Project Tracking
-description: Automatically track issues and pull requests in GitHub Projects boards
+description: Automatically track issues and pull requests in GitHub Projects boards using safe-outputs configuration
 sidebar:
   badge: { text: 'Project', variant: 'tip' }
 ---
 
-The `project` frontmatter field enables automatic tracking of workflow-created items in GitHub Projects boards. When configured, workflows automatically get project management capabilities including item addition, field updates, and status reporting.
+The `update-project` and `create-project-status-update` safe-output tools enable automatic tracking of workflow-created items in GitHub Projects boards. Configure these tools in the `safe-outputs` section of your workflow frontmatter to enable project management capabilities including item addition, field updates, and status reporting.
 
 ## Quick Start
 
-Add the `project` field to your workflow frontmatter to enable project tracking:
+Add project configuration to your workflow's `safe-outputs` section:
 
 ```yaml
 ---
 on:
   issues:
     types: [opened]
-project: https://github.com/orgs/github/projects/123
 safe-outputs:
   create-issue:
     max: 3
+  update-project:
+    project: https://github.com/orgs/github/projects/123
+    max: 10
+  create-project-status-update:
+    project: https://github.com/orgs/github/projects/123
+    max: 1
 ---
 ```
 
-This automatically enables:
+This enables:
 - **update-project** - Add items to projects, update fields (status, priority, etc.)
 - **create-project-status-update** - Post status updates to project boards
 
-## Configuration Options
+## Configuration
 
-### Simple Format (String)
+### Update Project Configuration
 
-Use a GitHub Project URL directly:
+Configure `update-project` in the `safe-outputs` section:
 
 ```yaml
-project: https://github.com/orgs/github/projects/123
+safe-outputs:
+  update-project:
+    project: https://github.com/orgs/github/projects/123  # Default project URL
+    max: 20                                                # Max operations per run (default: 10)
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
+    views:                                                 # Optional: auto-create views
+      - name: "Sprint Board"
+        layout: board
+        filter: "is:issue is:open"
+      - name: "Task Tracker"
+        layout: table
 ```
 
-### Full Configuration (Object)
+### Project Status Update Configuration
 
-Customize behavior with additional options:
+Configure `create-project-status-update` in the `safe-outputs` section:
 
 ```yaml
-project:
-  url: https://github.com/orgs/github/projects/123
-  scope:
-    - owner/repo1
-    - owner/repo2
-    - org:myorg
-  max-updates: 50
-  max-status-updates: 2
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-  do-not-downgrade-done-items: true
+safe-outputs:
+  create-project-status-update:
+    project: https://github.com/orgs/github/projects/123  # Default project URL
+    max: 1                                                 # Max status updates per run (default: 1)
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
 
 ### Configuration Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `url` | string | (required) | GitHub Project URL (user or organization) |
-| `scope` | array | current repo | Repositories/organizations this workflow can operate on (e.g., `owner/repo`, `org:name`) |
-| `max-updates` | integer | 100 | Maximum project updates per workflow run |
-| `max-status-updates` | integer | 1 | Maximum status updates per workflow run |
+| `project` | string | (required) | GitHub Project URL for update-project or create-project-status-update |
+| `max` | integer | 10 | Maximum operations per run (update-project) or 1 (create-project-status-update) |
 | `github-token` | string | `GITHUB_TOKEN` | Custom token with Projects permissions |
-| `do-not-downgrade-done-items` | boolean | false | Prevent moving completed items backward |
+| `views` | array | - | Optional auto-created views for update-project (with name, layout, filter) |
+
+See [Safe Outputs: Project Board Updates](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) for complete configuration details.
 
 ## Prerequisites
 
@@ -115,13 +125,13 @@ tools:
   github:
     toolsets: [default, projects]
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-project:
-  url: https://github.com/orgs/myorg/projects/1
-  max-updates: 10
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 safe-outputs:
   add-comment:
     max: 1
+  update-project:
+    project: https://github.com/orgs/myorg/projects/1
+    max: 10
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ---
 
 # Smart Issue Triage
@@ -155,10 +165,11 @@ tools:
   github:
     toolsets: [default, projects]
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-project:
-  url: https://github.com/orgs/myorg/projects/2
-  max-updates: 5
-  do-not-downgrade-done-items: true
+safe-outputs:
+  update-project:
+    project: https://github.com/orgs/myorg/projects/2
+    max: 5
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ---
 
 # PR Project Tracker
@@ -178,23 +189,23 @@ When a pull request is opened or reviews are requested:
    - Default → "Low"
 ```
 
-## Automatic Safe Outputs
+## Safe Output Operations
 
-When you configure the `project` field, the compiler automatically adds these safe-output operations if not already configured:
+Configure project operations in the `safe-outputs` section:
 
 ### update-project
 
 Manages project items (add, update fields, views):
 
 ```yaml
-# Automatically configured with project field
-update-project:
-  max: 100  # Default from project.max-updates
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
+safe-outputs:
+  update-project:
+    project: https://github.com/orgs/myorg/projects/1
+    max: 100  # Maximum operations per run
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
 
 Operations:
-- `create` - Create a new project
 - `add` - Add items to project
 - `update` - Update project fields (status, priority, custom fields)
 - `create_fields` - Create custom fields
@@ -205,35 +216,18 @@ Operations:
 Posts status updates to project boards:
 
 ```yaml
-# Automatically configured with project field
-create-project-status-update:
-  max: 1  # Default from project.max-status-updates
-  github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
+safe-outputs:
+  create-project-status-update:
+    project: https://github.com/orgs/myorg/projects/1
+    max: 1  # Maximum status updates per run
+    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
 
 Use for campaign progress reports, milestone summaries, or workflow health indicators.
 
-## Overriding Auto-Configuration
-
-If you need custom configuration, define safe-outputs explicitly. Your configuration takes precedence:
-
-```yaml
-project:
-  url: https://github.com/orgs/github/projects/123
-safe-outputs:
-  update-project:
-    max: 25  # Custom max overrides project.max-updates
-    views:
-      - name: "Triage View"
-        layout: board
-        filter: "status:Needs Triage"
-  create-project-status-update:
-    max: 3  # Custom max overrides project.max-status-updates
-```
-
 ## Relationship with Campaigns
 
-The `project` field brings project tracking capabilities from [campaign coordinators](/gh-aw/guides/campaigns/) to regular agentic workflows:
+Project tracking in safe-outputs brings project management capabilities from [campaign coordinators](/gh-aw/guides/campaigns/) to regular agentic workflows:
 
 **Campaign coordinators** (campaign.md files):
 - Use `project-url` in campaign spec
@@ -241,7 +235,7 @@ The `project` field brings project tracking capabilities from [campaign coordina
 - Track campaign-wide progress
 
 **Agentic workflows** (regular .md files):
-- Use `project` in frontmatter
+- Configure `update-project` and `create-project-status-update` in `safe-outputs`
 - Focus on single workflow operations
 - Track workflow-specific items
 
