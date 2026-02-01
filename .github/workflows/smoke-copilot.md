@@ -15,7 +15,7 @@ permissions:
   actions: read
 name: Smoke Copilot
 engine: copilot
-project: "https://github.com/orgs/nonexistent-test-org-12345/projects/99999"
+project: "https://github.com/orgs/github-agentic-workflows/projects/1"
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -113,11 +113,15 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-9. **Project Update Testing**: Use the `update_project` safe-output tool to add a random issue from ${{ github.repository }} to the project configured in the frontmatter. Select any open issue (use the GitHub MCP tool to find one), then call `update_project` with:
-   - `content_type`: "issue"
-   - `content_number`: the issue number you selected
-   - `fields`: `{"Status": "Todo"}`
-   Note: The project URL will be automatically populated from the frontmatter configuration. This test is expected to fail (the project doesn't exist), but verify the safe-output message is properly formatted.
+9. **Project Update Testing**: Use the `update_project` safe-output tool to add a random issue from ${{ github.repository }} to the project configured in the frontmatter. Steps:
+   - Select any open issue (use the GitHub MCP tool to find one)
+   - Call `update_project` with:
+     - `content_type`: "issue"
+     - `content_number`: the issue number you selected
+     - `fields`: `{"Status": "Todo"}`
+   - The project URL will be automatically populated from the frontmatter configuration
+   - Verify the safe-output message is properly formatted in the output file
+   - Note: If the operation fails due to permissions, that's acceptable - the test validates message formatting and tool invocation, not actual project modification
 
 ## Output
 
