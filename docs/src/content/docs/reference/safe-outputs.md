@@ -875,13 +875,13 @@ safe-outputs:
 safe-outputs:
   dispatch-workflow:
     workflows: [worker-workflow, scanner-workflow]
-    max: 3  # maximum dispatches (default: 1, max: 3)
+    max: 3  # maximum dispatches (default: 1, max: 50)
 ```
 
 #### Configuration
 
 - **`workflows`** (required) — List of workflow names (without `.md` extension) that the agent is allowed to dispatch. Each workflow must exist in the same repository and support the `workflow_dispatch` trigger.
-- **`max`** (optional) — Maximum number of workflow dispatches allowed (default: 1, maximum: 3). This prevents excessive workflow triggering.
+- **`max`** (optional) — Maximum number of workflow dispatches allowed (default: 1, maximum: 50). This prevents excessive workflow triggering.
 
 #### Validation Rules
 
@@ -908,17 +908,72 @@ At compile time, the compiler validates:
 
 4. **File resolution** — The compiler resolves the correct file extension (`.lock.yml` or `.yml`) at compile time and embeds it in the safe output configuration, ensuring the runtime handler dispatches the correct workflow file.
 
-#### Agent Output Format
+#### How It Works: MCP Tool Generation
 
-The agent produces dispatch requests in its output:
+When you configure `dispatch-workflow`, the compiler automatically generates MCP (Model Context Protocol) tools that the AI agent can call. Each workflow in your `workflows` list becomes a callable tool:
+
+**Example Configuration:**
+```yaml wrap
+safe-outputs:
+  dispatch-workflow:
+    workflows: [deploy-app, run-tests]
+```
+
+**Generated MCP Tools:**
+- `deploy_app` tool — Dispatches the deploy-app workflow
+- `run_tests` tool — Dispatches the run-tests workflow
+
+The compiler:
+1. **Reads workflow_dispatch inputs** from the target workflow's YAML
+2. **Generates MCP tool schemas** with matching input parameters
+3. **Validates workflow files** exist and support workflow_dispatch
+4. **Embeds tool definitions** in the compiled workflow
+
+This means the AI agent automatically knows what inputs each workflow expects and can call them directly as tools.
+
+#### Defining Workflow Inputs
+
+To enable the agent to provide inputs when dispatching workflows, define `workflow_dispatch` inputs in the target workflow:
+
+**Target Workflow Example (`deploy-app.md`):**
+```yaml wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target deployment environment"
+        required: true
+        type: choice
+        options: [staging, production]
+      version:
+        description: "Version to deploy"
+        required: true
+        type: string
+      dry_run:
+        description: "Perform dry run without actual deployment"
+        required: false
+        type: boolean
+        default: false
+---
+
+# Deploy Application Workflow
+
+Deploys the application to the specified environment...
+```
+
+**Agent Output Format:**
+
+When the agent calls the generated MCP tool, it produces:
 
 ```json
 {
   "type": "dispatch_workflow",
-  "workflow_name": "worker-workflow",
+  "workflow_name": "deploy-app",
   "inputs": {
-    "campaign_id": "bootstrap-123",
-    "payload": "{\"target\": \"repositories\"}"
+    "environment": "staging",
+    "version": "v1.2.3",
+    "dry_run": false
   }
 }
 ```
@@ -931,6 +986,146 @@ All input values are automatically converted to strings as required by GitHub's 
 #### Rate Limiting
 
 To respect GitHub API rate limits, the handler automatically enforces a 5-second delay between consecutive workflow dispatches. The first dispatch has no delay.
+
+#### Best Practices
+
+**1. Always Define Explicit Inputs**
+
+When creating workflows that will be dispatched, explicitly define all required inputs in the `workflow_dispatch` section:
+
+```yaml wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Unique task identifier"
+        required: true
+        type: string
+      priority:
+        description: "Task priority level"
+        required: false
+        type: choice
+        options: [low, medium, high]
+        default: medium
+---
+```
+
+This ensures:
+- The MCP tool schema includes all expected parameters
+- The agent knows what information to provide
+- GitHub validates inputs at dispatch time
+
+**2. Use Descriptive Input Descriptions**
+
+Clear descriptions help the AI agent understand what information to provide:
+
+```yaml wrap
+# ✅ GOOD - Clear description
+repository_url:
+  description: "Full GitHub repository URL (e.g., https://github.com/owner/repo)"
+  required: true
+  type: string
+
+# ❌ BAD - Vague description
+repo:
+  description: "Repository"
+  type: string
+```
+
+**3. Use Choice Types for Limited Options**
+
+When inputs have a fixed set of valid values, use `type: choice`:
+
+```yaml wrap
+action:
+  description: "Action to perform"
+  required: true
+  type: choice
+  options: [analyze, fix, report]
+```
+
+This prevents the agent from providing invalid values and makes the interface clearer.
+
+**4. Provide Sensible Defaults**
+
+For optional inputs, provide defaults that work for the most common use case:
+
+```yaml wrap
+timeout:
+  description: "Maximum execution time in minutes"
+  required: false
+  type: number
+  default: 30
+```
+
+#### Troubleshooting
+
+**Problem: "Workflow file not found"**
+
+Error: `dispatch-workflow: workflow 'my-workflow' not found in .github/workflows/`
+
+**Solutions:**
+1. Ensure the workflow file exists in `.github/workflows/`
+2. Use the workflow name without extension (e.g., `my-workflow`, not `my-workflow.md`)
+3. Compile markdown workflows before dispatching: `gh aw compile my-workflow`
+
+**Problem: "Workflow does not support workflow_dispatch trigger"**
+
+Error: `dispatch-workflow: workflow 'my-workflow' does not support workflow_dispatch trigger`
+
+**Solution:** Add `workflow_dispatch` to the `on:` section of the target workflow:
+
+```yaml wrap
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      # Define your inputs here
+```
+
+**Problem: "Required input not provided"**
+
+The workflow is dispatched but GitHub rejects it due to missing required inputs.
+
+**Solution:** Ensure the target workflow defines its inputs and they match what the agent is providing:
+
+1. Check the target workflow's `workflow_dispatch.inputs` section
+2. Mark required inputs with `required: true`
+3. The agent will automatically know to provide these inputs based on the MCP tool schema
+
+**Problem: "Agent doesn't know what inputs to provide"**
+
+The agent dispatches the workflow but doesn't include necessary inputs.
+
+**Solutions:**
+1. **Define inputs explicitly** in the target workflow's `workflow_dispatch` section
+2. **Add clear descriptions** to help the agent understand what each input is for
+3. **Mark required inputs** with `required: true`
+4. **Update your dispatcher workflow's prompt** to mention specific inputs if needed
+
+**Example of well-defined inputs:**
+
+```yaml wrap
+---
+on:
+  workflow_dispatch:
+    inputs:
+      campaign_id:
+        description: "Unique identifier for this campaign run (e.g., 'campaign-2024-01-15-001')"
+        required: true
+        type: string
+      target_repos:
+        description: "JSON array of repository names to process (e.g., '[\"repo1\", \"repo2\"]')"
+        required: true
+        type: string
+      dry_run:
+        description: "If true, validate configuration without executing actions"
+        required: false
+        type: boolean
+        default: false
+---
+```
 
 #### Security Considerations
 
@@ -961,8 +1156,11 @@ A workflow can trigger deployment and testing workflows as separate, trackable r
 > [!WARNING]
 > **Workflow compilation required**: Markdown workflows (`.md` files) must be compiled to `.lock.yml` files before they can be dispatched. If you reference a workflow that only exists as `.md`, compilation will fail with an error asking you to run `gh aw compile <workflow-name>`.
 
+> [!TIP]
+> **Define workflow_dispatch inputs explicitly**: The compiler automatically generates MCP tool schemas based on the target workflow's `workflow_dispatch` inputs. Always define inputs in your target workflows to ensure the agent knows what parameters to provide.
+
 > [!NOTE]
-> **Workflow inputs**: If the target workflow defines `workflow_dispatch` inputs, the agent should provide matching inputs in the dispatch request. GitHub validates input requirements at dispatch time.
+> **Input validation**: GitHub validates `workflow_dispatch` inputs at dispatch time. If the agent provides inputs that don't match the workflow's input schema (wrong type, missing required fields, invalid choices), the dispatch will fail with a validation error.
 
 ### Agent Session Creation (`create-agent-session:`)
 
