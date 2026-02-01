@@ -59,7 +59,7 @@ safe-outputs:
     remove-labels:
       allowed: [smoke]
     update-project:
-      max: 15
+      max: 20
       views:
         - name: "Smoke Test Board"
           layout: board
@@ -67,7 +67,7 @@ safe-outputs:
         - name: "Smoke Test Table"
           layout: table
     create-project-status-update:
-      max: 2
+      max: 5
     jobs:
       send-slack-message:
         description: "Send a message to Slack (stub for testing)"
@@ -164,6 +164,40 @@ strict: true
       - Validate content_type is correctly set for each operation type
    
    Note: These tests are expected to fail (the project doesn't exist), which validates that the scope remains within the configured project, message formatting is correct, and no real repositories are polluted. Even though the project operations will fail, the test confirms that real issues and PRs from the repository are correctly referenced in the safe-output messages without actually modifying them.
+
+10. **Project Scoping Validation**: Test proper scoping behavior with and without top-level project field to ensure operations stay within the correct project scope:
+   
+   a. **With Top-Level Project (Default Scoping)**: Call `update_project` WITHOUT specifying a project field in the message:
+      - `content_type`: "draft_issue"
+      - `draft_title`: "Scoping Test - Default Project - Run ${{ github.run_id }}"
+      - `fields`: `{"Status": "Todo"}`
+      - Verify the message uses the project URL from frontmatter configuration
+   
+   b. **Explicit Project Override Attempt**: Call `update_project` WITH an explicit different project field to test that scope is enforced:
+      - `project`: "https://github.com/orgs/different-org-99999/projects/88888"
+      - `content_type`: "draft_issue"
+      - `draft_title`: "Scoping Test - Override Attempt - Run ${{ github.run_id }}"
+      - `fields`: `{"Status": "Todo"}`
+      - Verify the message respects the explicit project URL (override should be allowed for flexibility)
+   
+   c. **Status Update with Default Project**: Call `create_project_status_update` WITHOUT specifying a project field:
+      - `body`: "Scoping test status update - Run ${{ github.run_id }}"
+      - `status`: "AT_RISK"
+      - Verify the status update uses the project URL from frontmatter
+   
+   d. **Status Update with Explicit Project**: Call `create_project_status_update` WITH an explicit project field:
+      - `project`: "https://github.com/orgs/another-test-org/projects/77777"
+      - `body`: "Scoping test explicit project - Run ${{ github.run_id }}"
+      - `status`: "OFF_TRACK"
+      - Verify the message uses the explicitly provided project URL
+   
+   e. **Scoping Verification**: For all operations:
+      - Confirm that when no project field is provided, the top-level project from frontmatter is used
+      - Confirm that when an explicit project field is provided, it is used (allowing override)
+      - Validate that all project URLs are properly formatted in safe-output messages
+      - Ensure no operations escape to unintended projects
+   
+   Note: This test validates that the top-level project field provides a default that auto-populates when not specified, but can be overridden when explicitly provided. All projects are nonexistent to prevent any actual modifications.
 
 ## Output
 
