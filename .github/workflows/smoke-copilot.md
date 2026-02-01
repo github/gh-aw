@@ -59,7 +59,7 @@ safe-outputs:
       allowed: [smoke]
     dispatch-workflow:
       workflows:
-        - test-dispatch-workflow
+        - haiku-printer
       max: 1
     jobs:
       send-slack-message:
@@ -114,7 +114,7 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-9. **Workflow Dispatch Testing**: Use the `dispatch_workflow` safe output tool to trigger the `test-dispatch-workflow` workflow with a haiku as the message input. Create an original, creative haiku about software testing or automation.
+9. **Workflow Dispatch Testing**: Use the `dispatch_workflow` safe output tool to trigger the `haiku-printer` workflow with a haiku as the message input. Create an original, creative haiku about software testing or automation.
 
 ## Output
 

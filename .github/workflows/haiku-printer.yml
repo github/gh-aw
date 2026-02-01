@@ -1,4 +1,4 @@
-name: Test Dispatch Workflow
+name: Haiku Printer
 on:
   workflow_dispatch:
     inputs:
