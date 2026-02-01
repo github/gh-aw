@@ -310,6 +310,12 @@ func AuditWorkflowRun(ctx context.Context, runID int64, owner, repo, hostname st
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to analyze redacted domains: %v", err)))
 	}
 
+	// Extract MCP tool usage data from gateway logs
+	mcpToolUsage, err := extractMCPToolUsageData(runOutputDir, verbose)
+	if err != nil && verbose {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract MCP tool usage: %v", err)))
+	}
+
 	// List all artifacts
 	artifacts, err := listArtifacts(runOutputDir)
 	if err != nil && verbose {
@@ -329,7 +335,7 @@ func AuditWorkflowRun(ctx context.Context, runID int64, owner, repo, hostname st
 	}
 
 	// Build structured audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, mcpToolUsage)
 
 	// Render output based on format preference
 	if jsonOutput {
