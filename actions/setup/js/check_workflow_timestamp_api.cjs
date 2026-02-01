@@ -8,6 +8,8 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { computeFrontmatterHash, extractHashFromLockFile, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
+const { getFileContent } = require("./github_api_helpers.cjs");
 
 async function main() {
   const workflowFile = process.env.GH_AW_WORKFLOW_FILE;
@@ -60,6 +62,42 @@ async function main() {
     }
   }
 
+  // Helper function to compute and compare frontmatter hashes
+  async function logFrontmatterHashComparison() {
+    try {
+      // Fetch lock file content to extract stored hash
+      const lockFileContent = await getFileContent(github, owner, repo, lockFilePath, ref);
+      if (!lockFileContent) {
+        core.info("Unable to fetch lock file content for hash comparison");
+        return;
+      }
+
+      const storedHash = extractHashFromLockFile(lockFileContent);
+      if (!storedHash) {
+        core.info("No frontmatter hash found in lock file");
+        return;
+      }
+
+      // Compute hash from source .md file using GitHub API
+      const fileReader = createGitHubFileReader(github, owner, repo, ref);
+      const recomputedHash = await computeFrontmatterHash(workflowMdPath, { fileReader });
+
+      // Log hash comparison
+      core.info(`Frontmatter hash comparison:`);
+      core.info(`  Lock file hash:    ${storedHash}`);
+      core.info(`  Recomputed hash:   ${recomputedHash}`);
+
+      if (storedHash === recomputedHash) {
+        core.info(`  Status: ✅ Hashes match`);
+      } else {
+        core.info(`  Status: ⚠️  Hashes differ`);
+      }
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.info(`Could not compute frontmatter hash: ${errorMessage}`);
+    }
+  }
+
   // Fetch last commits for both files
   const workflowCommit = await getLastCommitForFile(workflowMdPath);
   const lockCommit = await getLastCommitForFile(lockFilePath);
@@ -85,6 +123,8 @@ async function main() {
   core.info(`  Source last commit: ${workflowDate.toISOString()} (${workflowCommit.sha.substring(0, 7)})`);
   core.info(`  Lock last commit: ${lockDate.toISOString()} (${lockCommit.sha.substring(0, 7)})`);
 
+  // Log frontmatter hash comparison
+  await logFrontmatterHashComparison();
   // Check if workflow file is newer than lock file
   if (workflowDate > lockDate) {
     const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;

@@ -19,6 +19,7 @@ const mockGithub = {
   rest: {
     repos: {
       listCommits: vi.fn(),
+      getContent: vi.fn(),
     },
   },
 };
@@ -357,6 +358,151 @@ describe("check_workflow_timestamp_api.cjs", () => {
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping timestamp check"));
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("frontmatter hash comparison", () => {
+    beforeEach(() => {
+      process.env.GH_AW_WORKFLOW_FILE = "test.lock.yml";
+    });
+
+    it("should log frontmatter hash comparison when both files exist", async () => {
+      const lockFileContent = `# frontmatter-hash: abc123def456
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test"`;
+
+      const mdFileContent = `---
+engine: copilot
+---
+# Test Workflow`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" },
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock123",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" },
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash comparison"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file hash:"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Recomputed hash:"));
+    });
+
+    it("should handle missing frontmatter hash in lock file", async () => {
+      const lockFileContent = `name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" },
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock123",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" },
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(lockFileContent).toString("base64"),
+        },
+      });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No frontmatter hash found"));
+    });
+
+    it("should handle errors during hash computation gracefully", async () => {
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" },
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock123",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" },
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent.mockRejectedValue(new Error("API error"));
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not fetch content"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled(); // Should not fail the workflow
     });
   });
 });
