@@ -720,20 +720,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to get agentic engine: %w", err)
 	}
-	installSteps := engine.GetInstallationSteps(data)
-	hasValidateSecretStep := false
-	for _, step := range installSteps {
-		for _, line := range step {
-			if strings.Contains(line, "id: validate-secret") {
-				hasValidateSecretStep = true
-				break
-			}
-		}
-		if hasValidateSecretStep {
-			break
-		}
-	}
-	if hasValidateSecretStep {
+	if EngineHasValidateSecretStep(engine, data) {
 		outputs["secret_verification_result"] = "${{ steps.validate-secret.outputs.verification_result }}"
 		compilerActivationJobsLog.Printf("Added secret_verification_result output (engine includes validate-secret step)")
 	} else {

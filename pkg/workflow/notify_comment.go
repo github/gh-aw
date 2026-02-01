@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
@@ -159,20 +158,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	if err != nil {
 		return nil, fmt.Errorf("failed to get agentic engine: %w", err)
 	}
-	installSteps := engine.GetInstallationSteps(data)
-	hasValidateSecretStep := false
-	for _, step := range installSteps {
-		for _, line := range step {
-			if strings.Contains(line, "id: validate-secret") {
-				hasValidateSecretStep = true
-				break
-			}
-		}
-		if hasValidateSecretStep {
-			break
-		}
-	}
-	if hasValidateSecretStep {
+	if EngineHasValidateSecretStep(engine, data) {
 		agentFailureEnvVars = append(agentFailureEnvVars, fmt.Sprintf("          GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.%s.outputs.secret_verification_result }}\n", mainJobName))
 	}
 

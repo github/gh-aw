@@ -441,3 +441,30 @@ func GetToolBinsEnvArg() []string {
 	// Pre-wrap in double quotes so shellEscapeArg preserves them (allowing shell expansion)
 	return []string{"--env", "\"GH_AW_TOOL_BINS=$GH_AW_TOOL_BINS\""}
 }
+
+// EngineHasValidateSecretStep checks if the engine's installation steps include the validate-secret step.
+// This is used to determine whether the secret_verification_result job output should be added.
+//
+// The validate-secret step is only added by engines that include it in GetInstallationSteps():
+//   - Copilot engine: Adds step when GetRequiredSecretNames returns non-empty
+//   - Claude engine: Adds step when GetRequiredSecretNames returns non-empty
+//   - Codex engine: Adds step when GetRequiredSecretNames returns non-empty
+//   - Custom engine: Never adds this step (returns empty from GetInstallationSteps)
+//
+// Parameters:
+//   - engine: The agentic engine to check
+//   - data: The workflow data (needed for GetInstallationSteps)
+//
+// Returns:
+//   - bool: true if the engine includes the validate-secret step, false otherwise
+func EngineHasValidateSecretStep(engine CodingAgentEngine, data *WorkflowData) bool {
+	installSteps := engine.GetInstallationSteps(data)
+	for _, step := range installSteps {
+		for _, line := range step {
+			if strings.Contains(line, "id: validate-secret") {
+				return true
+			}
+		}
+	}
+	return false
+}
