@@ -109,7 +109,7 @@ func TestAgentFriendlyOutputExample(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Test JSON output
 	t.Run("JSON Output", func(t *testing.T) {
@@ -301,7 +301,7 @@ func TestAgentFriendlyOutputFailureScenario(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Test failure analysis
 	t.Run("Failure Analysis", func(t *testing.T) {

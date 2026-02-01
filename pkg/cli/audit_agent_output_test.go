@@ -485,7 +485,7 @@ func TestAuditDataJSONStructure(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Marshal to JSON
 	jsonBytes, err := json.MarshalIndent(auditData, "", "  ")

@@ -33,6 +33,7 @@ type AuditData struct {
 	Errors                  []ErrorInfo              `json:"errors,omitempty"`
 	Warnings                []ErrorInfo              `json:"warnings,omitempty"`
 	ToolUsage               []ToolUsageInfo          `json:"tool_usage,omitempty"`
+	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`
 }
 
 // Finding represents a key insight discovered during audit
@@ -126,6 +127,51 @@ type ToolUsageInfo struct {
 	MaxDuration   string `json:"max_duration,omitempty" console:"header:Max Duration,omitempty"`
 }
 
+// MCPToolUsageData contains detailed MCP tool usage statistics and individual call records
+type MCPToolUsageData struct {
+	Summary   []MCPToolSummary `json:"summary"`           // Aggregated statistics per tool
+	ToolCalls []MCPToolCall    `json:"tool_calls"`        // Individual tool call records
+	Servers   []MCPServerStats `json:"servers,omitempty"` // Server-level statistics
+}
+
+// MCPToolSummary contains aggregated statistics for a single MCP tool
+type MCPToolSummary struct {
+	ServerName      string `json:"server_name" console:"header:Server"`
+	ToolName        string `json:"tool_name" console:"header:Tool"`
+	CallCount       int    `json:"call_count" console:"header:Calls"`
+	TotalInputSize  int    `json:"total_input_size" console:"header:Total Input,format:number"`
+	TotalOutputSize int    `json:"total_output_size" console:"header:Total Output,format:number"`
+	MaxInputSize    int    `json:"max_input_size" console:"header:Max Input,format:number"`
+	MaxOutputSize   int    `json:"max_output_size" console:"header:Max Output,format:number"`
+	AvgDuration     string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
+	MaxDuration     string `json:"max_duration,omitempty" console:"header:Max Duration,omitempty"`
+	ErrorCount      int    `json:"error_count,omitempty" console:"header:Errors,omitempty"`
+}
+
+// MCPToolCall represents a single MCP tool call with full details
+type MCPToolCall struct {
+	Timestamp  string `json:"timestamp"`
+	ServerName string `json:"server_name"`
+	ToolName   string `json:"tool_name"`
+	Method     string `json:"method,omitempty"`
+	InputSize  int    `json:"input_size"`
+	OutputSize int    `json:"output_size"`
+	Duration   string `json:"duration,omitempty"`
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
+}
+
+// MCPServerStats contains server-level statistics
+type MCPServerStats struct {
+	ServerName      string `json:"server_name" console:"header:Server"`
+	RequestCount    int    `json:"request_count" console:"header:Requests"`
+	ToolCallCount   int    `json:"tool_call_count" console:"header:Tool Calls"`
+	TotalInputSize  int    `json:"total_input_size" console:"header:Total Input,format:number"`
+	TotalOutputSize int    `json:"total_output_size" console:"header:Total Output,format:number"`
+	AvgDuration     string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
+	ErrorCount      int    `json:"error_count,omitempty" console:"header:Errors,omitempty"`
+}
+
 // OverviewDisplay is a display-optimized version of OverviewData for console rendering
 type OverviewDisplay struct {
 	RunID    int64  `console:"header:Run ID"`
@@ -139,7 +185,7 @@ type OverviewDisplay struct {
 }
 
 // buildAuditData creates structured audit data from workflow run information
-func buildAuditData(processedRun ProcessedRun, metrics LogMetrics) AuditData {
+func buildAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolUsage *MCPToolUsageData) AuditData {
 	run := processedRun.Run
 	auditReportLog.Printf("Building audit data for run ID %d", run.DatabaseID)
 
@@ -276,6 +322,7 @@ func buildAuditData(processedRun ProcessedRun, metrics LogMetrics) AuditData {
 		Errors:                  errors,
 		Warnings:                warnings,
 		ToolUsage:               toolUsage,
+		MCPToolUsage:            mcpToolUsage,
 	}
 }
 

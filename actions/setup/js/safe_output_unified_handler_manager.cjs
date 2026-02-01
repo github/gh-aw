@@ -22,6 +22,7 @@ const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
+const { sortSafeOutputMessages } = require("./safe_output_topological_sort.cjs");
 const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
@@ -342,9 +343,13 @@ function collectMissingMessages(messages) {
 }
 
 /**
- * Process all messages from agent output in the order they appear
+ * Process all messages from agent output in topologically sorted order
  * Dispatches each message to the appropriate handler while maintaining shared state (unified temporary ID map)
  * Tracks outputs created with unresolved temporary IDs and generates synthetic updates after resolution
+ *
+ * Messages are sorted topologically based on temporary ID dependencies before processing.
+ * This ensures items without temporary IDs are created first, enabling single-pass resolution
+ * of temporary IDs in acyclic dependency graphs.
  *
  * The unified temporary ID map stores both issue/PR references and project URLs:
  * - Issue/PR: temporary_id -> {repo: string, number: number}
@@ -366,6 +371,10 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
 
   // Load custom safe output job types that are processed by dedicated custom jobs
   const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
+
+  // Sort messages topologically based on temporary ID dependencies
+  // This ensures messages that create entities are processed before messages that reference them
+  const sortedMessages = sortSafeOutputMessages(messages);
 
   // Initialize unified temporary ID map
   // This will be populated by handlers as they create entities with temporary IDs
@@ -393,11 +402,11 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
   /** @type {Array<{type: string, message: any, messageIndex: number, handler: Function}>} */
   const deferredMessages = [];
 
-  core.info(`Processing ${messages.length} message(s) in order of appearance...`);
+  core.info(`Processing ${sortedMessages.length} message(s) in topologically sorted order...`);
 
-  // Process messages in order of appearance
-  for (let i = 0; i < messages.length; i++) {
-    const message = applyCampaignLabelsToMessage(messages[i], campaignLabels);
+  // Process messages in topologically sorted order
+  for (let i = 0; i < sortedMessages.length; i++) {
+    const message = applyCampaignLabelsToMessage(sortedMessages[i], campaignLabels);
     const messageType = message.type;
 
     if (!messageType) {

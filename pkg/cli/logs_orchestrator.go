@@ -343,8 +343,10 @@ func DownloadWorkflowLogs(ctx context.Context, workflowName string, count int, s
 					FirewallAnalysis:        result.FirewallAnalysis,
 					RedactedDomainsAnalysis: result.RedactedDomainsAnalysis,
 					MissingTools:            result.MissingTools,
+					MissingData:             result.MissingData,
 					Noops:                   result.Noops,
 					MCPFailures:             result.MCPFailures,
+					MCPToolUsage:            result.MCPToolUsage,
 					JobDetails:              result.JobDetails,
 				}
 				processedRuns = append(processedRuns, processedRun)
@@ -593,6 +595,7 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, out
 					MissingData:             summary.MissingData,
 					Noops:                   summary.Noops,
 					MCPFailures:             summary.MCPFailures,
+					MCPToolUsage:            summary.MCPToolUsage,
 					JobDetails:              summary.JobDetails,
 					LogsPath:                runOutputDir,
 					Cached:                  true, // Mark as cached
@@ -710,6 +713,15 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, out
 				}
 				result.MCPFailures = mcpFailures
 
+				// Extract MCP tool usage data from gateway logs if available
+				mcpToolUsage, mcpToolErr := extractMCPToolUsageData(runOutputDir, verbose)
+				if mcpToolErr != nil {
+					if verbose {
+						fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to extract MCP tool usage for run %d: %v", run.DatabaseID, mcpToolErr)))
+					}
+				}
+				result.MCPToolUsage = mcpToolUsage
+
 				// Fetch job details for the summary
 				jobDetails, jobErr := fetchJobDetails(run.DatabaseID, verbose)
 				if jobErr != nil {
@@ -740,6 +752,7 @@ func downloadRunArtifactsConcurrent(ctx context.Context, runs []WorkflowRun, out
 					MissingData:             missingData,
 					Noops:                   noops,
 					MCPFailures:             mcpFailures,
+					MCPToolUsage:            mcpToolUsage,
 					ArtifactsList:           artifacts,
 					JobDetails:              jobDetails,
 				}

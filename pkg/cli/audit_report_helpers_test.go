@@ -320,7 +320,7 @@ func TestConsoleOutputIncludesFileInfo(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 	auditData.DownloadedFiles = downloadedFiles
 
 	// Verify downloaded files are in audit data
@@ -455,7 +455,7 @@ func TestAuditReportFileListingIntegration(t *testing.T) {
 	}
 
 	// Build audit data with the extracted files
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// The buildAuditData should have extracted files automatically
 	if len(auditData.DownloadedFiles) == 0 {

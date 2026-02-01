@@ -398,7 +398,7 @@ describe("add_comment", () => {
       process.env.GH_AW_SAFE_OUTPUT_MESSAGES = JSON.stringify({
         appendOnlyComments: true,
       });
-      process.env.GITHUB_WORKFLOW = "test-workflow";
+      process.env.GH_AW_WORKFLOW_ID = "test-workflow";
 
       let hideCommentsWasCalled = false;
       let listCommentsCalls = 0;
@@ -458,7 +458,7 @@ describe("add_comment", () => {
 
       // Clean up
       delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
-      delete process.env.GITHUB_WORKFLOW;
+      delete process.env.GH_AW_WORKFLOW_ID;
     });
 
     it("should hide older comments when append-only-comments is not enabled", async () => {
@@ -466,7 +466,7 @@ describe("add_comment", () => {
 
       // Set up environment variable WITHOUT append-only-comments
       delete process.env.GH_AW_SAFE_OUTPUT_MESSAGES;
-      process.env.GITHUB_WORKFLOW = "test-workflow";
+      process.env.GH_AW_WORKFLOW_ID = "test-workflow";
 
       let hideCommentsWasCalled = false;
       let listCommentsCalls = 0;
@@ -525,7 +525,7 @@ describe("add_comment", () => {
       expect(capturedComment.body).toContain("New comment - should hide old ones");
 
       // Clean up
-      delete process.env.GITHUB_WORKFLOW;
+      delete process.env.GH_AW_WORKFLOW_ID;
     });
   });
 
