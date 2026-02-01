@@ -239,10 +239,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			// When provided, the update-project safe output applies a "z_campaign_<id>" label.
 			// This is part of the campaign tracking convention but not required for general use.
 			"campaign_id":    {Type: "string", Sanitize: true, MaxLength: 128},
-			"content_type":   {Type: "string", Enum: []string{"issue", "pull_request"}},
+			"content_type":   {Type: "string", Enum: []string{"issue", "pull_request", "draft_issue"}},
 			"content_number": {OptionalPositiveInteger: true},
 			"issue":          {OptionalPositiveInteger: true}, // Legacy
 			"pull_request":   {OptionalPositiveInteger: true}, // Legacy
+			"draft_title":    {Type: "string", Sanitize: true, MaxLength: 256},
+			"draft_body":     {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 			"fields":         {Type: "object"},
 		},
 	},
