@@ -35,11 +35,14 @@ tools:
   edit:
   bash:
     - "*"
+<<<<<<< HEAD
   cache:
     enabled: true
     keys:
       - "last_processed_package"
       - "processed_packages"
+=======
+>>>>>>> origin/main
 
 timeout-minutes: 45
 strict: true

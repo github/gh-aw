@@ -53,3 +53,41 @@ Test workflow
 		"Expected field definitions in update_project handler config",
 	)
 }
+<<<<<<< HEAD
+=======
+
+func TestUpdateProjectWithProjectURLConfig(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "handler-config-test")
+
+	testContent := `---
+name: Test Update Project with Project URL
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  update-project:
+    max: 5
+    project: "https://github.com/orgs/nonexistent-test-org-12345/projects/99999"
+---
+
+Test workflow
+`
+
+	mdFile := filepath.Join(tmpDir, "test-workflow.md")
+	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	require.NoError(t, err, "Failed to write test markdown file")
+
+	compiler := NewCompiler()
+	err = compiler.CompileWorkflow(mdFile)
+	require.NoError(t, err, "Failed to compile workflow")
+
+	lockFile := filepath.Join(tmpDir, "test-workflow.lock.yml")
+	compiledContent, err := os.ReadFile(lockFile)
+	require.NoError(t, err, "Failed to read compiled output")
+
+	compiledStr := string(compiledContent)
+
+	// Verify GH_AW_PROJECT_URL environment variable is set
+	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
+	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-12345/projects/99999", "Expected project URL in environment variable")
+}
+>>>>>>> origin/main

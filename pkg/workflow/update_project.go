@@ -25,6 +25,10 @@ type ProjectFieldDefinition struct {
 type UpdateProjectConfig struct {
 	BaseSafeOutputConfig `yaml:",inline"`
 	GitHubToken          string                   `yaml:"github-token,omitempty"`
+<<<<<<< HEAD
+=======
+	Project              string                   `yaml:"project,omitempty"` // Default project URL for operations
+>>>>>>> origin/main
 	Views                []ProjectView            `yaml:"views,omitempty"`
 	FieldDefinitions     []ProjectFieldDefinition `yaml:"field-definitions,omitempty" json:"field_definitions,omitempty"`
 }
@@ -48,6 +52,17 @@ func (c *Compiler) parseUpdateProjectConfig(outputMap map[string]any) *UpdatePro
 				}
 			}
 
+<<<<<<< HEAD
+=======
+			// Parse project URL override if specified
+			if project, exists := configMap["project"]; exists {
+				if projectStr, ok := project.(string); ok {
+					updateProjectConfig.Project = projectStr
+					updateProjectLog.Printf("Using custom project URL for update-project: %s", projectStr)
+				}
+			}
+
+>>>>>>> origin/main
 			// Parse views if specified
 			if viewsData, exists := configMap["views"]; exists {
 				if viewsList, ok := viewsData.([]any); ok {
@@ -155,8 +170,13 @@ func (c *Compiler) parseUpdateProjectConfig(outputMap map[string]any) *UpdatePro
 			}
 		}
 
+<<<<<<< HEAD
 		updateProjectLog.Printf("Parsed update-project config: max=%d, hasCustomToken=%v, viewCount=%d, fieldDefinitionCount=%d",
 			updateProjectConfig.Max, updateProjectConfig.GitHubToken != "", len(updateProjectConfig.Views), len(updateProjectConfig.FieldDefinitions))
+=======
+		updateProjectLog.Printf("Parsed update-project config: max=%d, hasCustomToken=%v, hasCustomProject=%v, viewCount=%d, fieldDefinitionCount=%d",
+			updateProjectConfig.Max, updateProjectConfig.GitHubToken != "", updateProjectConfig.Project != "", len(updateProjectConfig.Views), len(updateProjectConfig.FieldDefinitions))
+>>>>>>> origin/main
 		return updateProjectConfig
 	}
 	updateProjectLog.Print("No update-project configuration found")

@@ -283,7 +283,11 @@ const (
 )
 
 // DefaultCodexVersion is the default version of the OpenAI Codex CLI
+<<<<<<< HEAD
 const DefaultCodexVersion Version = "0.92.0"
+=======
+const DefaultCodexVersion Version = "0.93.0"
+>>>>>>> origin/main
 
 // DefaultGitHubMCPServerVersion is the default version of the GitHub MCP server Docker image
 const DefaultGitHubMCPServerVersion Version = "v0.30.2"

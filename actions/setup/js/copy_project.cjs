@@ -259,14 +259,32 @@ async function copyProject(output) {
  * @param {number} [config.max] - Maximum number of copy_project items to process
  * @param {string} [config.source_project] - Default source project URL
  * @param {string} [config.target_owner] - Default target owner
+<<<<<<< HEAD
  * @returns {Promise<Function>} Message handler function
  */
 async function main(config = {}) {
+=======
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
+ * @returns {Promise<Function>} Message handler function
+ */
+async function main(config = {}, githubClient = null) {
+>>>>>>> origin/main
   // Extract configuration
   const maxCount = config.max || 10;
   const defaultSourceProject = config.source_project || "";
   const defaultTargetOwner = config.target_owner || "";
 
+<<<<<<< HEAD
+=======
+  // Use the provided github client, or fall back to the global github object
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
+
+>>>>>>> origin/main
   core.info(`Max count: ${maxCount}`);
   if (defaultSourceProject) {
     core.info(`Default source project: ${defaultSourceProject}`);
@@ -281,10 +299,18 @@ async function main(config = {}) {
   /**
    * Message handler function that processes a single copy_project message
    * @param {Object} message - The copy_project message to process
+<<<<<<< HEAD
    * @param {Object} resolvedTemporaryIds - Map of temporary IDs (unused for copy_project)
    * @returns {Promise<Object>} Result with success/error status and project details
    */
   return async function handleCopyProject(message, resolvedTemporaryIds) {
+=======
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
+   * @returns {Promise<Object>} Result with success/error status and project details
+   */
+  return async function handleCopyProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
+>>>>>>> origin/main
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping copy_project: max count of ${maxCount} reached`);

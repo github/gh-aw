@@ -78,6 +78,15 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 	var failedFiles []string
 	var violations []string
 
+<<<<<<< HEAD
+=======
+	// Exception: safe_output_unified_handler_manager.cjs is allowed to require @actions/github
+	// because the package is installed at runtime via setup.sh when safe-output-projects flag is enabled
+	allowedNpmActionsRequires := map[string][]string{
+		"safe_output_unified_handler_manager.cjs": {"@actions/github"},
+	}
+
+>>>>>>> origin/main
 	for _, filename := range cjsFiles {
 		filepath := filepath.Join(cjsDir, filename)
 		content, err := os.ReadFile(filepath)
@@ -114,6 +123,7 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 			}
 		}
 
+<<<<<<< HEAD
 		// Check for @actions/* npm package requires
 		npmMatches := npmActionsPattern.FindAllString(code, -1)
 		if len(npmMatches) > 0 {
@@ -124,6 +134,32 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 			}
 			if !sliceContainsString(failedFiles, filename) {
 				failedFiles = append(failedFiles, filename)
+=======
+		// Check for @actions/* npm package requires (with exceptions)
+		npmMatches := npmActionsPattern.FindAllString(code, -1)
+		if len(npmMatches) > 0 {
+			for _, match := range npmMatches {
+				// Check if this file/package combination is allowed
+				isAllowed := false
+				if allowedPackages, ok := allowedNpmActionsRequires[filename]; ok {
+					for _, allowedPkg := range allowedPackages {
+						if strings.Contains(match, allowedPkg) {
+							isAllowed = true
+							t.Logf("Allowed @actions/* require in %s: %s (package installed at runtime)", filename, match)
+							break
+						}
+					}
+				}
+
+				if !isAllowed {
+					violation := filename + ": " + match
+					violations = append(violations, violation)
+					t.Errorf("Invalid require in %s: %s", filename, match)
+					if !sliceContainsString(failedFiles, filename) {
+						failedFiles = append(failedFiles, filename)
+					}
+				}
+>>>>>>> origin/main
 			}
 		}
 	}

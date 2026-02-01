@@ -51,7 +51,12 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		// For dev mode (local action path), checkout the actions folder first
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 
+<<<<<<< HEAD
 		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination)...)
+=======
+		// Notify comment job doesn't need project support
+		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
+>>>>>>> origin/main
 	}
 
 	// Add GitHub App token minting step if app is configured

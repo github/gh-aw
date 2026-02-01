@@ -201,3 +201,43 @@ Test workflow
 	assert.Contains(t, projectConfigJSON, `"create_project_status_update":{"max":2}`,
 		"Expected create_project_status_update with max:2 in project handler config")
 }
+<<<<<<< HEAD
+=======
+
+// TestCreateProjectStatusUpdateWithProjectURLConfig verifies that the project URL configuration
+// is properly set as an environment variable when configured in safe-outputs
+func TestCreateProjectStatusUpdateWithProjectURLConfig(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "handler-config-test")
+
+	testContent := `---
+name: Test Create Project Status Update with Project URL
+on: workflow_dispatch
+engine: copilot
+safe-outputs:
+  create-project-status-update:
+    max: 1
+    project: "https://github.com/orgs/nonexistent-test-org-67890/projects/88888"
+---
+
+Test workflow
+`
+
+	mdFile := filepath.Join(tmpDir, "test-workflow.md")
+	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	require.NoError(t, err, "Failed to write test markdown file")
+
+	compiler := NewCompiler()
+	err = compiler.CompileWorkflow(mdFile)
+	require.NoError(t, err, "Failed to compile workflow")
+
+	lockFile := filepath.Join(tmpDir, "test-workflow.lock.yml")
+	compiledContent, err := os.ReadFile(lockFile)
+	require.NoError(t, err, "Failed to read compiled output")
+
+	compiledStr := string(compiledContent)
+
+	// Verify GH_AW_PROJECT_URL environment variable is set
+	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
+	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-67890/projects/88888", "Expected project URL in environment variable")
+}
+>>>>>>> origin/main

@@ -7,6 +7,13 @@ inputs:
     description: 'Destination directory for activation files (default: /opt/gh-aw/actions)'
     required: false
     default: '/opt/gh-aw/actions'
+<<<<<<< HEAD
+=======
+  safe-output-projects:
+    description: 'Enable safe-output-projects support (installs @actions/github package for project handlers)'
+    required: false
+    default: 'false'
+>>>>>>> origin/main
 
 outputs:
   files-copied:
@@ -19,6 +26,10 @@ runs:
       shell: bash
       env:
         INPUT_DESTINATION: ${{ inputs.destination }}
+<<<<<<< HEAD
+=======
+        INPUT_SAFE_OUTPUT_PROJECTS: ${{ inputs.safe-output-projects }}
+>>>>>>> origin/main
       run: ${{ github.action_path }}/setup.sh
 
 branding:

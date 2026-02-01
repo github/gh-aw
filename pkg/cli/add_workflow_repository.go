@@ -7,7 +7,6 @@ import (
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/sliceutil"
 )
 
 var repositoryLog = logger.New("cli:add_workflow_repository")
@@ -87,10 +86,11 @@ func handleRepoOnlySpec(repoSpec string, verbose bool) error {
 func showInteractiveWorkflowSelection(repoSlug string, workflows []WorkflowInfo, version string, verbose bool) (string, error) {
 	repositoryLog.Printf("Showing interactive workflow selection: repo=%s, workflows=%d", repoSlug, len(workflows))
 
-	// Convert WorkflowInfo to ListItems using functional transformation
-	items := sliceutil.Map(workflows, func(wf WorkflowInfo) console.ListItem {
-		return console.NewListItem(wf.Name, wf.Description, wf.ID)
-	})
+	// Convert WorkflowInfo to ListItems
+	items := make([]console.ListItem, len(workflows))
+	for i, wf := range workflows {
+		items[i] = console.NewListItem(wf.Name, wf.Description, wf.ID)
+	}
 
 	// Show interactive list
 	title := fmt.Sprintf("Select a workflow from %s:", repoSlug)

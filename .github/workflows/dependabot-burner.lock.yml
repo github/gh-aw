@@ -25,6 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
+<<<<<<< HEAD
 # frontmatter-hash: 38b0ad5430565f4152442d2397e3eb1d45abf9dbc7b123eee156dd25b2799037
 
 name: "Dependabot Burner"
@@ -33,6 +34,12 @@ name: "Dependabot Burner"
   - cron: "32 23 * * *"
     # Friendly format: daily (scattered)
   # skip-if-no-match: is:pr is:open author:app/dependabot # Skip-if-no-match processed as search check in pre-activation job
+=======
+# frontmatter-hash: d450c954c557790fd2747a97adc633027ab85421d23765d3b50a6b92f92b4622
+
+name: "Dependabot Burner"
+"on":
+>>>>>>> origin/main
   workflow_dispatch:
 
 permissions: {}
@@ -44,8 +51,11 @@ run-name: "Dependabot Burner"
 
 jobs:
   activation:
+<<<<<<< HEAD
     needs: pre_activation
     if: needs.pre_activation.outputs.activated == 'true'
+=======
+>>>>>>> origin/main
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1254,6 +1264,7 @@ jobs:
           path: /tmp/gh-aw/threat-detection/detection.log
           if-no-files-found: ignore
 
+<<<<<<< HEAD
   pre_activation:
     runs-on: ubuntu-slim
     permissions:
@@ -1297,6 +1308,8 @@ jobs:
             const { main } = require('/opt/gh-aw/actions/check_skip_if_no_match.cjs');
             await main();
 
+=======
+>>>>>>> origin/main
   safe_outputs:
     needs:
       - agent
@@ -1327,6 +1340,10 @@ jobs:
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
+<<<<<<< HEAD
+=======
+          safe-output-projects: 'true'
+>>>>>>> origin/main
       - name: Download agent output artifact
         continue-on-error: true
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
