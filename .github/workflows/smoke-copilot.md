@@ -59,7 +59,7 @@ safe-outputs:
     remove-labels:
       allowed: [smoke]
     update-project:
-      max: 10
+      max: 15
       views:
         - name: "Smoke Test Board"
           layout: board
@@ -129,25 +129,41 @@ strict: true
       - `draft_body`: "Test draft issue for smoke test validation"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
    
-   b. **Field Update**: Call `update_project` again with the same draft issue to update fields:
+   b. **Field Creation with New Fields**: Call `update_project` with draft issue including new custom fields:
+      - `content_type`: "draft_issue"
+      - `draft_title`: "Smoke Test Draft Issue with Custom Fields - Run ${{ github.run_id }}"
+      - `fields`: `{"Status": "Todo", "Priority": "High", "Team": "Engineering", "Sprint": "Q1-2026"}`
+   
+   c. **Field Update**: Call `update_project` again with the same draft issue to update fields:
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "In Progress", "Priority": "Medium"}`
    
-   c. **View Creation**: The workflow automatically creates two views (configured in safe-outputs):
+   d. **Existing Issue Addition**: Use GitHub MCP to find any open issue from ${{ github.repository }}, then call `update_project` with:
+      - `content_type`: "issue"
+      - `content_number`: the issue number you found
+      - `fields`: `{"Status": "In Review", "Priority": "Low"}`
+   
+   e. **Existing PR Addition**: Use GitHub MCP to find any open pull request from ${{ github.repository }}, then call `update_project` with:
+      - `content_type`: "pull_request"
+      - `content_number`: the PR number you found
+      - `fields`: `{"Status": "In Progress", "Priority": "High"}`
+   
+   f. **View Creation**: The workflow automatically creates two views (configured in safe-outputs):
       - "Smoke Test Board" (board layout, filter: "is:open")
       - "Smoke Test Table" (table layout)
    
-   d. **Project Status Update**: Call `create_project_status_update` with:
+   g. **Project Status Update**: Call `create_project_status_update` with:
       - `body`: "Smoke test project status - Run ${{ github.run_id }}"
       - `status`: "ON_TRACK"
    
-   e. **Verification**: For each operation:
+   h. **Verification**: For each operation:
       - Verify the safe-output message is properly formatted in the output file
       - Confirm the project URL auto-populates from frontmatter
       - Check that all field names and values are correctly structured
+      - Validate content_type is correctly set for each operation type
    
-   Note: These tests are expected to fail (the project doesn't exist), which validates that the scope remains within the configured project, message formatting is correct, and no real repositories are polluted.
+   Note: These tests are expected to fail (the project doesn't exist), which validates that the scope remains within the configured project, message formatting is correct, and no real repositories are polluted. Even though the project operations will fail, the test confirms that real issues and PRs from the repository are correctly referenced in the safe-output messages without actually modifying them.
 
 ## Output
 
