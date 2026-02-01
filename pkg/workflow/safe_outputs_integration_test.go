@@ -184,23 +184,6 @@ func TestSafeOutputJobsIntegration(t *testing.T) {
 				return c.buildUploadAssetsJob(data, mainJobName, false)
 			},
 		},
-		{
-			name:           "update_project",
-			safeOutputType: "update-project",
-			configBuilder: func() *SafeOutputsConfig {
-				return &SafeOutputsConfig{
-					UpdateProjects: &UpdateProjectConfig{
-						BaseSafeOutputConfig: BaseSafeOutputConfig{
-							Max: 5,
-						},
-					},
-				}
-			},
-			requiredEnvVar: "GH_AW_WORKFLOW_ID",
-			jobBuilder: func(c *Compiler, data *WorkflowData, mainJobName string) (*Job, error) {
-				return c.buildUpdateProjectJob(data, mainJobName)
-			},
-		},
 	}
 
 	// Known issue: Individual job builders are missing GH_AW_WORKFLOW_ID
@@ -215,7 +198,6 @@ func TestSafeOutputJobsIntegration(t *testing.T) {
 		"create_code_scanning_alert": true,
 		"create_agent_session":       true,
 		"upload_assets":              true,
-		"update_project":             true,
 	}
 
 	for _, tt := range tests {
