@@ -17,6 +17,13 @@ import (
 
 var frontmatterHashLog = logger.New("parser:frontmatter_hash")
 
+// FileReader is a function type that reads file content
+// This abstraction allows for different file reading strategies (disk, GitHub API, in-memory, etc.)
+type FileReader func(filePath string) ([]byte, error)
+
+// DefaultFileReader reads files from disk using os.ReadFile
+var DefaultFileReader FileReader = os.ReadFile
+
 // compilerVersion holds the gh-aw version for hash computation
 var compilerVersion = "dev"
 
@@ -250,10 +257,16 @@ func marshalSorted(data any) string {
 // ComputeFrontmatterHashFromFile computes the frontmatter hash for a workflow file
 // using text-based approach (no YAML parsing) to match JavaScript implementation
 func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string, error) {
+	return ComputeFrontmatterHashFromFileWithReader(filePath, cache, DefaultFileReader)
+}
+
+// ComputeFrontmatterHashFromFileWithReader computes the frontmatter hash for a workflow file
+// using a custom file reader function (e.g., for GitHub API, in-memory file system, etc.)
+func ComputeFrontmatterHashFromFileWithReader(filePath string, cache *ImportCache, fileReader FileReader) (string, error) {
 	frontmatterHashLog.Printf("Computing hash for file: %s", filePath)
 
-	// Read file content
-	content, err := os.ReadFile(filePath)
+	// Read file content using the provided file reader
+	content, err := fileReader(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
@@ -270,8 +283,8 @@ func ComputeFrontmatterHashFromFile(filePath string, cache *ImportCache) (string
 	// Extract relevant template expressions from markdown body
 	relevantExpressions := extractRelevantTemplateExpressions(markdown)
 
-	// Compute hash using text-based approach
-	return computeFrontmatterHashTextBased(frontmatterText, markdown, baseDir, cache, relevantExpressions)
+	// Compute hash using text-based approach with custom file reader
+	return computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir, cache, relevantExpressions, fileReader)
 }
 
 // ComputeFrontmatterHashWithExpressions computes the hash including template expressions
@@ -467,7 +480,7 @@ func extractImportsFromText(frontmatterText string) []string {
 
 // processImportsTextBased processes imports from frontmatter using text-based parsing
 // Returns: importedFiles (list of import paths), importedFrontmatterTexts (list of frontmatter texts)
-func processImportsTextBased(frontmatterText, baseDir string, visited map[string]bool) ([]string, []string, error) {
+func processImportsTextBased(frontmatterText, baseDir string, visited map[string]bool, fileReader FileReader) ([]string, []string, error) {
 	var importedFiles []string
 	var importedFrontmatterTexts []string
 
@@ -493,8 +506,8 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 		}
 		visited[fullPath] = true
 
-		// Read imported file
-		content, err := os.ReadFile(fullPath)
+		// Read imported file using the provided file reader
+		content, err := fileReader(fullPath)
 		if err != nil {
 			// Skip missing imports silently (matches JavaScript behavior)
 			continue
@@ -513,7 +526,7 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 
 		// Recursively process imports in the imported file
 		importBaseDir := filepath.Dir(fullPath)
-		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, visited)
+		nestedFiles, nestedTexts, err := processImportsTextBased(importFrontmatterText, importBaseDir, visited, fileReader)
 		if err != nil {
 			// Continue processing other imports even if one fails
 			continue
@@ -530,11 +543,16 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 // computeFrontmatterHashTextBased computes the hash using text-based approach (no YAML parsing)
 // This matches the JavaScript implementation
 func computeFrontmatterHashTextBased(frontmatterText, markdown, baseDir string, cache *ImportCache, expressions []string) (string, error) {
+	return computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir, cache, expressions, DefaultFileReader)
+}
+
+// computeFrontmatterHashTextBasedWithReader computes the hash using text-based approach with custom file reader
+func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir string, cache *ImportCache, expressions []string, fileReader FileReader) (string, error) {
 	frontmatterHashLog.Print("Computing frontmatter hash using text-based approach")
 
-	// Process imports using text-based parsing
+	// Process imports using text-based parsing with custom file reader
 	visited := make(map[string]bool)
-	importedFiles, importedFrontmatterTexts, err := processImportsTextBased(frontmatterText, baseDir, visited)
+	importedFiles, importedFrontmatterTexts, err := processImportsTextBased(frontmatterText, baseDir, visited, fileReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to process imports: %w", err)
 	}

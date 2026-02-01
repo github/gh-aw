@@ -378,3 +378,75 @@ func TestBuildCanonicalFrontmatter(t *testing.T) {
 	assert.Equal(t, []string{"claude", "copilot"}, canonical["merged-engines"], "Should include merged engines")
 	assert.Equal(t, []string{"shared/common.md"}, canonical["imports"], "Should include imported files")
 }
+
+func TestComputeFrontmatterHashFromFileWithReader_CustomReader(t *testing.T) {
+	// Create in-memory file system mock
+	mockFS := map[string]string{
+		"/test/workflow.md": `---
+engine: copilot
+description: Test workflow
+---
+
+# Workflow Body`,
+		"/test/shared/imported.md": `---
+tools:
+  bash: true
+---
+
+# Imported Content`,
+	}
+
+	// Create custom file reader
+	customReader := func(filePath string) ([]byte, error) {
+		content, exists := mockFS[filePath]
+		if !exists {
+			return nil, os.ErrNotExist
+		}
+		return []byte(content), nil
+	}
+
+	// Test basic hash computation
+	hash, err := ComputeFrontmatterHashFromFileWithReader("/test/workflow.md", nil, customReader)
+	require.NoError(t, err, "Should compute hash with custom reader")
+	assert.Len(t, hash, 64, "Hash should be 64 characters")
+	assert.Regexp(t, "^[a-f0-9]{64}$", hash, "Hash should be lowercase hex")
+
+	// Verify determinism
+	hash2, err := ComputeFrontmatterHashFromFileWithReader("/test/workflow.md", nil, customReader)
+	require.NoError(t, err, "Should compute hash again")
+	assert.Equal(t, hash, hash2, "Hash should be deterministic")
+}
+
+func TestComputeFrontmatterHashFromFileWithReader_WithImports(t *testing.T) {
+	// Create in-memory file system mock with imports
+	mockFS := map[string]string{
+		"/test/workflow.md": `---
+engine: copilot
+imports:
+  - shared/imported.md
+---
+
+# Main Workflow`,
+		"/test/shared/imported.md": `---
+tools:
+  bash: true
+---
+
+# Imported Content`,
+	}
+
+	// Create custom file reader
+	customReader := func(filePath string) ([]byte, error) {
+		content, exists := mockFS[filePath]
+		if !exists {
+			return nil, os.ErrNotExist
+		}
+		return []byte(content), nil
+	}
+
+	// Test hash computation with imports
+	hash, err := ComputeFrontmatterHashFromFileWithReader("/test/workflow.md", nil, customReader)
+	require.NoError(t, err, "Should compute hash with imports using custom reader")
+	assert.Len(t, hash, 64, "Hash should be 64 characters")
+	assert.Regexp(t, "^[a-f0-9]{64}$", hash, "Hash should be lowercase hex")
+}
