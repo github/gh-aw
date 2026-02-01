@@ -435,8 +435,7 @@ var projectHandlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("max", c.Max).
 			AddIfNotEmpty("target_owner", c.TargetOwner).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
-			AddIfNotEmpty("github-token", c.GitHubToken).
-			AddDefault("continue_on_error", cfg.ContinueOnError)
+			AddIfNotEmpty("github-token", c.GitHubToken)
 		if len(c.Views) > 0 {
 			builder.AddDefault("views", c.Views)
 		}
@@ -453,7 +452,6 @@ var projectHandlerRegistry = map[string]handlerBuilder{
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
 			AddIfNotEmpty("github-token", c.GitHubToken).
-			AddDefault("continue_on_error", cfg.ContinueOnError).
 			Build()
 	},
 	"update_project": func(cfg *SafeOutputsConfig) map[string]any {
@@ -463,8 +461,7 @@ var projectHandlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateProjects
 		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
-			AddIfNotEmpty("github-token", c.GitHubToken).
-			AddDefault("continue_on_error", cfg.ContinueOnError)
+			AddIfNotEmpty("github-token", c.GitHubToken)
 		if len(c.Views) > 0 {
 			builder.AddDefault("views", c.Views)
 		}
@@ -483,7 +480,6 @@ var projectHandlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("source_project", c.SourceProject).
 			AddIfNotEmpty("target_owner", c.TargetOwner).
-			AddDefault("continue_on_error", cfg.ContinueOnError).
 			Build()
 	},
 }

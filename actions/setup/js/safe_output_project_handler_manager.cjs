@@ -17,7 +17,6 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { loadTemporaryIdMap } = require("./temporary_id.cjs");
-const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
  * Handler map configuration for project-related safe outputs
@@ -32,16 +31,9 @@ const PROJECT_HANDLER_MAP = {
 };
 
 /**
- * Project handler config result
- * @typedef {Object} ProjectHandlerConfig
- * @property {Object} config - Safe outputs configuration
- * @property {boolean} continueOnError - Global continue-on-error flag
- */
-
-/**
  * Load configuration for project-related safe outputs
  * Reads configuration from GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
- * @returns {ProjectHandlerConfig} Safe outputs configuration and global continue-on-error flag
+ * @returns {Object} Safe outputs configuration
  */
 function loadConfig() {
   if (!process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG) {
@@ -51,19 +43,8 @@ function loadConfig() {
   try {
     const config = JSON.parse(process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG);
     core.info(`Loaded project handler config from GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: ${JSON.stringify(config)}`);
-
-    // Extract global continue_on_error flag from any handler config (they all have the same value)
-    let continueOnError = false;
-    for (const handlerConfig of Object.values(config)) {
-      if (handlerConfig && typeof handlerConfig.continue_on_error === "boolean") {
-        continueOnError = handlerConfig.continue_on_error;
-        break;
-      }
-    }
-
     // Normalize config keys: convert hyphens to underscores
-    const normalizedConfig = Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]));
-    return { config: normalizedConfig, continueOnError };
+    return Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]));
   } catch (error) {
     throw new Error(`Failed to parse GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: ${getErrorMessage(error)}`);
   }
@@ -141,9 +122,6 @@ async function processMessages(messageHandlers, messages) {
     core.info(`Loaded temporary ID map with ${temporaryIdMap.size} entry(ies)`);
   }
 
-  // Load custom safe output job types that are processed by dedicated custom jobs
-  const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
-
   core.info(`Processing ${messages.length} project-related message(s)...`);
 
   // Process messages in order of appearance
@@ -159,13 +137,6 @@ async function processMessages(messageHandlers, messages) {
     const messageHandler = messageHandlers.get(messageType);
 
     if (!messageHandler) {
-      // Check if this message type is a custom safe output job
-      if (customSafeOutputJobTypes.has(messageType)) {
-        // Silently skip - this is handled by a custom safe output job
-        core.debug(`Message ${i + 1} (${messageType}) will be handled by custom safe output job`);
-        continue;
-      }
-
       // Skip messages that are not project-related
       // These should be handled by other steps (main handler manager or standalone steps)
       core.debug(`Message ${i + 1} (${messageType}) is not a project-related type - skipping`);
@@ -238,11 +209,7 @@ async function main() {
     }
 
     // Load configuration
-    const { config, continueOnError } = loadConfig();
-
-    if (continueOnError) {
-      core.info("continue-on-error is enabled - failures will not cause workflow to fail");
-    }
+    const config = loadConfig();
 
     // Load and initialize handlers
     const messageHandlers = await loadHandlers(config);
@@ -291,12 +258,7 @@ async function main() {
     core.info(`Temporary project IDs registered: ${Object.keys(temporaryProjectMap || {}).length}`);
 
     if (failureCount > 0) {
-      const errorMsg = `${failureCount} project-related message(s) failed to process`;
-      if (continueOnError) {
-        core.warning(errorMsg + " (continue-on-error is enabled, not failing workflow)");
-      } else {
-        core.setFailed(errorMsg);
-      }
+      core.setFailed(`${failureCount} project-related message(s) failed to process`);
     }
   } catch (error) {
     core.setFailed(`Project handler manager failed: ${getErrorMessage(error)}`);
