@@ -59,7 +59,15 @@ safe-outputs:
     remove-labels:
       allowed: [smoke]
     update-project:
-      max: 5
+      max: 10
+      views:
+        - name: "Smoke Test Board"
+          layout: board
+          filter: "is:open"
+        - name: "Smoke Test Table"
+          layout: table
+    create-project-status-update:
+      max: 2
     jobs:
       send-slack-message:
         description: "Send a message to Slack (stub for testing)"
@@ -113,15 +121,33 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-9. **Project Update Testing**: Use the `update_project` safe-output tool to create a draft issue in the project configured in the frontmatter. Steps:
-   - Call `update_project` with:
-     - `content_type`: "draft_issue"
-     - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
-     - `draft_body`: "This is a test draft issue created by the smoke test to validate update_project functionality."
-     - `fields`: `{"Status": "Todo"}`
-   - The project URL will be automatically populated from the frontmatter configuration
-   - Verify the safe-output message is properly formatted in the output file
-   - Note: This test is expected to fail (the project doesn't exist), which validates that the scope remains within the configured project and doesn't pollute real repositories
+9. **Project Operations Testing**: Use project-related safe-output tools to validate multiple project features. All tests use the nonexistent project configured in the frontmatter to ensure no real repositories are affected. Steps:
+   
+   a. **Draft Issue Creation**: Call `update_project` with:
+      - `content_type`: "draft_issue"
+      - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
+      - `draft_body`: "Test draft issue for smoke test validation"
+      - `fields`: `{"Status": "Todo", "Priority": "High"}`
+   
+   b. **Field Update**: Call `update_project` again with the same draft issue to update fields:
+      - `content_type`: "draft_issue"
+      - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
+      - `fields`: `{"Status": "In Progress", "Priority": "Medium"}`
+   
+   c. **View Creation**: The workflow automatically creates two views (configured in safe-outputs):
+      - "Smoke Test Board" (board layout, filter: "is:open")
+      - "Smoke Test Table" (table layout)
+   
+   d. **Project Status Update**: Call `create_project_status_update` with:
+      - `body`: "Smoke test project status - Run ${{ github.run_id }}"
+      - `status`: "ON_TRACK"
+   
+   e. **Verification**: For each operation:
+      - Verify the safe-output message is properly formatted in the output file
+      - Confirm the project URL auto-populates from frontmatter
+      - Check that all field names and values are correctly structured
+   
+   Note: These tests are expected to fail (the project doesn't exist), which validates that the scope remains within the configured project, message formatting is correct, and no real repositories are polluted.
 
 ## Output
 
