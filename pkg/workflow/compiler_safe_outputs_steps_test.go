@@ -480,6 +480,8 @@ func TestStepOrderInConsolidatedJob(t *testing.T) {
 }
 
 // TestHandlerManagerOrderWithProjects tests that project handler manager comes before general handler manager
+// Note: create_project is now handled by the unified handler, so only copy_project requires
+// the project handler manager step.
 func TestHandlerManagerOrderWithProjects(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()
@@ -487,9 +489,10 @@ func TestHandlerManagerOrderWithProjects(t *testing.T) {
 	workflowData := &WorkflowData{
 		Name: "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{
-			CreateProjects: &CreateProjectsConfig{
-				GitHubToken: "${{ secrets.PROJECTS_PAT }}",
-				TargetOwner: "test-org",
+			CopyProjects: &CopyProjectsConfig{
+				GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
+				TargetOwner:   "test-org",
+				SourceProject: "https://github.com/orgs/source-org/projects/1",
 			},
 			CreateIssues: &CreateIssuesConfig{
 				TitlePrefix: "[Test] ",
