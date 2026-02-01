@@ -1,0 +1,164 @@
+{
+  "metadata": {
+    "workflow_name": "Sergo - Serena Go Expert",
+    "run_id": "21560089409",
+    "job_id": "62122702303",
+    "analysis_timestamp": "2026-02-01T10:03:47.321901"
+  },
+  "registered_tools": {
+    "serena_tools_count": 23,
+    "serena_tools_list": [
+      "serena___activate_project",
+      "serena___check_onboarding_performed",
+      "serena___delete_memory",
+      "serena___edit_memory",
+      "serena___find_file",
+      "serena___find_referencing_symbols",
+      "serena___find_symbol",
+      "serena___get_current_config",
+      "serena___get_symbols_overview",
+      "serena___initial_instructions",
+      "serena___insert_after_symbol",
+      "serena___insert_before_symbol",
+      "serena___list_dir",
+      "serena___list_memories",
+      "serena___onboarding",
+      "serena___read_memory",
+      "serena___rename_symbol",
+      "serena___replace_symbol_body",
+      "serena___search_for_pattern",
+      "serena___think_about_collected_information",
+      "serena___think_about_task_adherence",
+      "serena___think_about_whether_you_are_done",
+      "serena___write_memory"
+    ]
+  },
+  "tool_usage_summary": {
+    "total_tool_calls": 44,
+    "total_tool_responses": 44,
+    "response_rate_percent": 100.0,
+    "serena_tool_calls": 9,
+    "github_tool_calls": 0,
+    "safeoutput_tool_calls": 1,
+    "builtin_tool_calls": 34
+  },
+  "tool_categories": {
+    "serena": {
+      "count": 9,
+      "percentage": 20.45,
+      "breakdown": {
+        "mcp__serena__search_for_pattern": 3,
+        "mcp__serena__find_symbol": 2,
+        "mcp__serena__get_current_config": 1,
+        "mcp__serena__initial_instructions": 1,
+        "mcp__serena__check_onboarding_performed": 1,
+        "mcp__serena__list_memories": 1
+      }
+    },
+    "github": {
+      "count": 0,
+      "percentage": 0.0
+    },
+    "safeoutputs": {
+      "count": 1,
+      "percentage": 2.27
+    },
+    "builtin": {
+      "count": 34,
+      "percentage": 77.27,
+      "breakdown": {
+        "Bash": 17,
+        "Read": 8,
+        "TodoWrite": 6,
+        "Write": 3
+      }
+    }
+  },
+  "all_tools_ranking": [
+    {
+      "tool": "Bash",
+      "count": 17,
+      "percentage": 38.64
+    },
+    {
+      "tool": "Read",
+      "count": 8,
+      "percentage": 18.18
+    },
+    {
+      "tool": "TodoWrite",
+      "count": 6,
+      "percentage": 13.64
+    },
+    {
+      "tool": "Write",
+      "count": 3,
+      "percentage": 6.82
+    },
+    {
+      "tool": "mcp__serena__search_for_pattern",
+      "count": 3,
+      "percentage": 6.82
+    },
+    {
+      "tool": "mcp__serena__find_symbol",
+      "count": 2,
+      "percentage": 4.55
+    },
+    {
+      "tool": "mcp__serena__get_current_config",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__initial_instructions",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__check_onboarding_performed",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__list_memories",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__safeoutputs__create_discussion",
+      "count": 1,
+      "percentage": 2.27
+    }
+  ],
+  "serena_tools_detail": {
+    "used_tools": [
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__find_symbol",
+      "mcp__serena__get_current_config",
+      "mcp__serena__initial_instructions",
+      "mcp__serena__list_memories",
+      "mcp__serena__search_for_pattern"
+    ],
+    "unused_registered_tools": [
+      "serena___activate_project",
+      "serena___delete_memory",
+      "serena___edit_memory",
+      "serena___find_file",
+      "serena___find_referencing_symbols",
+      "serena___get_symbols_overview",
+      "serena___insert_after_symbol",
+      "serena___insert_before_symbol",
+      "serena___list_dir",
+      "serena___onboarding",
+      "serena___read_memory",
+      "serena___rename_symbol",
+      "serena___replace_symbol_body",
+      "serena___think_about_collected_information",
+      "serena___think_about_task_adherence",
+      "serena___think_about_whether_you_are_done",
+      "serena___write_memory"
+    ],
+    "usage_rate": 26.09
+  }
+}
