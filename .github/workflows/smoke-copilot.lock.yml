@@ -27,11 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-<<<<<<< HEAD
-# frontmatter-hash: 41f47a47940cabc5413f9df6d4f802a65e69dc09fe358d3b94aacc8fb9714ce1
-=======
-# frontmatter-hash: 0899786e057960d0c71d8f7c7d02b43629245f56f3bdbdfcddabc8342163b04a
->>>>>>> origin/main
+# frontmatter-hash: 93ac6babdb426bdd9ca113f8b067a10de4ef77737d5d1360c3fc4b568d853275
 
 name: "Smoke Copilot"
 "on":
@@ -1894,8 +1890,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"create_project_status_update\":{\"max\":5,\"project\":\"https://github.com/orgs/nonexistent-test-org-12345/projects/99999\"},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke\"]},\"update_project\":{\"max\":20,\"project\":\"https://github.com/orgs/nonexistent-test-org-12345/projects/99999\",\"views\":[{\"name\":\"Smoke Test Board\",\"layout\":\"board\",\"filter\":\"is:open\"},{\"name\":\"Smoke Test Table\",\"layout\":\"table\"}]}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke\"]}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
