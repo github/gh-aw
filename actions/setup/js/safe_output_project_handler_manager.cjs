@@ -33,7 +33,7 @@ const PROJECT_HANDLER_MAP = {
 /**
  * Load configuration for project-related safe outputs
  * Reads configuration from GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
- * @returns {Object} Safe outputs configuration
+ * @returns {{config: Object, continueOnError: boolean}} Safe outputs configuration and global continue-on-error flag
  */
 function loadConfig() {
   if (!process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG) {
@@ -43,8 +43,19 @@ function loadConfig() {
   try {
     const config = JSON.parse(process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG);
     core.info(`Loaded project handler config from GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: ${JSON.stringify(config)}`);
+
+    // Extract global continue_on_error flag from any handler config (they all have the same value)
+    let continueOnError = false;
+    for (const handlerConfig of Object.values(config)) {
+      if (handlerConfig && typeof handlerConfig.continue_on_error === "boolean") {
+        continueOnError = handlerConfig.continue_on_error;
+        break;
+      }
+    }
+
     // Normalize config keys: convert hyphens to underscores
-    return Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]));
+    const normalizedConfig = Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]));
+    return { config: normalizedConfig, continueOnError };
   } catch (error) {
     throw new Error(`Failed to parse GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: ${getErrorMessage(error)}`);
   }
@@ -209,7 +220,11 @@ async function main() {
     }
 
     // Load configuration
-    const config = loadConfig();
+    const { config, continueOnError } = loadConfig();
+
+    if (continueOnError) {
+      core.info("continue-on-error is enabled - failures will not cause workflow to fail");
+    }
 
     // Load and initialize handlers
     const messageHandlers = await loadHandlers(config);
@@ -258,7 +273,12 @@ async function main() {
     core.info(`Temporary project IDs registered: ${Object.keys(temporaryProjectMap || {}).length}`);
 
     if (failureCount > 0) {
-      core.setFailed(`${failureCount} project-related message(s) failed to process`);
+      const errorMsg = `${failureCount} project-related message(s) failed to process`;
+      if (continueOnError) {
+        core.warning(errorMsg + " (continue-on-error is enabled, not failing workflow)");
+      } else {
+        core.setFailed(errorMsg);
+      }
     }
   } catch (error) {
     core.setFailed(`Project handler manager failed: ${getErrorMessage(error)}`);

@@ -360,6 +360,13 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.Mentions = parseMentionsConfig(mentions)
 			}
 
+			// Handle continue-on-error configuration
+			if continueOnError, exists := outputMap["continue-on-error"]; exists {
+				if continueOnErrorBool, ok := continueOnError.(bool); ok {
+					config.ContinueOnError = continueOnErrorBool
+				}
+			}
+
 			// Handle jobs (safe-jobs must be under safe-outputs)
 			if jobs, exists := outputMap["jobs"]; exists {
 				if jobsMap, ok := jobs.(map[string]any); ok {

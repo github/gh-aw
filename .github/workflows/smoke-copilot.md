@@ -68,6 +68,7 @@ safe-outputs:
           layout: table
     create-project-status-update:
       max: 5
+    continue-on-error: true
     jobs:
       send-slack-message:
         description: "Send a message to Slack (stub for testing)"

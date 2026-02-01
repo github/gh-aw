@@ -6219,6 +6219,11 @@
           "type": "string",
           "description": "Runner specification for all safe-outputs jobs (activation, create-issue, add-comment, etc.). Single runner label (e.g., 'ubuntu-slim', 'ubuntu-latest', 'windows-latest', 'self-hosted'). Defaults to 'ubuntu-slim'. See https://github.blog/changelog/2025-10-28-1-vcpu-linux-runner-now-available-in-github-actions-in-public-preview/"
         },
+        "continue-on-error": {
+          "type": "boolean",
+          "description": "If true, don't fail the workflow when safe-output operations fail. Useful for smoke tests with fake data or when testing with nonexistent organizations/projects. Default: false.",
+          "default": false
+        },
         "dispatch-workflow": {
           "oneOf": [
             {
