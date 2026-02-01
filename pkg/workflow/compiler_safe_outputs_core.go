@@ -14,7 +14,6 @@ func (c *Compiler) hasProjectRelatedSafeOutputs(safeOutputs *SafeOutputsConfig) 
 	}
 
 	return safeOutputs.UpdateProjects != nil ||
-		safeOutputs.CopyProjects != nil ||
 		safeOutputs.CreateProjects != nil ||
 		safeOutputs.CreateProjectStatusUpdates != nil
 }

@@ -364,74 +364,6 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 	}
 }
 
-// TestBuildProjectHandlerManagerStep tests project handler manager step generation
-func TestBuildProjectHandlerManagerStep(t *testing.T) {
-	tests := []struct {
-		name              string
-		safeOutputs       *SafeOutputsConfig
-		parsedFrontmatter *FrontmatterConfig
-		checkContains     []string
-	}{
-		{
-			name: "project handler manager with copy_project",
-			safeOutputs: &SafeOutputsConfig{
-				CopyProjects: &CopyProjectsConfig{
-					GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
-					TargetOwner:   "test-org",
-					SourceProject: "https://github.com/orgs/source-org/projects/1",
-				},
-			},
-			checkContains: []string{
-				"name: Process Project-Related Safe Outputs",
-				"id: process_project_safe_outputs",
-				"uses: actions/github-script@",
-				"GH_AW_AGENT_OUTPUT",
-				"GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG",
-				"GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}",
-				"github-token: ${{ secrets.PROJECTS_PAT }}",
-				"setupGlobals",
-				"safe_output_project_handler_manager.cjs",
-			},
-		},
-		{
-			name: "project handler manager without custom token uses default",
-			safeOutputs: &SafeOutputsConfig{
-				CopyProjects: &CopyProjectsConfig{
-					TargetOwner:   "test-org",
-					SourceProject: "https://github.com/orgs/source-org/projects/1",
-				},
-			},
-			checkContains: []string{
-				"name: Process Project-Related Safe Outputs",
-				"GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
-				"github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			compiler := NewCompiler()
-
-			workflowData := &WorkflowData{
-				Name:              "Test Workflow",
-				SafeOutputs:       tt.safeOutputs,
-				ParsedFrontmatter: tt.parsedFrontmatter,
-			}
-
-			steps := compiler.buildProjectHandlerManagerStep(workflowData)
-
-			require.NotEmpty(t, steps)
-
-			stepsContent := strings.Join(steps, "")
-
-			for _, expected := range tt.checkContains {
-				assert.Contains(t, stepsContent, expected, "Expected to find: "+expected)
-			}
-		})
-	}
-}
-
 // TestStepOrderInConsolidatedJob tests that steps appear in correct order
 func TestStepOrderInConsolidatedJob(t *testing.T) {
 	compiler := NewCompiler()
@@ -477,54 +409,6 @@ func TestStepOrderInConsolidatedJob(t *testing.T) {
 	if gitConfigPos != -1 && handlerPos != -1 {
 		assert.Less(t, gitConfigPos, handlerPos, "Git config should come before handler")
 	}
-}
-
-// TestHandlerManagerOrderWithProjects tests that project handler manager comes before general handler manager
-// Note: create_project is now handled by the unified handler, so only copy_project requires
-// the project handler manager step.
-func TestHandlerManagerOrderWithProjects(t *testing.T) {
-	compiler := NewCompiler()
-	compiler.jobManager = NewJobManager()
-
-	workflowData := &WorkflowData{
-		Name: "Test Workflow",
-		SafeOutputs: &SafeOutputsConfig{
-			CopyProjects: &CopyProjectsConfig{
-				GitHubToken:   "${{ secrets.PROJECTS_PAT }}",
-				TargetOwner:   "test-org",
-				SourceProject: "https://github.com/orgs/source-org/projects/1",
-			},
-			CreateIssues: &CreateIssuesConfig{
-				TitlePrefix: "[Test] ",
-			},
-			AssignToAgent: &AssignToAgentConfig{
-				BaseSafeOutputConfig: BaseSafeOutputConfig{
-					Max: 1,
-				},
-			},
-		},
-	}
-
-	job, _, err := compiler.buildConsolidatedSafeOutputsJob(workflowData, "agent", "test.md")
-
-	require.NoError(t, err)
-	require.NotNil(t, job)
-
-	stepsContent := strings.Join(job.Steps, "")
-
-	// Find positions of handler steps
-	projectHandlerPos := strings.Index(stepsContent, "name: Process Project-Related Safe Outputs")
-	generalHandlerPos := strings.Index(stepsContent, "name: Process Safe Outputs")
-	assignAgentPos := strings.Index(stepsContent, "name: Assign To Agent")
-
-	// Verify all steps are present
-	assert.NotEqual(t, -1, projectHandlerPos, "Project handler manager step should be present")
-	assert.NotEqual(t, -1, generalHandlerPos, "General handler manager step should be present")
-	assert.NotEqual(t, -1, assignAgentPos, "Assign to agent step should be present")
-
-	// Verify correct order: Project Handler → General Handler → Assign To Agent
-	assert.Less(t, projectHandlerPos, generalHandlerPos, "Project handler should come before general handler")
-	assert.Less(t, generalHandlerPos, assignAgentPos, "General handler should come before assign to agent")
 }
 
 // TestStepWithoutCondition tests step building without condition

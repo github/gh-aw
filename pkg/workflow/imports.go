@@ -571,9 +571,6 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	if result.UpdateProjects == nil && importedConfig.UpdateProjects != nil {
 		result.UpdateProjects = importedConfig.UpdateProjects
 	}
-	if result.CopyProjects == nil && importedConfig.CopyProjects != nil {
-		result.CopyProjects = importedConfig.CopyProjects
-	}
 	if result.CreateProjects == nil && importedConfig.CreateProjects != nil {
 		result.CreateProjects = importedConfig.CreateProjects
 	}

@@ -1506,9 +1506,6 @@ safe-outputs:
   create-project:
     max: 5
     github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
-  copy-project:
-    max: 2
-    github-token: "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}"
 ---
 
 # Shared Project Safe Outputs
@@ -1564,11 +1561,6 @@ This workflow uses the imported project safe-output configuration.
 	require.NotNil(t, workflowData.SafeOutputs.CreateProjects, "CreateProjects configuration should be imported")
 	assert.Equal(t, 5, workflowData.SafeOutputs.CreateProjects.Max)
 	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CreateProjects.GitHubToken)
-
-	// Verify copy-project configuration was imported correctly
-	require.NotNil(t, workflowData.SafeOutputs.CopyProjects, "CopyProjects configuration should be imported")
-	assert.Equal(t, 2, workflowData.SafeOutputs.CopyProjects.Max)
-	assert.Equal(t, "${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}", workflowData.SafeOutputs.CopyProjects.GitHubToken)
 }
 
 // TestAllMissingSafeOutputTypesImport tests that all previously missing safe-output types can be imported
