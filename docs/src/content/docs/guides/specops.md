@@ -3,29 +3,32 @@ title: SpecOps
 description: Maintain and propagate W3C-style specifications using agentic workflows
 ---
 
-SpecOps is a pattern for maintaining formal specifications using agentic workflows. The `w3c-specification-writer` agent creates W3C-style specifications with RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) and propagates changes to consuming implementations automatically.
+SpecOps is a pattern for maintaining formal specifications using agentic workflows. It leverages the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) to create W3C-style specifications with RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) and automatically propagates changes to consuming implementations.
 
-Use SpecOps when formal specifications need to stay synchronized across multiple repositories.
+Use SpecOps when you need to:
+- Maintain formal technical specifications
+- Keep specifications synchronized across multiple repositories
+- Ensure implementations stay compliant with specification updates
 
 ## How SpecOps Works
 
-The SpecOps workflow coordinates specification updates across multiple agents and repositories:
+SpecOps coordinates specification updates across agents and repositories:
 
-1. **User initiates specification change** - The user triggers a workflow with the `w3c-specification-writer` agent, describing what needs to change in the specification.
+1. **Update specification** - Trigger a workflow with the `w3c-specification-writer` agent to modify the specification document with RFC 2119 keywords, version numbers, and change log entries.
 
-2. **Agent updates specification** - The coding agent modifies the specification document, applying RFC 2119 keywords (MUST, SHALL, SHOULD, MAY), updating version numbers, and adding change log entries. The user reviews and approves the changes.
+2. **Review changes** - Review and approve the specification changes in the pull request.
 
-3. **Propagation workflows activate** - When the specification changes merge to main, agentic workflows automatically detect the updates and analyze the impact on consuming repositories.
+3. **Propagate automatically** - When merged to main, agentic workflows detect the updates and analyze impact on consuming repositories.
 
-4. **Implementation plans generated** - Coding agents create plans to update implementations in consuming repositories (like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg)) to comply with new specification requirements.
+4. **Update implementations** - Coding agents create pull requests to update implementations in consuming repositories (like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg)) to comply with new requirements.
 
-5. **Compliance tests updated** - Test generation workflows update compliance test suites to verify implementations satisfy the new specification requirements, ensuring continuous conformance.
+5. **Verify compliance** - Test generation workflows update compliance test suites to verify implementations satisfy the new specification requirements.
 
 This automated workflow ensures specifications remain the single source of truth while keeping all implementations synchronized and compliant.
 
 ## Update Specifications
 
-Create a workflow to update specifications using the w3c-specification-writer agent:
+Create a workflow to update specifications using the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md):
 
 ```yaml
 ---
@@ -45,7 +48,6 @@ safe-outputs:
   create-pull-request:
     title-prefix: "[spec] "
     labels: [documentation, specification]
-    draft: false
 
 tools:
   edit:
@@ -54,36 +56,30 @@ tools:
 
 # Specification Update Workflow
 
-You are using the w3c-specification-writer agent to update the
-MCP Gateway specification.
+Update the MCP Gateway specification using the w3c-specification-writer agent.
 
 **Change Request**: ${{ inputs.change_description }}
 
 ## Your Task
 
-1. Review the current specification at 
-   `docs/src/content/docs/reference/mcp-gateway.md`
+1. Review the current specification at `docs/src/content/docs/reference/mcp-gateway.md`
 
 2. Apply the requested changes following W3C conventions:
    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
-   - Update version number appropriately (major/minor/patch)
+   - Update version number (major/minor/patch)
    - Add entry to Change Log section
    - Update Status of This Document if needed
 
-3. Ensure all changes maintain:
-   - Clear conformance requirements
-   - Testable specifications
-   - Complete examples
-   - Proper cross-references
+3. Ensure changes maintain clear conformance requirements, testable specifications, and complete examples
 
 4. Create a pull request with the updated specification
 ```
 
-The agent applies RFC 2119 keywords, updates semantic versioning, adds change log entries, and creates a pull request.
+The agent applies RFC 2119 keywords, updates semantic versioning, and creates a pull request.
 
 ## Propagate Changes
 
-After specification updates merge, propagate changes to consuming repositories:
+After specification updates merge, automatically propagate changes to consuming repositories:
 
 ```yaml
 ---
@@ -94,7 +90,6 @@ on:
       - main
     paths:
       - 'docs/src/content/docs/reference/mcp-gateway.md'
-  workflow_dispatch:
 
 engine: copilot
 strict: true
@@ -113,38 +108,30 @@ tools:
 
 # Specification Propagation Workflow
 
-The MCP Gateway specification has been updated. Propagate changes
-to consuming repositories.
+The MCP Gateway specification has been updated. Propagate changes to consuming repositories.
 
 ## Consuming Repositories
 
-- **gh-aw-mcpg**: Implementation repository
-  - Update compliance with new requirements
-  - Adjust configuration schemas
-  - Update integration tests
-  
-- **gh-aw**: Main repository  
-  - Update MCP gateway configuration validation
-  - Adjust workflow compilation if needed
-  - Update documentation links
+- **gh-aw-mcpg**: Update implementation compliance, schemas, and tests
+- **gh-aw**: Update MCP gateway validation and documentation
 
 ## Your Task
 
 1. Read the latest specification version and change log
 2. Identify breaking changes and new requirements
 3. For each consuming repository:
-   - Clone or fetch latest code
    - Update implementation to match spec
    - Run tests to verify compliance
    - Create pull request with changes
 4. Create tracking issue linking all PRs
 ```
 
-This workflow updates consuming repositories (like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg)) to maintain spec compliance.
+This workflow automatically updates consuming repositories like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg) to maintain compliance.
 
 ## Specification Structure
 
-W3C-style specifications include:
+W3C-style specifications follow a formal structure:
+
 **Required Sections**:
 - Abstract, Status, Introduction, Conformance
 - Numbered technical sections with RFC 2119 keywords
@@ -159,29 +146,23 @@ The gateway SHOULD log validation errors with field names.
 The gateway MAY cache validated configurations.
 ```
 
+See the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) for complete specification template and guidelines.
+
 ## Semantic Versioning
 
 - **Major (X.0.0)** - Breaking changes
 - **Minor (0.Y.0)** - New features, backward-compatible
 - **Patch (0.0.Z)** - Bug fixes, clarifications
 
-## Propagation Strategies
-
-**Push-Based**: Specification repository triggers updates when changes merge to main.
-
-**Pull-Based**: Consumers check for updates on schedule (e.g., weekly).
-
-**Hybrid**: Push for breaking changes, pull for minor updates.
-
 ## Best Practices
 
-**Testable Requirements**: Write specifications with clear pass/fail criteria.
+**Write Testable Requirements** - Create specifications with clear pass/fail criteria.
 
-**Version Discipline**: Follow semantic versioning strictly for breaking changes.
+**Follow Version Discipline** - Use semantic versioning strictly for breaking changes.
 
-**Track Consumers**: Maintain list of repositories implementing the specification.
+**Track Consumers** - Maintain a list of repositories implementing the specification.
 
-**Compliance Checks**: Run automated tests to verify conformance regularly.
+**Automate Compliance** - Run automated tests to verify conformance regularly.
 
 ## Example: MCP Gateway
 
@@ -196,6 +177,6 @@ The [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) demonstrates Spec
 
 ## References
 
-- [W3C Specification Writer Agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md)
-- [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/)
-- [RFC 2119: Requirement Level Keywords](https://www.ietf.org/rfc/rfc2119.txt)
+- [W3C Specification Writer Agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) - Custom agent for writing W3C-style specifications
+- [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) - Example specification
+- [RFC 2119: Requirement Level Keywords](https://www.ietf.org/rfc/rfc2119.txt) - Keywords for technical specifications
