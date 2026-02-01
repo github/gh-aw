@@ -928,8 +928,8 @@ func TestBuildCategoryEnvVar(t *testing.T) {
 		{
 			name:       "category by name",
 			envVarName: "GH_AW_DISCUSSION_CATEGORY",
-			category:   "General",
-			expected:   []string{"          GH_AW_DISCUSSION_CATEGORY: \"General\"\n"},
+			category:   "general",
+			expected:   []string{"          GH_AW_DISCUSSION_CATEGORY: \"general\"\n"},
 		},
 		{
 			name:       "category by ID",

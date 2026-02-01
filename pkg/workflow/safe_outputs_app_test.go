@@ -215,7 +215,7 @@ func TestSafeOutputsAppTokenDiscussionsPermission(t *testing.T) {
 on: issues
 safe-outputs:
   create-discussion:
-    category: "General"
+    category: "general"
   app:
     app-id: ${{ vars.APP_ID }}
     private-key: ${{ secrets.APP_PRIVATE_KEY }}

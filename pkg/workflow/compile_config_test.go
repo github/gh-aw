@@ -276,12 +276,12 @@ func TestCreateDiscussionConfigParsing(t *testing.T) {
 			frontmatter: map[string]any{
 				"safe-outputs": map[string]any{
 					"create-discussion": map[string]any{
-						"category": "General",
+						"category": "general",
 					},
 				},
 			},
 			expectedTitlePrefix: "",
-			expectedCategory:    "General",
+			expectedCategory:    "general",
 			expectedMax:         1,
 			expectConfig:        true,
 		},

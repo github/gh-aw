@@ -425,12 +425,12 @@ func TestEnhanceToolDescription(t *testing.T) {
 			baseDescription: "Create a discussion.",
 			safeOutputs: &SafeOutputsConfig{
 				CreateDiscussions: &CreateDiscussionsConfig{
-					Category: "General",
+					Category: "general",
 				},
 			},
 			wantContains: []string{
 				"CONSTRAINTS:",
-				`Discussions will be created in category "General"`,
+				`Discussions will be created in category "general"`,
 			},
 		},
 		{

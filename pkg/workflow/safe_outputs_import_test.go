@@ -287,7 +287,7 @@ func TestSafeOutputsImportNoConflictDifferentTypes(t *testing.T) {
 safe-outputs:
   create-discussion:
     title-prefix: "[shared] "
-    category: "General"
+    category: "general"
 ---
 
 # Shared Create Discussion Configuration
@@ -334,7 +334,7 @@ safe-outputs:
 
 	require.NotNil(t, workflowData.SafeOutputs.CreateDiscussions, "CreateDiscussions should be imported")
 	assert.Equal(t, "[shared] ", workflowData.SafeOutputs.CreateDiscussions.TitlePrefix)
-	assert.Equal(t, "General", workflowData.SafeOutputs.CreateDiscussions.Category)
+	assert.Equal(t, "general", workflowData.SafeOutputs.CreateDiscussions.Category)
 }
 
 // TestSafeOutputsImportFromMultipleWorkflows tests importing different safe-output types from multiple workflows

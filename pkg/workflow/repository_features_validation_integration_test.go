@@ -140,7 +140,7 @@ permissions:
   pull-requests: read
 safe-outputs:
   create-discussion:
-    category: "General"
+    category: "general"
 ---
 
 # Test Discussion Workflow

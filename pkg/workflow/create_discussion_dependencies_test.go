@@ -41,7 +41,7 @@ func TestCreateDiscussionJobDependencies(t *testing.T) {
 						BaseSafeOutputConfig: BaseSafeOutputConfig{
 							Max: 1,
 						},
-						Category: "General",
+						Category: "general",
 					},
 				},
 			}
@@ -101,7 +101,7 @@ func TestParseDiscussionsConfigDefaultExpiration(t *testing.T) {
 			name: "No expires field - should default to 7 days (168 hours)",
 			config: map[string]any{
 				"create-discussion": map[string]any{
-					"category": "General",
+					"category": "general",
 				},
 			},
 			expectedExpires: 168, // 7 days = 168 hours
@@ -110,7 +110,7 @@ func TestParseDiscussionsConfigDefaultExpiration(t *testing.T) {
 			name: "Explicit expires integer - should use provided value",
 			config: map[string]any{
 				"create-discussion": map[string]any{
-					"category": "General",
+					"category": "general",
 					"expires":  14, // 14 days
 				},
 			},
@@ -120,7 +120,7 @@ func TestParseDiscussionsConfigDefaultExpiration(t *testing.T) {
 			name: "Explicit expires string format - should use provided value",
 			config: map[string]any{
 				"create-discussion": map[string]any{
-					"category": "General",
+					"category": "general",
 					"expires":  "7d",
 				},
 			},
@@ -130,7 +130,7 @@ func TestParseDiscussionsConfigDefaultExpiration(t *testing.T) {
 			name: "Explicit expires zero - should use default",
 			config: map[string]any{
 				"create-discussion": map[string]any{
-					"category": "General",
+					"category": "general",
 					"expires":  0,
 				},
 			},

@@ -2,6 +2,8 @@ package workflow
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
@@ -79,6 +81,11 @@ func (c *Compiler) parseDiscussionsConfig(outputMap map[string]any) *CreateDiscu
 
 	// Validate target-repo (wildcard "*" is not allowed)
 	if validateTargetRepoSlug(config.TargetRepoSlug, discussionLog) {
+		return nil // Invalid configuration, return nil to cause validation error
+	}
+
+	// Validate category naming convention (lowercase, preferably plural)
+	if validateDiscussionCategory(config.Category, discussionLog, c.markdownPath) {
 		return nil // Invalid configuration, return nil to cause validation error
 	}
 
@@ -176,4 +183,63 @@ func (c *Compiler) buildCreateOutputDiscussionJob(data *WorkflowData, mainJobNam
 		Token:          data.SafeOutputs.CreateDiscussions.GitHubToken,
 		TargetRepoSlug: data.SafeOutputs.CreateDiscussions.TargetRepoSlug,
 	})
+}
+
+// validateDiscussionCategory validates discussion category naming conventions
+// Categories should be lowercase and preferably plural
+// Returns true if validation fails (invalid), false if valid
+func validateDiscussionCategory(category string, log *logger.Logger, markdownPath string) bool {
+	// Empty category is allowed (GitHub Discussions will use default)
+	if category == "" {
+		return false
+	}
+
+	// GitHub Discussion category IDs start with "DIC_" - these are valid
+	if strings.HasPrefix(category, "DIC_") {
+		return false
+	}
+
+	// List of known category naming issues and their corrections
+	categoryCorrections := map[string]string{
+		"Audits":   "audits",
+		"General":  "general",
+		"Reports":  "reports",
+		"Research": "research",
+	}
+
+	// Check if category has uppercase letters
+	if category != strings.ToLower(category) {
+		var message string
+		// Check if we have a known correction
+		if corrected, exists := categoryCorrections[category]; exists {
+			message = fmt.Sprintf("Discussion category %q should use lowercase: %q", category, corrected)
+			if log != nil {
+				log.Printf("Invalid discussion category %q: should use lowercase: %q", category, corrected)
+			}
+		} else {
+			message = fmt.Sprintf("Discussion category %q should use lowercase", category)
+			if log != nil {
+				log.Printf("Invalid discussion category %q: should use lowercase", category)
+			}
+		}
+
+		// Print formatted warning to stderr
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+
+		return true // Validation failed
+	}
+
+	// Warn about singular forms of common categories
+	singularToPlural := map[string]string{
+		"audit":  "audits",
+		"report": "reports",
+	}
+
+	if plural, isSingular := singularToPlural[category]; isSingular {
+		if log != nil {
+			log.Printf("⚠ Discussion category %q is singular; consider using plural form %q for consistency", category, plural)
+		}
+	}
+
+	return false // Validation passed
 }

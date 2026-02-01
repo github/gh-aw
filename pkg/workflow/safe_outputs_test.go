@@ -564,7 +564,7 @@ func TestGenerateSafeOutputsConfig(t *testing.T) {
 					CloseDiscussions: &CloseDiscussionsConfig{
 						BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
 						SafeOutputDiscussionFilterConfig: SafeOutputDiscussionFilterConfig{
-							RequiredCategory: "General",
+							RequiredCategory: "general",
 							SafeOutputFilterConfig: SafeOutputFilterConfig{
 								RequiredLabels:      []string{"resolved"},
 								RequiredTitlePrefix: "[resolved] ",

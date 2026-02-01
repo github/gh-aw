@@ -162,7 +162,7 @@ safe-outputs:
     max: 5
   create-discussions:
     title-prefix: "[report] "
-    category: "General"
+    category: "general"
     max: 3
   add-comments:
     max: 3
