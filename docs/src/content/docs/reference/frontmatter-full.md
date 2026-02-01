@@ -3672,12 +3672,6 @@ safe-outputs:
   # (optional)
   runs-on: "example-value"
 
-  # If true, don't fail the workflow when safe-output operations fail. Useful for
-  # smoke tests with fake data or when testing with nonexistent
-  # organizations/projects. Default: false.
-  # (optional)
-  continue-on-error: true
-
 # Configuration for secret redaction behavior in workflow outputs and artifacts
 # (optional)
 secret-masking:

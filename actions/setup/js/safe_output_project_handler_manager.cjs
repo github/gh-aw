@@ -17,6 +17,7 @@ const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { loadTemporaryIdMap } = require("./temporary_id.cjs");
+const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
  * Handler map configuration for project-related safe outputs
@@ -122,6 +123,9 @@ async function processMessages(messageHandlers, messages) {
     core.info(`Loaded temporary ID map with ${temporaryIdMap.size} entry(ies)`);
   }
 
+  // Load custom safe output job types that are processed by dedicated custom jobs
+  const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
+
   core.info(`Processing ${messages.length} project-related message(s)...`);
 
   // Process messages in order of appearance
@@ -137,6 +141,13 @@ async function processMessages(messageHandlers, messages) {
     const messageHandler = messageHandlers.get(messageType);
 
     if (!messageHandler) {
+      // Check if this message type is a custom safe output job
+      if (customSafeOutputJobTypes.has(messageType)) {
+        // Silently skip - this is handled by a custom safe output job
+        core.debug(`Message ${i + 1} (${messageType}) will be handled by custom safe output job`);
+        continue;
+      }
+
       // Skip messages that are not project-related
       // These should be handled by other steps (main handler manager or standalone steps)
       core.debug(`Message ${i + 1} (${messageType}) is not a project-related type - skipping`);
