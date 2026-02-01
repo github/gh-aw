@@ -185,6 +185,7 @@ export default defineConfig({
 						{ label: 'ResearchPlanAssign', link: '/guides/researchplanassign/' },
 						{ label: 'MultiRepoOps', link: '/guides/multirepoops/' },
 						{ label: 'SideRepoOps', link: '/guides/siderepoops/' },
+						{ label: 'SpecOps', link: '/guides/specops/' },
 						{ label: 'TrialOps', link: '/guides/trialops/' },
 						{ label: 'AgenticImport', link: '/guides/agentic-import/' },
 					],
