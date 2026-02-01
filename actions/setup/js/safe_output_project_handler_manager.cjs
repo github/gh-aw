@@ -19,6 +19,30 @@ const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { loadTemporaryIdMap } = require("./temporary_id.cjs");
 
 /**
+ * Load custom safe output job types from environment variable
+ * These are job names defined in safe-outputs.jobs that are processed by custom jobs
+ * @returns {Set<string>} Set of custom safe output job type names
+ */
+function loadCustomSafeOutputJobTypes() {
+  const safeOutputJobsEnv = process.env.GH_AW_SAFE_OUTPUT_JOBS;
+  if (!safeOutputJobsEnv) {
+    return new Set();
+  }
+
+  try {
+    const safeOutputJobs = JSON.parse(safeOutputJobsEnv);
+    // The environment variable is a map of job names to output keys
+    // We need the job names (keys) as the message types to ignore
+    const jobTypes = Object.keys(safeOutputJobs);
+    core.debug(`Loaded ${jobTypes.length} custom safe output job type(s): ${jobTypes.join(", ")}`);
+    return new Set(jobTypes);
+  } catch (error) {
+    core.warning(`Failed to parse GH_AW_SAFE_OUTPUT_JOBS: ${getErrorMessage(error)}`);
+    return new Set();
+  }
+}
+
+/**
  * Handler map configuration for project-related safe outputs
  * Maps safe output types to their handler module file paths
  * All these types require GH_AW_PROJECT_GITHUB_TOKEN
@@ -122,6 +146,9 @@ async function processMessages(messageHandlers, messages) {
     core.info(`Loaded temporary ID map with ${temporaryIdMap.size} entry(ies)`);
   }
 
+  // Load custom safe output job types that are processed by dedicated custom jobs
+  const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
+
   core.info(`Processing ${messages.length} project-related message(s)...`);
 
   // Process messages in order of appearance
@@ -137,6 +164,13 @@ async function processMessages(messageHandlers, messages) {
     const messageHandler = messageHandlers.get(messageType);
 
     if (!messageHandler) {
+      // Check if this message type is a custom safe output job
+      if (customSafeOutputJobTypes.has(messageType)) {
+        // Silently skip - this is handled by a custom safe output job
+        core.debug(`Message ${i + 1} (${messageType}) will be handled by custom safe output job`);
+        continue;
+      }
+
       // Skip messages that are not project-related
       // These should be handled by other steps (main handler manager or standalone steps)
       core.debug(`Message ${i + 1} (${messageType}) is not a project-related type - skipping`);
@@ -271,6 +305,7 @@ module.exports = {
   loadHandlers,
   processMessages,
   main,
+  loadCustomSafeOutputJobTypes,
 };
 
 // Run main if this script is executed directly (not required as a module)
