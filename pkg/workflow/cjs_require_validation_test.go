@@ -78,63 +78,6 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 	var failedFiles []string
 	var violations []string
 
-<<<<<<< HEAD
-=======
-	// Exception: safe_output_unified_handler_manager.cjs is allowed to require @actions/github
-	// because the package is installed at runtime via setup.sh when safe-output-projects flag is enabled
-	allowedNpmActionsRequires := map[string][]string{
-		"safe_output_unified_handler_manager.cjs": {"@actions/github"},
-	}
-
->>>>>>> origin/main
-	for _, filename := range cjsFiles {
-		filepath := filepath.Join(cjsDir, filename)
-		content, err := os.ReadFile(filepath)
-		if err != nil {
-			t.Errorf("Failed to read %s: %v", filename, err)
-			continue
-		}
-
-		code := string(content)
-
-		// Check for "actions/" absolute path requires
-		actionsMatches := actionsRequirePattern.FindAllString(code, -1)
-		if len(actionsMatches) > 0 {
-			for _, match := range actionsMatches {
-				violation := filename + ": " + match
-				violations = append(violations, violation)
-				t.Errorf("Invalid require in %s: %s", filename, match)
-			}
-			if !sliceContainsString(failedFiles, filename) {
-				failedFiles = append(failedFiles, filename)
-			}
-		}
-
-		// Check for relative paths going up to actions directory
-		relativeMatches := relativeActionsPattern.FindAllString(code, -1)
-		if len(relativeMatches) > 0 {
-			for _, match := range relativeMatches {
-				violation := filename + ": " + match
-				violations = append(violations, violation)
-				t.Errorf("Invalid require in %s: %s", filename, match)
-			}
-			if !sliceContainsString(failedFiles, filename) {
-				failedFiles = append(failedFiles, filename)
-			}
-		}
-
-<<<<<<< HEAD
-		// Check for @actions/* npm package requires
-		npmMatches := npmActionsPattern.FindAllString(code, -1)
-		if len(npmMatches) > 0 {
-			for _, match := range npmMatches {
-				violation := filename + ": " + match
-				violations = append(violations, violation)
-				t.Errorf("Invalid require in %s: %s", filename, match)
-			}
-			if !sliceContainsString(failedFiles, filename) {
-				failedFiles = append(failedFiles, filename)
-=======
 		// Check for @actions/* npm package requires (with exceptions)
 		npmMatches := npmActionsPattern.FindAllString(code, -1)
 		if len(npmMatches) > 0 {
@@ -159,7 +102,6 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 						failedFiles = append(failedFiles, filename)
 					}
 				}
->>>>>>> origin/main
 			}
 		}
 	}

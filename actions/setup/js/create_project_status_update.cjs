@@ -265,13 +265,6 @@ function formatDate(date) {
 /**
  * Main handler factory for create_project_status_update
  * Returns a message handler function that processes individual create_project_status_update messages
-<<<<<<< HEAD
- * @type {HandlerFactoryFunction}
- */
-async function main(config = {}) {
-  const maxCount = config.max || 10;
-
-=======
  * @param {Object} config - Handler configuration
  * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
  * @returns {Promise<Function>} Message handler function
@@ -287,7 +280,6 @@ async function main(config = {}, githubClient = null) {
     throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
   }
 
->>>>>>> origin/main
   core.info(`Max count: ${maxCount}`);
 
   // Track how many items we've processed for max limit
@@ -299,18 +291,11 @@ async function main(config = {}, githubClient = null) {
   /**
    * Message handler function that processes a single create_project_status_update message
    * @param {Object} message - The create_project_status_update message to process
-<<<<<<< HEAD
-   * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
-   * @returns {Promise<Object>} Result with success/error status and status update details
-   */
-  return async function handleCreateProjectStatusUpdate(message, resolvedTemporaryIds) {
-=======
    * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
    * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
    * @returns {Promise<Object>} Result with success/error status and status update details
    */
   return async function handleCreateProjectStatusUpdate(message, temporaryIdMap, resolvedTemporaryIds = {}) {
->>>>>>> origin/main
     // Check if we've hit the max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping create-project-status-update: max count of ${maxCount} reached`);

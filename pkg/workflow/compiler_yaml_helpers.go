@@ -171,14 +171,6 @@ func generateGitHubScriptWithRequire(scriptPath string) string {
 // Parameters:
 //   - setupActionRef: The action reference for setup action (e.g., "./actions/setup" or "githubnext/gh-aw/actions/setup@sha")
 //   - destination: The destination path where files should be copied (e.g., SetupActionDestination)
-<<<<<<< HEAD
-//
-// Returns a slice of strings representing the YAML lines for the setup step.
-func (c *Compiler) generateSetupStep(setupActionRef string, destination string) []string {
-	// Script mode: run the setup.sh script directly
-	if c.actionMode.IsScript() {
-		return []string{
-=======
 //   - enableSafeOutputProjects: Whether to enable safe-output-projects support (installs @actions/github for project handlers)
 //
 // Returns a slice of strings representing the YAML lines for the setup step.
@@ -186,19 +178,12 @@ func (c *Compiler) generateSetupStep(setupActionRef string, destination string, 
 	// Script mode: run the setup.sh script directly
 	if c.actionMode.IsScript() {
 		lines := []string{
->>>>>>> origin/main
 			"      - name: Setup Scripts\n",
 			"        run: |\n",
 			"          bash /tmp/gh-aw/actions-source/actions/setup/setup.sh\n",
 			"        env:\n",
 			fmt.Sprintf("          INPUT_DESTINATION: %s\n", destination),
 		}
-<<<<<<< HEAD
-	}
-
-	// Dev/Release mode: use the setup action
-	return []string{
-=======
 		if enableSafeOutputProjects {
 			lines = append(lines, "          INPUT_SAFE_OUTPUT_PROJECTS: 'true'\n")
 		}
@@ -207,17 +192,13 @@ func (c *Compiler) generateSetupStep(setupActionRef string, destination string, 
 
 	// Dev/Release mode: use the setup action
 	lines := []string{
->>>>>>> origin/main
 		"      - name: Setup Scripts\n",
 		fmt.Sprintf("        uses: %s\n", setupActionRef),
 		"        with:\n",
 		fmt.Sprintf("          destination: %s\n", destination),
 	}
-<<<<<<< HEAD
-=======
 	if enableSafeOutputProjects {
 		lines = append(lines, "          safe-output-projects: 'true'\n")
 	}
 	return lines
->>>>>>> origin/main
 }

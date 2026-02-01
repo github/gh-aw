@@ -15,10 +15,7 @@ permissions:
   actions: read
 name: Smoke Copilot
 engine: copilot
-<<<<<<< HEAD
-=======
 project: "https://github.com/orgs/nonexistent-test-org-12345/projects/99999"
->>>>>>> origin/main
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -61,8 +58,6 @@ safe-outputs:
       allowed: [smoke-copilot]
     remove-labels:
       allowed: [smoke]
-<<<<<<< HEAD
-=======
     update-project:
       max: 20
       views:
@@ -73,7 +68,6 @@ safe-outputs:
           layout: table
     create-project-status-update:
       max: 5
->>>>>>> origin/main
     jobs:
       send-slack-message:
         description: "Send a message to Slack (stub for testing)"
@@ -127,8 +121,6 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-<<<<<<< HEAD
-=======
 9. **Project Operations Testing**: Use project-related safe-output tools to validate multiple project features. All tests use the nonexistent project configured in the frontmatter to ensure no real repositories are affected. Steps:
    
    a. **Draft Issue Creation**: Call `update_project` with:
@@ -206,7 +198,6 @@ strict: true
       - Ensure no operations escape to unintended projects
    
    Note: This test validates that the top-level project field provides a default that auto-populates when not specified, but can be overridden when explicitly provided. All projects are nonexistent to prevent any actual modifications.
->>>>>>> origin/main
 
 ## Output
 

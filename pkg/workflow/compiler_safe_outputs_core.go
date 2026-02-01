@@ -6,8 +6,6 @@ import (
 
 var consolidatedSafeOutputsLog = logger.New("workflow:compiler_safe_outputs_consolidated")
 
-<<<<<<< HEAD
-=======
 // hasProjectRelatedSafeOutputs checks if any project-related safe outputs are configured
 // Project-related safe outputs require the @actions/github package for Octokit instantiation
 func (c *Compiler) hasProjectRelatedSafeOutputs(safeOutputs *SafeOutputsConfig) bool {
@@ -21,7 +19,6 @@ func (c *Compiler) hasProjectRelatedSafeOutputs(safeOutputs *SafeOutputsConfig) 
 		safeOutputs.CreateProjectStatusUpdates != nil
 }
 
->>>>>>> origin/main
 // SafeOutputStepConfig holds configuration for building a single safe output step
 // within the consolidated safe-outputs job
 type SafeOutputStepConfig struct {

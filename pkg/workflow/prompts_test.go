@@ -72,8 +72,6 @@ func TestSafeOutputsPromptText_FollowsXMLFormat(t *testing.T) {
 	t.Skip("Safe outputs prompt is now generated dynamically based on enabled tools")
 }
 
-<<<<<<< HEAD
-=======
 func TestSafeOutputsPrompt_NeverListsToolNames(t *testing.T) {
 	// CRITICAL: This test ensures tool names are NEVER listed in the safe outputs prompt.
 	// The agent must query the MCP server to discover available tools - listing them
@@ -128,7 +126,6 @@ func TestSafeOutputsPrompt_NeverListsToolNames(t *testing.T) {
 	}
 }
 
->>>>>>> origin/main
 // ============================================================================
 // Cache Memory Prompt Tests
 // ============================================================================

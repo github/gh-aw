@@ -42,11 +42,7 @@ Extract technical vocabulary from documentation files and create a concise dicta
 ## Your Mission
 
 Create a concise dictation instruction file at `skills/dictation/SKILL.md` that:
-<<<<<<< HEAD
-1. Contains a glossary of approximately 250 project-specific terms extracted from documentation
-=======
 1. Contains a glossary of approximately 1000 project-specific terms extracted from documentation
->>>>>>> origin/main
 2. Provides instructions for fixing speech-to-text errors (ambiguous terms, spacing, hyphenation)
 3. Provides instructions for "agentifying" text: removing filler words (humm, you know, um, uh, like, etc.), improving clarity, and making text more professional
 4. Does NOT include planning guidelines or examples (keep it short and focused on error correction and text cleanup)
@@ -56,11 +52,7 @@ Create a concise dictation instruction file at `skills/dictation/SKILL.md` that:
 
 ### 1. Scan Documentation for Project-Specific Glossary
 
-<<<<<<< HEAD
-Scan documentation files in `docs/src/content/docs/` to extract approximately 250 project-specific technical terms (240-260 acceptable).
-=======
 Scan documentation files in `docs/src/content/docs/` to extract approximately 1000 project-specific technical terms (950-1050 acceptable).
->>>>>>> origin/main
 
 **Focus areas:**
 - Configuration: safe-outputs, permissions, tools, cache-memory, toolset, frontmatter
@@ -81,11 +73,7 @@ Create `skills/dictation/SKILL.md` with:
 - Frontmatter with name and description fields
 - Title: Dictation Instructions
 - Technical Context: Brief description of gh-aw
-<<<<<<< HEAD
-- Project Glossary: ~250 terms, alphabetically sorted, one per line
-=======
 - Project Glossary: ~1000 terms, alphabetically sorted, one per line
->>>>>>> origin/main
 - Fix Speech-to-Text Errors: Common misrecognitions → correct terms
 - Clean Up and Improve Text: Instructions for removing filler words and improving clarity
 - Guidelines: General instructions as follows
@@ -109,11 +97,7 @@ Use the create-pull-request tool to submit your changes with:
 ## Guidelines
 
 - Scan only `docs/src/content/docs/**/*.md` files
-<<<<<<< HEAD
-- Extract ~250 terms (240-260 acceptable)
-=======
 - Extract ~1000 terms (950-1050 acceptable)
->>>>>>> origin/main
 - Exclude tooling-specific terms (makefile, Astro, starlight)
 - Prioritize frequently used project-specific terms
 - Alphabetize the glossary
@@ -124,11 +108,7 @@ Use the create-pull-request tool to submit your changes with:
 
 - ✅ File `skills/dictation/SKILL.md` exists
 - ✅ Contains proper SKILL.md frontmatter (name, description)
-<<<<<<< HEAD
-- ✅ Contains ~250 project-specific terms (240-260 acceptable)
-=======
 - ✅ Contains ~1000 project-specific terms (950-1050 acceptable)
->>>>>>> origin/main
 - ✅ Terms extracted from documentation only
 - ✅ Focuses on fixing speech-to-text errors
 - ✅ Includes instructions for removing filler words and improving text clarity

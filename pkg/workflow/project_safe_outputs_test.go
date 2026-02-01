@@ -119,8 +119,6 @@ func TestProjectConfigIntegration(t *testing.T) {
 	// Check create-project-status-update configuration
 	assert.Equal(t, 1, result.CreateProjectStatusUpdates.Max, "CreateProjectStatusUpdates max should match")
 }
-<<<<<<< HEAD
-=======
 
 func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 	compiler := NewCompiler()
@@ -181,4 +179,3 @@ func TestApplyProjectSafeOutputsEnforcesProjectURL(t *testing.T) {
 		})
 	}
 }
->>>>>>> origin/main

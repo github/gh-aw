@@ -201,8 +201,6 @@ Test workflow
 	assert.Contains(t, projectConfigJSON, `"create_project_status_update":{"max":2}`,
 		"Expected create_project_status_update with max:2 in project handler config")
 }
-<<<<<<< HEAD
-=======
 
 // TestCreateProjectStatusUpdateWithProjectURLConfig verifies that the project URL configuration
 // is properly set as an environment variable when configured in safe-outputs
@@ -240,4 +238,3 @@ Test workflow
 	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
 	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-67890/projects/88888", "Expected project URL in environment variable")
 }
->>>>>>> origin/main

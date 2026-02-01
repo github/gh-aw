@@ -53,8 +53,6 @@ Test workflow
 		"Expected field definitions in update_project handler config",
 	)
 }
-<<<<<<< HEAD
-=======
 
 func TestUpdateProjectWithProjectURLConfig(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "handler-config-test")
@@ -90,4 +88,3 @@ Test workflow
 	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
 	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-12345/projects/99999", "Expected project URL in environment variable")
 }
->>>>>>> origin/main

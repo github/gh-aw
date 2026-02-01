@@ -17,15 +17,11 @@ set -e
 # Get destination from input or use default
 DESTINATION="${INPUT_DESTINATION:-/opt/gh-aw/actions}"
 
-<<<<<<< HEAD
-echo "Copying activation files to ${DESTINATION}"
-=======
 # Get safe-output-projects flag from input (default: false)
 SAFE_OUTPUT_PROJECTS_ENABLED="${INPUT_SAFE_OUTPUT_PROJECTS:-false}"
 
 echo "Copying activation files to ${DESTINATION}"
 echo "Safe-output-projects support: ${SAFE_OUTPUT_PROJECTS_ENABLED}"
->>>>>>> origin/main
 
 # Create destination directory if it doesn't exist
 mkdir -p "${DESTINATION}"
@@ -271,8 +267,6 @@ fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 
-<<<<<<< HEAD
-=======
 # Install @actions/github package ONLY if safe-output-projects flag is enabled
 # This package is needed by the unified handler manager to create separate Octokit clients
 # for project operations that require GH_AW_PROJECT_GITHUB_TOKEN
@@ -306,7 +300,6 @@ else
   echo "Safe-output-projects not enabled - skipping @actions/github installation"
 fi
 
->>>>>>> origin/main
 # Set output
 if [ -n "${GITHUB_OUTPUT}" ]; then
   echo "files_copied=${FILE_COUNT}" >> "${GITHUB_OUTPUT}"
