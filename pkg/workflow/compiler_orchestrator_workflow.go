@@ -421,9 +421,6 @@ func (c *Compiler) extractAdditionalConfigurations(
 	// Use the already extracted output configuration
 	workflowData.SafeOutputs = safeOutputs
 
-	// Apply project safe-outputs if project field is present
-	workflowData.SafeOutputs = c.applyProjectSafeOutputs(frontmatter, workflowData.SafeOutputs)
-
 	// Extract safe-inputs configuration
 	workflowData.SafeInputs = c.extractSafeInputsConfig(frontmatter)
 

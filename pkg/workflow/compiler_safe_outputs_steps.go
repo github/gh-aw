@@ -172,16 +172,13 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	// Add all safe output configuration env vars (still needed by individual handlers)
 	c.addAllSafeOutputConfigEnvVars(&steps, data)
 
-	// Add GH_AW_PROJECT_URL if project is configured in frontmatter or safe-outputs config
+	// Add GH_AW_PROJECT_URL if project is configured in safe-outputs config
 	// This provides a default project URL for update-project and create-project-status-update operations
 	// These types are handled by the unified handler manager, not the project handler manager.
 	//
-	// Precedence: frontmatter project > update-project.project > create-project-status-update.project
+	// Precedence: update-project.project > create-project-status-update.project
 	var projectURL string
-	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.Project != nil && data.ParsedFrontmatter.Project.URL != "" {
-		projectURL = data.ParsedFrontmatter.Project.URL
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from frontmatter for handler manager: %s", projectURL)
-	} else if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
+	if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
 		projectURL = data.SafeOutputs.UpdateProjects.Project
 		consolidatedSafeOutputsStepsLog.Printf("Using project URL from update-project config for handler manager: %s", projectURL)
 	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.Project != "" {

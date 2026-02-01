@@ -3,7 +3,6 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
@@ -160,8 +159,7 @@ type FrontmatterConfig struct {
 	Jobs             map[string]any     `json:"jobs,omitempty"`        // Custom workflow jobs (too dynamic to type)
 	SafeOutputs      *SafeOutputsConfig `json:"safe-outputs,omitempty"`
 	SafeInputs       *SafeInputsConfig  `json:"safe-inputs,omitempty"`
-	PermissionsTyped *PermissionsConfig `json:"-"`                 // New typed field (not in JSON to avoid conflict)
-	Project          *ProjectConfig     `json:"project,omitempty"` // Project tracking configuration
+	PermissionsTyped *PermissionsConfig `json:"-"` // New typed field (not in JSON to avoid conflict)
 
 	// Event and trigger configuration
 	On          map[string]any `json:"on,omitempty"`          // Complex trigger config with many variants (too dynamic to type)
@@ -250,35 +248,9 @@ func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, err
 	frontmatterTypesLog.Printf("Parsing frontmatter config with %d fields", len(frontmatter))
 	var config FrontmatterConfig
 
-	// Normalize mixed-type fields before unmarshaling into typed structs.
-	// In YAML frontmatter, "project" must be a URL string:
-	//   project: https://github.com/orgs/.../projects/123
-	normalizedFrontmatter := make(map[string]any, len(frontmatter))
-	for k, v := range frontmatter {
-		normalizedFrontmatter[k] = v
-	}
-	if projectValue, ok := frontmatter["project"]; ok {
-		switch v := projectValue.(type) {
-		case nil:
-			delete(normalizedFrontmatter, "project")
-		case string:
-			projectURL := strings.TrimSpace(v)
-			if projectURL == "" {
-				delete(normalizedFrontmatter, "project")
-			} else {
-				// Normalize string value into the typed struct shape.
-				normalizedFrontmatter["project"] = map[string]any{"url": projectURL}
-			}
-		case map[string]any, map[any]any:
-			return nil, fmt.Errorf("invalid frontmatter field 'project': expected URL string, got mapping")
-		default:
-			return nil, fmt.Errorf("invalid frontmatter field 'project': expected URL string, got %T", projectValue)
-		}
-	}
-
 	// Use JSON marshaling for the entire frontmatter conversion
 	// This automatically handles all field mappings
-	jsonBytes, err := json.Marshal(normalizedFrontmatter)
+	jsonBytes, err := json.Marshal(frontmatter)
 	if err != nil {
 		frontmatterTypesLog.Printf("Failed to marshal frontmatter: %v", err)
 		return nil, fmt.Errorf("failed to marshal frontmatter to JSON: %w", err)
@@ -555,9 +527,6 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 		// Convert SafeInputsConfig to map - would need a ToMap method
 		result["safe-inputs"] = fc.SafeInputs
 	}
-	if fc.Project != nil {
-		result["project"] = projectConfigToMap(fc.Project)
-	}
 
 	// Event and trigger configuration
 	if fc.On != nil {
@@ -758,40 +727,6 @@ func permissionsConfigToMap(config *PermissionsConfig) map[string]any {
 	}
 	if config.OrganizationPackages != "" {
 		result["organization-packages"] = config.OrganizationPackages
-	}
-
-	if len(result) == 0 {
-		return nil
-	}
-
-	return result
-}
-
-// projectConfigToMap converts ProjectConfig back to map[string]any
-func projectConfigToMap(config *ProjectConfig) map[string]any {
-	if config == nil {
-		return nil
-	}
-
-	result := make(map[string]any)
-
-	if config.URL != "" {
-		result["url"] = config.URL
-	}
-	if len(config.Scope) > 0 {
-		result["scope"] = config.Scope
-	}
-	if config.MaxUpdates > 0 {
-		result["max-updates"] = config.MaxUpdates
-	}
-	if config.MaxStatusUpdates > 0 {
-		result["max-status-updates"] = config.MaxStatusUpdates
-	}
-	if config.GitHubToken != "" {
-		result["github-token"] = config.GitHubToken
-	}
-	if config.DoNotDowngradeDoneItems != nil {
-		result["do-not-downgrade-done-items"] = *config.DoNotDowngradeDoneItems
 	}
 
 	if len(result) == 0 {

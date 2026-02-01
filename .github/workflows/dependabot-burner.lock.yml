@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/campaign.md
 #
-# frontmatter-hash: f8ec5be315af99f2a29aab2b35194be259f7312eb2982fb063e157fe60cdedc8
+# frontmatter-hash: ee5b79a092eced9121dacaa8887c6afe8d46eee2d1dbc79f0795d5eeefe6394a
 
 name: "Dependabot Burner"
 "on":
@@ -161,7 +161,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"expires":48,"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":100}}
+          {"create_issue":{"expires":48,"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":10}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1304,7 +1304,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"create_project_status_update\":{\"max\":1,\"project\":\"https://github.com/orgs/githubnext/projects/144\"},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":100,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"create_project_status_update\":{\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":10,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
           GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

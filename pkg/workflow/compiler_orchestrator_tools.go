@@ -49,9 +49,6 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	// Extract SafeOutputs configuration early so we can use it when applying default tools
 	safeOutputs := c.extractSafeOutputsConfig(result.Frontmatter)
 
-	// Check for project field and auto-configure safe-outputs for project tracking
-	safeOutputs = c.applyProjectSafeOutputs(result.Frontmatter, safeOutputs)
-
 	// Extract SecretMasking configuration
 	secretMasking := c.extractSecretMaskingConfig(result.Frontmatter)
 

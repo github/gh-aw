@@ -146,42 +146,6 @@ func TestParseFrontmatterConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("parses project as URL string", func(t *testing.T) {
-		frontmatter := map[string]any{
-			"name":    "project-string",
-			"project": "https://github.com/orgs/<ORG>/projects/<NUMBER>",
-		}
-
-		config, err := ParseFrontmatterConfig(frontmatter)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if config.Project == nil {
-			t.Fatal("Project should not be nil")
-		}
-		if config.Project.URL != "https://github.com/orgs/<ORG>/projects/<NUMBER>" {
-			t.Errorf("Project.URL = %q, want %q", config.Project.URL, "https://github.com/orgs/<ORG>/projects/<NUMBER>")
-		}
-	})
-
-	t.Run("rejects project as mapping", func(t *testing.T) {
-		frontmatter := map[string]any{
-			"name": "project-mapping",
-			"project": map[string]any{
-				"url": "https://github.com/orgs/<ORG>/projects/<NUMBER>",
-			},
-		}
-
-		_, err := ParseFrontmatterConfig(frontmatter)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-		if !strings.Contains(err.Error(), "expected URL string") {
-			t.Fatalf("expected type error, got: %v", err)
-		}
-	})
-
 	t.Run("parses complete workflow config", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"name":        "full-workflow",

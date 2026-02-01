@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: c40d2a0d0dd4c9161859ac192c7e53b80b2feda2f1dd25e294c61b9d932eeccb
+# frontmatter-hash: 780b769a0aa07ffa27794b2e7e22396e4aee64b3e665654ec4734c182e15838e
 
 name: "Test Project URL Default"
 "on":
