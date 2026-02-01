@@ -11,6 +11,8 @@ const {
   marshalSorted,
   extractHashFromLockFile,
   normalizeFrontmatterText,
+  defaultFileReader,
+  createGitHubFileReader,
 } = require("./frontmatter_hash_pure.cjs");
 
 describe("frontmatter_hash_pure (text-based)", () => {
@@ -252,6 +254,60 @@ on:
       } finally {
         if (fs.existsSync(testFile1)) fs.unlinkSync(testFile1);
         if (fs.existsSync(testFile2)) fs.unlinkSync(testFile2);
+      }
+    });
+
+    it("should work with custom file reader", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "frontmatter-hash-test-"));
+      const testFile = path.join(tmpDir, "test.md");
+      const content = "---\nengine: copilot\ndescription: Test\n---\n\nBody";
+
+      // Create an in-memory file system mock
+      const mockFileSystem = {
+        [testFile]: content,
+      };
+
+      const customFileReader = async filePath => {
+        if (mockFileSystem[filePath]) {
+          return mockFileSystem[filePath];
+        }
+        throw new Error(`File not found: ${filePath}`);
+      };
+
+      try {
+        const hash = await computeFrontmatterHash(testFile, { fileReader: customFileReader });
+        expect(hash).toHaveLength(64); // SHA-256 is 64 hex chars
+        expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should handle imports with custom file reader", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "frontmatter-hash-test-"));
+      const mainFile = path.join(tmpDir, "main.md");
+      const sharedDir = path.join(tmpDir, "shared");
+      const importedFile = path.join(sharedDir, "imported.md");
+
+      // Create an in-memory file system mock
+      const mockFileSystem = {
+        [mainFile]: "---\nengine: copilot\nimports:\n  - shared/imported.md\n---\n\nMain body",
+        [importedFile]: "---\ntools:\n  bash: true\n---\n\nImported content",
+      };
+
+      const customFileReader = async filePath => {
+        if (mockFileSystem[filePath]) {
+          return mockFileSystem[filePath];
+        }
+        throw new Error(`File not found: ${filePath}`);
+      };
+
+      try {
+        const hash = await computeFrontmatterHash(mainFile, { fileReader: customFileReader });
+        expect(hash).toHaveLength(64);
+        expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
   });
