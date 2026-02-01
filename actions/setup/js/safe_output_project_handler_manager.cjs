@@ -31,9 +31,16 @@ const PROJECT_HANDLER_MAP = {
 };
 
 /**
+ * Project handler config result
+ * @typedef {Object} ProjectHandlerConfig
+ * @property {Object} config - Safe outputs configuration
+ * @property {boolean} continueOnError - Global continue-on-error flag
+ */
+
+/**
  * Load configuration for project-related safe outputs
  * Reads configuration from GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
- * @returns {{config: Object, continueOnError: boolean}} Safe outputs configuration and global continue-on-error flag
+ * @returns {ProjectHandlerConfig} Safe outputs configuration and global continue-on-error flag
  */
 function loadConfig() {
   if (!process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG) {

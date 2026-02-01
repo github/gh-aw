@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -133,19 +134,18 @@ safe-outputs:
 Test the agent.
 `
 
-	// Write markdown to a temp file
-	tmpFile := "/tmp/test-continue-on-error.md"
+	// Create temp directory and file
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test-continue-on-error.md")
 	err := os.WriteFile(tmpFile, []byte(markdown), 0644)
 	require.NoError(t, err, "Should write temp file")
-	defer os.Remove(tmpFile)
 
 	compiler := NewCompiler()
 	err = compiler.CompileWorkflow(tmpFile)
 	require.NoError(t, err, "Workflow should compile successfully")
 
 	// Read the compiled lock file
-	lockFile := "/tmp/test-continue-on-error.lock.yml"
-	defer os.Remove(lockFile)
+	lockFile := filepath.Join(tmpDir, "test-continue-on-error.lock.yml")
 
 	compiled, err := os.ReadFile(lockFile)
 	require.NoError(t, err, "Should read compiled lock file")
