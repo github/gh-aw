@@ -9,6 +9,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { computeFrontmatterHash, extractHashFromLockFile, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
+const { getFileContent } = require("./github_api_helpers.cjs");
 
 async function main() {
   const workflowFile = process.env.GH_AW_WORKFLOW_FILE;
@@ -61,46 +62,11 @@ async function main() {
     }
   }
 
-  // Helper function to get file content using GitHub API
-  async function getFileContent(path) {
-    try {
-      const response = await github.rest.repos.getContent({
-        owner,
-        repo,
-        path,
-        ref,
-      });
-
-      // Handle case where response is an array (directory listing)
-      if (Array.isArray(response.data)) {
-        core.info(`Path ${path} is a directory, not a file`);
-        return null;
-      }
-
-      // Check if this is a file (not a symlink or submodule)
-      if (response.data.type !== "file") {
-        core.info(`Path ${path} is not a file (type: ${response.data.type})`);
-        return null;
-      }
-
-      // Decode base64 content
-      if (response.data.encoding === "base64" && response.data.content) {
-        return Buffer.from(response.data.content, "base64").toString("utf8");
-      }
-
-      return response.data.content || null;
-    } catch (error) {
-      const errorMessage = getErrorMessage(error);
-      core.info(`Could not fetch content for ${path}: ${errorMessage}`);
-      return null;
-    }
-  }
-
   // Helper function to compute and compare frontmatter hashes
   async function logFrontmatterHashComparison() {
     try {
       // Fetch lock file content to extract stored hash
-      const lockFileContent = await getFileContent(lockFilePath);
+      const lockFileContent = await getFileContent(github, owner, repo, lockFilePath, ref);
       if (!lockFileContent) {
         core.info("Unable to fetch lock file content for hash comparison");
         return;
