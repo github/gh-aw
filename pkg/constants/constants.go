@@ -253,7 +253,7 @@ const AgenticCampaignLabel = "agentic-campaign"
 const CampaignLabelPrefix = "z_campaign_"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.27"
+const DefaultClaudeCodeVersion Version = "2.1.29"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
@@ -292,7 +292,7 @@ const DefaultGitHubMCPServerVersion Version = "v0.30.2"
 const DefaultFirewallVersion Version = "v0.11.2"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
-const DefaultMCPGatewayVersion Version = "v0.0.86"
+const DefaultMCPGatewayVersion Version = "v0.0.88"
 
 // DefaultMCPGatewayContainer is the default container image for the MCP Gateway
 const DefaultMCPGatewayContainer = "ghcr.io/githubnext/gh-aw-mcpg"
