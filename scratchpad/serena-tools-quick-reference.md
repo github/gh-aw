@@ -70,6 +70,25 @@ GitHub:       0 (0.00%)
 - **No Failures:** Zero timeout or error conditions
 - **Stable Connection:** Reliable MCP gateway ↔ Serena communication
 
+### 📦 Request/Response Size Metrics
+
+**Overall Data Transfer:**
+- **Total Data:** 425.69 KB (72.60 KB requests + 353.09 KB responses)
+- **Response Amplification:** 4.86x average (responses 4.86x larger than requests)
+
+**By Category:**
+- **Bash:** 181.17 KB (42.56% of all data) - largest consumer
+- **Serena Tools:** 12.32 KB (2.89% of all data) - highly efficient
+- **SafeOutputs:** 30.58 KB (7.18% of all data) - single large request
+
+**Serena Efficiency:**
+- **Compact requests:** 700-840 bytes average per call
+- **Compact responses:** 386-771 bytes average per call
+- **Bandwidth efficient:** <1x response amplification vs. 11.8x for Bash
+- **Structured data:** Returns precise, formatted results vs. verbose text
+
+**Key Insight:** Serena tools are **bandwidth-efficient** despite lower usage - they transfer 10x less data per call than Bash operations.
+
 ### 📊 Efficiency Opportunities
 
 1. **Tool Registration Overhead:** 17/23 tools (74%) unused → consider lazy loading

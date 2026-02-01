@@ -107,6 +107,69 @@ This indicates:
 ✅ Reliable MCP gateway communication  
 ✅ Stable Serena server connection  
 
+## Request/Response Size Analysis
+
+### Overall Summary
+
+- **Total Requests:** 44 calls
+- **Total Request Data:** 74,341 bytes (72.60 KB)
+- **Total Response Data:** 361,564 bytes (353.09 KB)
+- **Total Data Transferred:** 435,905 bytes (425.69 KB)
+- **Average Request Size:** 1,689.57 bytes
+- **Average Response Size:** 8,217.36 bytes
+- **Response/Request Ratio:** 4.86x
+
+### Size Distribution by Category
+
+| Category | Request Data | Response Data | Total Data | % of Total |
+|----------|--------------|---------------|------------|------------|
+| **Builtin Tools** | 37,115B (36.25KB) | 215,329B (210.28KB) | 252,444B (246.53KB) | 57.91% |
+| **Serena Tools** | 6,829B (6.67KB) | 5,786B (5.65KB) | 12,615B (12.32KB) | 2.89% |
+| **SafeOutputs** | 30,397B (29.68KB) | 918B (0.90KB) | 31,315B (30.58KB) | 7.18% |
+
+### Data Transfer by Tool (Top 10)
+
+| Rank | Tool | Calls | Avg Request | Avg Response | Total Data | % of Total |
+|------|------|-------|-------------|--------------|------------|------------|
+| 1 | `Bash` | 17 | 854B | 10,059B | 185,521B (181.17KB) | 42.56% |
+| 2 | `safeoutputs/create_discussion` | 1 | 30,397B | 918B | 31,315B (30.58KB) | 7.18% |
+| 3 | `Write` | 3 | 1,872B | 7,650B | 28,566B (27.90KB) | 6.55% |
+| 4 | `TodoWrite` | 6 | 1,851B | 2,170B | 24,128B (23.56KB) | 5.54% |
+| 5 | `Read` | 8 | 735B | 1,043B | 14,229B (13.90KB) | 3.26% |
+| 6 | `search_for_pattern` | 3 | 837B | 727B | 4,692B (4.58KB) | 1.08% |
+| 7 | `find_symbol` | 2 | 754B | 511B | 2,530B (2.47KB) | 0.58% |
+| 8 | `get_current_config` | 1 | 700B | 771B | 1,471B (1.44KB) | 0.34% |
+| 9 | `check_onboarding_performed` | 1 | 710B | 727B | 1,437B (1.40KB) | 0.33% |
+| 10 | `initial_instructions` | 1 | 702B | 700B | 1,402B (1.37KB) | 0.32% |
+
+### Serena Tools Size Breakdown
+
+| Tool | Calls | Avg Request | Avg Response | Total Data | Response/Request Ratio |
+|------|-------|-------------|--------------|------------|------------------------|
+| `search_for_pattern` | 3 | 837B | 727B | 4,692B (4.58KB) | 0.87x |
+| `find_symbol` | 2 | 754B | 511B | 2,530B (2.47KB) | 0.68x |
+| `get_current_config` | 1 | 700B | 771B | 1,471B (1.44KB) | 1.10x |
+| `check_onboarding_performed` | 1 | 710B | 727B | 1,437B (1.40KB) | 1.02x |
+| `initial_instructions` | 1 | 702B | 700B | 1,402B (1.37KB) | 1.00x |
+| `list_memories` | 1 | 697B | 386B | 1,083B (1.06KB) | 0.55x |
+
+### Key Size Insights
+
+**Data Distribution:**
+- **Bash dominates data transfer:** 42.56% of all data (181.17 KB), with max single response of 109.75 KB
+- **Serena tools are lightweight:** Only 2.89% of total data despite 20.45% of calls
+- **SafeOutputs has largest single request:** 30.40 KB for discussion creation
+
+**Efficiency Patterns:**
+- **Serena tools are compact:** Average 700-840 bytes per request, 386-771 bytes per response
+- **Response amplification varies:** Overall 4.86x, but Serena tools average <1x (more compact responses)
+- **Bash is most verbose:** 10.06 KB average response (11.8x amplification)
+
+**Bandwidth Implications:**
+- Serena tools use **minimal bandwidth** compared to Bash operations
+- Despite lower usage rate, Serena tools are highly **bandwidth-efficient**
+- Pattern: Language-aware tools return structured, compact data vs. verbose text outputs
+
 ## Statistical Insights
 
 ### Tool Adoption Rate
@@ -206,7 +269,59 @@ This pattern suggests:
 - Log parsing may miss tool calls not following standard MCP format
 - Timing data limited (only server health check latencies captured)
 - No failure reason analysis (100% success rate means no error patterns to study)
-- Tool parameter/payload analysis not included
+- Size analysis based on log line lengths (approximation of actual payload sizes)
+
+### Data Transfer Volume Visualization
+
+```mermaid
+graph TB
+    A[Total Data: 425.69 KB] --> B[Builtin: 246.53 KB<br/>57.91%]
+    A --> C[SafeOutputs: 30.58 KB<br/>7.18%]
+    A --> D[Serena: 12.32 KB<br/>2.89%]
+    
+    B --> B1[Bash: 181.17 KB<br/>42.56%]
+    B --> B2[Write: 27.90 KB<br/>6.55%]
+    B --> B3[TodoWrite: 23.56 KB<br/>5.54%]
+    B --> B4[Read: 13.90 KB<br/>3.26%]
+    
+    D --> D1[search_for_pattern: 4.58 KB]
+    D --> D2[find_symbol: 2.47 KB]
+    D --> D3[Other Serena: 5.27 KB]
+    
+    style A fill:#e1f5ff
+    style B fill:#ffebcc
+    style C fill:#d4edda
+    style D fill:#cce5ff
+    style B1 fill:#ffd966
+```
+
+### Request vs Response Size Comparison
+
+```mermaid
+graph LR
+    subgraph "Requests (72.60 KB)"
+        R1[Builtin: 36.25 KB]
+        R2[SafeOutputs: 29.68 KB]
+        R3[Serena: 6.67 KB]
+    end
+    
+    subgraph "Responses (353.09 KB)"
+        S1[Builtin: 210.28 KB]
+        S2[SafeOutputs: 0.90 KB]
+        S3[Serena: 5.65 KB]
+    end
+    
+    R1 --> S1
+    R2 --> S2
+    R3 --> S3
+    
+    style R1 fill:#ffebcc
+    style R2 fill:#d4edda
+    style R3 fill:#cce5ff
+    style S1 fill:#ffebcc
+    style S2 fill:#d4edda
+    style S3 fill:#cce5ff
+```
 
 ## Appendix: Registered Serena Tools
 
