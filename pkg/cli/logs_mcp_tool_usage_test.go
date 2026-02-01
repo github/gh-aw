@@ -11,12 +11,12 @@ import (
 
 func TestBuildMCPToolUsageSummary(t *testing.T) {
 	tests := []struct {
-		name               string
-		processedRuns      []ProcessedRun
-		expectedServers    int
-		expectedTools      int
-		expectedToolCalls  int
-		expectNil          bool
+		name              string
+		processedRuns     []ProcessedRun
+		expectedServers   int
+		expectedTools     int
+		expectedToolCalls int
+		expectNil         bool
 	}{
 		{
 			name: "single run with MCP tool usage",

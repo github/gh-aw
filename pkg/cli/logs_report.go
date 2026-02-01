@@ -713,8 +713,8 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 	reportLog.Printf("Building MCP tool usage summary from %d processed runs", len(processedRuns))
 
 	// Maps for aggregating data
-	toolSummaryMap := make(map[string]*MCPToolSummary)    // Key: serverName:toolName
-	serverStatsMap := make(map[string]*MCPServerStats)    // Key: serverName
+	toolSummaryMap := make(map[string]*MCPToolSummary) // Key: serverName:toolName
+	serverStatsMap := make(map[string]*MCPServerStats) // Key: serverName
 	var allToolCalls []MCPToolCall
 
 	// Aggregate data from all runs
