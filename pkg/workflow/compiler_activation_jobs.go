@@ -711,8 +711,33 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	// Build job outputs
 	// Always include model output for reuse in other jobs
 	outputs := map[string]string{
-		"model":                      "${{ steps.generate_aw_info.outputs.model }}",
-		"secret_verification_result": "${{ steps.validate-secret.outputs.verification_result }}",
+		"model": "${{ steps.generate_aw_info.outputs.model }}",
+	}
+
+	// Only add secret_verification_result output if the engine adds the validate-secret step
+	// The validate-secret step is only added by engines that include it in GetInstallationSteps()
+	engine, err := c.getAgenticEngine(data.AI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agentic engine: %w", err)
+	}
+	installSteps := engine.GetInstallationSteps(data)
+	hasValidateSecretStep := false
+	for _, step := range installSteps {
+		for _, line := range step {
+			if strings.Contains(line, "id: validate-secret") {
+				hasValidateSecretStep = true
+				break
+			}
+		}
+		if hasValidateSecretStep {
+			break
+		}
+	}
+	if hasValidateSecretStep {
+		outputs["secret_verification_result"] = "${{ steps.validate-secret.outputs.verification_result }}"
+		compilerActivationJobsLog.Printf("Added secret_verification_result output (engine includes validate-secret step)")
+	} else {
+		compilerActivationJobsLog.Printf("Skipped secret_verification_result output (engine does not include validate-secret step)")
 	}
 
 	// Add safe-output specific outputs if the workflow uses the safe-outputs feature
