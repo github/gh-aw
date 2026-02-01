@@ -812,11 +812,13 @@ This rewards honest AI behavior and helps teams improve data accessibility for f
 
 Creates discussions with optional `category` (slug, name, or ID; defaults to first available). `expires` field auto-closes after period (integers, `2h`, `7d`, `2w`, `1m`, `1y`, or `false` to disable; hours < 24 treated as 1 day) as "OUTDATED" with comment. Generates maintenance workflow with dynamic frequency based on shortest expiration time (see Auto-Expiration section above).
 
+**Category Naming Standard**: Use lowercase, plural category names (e.g., `audits`, `general`, `reports`) for consistency and better searchability. GitHub Discussion category IDs (starting with `DIC_`) are also supported.
+
 ```yaml wrap
 safe-outputs:
   create-discussion:
     title-prefix: "[ai] "     # prefix for titles
-    category: "general"       # category slug, name, or ID
+    category: "general"       # category slug, name, or ID (use lowercase)
     expires: 3                # auto-close after 3 days (or false to disable)
     max: 3                    # max discussions (default: 1)
     target-repo: "owner/repo" # cross-repository
