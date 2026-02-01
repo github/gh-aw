@@ -480,37 +480,10 @@ describe("create_project_status_update", () => {
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("falling back to projectsV2 list search"));
   });
 
-  it("should use default project URL from GH_AW_PROJECT_URL when message.project is missing", async () => {
-    // Set default project URL in environment
+  it("should fail when project field is missing even if GH_AW_PROJECT_URL is set", async () => {
+    // Set default project URL in environment (should be ignored)
     const defaultProjectUrl = "https://github.com/orgs/test-org/projects/42";
     process.env.GH_AW_PROJECT_URL = defaultProjectUrl;
-
-    mockGithub.graphql
-      .mockResolvedValueOnce({
-        // First call: direct project query by number
-        organization: {
-          projectV2: {
-            id: "PVT_test123",
-            number: 42,
-            title: "Test Project",
-            url: defaultProjectUrl,
-          },
-        },
-      })
-      .mockResolvedValueOnce({
-        // Second call: create status update
-        createProjectV2StatusUpdate: {
-          statusUpdate: {
-            id: "PVTSU_test456",
-            body: "Default project status",
-            bodyHTML: "<p>Default project status</p>",
-            startDate: "2025-01-01",
-            targetDate: "2025-12-31",
-            status: "ON_TRACK",
-            createdAt: "2025-01-06T12:00:00Z",
-          },
-        },
-      });
 
     const handler = await main({ max: 10 });
 
@@ -523,16 +496,16 @@ describe("create_project_status_update", () => {
 
     const result = await handler(messageWithoutProject, {});
 
-    expect(result.success).toBe(true);
-    expect(result.status_update_id).toBe("PVTSU_test456");
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Missing required field: project");
+    expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Missing required "project" field'));
 
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;
   });
 
-  it("should prioritize message.project over GH_AW_PROJECT_URL when both are present", async () => {
-    // Set default project URL in environment (should be ignored)
+  it("should succeed when project field is explicitly provided", async () => {
+    // Set default project URL in environment (should be ignored since message has explicit project)
     process.env.GH_AW_PROJECT_URL = "https://github.com/orgs/test-org/projects/999";
 
     const messageProjectUrl = "https://github.com/orgs/test-org/projects/42";
@@ -578,8 +551,6 @@ describe("create_project_status_update", () => {
 
     expect(result.success).toBe(true);
     expect(result.status_update_id).toBe("PVTSU_test789");
-    // Should not use default from environment
-    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
 
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;

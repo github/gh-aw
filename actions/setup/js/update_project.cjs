@@ -1042,33 +1042,29 @@ async function main(config = {}) {
     }
 
     try {
-      // Get configured project URL from environment
-      // This is set from the safe-outputs configuration where project is required
-      const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
-
-      // Determine effective project URL: message.project takes precedence, otherwise use configured URL
+      // Validate that project field is explicitly provided in the message
+      // The project field is required in agent output messages and must be a full GitHub project URL
       let effectiveProjectUrl = message.project;
 
       if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
-        if (defaultProjectUrl) {
-          core.info(`Using project URL from safe-outputs configuration: ${defaultProjectUrl}`);
-          effectiveProjectUrl = defaultProjectUrl;
+        const errorMsg = 'Missing required "project" field. The agent must explicitly include the project URL in the output message.';
+        core.error(errorMsg);
+
+        // Provide helpful context based on content_type
+        if (message.content_type === "draft_issue") {
+          core.error('For draft_issue content_type, you must include: {"type": "update_project", "project": "https://github.com/orgs/myorg/projects/42", "content_type": "draft_issue", "draft_title": "...", "fields": {...}}');
+        } else if (message.content_type === "issue" || message.content_type === "pull_request") {
+          core.error(
+            `For ${message.content_type} content_type, you must include: {"type": "update_project", "project": "https://github.com/orgs/myorg/projects/42", "content_type": "${message.content_type}", "content_number": 123, "fields": {...}}`
+          );
         } else {
-          const errorMsg = 'Missing required "project" field. Either include "project" in the message, or configure it in safe-outputs: update-project: {project: "https://github.com/orgs/myorg/projects/42"}';
-          core.error(errorMsg);
-
-          // Provide helpful context based on content_type
-          if (message.content_type === "draft_issue") {
-            core.error('For draft_issue content_type, you must include: {"project": "https://...", "content_type": "draft_issue", "draft_title": "...", "fields": {...}}');
-          } else if (message.content_type === "issue" || message.content_type === "pull_request") {
-            core.error(`For ${message.content_type} content_type, you must include: {"project": "https://...", "content_type": "${message.content_type}", "content_number": 123, "fields": {...}}`);
-          }
-
-          return {
-            success: false,
-            error: errorMsg,
-          };
+          core.error('Example: {"type": "update_project", "project": "https://github.com/orgs/myorg/projects/42", "content_type": "draft_issue", "draft_title": "Task Title", "fields": {"Status": "Todo"}}');
         }
+
+        return {
+          success: false,
+          error: errorMsg,
+        };
       }
 
       // Validation passed - increment processed count

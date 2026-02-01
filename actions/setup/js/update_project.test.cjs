@@ -1269,8 +1269,8 @@ describe("updateProject", () => {
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Missing required"));
   });
 
-  it("should use default project URL from GH_AW_PROJECT_URL when message.project is missing", async () => {
-    // Set default project URL in environment
+  it("should fail when project field is missing even if GH_AW_PROJECT_URL is set", async () => {
+    // Set default project URL in environment (should be ignored)
     const defaultProjectUrl = "https://github.com/orgs/testowner/projects/60";
     process.env.GH_AW_PROJECT_URL = defaultProjectUrl;
 
@@ -1283,20 +1283,18 @@ describe("updateProject", () => {
       draft_body: "This is a test",
     };
 
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(defaultProjectUrl, 60, "project-default"), addDraftIssueResponse("draft-item-default")]);
-
     const result = await messageHandler(messageWithoutProject, new Map());
 
-    expect(result.success).toBe(true);
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
-    expect(getOutput("item-id")).toBe("draft-item-default");
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Missing required "project" field. The agent must explicitly include the project URL in the output message.');
+    expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Missing required "project" field'));
 
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;
   });
 
-  it("should prioritize message.project over GH_AW_PROJECT_URL when both are present", async () => {
-    // Set default project URL in environment
+  it("should succeed when project field is explicitly provided", async () => {
+    // Set default project URL in environment (should be ignored since message has explicit project)
     process.env.GH_AW_PROJECT_URL = "https://github.com/orgs/testowner/projects/999";
 
     const messageHandler = await updateProjectHandlerFactory({});
@@ -1315,8 +1313,6 @@ describe("updateProject", () => {
     const result = await messageHandler(messageWithProject, new Map());
 
     expect(result.success).toBe(true);
-    // Should not use default from environment
-    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
     expect(getOutput("item-id")).toBe("draft-item-message");
 
     // Cleanup

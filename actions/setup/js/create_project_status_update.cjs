@@ -309,24 +309,16 @@ async function main(config = {}, githubClient = null) {
 
     const output = message;
 
-    // Get configured project URL from environment
-    // This is set from the safe-outputs configuration where project is required
-    const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
-
-    // Determine effective project URL: output.project takes precedence, otherwise use configured URL
-    let effectiveProjectUrl = output.project;
+    // Validate that project field is explicitly provided in the message
+    // The project field is required in agent output messages and must be a full GitHub project URL
+    const effectiveProjectUrl = output.project;
 
     if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
-      if (defaultProjectUrl) {
-        core.info(`Using project URL from safe-outputs configuration: ${defaultProjectUrl}`);
-        effectiveProjectUrl = defaultProjectUrl;
-      } else {
-        core.error('Missing required "project" field. Configure it in safe-outputs: create-project-status-update: {project: "https://github.com/orgs/myorg/projects/42"}');
-        return {
-          success: false,
-          error: "Missing required field: project",
-        };
-      }
+      core.error('Missing required "project" field. The agent must explicitly include the project URL in the output message: {"type": "create_project_status_update", "project": "https://github.com/orgs/myorg/projects/42", "body": "..."}');
+      return {
+        success: false,
+        error: "Missing required field: project",
+      };
     }
 
     if (!output.body) {
