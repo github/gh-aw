@@ -111,17 +111,14 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	//
 	// IMPORTANT: Step order matters for safe outputs that depend on each other.
 	// The execution order ensures dependencies are satisfied:
-	// 1. Project Handler Manager - processes create_project, update_project, copy_project, create_project_status_update
-	// 2. Handler Manager - processes create_issue, update_issue, add_comment, etc.
-	// 3. Assign To Agent - assigns issue to agent (after handler managers complete)
-	// 4. Create Agent Session - creates agent session (after assignment)
+	// 1. Handler Manager - processes create_issue, update_issue, add_comment, etc.
+	// 2. Assign To Agent - assigns issue to agent (after handler managers complete)
+	// 3. Create Agent Session - creates agent session (after assignment)
 	//
-	// Note: Project-related operations (step 1) run first to ensure projects exist before
-	// issues/PRs are created (step 2) and potentially added to those projects.
-	// All project-related operations require GH_AW_PROJECT_GITHUB_TOKEN for proper token isolation.
+	// Note: All project-related operations (create_project, update_project, create_project_status_update)
+	// are now handled by the unified handler in the handler manager step.
 
 	// Check if any handler-manager-supported types are enabled
-	// Note: Project-related types are handled by the project handler manager
 	hasHandlerManagerTypes := data.SafeOutputs.CreateIssues != nil ||
 		data.SafeOutputs.AddComments != nil ||
 		data.SafeOutputs.CreateDiscussions != nil ||
@@ -146,37 +143,11 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		data.SafeOutputs.MissingTool != nil ||
 		data.SafeOutputs.MissingData != nil
 
-	// Check if any project-handler-manager-supported types are enabled
-	// These types require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately
-	// Note: create_project, update-project and create-project-status-update are handled by the unified handler,
-	// not the project handler manager, so they are excluded from this check
-	hasProjectHandlerManagerTypes := data.SafeOutputs.CopyProjects != nil
+	// Note: All project-related operations are now handled by the unified handler.
+	// The project handler manager has been removed.
 
-	// 1. Project Handler Manager step (processes copy_project)
-	// These types require GH_AW_PROJECT_GITHUB_TOKEN and must be processed separately from the main handler manager
-	// This runs FIRST to ensure projects exist before issues/PRs are created and potentially added to them
-	// Note: create_project, update-project and create-project-status-update are handled by the unified handler
-	if hasProjectHandlerManagerTypes {
-		consolidatedSafeOutputsJobLog.Print("Using project handler manager for project-related safe outputs")
-		projectHandlerManagerSteps := c.buildProjectHandlerManagerStep(data)
-		steps = append(steps, projectHandlerManagerSteps...)
-		safeOutputStepNames = append(safeOutputStepNames, "process_project_safe_outputs")
-
-		// Add outputs from project handler manager
-		outputs["process_project_safe_outputs_processed_count"] = "${{ steps.process_project_safe_outputs.outputs.processed_count }}"
-		outputs["process_project_safe_outputs_temporary_project_map"] = "${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}"
-
-		// Add permissions for project-related types
-		// Note: Projects v2 cannot use GITHUB_TOKEN; it requires a PAT or GitHub App token
-		// The permissions here are for workflow-level permissions, actual API calls use GH_AW_PROJECT_GITHUB_TOKEN
-		// Only copy_project is handled by the project handler manager
-		if data.SafeOutputs.CopyProjects != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-	}
-
-	// 2. Handler Manager step (processes create_issue, update_issue, add_comment, etc.)
-	// This runs AFTER project operations, allowing projects to exist before issues/PRs reference them
+	// 1. Handler Manager step (processes create_issue, update_issue, add_comment, etc.)
+	// This processes all safe output types that are handled by the unified handler
 	// Critical for workflows that create projects and then add issues/PRs to those projects
 	if hasHandlerManagerTypes {
 		consolidatedSafeOutputsJobLog.Print("Using handler manager for safe outputs")

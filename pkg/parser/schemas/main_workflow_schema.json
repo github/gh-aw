@@ -3977,7 +3977,7 @@
     },
     "safe-outputs": {
       "type": "object",
-      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, copy-project, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
+      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
       "description": "Safe output processing configuration that automatically creates GitHub issues, comments, and pull requests from AI workflow output without requiring write permissions in the main job",
       "examples": [
         {
@@ -4318,55 +4318,6 @@
             }
           ],
           "description": "Enable AI agents to update GitHub Project items (issues, pull requests) with status changes, field updates, and metadata modifications."
-        },
-        "copy-project": {
-          "oneOf": [
-            {
-              "type": "object",
-              "description": "Configuration for copying GitHub Projects v2 boards. Creates a new project with the same structure, fields, and views as the source project. By default, draft issues are NOT copied unless explicitly requested with includeDraftIssues=true in the tool call. Requires a Personal Access Token (PAT) or GitHub App token with Projects permissions; the GITHUB_TOKEN cannot be used. Safe output items use type=copy_project and include: sourceProject (URL), owner (org/user login), title (new project name), and optional includeDraftIssues (boolean). The source-project and target-owner can be configured in the workflow frontmatter to provide defaults that the agent can use or override.",
-              "properties": {
-                "max": {
-                  "type": "integer",
-                  "description": "Maximum number of copy operations to perform (default: 1).",
-                  "minimum": 1,
-                  "maximum": 100
-                },
-                "github-token": {
-                  "$ref": "#/$defs/github_token",
-                  "description": "GitHub token to use for this specific output type. Must have Projects write permission. Overrides global github-token if specified."
-                },
-                "source-project": {
-                  "type": "string",
-                  "pattern": "^https://github\\.com/(orgs|users)/[^/]+/projects/\\d+$",
-                  "description": "Optional default source project URL to copy from (e.g., 'https://github.com/orgs/myorg/projects/42'). If specified, the agent can omit the sourceProject field in the tool call and this default will be used. The agent can still override by providing a sourceProject in the tool call."
-                },
-                "target-owner": {
-                  "type": "string",
-                  "description": "Optional default target owner (organization or user login name) where the new project will be created (e.g., 'myorg' or 'username'). If specified, the agent can omit the owner field in the tool call and this default will be used. The agent can still override by providing an owner in the tool call."
-                }
-              },
-              "additionalProperties": false,
-              "examples": [
-                {
-                  "max": 1
-                },
-                {
-                  "github-token": "${{ secrets.PROJECT_GITHUB_TOKEN }}",
-                  "max": 1
-                },
-                {
-                  "source-project": "https://github.com/orgs/myorg/projects/42",
-                  "target-owner": "myorg",
-                  "max": 1
-                }
-              ]
-            },
-            {
-              "type": "null",
-              "description": "Enable project copying with default configuration (max=1)"
-            }
-          ],
-          "description": "Enable AI agents to duplicate GitHub Project boards with all configuration, views, and settings."
         },
         "create-project": {
           "oneOf": [

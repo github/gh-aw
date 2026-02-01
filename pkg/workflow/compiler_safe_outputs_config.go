@@ -473,23 +473,10 @@ var handlerRegistry = map[string]handlerBuilder{
 }
 
 // projectHandlerRegistry maps project handler names to their builder functions
-// Note: As of recent changes, only copy_project is in this registry.
-// create_project, update_project and create_project_status_update have been moved to the main handlerRegistry
-// as they are now handled by the unified handler.
-var projectHandlerRegistry = map[string]handlerBuilder{
-	"copy_project": func(cfg *SafeOutputsConfig) map[string]any {
-		if cfg.CopyProjects == nil {
-			return nil
-		}
-		c := cfg.CopyProjects
-		return newHandlerConfigBuilder().
-			AddIfPositive("max", c.Max).
-			AddIfNotEmpty("github-token", c.GitHubToken).
-			AddIfNotEmpty("source_project", c.SourceProject).
-			AddIfNotEmpty("target_owner", c.TargetOwner).
-			Build()
-	},
-}
+// Note: This registry is now empty as all project-related handlers have been moved to the unified handler.
+// create_project, update_project and create_project_status_update are now handled by the unified handler.
+// copy_project has been removed.
+var projectHandlerRegistry = map[string]handlerBuilder{}
 
 func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs == nil {
@@ -526,40 +513,6 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 		compilerSafeOutputsConfigLog.Printf("Added handler config env var: size=%d bytes", len(configStr))
 	} else {
 		compilerSafeOutputsConfigLog.Print("No handlers configured, skipping config env var")
-	}
-}
-
-// addProjectHandlerManagerConfigEnvVar adds the GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variable
-// containing JSON configuration for project-related safe output handlers (copy_project).
-// These handlers require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately from the main handler manager.
-// Note: create_project, update_project and create_project_status_update are now handled by the unified handler and are
-// NOT included in this config.
-func (c *Compiler) addProjectHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
-	if data.SafeOutputs == nil {
-		compilerSafeOutputsConfigLog.Print("No safe-outputs configuration, skipping project handler config")
-		return
-	}
-
-	compilerSafeOutputsConfigLog.Print("Building project handler manager configuration")
-	config := make(map[string]map[string]any)
-
-	// Build configuration for each project handler using the registry
-	for handlerName, builder := range projectHandlerRegistry {
-		if handlerConfig := builder(data.SafeOutputs); len(handlerConfig) > 0 {
-			config[handlerName] = handlerConfig
-		}
-	}
-
-	// Only add the env var if there are project handlers to configure
-	if len(config) > 0 {
-		configJSON, err := json.Marshal(config)
-		if err != nil {
-			consolidatedSafeOutputsLog.Printf("Failed to marshal project handler config: %v", err)
-			return
-		}
-		// Escape the JSON for YAML (handle quotes and special chars)
-		configStr := string(configJSON)
-		*steps = append(*steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: %q\n", configStr))
 	}
 }
 

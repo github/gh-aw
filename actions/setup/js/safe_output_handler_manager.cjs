@@ -151,19 +151,19 @@ const HANDLER_MAP = {
  * Message types handled by standalone steps (not through the handler manager)
  * These types should not trigger warnings when skipped by the handler manager
  *
- * Project-related types: create_project, create_project_status_update, update_project, copy_project
- *   - Require GH_AW_PROJECT_GITHUB_TOKEN and are processed in the dedicated project handler manager step
+ * Project-related types: create_project, create_project_status_update, update_project
+ *   - Handled by the unified handler in the handler manager step
  *
  * Other standalone types: assign_to_agent, create_agent_session, upload_asset, noop
  *   - Have dedicated processing steps with specialized logic
  */
-const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "create_project", "create_project_status_update", "update_project", "copy_project", "upload_asset", "noop"]);
+const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "create_project", "create_project_status_update", "update_project", "upload_asset", "noop"]);
 
 /**
- * Project-related message types that are handled by the project handler manager
+ * Project-related message types that are handled by the unified handler
  * Used to provide more specific skip reasons
  */
-const PROJECT_RELATED_TYPES = new Set(["create_project", "create_project_status_update", "update_project", "copy_project"]);
+const PROJECT_RELATED_TYPES = new Set(["create_project", "create_project_status_update", "update_project"]);
 
 /**
  * Load configuration for safe outputs

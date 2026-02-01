@@ -1003,36 +1003,6 @@
     }
   },
   {
-    "name": "copy_project",
-    "description": "Copy a GitHub Projects v2 board to create a new project with the same structure, fields, and views. Useful for duplicating project templates or migrating projects between organizations. By default, draft issues are not copied unless includeDraftIssues is set to true. If the workflow has configured default values for source-project or target-owner, those fields become optional in the tool call.",
-    "inputSchema": {
-      "type": "object",
-      "required": [
-        "title"
-      ],
-      "properties": {
-        "sourceProject": {
-          "type": "string",
-          "pattern": "^https://github\\\\.com/(orgs|users)/[^/]+/projects/\\\\d+$",
-          "description": "Full GitHub project URL of the source project to copy (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'). Optional if source-project is configured in the workflow frontmatter."
-        },
-        "owner": {
-          "type": "string",
-          "description": "Login name of the organization or user that will own the new project (e.g., 'myorg' or 'username'). The token must have access to this owner. Optional if target-owner is configured in the workflow frontmatter."
-        },
-        "title": {
-          "type": "string",
-          "description": "Title for the new project. Should be descriptive and unique within the owner's projects."
-        },
-        "includeDraftIssues": {
-          "type": "boolean",
-          "description": "Whether to copy draft issues from the source project. Default: false."
-        }
-      },
-      "additionalProperties": false
-    }
-  },
-  {
     "name": "autofix_code_scanning_alert",
     "description": "Create an autofix for a code scanning alert. Use this to provide automated fixes for security vulnerabilities detected by code scanning tools. The fix should contain the corrected code that resolves the security issue.",
     "inputSchema": {

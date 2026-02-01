@@ -160,17 +160,8 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	steps = append(steps, "        env:\n")
 	steps = append(steps, "          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}\n")
 
-	// Check if any project-handler types are enabled
-	// If so, pass the temporary project map from the project handler step
-	// Note: Only copy_project runs in the project handler manager now.
-	// create_project, update_project, and create_project_status_update are in the unified handler.
-	hasProjectHandlerTypes := data.SafeOutputs.CopyProjects != nil
-
-	if hasProjectHandlerTypes {
-		// If project handler ran before this, pass its temporary project map
-		// This allows update_issue and other text-based handlers to resolve project temporary IDs
-		steps = append(steps, "          GH_AW_TEMPORARY_PROJECT_MAP: ${{ steps.process_project_safe_outputs.outputs.temporary_project_map }}\n")
-	}
+	// Note: The project handler manager has been removed.
+	// All project-related operations are now handled by the unified handler.
 
 	// Add custom safe output env vars
 	c.addCustomSafeOutputEnvVars(&steps, data)
@@ -191,84 +182,6 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	steps = append(steps, "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n")
 	steps = append(steps, "            setupGlobals(core, github, context, exec, io);\n")
 	steps = append(steps, "            const { main } = require('"+SetupActionDestination+"/safe_output_handler_manager.cjs');\n")
-	steps = append(steps, "            await main();\n")
-
-	return steps
-}
-
-// buildProjectHandlerManagerStep builds a single step that uses the safe output project handler manager
-// to dispatch project-related messages (create_project, update_project, copy_project, create_project_status_update) to appropriate handlers.
-// These types require GH_AW_PROJECT_GITHUB_TOKEN and are separated from the main handler manager.
-func (c *Compiler) buildProjectHandlerManagerStep(data *WorkflowData) []string {
-	consolidatedSafeOutputsStepsLog.Print("Building project handler manager step")
-
-	var steps []string
-
-	// Step name and metadata
-	steps = append(steps, "      - name: Process Project-Related Safe Outputs\n")
-	steps = append(steps, "        id: process_project_safe_outputs\n")
-	steps = append(steps, fmt.Sprintf("        uses: %s\n", GetActionPin("actions/github-script")))
-
-	// Environment variables
-	steps = append(steps, "        env:\n")
-	steps = append(steps, "          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}\n")
-
-	// Add project handler manager config as JSON
-	c.addProjectHandlerManagerConfigEnvVar(&steps, data)
-
-	// Add custom safe output env vars
-	c.addCustomSafeOutputEnvVars(&steps, data)
-
-	// Add all safe output configuration env vars (still needed by individual handlers)
-	c.addAllSafeOutputConfigEnvVars(&steps, data)
-
-	// Add GH_AW_PROJECT_GITHUB_TOKEN - this is the critical difference from the main handler manager
-	// Project operations require this special token that has Projects permissions
-	// Determine which custom token to use: check all project-related types
-	var customToken string
-	if data.SafeOutputs.CreateProjects != nil && data.SafeOutputs.CreateProjects.GitHubToken != "" {
-		customToken = data.SafeOutputs.CreateProjects.GitHubToken
-	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.GitHubToken != "" {
-		customToken = data.SafeOutputs.CreateProjectStatusUpdates.GitHubToken
-	} else if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.GitHubToken != "" {
-		customToken = data.SafeOutputs.UpdateProjects.GitHubToken
-	} else if data.SafeOutputs.CopyProjects != nil && data.SafeOutputs.CopyProjects.GitHubToken != "" {
-		customToken = data.SafeOutputs.CopyProjects.GitHubToken
-	}
-	token := getEffectiveProjectGitHubToken(customToken, data.GitHubToken)
-	steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_GITHUB_TOKEN: %s\n", token))
-
-	// Add GH_AW_PROJECT_URL if project is configured in frontmatter or safe-outputs config
-	// This provides a default project URL for update-project and create-project-status-update operations
-	// when target=context (or target not specified). Users can override by setting target=* and
-	// providing an explicit project field in the safe output message.
-	//
-	// Precedence: frontmatter project > update-project.project > create-project-status-update.project
-	var projectURL string
-	if data.ParsedFrontmatter != nil && data.ParsedFrontmatter.Project != nil && data.ParsedFrontmatter.Project.URL != "" {
-		projectURL = data.ParsedFrontmatter.Project.URL
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from frontmatter: %s", projectURL)
-	} else if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
-		projectURL = data.SafeOutputs.UpdateProjects.Project
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from update-project config: %s", projectURL)
-	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.Project != "" {
-		projectURL = data.SafeOutputs.CreateProjectStatusUpdates.Project
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from create-project-status-update config: %s", projectURL)
-	}
-
-	if projectURL != "" {
-		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", projectURL))
-	}
-
-	// With section for github-token
-	// Use the project token for authentication
-	steps = append(steps, "        with:\n")
-	steps = append(steps, fmt.Sprintf("          github-token: %s\n", token))
-
-	steps = append(steps, "          script: |\n")
-	steps = append(steps, "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n")
-	steps = append(steps, "            setupGlobals(core, github, context, exec, io);\n")
-	steps = append(steps, "            const { main } = require('"+SetupActionDestination+"/safe_output_project_handler_manager.cjs');\n")
 	steps = append(steps, "            await main();\n")
 
 	return steps

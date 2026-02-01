@@ -297,12 +297,6 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 				10, // default max
 			)
 		}
-		if data.SafeOutputs.CopyProjects != nil {
-			safeOutputsConfig["copy_project"] = generateMaxConfig(
-				data.SafeOutputs.CopyProjects.Max,
-				1, // default max
-			)
-		}
 		if data.SafeOutputs.CreateProjects != nil {
 			config := generateMaxConfig(
 				data.SafeOutputs.CreateProjects.Max,
@@ -655,9 +649,6 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	}
 	if data.SafeOutputs.CreateProjectStatusUpdates != nil {
 		enabledTools["create_project_status_update"] = true
-	}
-	if data.SafeOutputs.CopyProjects != nil {
-		enabledTools["copy_project"] = true
 	}
 	if data.SafeOutputs.CreateProjects != nil {
 		enabledTools["create_project"] = true
