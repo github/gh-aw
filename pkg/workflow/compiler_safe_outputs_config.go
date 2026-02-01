@@ -472,12 +472,6 @@ var handlerRegistry = map[string]handlerBuilder{
 	},
 }
 
-// projectHandlerRegistry maps project handler names to their builder functions
-// Note: This registry is now empty as all project-related handlers have been moved to the unified handler.
-// create_project, update_project and create_project_status_update are now handled by the unified handler.
-// copy_project has been removed.
-var projectHandlerRegistry = map[string]handlerBuilder{}
-
 func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *WorkflowData) {
 	if data.SafeOutputs == nil {
 		compilerSafeOutputsConfigLog.Print("No safe-outputs configuration, skipping handler manager config")
