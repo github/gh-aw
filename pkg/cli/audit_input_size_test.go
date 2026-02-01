@@ -130,7 +130,7 @@ func TestAuditDataJSONIncludesInputSizes(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Verify tool usage data includes input sizes
 	if len(auditData.ToolUsage) == 0 {

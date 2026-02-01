@@ -136,29 +136,29 @@ type MCPToolUsageData struct {
 
 // MCPToolSummary contains aggregated statistics for a single MCP tool
 type MCPToolSummary struct {
-	ServerName       string `json:"server_name" console:"header:Server"`
-	ToolName         string `json:"tool_name" console:"header:Tool"`
-	CallCount        int    `json:"call_count" console:"header:Calls"`
-	TotalInputSize   int    `json:"total_input_size" console:"header:Total Input,format:number"`
-	TotalOutputSize  int    `json:"total_output_size" console:"header:Total Output,format:number"`
-	MaxInputSize     int    `json:"max_input_size" console:"header:Max Input,format:number"`
-	MaxOutputSize    int    `json:"max_output_size" console:"header:Max Output,format:number"`
-	AvgDuration      string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
-	MaxDuration      string `json:"max_duration,omitempty" console:"header:Max Duration,omitempty"`
-	ErrorCount       int    `json:"error_count,omitempty" console:"header:Errors,omitempty"`
+	ServerName      string `json:"server_name" console:"header:Server"`
+	ToolName        string `json:"tool_name" console:"header:Tool"`
+	CallCount       int    `json:"call_count" console:"header:Calls"`
+	TotalInputSize  int    `json:"total_input_size" console:"header:Total Input,format:number"`
+	TotalOutputSize int    `json:"total_output_size" console:"header:Total Output,format:number"`
+	MaxInputSize    int    `json:"max_input_size" console:"header:Max Input,format:number"`
+	MaxOutputSize   int    `json:"max_output_size" console:"header:Max Output,format:number"`
+	AvgDuration     string `json:"avg_duration,omitempty" console:"header:Avg Duration,omitempty"`
+	MaxDuration     string `json:"max_duration,omitempty" console:"header:Max Duration,omitempty"`
+	ErrorCount      int    `json:"error_count,omitempty" console:"header:Errors,omitempty"`
 }
 
 // MCPToolCall represents a single MCP tool call with full details
 type MCPToolCall struct {
-	Timestamp   string `json:"timestamp"`
-	ServerName  string `json:"server_name"`
-	ToolName    string `json:"tool_name"`
-	Method      string `json:"method,omitempty"`
-	InputSize   int    `json:"input_size"`
-	OutputSize  int    `json:"output_size"`
-	Duration    string `json:"duration,omitempty"`
-	Status      string `json:"status"`
-	Error       string `json:"error,omitempty"`
+	Timestamp  string `json:"timestamp"`
+	ServerName string `json:"server_name"`
+	ToolName   string `json:"tool_name"`
+	Method     string `json:"method,omitempty"`
+	InputSize  int    `json:"input_size"`
+	OutputSize int    `json:"output_size"`
+	Duration   string `json:"duration,omitempty"`
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
 }
 
 // MCPServerStats contains server-level statistics

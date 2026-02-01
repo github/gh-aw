@@ -269,12 +269,12 @@ func renderToolUsageTable(toolUsage []ToolUsageInfo) {
 // renderMCPToolUsageTable renders MCP tool usage with detailed statistics
 func renderMCPToolUsageTable(mcpData *MCPToolUsageData) {
 	auditReportLog.Printf("Rendering MCP tool usage table with %d tools", len(mcpData.Summary))
-	
+
 	// Render server-level statistics first
 	if len(mcpData.Servers) > 0 {
 		fmt.Fprintln(os.Stderr, "  Server Statistics:")
 		fmt.Fprintln(os.Stderr)
-		
+
 		serverConfig := console.TableConfig{
 			Headers: []string{"Server", "Requests", "Tool Calls", "Total Input", "Total Output", "Avg Duration", "Errors"},
 			Rows:    make([][]string, 0, len(mcpData.Servers)),

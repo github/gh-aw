@@ -636,7 +636,7 @@ func TestBuildAuditData(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Verify overview
 	if auditData.Overview.RunID != 123456 {
@@ -984,7 +984,7 @@ func TestBuildAuditDataWithFirewall(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Verify firewall analysis is included
 	if auditData.FirewallAnalysis == nil {

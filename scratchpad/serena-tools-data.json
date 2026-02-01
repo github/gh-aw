@@ -132,14 +132,7 @@
     }
   ],
   "serena_tools_detail": {
-    "used_tools": [
-      "mcp__serena__check_onboarding_performed",
-      "mcp__serena__find_symbol",
-      "mcp__serena__get_current_config",
-      "mcp__serena__initial_instructions",
-      "mcp__serena__list_memories",
-      "mcp__serena__search_for_pattern"
-    ],
+    "used_tools": ["mcp__serena__check_onboarding_performed", "mcp__serena__find_symbol", "mcp__serena__get_current_config", "mcp__serena__initial_instructions", "mcp__serena__list_memories", "mcp__serena__search_for_pattern"],
     "unused_registered_tools": [
       "serena___activate_project",
       "serena___delete_memory",
