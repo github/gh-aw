@@ -15,6 +15,13 @@
 const { isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
+ * Regex pattern for matching temporary ID references in text
+ * Format: #aw_XXXXXXXXXXXX (aw_ prefix + 12 hex characters)
+ * This pattern is also defined in temporary_id.cjs for consistency
+ */
+const TEMPORARY_ID_PATTERN = /#(aw_[0-9a-f]{12})/gi;
+
+/**
  * Extract all temporary ID references from a message
  * Checks fields that commonly contain temporary IDs:
  * - body (for create_issue, create_discussion, add_comment)
@@ -36,9 +43,8 @@ function extractTemporaryIdReferences(message) {
   const textFields = ["body", "title", "description"];
   for (const field of textFields) {
     if (typeof message[field] === "string") {
-      const regex = /#(aw_[0-9a-f]{12})/gi;
       let match;
-      while ((match = regex.exec(message[field])) !== null) {
+      while ((match = TEMPORARY_ID_PATTERN.exec(message[field])) !== null) {
         tempIds.add(normalizeTemporaryId(match[1]));
       }
     }
