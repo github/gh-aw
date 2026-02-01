@@ -731,6 +731,9 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 			key := summary.ServerName + ":" + summary.ToolName
 
 			if existing, exists := toolSummaryMap[key]; exists {
+				// Store previous count before updating
+				prevCallCount := existing.CallCount
+
 				// Merge with existing summary
 				existing.CallCount += summary.CallCount
 				existing.TotalInputSize += summary.TotalInputSize
@@ -751,8 +754,8 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 				if summary.AvgDuration != "" && existing.CallCount > 0 {
 					existingDur := parseDurationString(existing.AvgDuration)
 					newDur := parseDurationString(summary.AvgDuration)
-					// Weight by call counts
-					weightedDur := (existingDur*time.Duration(existing.CallCount-summary.CallCount) + newDur*time.Duration(summary.CallCount)) / time.Duration(existing.CallCount)
+					// Weight by call counts using previous count
+					weightedDur := (existingDur*time.Duration(prevCallCount) + newDur*time.Duration(summary.CallCount)) / time.Duration(existing.CallCount)
 					existing.AvgDuration = timeutil.FormatDuration(weightedDur)
 				}
 
@@ -774,6 +777,9 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 		// Aggregate server stats
 		for _, serverStats := range pr.MCPToolUsage.Servers {
 			if existing, exists := serverStatsMap[serverStats.ServerName]; exists {
+				// Store previous count before updating
+				prevRequestCount := existing.RequestCount
+
 				// Merge with existing stats
 				existing.RequestCount += serverStats.RequestCount
 				existing.ToolCallCount += serverStats.ToolCallCount
@@ -785,8 +791,8 @@ func buildMCPToolUsageSummary(processedRuns []ProcessedRun) *MCPToolUsageSummary
 				if serverStats.AvgDuration != "" && existing.RequestCount > 0 {
 					existingDur := parseDurationString(existing.AvgDuration)
 					newDur := parseDurationString(serverStats.AvgDuration)
-					// Weight by request counts
-					weightedDur := (existingDur*time.Duration(existing.RequestCount-serverStats.RequestCount) + newDur*time.Duration(serverStats.RequestCount)) / time.Duration(existing.RequestCount)
+					// Weight by request counts using previous count
+					weightedDur := (existingDur*time.Duration(prevRequestCount) + newDur*time.Duration(serverStats.RequestCount)) / time.Duration(existing.RequestCount)
 					existing.AvgDuration = timeutil.FormatDuration(weightedDur)
 				}
 			} else {
