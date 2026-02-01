@@ -540,12 +540,6 @@ func processImportsTextBased(frontmatterText, baseDir string, visited map[string
 	return importedFiles, importedFrontmatterTexts, nil
 }
 
-// computeFrontmatterHashTextBased computes the hash using text-based approach (no YAML parsing)
-// This matches the JavaScript implementation
-func computeFrontmatterHashTextBased(frontmatterText, markdown, baseDir string, cache *ImportCache, expressions []string) (string, error) {
-	return computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir, cache, expressions, DefaultFileReader)
-}
-
 // computeFrontmatterHashTextBasedWithReader computes the hash using text-based approach with custom file reader
 func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDir string, cache *ImportCache, expressions []string, fileReader FileReader) (string, error) {
 	frontmatterHashLog.Print("Computing frontmatter hash using text-based approach")

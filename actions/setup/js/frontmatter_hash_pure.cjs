@@ -36,7 +36,7 @@ async function defaultFileReader(filePath) {
  */
 async function computeFrontmatterHash(workflowPath, options = {}) {
   const fileReader = options.fileReader || defaultFileReader;
-  
+
   const content = await fileReader(workflowPath);
 
   // Extract frontmatter text and markdown body
