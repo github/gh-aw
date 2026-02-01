@@ -22,6 +22,7 @@ const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
+const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
  * Merge labels with trimming + case-insensitive de-duplication.
@@ -363,6 +364,9 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
   // Collect missing_tool and missing_data messages first
   const missings = collectMissingMessages(messages);
 
+  // Load custom safe output job types that are processed by dedicated custom jobs
+  const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
+
   // Initialize unified temporary ID map
   // This will be populated by handlers as they create entities with temporary IDs
   // Stores both issue/PR references ({repo, number}) and project URLs ({projectUrl})
@@ -414,6 +418,20 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
           success: false,
           skipped: true,
           reason: "Handled by standalone step",
+        });
+        continue;
+      }
+
+      // Check if this message type is a custom safe output job
+      if (customSafeOutputJobTypes.has(messageType)) {
+        // Silently skip - this is handled by a custom safe output job
+        core.debug(`Message ${i + 1} (${messageType}) will be handled by custom safe output job`);
+        results.push({
+          type: messageType,
+          messageIndex: i,
+          success: false,
+          skipped: true,
+          reason: "Handled by custom safe output job",
         });
         continue;
       }
