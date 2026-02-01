@@ -225,7 +225,7 @@ describe("check_workflow_timestamp_api.cjs", () => {
 
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Lock file"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("gh aw compile"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
@@ -292,7 +292,7 @@ describe("check_workflow_timestamp_api.cjs", () => {
 
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Workflow Lock File Warning"));
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("WARNING"));
-      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("gh aw compile"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed"));
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("src123a")); // Short SHA
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("lock456")); // Short SHA
       expect(mockCore.summary.write).toHaveBeenCalled();

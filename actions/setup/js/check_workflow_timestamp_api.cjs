@@ -169,7 +169,7 @@ async function main() {
   await logFrontmatterHashComparison();
   // Check if workflow file is newer than lock file
   if (workflowDate > lockDate) {
-    const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
+    const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. The lock file needs to be regenerated locally and committed.`;
 
     // Format timestamps and commits for display
     const workflowTimestamp = workflowDate.toISOString();
@@ -186,7 +186,7 @@ async function main() {
       .addRaw(`- Lock: \`${lockFilePath}\`\n`)
       .addRaw(`  - Last commit: ${lockTimestamp}\n`)
       .addRaw(`  - Commit SHA: [\`${lockCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${lockCommit.sha})\n\n`)
-      .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n");
+      .addRaw("**Action Required:** The lock file needs to be regenerated locally and committed.\n\n");
 
     await summary.write();
 

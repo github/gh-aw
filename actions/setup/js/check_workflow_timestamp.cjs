@@ -62,7 +62,7 @@ async function main() {
 
   // Check if workflow file is newer than lock file
   if (workflowMtime > lockMtime) {
-    core.error(`WARNING: Lock file '${lockFile}' is outdated! The workflow file '${workflowMdFile}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`);
+    core.error(`WARNING: Lock file '${lockFile}' is outdated! The workflow file '${workflowMdFile}' has been modified more recently. The lock file needs to be regenerated locally and committed.`);
 
     // Add summary to GitHub Step Summary
     await core.summary
@@ -72,7 +72,7 @@ async function main() {
       .addRaw(`- Source: \`${workflowMdFile}\` (modified: ${workflowStat.mtime.toISOString()})\n`)
       .addRaw(`- Lock: \`${lockFile}\` (modified: ${lockStat.mtime.toISOString()})\n\n`)
       .addRaw(process.env.GITHUB_SHA ? `**Git Commit:** \`${process.env.GITHUB_SHA}\`\n\n` : "")
-      .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n")
+      .addRaw("**Action Required:** The lock file needs to be regenerated locally and committed.\n\n")
       .write();
   } else {
     core.info("✅ Lock file is up to date");
