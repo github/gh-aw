@@ -124,10 +124,10 @@ async function main() {
   core.info(`  Source last commit: ${workflowDate.toISOString()} (${workflowCommit.sha.substring(0, 7)})`);
   core.info(`  Lock last commit: ${lockDate.toISOString()} (${lockCommit.sha.substring(0, 7)})`);
 
-  // Log frontmatter hash comparison
-  await logFrontmatterHashComparison();
   // Check if workflow file is newer than lock file
   if (workflowDate > lockDate) {
+    // Log frontmatter hash comparison only when timestamp check fails
+    await logFrontmatterHashComparison();
     const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
 
     // Format timestamps and commits for display

@@ -393,7 +393,7 @@ engine: copilot
             {
               sha: "src123",
               commit: {
-                committer: { date: "2024-01-01T12:00:00Z" },
+                committer: { date: "2024-01-01T13:00:00Z" }, // Source is newer
                 message: "Source commit",
               },
             },
@@ -404,7 +404,7 @@ engine: copilot
             {
               sha: "lock123",
               commit: {
-                committer: { date: "2024-01-01T13:00:00Z" },
+                committer: { date: "2024-01-01T12:00:00Z" }, // Lock is older
                 message: "Lock commit",
               },
             },
@@ -447,7 +447,7 @@ jobs:
             {
               sha: "src123",
               commit: {
-                committer: { date: "2024-01-01T12:00:00Z" },
+                committer: { date: "2024-01-01T13:00:00Z" }, // Source is newer
                 message: "Source commit",
               },
             },
@@ -458,7 +458,7 @@ jobs:
             {
               sha: "lock123",
               commit: {
-                committer: { date: "2024-01-01T13:00:00Z" },
+                committer: { date: "2024-01-01T12:00:00Z" }, // Lock is older
                 message: "Lock commit",
               },
             },
@@ -493,7 +493,7 @@ jobs:
             {
               sha: "src123",
               commit: {
-                committer: { date: "2024-01-01T12:00:00Z" },
+                committer: { date: "2024-01-01T13:00:00Z" }, // Source is newer
                 message: "Source commit",
               },
             },
@@ -504,7 +504,7 @@ jobs:
             {
               sha: "lock123",
               commit: {
-                committer: { date: "2024-01-01T13:00:00Z" },
+                committer: { date: "2024-01-01T12:00:00Z" }, // Lock is older
                 message: "Lock commit",
               },
             },
@@ -524,7 +524,7 @@ jobs:
       await main();
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compute frontmatter hash"));
-      expect(mockCore.setFailed).not.toHaveBeenCalled(); // Should not fail the workflow
+      expect(mockCore.setFailed).toHaveBeenCalled(); // Should fail because timestamp check failed
     });
   });
 });
