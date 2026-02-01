@@ -299,9 +299,11 @@ func TestBuildSharedPRCheckoutStepsConditions(t *testing.T) {
 // TestBuildHandlerManagerStep tests handler manager step generation
 func TestBuildHandlerManagerStep(t *testing.T) {
 	tests := []struct {
-		name          string
-		safeOutputs   *SafeOutputsConfig
-		checkContains []string
+		name              string
+		safeOutputs       *SafeOutputsConfig
+		parsedFrontmatter *FrontmatterConfig
+		checkContains     []string
+		checkNotContains  []string
 	}{
 		{
 			name: "basic handler manager",
@@ -338,6 +340,62 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 				"GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
 			},
 		},
+		{
+			name: "handler manager with project URL from frontmatter",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: 5,
+					},
+				},
+			},
+			parsedFrontmatter: &FrontmatterConfig{
+				Project: &ProjectConfig{
+					URL: "https://github.com/orgs/test-org/projects/123",
+				},
+			},
+			checkContains: []string{
+				"name: Process Safe Outputs",
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/test-org/projects/123\"",
+			},
+		},
+		{
+			name: "handler manager with project URL from update-project config",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: 5,
+					},
+					Project: "https://github.com/orgs/config-org/projects/456",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/config-org/projects/456\"",
+			},
+		},
+		{
+			name: "handler manager with project URL from create-project-status-update config",
+			safeOutputs: &SafeOutputsConfig{
+				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{
+						Max: 1,
+					},
+					Project: "https://github.com/orgs/status-org/projects/789",
+				},
+			},
+			checkContains: []string{
+				"GH_AW_PROJECT_URL: \"https://github.com/orgs/status-org/projects/789\"",
+			},
+		},
+		{
+			name: "handler manager without project does not include GH_AW_PROJECT_URL",
+			safeOutputs: &SafeOutputsConfig{
+				CreateIssues: &CreateIssuesConfig{},
+			},
+			checkNotContains: []string{
+				"GH_AW_PROJECT_URL",
+			},
+		},
 		// Note: create_project is now handled by the unified handler manager,
 		// not the separate project handler manager
 	}
@@ -347,8 +405,9 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 			compiler := NewCompiler()
 
 			workflowData := &WorkflowData{
-				Name:        "Test Workflow",
-				SafeOutputs: tt.safeOutputs,
+				Name:              "Test Workflow",
+				SafeOutputs:       tt.safeOutputs,
+				ParsedFrontmatter: tt.parsedFrontmatter,
 			}
 
 			steps := compiler.buildHandlerManagerStep(workflowData)
@@ -359,6 +418,10 @@ func TestBuildHandlerManagerStep(t *testing.T) {
 
 			for _, expected := range tt.checkContains {
 				assert.Contains(t, stepsContent, expected, "Expected to find: "+expected)
+			}
+
+			for _, notExpected := range tt.checkNotContains {
+				assert.NotContains(t, stepsContent, notExpected, "Expected NOT to find: "+notExpected)
 			}
 		})
 	}

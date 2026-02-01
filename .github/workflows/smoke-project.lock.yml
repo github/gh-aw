@@ -1657,6 +1657,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-project\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"create_project_status_update\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":5,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\"},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke-project\"]},\"update_project\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":20,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\",\"views\":[{\"name\":\"Smoke Test Board\",\"layout\":\"board\",\"filter\":\"is:open\"},{\"name\":\"Smoke Test Table\",\"layout\":\"table\"}]}}"
+          GH_AW_PROJECT_URL: "https://github.com/orgs/github-agentic-workflows/projects/1"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
