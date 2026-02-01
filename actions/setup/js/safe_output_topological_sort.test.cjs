@@ -413,5 +413,259 @@ describe("safe_output_topological_sort.cjs", () => {
       // It should appear but we don't enforce ordering relative to unrelated items
       expect(sorted.some(m => m.issue_number === "aw_def987654321")).toBe(true);
     });
+
+    it("should handle large graphs with many dependencies", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      // Create a large tree: 1 root, 10 level-1 children, each with 5 level-2 children
+      const messages = [];
+      const rootId = "aw_root00000000";
+      messages.push({ type: "create_issue", temporary_id: rootId, title: "Root" });
+
+      for (let i = 0; i < 10; i++) {
+        const level1Id = `aw_lv1_${i.toString().padStart(7, "0")}`;
+        messages.push({
+          type: "create_issue",
+          temporary_id: level1Id,
+          body: `Parent: #${rootId}`,
+        });
+
+        for (let j = 0; j < 5; j++) {
+          const level2Id = `aw_lv2_${i}_${j.toString().padStart(4, "0")}`;
+          messages.push({
+            type: "create_issue",
+            temporary_id: level2Id,
+            body: `Parent: #${level1Id}`,
+          });
+        }
+      }
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Verify root comes first
+      expect(sorted[0].temporary_id).toBe(rootId);
+
+      // Verify each level-1 item comes before its level-2 children
+      for (let i = 0; i < 10; i++) {
+        const level1Id = `aw_lv1_${i.toString().padStart(7, "0")}`;
+        const level1Index = sorted.findIndex(m => m.temporary_id === level1Id);
+
+        for (let j = 0; j < 5; j++) {
+          const level2Id = `aw_lv2_${i}_${j.toString().padStart(4, "0")}`;
+          const level2Index = sorted.findIndex(m => m.temporary_id === level2Id);
+          expect(level1Index).toBeLessThan(level2Index);
+        }
+      }
+
+      // Verify root comes before all level-1 items
+      const rootIndex = sorted.findIndex(m => m.temporary_id === rootId);
+      for (let i = 0; i < 10; i++) {
+        const level1Id = `aw_lv1_${i.toString().padStart(7, "0")}`;
+        const level1Index = sorted.findIndex(m => m.temporary_id === level1Id);
+        expect(rootIndex).toBeLessThan(level1Index);
+      }
+    });
+
+    it("should handle deeply nested linear dependencies", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      // Create a chain: A -> B -> C -> D -> E -> F
+      const messages = [];
+      const ids = ["aw_aaaaaa111111", "aw_bbbbbb222222", "aw_cccccc333333", "aw_dddddd444444", "aw_eeeeee555555", "aw_ffffff666666"];
+
+      // Add in reverse order to test sorting
+      for (let i = ids.length - 1; i >= 0; i--) {
+        messages.push({
+          type: "create_issue",
+          temporary_id: ids[i],
+          body: i > 0 ? `Depends on #${ids[i - 1]}` : "First issue",
+        });
+      }
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Verify they're sorted in dependency order
+      for (let i = 0; i < ids.length; i++) {
+        expect(sorted[i].temporary_id).toBe(ids[i]);
+      }
+    });
+
+    it("should handle multiple disconnected dependency chains", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        // Chain 1: A -> B
+        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "A" },
+        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Ref #aw_aaaaaa111111" },
+
+        // Chain 2: C -> D
+        { type: "create_issue", temporary_id: "aw_cccccc333333", title: "C" },
+        { type: "create_issue", temporary_id: "aw_dddddd444444", body: "Ref #aw_cccccc333333" },
+
+        // Chain 3: E -> F
+        { type: "create_issue", temporary_id: "aw_eeeeee555555", title: "E" },
+        { type: "create_issue", temporary_id: "aw_ffffff666666", body: "Ref #aw_eeeeee555555" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Within each chain, verify dependency order
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
+      expect(aIndex).toBeLessThan(bIndex);
+
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
+      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_dddddd444444");
+      expect(cIndex).toBeLessThan(dIndex);
+
+      const eIndex = sorted.findIndex(m => m.temporary_id === "aw_eeeeee555555");
+      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_ffffff666666");
+      expect(eIndex).toBeLessThan(fIndex);
+    });
+
+    it("should handle diamond dependency pattern", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      // Diamond: A -> B, A -> C, B -> D, C -> D
+      const messages = [
+        { type: "create_issue", temporary_id: "aw_dddddd444444", body: "Needs #aw_bbbbbb222222 and #aw_cccccc333333" },
+        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Child of #aw_aaaaaa111111" },
+        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Root" },
+        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Child of #aw_aaaaaa111111" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
+      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_dddddd444444");
+
+      // A must come first
+      expect(aIndex).toBe(0);
+
+      // B and C must come after A
+      expect(bIndex).toBeGreaterThan(aIndex);
+      expect(cIndex).toBeGreaterThan(aIndex);
+
+      // D must come after both B and C
+      expect(dIndex).toBeGreaterThan(bIndex);
+      expect(dIndex).toBeGreaterThan(cIndex);
+    });
+
+    it("should handle messages with multiple temporary ID references in body", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        {
+          type: "create_issue",
+          temporary_id: "aw_ffffff666666",
+          body: "Blocks #aw_aaaaaa111111, #aw_bbbbbb222222, and #aw_cccccc333333",
+        },
+        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "First" },
+        { type: "create_issue", temporary_id: "aw_bbbbbb222222", title: "Second" },
+        { type: "create_issue", temporary_id: "aw_cccccc333333", title: "Third" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // All referenced IDs must come before the message that references them
+      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_ffffff666666");
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
+
+      expect(fIndex).toBeGreaterThan(aIndex);
+      expect(fIndex).toBeGreaterThan(bIndex);
+      expect(fIndex).toBeGreaterThan(cIndex);
+    });
+
+    it("should handle empty messages array gracefully", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const sorted = sortSafeOutputMessages([]);
+
+      expect(sorted).toEqual([]);
+    });
+
+    it("should handle single message", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [{ type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Solo" }];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      expect(sorted).toEqual(messages);
+    });
+
+    it("should preserve message object references", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const msg1 = { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "First" };
+      const msg2 = { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Ref #aw_aaaaaa111111" };
+
+      const sorted = sortSafeOutputMessages([msg2, msg1]);
+
+      // Objects should be the same references, not copies
+      expect(sorted[0]).toBe(msg1);
+      expect(sorted[1]).toBe(msg2);
+    });
+
+    it("should handle cycle with 3 nodes", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      // Cycle: A -> B -> C -> A
+      const messages = [
+        { type: "create_issue", temporary_id: "aw_aaaaaa111111", body: "Needs #aw_cccccc333333" },
+        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Needs #aw_aaaaaa111111" },
+        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Needs #aw_bbbbbb222222" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Should preserve original order when cycle detected
+      expect(sorted).toEqual(messages);
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Dependency cycle detected"));
+    });
+
+    it("should handle messages with no type field", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { temporary_id: "aw_aaaaaa111111", title: "No type" },
+        { type: "create_issue", temporary_id: "aw_bbbbbb222222", title: "Has type" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Should handle gracefully without crashing
+      expect(sorted.length).toBe(2);
+    });
+
+    it("should handle mixed types (issues, PRs, discussions, comments)", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { type: "create_pull_request", temporary_id: "aw_aaaaaa111111", title: "PR" },
+        { type: "add_comment", issue_number: "aw_aaaaaa111111", body: "Comment on PR" },
+        { type: "create_discussion", temporary_id: "aw_bbbbbb222222", body: "See PR #aw_aaaaaa111111" },
+        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Related to #aw_bbbbbb222222" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // PR comes first
+      expect(sorted[0].type).toBe("create_pull_request");
+      // Comment on PR comes after PR
+      const prIndex = sorted.findIndex(m => m.type === "create_pull_request");
+      const commentIndex = sorted.findIndex(m => m.type === "add_comment");
+      expect(commentIndex).toBeGreaterThan(prIndex);
+      // Discussion referencing PR comes after PR
+      const discussionIndex = sorted.findIndex(m => m.type === "create_discussion");
+      expect(discussionIndex).toBeGreaterThan(prIndex);
+      // Issue referencing discussion comes after discussion
+      const issueIndex = sorted.findIndex(m => m.type === "create_issue");
+      expect(issueIndex).toBeGreaterThan(discussionIndex);
+    });
   });
 });
