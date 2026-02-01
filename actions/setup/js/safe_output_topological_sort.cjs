@@ -76,54 +76,78 @@ function buildDependencyGraph(messages) {
 }
 
 /**
- * Detect cycles in the dependency graph
+ * Detect cycles in the dependency graph using iterative mark-and-sweep algorithm
  * Returns an array of message indices that form a cycle, or empty array if no cycle
  *
  * @param {Map<number, Set<number>>} dependencies - Dependency graph
  * @returns {Array<number>} Indices of messages forming a cycle, or empty array
  */
 function detectCycle(dependencies) {
-  const visited = new Set();
-  const recursionStack = new Set();
-  /** @type {Array<number>} */
-  const path = [];
-  /** @type {Array<number>} */
-  let foundCycle = [];
+  const WHITE = 0; // Not visited
+  const GRAY = 1; // Visiting (on stack)
+  const BLACK = 2; // Visited (completed)
 
-  /**
-   * DFS to detect cycle
-   * @param {number} node - Current node index
-   * @returns {boolean} True if cycle detected
-   */
-  function dfs(node) {
-    visited.add(node);
-    recursionStack.add(node);
-    path.push(node);
+  const colors = new Map();
+  const parent = new Map();
 
-    const deps = dependencies.get(node) || new Set();
-    for (const dep of deps) {
-      if (!visited.has(dep)) {
-        if (dfs(dep)) {
-          return true;
-        }
-      } else if (recursionStack.has(dep)) {
-        // Cycle detected - extract cycle from path
-        const cycleStart = path.indexOf(dep);
-        foundCycle = path.slice(cycleStart);
-        return true;
-      }
-    }
-
-    recursionStack.delete(node);
-    path.pop();
-    return false;
+  // Initialize all nodes as WHITE
+  for (const node of dependencies.keys()) {
+    colors.set(node, WHITE);
+    parent.set(node, null);
   }
 
-  // Check each unvisited node
-  for (const node of dependencies.keys()) {
-    if (!visited.has(node)) {
-      if (dfs(node)) {
-        return foundCycle;
+  // Try to find cycle starting from each WHITE node
+  for (const startNode of dependencies.keys()) {
+    if (colors.get(startNode) !== WHITE) {
+      continue;
+    }
+
+    // Use a stack for iterative DFS
+    // Each stack entry: [node, iterator, isReturning]
+    /** @type {Array<[number, any, boolean]>} */
+    const stack = [[startNode, null, false]];
+
+    while (stack.length > 0) {
+      const entry = stack.pop();
+      if (!entry) continue;
+
+      const [node, depsIterator, isReturning] = entry;
+
+      if (isReturning) {
+        // Returning from exploring this node - mark as BLACK
+        colors.set(node, BLACK);
+        continue;
+      }
+
+      // Mark node as GRAY (being explored)
+      colors.set(node, GRAY);
+
+      // Push node again to mark BLACK when we return
+      stack.push([node, null, true]);
+
+      // Get dependencies for this node
+      const deps = dependencies.get(node) || new Set();
+
+      // Process each dependency
+      for (const dep of deps) {
+        const depColor = colors.get(dep);
+
+        if (depColor === WHITE) {
+          // Not visited yet - explore it
+          parent.set(dep, node);
+          stack.push([dep, null, false]);
+        } else if (depColor === GRAY) {
+          // Found a back edge - cycle detected!
+          // Reconstruct the cycle from dep to current node
+          const cycle = [dep];
+          let current = node;
+          while (current !== dep && current !== null) {
+            cycle.unshift(current);
+            current = parent.get(current);
+          }
+          return cycle;
+        }
+        // If BLACK, it's already fully explored - no cycle through this path
       }
     }
   }
