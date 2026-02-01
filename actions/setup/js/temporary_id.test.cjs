@@ -464,4 +464,184 @@ describe("temporary_id.cjs", () => {
       expect(map.get("aw_abc123def456")).toBe("https://github.com/orgs/myorg/projects/123");
     });
   });
+
+  describe("extractTemporaryIdReferences", () => {
+    it("should extract temporary IDs from body field", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        title: "Test Issue",
+        body: "See #aw_abc123def456 and #aw_111222333444 for details",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(2);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_111222333444")).toBe(true);
+    });
+
+    it("should extract temporary IDs from title field", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        title: "Follow up to #aw_abc123def456",
+        body: "Details here",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract temporary IDs from direct ID fields", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "link_sub_issue",
+        parent_issue_number: "aw_aaaaaa123456",
+        sub_issue_number: "aw_bbbbbb123456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(2);
+      expect(refs.has("aw_aaaaaa123456")).toBe(true);
+      expect(refs.has("aw_bbbbbb123456")).toBe(true);
+    });
+
+    it("should handle # prefix in ID fields", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "add_comment",
+        issue_number: "#aw_abc123def456",
+        body: "Comment text",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should normalize temporary IDs to lowercase", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        body: "See #AW_ABC123DEF456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract from items array for bulk operations", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "add_comment",
+        items: [
+          { issue_number: "aw_dddddd111111", body: "Comment 1" },
+          { issue_number: "aw_eeeeee222222", body: "Comment 2" },
+        ],
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(2);
+      expect(refs.has("aw_dddddd111111")).toBe(true);
+      expect(refs.has("aw_eeeeee222222")).toBe(true);
+    });
+
+    it("should return empty set for messages without temp IDs", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        title: "Regular Issue",
+        body: "No temporary IDs here",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(0);
+    });
+
+    it("should ignore invalid temporary ID formats", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        body: "Invalid: #aw_short #aw_toolongxxxxxxxx #temp_123456789012",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(0);
+    });
+  });
+
+  describe("getCreatedTemporaryId", () => {
+    it("should return temporary_id when present and valid", async () => {
+      const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        temporary_id: "aw_abc123def456",
+        title: "Test",
+      };
+
+      const created = getCreatedTemporaryId(message);
+
+      expect(created).toBe("aw_abc123def456");
+    });
+
+    it("should normalize created temporary ID to lowercase", async () => {
+      const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        temporary_id: "AW_ABC123DEF456",
+        title: "Test",
+      };
+
+      const created = getCreatedTemporaryId(message);
+
+      expect(created).toBe("aw_abc123def456");
+    });
+
+    it("should return null when temporary_id is missing", async () => {
+      const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        title: "Test",
+      };
+
+      const created = getCreatedTemporaryId(message);
+
+      expect(created).toBe(null);
+    });
+
+    it("should return null when temporary_id is invalid", async () => {
+      const { getCreatedTemporaryId } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_issue",
+        temporary_id: "invalid_id",
+        title: "Test",
+      };
+
+      const created = getCreatedTemporaryId(message);
+
+      expect(created).toBe(null);
+    });
+  });
 });

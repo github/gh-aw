@@ -352,6 +352,86 @@ function replaceTemporaryProjectReferences(text, tempProjectMap) {
   });
 }
 
+/**
+ * Extract all temporary ID references from a message
+ * Checks fields that commonly contain temporary IDs:
+ * - body (for create_issue, create_discussion, add_comment)
+ * - parent_issue_number, sub_issue_number (for link_sub_issue)
+ * - issue_number (for add_comment, update_issue, etc.)
+ * - discussion_number (for create_discussion, update_discussion)
+ *
+ * @param {any} message - The safe output message
+ * @returns {Set<string>} Set of normalized temporary IDs referenced by this message
+ */
+function extractTemporaryIdReferences(message) {
+  const tempIds = new Set();
+
+  if (!message || typeof message !== "object") {
+    return tempIds;
+  }
+
+  // Check text fields for #aw_XXXXXXXXXXXX references
+  const textFields = ["body", "title", "description"];
+  for (const field of textFields) {
+    if (typeof message[field] === "string") {
+      let match;
+      while ((match = TEMPORARY_ID_PATTERN.exec(message[field])) !== null) {
+        tempIds.add(normalizeTemporaryId(match[1]));
+      }
+    }
+  }
+
+  // Check direct ID reference fields
+  const idFields = ["parent_issue_number", "sub_issue_number", "issue_number", "discussion_number", "pull_request_number"];
+
+  for (const field of idFields) {
+    const value = message[field];
+    if (value !== undefined && value !== null) {
+      // Strip # prefix if present
+      const valueStr = String(value).trim();
+      const valueWithoutHash = valueStr.startsWith("#") ? valueStr.substring(1) : valueStr;
+
+      if (isTemporaryId(valueWithoutHash)) {
+        tempIds.add(normalizeTemporaryId(valueWithoutHash));
+      }
+    }
+  }
+
+  // Check items array for bulk operations (e.g., add_comment with multiple targets)
+  if (Array.isArray(message.items)) {
+    for (const item of message.items) {
+      if (item && typeof item === "object") {
+        const itemTempIds = extractTemporaryIdReferences(item);
+        for (const tempId of itemTempIds) {
+          tempIds.add(tempId);
+        }
+      }
+    }
+  }
+
+  return tempIds;
+}
+
+/**
+ * Get the temporary ID that a message will create (if any)
+ * Only messages with a temporary_id field will create a new entity
+ *
+ * @param {any} message - The safe output message
+ * @returns {string|null} Normalized temporary ID that will be created, or null
+ */
+function getCreatedTemporaryId(message) {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+
+  const tempId = message.temporary_id;
+  if (tempId && isTemporaryId(String(tempId))) {
+    return normalizeTemporaryId(String(tempId));
+  }
+
+  return null;
+}
+
 module.exports = {
   TEMPORARY_ID_PATTERN,
   generateTemporaryId,
@@ -367,4 +447,6 @@ module.exports = {
   serializeTemporaryIdMap,
   loadTemporaryProjectMap,
   replaceTemporaryProjectReferences,
+  extractTemporaryIdReferences,
+  getCreatedTemporaryId,
 };
