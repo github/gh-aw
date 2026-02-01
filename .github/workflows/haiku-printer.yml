@@ -1,0 +1,22 @@
+name: Haiku Printer
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Message to print'
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  print-message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print message
+        run: |
+          echo "📨 Received message:"
+          echo "${{ inputs.message }}"
+          echo ""
+          echo "### 📨 Message" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ inputs.message }}" >> "$GITHUB_STEP_SUMMARY"
