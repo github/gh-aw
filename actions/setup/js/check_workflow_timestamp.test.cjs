@@ -134,7 +134,7 @@ const mockCore = {
             await eval(`(async () => { ${checkWorkflowTimestampScript}; await main(); })()`),
             expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("WARNING: Lock file")),
             expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("is outdated")),
-            expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed")),
+            expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("gh aw compile")),
             expect(mockCore.summary.addRaw).toHaveBeenCalled(),
             expect(mockCore.summary.write).toHaveBeenCalled(),
             expect(mockCore.setFailed).not.toHaveBeenCalled());
@@ -160,7 +160,7 @@ const mockCore = {
               await eval(`(async () => { ${checkWorkflowTimestampScript}; await main(); })()`),
               expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Workflow Lock File Warning")),
               expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("WARNING")),
-              expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed")),
+              expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("gh aw compile")),
               expect(mockCore.summary.write).toHaveBeenCalled());
           }),
           it("should include git SHA in summary when GITHUB_SHA is available", async () => {

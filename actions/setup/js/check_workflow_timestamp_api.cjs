@@ -8,50 +8,8 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { extractHashFromLockFile } = require("./frontmatter_hash_pure.cjs");
+const { extractHashFromLockFile, computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
 const { getFileContent } = require("./github_api_helpers.cjs");
-
-/**
- * Compute frontmatter hash using the Go binary (gh aw hash-frontmatter)
- * This ensures consistency between compilation and validation
- * @param {string} workflowPath - Path to the workflow file
- * @returns {Promise<string>} The SHA-256 hash as a lowercase hexadecimal string
- */
-async function computeFrontmatterHashViaGo(workflowPath) {
-  try {
-    let hashOutput = "";
-    let errorOutput = "";
-
-    const exitCode = await exec.exec("gh", ["aw", "hash-frontmatter", workflowPath], {
-      silent: true,
-      ignoreReturnCode: true,
-      listeners: {
-        stdout: data => {
-          hashOutput += data.toString();
-        },
-        stderr: data => {
-          errorOutput += data.toString();
-        },
-      },
-    });
-
-    if (exitCode !== 0) {
-      throw new Error(`gh aw hash-frontmatter failed with exit code ${exitCode}: ${errorOutput}`);
-    }
-
-    // Extract the hash from output (remove any ANSI codes and whitespace)
-    const hash = hashOutput.replace(/\x1b\[[0-9;]*m/g, "").trim();
-
-    // Validate hash format (should be 64 hex characters)
-    if (!/^[a-f0-9]{64}$/.test(hash)) {
-      throw new Error(`Invalid hash format received: ${hash}`);
-    }
-
-    return hash;
-  } catch (error) {
-    throw new Error(`Failed to compute hash via Go binary: ${getErrorMessage(error)}`);
-  }
-}
 
 async function main() {
   const workflowFile = process.env.GH_AW_WORKFLOW_FILE;
@@ -120,9 +78,10 @@ async function main() {
         return;
       }
 
-      // Compute hash using Go binary for consistency with compilation
-      // Note: This requires the workflow file to exist locally in the checkout
-      const recomputedHash = await computeFrontmatterHashViaGo(workflowMdPath);
+      // Compute hash using pure JavaScript implementation
+      // Create a GitHub file reader for fetching workflow files via API
+      const fileReader = createGitHubFileReader(github, owner, repo, ref);
+      const recomputedHash = await computeFrontmatterHash(workflowMdPath, { fileReader });
 
       // Log hash comparison
       core.info(`Frontmatter hash comparison:`);
@@ -169,7 +128,7 @@ async function main() {
   await logFrontmatterHashComparison();
   // Check if workflow file is newer than lock file
   if (workflowDate > lockDate) {
-    const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. The lock file needs to be regenerated locally and committed.`;
+    const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
 
     // Format timestamps and commits for display
     const workflowTimestamp = workflowDate.toISOString();
@@ -186,7 +145,7 @@ async function main() {
       .addRaw(`- Lock: \`${lockFilePath}\`\n`)
       .addRaw(`  - Last commit: ${lockTimestamp}\n`)
       .addRaw(`  - Commit SHA: [\`${lockCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${lockCommit.sha})\n\n`)
-      .addRaw("**Action Required:** The lock file needs to be regenerated locally and committed.\n\n");
+      .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n");
 
     await summary.write();
 

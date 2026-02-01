@@ -225,7 +225,7 @@ describe("check_workflow_timestamp_api.cjs", () => {
 
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Lock file"));
       expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("is outdated"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("gh aw compile"));
       expect(mockCore.summary.addRaw).toHaveBeenCalled();
       expect(mockCore.summary.write).toHaveBeenCalled();
     });
@@ -292,7 +292,7 @@ describe("check_workflow_timestamp_api.cjs", () => {
 
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Workflow Lock File Warning"));
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("WARNING"));
-      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("regenerated locally and committed"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("gh aw compile"));
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("src123a")); // Short SHA
       expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("lock456")); // Short SHA
       expect(mockCore.summary.write).toHaveBeenCalled();
@@ -411,30 +411,27 @@ engine: copilot
           ],
         });
 
-      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
-        data: {
-          type: "file",
-          encoding: "base64",
-          content: Buffer.from(lockFileContent).toString("base64"),
-        },
-      });
-
-      // Mock the gh aw hash-frontmatter command to return a matching hash
-      mockExec.exec.mockImplementation((command, args, options) => {
-        if (command === "gh" && args[0] === "aw" && args[1] === "hash-frontmatter") {
-          // Call the stdout listener with a hash
-          options.listeners.stdout(Buffer.from(validHash + "\n"));
-          return Promise.resolve(0);
-        }
-        return Promise.resolve(0);
-      });
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
 
       await main();
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash comparison"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file hash:"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Recomputed hash:"));
-      expect(mockExec.exec).toHaveBeenCalledWith("gh", ["aw", "hash-frontmatter", ".github/workflows/test.md"], expect.any(Object));
     });
 
     it("should handle missing frontmatter hash in lock file", async () => {
@@ -514,22 +511,15 @@ jobs:
           ],
         });
 
-      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
-        data: {
-          type: "file",
-          encoding: "base64",
-          content: Buffer.from(lockFileContent).toString("base64"),
-        },
-      });
-
-      // Mock the gh aw hash-frontmatter command to fail
-      mockExec.exec.mockImplementation((command, args, options) => {
-        if (command === "gh" && args[0] === "aw" && args[1] === "hash-frontmatter") {
-          options.listeners.stderr(Buffer.from("Command failed"));
-          return Promise.resolve(1); // Exit code 1 indicates failure
-        }
-        return Promise.resolve(0);
-      });
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockRejectedValueOnce(new Error("Failed to fetch workflow file"));
 
       await main();
 
