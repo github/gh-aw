@@ -27,16 +27,15 @@ function formatCampaignLabel(campaignId) {
  * @returns {{enabled: boolean, labels: string[]}}
  */
 function getCampaignLabelsFromEnv() {
-  const campaignId = String(process.env.GH_AW_CAMPAIGN_ID || "").trim();
+  const campaignId = String(process.env.GH_AW_CAMPAIGN_ID ?? "").trim();
 
   if (!campaignId) {
     return { enabled: false, labels: [] };
   }
 
-  const specificLabel = formatCampaignLabel(campaignId);
   return {
     enabled: true,
-    labels: [DEFAULT_AGENTIC_CAMPAIGN_LABEL, specificLabel],
+    labels: [DEFAULT_AGENTIC_CAMPAIGN_LABEL, formatCampaignLabel(campaignId)],
   };
 }
 
