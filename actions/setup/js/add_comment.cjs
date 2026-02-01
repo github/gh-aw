@@ -302,7 +302,7 @@ async function main(config = {}) {
   const createdComments = [];
 
   // Get workflow ID for hiding older comments
-  const workflowId = process.env.GITHUB_WORKFLOW || "";
+  const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
 
   /**
    * Message handler function
