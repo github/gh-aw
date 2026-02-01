@@ -553,16 +553,6 @@ The YAML frontmatter supports these fields:
         title-prefix: "[ai] "           # Optional: prefix for project titles
     ```
     Not supported for cross-repository operations.
-  - `copy-project:` - Copy GitHub Projects V2
-    ```yaml
-    safe-outputs:
-      copy-project:
-        max: 1                          # Optional: max copies (default: 1)
-        github-token: ${{ secrets.PROJECTS_PAT }}  # Optional: token with projects:write
-        source-project: "https://github.com/orgs/myorg/projects/42"  # Optional: source project URL
-        target-owner: "org-or-user"     # Optional: owner for copied project
-    ```
-    Not supported for cross-repository operations.
   - `update-project:` - Manage GitHub Projects boards
     ```yaml
     safe-outputs:

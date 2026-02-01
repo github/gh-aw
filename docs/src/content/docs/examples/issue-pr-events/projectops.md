@@ -91,7 +91,6 @@ ProjectOps workflows leverage these safe outputs for project management operatio
 
 - **[`create-project`](/gh-aw/reference/safe-outputs/#project-creation-create-project)** - Create new GitHub Projects V2 boards with custom configuration
 - **[`update-project`](/gh-aw/reference/safe-outputs/#project-board-updates-update-project)** - Add issues/PRs to projects, update fields (status, priority, custom fields), and manage project views
-- **[`copy-project`](/gh-aw/reference/safe-outputs/#project-board-copy-copy-project)** - Duplicate project boards with all fields, views, and structure intact
 - **[`create-project-status-update`](/gh-aw/reference/safe-outputs/#project-status-updates-create-project-status-update)** - Post status updates to project boards with progress summaries and health indicators
 
 Each safe output operates in a separate job with minimal, scoped permissions. See the [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for complete configuration options and examples.
@@ -100,7 +99,6 @@ Each safe output operates in a separate job with minimal, scoped permissions. Se
 
 **Project Creation and Management**
 - Create new Projects V2 boards programmatically
-- Copy existing projects to duplicate templates or migrate structures
 - Add issues and pull requests to projects with duplicate prevention
 - Update project status with automated progress summaries
 
@@ -132,7 +130,6 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 - **Dynamic field assignment** - Set priority, effort, and custom fields based on AI analysis
 - **Automated project creation** - Create new project boards programmatically based on campaign needs
 - **Status tracking** - Generate automated progress summaries with health indicators
-- **Template replication** - Copy existing project structures for new initiatives
 
 ## Best Practices
 
@@ -147,8 +144,6 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 **Create custom views automatically** using the `views` configuration in frontmatter for consistent board setup across campaigns.
 
 **Post regular status updates** using `create-project-status-update` to keep stakeholders informed of campaign progress and health.
-
-**Duplicate successful templates** with `copy-project` to accelerate new campaign setup and maintain consistency.
 
 **Combine with issue creation** for initiative workflows that generate multiple tracked tasks automatically.
 

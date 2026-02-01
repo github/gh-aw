@@ -683,7 +683,6 @@ Operations for project management and releases:
 
 - `create-project` - Create GitHub Projects boards
 - `update-project` - Modify project items and fields
-- `copy-project` - Duplicate project boards
 - `create-project-status-update` - Post project status updates
 - `update-release` - Modify release descriptions
 - `upload-asset` - Upload files to orphaned branches
@@ -832,7 +831,6 @@ Each appendix includes:
 | `assign-to-user` | 1 | ✅ | `issues: write` | ✅ |
 | `create-project` | 1 | ✅ | PAT with `project` scope | ✅ |
 | `update-project` | 10 | ❌ | PAT with `project` scope | ✅ |
-| `copy-project` | 1 | ✅ | PAT with `project` scope | ✅ |
 | `create-project-status-update` | Unlimited | ✅ | PAT with `project` scope | ✅ |
 | `update-release` | 1 | ✅ | `contents: write` | ✅ |
 | `upload-asset` | 10 | ❌ | `contents: write` | ✅ |

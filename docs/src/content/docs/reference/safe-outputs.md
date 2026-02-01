@@ -57,7 +57,6 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 
 - [**Create Project**](#project-creation-create-project) (`create-project`) — Create new GitHub Projects boards (max: 1, cross-repo)
 - [**Update Project**](#project-board-updates-update-project) (`update-project`) — Manage GitHub Projects boards (max: 10, same-repo only)
-- [**Copy Project**](#project-board-copy-copy-project) (`copy-project`) — Copy GitHub Projects boards (max: 1, cross-repo)
 - [**Create Project Status Update**](#project-status-updates-create-project-status-update) (`create-project-status-update`) — Create project status updates
 - [**Update Release**](#release-updates-update-release) (`update-release`) — Update GitHub release descriptions (max: 1)
 - [**Upload Assets**](#asset-uploads-upload-asset) (`upload-asset`) — Upload files to orphaned git branch (max: 10, same-repo only)
@@ -546,46 +545,6 @@ safe-outputs:
 
 Views are created automatically during workflow execution. The workflow must include at least one `update_project` operation to provide the target project URL. For campaign workflows, see [Campaign Guides](/gh-aw/guides/campaigns/).
 
-
-
-### Project Board Copy (`copy-project:`)
-
-Copies GitHub Projects v2 boards to create new projects with the same structure, fields, and views. Useful for duplicating project templates or migrating projects between organizations. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access.
-
-```yaml wrap
-safe-outputs:
-  copy-project:
-    max: 1                          # max operations (default: 1)
-    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
-    source-project: "https://github.com/orgs/myorg/projects/42"  # default source (optional)
-    target-owner: "myorg"           # default target owner (optional)
-```
-
-The `source-project` and `target-owner` fields are optional defaults. When configured, the agent can omit these fields in tool calls, and the defaults will be used. The agent can still override these defaults by providing explicit values.
-
-**Without defaults** (agent must provide all fields):
-```javascript
-copy_project({
-  sourceProject: "https://github.com/orgs/myorg/projects/42",
-  owner: "myorg",
-  title: "Q1 Sprint Template",
-  includeDraftIssues: false  // Optional, default: false
-});
-```
-
-**With defaults configured** (agent only needs to provide title):
-```javascript
-copy_project({
-  title: "Q1 Sprint Template"
-  // sourceProject and owner use configured defaults
-  // Can still override: sourceProject: "...", owner: "..."
-});
-```
-
-Optionally include `includeDraftIssues: true` to copy draft issues (default: false). Exposes outputs: `project-id`, `project-title`, `project-url`.
-
-> [!NOTE]
-> Custom fields, views, and workflows are copied. Draft issues are excluded by default but can be included by setting `includeDraftIssues: true`.
 
 
 ### Project Status Updates (`create-project-status-update:`)

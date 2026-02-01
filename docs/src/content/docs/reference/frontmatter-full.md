@@ -2208,47 +2208,6 @@ safe-outputs:
   # Option 2: Enable project management with default configuration (max=10)
   update-project: null
 
-  # Enable AI agents to duplicate GitHub Project boards with all configuration,
-  # views, and settings.
-  # (optional)
-  # This field supports multiple formats (oneOf):
-
-  # Option 1: Configuration for copying GitHub Projects v2 boards. Creates a new
-  # project with the same structure, fields, and views as the source project. By
-  # default, draft issues are NOT copied unless explicitly requested with
-  # includeDraftIssues=true in the tool call. Requires a Personal Access Token (PAT)
-  # or GitHub App token with Projects permissions; the GITHUB_TOKEN cannot be used.
-  # Safe output items use type=copy_project and include: sourceProject (URL), owner
-  # (org/user login), title (new project name), and optional includeDraftIssues
-  # (boolean). The source-project and target-owner can be configured in the workflow
-  # frontmatter to provide defaults that the agent can use or override.
-  copy-project:
-    # Maximum number of copy operations to perform (default: 1).
-    # (optional)
-    max: 1
-
-    # GitHub token to use for this specific output type. Must have Projects write
-    # permission. Overrides global github-token if specified.
-    # (optional)
-    github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-    # Optional default source project URL to copy from (e.g.,
-    # 'https://github.com/orgs/myorg/projects/42'). If specified, the agent can omit
-    # the sourceProject field in the tool call and this default will be used. The
-    # agent can still override by providing a sourceProject in the tool call.
-    # (optional)
-    source-project: "example-value"
-
-    # Optional default target owner (organization or user login name) where the new
-    # project will be created (e.g., 'myorg' or 'username'). If specified, the agent
-    # can omit the owner field in the tool call and this default will be used. The
-    # agent can still override by providing an owner in the tool call.
-    # (optional)
-    target-owner: "example-value"
-
-  # Option 2: Enable project copying with default configuration (max=1)
-  copy-project: null
-
   # Enable AI agents to create new GitHub Project boards with custom fields, views,
   # and configurations.
   # (optional)
