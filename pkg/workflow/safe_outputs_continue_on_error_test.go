@@ -13,10 +13,10 @@ import (
 // TestSafeOutputsContinueOnError tests the continue-on-error configuration parsing and compilation
 func TestSafeOutputsContinueOnError(t *testing.T) {
 	tests := []struct {
-		name                   string
-		frontmatter            map[string]any
-		expectContinueOnError  bool
-		expectInConfig         bool
+		name                  string
+		frontmatter           map[string]any
+		expectContinueOnError bool
+		expectInConfig        bool
 	}{
 		{
 			name: "continue-on-error enabled",

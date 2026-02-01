@@ -198,8 +198,11 @@ Test workflow
 		"Expected create_project_status_update in project handler config")
 
 	// Verify max values are correct
-	assert.Contains(t, projectConfigJSON, `"create_project_status_update":{"max":2}`,
-		"Expected create_project_status_update with max:2 in project handler config")
+	// Note: Config now includes continue_on_error field (defaults to false)
+	assert.Contains(t, projectConfigJSON, `"create_project_status_update":`,
+		"Expected create_project_status_update in project handler config")
+	assert.Contains(t, projectConfigJSON, `"max":2`,
+		"Expected max:2 in create_project_status_update config")
 }
 
 // TestCreateProjectStatusUpdateWithProjectURLConfig verifies that the project URL configuration
