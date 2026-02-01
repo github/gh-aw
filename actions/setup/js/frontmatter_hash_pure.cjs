@@ -10,8 +10,8 @@ const crypto = require("crypto");
 const VERSIONS = {
   // "gh-aw": "dev", // Excluded for non-release builds
   awf: "v0.11.2",
-  agents: "v0.0.84",
-  gateway: "v0.0.84",
+  agents: "v0.0.86",
+  gateway: "v0.0.86",
 };
 
 /**
