@@ -15,7 +15,7 @@ permissions:
   actions: read
 name: Smoke Copilot
 engine: copilot
-project: "https://github.com/orgs/github-agentic-workflows/projects/1"
+project: "https://github.com/orgs/githubnext/projects/146"
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -54,14 +54,14 @@ safe-outputs:
       expires: 2h
       group: true
       close-older-issues: true
-      target-repo: "github-agentic-workflows/demo-repository"
+      target-repo: "githubnext/gh-aw"
     add-labels:
       allowed: [smoke-copilot]
     remove-labels:
       allowed: [smoke]
     update-project:
       max: 1
-      github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
+      github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     messages:
       append-only-comments: true
       footer: "> 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*"
@@ -90,7 +90,7 @@ strict: true
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
 9. **Project Operation with Temporary ID Testing**: Test project operations with temporary ID resolution:
-   - Use `create_issue` tool with a temporary ID to create an issue in `github-agentic-workflows/demo-repository`:
+   - Use `create_issue` tool with a temporary ID to create an issue in `githubnext/gh-aw`:
      - `temporary_id`: "smoke-test-issue"
      - `title`: "Smoke Test Issue - Run ${{ github.run_id }}"
      - `body`: "This issue was created by the smoke test to validate project operations and temporary ID resolution"
