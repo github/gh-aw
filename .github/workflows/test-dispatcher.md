@@ -15,19 +15,48 @@ safe-outputs:
 
 This workflow demonstrates the dispatch-workflow safe output capability.
 
-**Your task**: Call the `dispatch_workflow` tool to trigger the `test-workflow` workflow.
+**Your task**: Call the MCP tool to trigger the `test-workflow` workflow.
 
-**Important**: You MUST use the safe output tool - do NOT write to files or attempt other methods.
+**Important**: The MCP tool is automatically generated based on the target workflow's `workflow_dispatch` inputs.
+
+## How It Works
+
+When you configure `dispatch-workflow: [test-workflow]`, the compiler automatically:
+1. Reads the `test-workflow.yml` file
+2. Extracts the `workflow_dispatch.inputs` schema
+3. Generates an MCP tool named `test_workflow` that you can call
+
+The target workflow (`test-workflow.yml`) defines:
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      test_param:
+        description: 'Test parameter'
+        type: string
+        required: false
+```
+
+So you'll have a `test_workflow` tool available with an optional `test_param` input.
 
 ## Instructions
 
-1. **Call the safe output tool**: Use `dispatch_workflow` to trigger the test-workflow
-2. **Workflow name**: Specify `test-workflow` as the workflow to dispatch
-3. **Inputs (optional)**: You can provide test parameters if needed, but they are optional
+1. **Call the MCP tool**: Use the `test_workflow` tool (automatically generated from the workflow name)
+2. **Provide inputs (optional)**: The `test_param` input is optional, but you can provide it if you want
+3. **The tool handles everything**: The MCP tool will automatically dispatch the workflow with the correct inputs
 
-## Example
+## Example Tool Call
 
-The agent should call the `dispatch_workflow` tool like this:
+The agent should call the `test_workflow` MCP tool directly:
+
+```javascript
+// The MCP tool is named after the workflow (underscores replace hyphens)
+test_workflow({
+  test_param: "example value"
+})
+```
+
+Or in the agent's output format:
 
 ```json
 {
