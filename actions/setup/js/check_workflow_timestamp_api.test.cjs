@@ -32,9 +32,14 @@ const mockContext = {
   sha: "abc123",
 };
 
+const mockExec = {
+  exec: vi.fn(),
+};
+
 global.core = mockCore;
 global.github = mockGithub;
 global.context = mockContext;
+global.exec = mockExec;
 
 describe("check_workflow_timestamp_api.cjs", () => {
   let main;
@@ -367,7 +372,8 @@ describe("check_workflow_timestamp_api.cjs", () => {
     });
 
     it("should log frontmatter hash comparison when both files exist", async () => {
-      const lockFileContent = `# frontmatter-hash: abc123def456
+      const validHash = "cdb5fdf551a14f93f6a8bb32b4f8ee5a6e93a8075052ecd915180be7fbc168ca";
+      const lockFileContent = `# frontmatter-hash: ${validHash}
 name: Test Workflow
 on: push
 jobs:
@@ -405,27 +411,30 @@ engine: copilot
           ],
         });
 
-      mockGithub.rest.repos.getContent
-        .mockResolvedValueOnce({
-          data: {
-            type: "file",
-            encoding: "base64",
-            content: Buffer.from(lockFileContent).toString("base64"),
-          },
-        })
-        .mockResolvedValueOnce({
-          data: {
-            type: "file",
-            encoding: "base64",
-            content: Buffer.from(mdFileContent).toString("base64"),
-          },
-        });
+      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(lockFileContent).toString("base64"),
+        },
+      });
+
+      // Mock the gh aw hash-frontmatter command to return a matching hash
+      mockExec.exec.mockImplementation((command, args, options) => {
+        if (command === "gh" && args[0] === "aw" && args[1] === "hash-frontmatter") {
+          // Call the stdout listener with a hash
+          options.listeners.stdout(Buffer.from(validHash + "\n"));
+          return Promise.resolve(0);
+        }
+        return Promise.resolve(0);
+      });
 
       await main();
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash comparison"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file hash:"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Recomputed hash:"));
+      expect(mockExec.exec).toHaveBeenCalledWith("gh", ["aw", "hash-frontmatter", ".github/workflows/test.md"], expect.any(Object));
     });
 
     it("should handle missing frontmatter hash in lock file", async () => {
@@ -473,6 +482,14 @@ jobs:
     });
 
     it("should handle errors during hash computation gracefully", async () => {
+      const validHash = "cdb5fdf551a14f93f6a8bb32b4f8ee5a6e93a8075052ecd915180be7fbc168ca";
+      const lockFileContent = `# frontmatter-hash: ${validHash}
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest`;
+
       mockGithub.rest.repos.listCommits
         .mockResolvedValueOnce({
           data: [
@@ -497,11 +514,26 @@ jobs:
           ],
         });
 
-      mockGithub.rest.repos.getContent.mockRejectedValue(new Error("API error"));
+      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(lockFileContent).toString("base64"),
+        },
+      });
+
+      // Mock the gh aw hash-frontmatter command to fail
+      mockExec.exec.mockImplementation((command, args, options) => {
+        if (command === "gh" && args[0] === "aw" && args[1] === "hash-frontmatter") {
+          options.listeners.stderr(Buffer.from("Command failed"));
+          return Promise.resolve(1); // Exit code 1 indicates failure
+        }
+        return Promise.resolve(0);
+      });
 
       await main();
 
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not fetch content"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compute frontmatter hash"));
       expect(mockCore.setFailed).not.toHaveBeenCalled(); // Should not fail the workflow
     });
   });

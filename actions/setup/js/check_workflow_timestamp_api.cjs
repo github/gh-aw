@@ -8,8 +8,50 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { computeFrontmatterHash, extractHashFromLockFile, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
+const { extractHashFromLockFile } = require("./frontmatter_hash_pure.cjs");
 const { getFileContent } = require("./github_api_helpers.cjs");
+
+/**
+ * Compute frontmatter hash using the Go binary (gh aw hash-frontmatter)
+ * This ensures consistency between compilation and validation
+ * @param {string} workflowPath - Path to the workflow file
+ * @returns {Promise<string>} The SHA-256 hash as a lowercase hexadecimal string
+ */
+async function computeFrontmatterHashViaGo(workflowPath) {
+  try {
+    let hashOutput = "";
+    let errorOutput = "";
+
+    const exitCode = await exec.exec("gh", ["aw", "hash-frontmatter", workflowPath], {
+      silent: true,
+      ignoreReturnCode: true,
+      listeners: {
+        stdout: data => {
+          hashOutput += data.toString();
+        },
+        stderr: data => {
+          errorOutput += data.toString();
+        },
+      },
+    });
+
+    if (exitCode !== 0) {
+      throw new Error(`gh aw hash-frontmatter failed with exit code ${exitCode}: ${errorOutput}`);
+    }
+
+    // Extract the hash from output (remove any ANSI codes and whitespace)
+    const hash = hashOutput.replace(/\x1b\[[0-9;]*m/g, "").trim();
+
+    // Validate hash format (should be 64 hex characters)
+    if (!/^[a-f0-9]{64}$/.test(hash)) {
+      throw new Error(`Invalid hash format received: ${hash}`);
+    }
+
+    return hash;
+  } catch (error) {
+    throw new Error(`Failed to compute hash via Go binary: ${getErrorMessage(error)}`);
+  }
+}
 
 async function main() {
   const workflowFile = process.env.GH_AW_WORKFLOW_FILE;
@@ -78,9 +120,9 @@ async function main() {
         return;
       }
 
-      // Compute hash from source .md file using GitHub API
-      const fileReader = createGitHubFileReader(github, owner, repo, ref);
-      const recomputedHash = await computeFrontmatterHash(workflowMdPath, { fileReader });
+      // Compute hash using Go binary for consistency with compilation
+      // Note: This requires the workflow file to exist locally in the checkout
+      const recomputedHash = await computeFrontmatterHashViaGo(workflowMdPath);
 
       // Log hash comparison
       core.info(`Frontmatter hash comparison:`);
