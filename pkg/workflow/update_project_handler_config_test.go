@@ -22,6 +22,7 @@ engine: copilot
 safe-outputs:
   update-project:
     max: 1
+    project: "https://github.com/orgs/test-org/projects/1"
     field-definitions:
       - name: "campaign_id"
         data-type: "TEXT"

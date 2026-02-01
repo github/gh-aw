@@ -27,6 +27,7 @@ safe-outputs:
     max: 1
   create-project-status-update:
     max: 5
+    project: "https://github.com/orgs/test-org/projects/1"
 ---
 
 Test workflow
@@ -76,6 +77,7 @@ safe-outputs:
     max: 1
   create-project-status-update:
     max: 1
+    project: "https://github.com/orgs/test-org/projects/1"
     github-token: "${{ secrets.CUSTOM_TOKEN }}"
 ---
 
@@ -140,6 +142,7 @@ safe-outputs:
     max: 1
   create-project-status-update:
     max: 2
+    project: "https://github.com/orgs/test-org/projects/1"
 ---
 
 Test workflow
