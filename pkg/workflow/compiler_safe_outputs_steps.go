@@ -162,10 +162,9 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 
 	// Check if any project-handler types are enabled
 	// If so, pass the temporary project map from the project handler step
-	hasProjectHandlerTypes := data.SafeOutputs.CreateProjects != nil ||
-		data.SafeOutputs.CreateProjectStatusUpdates != nil ||
-		data.SafeOutputs.UpdateProjects != nil ||
-		data.SafeOutputs.CopyProjects != nil
+	// Note: Only copy_project runs in the project handler manager now.
+	// create_project, update_project, and create_project_status_update are in the unified handler.
+	hasProjectHandlerTypes := data.SafeOutputs.CopyProjects != nil
 
 	if hasProjectHandlerTypes {
 		// If project handler ran before this, pass its temporary project map
