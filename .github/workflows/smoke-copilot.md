@@ -54,6 +54,7 @@ safe-outputs:
       expires: 2h
       group: true
       close-older-issues: true
+      target-repo: "github-agentic-workflows/demo-repository"
     add-labels:
       allowed: [smoke-copilot]
     remove-labels:
@@ -88,13 +89,17 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-9. **Simple Project Operation Testing**: Test basic project operations to verify token and configuration:
-   - Call `update_project` with:
-     - `content_type`: "draft_issue"
-     - `draft_title`: "Smoke Test Draft - Run ${{ github.run_id }}"
-     - `draft_body`: "Simple smoke test validation"
+9. **Project Operation with Temporary ID Testing**: Test project operations with temporary ID resolution:
+   - Use `create_issue` tool with a temporary ID to create an issue in `github-agentic-workflows/demo-repository`:
+     - `temporary_id`: "smoke-test-issue"
+     - `title`: "Smoke Test Issue - Run ${{ github.run_id }}"
+     - `body`: "This issue was created by the smoke test to validate project operations and temporary ID resolution"
+     - `labels`: ["smoke-test"]
+   - Then use `update_project` tool to add the newly created issue to the project board using the temporary ID:
+     - `content_type`: "issue"
+     - `temporary_id`: "smoke-test-issue"
      - `fields`: `{"Status": "Backlog"}`
-   - Verify the operation completes (success or failure both acceptable, this just tests the plumbing)
+   - This tests both issue creation in a separate repo AND temporary ID resolution for project operations
 
 ## Output
 
