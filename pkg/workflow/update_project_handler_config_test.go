@@ -43,8 +43,9 @@ Test workflow
 	require.NoError(t, err, "Failed to read compiled output")
 
 	compiledStr := string(compiledContent)
-	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG", "Expected project handler config env var")
-	require.Contains(t, compiledStr, "update_project", "Expected update_project in project handler config")
+	// Note: update-project is now in the main handler config, not the project handler config
+	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "Expected main handler config env var")
+	require.Contains(t, compiledStr, "update_project", "Expected update_project in handler config")
 
 	// field_definitions uses underscore naming in the JSON config passed to JS
 	require.True(
@@ -84,7 +85,10 @@ Test workflow
 
 	compiledStr := string(compiledContent)
 
-	// Verify GH_AW_PROJECT_URL environment variable is set
-	require.Contains(t, compiledStr, "GH_AW_PROJECT_URL:", "Expected GH_AW_PROJECT_URL environment variable")
-	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-12345/projects/99999", "Expected project URL in environment variable")
+	// Note: Since update-project is no longer in the project handler manager,
+	// GH_AW_PROJECT_URL is not set when only update-project is configured.
+	// update-project is now handled by the unified handler, which doesn't set GH_AW_PROJECT_URL.
+	// The project URL is passed as part of the handler config instead.
+	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "Expected main handler config")
+	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-12345/projects/99999", "Expected project URL in handler config")
 }
