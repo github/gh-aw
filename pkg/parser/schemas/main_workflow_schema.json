@@ -3911,7 +3911,7 @@
                 },
                 "project": {
                   "type": "string",
-                  "description": "Target project URL for update-project operations. Agent messages can optionally override this by providing an explicit project field in the output. Must be a valid GitHub Projects v2 URL.",
+                  "description": "Target project URL for update-project operations. This is required in the configuration for documentation purposes. Agent messages MUST explicitly include the project field in their output - the configured value is not used as a fallback. Must be a valid GitHub Projects v2 URL.",
                   "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
                   "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 },
@@ -4120,7 +4120,7 @@
                 },
                 "project": {
                   "type": "string",
-                  "description": "Target project URL for status update operations. Agent messages can optionally override this by providing an explicit project field in the output. Must be a valid GitHub Projects v2 URL.",
+                  "description": "Target project URL for status update operations. This is required in the configuration for documentation purposes. Agent messages MUST explicitly include the project field in their output - the configured value is not used as a fallback. Must be a valid GitHub Projects v2 URL.",
                   "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
                   "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 }
