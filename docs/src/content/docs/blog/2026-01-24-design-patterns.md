@@ -33,30 +33,13 @@ Let's dive in!
 
 **Observe, analyze, and report - without changing anything**
 
-These agents gather data, perform analysis, and publish insights through discussions or assets. They have zero write permissions to code. This makes them incredibly safe to run continuously at any frequency.
+These agents gather data, perform analysis, and publish insights through discussions or assets with zero write permissions to code. Safe to run continuously at any frequency.
 
-Use these when:
+**Best for:** Building confidence in agent behavior, establishing baselines, generating reports, and deep research.
 
-- Building confidence in agent behavior (great for getting started!)
-- Establishing baselines before automation
-- Generating reports and metrics
-- Deep research and investigation
+**Examples:** [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md), [`portfolio-analyst`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md), [`session-insights`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-session-insights.md), [`org-health-report`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/org-health-report.md), [`scout`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/scout.md), [`archie`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/archie.md)
 
-Here are some examples:
-
-- [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) - Meta-agent that audits all other agents' runs
-- [`portfolio-analyst`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md) - Spots cost optimization opportunities
-- [`session-insights`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-session-insights.md) - Analyzes Copilot usage patterns
-- [`org-health-report`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/org-health-report.md) - Organization-wide health metrics
-- [`scout`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/scout.md), [`archie`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/archie.md) - Deep research agents
-
-Some key characteristics are:
-
-- `permissions: contents: read` only (that's it!)
-- Output via discussions, issues, or artifact uploads
-- Can run on any schedule without risk
-- Builds trust through transparency
-- Often creates visualizations and charts
+**Key characteristics:** `permissions: contents: read` only, output via discussions/issues/artifacts, can run on any schedule without risk.
 
 ---
 
@@ -64,30 +47,13 @@ Some key characteristics are:
 
 **On-demand assistance via slash commands**
 
-These agentic workflows areactivated by `/command` mentions in issues or PRs. Role-gated for security. They respond with analysis, visualizations, or actions.
+Activated by `/command` mentions in issues or PRs. Role-gated for security. Respond with analysis, visualizations, or actions.
 
-Use these when:
+**Best for:** Interactive code reviews, on-demand optimizations, user-initiated research, and specialized assistance requiring authorization.
 
-- Interactive code reviews
-- On-demand optimizations
-- User-initiated research
-- Specialized assistance requiring authorization
+**Examples:** [`q`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/q.md), [`grumpy-reviewer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md), [`poem-bot`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/poem-bot.md), [`mergefest`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mergefest.md), [`pr-fix`](https://github.com/githubnext/agentics/blob/main/workflows/pr-fix.md)
 
-Here are some examples:
-
-- [`q`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/q.md) - Workflow optimizer (type `/q` and it investigates!)
-- [`grumpy-reviewer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) - Critical code review with personality
-- [`poem-bot`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/poem-bot.md) - Creative verse generation (because why not?)
-- [`mergefest`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mergefest.md) - Branch merging automation
-- [`pr-fix`](https://github.com/githubnext/agentics/blob/main/workflows/pr-fix.md) - Fixes failing CI checks on demand
-
-Some key characteristics are:
-
-- Triggered by `/command` in issue/PR comments
-- Often includes role-gating for security
-- Provides immediate feedback
-- Uses cache-memory to avoid duplicate work
-- Clear personality and purpose
+**Key characteristics:** Triggered by `/command` in comments, often includes role-gating, provides immediate feedback.
 
 ---
 
@@ -95,30 +61,13 @@ Some key characteristics are:
 
 **Automated cleanup and maintenance**
 
-These agentic workflows propose incremental improvements through PRs. Run on schedules (daily/weekly). Create scoped changes with descriptive labels and commit messages. Always require human review before merging.
+Propose incremental improvements through PRs on schedules (daily/weekly). Create scoped changes with descriptive labels and commit messages. Always require human review before merging.
 
-Use these when:
+**Best for:** Dependency updates, documentation sync, formatting consistency, small refactorings, and file organization.
 
-- Keeping dependencies up to date
-- Maintaining documentation sync
-- Formatting and style consistency
-- Small refactorings and cleanups
-- File organization improvements
+**Examples:** [`daily-workflow-updater`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-workflow-updater.md), [`glossary-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/glossary-maintainer.md), [`daily-file-diet`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-file-diet.md), [`hourly-ci-cleaner`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/hourly-ci-cleaner.md)
 
-Here are some examples:
-
-- [`daily-workflow-updater`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-workflow-updater.md) - Keeps actions and dependencies current
-- [`glossary-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/glossary-maintainer.md) - Syncs glossary with codebase
-- [`daily-file-diet`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-file-diet.md) - Refactors oversized files
-- [`hourly-ci-cleaner`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/hourly-ci-cleaner.md) - Repairs CI issues
-
-Some key characteristics are:
-
-- Runs on fixed schedules
-- Creates PRs for human review (no auto-merge!)
-- Makes small, focused changes
-- Uses descriptive labels and commits
-- Often includes "if no changes" guards
+**Key characteristics:** Runs on fixed schedules, creates PRs for human review (no auto-merge), makes small focused changes.
 
 ---
 
@@ -126,31 +75,13 @@ Some key characteristics are:
 
 **Continuous validation and compliance enforcement**
 
-These agentic workflows validate system integrity through testing, scanning, and compliance checks. Run frequently (hourly/daily) to catch regressions early.
+Validate system integrity through testing, scanning, and compliance checks. Run frequently (hourly/daily) to catch regressions early.
 
-Use these when:
+**Best for:** Smoke testing, security scanning, accessibility validation, schema consistency, and infrastructure health monitoring.
 
-- Smoke testing infrastructure
-- Security scanning
-- Accessibility validation
-- Schema consistency checks
-- Infrastructure health monitoring
+**Examples:** [`smoke-copilot`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-copilot.md), [`smoke-claude`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-claude.md), [`schema-consistency-checker`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/schema-consistency-checker.md), [`breaking-change-checker`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/breaking-change-checker.md), [`firewall`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/firewall.md), [`daily-accessibility-review`](https://github.com/githubnext/agentics/blob/main/workflows/daily-accessibility-review.md)
 
-Here are some examples:
-
-- Smoke tests for [`copilot`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-copilot.md), [`claude`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-claude.md), [`codex`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-codex.md)
-- [`schema-consistency-checker`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/schema-consistency-checker.md)
-- [`breaking-change-checker`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/breaking-change-checker.md)
-- [`firewall`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/firewall.md), [`mcp-inspector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mcp-inspector.md)
-- [`daily-accessibility-review`](https://github.com/githubnext/agentics/blob/main/workflows/daily-accessibility-review.md)
-
-Some key characteristics are:
-
-- Frequent execution (hourly to daily)
-- Clear pass/fail criteria
-- Creates issues when validation fails
-- Minimal false positives
-- Fast execution (heartbeat pattern)
+**Key characteristics:** Frequent execution (hourly/daily), clear pass/fail criteria, creates issues when validation fails.
 
 ---
 
@@ -158,30 +89,13 @@ Some key characteristics are:
 
 **Intelligent workflow automation for issues and pull requests**
 
-These agentic workflows triage, link, label, close, and coordinate issues and PRs. React to events or run on schedules.
+Triage, link, label, close, and coordinate issues and PRs. React to events or run on schedules.
 
-Use these when:
+**Best for:** Issue triage, linking related issues, managing sub-issues, coordinating merges, and optimizing templates.
 
-- Automating issue triage
-- Linking related issues
-- Managing sub-issues
-- Coordinating merges
-- Optimizing issue templates
+**Examples:** [`issue-triage-agent`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md), [`issue-arborist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-arborist.md), [`mergefest`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mergefest.md), [`sub-issue-closer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/sub-issue-closer.md)
 
-Here are some examples:
-
-- [`issue-triage-agent`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md) - Auto-labels and categorizes
-- [`issue-arborist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-arborist.md) - Links related issues
-- [`mergefest`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mergefest.md) - Merge coordination
-- [`sub-issue-closer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/sub-issue-closer.md) - Closes completed sub-issues
-
-Some key characteristics are:
-
-- Event-driven (issue/PR triggers)
-- Uses safe outputs for modifications
-- Often includes intelligent classification
-- Maintains issue relationships
-- Respects user intent and context
+**Key characteristics:** Event-driven (issue/PR triggers), uses safe outputs, includes intelligent classification.
 
 ---
 
@@ -189,30 +103,13 @@ Some key characteristics are:
 
 **Progressive work across multiple days with human checkpoints**
 
-These agentic workflows tackle complex improvements too large for single runs. Three phases: (1) Research and create plan discussion, (2) Infer/setup build infrastructure, (3) Implement changes via PR. Check state each run to determine current phase.
+Tackle complex improvements too large for single runs through three phases: (1) Research and create plan discussion, (2) Infer/setup build infrastructure, (3) Implement changes via PR. Check state each run to determine current phase.
 
-Use these when:
+**Best for:** Large refactorings, test coverage improvements, performance optimization, backlog reduction, and quality improvement programs.
 
-- Large refactoring projects
-- Test coverage improvements
-- Performance optimization
-- Backlog reduction initiatives
-- Quality improvement programs
+**Examples:** [`daily-backlog-burner`](https://github.com/githubnext/agentics/blob/main/workflows/daily-backlog-burner.md), [`daily-perf-improver`](https://github.com/githubnext/agentics/blob/main/workflows/daily-perf-improver.md), [`daily-test-improver`](https://github.com/githubnext/agentics/blob/main/workflows/daily-test-improver.md), [`daily-qa`](https://github.com/githubnext/agentics/blob/main/workflows/daily-qa.md)
 
-Here are some examples:
-
-- [`daily-backlog-burner`](https://github.com/githubnext/agentics/blob/main/workflows/daily-backlog-burner.md) - Systematic backlog reduction
-- [`daily-perf-improver`](https://github.com/githubnext/agentics/blob/main/workflows/daily-perf-improver.md) - Performance optimization
-- [`daily-test-improver`](https://github.com/githubnext/agentics/blob/main/workflows/daily-test-improver.md) - Test coverage enhancement
-- [`daily-qa`](https://github.com/githubnext/agentics/blob/main/workflows/daily-qa.md) - Continuous quality assurance
-
-Some key characteristics are:
-
-- Multi-day operation
-- Three distinct phases with checkpoints
-- Uses repo-memory for state persistence
-- Human approval between phases
-- Creates comprehensive documentation
+**Key characteristics:** Multi-day operation, three distinct phases with checkpoints, uses repo-memory for state persistence.
 
 ---
 
@@ -220,31 +117,13 @@ Some key characteristics are:
 
 **Semantic analysis and pattern detection**
 
-Agents using specialized code analysis tools (Serena, ast-grep) to detect patterns, duplicates, anti-patterns, and refactoring opportunities.
+Use specialized code analysis tools (Serena, ast-grep) to detect patterns, duplicates, anti-patterns, and refactoring opportunities.
 
-Use these when:
+**Best for:** Finding duplicate code, detecting anti-patterns, identifying refactoring opportunities, analyzing style consistency, and type system improvements.
 
-- Finding duplicate code
-- Detecting anti-patterns
-- Identifying refactoring opportunities
-- Analyzing code style consistency
-- Type system improvements
+**Examples:** [`duplicate-code-detector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md), [`semantic-function-refactor`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/semantic-function-refactor.md), [`terminal-stylist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/terminal-stylist.md), [`go-pattern-detector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/go-pattern-detector.md), [`typist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/typist.md)
 
-Here are some examples:
-
-- [`duplicate-code-detector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md) - Finds code duplicates
-- [`semantic-function-refactor`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/semantic-function-refactor.md) - Refactoring opportunities
-- [`terminal-stylist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/terminal-stylist.md) - Console output analysis
-- [`go-pattern-detector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/go-pattern-detector.md) - Go-specific patterns
-- [`typist`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/typist.md) - Type analysis
-
-Some key characteristics are:
-
-- Uses specialized analysis tools (MCP servers)
-- Language-aware or cross-language
-- Creates detailed issues with code locations
-- Often proposes concrete fixes
-- Integrates with IDE workflows
+**Key characteristics:** Uses specialized analysis tools (MCP servers), language-aware, creates detailed issues with code locations.
 
 ---
 
@@ -252,30 +131,13 @@ Some key characteristics are:
 
 **Maintain knowledge artifacts synchronized with code**
 
-These agentic workflows keep documentation, glossaries, slide decks, blog posts, and other content fresh by monitoring codebase changes and updating corresponding docs.
+Keep documentation, glossaries, slide decks, blog posts, and other content fresh by monitoring codebase changes and updating corresponding docs.
 
-Use these when:
+**Best for:** Keeping docs synchronized, maintaining glossaries, updating slide decks, analyzing multimedia content, and generating documentation.
 
-- Keeping docs synchronized
-- Maintaining glossaries
-- Updating slide decks
-- Analyzing multimedia content
-- Generating documentation
+**Examples:** [`glossary-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/glossary-maintainer.md), [`technical-doc-writer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/technical-doc-writer.md), [`slide-deck-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/slide-deck-maintainer.md), [`ubuntu-image-analyzer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/ubuntu-image-analyzer.md)
 
-Here are some examples:
-
-- [`glossary-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/glossary-maintainer.md) - Glossary synchronization
-- [`technical-doc-writer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/technical-doc-writer.md) - Technical documentation
-- [`slide-deck-maintainer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/slide-deck-maintainer.md) - Presentation maintenance
-- [`ubuntu-image-analyzer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/ubuntu-image-analyzer.md) - Environment documentation
-
-Some key characteristics are:
-
-- Monitors code changes
-- Creates documentation PRs
-- Uses document analysis tools (markitdown)
-- Maintains consistency
-- Often includes visualization
+**Key characteristics:** Monitors code changes, creates documentation PRs, uses document analysis tools.
 
 ---
 
@@ -283,30 +145,13 @@ Some key characteristics are:
 
 **Monitor and optimize other agents**
 
-These agentic workflows analyze the agent ecosystem itself. Download workflow logs, classify failures, detect missing tools, track performance metrics, identify cost optimization opportunities.
+Analyze the agent ecosystem by downloading workflow logs, classifying failures, detecting missing tools, tracking performance metrics, and identifying cost optimization opportunities.
 
-Use these when:
+**Best for:** Managing ecosystems at scale, cost optimization, performance monitoring, failure pattern detection, and tool availability validation.
 
-- Managing agentic ecosystems at scale
-- Cost optimization
-- Performance monitoring
-- Failure pattern detection
-- Tool availability validation
+**Examples:** [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md), [`agent-performance-analyzer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md), [`portfolio-analyst`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md), [`workflow-health-manager`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/workflow-health-manager.md)
 
-Here are some examples:
-
-- [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) - Comprehensive workflow auditing
-- [`agent-performance-analyzer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md) - Agent quality metrics
-- [`portfolio-analyst`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md) - Cost optimization
-- [`workflow-health-manager`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/workflow-health-manager.md) - Health monitoring
-
-Some key characteristics are:
-
-- Accesses workflow run data
-- Analyzes logs and metrics
-- Identifies systemic issues
-- Provides actionable recommendations
-- Essential for scale
+**Key characteristics:** Accesses workflow run data, analyzes logs and metrics, provides actionable recommendations.
 
 ---
 
@@ -314,28 +159,13 @@ Some key characteristics are:
 
 **Orchestrate multi-step workflows via state machines**
 
-These agentic workflows coordinate complex workflows through task queue patterns. Track state across runs (open/in-progress/completed).
+Coordinate complex workflows through task queue patterns. Track state across runs (open/in-progress/completed).
 
-Use these when:
+**Best for:** Task management, multi-step coordination, workflow generation, development monitoring, and task distribution.
 
-- Task management
-- Multi-step coordination
-- Workflow generation
-- Development monitoring
-- Task distribution
+**Examples:** [`workflow-generator`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/workflow-generator.md), [`dev-hawk`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/dev-hawk.md)
 
-Here are some examples:
-
-- [`workflow-generator`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/workflow-generator.md) - Generates new workflows
-- [`dev-hawk`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/dev-hawk.md) - Development monitoring
-
-Some key characteristics are:
-
-- Manages state across runs
-- Uses GitHub primitives (issues, projects)
-- Coordinates multiple agents
-- Implements workflow patterns
-- Often dispatcher-based
+**Key characteristics:** Manages state across runs, uses GitHub primitives (issues, projects), coordinates multiple agents.
 
 ---
 
@@ -343,29 +173,13 @@ Some key characteristics are:
 
 **Advanced insights through machine learning and NLP**
 
-These agentic workflows apply clustering, NLP, statistical analysis, or ML techniques to extract patterns from historical data. Generate visualizations and trend reports.
+Apply clustering, NLP, statistical analysis, or ML techniques to extract patterns from historical data. Generate visualizations and trend reports.
 
-Use these when:
+**Best for:** Pattern discovery in large datasets, NLP on conversations, clustering similar items, trend analysis, and longitudinal studies.
 
-- Pattern discovery in large datasets
-- NLP on conversations
-- Clustering similar items
-- Trend analysis
-- Longitudinal studies
+**Examples:** [`copilot-session-insights`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-session-insights.md), [`copilot-pr-nlp-analysis`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-pr-nlp-analysis.md), [`prompt-clustering`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/prompt-clustering-analysis.md)
 
-Here are some examples:
-
-- [`copilot-session-insights`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-session-insights.md) - Session usage analysis
-- [`copilot-pr-nlp-analysis`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-pr-nlp-analysis.md) - NLP on PR conversations
-- [`prompt-clustering`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/prompt-clustering-analysis.md) - Clusters and categorizes prompts
-
-Some key characteristics are:
-
-- Uses ML/statistical techniques
-- Requires historical data
-- Often uses repo-memory
-- Generates visualizations
-- Discovers non-obvious patterns
+**Key characteristics:** Uses ML/statistical techniques, requires historical data, generates visualizations.
 
 ---
 
@@ -373,31 +187,13 @@ Some key characteristics are:
 
 **Protect repositories from threats and enforce policies**
 
-These agentic workflows guard repositories through vulnerability scanning, secret detection, spam filtering, malicious code analysis, and compliance enforcement.
+Guard repositories through vulnerability scanning, secret detection, spam filtering, malicious code analysis, and compliance enforcement.
 
-Use these when:
+**Best for:** Security vulnerability scanning, secret detection, spam and abuse prevention, compliance enforcement, and security fix generation.
 
-- Security vulnerability scanning
-- Secret detection
-- Spam and abuse prevention
-- Compliance enforcement
-- Security fix generation
+**Examples:** [`security-compliance`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/security-compliance.md), [`firewall`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/firewall.md), [`daily-secrets-analysis`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-secrets-analysis.md), [`ai-moderator`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/ai-moderator.md), [`security-fix-pr`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/security-fix-pr.md)
 
-Here are some examples:
-
-- [`security-compliance`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/security-compliance.md) - Vulnerability campaigns
-- [`firewall`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/firewall.md) - Network security testing
-- [`daily-secrets-analysis`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-secrets-analysis.md) - Secret scanning
-- [`ai-moderator`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/ai-moderator.md) - Comment spam filtering
-- [`security-fix-pr`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/security-fix-pr.md) - Automated security fixes
-
-Some key characteristics are:
-
-- Security-focused permissions
-- High accuracy requirements
-- Often regulatory-driven
-- Creates actionable alerts
-- May include auto-remediation
+**Key characteristics:** Security-focused permissions, high accuracy requirements, creates actionable alerts.
 
 ---
 
