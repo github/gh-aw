@@ -148,14 +148,15 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 
 	// Check if any project-handler-manager-supported types are enabled
 	// These types require GH_AW_PROJECT_GITHUB_TOKEN and are processed separately
+	// Note: update-project and create-project-status-update are handled by the unified handler,
+	// not the project handler manager, so they are excluded from this check
 	hasProjectHandlerManagerTypes := data.SafeOutputs.CreateProjects != nil ||
-		data.SafeOutputs.CreateProjectStatusUpdates != nil ||
-		data.SafeOutputs.UpdateProjects != nil ||
 		data.SafeOutputs.CopyProjects != nil
 
-	// 1. Project Handler Manager step (processes create_project, update_project, copy_project, etc.)
+	// 1. Project Handler Manager step (processes create_project, copy_project)
 	// These types require GH_AW_PROJECT_GITHUB_TOKEN and must be processed separately from the main handler manager
 	// This runs FIRST to ensure projects exist before issues/PRs are created and potentially added to them
+	// Note: update-project and create-project-status-update are handled by the unified handler
 	if hasProjectHandlerManagerTypes {
 		consolidatedSafeOutputsJobLog.Print("Using project handler manager for project-related safe outputs")
 		projectHandlerManagerSteps := c.buildProjectHandlerManagerStep(data)
@@ -169,13 +170,8 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		// Add permissions for project-related types
 		// Note: Projects v2 cannot use GITHUB_TOKEN; it requires a PAT or GitHub App token
 		// The permissions here are for workflow-level permissions, actual API calls use GH_AW_PROJECT_GITHUB_TOKEN
+		// Only create_project and copy_project are handled by the project handler manager
 		if data.SafeOutputs.CreateProjects != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.UpdateProjects != nil {
 			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
 		}
 		if data.SafeOutputs.CopyProjects != nil {
@@ -253,6 +249,14 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		}
 		if data.SafeOutputs.DispatchWorkflow != nil {
 			permissions.Merge(NewPermissionsActionsWrite())
+		}
+		// Project-related types now handled by the unified handler
+		// (not the separate project handler manager step)
+		if data.SafeOutputs.UpdateProjects != nil {
+			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
+		}
+		if data.SafeOutputs.CreateProjectStatusUpdates != nil {
+			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
 		}
 
 		// If create-issue is configured with assignees: copilot, run a follow-up step to
