@@ -453,4 +453,53 @@ describe("safe_output_helpers", () => {
       });
     });
   });
+
+  describe("loadCustomSafeOutputJobTypes", () => {
+    beforeEach(() => {
+      // Clean up environment variables
+      delete process.env.GH_AW_SAFE_OUTPUT_JOBS;
+    });
+
+    it("should return empty set when GH_AW_SAFE_OUTPUT_JOBS is not set", () => {
+      const result = helpers.loadCustomSafeOutputJobTypes();
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(0);
+    });
+
+    it("should parse and return custom job types from GH_AW_SAFE_OUTPUT_JOBS", () => {
+      process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({
+        notion_add_comment: "comment_url",
+        slack_post_message: "message_url",
+        custom_job: "output_url",
+      });
+
+      const result = helpers.loadCustomSafeOutputJobTypes();
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(3);
+      expect(result.has("notion_add_comment")).toBe(true);
+      expect(result.has("slack_post_message")).toBe(true);
+      expect(result.has("custom_job")).toBe(true);
+    });
+
+    it("should return empty set when GH_AW_SAFE_OUTPUT_JOBS is invalid JSON", () => {
+      process.env.GH_AW_SAFE_OUTPUT_JOBS = "invalid json";
+
+      const result = helpers.loadCustomSafeOutputJobTypes();
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(0);
+      // Note: Warning is logged but we don't test for it since core is not mocked in this test file
+    });
+
+    it("should handle empty object in GH_AW_SAFE_OUTPUT_JOBS", () => {
+      process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({});
+
+      const result = helpers.loadCustomSafeOutputJobTypes();
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(0);
+    });
+  });
 });

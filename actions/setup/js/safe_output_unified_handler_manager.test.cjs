@@ -1,7 +1,7 @@
 // @ts-check
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { loadConfig, setupProjectGitHubClient, loadCustomSafeOutputJobTypes } from "./safe_output_unified_handler_manager.cjs";
+import { loadConfig, setupProjectGitHubClient } from "./safe_output_unified_handler_manager.cjs";
 
 // Mock @actions/github
 vi.mock("@actions/github", () => ({
@@ -112,55 +112,6 @@ describe("Unified Safe Output Handler Manager", () => {
       expect(octokit).toBeDefined();
       expect(octokit).toHaveProperty("graphql");
       expect(octokit).toHaveProperty("request");
-    });
-  });
-
-  describe("loadCustomSafeOutputJobTypes", () => {
-    beforeEach(() => {
-      // Clean up environment variables
-      delete process.env.GH_AW_SAFE_OUTPUT_JOBS;
-    });
-
-    it("should return empty set when GH_AW_SAFE_OUTPUT_JOBS is not set", () => {
-      const result = loadCustomSafeOutputJobTypes();
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(0);
-    });
-
-    it("should parse and return custom job types from GH_AW_SAFE_OUTPUT_JOBS", () => {
-      process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({
-        notion_add_comment: "comment_url",
-        slack_post_message: "message_url",
-        custom_job: "output_url",
-      });
-
-      const result = loadCustomSafeOutputJobTypes();
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(3);
-      expect(result.has("notion_add_comment")).toBe(true);
-      expect(result.has("slack_post_message")).toBe(true);
-      expect(result.has("custom_job")).toBe(true);
-    });
-
-    it("should return empty set and warn when GH_AW_SAFE_OUTPUT_JOBS is invalid JSON", () => {
-      process.env.GH_AW_SAFE_OUTPUT_JOBS = "invalid json";
-
-      const result = loadCustomSafeOutputJobTypes();
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(0);
-      expect(global.core.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to parse GH_AW_SAFE_OUTPUT_JOBS"));
-    });
-
-    it("should handle empty object in GH_AW_SAFE_OUTPUT_JOBS", () => {
-      process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({});
-
-      const result = loadCustomSafeOutputJobTypes();
-
-      expect(result).toBeInstanceOf(Set);
-      expect(result.size).toBe(0);
     });
   });
 });

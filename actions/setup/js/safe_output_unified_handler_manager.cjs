@@ -22,6 +22,7 @@ const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
+const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
  * Merge labels with trimming + case-insensitive de-duplication.
@@ -142,30 +143,6 @@ const PROJECT_HANDLER_MAP = {
  *   - Have dedicated processing steps with specialized logic
  */
 const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "upload_asset", "noop"]);
-
-/**
- * Load custom safe output job types from environment variable
- * These are job names defined in safe-outputs.jobs that are processed by custom jobs
- * @returns {Set<string>} Set of custom safe output job type names
- */
-function loadCustomSafeOutputJobTypes() {
-  const safeOutputJobsEnv = process.env.GH_AW_SAFE_OUTPUT_JOBS;
-  if (!safeOutputJobsEnv) {
-    return new Set();
-  }
-
-  try {
-    const safeOutputJobs = JSON.parse(safeOutputJobsEnv);
-    // The environment variable is a map of job names to output keys
-    // We need the job names (keys) as the message types to ignore
-    const jobTypes = Object.keys(safeOutputJobs);
-    core.debug(`Loaded ${jobTypes.length} custom safe output job type(s): ${jobTypes.join(", ")}`);
-    return new Set(jobTypes);
-  } catch (error) {
-    core.warning(`Failed to parse GH_AW_SAFE_OUTPUT_JOBS: ${getErrorMessage(error)}`);
-    return new Set();
-  }
-}
 
 /**
  * Project-related message types that are handled by project handlers
@@ -1067,7 +1044,7 @@ async function main() {
   }
 }
 
-module.exports = { main, loadConfig, loadHandlers, processMessages, setupProjectGitHubClient, loadCustomSafeOutputJobTypes };
+module.exports = { main, loadConfig, loadHandlers, processMessages, setupProjectGitHubClient };
 
 // Run main if this script is executed directly (not required as a module)
 if (require.main === module) {
