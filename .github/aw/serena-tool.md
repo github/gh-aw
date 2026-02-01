@@ -78,33 +78,6 @@ tools:
 
 The first language is the default fallback.
 
-## Detecting Repository Language
-
-**Method 1: Check language-specific files**
-```bash
-# Go
-[ -f go.mod ] && echo "go"
-
-# TypeScript/JavaScript  
-[ -f package.json ] && echo "typescript"
-
-# Python
-[ -f requirements.txt ] || [ -f pyproject.toml ] && echo "python"
-
-# Rust
-[ -f Cargo.toml ] && echo "rust"
-
-# Java
-[ -f pom.xml ] || [ -f build.gradle ] && echo "java"
-```
-
-**Method 2: Examine file extensions**
-```bash
-find . -type f -name "*.go" | head -1  # Go files
-find . -type f -name "*.ts" | head -1  # TypeScript
-find . -type f -name "*.py" | head -1  # Python
-```
-
 ## Available Serena Tools
 
 Once Serena is enabled, you have access to powerful MCP tools:
@@ -133,10 +106,6 @@ Once Serena is enabled, you have access to powerful MCP tools:
 - `onboarding` - Analyze project structure and essential tasks
 - `activate_project` - Activate Serena for a workspace
 - `restart_language_server` - Restart LSP if needed
-
-### Memory and State
-
-- `write_memory` / `read_memory` / `list_memories` - Store project insights
 - `get_current_config` - View Serena configuration
 
 ## Practical Usage Patterns
@@ -258,19 +227,7 @@ Always activate the project first:
 }
 ```
 
-### 4. Leverage Memory for Insights
-
-Store long-term insights using Serena's memory:
-
-```javascript
-// write_memory tool
-{
-  "name": "authentication_pattern",
-  "content": "Auth logic centralized in pkg/auth/handler.go"
-}
-```
-
-### 5. Don't Over-Use Serena
+### 4. Don't Over-Use Serena
 
 **Good**: "Analyze function call graph for authentication flow" → Use Serena
 
