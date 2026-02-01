@@ -1042,20 +1042,19 @@ async function main(config = {}) {
     }
 
     try {
-      // Get default project URL from environment if available
+      // Get configured project URL from environment
+      // This is set from the safe-outputs configuration where project is required
       const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
 
-      // Validate project field - can use default from frontmatter if available
+      // Determine effective project URL: message.project takes precedence, otherwise use configured URL
       let effectiveProjectUrl = message.project;
 
-      // If no project field in message, try to use default from frontmatter
       if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
         if (defaultProjectUrl) {
-          core.info(`Using default project URL from frontmatter: ${defaultProjectUrl}`);
+          core.info(`Using project URL from safe-outputs configuration: ${defaultProjectUrl}`);
           effectiveProjectUrl = defaultProjectUrl;
         } else {
-          const errorMsg =
-            'Missing required "project" field in update_project message. The "project" field must be a full GitHub project URL (e.g., "https://github.com/orgs/myorg/projects/42"), or configure a default project URL in the workflow frontmatter.';
+          const errorMsg = 'Missing required "project" field. Either include "project" in the message, or configure it in safe-outputs: update-project: {project: "https://github.com/orgs/myorg/projects/42"}';
           core.error(errorMsg);
 
           // Provide helpful context based on content_type

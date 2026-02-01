@@ -172,18 +172,20 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	// Add all safe output configuration env vars (still needed by individual handlers)
 	c.addAllSafeOutputConfigEnvVars(&steps, data)
 
-	// Add GH_AW_PROJECT_URL if project is configured in safe-outputs config
-	// This provides a default project URL for update-project and create-project-status-update operations
-	// These types are handled by the unified handler manager, not the project handler manager.
+	// Add GH_AW_PROJECT_URL environment variable for project operations
+	// This is set from the project URL configured in update-project or create-project-status-update safe-outputs
+	// The project field is REQUIRED in both configurations (enforced by schema validation)
+	// Agents can optionally override this per-message by including a project field in their output
 	//
-	// Precedence: update-project.project > create-project-status-update.project
+	// Note: If both update-project and create-project-status-update are configured, we prefer update-project's URL
+	// This is only relevant for the environment variable - each configuration must explicitly specify its own project URL
 	var projectURL string
 	if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
 		projectURL = data.SafeOutputs.UpdateProjects.Project
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from update-project config for handler manager: %s", projectURL)
+		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_URL from update-project config: %s", projectURL)
 	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.Project != "" {
 		projectURL = data.SafeOutputs.CreateProjectStatusUpdates.Project
-		consolidatedSafeOutputsStepsLog.Printf("Using project URL from create-project-status-update config for handler manager: %s", projectURL)
+		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_URL from create-project-status-update config: %s", projectURL)
 	}
 
 	if projectURL != "" {

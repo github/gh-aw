@@ -1288,7 +1288,7 @@ describe("updateProject", () => {
     const result = await messageHandler(messageWithoutProject, new Map());
 
     expect(result.success).toBe(true);
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
     expect(getOutput("item-id")).toBe("draft-item-default");
 
     // Cleanup

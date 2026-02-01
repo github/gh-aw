@@ -309,18 +309,19 @@ async function main(config = {}, githubClient = null) {
 
     const output = message;
 
-    // Get default project URL from environment if available
+    // Get configured project URL from environment
+    // This is set from the safe-outputs configuration where project is required
     const defaultProjectUrl = process.env.GH_AW_PROJECT_URL || "";
 
-    // Validate project field - can use default from frontmatter if available
+    // Determine effective project URL: output.project takes precedence, otherwise use configured URL
     let effectiveProjectUrl = output.project;
 
     if (!effectiveProjectUrl || typeof effectiveProjectUrl !== "string" || effectiveProjectUrl.trim() === "") {
       if (defaultProjectUrl) {
-        core.info(`Using default project URL from frontmatter: ${defaultProjectUrl}`);
+        core.info(`Using project URL from safe-outputs configuration: ${defaultProjectUrl}`);
         effectiveProjectUrl = defaultProjectUrl;
       } else {
-        core.error("Missing required field: project (GitHub project URL)");
+        core.error('Missing required "project" field. Configure it in safe-outputs: create-project-status-update: {project: "https://github.com/orgs/myorg/projects/42"}');
         return {
           success: false,
           error: "Missing required field: project",

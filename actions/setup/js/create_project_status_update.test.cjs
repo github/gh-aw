@@ -525,7 +525,7 @@ describe("create_project_status_update", () => {
 
     expect(result.success).toBe(true);
     expect(result.status_update_id).toBe("PVTSU_test456");
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
 
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;
@@ -579,7 +579,7 @@ describe("create_project_status_update", () => {
     expect(result.success).toBe(true);
     expect(result.status_update_id).toBe("PVTSU_test789");
     // Should not use default from environment
-    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using default project URL from frontmatter"));
+    expect(mockCore.info).not.toHaveBeenCalledWith(expect.stringContaining("Using project URL from safe-outputs configuration"));
 
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;
