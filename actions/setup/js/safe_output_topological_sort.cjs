@@ -230,16 +230,8 @@ function topologicalSort(messages, dependencies) {
   // Calculate in-degree (number of dependencies) for each message
   const inDegree = new Map();
   for (let i = 0; i < messages.length; i++) {
-    inDegree.set(i, 0);
-  }
-
-  for (const [node, deps] of dependencies.entries()) {
-    for (const dep of deps) {
-      const currentDegree = inDegree.get(node);
-      if (currentDegree !== undefined) {
-        inDegree.set(node, currentDegree + 1);
-      }
-    }
+    const deps = dependencies.get(i) || new Set();
+    inDegree.set(i, deps.size);
   }
 
   // Queue of messages with no dependencies

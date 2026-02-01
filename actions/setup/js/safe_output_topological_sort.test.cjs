@@ -261,9 +261,13 @@ describe("safe_output_topological_sort.cjs", () => {
         { type: "create_issue", temporary_id: "aw_abc111def222", title: "Second" },
       ];
 
-      buildDependencyGraph(messages);
+      const { providers } = buildDependencyGraph(messages);
 
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Duplicate temporary_id 'aw_abc111def222'"));
+
+      // Verify only the first occurrence is used as provider
+      expect(providers.get("aw_abc111def222")).toBe(0);
+      expect(providers.size).toBe(1);
     });
 
     it("should handle messages without temporary IDs", async () => {
