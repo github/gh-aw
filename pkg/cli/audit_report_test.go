@@ -905,7 +905,7 @@ func TestBuildAuditDataComplete(t *testing.T) {
 	}
 
 	// Build audit data
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Verify overview
 	t.Run("Overview", func(t *testing.T) {
@@ -1018,7 +1018,7 @@ func TestBuildAuditDataMinimal(t *testing.T) {
 
 	metrics := workflow.LogMetrics{}
 
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Should still produce valid data
 	assert.Equal(t, int64(1), auditData.Overview.RunID,
@@ -1129,7 +1129,7 @@ func TestToolUsageAggregation(t *testing.T) {
 		},
 	}
 
-	auditData := buildAuditData(processedRun, metrics)
+	auditData := buildAuditData(processedRun, metrics, nil)
 
 	// Tool usage should be aggregated
 	// The exact aggregation depends on workflow.PrettifyToolName behavior

@@ -1,0 +1,444 @@
+{
+  "metadata": {
+    "workflow_name": "Sergo - Serena Go Expert",
+    "run_id": "21560089409",
+    "job_id": "62122702303",
+    "analysis_timestamp": "2026-02-01T10:03:47.321901"
+  },
+  "registered_tools": {
+    "serena_tools_count": 23,
+    "serena_tools_list": [
+      "serena___activate_project",
+      "serena___check_onboarding_performed",
+      "serena___delete_memory",
+      "serena___edit_memory",
+      "serena___find_file",
+      "serena___find_referencing_symbols",
+      "serena___find_symbol",
+      "serena___get_current_config",
+      "serena___get_symbols_overview",
+      "serena___initial_instructions",
+      "serena___insert_after_symbol",
+      "serena___insert_before_symbol",
+      "serena___list_dir",
+      "serena___list_memories",
+      "serena___onboarding",
+      "serena___read_memory",
+      "serena___rename_symbol",
+      "serena___replace_symbol_body",
+      "serena___search_for_pattern",
+      "serena___think_about_collected_information",
+      "serena___think_about_task_adherence",
+      "serena___think_about_whether_you_are_done",
+      "serena___write_memory"
+    ]
+  },
+  "tool_usage_summary": {
+    "total_tool_calls": 44,
+    "total_tool_responses": 44,
+    "response_rate_percent": 100.0,
+    "serena_tool_calls": 9,
+    "github_tool_calls": 0,
+    "safeoutput_tool_calls": 1,
+    "builtin_tool_calls": 34
+  },
+  "tool_categories": {
+    "serena": {
+      "count": 9,
+      "percentage": 20.45,
+      "breakdown": {
+        "mcp__serena__search_for_pattern": 3,
+        "mcp__serena__find_symbol": 2,
+        "mcp__serena__get_current_config": 1,
+        "mcp__serena__initial_instructions": 1,
+        "mcp__serena__check_onboarding_performed": 1,
+        "mcp__serena__list_memories": 1
+      }
+    },
+    "github": {
+      "count": 0,
+      "percentage": 0.0
+    },
+    "safeoutputs": {
+      "count": 1,
+      "percentage": 2.27
+    },
+    "builtin": {
+      "count": 34,
+      "percentage": 77.27,
+      "breakdown": {
+        "Bash": 17,
+        "Read": 8,
+        "TodoWrite": 6,
+        "Write": 3
+      }
+    }
+  },
+  "all_tools_ranking": [
+    {
+      "tool": "Bash",
+      "count": 17,
+      "percentage": 38.64
+    },
+    {
+      "tool": "Read",
+      "count": 8,
+      "percentage": 18.18
+    },
+    {
+      "tool": "TodoWrite",
+      "count": 6,
+      "percentage": 13.64
+    },
+    {
+      "tool": "Write",
+      "count": 3,
+      "percentage": 6.82
+    },
+    {
+      "tool": "mcp__serena__search_for_pattern",
+      "count": 3,
+      "percentage": 6.82
+    },
+    {
+      "tool": "mcp__serena__find_symbol",
+      "count": 2,
+      "percentage": 4.55
+    },
+    {
+      "tool": "mcp__serena__get_current_config",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__initial_instructions",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__check_onboarding_performed",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__serena__list_memories",
+      "count": 1,
+      "percentage": 2.27
+    },
+    {
+      "tool": "mcp__safeoutputs__create_discussion",
+      "count": 1,
+      "percentage": 2.27
+    }
+  ],
+  "serena_tools_detail": {
+    "used_tools": ["mcp__serena__check_onboarding_performed", "mcp__serena__find_symbol", "mcp__serena__get_current_config", "mcp__serena__initial_instructions", "mcp__serena__list_memories", "mcp__serena__search_for_pattern"],
+    "unused_registered_tools": [
+      "serena___activate_project",
+      "serena___delete_memory",
+      "serena___edit_memory",
+      "serena___find_file",
+      "serena___find_referencing_symbols",
+      "serena___get_symbols_overview",
+      "serena___insert_after_symbol",
+      "serena___insert_before_symbol",
+      "serena___list_dir",
+      "serena___onboarding",
+      "serena___read_memory",
+      "serena___rename_symbol",
+      "serena___replace_symbol_body",
+      "serena___think_about_collected_information",
+      "serena___think_about_task_adherence",
+      "serena___think_about_whether_you_are_done",
+      "serena___write_memory"
+    ],
+    "usage_rate": 26.09
+  },
+  "size_analysis": {
+    "summary": {
+      "total_calls": 44,
+      "total_responses": 105,
+      "total_request_bytes": 74341,
+      "total_response_bytes": 361564
+    },
+    "tools": {
+      "Bash": {
+        "count": 17,
+        "avg_request_bytes": 853.53,
+        "avg_response_bytes": 10059.47,
+        "total_request_bytes": 14510,
+        "total_response_bytes": 171011,
+        "total_bytes": 185521,
+        "min_request": 757,
+        "max_request": 1499,
+        "min_response": 394,
+        "max_response": 109750
+      },
+      "mcp__serena__get_current_config": {
+        "count": 1,
+        "avg_request_bytes": 700.0,
+        "avg_response_bytes": 771.0,
+        "total_request_bytes": 700,
+        "total_response_bytes": 771,
+        "total_bytes": 1471,
+        "min_request": 700,
+        "max_request": 700,
+        "min_response": 771,
+        "max_response": 771
+      },
+      "mcp__serena__initial_instructions": {
+        "count": 1,
+        "avg_request_bytes": 702.0,
+        "avg_response_bytes": 700.0,
+        "total_request_bytes": 702,
+        "total_response_bytes": 700,
+        "total_bytes": 1402,
+        "min_request": 702,
+        "max_request": 702,
+        "min_response": 700,
+        "max_response": 700
+      },
+      "Read": {
+        "count": 8,
+        "avg_request_bytes": 735.38,
+        "avg_response_bytes": 1043.25,
+        "total_request_bytes": 5883,
+        "total_response_bytes": 8346,
+        "total_bytes": 14229,
+        "min_request": 727,
+        "max_request": 745,
+        "min_response": 702,
+        "max_response": 2114
+      },
+      "mcp__serena__check_onboarding_performed": {
+        "count": 1,
+        "avg_request_bytes": 710.0,
+        "avg_response_bytes": 727.0,
+        "total_request_bytes": 710,
+        "total_response_bytes": 727,
+        "total_bytes": 1437,
+        "min_request": 710,
+        "max_request": 710,
+        "min_response": 727,
+        "max_response": 727
+      },
+      "mcp__serena__list_memories": {
+        "count": 1,
+        "avg_request_bytes": 697.0,
+        "avg_response_bytes": 386.0,
+        "total_request_bytes": 697,
+        "total_response_bytes": 386,
+        "total_bytes": 1083,
+        "min_request": 697,
+        "max_request": 697,
+        "min_response": 386,
+        "max_response": 386
+      },
+      "Write": {
+        "count": 3,
+        "avg_request_bytes": 1872.33,
+        "avg_response_bytes": 7649.67,
+        "total_request_bytes": 5617,
+        "total_response_bytes": 22949,
+        "total_bytes": 28566,
+        "min_request": 940,
+        "max_request": 3736,
+        "min_response": 687,
+        "max_response": 21507
+      },
+      "TodoWrite": {
+        "count": 6,
+        "avg_request_bytes": 1850.83,
+        "avg_response_bytes": 2170.5,
+        "total_request_bytes": 11105,
+        "total_response_bytes": 13023,
+        "total_bytes": 24128,
+        "min_request": 1846,
+        "max_request": 1855,
+        "min_response": 725,
+        "max_response": 8438
+      },
+      "mcp__serena__search_for_pattern": {
+        "count": 3,
+        "avg_request_bytes": 837.33,
+        "avg_response_bytes": 726.67,
+        "total_request_bytes": 2512,
+        "total_response_bytes": 2180,
+        "total_bytes": 4692,
+        "min_request": 835,
+        "max_request": 840,
+        "min_response": 697,
+        "max_response": 773
+      },
+      "mcp__serena__find_symbol": {
+        "count": 2,
+        "avg_request_bytes": 754.0,
+        "avg_response_bytes": 511.0,
+        "total_request_bytes": 1508,
+        "total_response_bytes": 1022,
+        "total_bytes": 2530,
+        "min_request": 753,
+        "max_request": 755,
+        "min_response": 364,
+        "max_response": 658
+      },
+      "mcp__safeoutputs__create_discussion": {
+        "count": 1,
+        "avg_request_bytes": 30397.0,
+        "avg_response_bytes": 918.0,
+        "total_request_bytes": 30397,
+        "total_response_bytes": 918,
+        "total_bytes": 31315,
+        "min_request": 30397,
+        "max_request": 30397,
+        "min_response": 918,
+        "max_response": 918
+      }
+    },
+    "tools_ranked_by_size": [
+      {
+        "tool": "Bash",
+        "count": 17,
+        "avg_request_bytes": 853.53,
+        "avg_response_bytes": 10059.47,
+        "total_request_bytes": 14510,
+        "total_response_bytes": 171011,
+        "total_bytes": 185521,
+        "min_request": 757,
+        "max_request": 1499,
+        "min_response": 394,
+        "max_response": 109750
+      },
+      {
+        "tool": "mcp__safeoutputs__create_discussion",
+        "count": 1,
+        "avg_request_bytes": 30397.0,
+        "avg_response_bytes": 918.0,
+        "total_request_bytes": 30397,
+        "total_response_bytes": 918,
+        "total_bytes": 31315,
+        "min_request": 30397,
+        "max_request": 30397,
+        "min_response": 918,
+        "max_response": 918
+      },
+      {
+        "tool": "Write",
+        "count": 3,
+        "avg_request_bytes": 1872.33,
+        "avg_response_bytes": 7649.67,
+        "total_request_bytes": 5617,
+        "total_response_bytes": 22949,
+        "total_bytes": 28566,
+        "min_request": 940,
+        "max_request": 3736,
+        "min_response": 687,
+        "max_response": 21507
+      },
+      {
+        "tool": "TodoWrite",
+        "count": 6,
+        "avg_request_bytes": 1850.83,
+        "avg_response_bytes": 2170.5,
+        "total_request_bytes": 11105,
+        "total_response_bytes": 13023,
+        "total_bytes": 24128,
+        "min_request": 1846,
+        "max_request": 1855,
+        "min_response": 725,
+        "max_response": 8438
+      },
+      {
+        "tool": "Read",
+        "count": 8,
+        "avg_request_bytes": 735.38,
+        "avg_response_bytes": 1043.25,
+        "total_request_bytes": 5883,
+        "total_response_bytes": 8346,
+        "total_bytes": 14229,
+        "min_request": 727,
+        "max_request": 745,
+        "min_response": 702,
+        "max_response": 2114
+      },
+      {
+        "tool": "mcp__serena__search_for_pattern",
+        "count": 3,
+        "avg_request_bytes": 837.33,
+        "avg_response_bytes": 726.67,
+        "total_request_bytes": 2512,
+        "total_response_bytes": 2180,
+        "total_bytes": 4692,
+        "min_request": 835,
+        "max_request": 840,
+        "min_response": 697,
+        "max_response": 773
+      },
+      {
+        "tool": "mcp__serena__find_symbol",
+        "count": 2,
+        "avg_request_bytes": 754.0,
+        "avg_response_bytes": 511.0,
+        "total_request_bytes": 1508,
+        "total_response_bytes": 1022,
+        "total_bytes": 2530,
+        "min_request": 753,
+        "max_request": 755,
+        "min_response": 364,
+        "max_response": 658
+      },
+      {
+        "tool": "mcp__serena__get_current_config",
+        "count": 1,
+        "avg_request_bytes": 700.0,
+        "avg_response_bytes": 771.0,
+        "total_request_bytes": 700,
+        "total_response_bytes": 771,
+        "total_bytes": 1471,
+        "min_request": 700,
+        "max_request": 700,
+        "min_response": 771,
+        "max_response": 771
+      },
+      {
+        "tool": "mcp__serena__check_onboarding_performed",
+        "count": 1,
+        "avg_request_bytes": 710.0,
+        "avg_response_bytes": 727.0,
+        "total_request_bytes": 710,
+        "total_response_bytes": 727,
+        "total_bytes": 1437,
+        "min_request": 710,
+        "max_request": 710,
+        "min_response": 727,
+        "max_response": 727
+      },
+      {
+        "tool": "mcp__serena__initial_instructions",
+        "count": 1,
+        "avg_request_bytes": 702.0,
+        "avg_response_bytes": 700.0,
+        "total_request_bytes": 702,
+        "total_response_bytes": 700,
+        "total_bytes": 1402,
+        "min_request": 702,
+        "max_request": 702,
+        "min_response": 700,
+        "max_response": 700
+      },
+      {
+        "tool": "mcp__serena__list_memories",
+        "count": 1,
+        "avg_request_bytes": 697.0,
+        "avg_response_bytes": 386.0,
+        "total_request_bytes": 697,
+        "total_response_bytes": 386,
+        "total_bytes": 1083,
+        "min_request": 697,
+        "max_request": 697,
+        "min_response": 386,
+        "max_response": 386
+      }
+    ]
+  }
+}

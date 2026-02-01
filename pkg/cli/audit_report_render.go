@@ -129,6 +129,13 @@ func renderConsole(data AuditData, logsPath string) {
 		renderToolUsageTable(data.ToolUsage)
 	}
 
+	// MCP Tool Usage Section - detailed MCP statistics
+	if data.MCPToolUsage != nil && len(data.MCPToolUsage.Summary) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("MCP Tool Usage"))
+		fmt.Fprintln(os.Stderr)
+		renderMCPToolUsageTable(data.MCPToolUsage)
+	}
+
 	// Errors and Warnings Section
 	if len(data.Errors) > 0 || len(data.Warnings) > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Errors and Warnings"))
@@ -257,6 +264,80 @@ func renderToolUsageTable(toolUsage []ToolUsageInfo) {
 	}
 
 	fmt.Fprint(os.Stderr, console.RenderTable(config))
+}
+
+// renderMCPToolUsageTable renders MCP tool usage with detailed statistics
+func renderMCPToolUsageTable(mcpData *MCPToolUsageData) {
+	auditReportLog.Printf("Rendering MCP tool usage table with %d tools", len(mcpData.Summary))
+
+	// Render server-level statistics first
+	if len(mcpData.Servers) > 0 {
+		fmt.Fprintln(os.Stderr, "  Server Statistics:")
+		fmt.Fprintln(os.Stderr)
+
+		serverConfig := console.TableConfig{
+			Headers: []string{"Server", "Requests", "Tool Calls", "Total Input", "Total Output", "Avg Duration", "Errors"},
+			Rows:    make([][]string, 0, len(mcpData.Servers)),
+		}
+
+		for _, server := range mcpData.Servers {
+			inputStr := console.FormatFileSize(int64(server.TotalInputSize))
+			outputStr := console.FormatFileSize(int64(server.TotalOutputSize))
+			durationStr := server.AvgDuration
+			if durationStr == "" {
+				durationStr = "N/A"
+			}
+			errorStr := fmt.Sprintf("%d", server.ErrorCount)
+			if server.ErrorCount == 0 {
+				errorStr = "-"
+			}
+
+			row := []string{
+				stringutil.Truncate(server.ServerName, 25),
+				fmt.Sprintf("%d", server.RequestCount),
+				fmt.Sprintf("%d", server.ToolCallCount),
+				inputStr,
+				outputStr,
+				durationStr,
+				errorStr,
+			}
+			serverConfig.Rows = append(serverConfig.Rows, row)
+		}
+
+		fmt.Fprint(os.Stderr, console.RenderTable(serverConfig))
+		fmt.Fprintln(os.Stderr)
+	}
+
+	// Render tool-level statistics
+	if len(mcpData.Summary) > 0 {
+		fmt.Fprintln(os.Stderr, "  Tool Statistics:")
+		fmt.Fprintln(os.Stderr)
+
+		toolConfig := console.TableConfig{
+			Headers: []string{"Server", "Tool", "Calls", "Total In", "Total Out", "Max In", "Max Out"},
+			Rows:    make([][]string, 0, len(mcpData.Summary)),
+		}
+
+		for _, tool := range mcpData.Summary {
+			totalInStr := console.FormatFileSize(int64(tool.TotalInputSize))
+			totalOutStr := console.FormatFileSize(int64(tool.TotalOutputSize))
+			maxInStr := console.FormatFileSize(int64(tool.MaxInputSize))
+			maxOutStr := console.FormatFileSize(int64(tool.MaxOutputSize))
+
+			row := []string{
+				stringutil.Truncate(tool.ServerName, 20),
+				stringutil.Truncate(tool.ToolName, 30),
+				fmt.Sprintf("%d", tool.CallCount),
+				totalInStr,
+				totalOutStr,
+				maxInStr,
+				maxOutStr,
+			}
+			toolConfig.Rows = append(toolConfig.Rows, row)
+		}
+
+		fmt.Fprint(os.Stderr, console.RenderTable(toolConfig))
+	}
 }
 
 // renderFirewallAnalysis renders firewall analysis with summary and domain breakdown

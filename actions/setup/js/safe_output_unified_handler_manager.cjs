@@ -23,6 +23,7 @@ const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
 const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
 const { sortSafeOutputMessages } = require("./safe_output_topological_sort.cjs");
+const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
 
 /**
  * Merge labels with trimming + case-insensitive de-duplication.
@@ -368,6 +369,9 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
   // Collect missing_tool and missing_data messages first
   const missings = collectMissingMessages(messages);
 
+  // Load custom safe output job types that are processed by dedicated custom jobs
+  const customSafeOutputJobTypes = loadCustomSafeOutputJobTypes();
+
   // Sort messages topologically based on temporary ID dependencies
   // This ensures messages that create entities are processed before messages that reference them
   const sortedMessages = sortSafeOutputMessages(messages);
@@ -423,6 +427,20 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
           success: false,
           skipped: true,
           reason: "Handled by standalone step",
+        });
+        continue;
+      }
+
+      // Check if this message type is a custom safe output job
+      if (customSafeOutputJobTypes.has(messageType)) {
+        // Silently skip - this is handled by a custom safe output job
+        core.debug(`Message ${i + 1} (${messageType}) will be handled by custom safe output job`);
+        results.push({
+          type: messageType,
+          messageIndex: i,
+          success: false,
+          skipped: true,
+          reason: "Handled by custom safe output job",
         });
         continue;
       }
