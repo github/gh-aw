@@ -8,6 +8,9 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { computeFrontmatterHash, extractHashFromLockFile } = require("./frontmatter_hash.cjs");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const workflowFile = process.env.GH_AW_WORKFLOW_FILE;
@@ -85,6 +88,9 @@ async function main() {
   core.info(`  Source last commit: ${workflowDate.toISOString()} (${workflowCommit.sha.substring(0, 7)})`);
   core.info(`  Lock last commit: ${lockDate.toISOString()} (${lockCommit.sha.substring(0, 7)})`);
 
+  // Display frontmatter hashes
+  await displayFrontmatterHashes(workflowMdPath, lockFilePath);
+
   // Check if workflow file is newer than lock file
   if (workflowDate > lockDate) {
     const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
@@ -114,6 +120,64 @@ async function main() {
     core.info("✅ Lock file is up to date (same commit)");
   } else {
     core.info("✅ Lock file is up to date");
+  }
+}
+
+/**
+ * Display frontmatter hashes from lock file and recomputed from source
+ * @param {string} workflowMdPath - Path to the source .md file
+ * @param {string} lockFilePath - Path to the compiled .lock.yml file
+ */
+async function displayFrontmatterHashes(workflowMdPath, lockFilePath) {
+  try {
+    core.info("Checking frontmatter hashes:");
+
+    // Extract hash from lock file
+    let lockFileHash = "";
+    try {
+      const lockContent = fs.readFileSync(lockFilePath, "utf8");
+      lockFileHash = extractHashFromLockFile(lockContent);
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.info(`  Could not read lock file: ${errorMessage}`);
+      return;
+    }
+
+    // Recompute hash from .md file
+    let recomputedHash = "";
+    try {
+      // Get the absolute path to the workflow file
+      const workspacePath = process.env.GITHUB_WORKSPACE || process.cwd();
+      const absoluteMdPath = path.join(workspacePath, workflowMdPath);
+
+      if (fs.existsSync(absoluteMdPath)) {
+        recomputedHash = await computeFrontmatterHash(absoluteMdPath);
+      } else {
+        core.info(`  Source file not found: ${workflowMdPath}`);
+        return;
+      }
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.info(`  Could not compute hash from source: ${errorMessage}`);
+      return;
+    }
+
+    // Display both hashes
+    core.info(`  Lock file hash:  ${lockFileHash || "(not found)"}`);
+    core.info(`  Recomputed hash: ${recomputedHash}`);
+
+    // Check if hashes match
+    if (lockFileHash && recomputedHash) {
+      if (lockFileHash === recomputedHash) {
+        core.info("  ✅ Frontmatter hashes match");
+      } else {
+        core.warning(`  ⚠️  Frontmatter hashes DO NOT match - frontmatter may have changed`);
+      }
+    }
+  } catch (error) {
+    // Don't fail the step if hash checking fails, just log it
+    const errorMessage = getErrorMessage(error);
+    core.info(`Could not check frontmatter hashes: ${errorMessage}`);
   }
 }
 
