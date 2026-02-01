@@ -27,7 +27,7 @@
 #     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 824b8c205f28ce0a084f7b0f87ae2b9566aa0e10cf409df793b721eb276c99fc
+# frontmatter-hash: 8d86caf02dcabe246d3913e305fcedfb436678c77e17adba17fae46d91775b18
 
 name: "Safe Output Health Monitor"
 "on":

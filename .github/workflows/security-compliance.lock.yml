@@ -21,7 +21,7 @@
 #
 # Fix critical vulnerabilities before audit deadline with full tracking and reporting
 #
-# frontmatter-hash: 314b05878ec7e997e4ae2f93a29daa3885c8dae8e4755174a590d3e5bf0acb87
+# frontmatter-hash: fa196cbd40227d9ef74dd1222fc8604fde9464975b5de5d620ad06c9e2c39e0c
 
 name: "Security Compliance Campaign"
 "on":

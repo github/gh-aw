@@ -21,7 +21,7 @@
 #
 # Maintains the gh-aw slide deck by scanning repository content and detecting layout issues using Playwright
 #
-# frontmatter-hash: 1029f2405a4d0266649ee4a0daa2334a95d5836c0f7cbe497fd174beef4f4e9d
+# frontmatter-hash: 425121d73d927d957af0876ad36195c3ab514bf41e546ee6956ad38b75b44118
 
 name: "Slide Deck Maintainer"
 "on":

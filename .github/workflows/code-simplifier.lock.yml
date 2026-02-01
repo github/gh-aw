@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 75a52a4cef21f4ad213917d799f010a2857f5b0cf3bfa7c9d3e367d48140daf9
+# frontmatter-hash: c14a6be26df31e8641c7f2235bfbc5170d3fd74bf5af8b853df8cff60f22d975
 
 name: "Code Simplifier"
 "on":
