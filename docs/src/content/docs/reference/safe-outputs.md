@@ -474,7 +474,7 @@ safe-outputs:
 ```
 
 **Configuration options:**
-- `project` (required): Target project URL for operations. Agent messages can optionally override this by providing an explicit `project` field in the output.
+- `project` (required in configuration): Default project URL shown in examples. Note: Agent output messages **must** explicitly include the `project` field - the configured value is for documentation purposes only.
 - `max`: Maximum number of operations per run (default: 10).
 - `github-token`: Custom token with Projects permissions (required for Projects v2 access).
 - `views`: Optional array of project views to create automatically.
@@ -562,7 +562,7 @@ safe-outputs:
 ```
 
 **Configuration options:**
-- `project` (required): Target project URL for status updates. Agent messages can optionally override this by providing an explicit `project` field in the output.
+- `project` (required in configuration): Default project URL shown in examples. Note: Agent output messages **must** explicitly include the `project` field - the configured value is for documentation purposes only.
 - `max`: Maximum number of status updates per run (default: 1).
 - `github-token`: Custom token with Projects permissions (required for Projects v2 access).
 - Typically used by [Campaign Workflows](/gh-aw/guides/campaigns/) to automatically post run summaries.
@@ -571,7 +571,7 @@ safe-outputs:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `project` | URL | Full GitHub project URL (e.g., `https://github.com/orgs/myorg/projects/73`). Can be omitted in agent output if configured in safe-outputs. |
+| `project` | URL | Full GitHub project URL (e.g., `https://github.com/orgs/myorg/projects/73`). **Required** in every agent output message. |
 | `body` | Markdown | Status update content with campaign summary, findings, and next steps |
 
 #### Optional Fields

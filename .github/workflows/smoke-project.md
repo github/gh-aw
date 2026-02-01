@@ -71,27 +71,32 @@ strict: true
 1. **Project Operations Testing**: Use project-related safe-output tools to validate multiple project features against the real project configured in the frontmatter. Steps:
    
    a. **Draft Issue Creation**: Call `update_project` with:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `draft_body`: "Test draft issue for smoke test validation"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
    
    b. **Field Creation with New Fields**: Call `update_project` with draft issue including new custom fields:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue with Custom Fields - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "Todo", "Priority": "High", "Team": "Engineering", "Sprint": "Q1-2026"}`
    
    c. **Field Update**: Call `update_project` again with the same draft issue to update fields:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "In Progress", "Priority": "Medium"}`
    
    d. **Existing Issue Addition**: Use GitHub MCP to find any open issue from ${{ github.repository }}, then call `update_project` with:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "issue"
       - `content_number`: the issue number you found
       - `fields`: `{"Status": "In Review", "Priority": "Low"}`
    
    e. **Existing PR Addition**: Use GitHub MCP to find any open pull request from ${{ github.repository }}, then call `update_project` with:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "pull_request"
       - `content_number`: the PR number you found
       - `fields`: `{"Status": "In Progress", "Priority": "High"}`
@@ -101,46 +106,42 @@ strict: true
       - "Smoke Test Table" (table layout)
    
    g. **Project Status Update**: Call `create_project_status_update` with:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `body`: "Smoke test project status - Run ${{ github.run_id }}"
       - `status`: "ON_TRACK"
    
    h. **Verification**: For each operation:
       - Verify the safe-output message is properly formatted in the output file
-      - Confirm the project URL auto-populates from frontmatter
+      - Confirm the project URL is explicitly included in each message
       - Check that all field names and values are correctly structured
       - Validate content_type is correctly set for each operation type
 
-2. **Project Scoping Validation**: Test proper scoping behavior with and without top-level project field to ensure operations stay within the correct project scope:
+2. **Project URL Requirement Testing**: Test that the `project` field is required in all messages:
    
-   a. **With Top-Level Project (Default Scoping)**: Call `update_project` WITHOUT specifying a project field in the message:
+   a. **Explicit Project URL (Required)**: Call `update_project` WITH the project field:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
       - `content_type`: "draft_issue"
-      - `draft_title`: "Scoping Test - Default Project - Run ${{ github.run_id }}"
+      - `draft_title`: "Test - Explicit Project URL - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "Todo"}`
-      - Verify the message uses the project URL from frontmatter configuration
+      - Verify the operation succeeds with the explicitly provided project URL
    
-   b. **Explicit Project Override Attempt**: Call `update_project` WITH an explicit different project field to test that scope is enforced:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/999"
+   b. **Different Project URL**: Call `update_project` WITH a different explicit project field to test flexibility:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
       - `content_type`: "draft_issue"
-      - `draft_title`: "Scoping Test - Override Attempt - Run ${{ github.run_id }}"
+      - `draft_title`: "Test - Different Project - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "Todo"}`
-      - Verify the message respects the explicit project URL (override should be allowed for flexibility)
-   
-   c. **Status Update with Default Project**: Call `create_project_status_update` WITHOUT specifying a project field:
-      - `body`: "Scoping test status update - Run ${{ github.run_id }}"
-      - `status`: "AT_RISK"
-      - Verify the status update uses the project URL from frontmatter
-   
-   d. **Status Update with Explicit Project**: Call `create_project_status_update` WITH an explicit project field:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/999"
-      - `body`: "Scoping test explicit project - Run ${{ github.run_id }}"
-      - `status`: "OFF_TRACK"
       - Verify the message uses the explicitly provided project URL
    
-   e. **Scoping Verification**: For all operations:
-      - Confirm that when no project field is provided, the top-level project from frontmatter is used
-      - Confirm that when an explicit project field is provided, it is used (allowing override)
+   c. **Status Update with Explicit Project**: Call `create_project_status_update` WITH the project field:
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
+      - `body`: "Test status update with explicit project - Run ${{ github.run_id }}"
+      - `status`: "ON_TRACK"
+      - Verify the status update uses the explicitly provided project URL
+   
+   d. **URL Format Verification**: For all operations:
+      - Confirm that every message includes an explicit project URL
       - Validate that all project URLs are properly formatted in safe-output messages
-      - Ensure no operations stay within the configured project scope
+      - Ensure operations target the correct project scope
 
 ## Output
 

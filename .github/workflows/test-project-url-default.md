@@ -1,5 +1,5 @@
 ---
-name: Test Project URL Default
+name: Test Project URL Explicit Requirement
 engine: copilot
 on:
   workflow_dispatch:
@@ -13,47 +13,49 @@ safe-outputs:
     project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
 ---
 
-# Test Default Project URL
+# Test Explicit Project URL Requirement
 
-This workflow demonstrates the `project:` field within safe-outputs configuration.
+This workflow tests that the `project` field is required in agent output messages.
 
-When the `project` field is configured in safe-outputs like `update-project` or 
-`create-project-status-update`, the safe output handler will use this URL as the 
-default project when processing messages.
+The `project` field in safe-outputs configuration is for reference purposes. Agent 
+output messages must explicitly include the `project` field with the target project URL.
 
 ## Test Cases
 
-1. **Default project URL from safe-outputs config**: Safe output messages without a 
-   `project` field will use the URL from the safe-outputs configuration.
+1. **Explicit project URL in message**: Safe output messages must include the `project` 
+   field with the target project URL.
 
-2. **Override with explicit project**: If a safe output message includes a `project` 
-   field, it takes precedence over the configured default.
+2. **Project field is always required**: The agent must always provide the `project` field
+   in safe output messages. The configured value in frontmatter is for reference only.
 
 ## Example Safe Outputs
+
+All safe output messages must explicitly include the `project` field:
 
 ```json
 {
   "type": "update_project",
+  "project": "https://github.com/orgs/<ORG>/projects/<NUMBER>",
   "content_type": "draft_issue",
-  "draft_title": "Test Issue Using Default Project URL",
+  "draft_title": "Test Issue with Explicit Project URL",
   "fields": {
     "status": "Todo"
   }
 }
 ```
 
-This will automatically use `https://github.com/orgs/<ORG>/projects/<NUMBER>` from the 
-safe-outputs configuration.
+The `project` field must be included in every message.
 
-Important: this is a placeholder. Replace it with a real GitHub Projects v2 URL before 
+Important: Replace `<ORG>` and `<NUMBER>` with a real GitHub Projects v2 URL before 
 running the workflow.
 
 ```json
 {
   "type": "create_project_status_update",
-  "body": "Project status update using default project URL",
+  "project": "https://github.com/orgs/<ORG>/projects/<NUMBER>",
+  "body": "Project status update with explicit project URL",
   "status": "ON_TRACK"
 }
 ```
 
-This will also use the default project URL from the frontmatter.
+The agent must always provide the project URL explicitly in the output message.
