@@ -7,7 +7,7 @@ sidebar:
 
 # MCP Gateway Specification
 
-**Version**: 1.7.0  
+**Version**: 1.8.0  
 **Status**: Draft Specification  
 **Latest Version**: [mcp-gateway](/gh-aw/reference/mcp-gateway/)  
 **JSON Schema**: [mcp-gateway-config.schema.json](/gh-aw/schemas/mcp-gateway-config.schema.json)  
@@ -204,7 +204,8 @@ The gateway MUST accept configuration via stdin in JSON format conforming to the
     "apiKey": "string",
     "domain": "string",
     "startupTimeout": 30,
-    "toolTimeout": 60
+    "toolTimeout": 60,
+    "payloadDir": "/tmp/gh-aw/res/"
   },
   "customSchemas": {
     "custom-type": "https://example.com/schema.json"
@@ -245,6 +246,7 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `apiKey` | string | Yes | API key for authentication |
 | `startupTimeout` | integer | No | Server startup timeout in seconds (default: 30) |
 | `toolTimeout` | integer | No | Tool invocation timeout in seconds (default: 60) |
+| `payloadDir` | string | No | Directory path for storing large response payloads (default: "/tmp/gh-aw/res/"). When MCP server responses exceed the size threshold, the gateway stores payloads in this directory segmented by session ID. The directory SHOULD be mounted as a shared volume between the gateway and agent containers to enable payload retrieval. |
 
 #### 4.1.3a Top-Level Configuration Fields
 
@@ -272,7 +274,8 @@ Custom server types MUST be registered in the `customSchemas` field at the top l
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "secret"
+    "apiKey": "secret",
+    "payloadDir": "/tmp/gh-aw/res/"
   },
   "customSchemas": {
     "safeinputs": "https://docs.github.com/gh-aw/schemas/safe-inputs-config.schema.json"
@@ -309,7 +312,8 @@ When a server configuration includes a `type` field with a value not in `["stdio
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "secret"
+    "apiKey": "secret",
+    "payloadDir": "/tmp/gh-aw/res/"
   },
   "customSchemas": {
     "safeinputs": "https://docs.github.com/gh-aw/schemas/safe-inputs-config.schema.json"
@@ -1105,7 +1109,8 @@ Implementations SHOULD provide:
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "apiKey": "gateway-secret-token",
+    "payloadDir": "/tmp/gh-aw/res/"
   }
 }
 ```
@@ -1129,7 +1134,8 @@ Implementations SHOULD provide:
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "apiKey": "gateway-secret-token",
+    "payloadDir": "/tmp/gh-aw/res/"
   }
 }
 ```
@@ -1158,7 +1164,8 @@ Implementations SHOULD provide:
     "port": 8080,
     "domain": "localhost",
     "startupTimeout": 60,
-    "toolTimeout": 120
+    "toolTimeout": 120,
+    "payloadDir": "/tmp/gh-aw/res/"
   }
 }
 ```
@@ -1177,7 +1184,8 @@ Implementations SHOULD provide:
   },
   "gateway": {
     "port": 8080,
-    "domain": "localhost"
+    "domain": "localhost",
+    "payloadDir": "/tmp/gh-aw/res/"
   }
 }
 ```
@@ -1213,7 +1221,8 @@ The `registry` field documents the MCP server's installation location in an MCP 
   "gateway": {
     "port": 8080,
     "domain": "localhost",
-    "apiKey": "gateway-secret-token"
+    "apiKey": "gateway-secret-token",
+    "payloadDir": "/tmp/gh-aw/res/"
   }
 }
 ```

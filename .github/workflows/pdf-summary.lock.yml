@@ -515,7 +515,7 @@ jobs:
               "port": $MCP_GATEWAY_PORT,
               "domain": "${MCP_GATEWAY_DOMAIN}",
               "apiKey": "${MCP_GATEWAY_API_KEY}",
-              "payloadDir": "/tmp/jq-payloads"
+              "payloadDir": "/tmp/gh-aw/res/"
             }
           }
           MCPCONFIG_EOF
