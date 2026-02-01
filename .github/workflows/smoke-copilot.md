@@ -15,6 +15,7 @@ permissions:
   actions: read
 name: Smoke Copilot
 engine: copilot
+project: "https://github.com/orgs/github-agentic-workflows/projects/1"
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -57,6 +58,9 @@ safe-outputs:
       allowed: [smoke-copilot]
     remove-labels:
       allowed: [smoke]
+    update-project:
+      max: 1
+      github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
     messages:
       append-only-comments: true
       footer: "> 📰 *BREAKING: Report filed by [{workflow_name}]({run_url})*"
@@ -84,6 +88,13 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
+9. **Simple Project Operation Testing**: Test basic project operations to verify token and configuration:
+   - Use GitHub MCP to find any open issue from ${{ github.repository }}
+   - Call `update_project` with:
+     - `content_type`: "issue"
+     - `content_number`: the issue number you found
+     - `fields`: `{"Status": "Backlog"}`
+   - Verify the operation completes (success or failure both acceptable, this just tests the plumbing)
 
 ## Output
 
