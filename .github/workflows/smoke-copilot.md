@@ -15,7 +15,7 @@ permissions:
   actions: read
 name: Smoke Copilot
 engine: copilot
-project: "https://github.com/orgs/github-agentic-workflows/projects/1"
+project: "https://github.com/orgs/nonexistent-test-org-12345/projects/99999"
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -113,15 +113,15 @@ strict: true
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, playful comment stating that the smoke test agent was here
 8. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-9. **Project Update Testing**: Use the `update_project` safe-output tool to add a random issue from ${{ github.repository }} to the project configured in the frontmatter. Steps:
-   - Select any open issue (use the GitHub MCP tool to find one)
+9. **Project Update Testing**: Use the `update_project` safe-output tool to create a draft issue in the project configured in the frontmatter. Steps:
    - Call `update_project` with:
-     - `content_type`: "issue"
-     - `content_number`: the issue number you selected
+     - `content_type`: "draft_issue"
+     - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
+     - `draft_body`: "This is a test draft issue created by the smoke test to validate update_project functionality."
      - `fields`: `{"Status": "Todo"}`
    - The project URL will be automatically populated from the frontmatter configuration
    - Verify the safe-output message is properly formatted in the output file
-   - Note: If the operation fails due to permissions, that's acceptable - the test validates message formatting and tool invocation, not actual project modification
+   - Note: This test is expected to fail (the project doesn't exist), which validates that the scope remains within the configured project and doesn't pollute real repositories
 
 ## Output
 
