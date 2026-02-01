@@ -49,7 +49,7 @@ safe-outputs:
           layout: table
       github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
     create-project-status-update:
-      max: 5
+      max: 1
       project: "https://github.com/orgs/github-agentic-workflows/projects/1"
       github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
     messages:
@@ -69,26 +69,26 @@ strict: true
 ## Test Requirements
 
 1. **Project Operations Testing**: Use project-related safe-output tools to validate multiple project features against the real project configured in the frontmatter. Steps:
-   
+
    a. **Draft Issue Creation**: Call `update_project` with:
       - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `draft_body`: "Test draft issue for smoke test validation"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
-   
+
    b. **Field Creation with New Fields**: Call `update_project` with draft issue including new custom fields:
       - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue with Custom Fields - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "Todo", "Priority": "High", "Team": "Engineering", "Sprint": "Q1-2026"}`
-   
+
    c. **Field Update**: Call `update_project` again with the same draft issue to update fields:
       - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "In Progress", "Priority": "Medium"}`
-   
+
    d. **Existing Issue Addition**: Use GitHub MCP to find any open issue from ${{ github.repository }}, then call `update_project` with:
       - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
       - `content_type`: "issue"
