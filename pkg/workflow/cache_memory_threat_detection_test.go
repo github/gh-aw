@@ -32,7 +32,7 @@ engine: claude
 tools:
   cache-memory: true
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 safe-outputs:
   create-issue:
   threat-detection: true
@@ -76,7 +76,7 @@ engine: claude
 tools:
   cache-memory: true
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 ---
 
 Test workflow with cache-memory but no threat detection.`,
@@ -112,7 +112,7 @@ tools:
     - id: session
       key: memory-session
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 safe-outputs:
   create-issue:
   threat-detection: true
@@ -160,7 +160,7 @@ tools:
       key: memory-restore-only
       restore-only: true
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 safe-outputs:
   create-issue:
   threat-detection: true

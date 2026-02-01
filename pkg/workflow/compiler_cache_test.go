@@ -40,7 +40,7 @@ cache:
     node-modules-
 tools:
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 ---`,
 			expectedInLock: []string{
 				"# Cache configuration from frontmatter was processed and added to the main job steps",
@@ -82,7 +82,7 @@ cache:
     fail-on-cache-miss: false
 tools:
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 ---`,
 			expectedInLock: []string{
 				"# Cache configuration from frontmatter was processed and added to the main job steps",
@@ -126,7 +126,7 @@ cache:
   lookup-only: false
 tools:
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 ---`,
 			expectedInLock: []string{
 				"# Cache configuration from frontmatter processed below",

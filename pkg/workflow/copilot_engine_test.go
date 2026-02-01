@@ -326,10 +326,10 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			name: "github tool with allowed tools",
 			tools: map[string]any{
 				"github": map[string]any{
-					"allowed": []any{"get_repository", "list_commits"},
+					"allowed": []any{"get_file_contents", "list_commits"},
 				},
 			},
-			expected: []string{"--allow-tool", "github(get_repository)", "--allow-tool", "github(list_commits)"},
+			expected: []string{"--allow-tool", "github(get_file_contents)", "--allow-tool", "github(list_commits)"},
 		},
 		{
 			name: "github tool with single allowed tool",
@@ -353,10 +353,10 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			name: "github tool with wildcard and specific tools",
 			tools: map[string]any{
 				"github": map[string]any{
-					"allowed": []any{"*", "get_repository", "list_commits"},
+					"allowed": []any{"*", "get_file_contents", "list_commits"},
 				},
 			},
-			expected: []string{"--allow-tool", "github", "--allow-tool", "github(get_repository)", "--allow-tool", "github(list_commits)"},
+			expected: []string{"--allow-tool", "github", "--allow-tool", "github(get_file_contents)", "--allow-tool", "github(list_commits)"},
 		},
 		{
 			name: "github tool with empty allowed array",
@@ -394,12 +394,12 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			name: "github tool with bash and edit tools",
 			tools: map[string]any{
 				"github": map[string]any{
-					"allowed": []any{"get_repository", "list_commits"},
+					"allowed": []any{"get_file_contents", "list_commits"},
 				},
 				"bash": []any{"echo", "ls"},
 				"edit": nil,
 			},
-			expected: []string{"--allow-tool", "github(get_repository)", "--allow-tool", "github(list_commits)", "--allow-tool", "shell(echo)", "--allow-tool", "shell(ls)", "--allow-tool", "write"},
+			expected: []string{"--allow-tool", "github(get_file_contents)", "--allow-tool", "github(list_commits)", "--allow-tool", "shell(echo)", "--allow-tool", "shell(ls)", "--allow-tool", "write"},
 		},
 	}
 
@@ -733,7 +733,7 @@ func TestCopilotEngineRenderGitHubMCPConfig(t *testing.T) {
 		{
 			name: "GitHub MCP with allowed tools",
 			githubTool: map[string]any{
-				"allowed": []string{"list_workflows", "get_repository"},
+				"allowed": []string{"list_workflows", "get_file_contents"},
 			},
 			isLast: true,
 			expectedStrs: []string{

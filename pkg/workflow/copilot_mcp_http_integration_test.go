@@ -130,7 +130,7 @@ func TestCopilotEngine_MultipleHTTPMCPTools_Integration(t *testing.T) {
 				},
 			},
 			"github": map[string]any{
-				"allowed": []string{"get_repository"},
+				"allowed": []string{"get_file_contents"},
 			},
 		},
 		EngineConfig: &EngineConfig{

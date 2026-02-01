@@ -27,7 +27,7 @@ tools:
       - repos
       - pull_requests
     allowed:
-      - get_repository
+      - get_file_contents
       - search_pull_requests
 ---
 
@@ -46,7 +46,7 @@ tools:
     toolsets:
       - default
     allowed:
-      - get_repository
+      - get_file_contents
       - list_issues
 ---
 
@@ -65,7 +65,7 @@ tools:
     toolsets:
       - all
     allowed:
-      - get_repository
+      - get_file_contents
       - list_workflows
       - create_gist
 ---
@@ -85,7 +85,7 @@ tools:
     toolsets:
       - repos
     allowed:
-      - get_repository
+      - get_file_contents
       - list_issues
 ---
 
@@ -105,7 +105,7 @@ tools:
     toolsets:
       - repos
     allowed:
-      - get_repository
+      - get_file_contents
       - list_issues
       - list_workflows
       - search_pull_requests
@@ -195,7 +195,7 @@ tools:
       - default
       - actions
     allowed:
-      - get_repository
+      - get_file_contents
       - list_issues
       - list_workflows
 ---
@@ -265,7 +265,7 @@ tools:
     toolsets:
       - repos
     allowed:
-      - get_repository
+      - get_file_contents
       - list_issues
 ---
 
@@ -322,7 +322,7 @@ tools:
     toolsets:
       - repos
     allowed:
-      - get_repository
+      - get_file_contents
       - create_discussion
 ---
 

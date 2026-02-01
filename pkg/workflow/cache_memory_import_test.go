@@ -54,7 +54,7 @@ imports:
   - shared/cache-config.md
 tools:
   github:
-    allowed: [get_repository]
+    allowed: [get_file_contents]
 ---
 
 # Main Workflow
