@@ -17,12 +17,12 @@ safe-outputs:
   github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
   update-project:
     max: 100
+    project: https://github.com/orgs/githubnext/projects/144
   create-issue:
     expires: 2d
     max: 1
     title-prefix: "[campaign]"
     assignees: copilot
-project: https://github.com/orgs/githubnext/projects/144
 ---
 
 # Security Alert Burndown

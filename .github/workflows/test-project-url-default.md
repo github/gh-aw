@@ -4,30 +4,30 @@ engine: copilot
 on:
   workflow_dispatch:
 
-project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
-
 safe-outputs:
   update-project:
     max: 5
+    project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
   create-project-status-update:
     max: 1
+    project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
 ---
 
 # Test Default Project URL
 
-This workflow demonstrates the new `GH_AW_PROJECT_URL` environment variable feature.
+This workflow demonstrates the `project:` field within safe-outputs configuration.
 
-When the `project` field is configured in the frontmatter, safe output entries like
-`update-project` and `create-project-status-update` will automatically use this project
-URL as a default when the message doesn't specify a project field.
+When the `project` field is configured in safe-outputs like `update-project` or 
+`create-project-status-update`, the safe output handler will use this URL as the 
+default project when processing messages.
 
 ## Test Cases
 
-1. **Default project URL from frontmatter**: Safe output messages without a `project` field 
-   will use the URL from the frontmatter configuration.
+1. **Default project URL from safe-outputs config**: Safe output messages without a 
+   `project` field will use the URL from the safe-outputs configuration.
 
-2. **Override with explicit project**: If a safe output message includes a `project` field,
-   it takes precedence over the frontmatter default.
+2. **Override with explicit project**: If a safe output message includes a `project` 
+   field, it takes precedence over the configured default.
 
 ## Example Safe Outputs
 
@@ -42,9 +42,11 @@ URL as a default when the message doesn't specify a project field.
 }
 ```
 
-This will automatically use `https://github.com/orgs/<ORG>/projects/<NUMBER>` from the frontmatter.
+This will automatically use `https://github.com/orgs/<ORG>/projects/<NUMBER>` from the 
+safe-outputs configuration.
 
-Important: this is a placeholder. Replace it with a real GitHub Projects v2 URL before running the workflow.
+Important: this is a placeholder. Replace it with a real GitHub Projects v2 URL before 
+running the workflow.
 
 ```json
 {

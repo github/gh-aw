@@ -14,7 +14,6 @@ permissions:
   actions: read
 name: Smoke Project
 engine: copilot
-project: "https://github.com/orgs/github-agentic-workflows/projects/1"
 imports:
   - shared/gh.md
   - shared/reporting.md
@@ -41,6 +40,7 @@ safe-outputs:
       allowed: [smoke-project]
     update-project:
       max: 20
+      project: "https://github.com/orgs/github-agentic-workflows/projects/1"
       views:
         - name: "Smoke Test Board"
           layout: board
@@ -50,6 +50,7 @@ safe-outputs:
       github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
     create-project-status-update:
       max: 5
+      project: "https://github.com/orgs/github-agentic-workflows/projects/1"
       github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
     messages:
       append-only-comments: true

@@ -16,7 +16,9 @@ permissions:
 imports:
   - shared/campaign.md
 
-project: https://github.com/orgs/githubnext/projects/144
+safe-outputs:
+  update-project:
+    project: https://github.com/orgs/githubnext/projects/144
 ---
 
 # Dependabot Burner
