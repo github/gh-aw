@@ -137,6 +137,7 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 			"        with:\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
+			"          depth: 1\n",
 			"          persist-credentials: false\n",
 		}
 	}
