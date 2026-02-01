@@ -75,6 +75,7 @@ type ProcessedRun struct {
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
 	MCPFailures             []MCPFailureReport
+	MCPToolUsage            *MCPToolUsageData
 	JobDetails              []JobInfoWithDuration
 }
 
@@ -147,6 +148,13 @@ type MissingDataSummary struct {
 	RunIDs             []int64  `json:"run_ids" console:"-"`                       // List of run IDs where this data was reported
 }
 
+// MCPToolUsageSummary aggregates MCP tool usage across all runs
+type MCPToolUsageSummary struct {
+	Summary   []MCPToolSummary `json:"summary" console:"title:Tool Statistics"`             // Aggregated statistics per tool
+	Servers   []MCPServerStats `json:"servers,omitempty" console:"title:Server Statistics"` // Server-level statistics
+	ToolCalls []MCPToolCall    `json:"tool_calls" console:"-"`                              // Individual tool call records (excluded from console)
+}
+
 // ErrNoArtifacts indicates that a workflow run has no artifacts
 var ErrNoArtifacts = errors.New("no artifacts found for this run")
 
@@ -176,6 +184,7 @@ type RunSummary struct {
 	MissingData             []MissingDataReport      `json:"missing_data"`              // Missing data reports
 	Noops                   []NoopReport             `json:"noops"`                     // Noop messages
 	MCPFailures             []MCPFailureReport       `json:"mcp_failures"`              // MCP server failures
+	MCPToolUsage            *MCPToolUsageData        `json:"mcp_tool_usage,omitempty"`  // MCP tool usage data
 	ArtifactsList           []string                 `json:"artifacts_list"`            // List of downloaded artifact files
 	JobDetails              []JobInfoWithDuration    `json:"job_details"`               // Job execution details
 }
@@ -191,6 +200,7 @@ type DownloadResult struct {
 	MissingData             []MissingDataReport
 	Noops                   []NoopReport
 	MCPFailures             []MCPFailureReport
+	MCPToolUsage            *MCPToolUsageData
 	JobDetails              []JobInfoWithDuration
 	Error                   error
 	Skipped                 bool
