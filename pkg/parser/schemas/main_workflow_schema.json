@@ -3897,6 +3897,7 @@
             {
               "type": "object",
               "description": "Configuration for managing GitHub Projects v2 boards. Smart tool that can add issue/PR items and update custom fields on existing items. By default it is update-only: if the project does not exist, the job fails with instructions to create it manually. To allow workflows to create missing projects, explicitly opt in via the agent output field create_if_missing=true (and/or provide a github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT) or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output items produced by the agent use type=update_project Configuration also supports an optional views array for declaring project views to create. Safe output items produced by the agent use type=update_project and may include: project (board name), content_type (issue|pull_request), content_number, fields, campaign_id, and create_if_missing.",
+              "required": ["project"],
               "properties": {
                 "max": {
                   "type": "integer",
@@ -3910,7 +3911,7 @@
                 },
                 "project": {
                   "type": "string",
-                  "description": "Default project URL for update-project operations. When specified, safe output messages can omit the project field and will use this URL by default. Must be a valid GitHub Projects v2 URL. Overridden by explicit project field in safe output messages.",
+                  "description": "Target project URL for update-project operations. Agent messages can optionally override this by providing an explicit project field in the output. Must be a valid GitHub Projects v2 URL.",
                   "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
                   "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 },
@@ -4105,6 +4106,7 @@
             {
               "type": "object",
               "description": "Configuration for creating GitHub Project status updates. Status updates provide stakeholder communication and historical record of project progress. Requires a Personal Access Token (PAT) or GitHub App token with Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects v2. Status updates are created on the specified project board and appear in the Updates tab. Typically used by campaign orchestrators to post run summaries with progress, findings, and next steps.",
+              "required": ["project"],
               "properties": {
                 "max": {
                   "type": "integer",
@@ -4118,7 +4120,7 @@
                 },
                 "project": {
                   "type": "string",
-                  "description": "Default project URL for status update operations. When specified, safe output messages can omit the project field and will use this URL by default. Must be a valid GitHub Projects v2 URL. Overridden by explicit project field in safe output messages.",
+                  "description": "Target project URL for status update operations. Agent messages can optionally override this by providing an explicit project field in the output. Must be a valid GitHub Projects v2 URL.",
                   "pattern": "^https://github\\.com/(users|orgs)/([^/]+|<[A-Z_]+>)/projects/(\\d+|<[A-Z_]+>)$",
                   "examples": ["https://github.com/orgs/myorg/projects/123", "https://github.com/users/username/projects/456"]
                 }

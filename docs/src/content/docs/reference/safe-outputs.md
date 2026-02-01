@@ -460,8 +460,8 @@ Manages GitHub Projects boards. Requires PAT or GitHub App token ([`GH_AW_PROJEC
 ```yaml wrap
 safe-outputs:
   update-project:
+    project: "https://github.com/orgs/myorg/projects/42"  # required: target project URL
     max: 20                         # max operations (default: 10)
-    project: "https://github.com/orgs/myorg/projects/42"  # default project URL (optional)
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     views:                          # optional: auto-create views
       - name: "Sprint Board"
@@ -474,9 +474,11 @@ safe-outputs:
 ```
 
 **Configuration options:**
-- `project` (optional): Default project URL for operations. When specified, agent messages can omit the `project` field and will use this URL by default. Overridden by explicit `project` field in agent output.
-- Agent can provide full project URL (e.g., `https://github.com/orgs/myorg/projects/42`) in each message, or rely on the configured default.
-- Optional `campaign_id` applies `z_campaign_<id>` labels for [Campaign Workflows](/gh-aw/guides/campaigns/).
+- `project` (required): Target project URL for operations. Agent messages can optionally override this by providing an explicit `project` field in the output.
+- `max`: Maximum number of operations per run (default: 10).
+- `github-token`: Custom token with Projects permissions (required for Projects v2 access).
+- `views`: Optional array of project views to create automatically.
+- Optional `campaign_id` in agent output applies `z_campaign_<id>` labels for [Campaign Workflows](/gh-aw/guides/campaigns/).
 - Exposes outputs: `project-id`, `project-number`, `project-url`, `campaign-id`, `item-id`.
 
 #### Supported Field Types
@@ -554,21 +556,22 @@ Creates status updates on GitHub Projects boards to communicate campaign progres
 ```yaml wrap
 safe-outputs:
   create-project-status-update:
+    project: "https://github.com/orgs/myorg/projects/73"  # required: target project URL
     max: 1                          # max updates per run (default: 1)
-    project: "https://github.com/orgs/myorg/projects/73"  # default project URL (optional)
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
 
 **Configuration options:**
-- `project` (optional): Default project URL for status updates. When specified, agent messages can omit the `project` field and will use this URL by default. Overridden by explicit `project` field in agent output.
-- Agent can provide full project URL in each message, or rely on the configured default.
+- `project` (required): Target project URL for status updates. Agent messages can optionally override this by providing an explicit `project` field in the output.
+- `max`: Maximum number of status updates per run (default: 1).
+- `github-token`: Custom token with Projects permissions (required for Projects v2 access).
 - Typically used by [Campaign Workflows](/gh-aw/guides/campaigns/) to automatically post run summaries.
 
 #### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `project` | URL | Full GitHub project URL (e.g., `https://github.com/orgs/myorg/projects/73`). Can be omitted if configured in safe-outputs. |
+| `project` | URL | Full GitHub project URL (e.g., `https://github.com/orgs/myorg/projects/73`). Can be omitted in agent output if configured in safe-outputs. |
 | `body` | Markdown | Status update content with campaign summary, findings, and next steps |
 
 #### Optional Fields

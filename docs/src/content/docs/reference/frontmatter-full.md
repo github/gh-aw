@@ -1950,11 +1950,9 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Default project URL for update-project operations. When specified, safe output
-    # messages can omit the project field and will use this URL by default. Must be a
-    # valid GitHub Projects v2 URL. Overridden by explicit project field in safe
-    # output messages.
-    # (optional)
+    # Target project URL for update-project operations. Agent messages can optionally
+    # override this by providing an explicit project field in the output. Must be a
+    # valid GitHub Projects v2 URL.
     project: "example-value"
 
     # Optional array of project views to create. Each view must have a name and
@@ -2108,11 +2106,9 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-    # Default project URL for status update operations. When specified, safe output
-    # messages can omit the project field and will use this URL by default. Must be a
-    # valid GitHub Projects v2 URL. Overridden by explicit project field in safe
-    # output messages.
-    # (optional)
+    # Target project URL for status update operations. Agent messages can optionally
+    # override this by providing an explicit project field in the output. Must be a
+    # valid GitHub Projects v2 URL.
     project: "example-value"
 
   # Option 2: Enable project status updates with default configuration (max=1)
