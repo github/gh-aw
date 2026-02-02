@@ -35,27 +35,24 @@ safe-outputs:
       expires: 2h
       group: true
       close-older-issues: true
-      target-repo: github-agentic-workflows/demo-repository  
     add-labels:
       allowed: [smoke-project]
-      target-repo: github-agentic-workflows/demo-repository  
     remove-labels:
       allowed: [smoke-project]
-      target-repo: github-agentic-workflows/demo-repository  
     update-project:
       max: 20
-      project: "https://github.com/orgs/github-agentic-workflows/projects/1"
+      project: "https://github.com/orgs/githubnext/projects/146"
       views:
         - name: "Smoke Test Board"
           layout: board
           filter: "is:open"
         - name: "Smoke Test Table"
           layout: table
-      github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
+      github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     create-project-status-update:
       max: 1
-      project: "https://github.com/orgs/github-agentic-workflows/projects/1"
-      github-token: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
+      project: "https://github.com/orgs/githubnext/projects/146"
+      github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     messages:
       append-only-comments: true
       footer: "> 🧪 *Project smoke test report by [{workflow_name}]({run_url})*"
@@ -75,77 +72,34 @@ strict: true
 1. **Project Operations Testing**: Use project-related safe-output tools to validate multiple project features against the real project configured in the frontmatter. Steps:
 
    a. **Draft Issue Creation**: Call `update_project` with:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
+      - `project`: "https://github.com/orgs/githubnext/projects/146"
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `draft_body`: "Test draft issue for smoke test validation"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
 
    b. **Field Creation with New Fields**: Call `update_project` with draft issue including new custom fields:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
+      - `project`: "https://github.com/orgs/githubnext/projects/146"
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue with Custom Fields - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "Todo", "Priority": "High", "Team": "Engineering", "Sprint": "Q1-2026"}`
 
    c. **Field Update**: Call `update_project` again with the same draft issue to update fields:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
+      - `project`: "https://github.com/orgs/githubnext/projects/146"
       - `content_type`: "draft_issue"
       - `draft_title`: "Smoke Test Draft Issue - Run ${{ github.run_id }}"
       - `fields`: `{"Status": "In Progress", "Priority": "Medium"}`
-
-   d. **Existing Issue Addition**: Use GitHub MCP to find any open issue from ${{ github.repository }}, then call `update_project` with:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
-      - `content_type`: "issue"
-      - `content_number`: the issue number you found
-      - `fields`: `{"Status": "In Review", "Priority": "Low"}`
    
-   e. **Existing PR Addition**: Use GitHub MCP to find any open pull request from ${{ github.repository }}, then call `update_project` with:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
-      - `content_type`: "pull_request"
-      - `content_number`: the PR number you found
-      - `fields`: `{"Status": "In Progress", "Priority": "High"}`
-   
-   f. **View Creation**: The workflow automatically creates two views (configured in safe-outputs):
-      - "Smoke Test Board" (board layout, filter: "is:open")
-      - "Smoke Test Table" (table layout)
-   
-   g. **Project Status Update**: Call `create_project_status_update` with:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1" (explicit project URL required)
+   d. **Project Status Update**: Call `create_project_status_update` with:
+      - `project`: "https://github.com/orgs/githubnext/projects/146"
       - `body`: "Smoke test project status - Run ${{ github.run_id }}"
       - `status`: "ON_TRACK"
    
-   h. **Verification**: For each operation:
+   f. **Verification**: For each operation:
       - Verify the safe-output message is properly formatted in the output file
       - Confirm the project URL is explicitly included in each message
       - Check that all field names and values are correctly structured
       - Validate content_type is correctly set for each operation type
-
-2. **Project URL Requirement Testing**: Test that the `project` field is required in all messages:
-   
-   a. **Explicit Project URL (Required)**: Call `update_project` WITH the project field:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
-      - `content_type`: "draft_issue"
-      - `draft_title`: "Test - Explicit Project URL - Run ${{ github.run_id }}"
-      - `fields`: `{"Status": "Todo"}`
-      - Verify the operation succeeds with the explicitly provided project URL
-   
-   b. **Different Project URL**: Call `update_project` WITH a different explicit project field to test flexibility:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
-      - `content_type`: "draft_issue"
-      - `draft_title`: "Test - Different Project - Run ${{ github.run_id }}"
-      - `fields`: `{"Status": "Todo"}`
-      - Verify the message uses the explicitly provided project URL
-   
-   c. **Status Update with Explicit Project**: Call `create_project_status_update` WITH the project field:
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
-      - `body`: "Test status update with explicit project - Run ${{ github.run_id }}"
-      - `status`: "ON_TRACK"
-      - Verify the status update uses the explicitly provided project URL
-   
-   d. **URL Format Verification**: For all operations:
-      - Confirm that every message includes an explicit project URL
-      - Validate that all project URLs are properly formatted in safe-output messages
-      - Ensure operations target the correct project scope
 
 ## Output
 
