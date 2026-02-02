@@ -93,8 +93,8 @@ func (b *handlerConfigBuilder) Build() map[string]any {
 // handlerBuilder is a function that builds a handler config from SafeOutputsConfig
 type handlerBuilder func(*SafeOutputsConfig) map[string]any
 
-// handlerRegistry maps handler names to their builder functions
-var handlerRegistry = map[string]handlerBuilder{
+// regularHandlerRegistry maps regular (non-project) handler names to their builder functions
+var regularHandlerRegistry = map[string]handlerBuilder{
 	"create_issue": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CreateIssues == nil {
 			return nil
@@ -422,8 +422,11 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("github-token", c.GitHubToken).
 			Build()
 	},
-	// Note: create_project, update_project and create_project_status_update are handled by the unified handler,
-	// not the separate project handler manager, so they are included in this registry.
+}
+
+// projectHandlerRegistry maps project handler names to their builder functions
+// These handlers require GH_AW_PROJECT_GITHUB_TOKEN and are loaded separately
+var projectHandlerRegistry = map[string]handlerBuilder{
 	"create_project": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CreateProjects == nil {
 			return nil
@@ -479,34 +482,55 @@ func (c *Compiler) addHandlerManagerConfigEnvVar(steps *[]string, data *Workflow
 	}
 
 	compilerSafeOutputsConfigLog.Print("Building handler manager configuration for safe-outputs")
-	config := make(map[string]map[string]any)
-
-	// Build configuration for each handler using the registry
-	for handlerName, builder := range handlerRegistry {
+	
+	// Build regular handlers config
+	regularConfig := make(map[string]map[string]any)
+	for handlerName, builder := range regularHandlerRegistry {
 		handlerConfig := builder(data.SafeOutputs)
-		// Include handler if:
-		// 1. It returns a non-nil config (explicitly enabled, even if empty)
-		// 2. For auto-enabled handlers, include even with empty config
 		if handlerConfig != nil {
-			compilerSafeOutputsConfigLog.Printf("Adding %s handler configuration", handlerName)
-			config[handlerName] = handlerConfig
+			compilerSafeOutputsConfigLog.Printf("Adding regular handler configuration: %s", handlerName)
+			regularConfig[handlerName] = handlerConfig
 		}
 	}
 
-	// Only add the env var if there are handlers to configure
-	if len(config) > 0 {
-		compilerSafeOutputsConfigLog.Printf("Marshaling handler config with %d handlers", len(config))
-		configJSON, err := json.Marshal(config)
+	// Build project handlers config
+	projectConfig := make(map[string]map[string]any)
+	for handlerName, builder := range projectHandlerRegistry {
+		handlerConfig := builder(data.SafeOutputs)
+		if handlerConfig != nil {
+			compilerSafeOutputsConfigLog.Printf("Adding project handler configuration: %s", handlerName)
+			projectConfig[handlerName] = handlerConfig
+		}
+	}
+
+	// Add regular handlers config env var
+	if len(regularConfig) > 0 {
+		compilerSafeOutputsConfigLog.Printf("Marshaling regular handler config with %d handlers", len(regularConfig))
+		configJSON, err := json.Marshal(regularConfig)
 		if err != nil {
-			consolidatedSafeOutputsLog.Printf("Failed to marshal handler config: %v", err)
+			consolidatedSafeOutputsLog.Printf("Failed to marshal regular handler config: %v", err)
 			return
 		}
-		// Escape the JSON for YAML (handle quotes and special chars)
 		configStr := string(configJSON)
 		*steps = append(*steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: %q\n", configStr))
-		compilerSafeOutputsConfigLog.Printf("Added handler config env var: size=%d bytes", len(configStr))
+		compilerSafeOutputsConfigLog.Printf("Added regular handler config env var: size=%d bytes", len(configStr))
 	} else {
-		compilerSafeOutputsConfigLog.Print("No handlers configured, skipping config env var")
+		compilerSafeOutputsConfigLog.Print("No regular handlers configured, skipping regular config env var")
+	}
+
+	// Add project handlers config env var
+	if len(projectConfig) > 0 {
+		compilerSafeOutputsConfigLog.Printf("Marshaling project handler config with %d handlers", len(projectConfig))
+		configJSON, err := json.Marshal(projectConfig)
+		if err != nil {
+			consolidatedSafeOutputsLog.Printf("Failed to marshal project handler config: %v", err)
+			return
+		}
+		configStr := string(configJSON)
+		*steps = append(*steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: %q\n", configStr))
+		compilerSafeOutputsConfigLog.Printf("Added project handler config env var: size=%d bytes", len(configStr))
+	} else {
+		compilerSafeOutputsConfigLog.Print("No project handlers configured, skipping project config env var")
 	}
 }
 

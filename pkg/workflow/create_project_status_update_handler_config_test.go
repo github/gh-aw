@@ -50,11 +50,11 @@ Test workflow
 
 	compiledStr := string(compiledContent)
 
-	// Find the GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG line
-	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-		"Expected GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG in compiled workflow")
+	// Project handlers should be in GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG
+	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG",
+		"Expected GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG in compiled workflow")
 
-	// Verify create_project_status_update is in the handler config
+	// Verify create_project_status_update is in the project handler config
 	require.Contains(t, compiledStr, "create_project_status_update",
 		"Expected create_project_status_update in handler config")
 
@@ -101,11 +101,11 @@ Test workflow
 
 	compiledStr := string(compiledContent)
 
-	// Find the GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG line
-	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-		"Expected GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG in compiled workflow")
+	// Project handlers should be in GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG
+	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG",
+		"Expected GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG in compiled workflow")
 
-	// Verify create_project_status_update is in the handler config
+	// Verify create_project_status_update is in the project handler config
 	require.Contains(t, compiledStr, "create_project_status_update",
 		"Expected create_project_status_update in handler config")
 
@@ -165,8 +165,23 @@ Test workflow
 
 	compiledStr := string(compiledContent)
 
-	// Extract main handler config JSON
+	// Extract project handler config JSON
 	lines := strings.Split(compiledStr, "\n")
+	var projectConfigJSON string
+	for _, line := range lines {
+		if strings.Contains(line, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG:") {
+			parts := strings.SplitN(line, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG:", 2)
+			if len(parts) == 2 {
+				projectConfigJSON = strings.TrimSpace(parts[1])
+				projectConfigJSON = strings.Trim(projectConfigJSON, "\"")
+				projectConfigJSON = strings.ReplaceAll(projectConfigJSON, "\\\"", "\"")
+			}
+		}
+	}
+
+	require.NotEmpty(t, projectConfigJSON, "Failed to extract GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG JSON")
+
+	// Verify create-issue is in the regular handler config
 	var mainConfigJSON string
 	for _, line := range lines {
 		if strings.Contains(line, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG:") {
@@ -178,20 +193,16 @@ Test workflow
 			}
 		}
 	}
-
 	require.NotEmpty(t, mainConfigJSON, "Failed to extract GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG JSON")
-
-	// Verify create_issue is in the main handler config
 	assert.Contains(t, mainConfigJSON, "create_issue",
 		"Expected create_issue in main handler config")
 
-	// Verify create_project_status_update is also in the main handler config
-	// (as of recent changes, it's handled by the unified handler, not a separate project handler step)
-	assert.Contains(t, mainConfigJSON, "create_project_status_update",
-		"Expected create_project_status_update in main handler config")
+	// Verify create_project_status_update is in the project handler config
+	assert.Contains(t, projectConfigJSON, "create_project_status_update",
+		"Expected create_project_status_update in project handler config")
 
 	// Verify max value is correct
-	assert.Contains(t, mainConfigJSON, `"max":2`,
+	assert.Contains(t, projectConfigJSON, `"max":2`,
 		"Expected max:2 in create_project_status_update handler config")
 }
 
@@ -229,7 +240,7 @@ Test workflow
 
 	compiledStr := string(compiledContent)
 
-	// Verify project URL is in the handler config
-	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG", "Expected main handler config")
+	// Verify project URL is in the project handler config
+	require.Contains(t, compiledStr, "GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG", "Expected project handler config")
 	require.Contains(t, compiledStr, "https://github.com/orgs/nonexistent-test-org-67890/projects/88888", "Expected project URL in handler config")
 }
