@@ -190,7 +190,7 @@ describe("safe_outputs_tools_loader", () => {
       expect(defaultHandler).toHaveBeenCalledWith("dispatch_workflow");
     });
 
-    it("should include workflow_name in dispatch_workflow handler args", () => {
+    it("should wrap args in inputs property for dispatch_workflow handler", () => {
       const tools = [{ name: "ci_workflow", description: "CI workflow", _workflow_name: "ci" }];
       const mockHandlerFunction = vi.fn();
       const defaultHandler = vi.fn(() => mockHandlerFunction);
@@ -204,16 +204,17 @@ describe("safe_outputs_tools_loader", () => {
       const result = attachHandlers(tools, handlers);
 
       // Call the handler
-      const mockArgs = { input1: "value1" };
+      const mockArgs = { input1: "value1", input2: "value2" };
       result[0].handler(mockArgs);
 
-      // Verify the handler function was called with workflow_name
-      expect(mockHandlerFunction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          workflow_name: "ci",
+      // Verify the handler function was called with workflow_name and inputs wrapped
+      expect(mockHandlerFunction).toHaveBeenCalledWith({
+        workflow_name: "ci",
+        inputs: {
           input1: "value1",
-        })
-      );
+          input2: "value2",
+        },
+      });
     });
   });
 
