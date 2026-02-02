@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: bd98ff099b52119aece71b2ef93625e572df4d1b0bcba1a83133c67277088447
+# frontmatter-hash: a519ab687af712043ca420d8b8b3ebc3b508c6d75c19969ef3a5c9fbc26024b9
 
 name: "Test Dispatcher Workflow"
 "on": issues

@@ -21,7 +21,7 @@
 #
 # Automated cleanup policy for stale draft pull requests to reduce clutter and improve triage efficiency
 #
-# frontmatter-hash: fa37689eeb7c3bc035a34adf77e4ff43a6985736e660f56f9d12eacc6536d854
+# frontmatter-hash: fe61f2690e11dd5437126effa9913e0fe5fb800129cec7f82147f8277cdd0cad
 
 name: "Draft PR Cleanup"
 "on":

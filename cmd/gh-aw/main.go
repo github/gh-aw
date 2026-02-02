@@ -8,7 +8,6 @@ import (
 	"github.com/githubnext/gh-aw/pkg/cli"
 	"github.com/githubnext/gh-aw/pkg/console"
 	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/parser"
 	"github.com/githubnext/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -636,10 +635,6 @@ func main() {
 
 	// Set version information in the workflow package for generated file headers
 	workflow.SetVersion(version)
-
-	// Set version information in the parser package for frontmatter hash computation
-	parser.SetCompilerVersion(version)
-	parser.SetIsRelease(isRelease == "true")
 
 	// Set release flag in the workflow package
 	workflow.SetIsRelease(isRelease == "true")

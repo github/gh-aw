@@ -21,7 +21,7 @@
 #
 # Automates PR categorization, risk assessment, and prioritization for agent-created pull requests
 #
-# frontmatter-hash: 0430fadb49d986bd402999cef256d994e07290825984ed5ba4148e2a971fc834
+# frontmatter-hash: 55ba33ed3df545e5bb89b0fb5f0bee7164381c47051057165de2e7c2bf2a7959
 
 name: "PR Triage Agent"
 "on":

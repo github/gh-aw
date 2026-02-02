@@ -40,7 +40,7 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: caf321ca12a213338ddd1c576ee1737998648e5b3e4c5dd7d048fcfe5fa40dfd
+# frontmatter-hash: 0bb136115bbfbc85b1f8aeb7205d13bb3327b563d45a461acbd8189e6fd1b072
 
 name: "MCP Inspector Agent"
 "on":

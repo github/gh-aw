@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
 	"github.com/githubnext/gh-aw/pkg/logger"
 )
 
@@ -23,22 +22,6 @@ type FileReader func(filePath string) ([]byte, error)
 
 // DefaultFileReader reads files from disk using os.ReadFile
 var DefaultFileReader FileReader = os.ReadFile
-
-// compilerVersion holds the gh-aw version for hash computation
-var compilerVersion = "dev"
-
-// isReleaseVersion indicates whether the current version is a release
-var isReleaseVersion = false
-
-// SetCompilerVersion sets the compiler version for hash computation
-func SetCompilerVersion(version string) {
-	compilerVersion = version
-}
-
-// SetIsRelease sets whether the current version is a release build
-func SetIsRelease(isRelease bool) {
-	isReleaseVersion = isRelease
-}
 
 // ComputeFrontmatterHash computes a deterministic SHA-256 hash of frontmatter
 // including contributions from all imported workflows.
@@ -309,9 +292,6 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 		canonical["template-expressions"] = sortedExpressions
 	}
 
-	// Add version information for reproducibility
-	canonical["versions"] = buildVersionInfo()
-
 	// Serialize to canonical JSON
 	canonicalJSON, err := marshalCanonicalJSON(canonical)
 	if err != nil {
@@ -326,27 +306,6 @@ func ComputeFrontmatterHashWithExpressions(frontmatter map[string]any, baseDir s
 
 	frontmatterHashLog.Printf("Computed hash: %s", hashHex)
 	return hashHex, nil
-}
-
-// buildVersionInfo builds version information for hash computation
-func buildVersionInfo() map[string]string {
-	versions := make(map[string]string)
-
-	// gh-aw version (compiler version) - only include for release builds
-	// This prevents hash changes during development when version is "dev"
-	if isReleaseVersion {
-		versions["gh-aw"] = compilerVersion
-	}
-
-	// awf (firewall) version
-	versions["awf"] = string(constants.DefaultFirewallVersion)
-
-	// agents (MCP gateway) version - also aliased as "gateway" for clarity
-	gatewayVersion := string(constants.DefaultMCPGatewayVersion)
-	versions["agents"] = gatewayVersion
-	versions["gateway"] = gatewayVersion
-
-	return versions
 }
 
 // extractRelevantTemplateExpressions extracts template expressions from markdown
@@ -580,9 +539,6 @@ func computeFrontmatterHashTextBasedWithReader(frontmatterText, markdown, baseDi
 	if len(expressions) > 0 {
 		canonical["template-expressions"] = expressions
 	}
-
-	// Add version information
-	canonical["versions"] = buildVersionInfo()
 
 	// Serialize to canonical JSON
 	canonicalJSON, err := marshalCanonicalJSON(canonical)

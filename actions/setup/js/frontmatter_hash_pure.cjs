@@ -4,16 +4,6 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// Version information - should match Go constants
-// Note: gh-aw version is excluded for non-release builds to prevent
-// hash changes during development. Only include it for release builds.
-const VERSIONS = {
-  // "gh-aw": "dev", // Excluded for non-release builds
-  awf: "v0.11.2",
-  agents: "v0.0.88",
-  gateway: "v0.0.88",
-};
-
 /**
  * Default file reader using Node.js fs module
  * @param {string} filePath - Path to the file
@@ -74,9 +64,6 @@ async function computeFrontmatterHash(workflowPath, options = {}) {
   if (expressions.length > 0) {
     canonical["template-expressions"] = expressions;
   }
-
-  // Add version information
-  canonical.versions = VERSIONS;
 
   // Serialize to canonical JSON
   const canonicalJSON = marshalCanonicalJSON(canonical);

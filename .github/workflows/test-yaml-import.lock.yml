@@ -24,7 +24,7 @@
 #   Imports:
 #     - license-check.yml
 #
-# frontmatter-hash: 0320ec905eb5f07de23540f7e03045a71984a20e209e69b65c3f320819a80e26
+# frontmatter-hash: 7ff9d56001e17737a30e42b7be9ae46ac41036bd4a2afb74712b591d0d14ec24
 
 name: "Test YAML Import"
 "on": issue_comment

@@ -78,19 +78,9 @@ func TestGoJSHashStability(t *testing.T) {
 			require.NoError(t, err, "JS iteration 2 should compute hash")
 			assert.Equal(t, jsHash1, jsHash2, "JS hashes should be stable across iterations")
 
-			// Cross-language validation
-			// Note: JS uses hardcoded "dev" version, so skip comparison if Go is using a different version
-			// This allows tests to pass during development with custom git versions
-			if compilerVersion == "dev" {
-				assert.Equal(t, goHash1, jsHash1, "Go and JS should produce identical hashes")
-				t.Logf("  ✓ Go=%s JS=%s (match: %v)", goHash1, jsHash1, goHash1 == jsHash1)
-			} else {
-				// When Go uses a git version, JS will produce a different hash
-				// This is expected and doesn't indicate a problem with the implementation
-				t.Logf("  ⚠ Skipping cross-language comparison (Go version: %s, JS version: dev)", compilerVersion)
-				t.Logf("  ✓ Go hash (stable): %s", goHash1)
-				t.Logf("  ✓ JS hash (stable): %s", jsHash1)
-			}
+			// Cross-language validation - both should produce identical hashes
+			assert.Equal(t, goHash1, jsHash1, "Go and JS should produce identical hashes")
+			t.Logf("  ✓ Go=%s JS=%s (match: %v)", goHash1, jsHash1, goHash1 == jsHash1)
 		})
 	}
 }
@@ -177,13 +167,12 @@ Use env: ${{ env.TEST_VAR }}
 	goHash, err := ComputeFrontmatterHashFromFile(workflowFile, cache)
 	require.NoError(t, err, "Go should compute hash")
 
-	// For this test, we verify the Go hash includes versions
-	// Full JS implementation and comparison will be done in TestGoJSHashStability
+	// Verify hash is valid SHA-256 (64 hex characters)
 	assert.Len(t, goHash, 64, "Hash should be 64 characters")
 
 	t.Logf("Go hash: %s", goHash)
 
-	// Verify the canonical JSON includes versions
+	// Verify the canonical JSON structure
 	result, err := ExtractFrontmatterFromContent(content)
 	require.NoError(t, err, "Should extract frontmatter")
 
@@ -191,33 +180,21 @@ Use env: ${{ env.TEST_VAR }}
 	require.Len(t, expressions, 1, "Should extract one env expression")
 	assert.Equal(t, "${{ env.TEST_VAR }}", expressions[0], "Should extract correct expression")
 
-	// Build canonical to verify versions are included
+	// Build canonical
 	importsResult := &ImportsResult{}
 	canonical := buildCanonicalFrontmatter(result.Frontmatter, importsResult)
 	canonical["template-expressions"] = expressions
-	canonical["versions"] = buildVersionInfo()
 
 	canonicalJSON, err := marshalCanonicalJSON(canonical)
 	require.NoError(t, err, "Should marshal canonical JSON")
 
-	// Verify versions are in the canonical JSON
+	// Verify the canonical JSON structure
 	var parsed map[string]any
 	err = json.Unmarshal([]byte(canonicalJSON), &parsed)
 	require.NoError(t, err, "Should parse canonical JSON")
 
-	versions, hasVersions := parsed["versions"].(map[string]any)
-	require.True(t, hasVersions, "Canonical JSON should include versions")
-
-	// gh-aw version is only included for release builds
-	if isReleaseVersion {
-		assert.NotNil(t, versions["gh-aw"], "Should include gh-aw version for release builds")
-	} else {
-		assert.Nil(t, versions["gh-aw"], "Should not include gh-aw version for non-release builds")
-	}
-
-	// awf and agents versions should always be included
-	assert.NotNil(t, versions["awf"], "Should include awf version")
-	assert.NotNil(t, versions["agents"], "Should include agents version")
-
-	t.Logf("Versions in hash: %+v", versions)
+	// Verify template expressions are included
+	exprs, hasExprs := parsed["template-expressions"].([]any)
+	require.True(t, hasExprs, "Canonical JSON should include template expressions")
+	assert.Len(t, exprs, 1, "Should have one expression")
 }

@@ -21,7 +21,7 @@
 #
 # Weekly analysis of the default Ubuntu Actions runner image and guidance for creating Docker mimics
 #
-# frontmatter-hash: f5954d67980daa99f8f3f72b8ea81c7c5abb8701de697f5aff729c51cf850703
+# frontmatter-hash: 1b77ee5588bec8768275bd46f455f4de9e4a951d06284ae5b0967a7e5ccc5539
 
 name: "Ubuntu Actions Image Analyzer"
 "on":

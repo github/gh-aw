@@ -21,7 +21,7 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: beedab9cbdf2064e56ef249b98c06e0cd7dd54c879c4e89f671378213228d6ba
+# frontmatter-hash: 476bea6ea011448724d49d6c7950b45c253c50c1c000a01e283df1828d4509ec
 
 name: "Issue Monster"
 "on":
