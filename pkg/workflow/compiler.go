@@ -392,17 +392,17 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		log.Printf("Writing output to: %s", lockFile)
 
 		// Check if content has actually changed
-		shouldSkipWrite := false
+		contentUnchanged := false
 		if existingContent, err := os.ReadFile(lockFile); err == nil {
 			if string(existingContent) == yamlContent {
 				// Content is identical - skip write to preserve timestamp
-				shouldSkipWrite = true
+				contentUnchanged = true
 				log.Print("Lock file content unchanged - skipping write to preserve timestamp")
 			}
 		}
 
 		// Only write if content has changed
-		if !shouldSkipWrite {
+		if !contentUnchanged {
 			if err := os.WriteFile(lockFile, []byte(yamlContent), 0644); err != nil {
 				return formatCompilerError(lockFile, "error", fmt.Sprintf("failed to write lock file: %v", err))
 			}
