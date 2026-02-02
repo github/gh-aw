@@ -125,7 +125,7 @@ describe("update_project token guardrails", () => {
   it("fails fast with a clear error when authenticated as github-actions[bot]", async () => {
     delete process.env.GH_AW_PROJECT_GITHUB_TOKEN;
 
-    const projectUrl = "https://github.com/orgs/githubnext/projects/146";
+    const projectUrl = "https://github.com/orgs/github/projects/146";
 
     mockGithub.graphql.mockImplementation(async (query, vars) => {
       const q = String(query);
