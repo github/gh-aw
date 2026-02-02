@@ -169,6 +169,18 @@ func (c *Compiler) parsePullRequestsConfig(outputMap map[string]any) *CreatePull
 	// Get the config data to check for special cases before unmarshaling
 	configData, _ := outputMap["create-pull-request"].(map[string]any)
 
+	// Pre-process the reviewers field to convert single string to array BEFORE unmarshaling
+	// This prevents YAML unmarshal errors when reviewers is a string instead of []string
+	if configData != nil {
+		if reviewers, exists := configData["reviewers"]; exists {
+			if reviewerStr, ok := reviewers.(string); ok {
+				// Convert single string to array
+				configData["reviewers"] = []string{reviewerStr}
+				createPRLog.Printf("Converted single reviewer string to array before unmarshaling")
+			}
+		}
+	}
+
 	// Pre-process the expires field if it's a string (convert to int before unmarshaling)
 	if configData != nil {
 		if expires, exists := configData["expires"]; exists {
@@ -177,6 +189,7 @@ func (c *Compiler) parsePullRequestsConfig(outputMap map[string]any) *CreatePull
 				expiresInt := parseExpiresFromConfig(configData)
 				if expiresInt > 0 {
 					configData["expires"] = expiresInt
+					createPRLog.Printf("Converted expires from relative time format to hours: %d", expiresInt)
 				}
 			}
 		}
@@ -188,16 +201,6 @@ func (c *Compiler) parsePullRequestsConfig(outputMap map[string]any) *CreatePull
 		createPRLog.Printf("Failed to unmarshal config: %v", err)
 		// For backward compatibility, handle nil/empty config
 		config = CreatePullRequestsConfig{}
-	}
-
-	// Handle single string reviewer (YAML unmarshaling won't convert string to []string)
-	if len(config.Reviewers) == 0 && configData != nil {
-		if reviewers, exists := configData["reviewers"]; exists {
-			if reviewerStr, ok := reviewers.(string); ok {
-				config.Reviewers = []string{reviewerStr}
-				createPRLog.Printf("Converted single reviewer string to array: %v", config.Reviewers)
-			}
-		}
 	}
 
 	// Validate target-repo (wildcard "*" is not allowed)
