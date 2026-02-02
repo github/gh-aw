@@ -195,6 +195,33 @@ describe("dispatch_workflow handler factory", () => {
     );
   });
 
+  it("should handle workflows with no inputs", async () => {
+    const config = {
+      workflows: ["no-inputs-workflow"],
+      workflow_files: {
+        "no-inputs-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    // Test with inputs property missing entirely
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "no-inputs-workflow",
+    };
+
+    const result = await handler(message, {});
+
+    expect(result.success).toBe(true);
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "no-inputs-workflow.lock.yml",
+      ref: expect.any(String),
+      inputs: {}, // Should pass empty object even when inputs property is missing
+    });
+  });
+
   it("should delay 5 seconds between dispatches", async () => {
     const config = {
       workflows: ["workflow1", "workflow2"],
