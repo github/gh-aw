@@ -10,6 +10,10 @@ describe("checkout_pr_branch.cjs", () => {
     mockCore = {
       info: vi.fn(),
       setFailed: vi.fn(),
+      summary: {
+        addRaw: vi.fn().mockReturnThis(),
+        write: vi.fn().mockResolvedValue(undefined),
+      },
     };
 
     // Mock exec
@@ -92,6 +96,14 @@ describe("checkout_pr_branch.cjs", () => {
 
       await runScript();
 
+      expect(mockCore.summary.addRaw).toHaveBeenCalled();
+      expect(mockCore.summary.write).toHaveBeenCalled();
+
+      const summaryCall = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summaryCall).toContain("Failed to Checkout PR Branch");
+      expect(summaryCall).toContain("git fetch failed");
+      expect(summaryCall).toContain("pull request has been closed");
+
       expect(mockCore.setFailed).toHaveBeenCalledWith("Failed to checkout PR branch: git fetch failed");
     });
 
@@ -100,6 +112,13 @@ describe("checkout_pr_branch.cjs", () => {
       mockExec.exec.mockRejectedValueOnce(new Error("git checkout failed"));
 
       await runScript();
+
+      expect(mockCore.summary.addRaw).toHaveBeenCalled();
+      expect(mockCore.summary.write).toHaveBeenCalled();
+
+      const summaryCall = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summaryCall).toContain("Failed to Checkout PR Branch");
+      expect(summaryCall).toContain("git checkout failed");
 
       expect(mockCore.setFailed).toHaveBeenCalledWith("Failed to checkout PR branch: git checkout failed");
     });
@@ -128,6 +147,14 @@ describe("checkout_pr_branch.cjs", () => {
       mockExec.exec.mockRejectedValueOnce(new Error("gh pr checkout failed"));
 
       await runScript();
+
+      expect(mockCore.summary.addRaw).toHaveBeenCalled();
+      expect(mockCore.summary.write).toHaveBeenCalled();
+
+      const summaryCall = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summaryCall).toContain("Failed to Checkout PR Branch");
+      expect(summaryCall).toContain("gh pr checkout failed");
+      expect(summaryCall).toContain("pull request has been closed");
 
       expect(mockCore.setFailed).toHaveBeenCalledWith("Failed to checkout PR branch: gh pr checkout failed");
     });
