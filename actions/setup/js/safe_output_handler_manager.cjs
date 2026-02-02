@@ -145,16 +145,16 @@ const HANDLER_MAP = {
   create_missing_data_issue: "./create_missing_data_issue.cjs",
   missing_data: "./missing_data.cjs",
   noop: "./noop_handler.cjs",
+  create_project: "./create_project.cjs",
+  create_project_status_update: "./create_project_status_update.cjs",
+  update_project: "./update_project.cjs",
 };
 
 /**
  * Message types handled by standalone steps (not through the handler manager)
  * These types should not trigger warnings when skipped by the handler manager
  *
- * Project-related types: create_project, create_project_status_update, update_project
- *   - Handled by the unified handler in the handler manager step
- *
- * Other standalone types: assign_to_agent, create_agent_session, upload_asset, noop
+ * Standalone types: assign_to_agent, create_agent_session, upload_asset, noop
  *   - Have dedicated processing steps with specialized logic
  */
 const STANDALONE_STEP_TYPES = new Set(["assign_to_agent", "create_agent_session", "upload_asset", "noop"]);
