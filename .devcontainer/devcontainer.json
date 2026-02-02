@@ -16,25 +16,13 @@
     },
     "codespaces": {
       "repositories": {
-        "githubnext/agentics": {
-          "permissions": {
-            "contents": "read",
-            "workflows": "write"
-          }
-        },
-        "githubnext/gh-aw": {
+        "github/gh-aw": {
           "permissions": {
             "actions": "write",
             "contents": "write",
             "discussions": "read",
             "issues": "read",
             "pull-requests": "write",
-            "workflows": "write"
-          }
-        },
-        "githubnext/gh-aw-test": {
-          "permissions": {
-            "contents": "write",
             "workflows": "write"
           }
         }
