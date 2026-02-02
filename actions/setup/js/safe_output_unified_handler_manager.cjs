@@ -170,7 +170,10 @@ function loadConfig() {
       const normalizedEntries = Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]);
 
       // Automatically split project handlers from regular handlers
-      // This handles the case where the Go compiler puts all handlers in the same config
+      // Project handlers (update_project, create_project, create_project_status_update) require
+      // a separate Octokit client authenticated with GH_AW_PROJECT_GITHUB_TOKEN because they need
+      // Projects permissions that differ from regular handler permissions. This auto-split ensures
+      // backward compatibility with the Go compiler which puts all handlers in a unified config.
       for (const [key, value] of normalizedEntries) {
         if (PROJECT_RELATED_TYPES.has(key)) {
           project[key] = value;
@@ -202,8 +205,10 @@ function loadConfig() {
     throw new Error("At least one of GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG or GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variables is required");
   }
 
-  core.info(`Configuration loaded: ${Object.keys(regular).length} regular handler(s), ${Object.keys(project).length} project handler(s)`);
-  if (Object.keys(project).length > 0) {
+  const regularCount = Object.keys(regular).length;
+  const projectCount = Object.keys(project).length;
+  core.info(`Configuration loaded: ${regularCount} regular handler${regularCount === 1 ? "" : "s"}, ${projectCount} project handler${projectCount === 1 ? "" : "s"}`);
+  if (projectCount > 0) {
     core.info(`Project handlers: ${Object.keys(project).join(", ")}`);
   }
 
