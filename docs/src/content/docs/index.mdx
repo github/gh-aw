@@ -5,7 +5,7 @@ template: splash
 tableOfContents: true
 hero:
   title: GitHub Agentic Workflows
-  tagline: <strong>Automate GitHub tasks safely using AI agents—write workflows in plain English, no YAML required.</strong><br>AI agents execute complex GitHub operations like issue triage, PR reviews, and repository maintenance automatically.
+  tagline: <strong>Automated repository agents running in GitHub Actions, safely and securely.</strong>
   actions:
     - text: Getting Started
       link: /gh-aw/setup/quick-start/
@@ -19,44 +19,43 @@ import FeatureGrid from '../../components/FeatureGrid.astro';
 
 ## What are GitHub Agentic Workflows?
 
-GitHub Agentic Workflows allow you to write repository-level AI agent descriptions in plain markdown and run automatically in GitHub Actions. Describe your repository automation goals and execute safely with built-in security controls, having AI make intelligent decisions based on context.
+Imagine a world where improvements to your repositories are delivered automatically each morning. Issues are automatically triaged, CI failures analyzed, documentation maintained, test coverage improved and compliance monitored - all defined via simple markdown files.
 
-**How they work:**
-1. **Write** - Create a `.md` file with your automation instructions in natural language
-2. **Compile** - Run `gh aw compile` to transform it into a secure GitHub Actions workflow (`.lock.yml`)
-3. **Run** - GitHub Actions executes your workflow automatically based on your triggers
-
-> [!WARNING]
-> GitHub Agentic Workflows is in early development and may change significantly. Using agentic workflows requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.
-
-### Security Built-In
-
-Workflows run with read-only permissions by default. Write operations require explicit approval through sanitized [safe outputs](/gh-aw/reference/glossary/#safe-outputs) (pre-approved GitHub operations), with sandboxed execution, tool allowlisting, and network isolation ensuring AI agents operate safely within controlled boundaries.
+GitHub Agentic Workflows deliver this: automated repository agents, running in GitHub Actions, with security-first design principles ensuring safe operation.
 
 ## Key Features
 
 <FeatureGrid columns={3}>
-  <FeatureCard icon="pencil" title="Natural Language Workflows" href="/gh-aw/introduction/overview/#natural-language-to-github-actions">
+  <FeatureCard icon="pencil" title="Automated Markdown Workflows" href="/gh-aw/introduction/overview/#natural-language-to-github-actions">
     Write automation in markdown instead of complex YAML
   </FeatureCard>
   <FeatureCard icon="cpu" title="AI-Powered Decision Making" href="/gh-aw/introduction/how-they-work/">
     Workflows that understand context and adapt to situations
   </FeatureCard>
   <FeatureCard icon="mark-github" title="GitHub Integration" href="/gh-aw/reference/tools/#github-tools-github">
-    Deep integration with Actions, issues, PRs, discussions, and repository management
+    Deep integration with Actions, Issues, PRs, Discussions, and repository management
   </FeatureCard>
   <FeatureCard icon="shield-lock" title="Safety First" href="/gh-aw/guides/security">
     Sandboxed execution with minimal permissions and safe output processing
   </FeatureCard>
   <FeatureCard icon="beaker" title="Multiple AI Engines" href="/gh-aw/reference/engines/">
-    Support for Claude, Codex, and custom AI processors
+    Support for Copilot, Claude, Codex, and custom AI processors
   </FeatureCard>
   <FeatureCard icon="workflow" title="Continuous AI" href="/gh-aw/introduction/how-they-work/">
     Systematic, automated application of AI to software collaboration
   </FeatureCard>
 </FeatureGrid>
 
+### Security Built-In
+
+Workflows run with read-only permissions by default. Write operations require explicit approval through sanitized [safe outputs](/gh-aw/reference/glossary/#safe-outputs) (pre-approved GitHub operations), with sandboxed execution, tool allowlisting, and network isolation ensuring AI agents operate safely within controlled boundaries.
+
 ## Example: Daily Issues Report
+
+**How they work:**
+1. **Write** - Create a `.md` file with your automation instructions in natural language
+2. **Compile** - Run `gh aw compile` to transform it into a secure GitHub Actions workflow (`.lock.yml`)
+3. **Run** - GitHub Actions executes your workflow automatically based on your triggers
 
 Here's a simple workflow that runs daily to create an upbeat status report:
 
@@ -82,7 +81,7 @@ Create an upbeat daily status report for the team as a GitHub issue.
 
 The `gh aw` cli converts this into a GitHub Actions Workflow (.yml) that runs an AI agent (Copilot, Claude, Codex, ...) in a containerized environment on a schedule or manually.
 
-The AI agent reads your repository context, analyzes issues, generates visualizations, and creates reports - all defined in natural language rather than complex code.
+The AI coding agent reads your repository context, analyzes issues, generates visualizations, and creates reports - all defined in natural language rather than complex code.
 
 <div style="max-width: 600px; margin: 3rem auto; text-align: center;">
 
@@ -90,18 +89,36 @@ The AI agent reads your repository context, analyzes issues, generates visualiza
 
 ## Workflow Examples
 
-<FeatureGrid columns={2}>
-  <FeatureCard icon="beaker" title="Triage & Analysis" badge="automated" href="/gh-aw/examples/issue-pr-events/triage-analysis/">
-    Intelligent issue triage and CI failure investigation
+<FeatureGrid columns={3}>
+  <FeatureCard icon="code-review" title="Continuous Improvement" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/">
+    Daily code simplification, refactoring, and style improvements
   </FeatureCard>
-  <FeatureCard icon="code" title="Coding & Development" badge="automated" href="/gh-aw/examples/issue-pr-events/coding-development/">
-    PR assistance and automated dependency updates
+  <FeatureCard icon="comment-discussion" title="Continuous Refactoring" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/">
+    Slash commands for on-demand analysis and automation
   </FeatureCard>
-  <FeatureCard icon="check-circle" title="Quality & Testing" badge="automated" href="/gh-aw/examples/issue-pr-events/quality-testing/">
-    Test coverage improvements and performance optimization
+  <FeatureCard icon="book" title="Continuous Documentation" href="/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/">
+    Continuous documentation maintenance and consistency
   </FeatureCard>
-  <FeatureCard icon="check-circle" title="Peli's Agent Factory" badge="automated" href="/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/">
-    Take a magical journey with Peli de Halleux to explore over 100 specialized agentic workflows
+  <FeatureCard icon="issue-opened" title="Issue & PR Management" href="/gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/">
+    Automated triage, labeling, and project coordination
+  </FeatureCard>
+  <FeatureCard icon="pulse" title="Metrics & Analytics" href="/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analytics/">
+    Daily reports, trend analysis, and workflow health monitoring
+  </FeatureCard>
+  <FeatureCard icon="shield-check" title="Continuous Scanning & Compliance" href="/gh-aw/blog/2026-01-13-meet-the-workflows-security-compliance/">
+    Scanning, alert triage, and compliance monitoring
+  </FeatureCard>
+  <FeatureCard icon="tools" title="Quality & Testing" href="/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/">
+    CI failure diagnosis, test improvements, and quality checks
+  </FeatureCard>
+  <FeatureCard icon="repo" title="Multi-Repository" href="/gh-aw/examples/multi-repo/">
+    Feature sync and cross-repo tracking workflows
+  </FeatureCard>
+  <FeatureCard icon="calendar" title="Scheduled Workflows" href="/gh-aw/examples/scheduled/">
+    DailyOps, research, and automated maintenance
   </FeatureCard>
 </FeatureGrid>
+
+> [!NOTE]
+> GitHub Agentic Workflows is in early development and may change significantly. Using agentic workflows requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.
 

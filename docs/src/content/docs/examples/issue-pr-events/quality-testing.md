@@ -25,7 +25,3 @@ Identifies performance bottlenecks, runs benchmarks, and implements optimization
 ### Test Failure Investigation
 
 Automatically investigates failed workflow runs by analyzing logs, identifying root causes, and creating detailed investigation reports with actionable recommendations to prevent similar failures. [Learn more](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/smoke-detector.md)
-
-> [!WARNING]
-> GitHub Agentic Workflows is a research demonstrator, and not for production use.
-
