@@ -153,6 +153,7 @@ const PROJECT_RELATED_TYPES = new Set(Object.keys(PROJECT_HANDLER_MAP));
 /**
  * Load configuration for safe outputs
  * Reads configuration from both GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG and GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG
+ * Automatically splits project handlers from regular config if they're in the wrong place
  * @returns {{regular: Object, project: Object}} Safe outputs configuration for regular and project handlers
  */
 function loadConfig() {
@@ -163,20 +164,33 @@ function loadConfig() {
   if (process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG) {
     try {
       const config = JSON.parse(process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG);
-      core.info(`Loaded regular handler config: ${JSON.stringify(config)}`);
+      core.info(`Loaded config from GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ${JSON.stringify(config)}`);
+
       // Normalize config keys: convert hyphens to underscores
-      Object.assign(regular, Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v])));
+      const normalizedEntries = Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v]);
+
+      // Automatically split project handlers from regular handlers
+      // This handles the case where the Go compiler puts all handlers in the same config
+      for (const [key, value] of normalizedEntries) {
+        if (PROJECT_RELATED_TYPES.has(key)) {
+          project[key] = value;
+          core.info(`Moved ${key} from regular to project config (requires project token)`);
+        } else {
+          regular[key] = value;
+        }
+      }
     } catch (error) {
       throw new Error(`Failed to parse GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ${getErrorMessage(error)}`);
     }
   }
 
-  // Load project handler config
+  // Load project handler config (if explicitly provided, merge with auto-split handlers)
   if (process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG) {
     try {
       const config = JSON.parse(process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG);
       core.info(`Loaded project handler config: ${JSON.stringify(config)}`);
       // Normalize config keys: convert hyphens to underscores
+      // Explicitly provided project config takes precedence over auto-split config
       Object.assign(project, Object.fromEntries(Object.entries(config).map(([k, v]) => [k.replace(/-/g, "_"), v])));
     } catch (error) {
       throw new Error(`Failed to parse GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG: ${getErrorMessage(error)}`);
@@ -186,6 +200,11 @@ function loadConfig() {
   // At least one config must be present
   if (Object.keys(regular).length === 0 && Object.keys(project).length === 0) {
     throw new Error("At least one of GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG or GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG environment variables is required");
+  }
+
+  core.info(`Configuration loaded: ${Object.keys(regular).length} regular handler(s), ${Object.keys(project).length} project handler(s)`);
+  if (Object.keys(project).length > 0) {
+    core.info(`Project handlers: ${Object.keys(project).join(", ")}`);
   }
 
   return { regular, project };

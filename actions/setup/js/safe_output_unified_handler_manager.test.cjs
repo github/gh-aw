@@ -97,6 +97,69 @@ describe("Unified Safe Output Handler Manager", () => {
       expect(config.regular).toHaveProperty("create_issue");
       expect(config.regular).not.toHaveProperty("create-issue");
     });
+
+    it("should automatically split project handlers from unified config", () => {
+      // Simulate Go compiler putting all handlers in one config
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
+        create_issue: { max: 5 },
+        add_comment: {},
+        update_project: { max: 20, project: "https://github.com/orgs/test/projects/1" },
+        create_project: { max: 1 },
+        create_project_status_update: { max: 1, project: "https://github.com/orgs/test/projects/1" },
+      });
+
+      const config = loadConfig();
+
+      // Regular handlers should stay in regular config
+      expect(config.regular).toHaveProperty("create_issue");
+      expect(config.regular).toHaveProperty("add_comment");
+      expect(config.regular).not.toHaveProperty("update_project");
+      expect(config.regular).not.toHaveProperty("create_project");
+      expect(config.regular).not.toHaveProperty("create_project_status_update");
+
+      // Project handlers should be moved to project config
+      expect(config.project).toHaveProperty("update_project");
+      expect(config.project).toHaveProperty("create_project");
+      expect(config.project).toHaveProperty("create_project_status_update");
+      expect(config.project.update_project).toEqual({ max: 20, project: "https://github.com/orgs/test/projects/1" });
+    });
+
+    it("should handle hyphenated project handler names and split correctly", () => {
+      // Test with hyphenated names (common in YAML/JSON configs)
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
+        "create-issue": { max: 5 },
+        "update-project": { max: 20 },
+        "create-project-status-update": { max: 1 },
+      });
+
+      const config = loadConfig();
+
+      // Check normalization and splitting
+      expect(config.regular).toHaveProperty("create_issue");
+      expect(config.regular).not.toHaveProperty("update_project");
+      expect(config.project).toHaveProperty("update_project");
+      expect(config.project).toHaveProperty("create_project_status_update");
+    });
+
+    it("should merge explicit project config with auto-split handlers", () => {
+      // Both configs provided - explicit project config should take precedence
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
+        create_issue: { max: 5 },
+        update_project: { max: 20, project: "url1" },
+      });
+      process.env.GH_AW_SAFE_OUTPUTS_PROJECT_HANDLER_CONFIG = JSON.stringify({
+        update_project: { max: 50, project: "url2" }, // Should override auto-split config
+        create_project: { max: 1 },
+      });
+
+      const config = loadConfig();
+
+      expect(config.regular).toHaveProperty("create_issue");
+      expect(config.project).toHaveProperty("update_project");
+      expect(config.project).toHaveProperty("create_project");
+      // Explicit config should take precedence
+      expect(config.project.update_project).toEqual({ max: 50, project: "url2" });
+    });
   });
 
   describe("setupProjectGitHubClient", () => {
