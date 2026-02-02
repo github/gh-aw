@@ -189,6 +189,11 @@
           "description": "Tool invocation timeout in seconds. The gateway enforces this timeout for individual tool/method calls to MCP servers.",
           "minimum": 1,
           "default": 60
+        },
+        "payloadDir": {
+          "type": "string",
+          "description": "Directory path where the gateway places large payload JSON files for authenticated clients. Each client (identified by API key) can access their respective payload files from this directory. The gateway MUST ensure proper isolation between clients' payload files.",
+          "minLength": 1
         }
       },
       "required": ["port", "domain", "apiKey"],

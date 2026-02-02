@@ -7,7 +7,7 @@ sidebar:
 
 # MCP Gateway Specification
 
-**Version**: 1.7.0  
+**Version**: 1.8.0  
 **Status**: Draft Specification  
 **Latest Version**: [mcp-gateway](/gh-aw/reference/mcp-gateway/)  
 **JSON Schema**: [mcp-gateway-config.schema.json](/gh-aw/schemas/mcp-gateway-config.schema.json)  
@@ -245,6 +245,7 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `apiKey` | string | Yes | API key for authentication |
 | `startupTimeout` | integer | No | Server startup timeout in seconds (default: 30) |
 | `toolTimeout` | integer | No | Tool invocation timeout in seconds (default: 60) |
+| `payloadDir` | string | No | Directory path where the gateway places large payload JSON files for authenticated clients. Each client (identified by API key) can access their respective payload files from this directory. The gateway MUST ensure proper isolation between clients' payload files. |
 
 #### 4.1.3a Top-Level Configuration Fields
 
@@ -1346,6 +1347,14 @@ Content-Type: application/json
 ---
 
 ## Change Log
+
+### Version 1.8.0 (Draft)
+
+- **Added**: `payloadDir` field to gateway configuration (Section 4.1.3)
+  - Optional directory path where the gateway places large payload JSON files for authenticated clients
+  - Enables efficient handling of large response payloads by offloading them to the filesystem
+  - Gateway implementations MUST ensure proper isolation between clients' payload files when this feature is used
+  - Payload files are accessible to clients authenticated with the corresponding API key
 
 ### Version 1.7.0 (Draft)
 
