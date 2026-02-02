@@ -130,31 +130,67 @@ async function main() {
 
   // Check if workflow file is newer than lock file
   if (workflowTime > lockTime) {
-    // Clear case: workflow file is newer - needs recompilation
-    await compareFrontmatterHashes(); // Log for diagnostic purposes
-    const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
+    // Workflow file is newer - check frontmatter hash to determine if recompilation needed
+    core.info("Workflow file is newer - checking frontmatter hash");
+    const hashComparison = await compareFrontmatterHashes();
 
-    // Format timestamps and commits for display
-    const workflowTimestamp = workflowDate.toISOString();
-    const lockTimestamp = lockDate.toISOString();
+    if (!hashComparison) {
+      // Could not compute hash - be conservative and fail
+      core.warning("Could not compare frontmatter hashes - assuming lock file is outdated");
+      const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' has been modified more recently. Run 'gh aw compile' to regenerate the lock file.`;
 
-    // Add summary to GitHub Step Summary
-    let summary = core.summary
-      .addRaw("### ⚠️ Workflow Lock File Warning\n\n")
-      .addRaw("**WARNING**: Lock file is outdated and needs to be regenerated.\n\n")
-      .addRaw("**Files:**\n")
-      .addRaw(`- Source: \`${workflowMdPath}\`\n`)
-      .addRaw(`  - Last commit: ${workflowTimestamp}\n`)
-      .addRaw(`  - Commit SHA: [\`${workflowCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${workflowCommit.sha})\n`)
-      .addRaw(`- Lock: \`${lockFilePath}\`\n`)
-      .addRaw(`  - Last commit: ${lockTimestamp}\n`)
-      .addRaw(`  - Commit SHA: [\`${lockCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${lockCommit.sha})\n\n`)
-      .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n");
+      // Format timestamps and commits for display
+      const workflowTimestamp = workflowDate.toISOString();
+      const lockTimestamp = lockDate.toISOString();
 
-    await summary.write();
+      // Add summary to GitHub Step Summary
+      let summary = core.summary
+        .addRaw("### ⚠️ Workflow Lock File Warning\n\n")
+        .addRaw("**WARNING**: Lock file is outdated and needs to be regenerated.\n\n")
+        .addRaw("**Files:**\n")
+        .addRaw(`- Source: \`${workflowMdPath}\`\n`)
+        .addRaw(`  - Last commit: ${workflowTimestamp}\n`)
+        .addRaw(`  - Commit SHA: [\`${workflowCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${workflowCommit.sha})\n`)
+        .addRaw(`- Lock: \`${lockFilePath}\`\n`)
+        .addRaw(`  - Last commit: ${lockTimestamp}\n`)
+        .addRaw(`  - Commit SHA: [\`${lockCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${lockCommit.sha})\n\n`)
+        .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n");
 
-    // Fail the step to prevent workflow from running with outdated configuration
-    core.setFailed(warningMessage);
+      await summary.write();
+
+      // Fail the step to prevent workflow from running with outdated configuration
+      core.setFailed(warningMessage);
+    } else if (hashComparison.match) {
+      // Hashes match - lock file is up to date despite timestamp difference
+      core.info("✅ Lock file is up to date (frontmatter hashes match despite timestamp difference)");
+    } else {
+      // Hashes differ - lock file needs recompilation
+      const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' frontmatter has changed. Run 'gh aw compile' to regenerate the lock file.`;
+
+      // Format timestamps and commits for display
+      const workflowTimestamp = workflowDate.toISOString();
+      const lockTimestamp = lockDate.toISOString();
+
+      // Add summary to GitHub Step Summary
+      let summary = core.summary
+        .addRaw("### ⚠️ Workflow Lock File Warning\n\n")
+        .addRaw("**WARNING**: Lock file is outdated (frontmatter hash mismatch).\n\n")
+        .addRaw("**Files:**\n")
+        .addRaw(`- Source: \`${workflowMdPath}\`\n`)
+        .addRaw(`  - Last commit: ${workflowTimestamp}\n`)
+        .addRaw(`  - Commit SHA: [\`${workflowCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${workflowCommit.sha})\n`)
+        .addRaw(`  - Frontmatter hash: \`${hashComparison.recomputedHash.substring(0, 12)}...\`\n`)
+        .addRaw(`- Lock: \`${lockFilePath}\`\n`)
+        .addRaw(`  - Last commit: ${lockTimestamp}\n`)
+        .addRaw(`  - Commit SHA: [\`${lockCommit.sha.substring(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${lockCommit.sha})\n`)
+        .addRaw(`  - Stored hash: \`${hashComparison.storedHash.substring(0, 12)}...\`\n\n`)
+        .addRaw("**Action Required:** Run `gh aw compile` to regenerate the lock file.\n\n");
+
+      await summary.write();
+
+      // Fail the step to prevent workflow from running with outdated configuration
+      core.setFailed(warningMessage);
+    }
   } else if (workflowCommit.sha === lockCommit.sha) {
     // Same commit - definitely up to date
     core.info("✅ Lock file is up to date (same commit)");
@@ -173,7 +209,7 @@ async function main() {
       core.info("✅ Lock file is up to date (hashes match)");
     } else {
       // Hashes differ - lock file needs recompilation
-      const warningMessage = `Lock file '${lockFilePath}' is outdated! Frontmatter hash mismatch detected. Run 'gh aw compile' to regenerate the lock file.`;
+      const warningMessage = `Lock file '${lockFilePath}' is outdated! The workflow file '${workflowMdPath}' frontmatter has changed. Run 'gh aw compile' to regenerate the lock file.`;
 
       // Format timestamps and commits for display
       const workflowTimestamp = workflowDate.toISOString();
