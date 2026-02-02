@@ -551,6 +551,57 @@ jobs:
           cp actions/setup/md/*.md /opt/gh-aw/prompts/
       - name: Run tests
         run: cd actions/setup/js && npm test
+
+  js-integration-live-api:
+    runs-on: ubuntu-latest
+    needs: validate-yaml
+    permissions:
+      contents: read
+    concurrency:
+      group: ci-${{ github.ref }}-js-integration-live-api
+      cancel-in-progress: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Node.js
+        id: setup-node
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: actions/setup/js/package-lock.json
+
+      - name: Report Node cache status
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Node cache hit" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Node cache miss" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Install npm dependencies
+        run: cd actions/setup/js && npm ci
+
+      - name: Run live GitHub API integration test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## 🔍 Live GitHub API Integration Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "⚠️ GITHUB_TOKEN not available - test will be skipped" >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ This is expected in forks or when secrets are not available" >> $GITHUB_STEP_SUMMARY
+            cd actions/setup/js && npm test -- frontmatter_hash_github_api.test.cjs
+          else
+            echo "✅ GITHUB_TOKEN available - running live API test" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cd actions/setup/js && npm test -- frontmatter_hash_github_api.test.cjs
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✨ Live API test completed successfully" >> $GITHUB_STEP_SUMMARY
+          fi
+
   bench:
     # Only run benchmarks on main branch for performance tracking
     if: github.ref == 'refs/heads/main'
