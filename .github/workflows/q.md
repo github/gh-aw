@@ -29,6 +29,7 @@ safe-outputs:
   add-comment:
     max: 1
   create-pull-request:
+    expires: 2d
     title-prefix: "[q] "
     labels: [automation, workflow-optimization]
     reviewers: copilot

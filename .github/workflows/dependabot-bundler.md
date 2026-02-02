@@ -27,6 +27,7 @@ safe-outputs:
       - agentic-campaign
       - z_campaign_security-alert-burndown
   create-pull-request:
+    expires: 2d
     title-prefix: "[dependabot-bundle] "
     labels: [security, dependencies, dependabot, automated-fix, agentic-campaign, z_campaign_security-alert-burndown]
     reviewers: [copilot]

@@ -27,6 +27,7 @@ tools:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, automation]
     draft: false

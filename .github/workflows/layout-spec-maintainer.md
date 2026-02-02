@@ -34,6 +34,7 @@ network:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[specs] "
     labels: [documentation, automation]
     draft: false

@@ -15,6 +15,7 @@ timeout-minutes: 5
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     labels: [test]
 
 tools:

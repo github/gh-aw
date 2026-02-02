@@ -31,6 +31,7 @@ tools:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[ubuntu-image] "
     labels: [documentation, automation, infrastructure]
     draft: false

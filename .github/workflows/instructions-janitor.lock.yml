@@ -21,7 +21,7 @@
 #
 # Reviews and cleans up instruction files to ensure clarity, consistency, and adherence to best practices
 #
-# frontmatter-hash: ac0458b566411ff74a7ecc9e936f0c05ee5bc0c1a831b38748c2ca91c867e792
+# frontmatter-hash: 2b58ac826f62d19d5c8c1a4e00a7fcb7716118e1f6a7035bb9a05f66507246d3
 
 name: "Instructions Janitor"
 "on":
@@ -176,7 +176,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_pull_request":{},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_pull_request":{"expires":48},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1154,7 +1154,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"base_branch\":\"${{ github.ref_name }}\",\"draft\":false,\"labels\":[\"documentation\",\"automation\",\"instructions\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[instructions] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"base_branch\":\"${{ github.ref_name }}\",\"draft\":false,\"expires\":48,\"labels\":[\"documentation\",\"automation\",\"instructions\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[instructions] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

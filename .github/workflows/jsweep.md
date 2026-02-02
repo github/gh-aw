@@ -26,6 +26,7 @@ steps:
     run: npm install
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[jsweep] "
     labels: [unbloat, automation]
     draft: false

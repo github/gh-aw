@@ -20,6 +20,7 @@ network:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[instructions] "
     labels: [documentation, automation, instructions]
     draft: false

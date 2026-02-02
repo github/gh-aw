@@ -26,7 +26,7 @@
 #     - shared/docs-server-lifecycle.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 48013448fb50eb57fb0d194a5e8627f7e644a4bbd80ef0e4c441bbe38ba2c8d7
+# frontmatter-hash: 1c3a8e9470c2e6c6a1f21870c2fbb2f983713961a43ca5afeb15a67dcb136774
 
 name: "Documentation Unbloat"
 "on":
@@ -221,7 +221,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":1},"create_pull_request":{"auto_merge":true},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
+          {"add_comment":{"max":1},"create_pull_request":{"auto_merge":true,"expires":48},"missing_data":{},"missing_tool":{},"noop":{"max":1},"upload_asset":{"max":0}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1531,7 +1531,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_pull_request\":{\"auto_merge\":true,\"base_branch\":\"${{ github.ref_name }}\",\"draft\":true,\"labels\":[\"documentation\",\"automation\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[docs] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_pull_request\":{\"auto_merge\":true,\"base_branch\":\"${{ github.ref_name }}\",\"draft\":true,\"expires\":48,\"labels\":[\"documentation\",\"automation\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[docs] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

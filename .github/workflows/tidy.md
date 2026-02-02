@@ -39,6 +39,7 @@ tools:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[tidy] "
     labels: [automation, maintenance]
     reviewers: copilot

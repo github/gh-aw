@@ -28,6 +28,7 @@ imports:
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[docs] "
     labels: [documentation, glossary]
     draft: false

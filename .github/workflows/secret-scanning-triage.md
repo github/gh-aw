@@ -34,6 +34,7 @@ safe-outputs:
     labels: [security, secret-scanning, triage, agentic-campaign, z_campaign_security-alert-burndown]
     max: 1
   create-pull-request:
+    expires: 2d
     title-prefix: "[secret-removal] "
     labels: [security, secret-scanning, automated-fix, agentic-campaign, z_campaign_security-alert-burndown]
     reviewers: [copilot]

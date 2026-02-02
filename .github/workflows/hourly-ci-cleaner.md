@@ -101,6 +101,7 @@ steps:
     run: make deps-dev
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[ca] "
   missing-tool:
 timeout-minutes: 45

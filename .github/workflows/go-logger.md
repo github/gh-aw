@@ -14,6 +14,7 @@ engine: claude
 
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[log] "
     labels: [enhancement, automation]
     draft: false

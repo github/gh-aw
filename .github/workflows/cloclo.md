@@ -28,6 +28,7 @@ tools:
     key: cloclo-memory-${{ github.workflow }}-${{ github.run_id }}
 safe-outputs:
   create-pull-request:
+    expires: 2d
     title-prefix: "[cloclo] "
     labels: [automation, cloclo]
   add-comment:

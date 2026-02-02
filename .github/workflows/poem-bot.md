@@ -92,6 +92,7 @@ safe-outputs:
 
   # Pull request creation
   create-pull-request:
+    expires: 2d
     title-prefix: "[🎨 POETRY] "
     labels: [poetry, automation, creative-writing]
     reviewers: copilot
