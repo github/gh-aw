@@ -31,13 +31,6 @@ Install the [GitHub CLI](https://cli.github.com/), then install the GitHub Agent
 gh extension install github/gh-aw
 ```
 
-> [!TIP]
-> If you're working in a GitHub Codespace, use the standalone installer instead:
->
-> ```bash wrap
-> curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
-> ```
-
 ### Step 2 — Add the sample workflow and trigger a run
 
 From your repository root run:
