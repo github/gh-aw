@@ -107,7 +107,7 @@ function createMCPServer(options = {}) {
     // Check if this is a dispatch_workflow tool (has _workflow_name metadata)
     // These tools are dynamically generated with workflow-specific names
     const isDispatchWorkflowTool = !!tool._workflow_name;
-    
+
     if (isDispatchWorkflowTool) {
       logger.debug(`Found dispatch_workflow tool: ${tool.name} (_workflow_name: ${tool._workflow_name})`);
       if (!safeOutputsConfig.dispatch_workflow) {
