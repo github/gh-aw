@@ -247,6 +247,60 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `toolTimeout` | integer | No | Tool invocation timeout in seconds (default: 60) |
 | `payloadDir` | string | No | Directory path for storing large payload JSON files for authenticated clients |
 
+#### 4.1.3.1 Payload Directory Path Validation
+
+When the optional `payloadDir` field is provided in the gateway configuration, it specifies a directory path where the gateway stores large payload JSON files for authenticated clients. This enables efficient handling of large response payloads by offloading them to the filesystem.
+
+**Path Requirements**:
+
+If `payloadDir` is specified, the following requirements apply:
+
+1. The path MUST be an absolute path (full pathname)
+2. On Unix-like systems (Linux, macOS), absolute paths MUST start with `/`
+3. On Windows systems, absolute paths MUST start with a drive letter followed by `:` and `\` (e.g., `C:\`, `D:\`)
+4. The path MUST NOT be an empty string
+5. The path SHOULD be writable by the gateway process
+6. The path SHOULD exist or be creatable by the gateway process
+
+**Validation Examples**:
+
+Valid absolute paths:
+
+```
+Unix/Linux/macOS:
+- "/var/lib/mcp-gateway/payloads"
+- "/tmp/gateway-payloads"
+- "/opt/mcp/data/payloads"
+
+Windows:
+- "C:\Program Files\MCP Gateway\payloads"
+- "D:\gateway\payloads"
+- "C:\temp\payloads"
+```
+
+Invalid paths (MUST be rejected):
+
+```
+Relative paths:
+- "payloads" (no leading / or drive letter)
+- "./payloads" (relative to current directory)
+- "../data/payloads" (relative path with parent reference)
+- "data/payloads" (relative path)
+
+Empty or malformed:
+- "" (empty string)
+- " " (whitespace only)
+```
+
+**Security Considerations**:
+
+- Gateway implementations MUST ensure proper isolation between different clients' payload files
+- The gateway SHOULD use appropriate file permissions to prevent unauthorized access
+- The gateway SHOULD implement cleanup mechanisms for old payload files
+- The gateway SHOULD validate that the path does not escape intended directory boundaries through symbolic links or other mechanisms
+
+**Compliance Test**: T-CFG-005 - Payload Directory Path Validation
+
 #### 4.1.3a Top-Level Configuration Fields
 
 The following fields MAY be specified at the top level of the configuration:
@@ -965,20 +1019,21 @@ A conforming implementation MUST pass the following test categories:
 - **T-CFG-002**: Valid HTTP server configuration
 - **T-CFG-003**: Variable expression resolution
 - **T-CFG-004**: Undefined variable error detection
-- **T-CFG-005**: Unknown field rejection
-- **T-CFG-006**: Missing required field detection
-- **T-CFG-007**: Invalid type detection
-- **T-CFG-008**: Port range validation
-- **T-CFG-009**: Valid custom server type with registered schema
-- **T-CFG-010**: Reject custom type without schema registration
-- **T-CFG-011**: Validate custom configuration against registered schema
-- **T-CFG-012**: Reject custom type conflicting with reserved types (stdio/http)
-- **T-CFG-013**: Custom schema URL fetch and cache
-- **T-CFG-014**: Valid volume mount format (host:container:mode)
-- **T-CFG-015**: Reject invalid mount format (missing components)
-- **T-CFG-016**: Reject invalid mount mode (not "ro" or "rw")
-- **T-CFG-017**: Multiple mounts for single stdio server
-- **T-CFG-018**: Reject mounts for HTTP servers (stdio only)
+- **T-CFG-005**: Payload directory path validation (absolute paths)
+- **T-CFG-006**: Unknown field rejection
+- **T-CFG-007**: Missing required field detection
+- **T-CFG-008**: Invalid type detection
+- **T-CFG-009**: Port range validation
+- **T-CFG-010**: Valid custom server type with registered schema
+- **T-CFG-011**: Reject custom type without schema registration
+- **T-CFG-012**: Validate custom configuration against registered schema
+- **T-CFG-013**: Reject custom type conflicting with reserved types (stdio/http)
+- **T-CFG-014**: Custom schema URL fetch and cache
+- **T-CFG-015**: Valid volume mount format (host:container:mode)
+- **T-CFG-016**: Reject invalid mount format (missing components)
+- **T-CFG-017**: Reject invalid mount mode (not "ro" or "rw")
+- **T-CFG-018**: Multiple mounts for single stdio server
+- **T-CFG-019**: Reject mounts for HTTP servers (stdio only)
 
 #### 10.1.2 Protocol Translation Tests
 
@@ -1355,6 +1410,13 @@ Content-Type: application/json
   - Enables efficient handling of large response payloads by offloading them to the filesystem
   - Gateway implementations MUST ensure proper isolation between clients' payload files when this feature is used
   - Payload files are accessible to clients authenticated with the corresponding API key
+- **Added**: Path validation requirements for `payloadDir` field (Section 4.1.3.1)
+  - `payloadDir` MUST be an absolute path if provided
+  - Unix-like systems: paths MUST start with `/`
+  - Windows systems: paths MUST start with a drive letter followed by `:\`
+  - Relative paths, empty strings, and malformed paths MUST be rejected
+  - JSON schema pattern validation added: `^(/|[A-Za-z]:\\\\)`
+  - Compliance test T-CFG-005 for payload directory path validation
 
 ### Version 1.7.0 (Draft)
 

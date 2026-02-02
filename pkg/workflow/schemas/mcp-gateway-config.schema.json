@@ -192,8 +192,9 @@
         },
         "payloadDir": {
           "type": "string",
-          "description": "Directory path for storing large payload JSON files for authenticated clients.",
-          "minLength": 1
+          "description": "Directory path for storing large payload JSON files for authenticated clients. MUST be an absolute path: Unix paths start with '/', Windows paths start with a drive letter followed by ':\\'. Relative paths, empty strings, and paths that don't follow these conventions are not allowed.",
+          "minLength": 1,
+          "pattern": "^(/|[A-Za-z]:\\\\)"
         }
       },
       "required": ["port", "domain", "apiKey"],
