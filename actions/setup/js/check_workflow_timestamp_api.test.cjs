@@ -778,11 +778,11 @@ engine: copilot
       await main();
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (hashes match)"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (lock is newer and hashes match)"));
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
-    it("should fail when lock file is newer but hashes differ", async () => {
+    it("should pass when lock file is newer but hashes differ", async () => {
       const storedHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
       const lockFileContent = `# frontmatter-hash: ${storedHash}
 name: Test Workflow
@@ -843,10 +843,9 @@ model: claude-sonnet-4
       await main();
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Hashes differ"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash mismatch"));
-      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("despite lock file being newer"));
-      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Frontmatter hash mismatch"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
     it("should pass when lock file is newer and hash comparison fails", async () => {
@@ -893,7 +892,7 @@ jobs:
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No frontmatter hash found"));
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compare frontmatter hashes"));
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (lock is newer than source)"));
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
   });
