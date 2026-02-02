@@ -70,7 +70,7 @@ The audit command accepts run IDs, workflow URLs, job URLs, or step URLs:
 Install the GitHub CLI extension:
 
 ```bash wrap
-gh extension install githubnext/gh-aw
+gh extension install github/gh-aw
 ```
 
 ### Pinning to a Specific Version
@@ -78,13 +78,13 @@ gh extension install githubnext/gh-aw
 Pin to specific versions for production environments, team consistency, or avoiding breaking changes:
 
 ```bash wrap
-gh extension install githubnext/gh-aw@v0.1.0          # Pin to release tag
-gh extension install githubnext/gh-aw@abc123def456    # Pin to commit SHA
+gh extension install github/gh-aw@v0.1.0          # Pin to release tag
+gh extension install github/gh-aw@abc123def456    # Pin to commit SHA
 gh aw version                                         # Check current version
 
 # Upgrade pinned version
 gh extension remove gh-aw
-gh extension install githubnext/gh-aw@v0.2.0
+gh extension install github/gh-aw@v0.2.0
 ```
 
 ### Alternative: Standalone Installer
@@ -92,8 +92,8 @@ gh extension install githubnext/gh-aw@v0.2.0
 Use the standalone installer if extension installation fails (common in Codespaces or with auth issues):
 
 ```bash wrap
-curl -sL https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh | bash                # Latest
-curl -sL https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh | bash -s v0.1.0      # Pinned
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash                # Latest
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s v0.1.0      # Pinned
 ```
 
 Installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and works with all `gh aw` commands. Supports Linux, macOS, FreeBSD, and Windows.
@@ -104,7 +104,7 @@ Install the CLI in GitHub Actions workflows using the `setup-cli` action:
 
 ``````yaml wrap
 - name: Install gh-aw CLI
-  uses: githubnext/gh-aw/actions/setup-cli@main
+  uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
 ``````
@@ -123,7 +123,7 @@ The action automatically installs the specified version with checksum verificati
 ``````yaml wrap
 - name: Install gh-aw CLI
   id: install
-  uses: githubnext/gh-aw/actions/setup-cli@main
+  uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
 
@@ -133,7 +133,7 @@ The action automatically installs the specified version with checksum verificati
     echo "Installed: ${{ steps.install.outputs.installed-version }}"
 ``````
 
-See the [setup-cli action README](https://github.com/githubnext/gh-aw/blob/main/actions/setup-cli/README.md) for complete documentation and examples.
+See the [setup-cli action README](https://github.com/github/gh-aw/blob/main/actions/setup-cli/README.md) for complete documentation and examples.
 
 ### GitHub Enterprise Server Support
 
@@ -642,7 +642,7 @@ Works with: compile, enable, disable, logs, mcp commands.
 | Issue | Solution |
 |-------|----------|
 | `command not found: gh` | Install from [cli.github.com](https://cli.github.com/) |
-| `extension not found: aw` | Run `gh extension install githubnext/gh-aw` |
+| `extension not found: aw` | Run `gh extension install github/gh-aw` |
 | Compilation fails with YAML errors | Check indentation, colons, and array syntax in frontmatter |
 | Workflow not found | Check typo suggestions or run `gh aw status` to list available workflows |
 | Permission denied | Check file permissions or repository access |

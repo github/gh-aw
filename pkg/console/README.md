@@ -45,7 +45,7 @@ The `Spinner` component provides animated visual feedback during long-running op
 ### Usage
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Create and use a spinner
 spinner := console.NewSpinner("Loading...")
@@ -110,7 +110,7 @@ The progress bar uses bubbles v0.21.0+ gradient capabilities for enhanced visual
 Use when the total size or count is known:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Create a progress bar for 1GB total
 totalBytes := int64(1024 * 1024 * 1024)
@@ -125,7 +125,7 @@ fmt.Fprintf(os.Stderr, "\r%s", output)
 Use when the total size or count is unknown:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Create an indeterminate progress bar
 bar := console.NewIndeterminateProgressBar()
@@ -231,7 +231,7 @@ Maps are rendered as markdown-style headers with key-value pairs:
 
 ```go
 data := map[string]string{
-    "Repository": "githubnext/gh-aw",
+    "Repository": "github/gh-aw",
     "Author":     "test-user",
 }
 
@@ -241,7 +241,7 @@ fmt.Print(console.RenderStruct(data))
 Renders as:
 
 ```
-  Repository: githubnext/gh-aw
+  Repository: github/gh-aw
   Author    : test-user
 ```
 

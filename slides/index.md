@@ -8,7 +8,7 @@ paginate: true
 ## Write AI Automation in Natural Language
 ### Research Preview
 
-https://github.com/githubnext/gh-aw
+https://github.com/github/gh-aw
 
 ---
 
@@ -30,7 +30,7 @@ GitHub Agentic Workflows (gh-aw) is a CLI tool and GitHub extension that enables
 Install the GitHub CLI extension:
 
 ```bash
-gh extension install githubnext/gh-aw
+gh extension install github/gh-aw
 gh aw init
 ```
 
@@ -180,7 +180,7 @@ Topics covered:
 
 # Community & Support
 
-- **GitHub Repository**: githubnext/gh-aw
+- **GitHub Repository**: github/gh-aw
 - **Documentation**: githubnext.github.io/gh-aw
 - **Issues**: Report bugs and request features
 - **Discussions**: Community support
@@ -191,4 +191,4 @@ Topics covered:
 
 Questions?
 
-Visit: https://github.com/githubnext/gh-aw
+Visit: https://github.com/github/gh-aw

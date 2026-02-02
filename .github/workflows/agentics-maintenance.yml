@@ -17,7 +17,7 @@
 #
 # To regenerate this workflow, run:
 #   gh aw compile
-# For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
+# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Alternative regeneration methods:
 # make recompile

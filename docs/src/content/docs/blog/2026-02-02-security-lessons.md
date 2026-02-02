@@ -37,7 +37,7 @@ Let's share what we've figured out so you can build secure agent ecosystems from
 
 Every workflow begins with `permissions: contents: read`. That's our default stance. Write permissions (`contents: write`, `pull-requests: write`, `issues: write`) get granted sparingly and only through safe output mechanisms.
 
-**Example**: The [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) agent has read-only access to workflow runs but creates reports via discussions, which are append-only by nature.
+**Example**: The [`audit-workflows`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) agent has read-only access to workflow runs but creates reports via discussions, which are append-only by nature.
 
 **Why this works**: If an agent can only read, the worst it can do is waste compute time. It can't delete code, close important issues, or push malicious changes.
 
@@ -77,7 +77,7 @@ safe_outputs:
 
 Not every mention or workflow event should trigger powerful agents. We use role-gating to ensure only authorized users can invoke sensitive operations.
 
-**Example**: The [`q`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/q.md) optimizer requires the user commenting `/q` to be a repository maintainer. Random contributors can't trigger expensive optimization runs.
+**Example**: The [`q`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/q.md) optimizer requires the user commenting `/q` to be a repository maintainer. Random contributors can't trigger expensive optimization runs.
 
 **Implementation**:
 
@@ -148,7 +148,7 @@ Every agent action leaves a trail:
 - Artifacts are versioned
 - Workflow runs are logged
 
-**Example**: The [`agent-performance-analyzer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md) creates weekly discussion posts. You can scroll back months to see how agent quality has evolved over time.
+**Example**: The [`agent-performance-analyzer`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md) creates weekly discussion posts. You can scroll back months to see how agent quality has evolved over time.
 
 **Why this works**: Transparency builds trust. When something goes wrong, the audit trail makes debugging straightforward. When something goes right, the evidence is right there for everyone to see.
 
@@ -183,7 +183,7 @@ When agents need write access, use safe outputs with strict bounds.
 
 **Use case**: Issue triage, PR creation, documentation updates
 
-**Example**: [`issue-triage-agent`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md) can add labels but can't close issues or modify code.
+**Example**: [`issue-triage-agent`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md) can add labels but can't close issues or modify code.
 
 ### Pattern 3: Human-in-the-Loop
 
@@ -198,7 +198,7 @@ For high-impact operations, require human approval before execution.
 
 **Use case**: Code changes, dependency updates, configuration changes
 
-**Example**: [`daily-workflow-updater`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-workflow-updater.md) creates PRs for dependency updates but never merges them automatically.
+**Example**: [`daily-workflow-updater`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/daily-workflow-updater.md) creates PRs for dependency updates but never merges them automatically.
 
 ### Pattern 4: Role-Gated ChatOps
 
@@ -213,7 +213,7 @@ Interactive agents that require authorization to invoke.
 
 **Use case**: Code review, optimization, debugging assistance
 
-**Example**: [`grumpy-reviewer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) requires collaborator access to invoke via `/grumpy`.
+**Example**: [`grumpy-reviewer`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) requires collaborator access to invoke via `/grumpy`.
 
 ### Pattern 5: Network Restricted
 

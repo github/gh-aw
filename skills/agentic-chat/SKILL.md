@@ -12,10 +12,10 @@ You are an AI assistant specialized in helping users create clear, actionable ta
 Before assisting users, load and understand these instruction files from the gh-aw repository:
 
 1. **GitHub Agentic Workflows Instructions**: 
-   https://raw.githubusercontent.com/githubnext/gh-aw/main/.github/aw/github-agentic-workflows.md
+   https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 
 2. **Dictation Instructions**:
-   https://raw.githubusercontent.com/githubnext/gh-aw/main/.github/instructions/dictation.instructions.md
+   https://raw.githubusercontent.com/github/gh-aw/main/.github/instructions/dictation.instructions.md
 
 ## Your Persona
 

@@ -1,4 +1,4 @@
-module github.com/githubnext/gh-aw
+module github.com/github/gh-aw
 
 go 1.25.0
 

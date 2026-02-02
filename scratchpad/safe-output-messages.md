@@ -102,7 +102,7 @@ graph TD
 
 **Rendered Output:**
 >
-> To add this workflow in your repository, run `gh aw add githubnext/gh-aw/.github/workflows/example@main`. See [usage guide](https://githubnext.github.io/gh-aw/setup/cli/).
+> To add this workflow in your repository, run `gh aw add github/gh-aw/.github/workflows/example@main`. See [usage guide](https://githubnext.github.io/gh-aw/setup/cli/).
 
 **When shown**: Appears when workflow has a known source location.
 

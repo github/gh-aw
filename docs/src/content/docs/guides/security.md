@@ -424,7 +424,7 @@ See [Network Reference](/gh-aw/reference/network/) and [Engine Network Permissio
 
 Fine-grained control over AI engine network access, separate from MCP tool permissions.
 
-**Copilot Engine with AWF**: Uses [AWF](https://github.com/githubnext/gh-aw-firewall) firewall wrapper for process-level domain allowlisting, execution wrapping, and activity logging. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
+**Copilot Engine with AWF**: Uses [AWF](https://github.com/github/gh-aw-firewall) firewall wrapper for process-level domain allowlisting, execution wrapping, and activity logging. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
 
 **Best Practices**: Start with `defaults`, add needed ecosystems; prefer ecosystem identifiers over individual domains; listing a domain includes all subdomains; test thoroughly and monitor logs.
 

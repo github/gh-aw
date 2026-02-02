@@ -27,7 +27,7 @@ safe-outputs:
 
 # Security Alert Burndown
 
-This workflow discovers security alert work items in the githubnext/gh-aw repository and updates the project board with their status:
+This workflow discovers security alert work items in the github/gh-aw repository and updates the project board with their status:
 
 - Dependabot-created PRs for JavaScript dependency updates
 
@@ -37,14 +37,14 @@ You need to discover and update security work items on the project board. Follow
 
 ### Step 1: Discover Dependabot PRs
 
-Use the GitHub MCP server to search for pull requests in the `githubnext/gh-aw` repository with:
+Use the GitHub MCP server to search for pull requests in the `github/gh-aw` repository with:
 - Author: `app/dependabot`
 - Labels: `dependencies`, `javascript`
 - State: open
 
 Example search query:
 ```
-repo:githubnext/gh-aw is:pr author:app/dependabot label:dependencies label:javascript is:open
+repo:github/gh-aw is:pr author:app/dependabot label:dependencies label:javascript is:open
 ```
 
 ### Step 2: Check for Work
@@ -66,7 +66,7 @@ For each discovered item (up to 100 total per run):
 - Set fields:
   - `campaign_id`: "security-alert-burndown"
   - `status`: "Todo" (for open items)
-  - `target_repo`: "githubnext/gh-aw"
+  - `target_repo`: "github/gh-aw"
   - `worker_workflow`: who discovered it, using one of:
     - "dependabot"
   - `priority`: Estimate priority:
@@ -147,7 +147,7 @@ update_project(
   fields={
     "campaign_id": "security-alert-burndown",
     "status": "Todo",
-    "target_repo": "githubnext/gh-aw",
+    "target_repo": "github/gh-aw",
     "worker_workflow": "dependabot",
     "priority": "High",
     "size": "Medium",

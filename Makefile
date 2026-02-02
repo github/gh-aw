@@ -7,7 +7,7 @@ ifeq ($(OS),Windows_NT)
 	BINARY_NAME := gh-aw.exe
 endif
 VERSION ?= $(shell git describe --tags --always --dirty)
-DOCKER_IMAGE=ghcr.io/githubnext/gh-aw
+DOCKER_IMAGE=ghcr.io/github/gh-aw
 DOCKER_PLATFORMS=linux/amd64,linux/arm64
 
 # Build flags
@@ -336,7 +336,7 @@ check-node-version:
 		echo "Please install Node.js 20+ and try again."; \
 		echo ""; \
 		echo "For installation instructions, see:"; \
-		echo "  https://github.com/githubnext/gh-aw/blob/main/CONTRIBUTING.md#prerequisites"; \
+		echo "  https://github.com/github/gh-aw/blob/main/CONTRIBUTING.md#prerequisites"; \
 		exit 1; \
 	fi; \
 	NODE_VERSION=$$(node --version); \
@@ -351,7 +351,7 @@ check-node-version:
 		echo "Please upgrade Node.js and try again."; \
 		echo ""; \
 		echo "For installation instructions, see:"; \
-		echo "  https://github.com/githubnext/gh-aw/blob/main/CONTRIBUTING.md#prerequisites"; \
+		echo "  https://github.com/github/gh-aw/blob/main/CONTRIBUTING.md#prerequisites"; \
 		exit 1; \
 	fi; \
 	echo "✓ Node.js version check passed ($$NODE_VERSION)"

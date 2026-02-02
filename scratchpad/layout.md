@@ -37,7 +37,7 @@ Common GitHub Actions used across workflows (24 unique external actions + 1 loca
 | `anchore/sbom-action` | `deef08a0db64bfad603422135db61477b16cef56` | Generates Software Bill of Materials | Used for security compliance |
 | `github/stale-repos` | `3477b6488008d9411aaf22a0924ec7c1f6a69980` | Identifies stale repositories | Used for repository maintenance |
 | `super-linter/super-linter` | `2bdd90ed3262e023ac84bf8fe35dc480721fc1f2` | Lints code across multiple languages | Used for code quality checks |
-| `githubnext/gh-aw/actions/setup` | `623e612ff6a684e9a8634449508bdda21e2c178c` | gh-aw setup action (pinned version) | Used for specific workflow versions |
+| `github/gh-aw/actions/setup` | `623e612ff6a684e9a8634449508bdda21e2c178c` | gh-aw setup action (pinned version) | Used for specific workflow versions |
 
 ## Artifact Names
 

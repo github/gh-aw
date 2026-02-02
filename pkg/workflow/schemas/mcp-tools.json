@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/githubnext/gh-aw/schemas/mcp-tools.json",
+  "$id": "https://github.com/github/gh-aw/schemas/mcp-tools.json",
   "title": "MCP Tools Schema",
   "description": "JSON Schema for MCP (Model Context Protocol) tools array based on the MCP specification",
   "type": "array",

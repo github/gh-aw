@@ -28,8 +28,8 @@ But here's the ultimate challenge: how do you coordinate *multiple* agents worki
 
 These agents coordinate multi-agent plans and projects:
 
-- **[Plan Command](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/plan.md?plain=1)** - Breaks down issues into actionable sub-tasks via `/plan` command
-- **[Discussion Task Miner](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/discussion-task-miner.md?plain=1)** - Extracts actionable tasks from discussion threads
+- **[Plan Command](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/plan.md?plain=1)** - Breaks down issues into actionable sub-tasks via `/plan` command
+- **[Discussion Task Miner](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/discussion-task-miner.md?plain=1)** - Extracts actionable tasks from discussion threads
 
 The Plan Command provides on-demand task decomposition: developers can comment `/plan` on any issue to get an AI-generated breakdown into actionable sub-issues that agents can work on.
 
@@ -46,13 +46,13 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Plan Command:**
 
 ```bash
-gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/plan.md
+gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/plan.md
 ```
 
 **Discussion Task Miner:**
 
 ```bash
-gh aw add https://github.com/githubnext/gh-aw/blob/v0.37.7/.github/workflows/discussion-task-miner.md
+gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/discussion-task-miner.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/) for further installation and setup instructions.

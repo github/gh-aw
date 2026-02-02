@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/githubnext/gh-aw/pkg/cli"
+	"github.com/github/gh-aw/pkg/cli"
 )
 
 func main() {

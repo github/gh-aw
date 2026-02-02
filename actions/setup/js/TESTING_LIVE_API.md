@@ -41,7 +41,7 @@ The standalone script provides more detailed output about the API interaction.
 ## What the Live API Test Does
 
 The live API test:
-1. Fetches the `audit-workflows.md` workflow from the `githubnext/gh-aw` repository
+1. Fetches the `audit-workflows.md` workflow from the `github/gh-aw` repository
 2. Resolves and fetches all imported files (like `shared/mcp/gh-aw.md`)
 3. Computes the frontmatter hash using the JavaScript implementation
 4. Verifies the hash is deterministic by computing it twice
@@ -66,7 +66,7 @@ Example: GITHUB_TOKEN=ghp_xxx npm test -- frontmatter_hash_github_api.test.cjs
 $ GITHUB_TOKEN=ghp_xxx node test-live-github-api.cjs
 🔍 Testing frontmatter hash with live GitHub API
 
-Repository: githubnext/gh-aw
+Repository: github/gh-aw
 Branch: main
 Workflow: .github/workflows/audit-workflows.md
 
@@ -124,5 +124,5 @@ If you hit GitHub API rate limits:
 - Verify the token is correctly set in the environment variable
 
 ### File Not Found
-- The test uses `githubnext/gh-aw` repository which is public
+- The test uses `github/gh-aw` repository which is public
 - If testing against a different repository, update the owner/repo in the test

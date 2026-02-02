@@ -305,7 +305,7 @@ jobs:
       - uses: actions/checkout@v5
       
       # Install gh-aw
-      - run: gh extension install githubnext/gh-aw
+      - run: gh extension install github/gh-aw
         env:
           GH_TOKEN: ${{ github.token }}
       
@@ -380,7 +380,7 @@ If you have existing YAML 1.1 code that needs to work with YAML 1.2:
 
 ### Related Issues
 
-- Discussion: githubnext/gh-aw#2489
+- Discussion: github/gh-aw#2489
 - Schema consistency audit revealed this issue
 
 ### GitHub Actions Compatibility
@@ -400,4 +400,4 @@ However, this means that **Python yaml.safe_load and other YAML 1.1 tools will g
 ---
 
 **Last Updated**: 2025-10-26  
-**Related**: Schema consistency audit, Issue githubnext/gh-aw#2489
+**Related**: Schema consistency audit, Issue github/gh-aw#2489

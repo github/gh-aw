@@ -2,7 +2,7 @@
 on:
   workflow_dispatch:
 engine: claude
-source: githubnext/gh-aw/workflows/test-footer.md@main
+source: github/gh-aw/workflows/test-footer.md@main
 permissions:
   contents: read
   actions: read

@@ -35,6 +35,6 @@ ENTRYPOINT ["gh-aw"]
 CMD ["--help"]
 
 # Metadata labels
-LABEL org.opencontainers.image.source="https://github.com/githubnext/gh-aw"
+LABEL org.opencontainers.image.source="https://github.com/github/gh-aw"
 LABEL org.opencontainers.image.description="GitHub Agentic Workflows - Write agentic workflows in natural language markdown"
 LABEL org.opencontainers.image.licenses="MIT"

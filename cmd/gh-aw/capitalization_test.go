@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/cli"
+	"github.com/github/gh-aw/pkg/cli"
 	"github.com/spf13/cobra"
 )
 

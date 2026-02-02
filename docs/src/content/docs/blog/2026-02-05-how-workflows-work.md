@@ -229,7 +229,7 @@ tools:
 
 ## Error Handling and Debugging
 
-When workflows fail, detailed logs capture job, step, tool invocation, and error information. Safe output validation provides clear error messages and example corrections while allowing workflows to fail gracefully. The [`mcp-inspector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mcp-inspector.md) workflow validates server availability and configuration. The [`audit-workflows`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) agent tracks runs, classifies failures, and creates issues for persistent problems.
+When workflows fail, detailed logs capture job, step, tool invocation, and error information. Safe output validation provides clear error messages and example corrections while allowing workflows to fail gracefully. The [`mcp-inspector`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mcp-inspector.md) workflow validates server availability and configuration. The [`audit-workflows`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) agent tracks runs, classifies failures, and creates issues for persistent problems.
 
 ## Performance Considerations
 

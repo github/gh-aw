@@ -6,7 +6,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/githubnext/gh-aw.git
+git clone https://github.com/github/gh-aw.git
 cd gh-aw
 ```
 
@@ -442,7 +442,7 @@ The CI workflow generates JSON test result artifacts with timing information tha
 Each test result file contains newline-delimited JSON (ndjson) with test events:
 
 ```json
-{"Time":"2025-12-12T13:17:30Z","Action":"pass","Package":"github.com/githubnext/gh-aw/pkg/logger","Elapsed":0.022}
+{"Time":"2025-12-12T13:17:30Z","Action":"pass","Package":"github.com/github/gh-aw/pkg/logger","Elapsed":0.022}
 ```
 
 Key fields:
@@ -498,8 +498,8 @@ import (
     "fmt"
     "os"
     
-    "github.com/githubnext/gh-aw/pkg/console"
-    "github.com/githubnext/gh-aw/pkg/logger"
+    "github.com/github/gh-aw/pkg/console"
+    "github.com/github/gh-aw/pkg/logger"
     "github.com/spf13/cobra"
 )
 
@@ -579,7 +579,7 @@ func RunCommandName(arg string, flagValue string, verbose bool) error {
 Use helper functions from `flags.go` for consistency:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/cli"
+import "github.com/github/gh-aw/pkg/cli"
 
 // Add common flags
 addEngineFlag(cmd)          // --engine/-e (Override AI engine)
@@ -689,7 +689,7 @@ func TestRunCommand(t *testing.T) {
 **Include WorkflowIDExplanation** for workflow commands:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/cli"
+import "github.com/github/gh-aw/pkg/cli"
 
 Long: `Description...
 
@@ -1124,7 +1124,7 @@ gh release list
 gh extension remove gh-aw || true
 
 # Test installation as a GitHub CLI extension
-gh extension install githubnext/gh-aw@v1.0.0
+gh extension install github/gh-aw@v1.0.0
 gh aw --help
 ```
 

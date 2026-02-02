@@ -388,7 +388,7 @@ features:
 
 sandbox:
   mcp:
-    container: "ghcr.io/githubnext/gh-aw-mcpg:latest"
+    container: "ghcr.io/github/gh-aw-mcpg:latest"
     args: ["--rm", "-i"]
     entrypointArgs: ["--routed", "--listen", "0.0.0.0:8000", "--config-stdin"]
     port: 8000

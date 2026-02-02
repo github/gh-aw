@@ -18,7 +18,7 @@ set -euo pipefail
 
 # Configuration
 AWF_VERSION="${1:-}"
-AWF_REPO="githubnext/gh-aw-firewall"
+AWF_REPO="github/gh-aw-firewall"
 AWF_BINARY="awf-linux-x64"
 AWF_INSTALL_DIR="/usr/local/bin"
 AWF_INSTALL_NAME="awf"

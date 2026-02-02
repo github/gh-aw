@@ -11,7 +11,7 @@ import path from "path";
  * 2. Error messages follow the enhanced format with parameter names and examples
  * 3. Schema structure is consistent across all tools
  *
- * Related to githubnext/gh-aw#7950
+ * Related to github/gh-aw#7950
  */
 
 describe("Safe Outputs MCP Schema Validation", () => {

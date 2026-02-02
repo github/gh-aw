@@ -158,7 +158,7 @@ fi
 # Test 7: Verify download URL construction
 echo ""
 echo "Test 7: Download URL construction"
-REPO="githubnext/gh-aw"
+REPO="github/gh-aw"
 VERSION="v1.0.0"
 OS_NAME="linux"
 PLATFORM="linux-amd64"
@@ -166,7 +166,7 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$PLATFORM"
 if [ "$OS_NAME" = "windows" ]; then
     DOWNLOAD_URL="${DOWNLOAD_URL}.exe"
 fi
-EXPECTED_URL="https://github.com/githubnext/gh-aw/releases/download/v1.0.0/linux-amd64"
+EXPECTED_URL="https://github.com/github/gh-aw/releases/download/v1.0.0/linux-amd64"
 if [ "$DOWNLOAD_URL" = "$EXPECTED_URL" ]; then
     echo "  ✓ PASS: Linux URL is correct: $DOWNLOAD_URL"
 else
@@ -180,7 +180,7 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$PLATFORM"
 if [ "$OS_NAME" = "windows" ]; then
     DOWNLOAD_URL="${DOWNLOAD_URL}.exe"
 fi
-EXPECTED_URL="https://github.com/githubnext/gh-aw/releases/download/v1.0.0/windows-amd64.exe"
+EXPECTED_URL="https://github.com/github/gh-aw/releases/download/v1.0.0/windows-amd64.exe"
 if [ "$DOWNLOAD_URL" = "$EXPECTED_URL" ]; then
     echo "  ✓ PASS: Windows URL is correct: $DOWNLOAD_URL"
 else

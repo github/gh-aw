@@ -15,7 +15,7 @@ Read the ENTIRE content of this file carefully before proceeding. Follow the ins
 - The `gh aw` CLI may be available in this environment.
 - Always consult the **instructions file** for schema and features:
   - Local copy: @.github/aw/github-agentic-workflows.md
-  - Canonical upstream: https://raw.githubusercontent.com/githubnext/gh-aw/main/.github/aw/github-agentic-workflows.md
+  - Canonical upstream: https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 
 **Key Commands Available**
 
@@ -43,7 +43,7 @@ Read the ENTIRE content of this file carefully before proceeding. Follow the ins
 Before upgrading, always review what's new:
 
 1. **Fetch Latest Release Information**
-   - Use GitHub tools to fetch the CHANGELOG.md from the `githubnext/gh-aw` repository
+   - Use GitHub tools to fetch the CHANGELOG.md from the `github/gh-aw` repository
    - Review and understand:
      - Breaking changes
      - New features

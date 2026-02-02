@@ -16,7 +16,7 @@ This GitHub Action installs the `gh-aw` CLI extension for a specific version usi
 
 ```yaml
 - name: Install gh-aw
-  uses: githubnext/gh-aw/actions/setup-cli@main
+  uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
 ```
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install gh-aw
-        uses: githubnext/gh-aw/actions/setup-cli@main
+        uses: github/gh-aw/actions/setup-cli@main
         with:
           version: v0.37.18
       
@@ -72,7 +72,7 @@ The version tag that was actually installed.
 
 1. **Version validation**: Validates the input is a valid release tag
 2. **Release verification**: Validates that the release exists on GitHub
-3. **Primary installation method**: Attempts to install using `gh extension install githubnext/gh-aw`
+3. **Primary installation method**: Attempts to install using `gh extension install github/gh-aw`
 4. **Fallback method**: If primary method fails, downloads the binary directly from GitHub releases
 5. **Checksum verification**: Downloads and verifies SHA256 checksums for the binary
 6. **Binary verification**: Ensures the installed binary works correctly
@@ -105,7 +105,7 @@ The action will fail if:
 ### Install Specific Version
 
 ```yaml
-- uses: githubnext/gh-aw/actions/setup-cli@main
+- uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
 ```
@@ -115,7 +115,7 @@ The action will fail if:
 ```yaml
 - name: Install gh-aw
   id: install
-  uses: githubnext/gh-aw/actions/setup-cli@main
+  uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
 
@@ -134,7 +134,7 @@ jobs:
         version: [v0.37.18, v0.37.17, v0.37.16]
     runs-on: ubuntu-latest
     steps:
-      - uses: githubnext/gh-aw/actions/setup-cli@main
+      - uses: github/gh-aw/actions/setup-cli@main
         with:
           version: ${{ matrix.version }}
       
@@ -145,7 +145,7 @@ jobs:
 ### Using a Custom GitHub Token
 
 ```yaml
-- uses: githubnext/gh-aw/actions/setup-cli@main
+- uses: github/gh-aw/actions/setup-cli@main
   with:
     version: v0.37.18
     github-token: ${{ secrets.MY_CUSTOM_TOKEN }}
@@ -157,11 +157,11 @@ jobs:
 
 ### "Release X does not exist"
 
-Verify the release exists at: https://github.com/githubnext/gh-aw/releases
+Verify the release exists at: https://github.com/github/gh-aw/releases
 
 ### "Release X does not exist"
 
-Verify the release exists at: https://github.com/githubnext/gh-aw/releases
+Verify the release exists at: https://github.com/github/gh-aw/releases
 
 ### "gh extension install failed"
 

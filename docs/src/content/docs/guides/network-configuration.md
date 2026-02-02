@@ -139,7 +139,7 @@ Disable all external network access (engine communication still allowed):
 network: {}
 ```
 
-View complete ecosystem domain lists in the [ecosystem domains source](https://github.com/githubnext/gh-aw/blob/main/pkg/workflow/data/ecosystem_domains.json).
+View complete ecosystem domain lists in the [ecosystem domains source](https://github.com/github/gh-aw/blob/main/pkg/workflow/data/ecosystem_domains.json).
 
 ## Related Documentation
 

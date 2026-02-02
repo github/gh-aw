@@ -34,7 +34,7 @@ Follows README instructions, tests build processes, and validates user experienc
 
 ### Grumpy Code Reviewer
 
-Reviews pull request code changes with a grumpy senior developer personality, identifying code smells, performance issues, security concerns, and best practice violations. Triggered by `/grumpy` command on PR comments and uses cache memory to avoid duplicate feedback. [Learn more](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md)
+Reviews pull request code changes with a grumpy senior developer personality, identifying code smells, performance issues, security concerns, and best practice violations. Triggered by `/grumpy` command on PR comments and uses cache memory to avoid duplicate feedback. [Learn more](https://github.com/github/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md)
 
 ## Security Considerations
 

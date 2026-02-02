@@ -290,7 +290,7 @@ async function main(config = {}) {
       };
     }
 
-    // Use the qualified repo from validation (handles bare names like "gh-aw" -> "githubnext/gh-aw")
+    // Use the qualified repo from validation (handles bare names like "gh-aw" -> "github/gh-aw")
     const qualifiedItemRepo = repoValidation.qualifiedRepo;
 
     // Parse the repository slug

@@ -188,10 +188,10 @@ features:
 
 - **`dev`** (default): References custom actions using local paths (e.g., `uses: ./actions/setup`). Best for development and testing workflows in the gh-aw repository.
 
-- **`release`**: References custom actions using SHA-pinned remote paths (e.g., `uses: githubnext/gh-aw/actions/setup@sha`). Used for production workflows with version pinning.
+- **`release`**: References custom actions using SHA-pinned remote paths (e.g., `uses: github/gh-aw/actions/setup@sha`). Used for production workflows with version pinning.
 
 - **`script`**: Generates direct shell script calls instead of using GitHub Actions `uses:` syntax. The compiler:
-  1. Checks out the `githubnext/gh-aw` repository's `actions` folder to `/tmp/gh-aw/actions-source`
+  1. Checks out the `github/gh-aw` repository's `actions` folder to `/tmp/gh-aw/actions-source`
   2. Runs the setup script directly: `bash /tmp/gh-aw/actions-source/actions/setup/setup.sh`
   3. Uses shallow clone (`depth: 1`) for efficiency
 

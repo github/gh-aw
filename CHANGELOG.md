@@ -28,13 +28,13 @@ blocked domains are present.
 
 Supported engines: Copilot, Claude, Codex.
 
-Ref: githubnext/gh-aw#9063
+Ref: github/gh-aw#9063
 
 #### Use `awf logs summary` to generate the CI firewall report and print it to the GitHub Actions step summary.
 
 - Adds `continue-on-error: true` to the "Firewall summary" step so CI does not fail when generating reports.
 - Recompiles workflow lock files and merges `main` to pick up latest changes.
-- Fixes githubnext/gh-aw#9041
+- Fixes github/gh-aw#9041
 
 #### Bump gh-aw-firewall (AWF) default binary version to v0.8.2.
 
@@ -48,7 +48,7 @@ version. Changes include security hardening, reliability fixes, and UX improveme
 
 Files affected in the PR: constants, tests, docs, and recompiled workflow lock files.
 
-Fixes: githubnext/gh-aw#9159
+Fixes: github/gh-aw#9159
 
 #### Copy Copilot session state files (`~/.copilot/session-state/*.jsonl`) to
 
@@ -62,7 +62,7 @@ handling. This change updates the way safe-inputs and MCP lockdown values are
 passed to runtime steps (moved to `env:` blocks) and simplifies lockdown value
 conversion. Affects several workflows and related MCP renderer/server code.
 
-Fixes: githubnext/gh-aw#9124
+Fixes: github/gh-aw#9124
 
 #### Increase markdown header levels by 1 for Copilot `conversation.md` outputs
 
@@ -86,7 +86,7 @@ This change adds validation and compiler integration so `http://` and
 domain restrictions. It also preserves protocol prefixes through compilation,
 adds unit and integration tests, and updates the documentation.
 
-Fixes githubnext/gh-aw#9040
+Fixes github/gh-aw#9040
 
 #### Rewrite MCP server URLs using `localhost` or `127.0.0.1` to
 
@@ -100,7 +100,7 @@ URLs are preserved when explicitly disabled.
 
 #### Support protocol-specific domain filtering for `network.allowed` entries: validation and compiler integration for `http://` and `https://` prefixes, tests, and documentation updates.
 
-Fixes githubnext/gh-aw#9040
+Fixes github/gh-aw#9040
 
 #### Update Copilot CLI to `0.0.375` and Codex to `0.79.0`.
 
@@ -124,7 +124,7 @@ This is an internal tooling change (workflow lock files) and does not affect run
 
 #### Use `awf logs summary` to generate CI firewall reports and print them to the GitHub Actions step summary. Adds `continue-on-error: true` to the "Firewall summary" step so CI does not fail when generating reports. Recompiled workflow lock files and merged `main` to pick up latest changes.
 
-Fixes githubnext/gh-aw#9041
+Fixes github/gh-aw#9041
 
 ---
 
@@ -378,7 +378,7 @@ This is a non-breaking tooling addition.
 access its MCP configuration. This fixes smoke-test failures where MCP tools were
 unavailable (playwright, safeinputs, github).
 
-Fixes: githubnext/gh-aw#8157
+Fixes: github/gh-aw#8157
 
 #### Add importable tools: `agentic-workflows`, `serena`, and `playwright`.
 
@@ -457,7 +457,7 @@ is not masked. This resolves 31 shellcheck SC2155 warnings related to PATH
 setup in generated workflows and keeps `claude_engine.go` and
 `codex_engine.go` consistent by using the `pathSetup` variable pattern.
 
-Fixes: githubnext/gh-aw#7897
+Fixes: github/gh-aw#7897
 
 #### Improve visibility when safe output messages are not handled
 
@@ -490,7 +490,7 @@ full coverage for the module.
 This exposes the Copilot config directory at `/home/runner/.copilot` to the AWF container with read-write
 permissions, allowing the Copilot CLI to read and write MCP configuration and runtime state.
 
-Fixes: githubnext/gh-aw#8157
+Fixes: github/gh-aw#8157
 
 #### Pass MCP environment variables through to the MCP gateway (awmg) so the gateway process has access to the same secrets and env vars configured in the "Setup MCPs" step. This centralizes env var collection and updates gateway step generation and tests.
 
@@ -742,7 +742,7 @@ Maintenance release with dependency updates and minor improvements.
 
 Workflows that install and reference the Claude Code CLI now use v2.0.71.
 
-#### Replace insecure 'curl | sudo bash' Copilot installer usage with the official `install.sh` downloaded to a temporary file, executed, and removed. Tests updated to assert secure installer usage. Fixes githubnext/gh-aw#6674
+#### Replace insecure 'curl | sudo bash' Copilot installer usage with the official `install.sh` downloaded to a temporary file, executed, and removed. Tests updated to assert secure installer usage. Fixes github/gh-aw#6674
 
 ---
 
@@ -753,7 +753,7 @@ This changeset was generated for PR #6691.
 This change updates the default CLI version constants and includes the regenerated
 workflow lock files produced by `make recompile`.
 
-Fixes githubnext/gh-aw#6587
+Fixes github/gh-aw#6587
 
 #### Update the GitHub MCP Server Docker image to `v0.25.0`.
 
@@ -768,7 +768,7 @@ This is a non-breaking patch release that updates the MCP server image and relat
 downloaded script directly into `sudo bash`. The new pattern downloads the
 installer to a temporary file, executes it, and removes the temporary file to
 reduce supply-chain risk. Tests were updated to assert the secure install
-pattern. Fixes githubnext/gh-aw#6674
+pattern. Fixes github/gh-aw#6674
 
 
 ## v0.33.1 - 2025-12-16
@@ -788,7 +788,7 @@ is unspecified.
 
 `update_context_helpers.cjs` and updated `update_issue.cjs` and
 `update_pull_request.cjs` to import and use the shared helpers. This reduces
-duplication and improves maintainability. Fixes githubnext/gh-aw#6563
+duplication and improves maintainability. Fixes github/gh-aw#6563
 
 #### Prevent false-positive download annotations by gating the patch download step
 
@@ -877,7 +877,7 @@ type-checked manipulation of GitHub Actions steps. Replace ad-hoc
 possible, add conversion helpers, and add tests. Also fix
 `ContinueOnError` to accept both boolean and string values.
 
-Fixes githubnext/gh-aw#6053
+Fixes github/gh-aw#6053
 
 #### Bump Claude Code CLI from 2.0.65 to 2.0.67.
 
@@ -939,7 +939,7 @@ The `slash_command` frontmatter field was added (same validation as the old `com
 
 Bumped version constants and recompiled workflow lock files.
 
-Fixes githubnext/gh-aw#6187
+Fixes github/gh-aw#6187
 
 #### Replace the npm-based GitHub Copilot CLI installation with the
 
@@ -959,7 +959,7 @@ usage for workflows that run Copilot inside AWF.
 
 This documents the changes introduced by PR #5953: create an `actions/` directory, add `actions-build`, `actions-validate`, and `actions-clean` targets, initial actions `setup-safe-inputs` and `setup-safe-outputs`, and supporting Go CLI commands for building and validating actions.
 
-Fixes githubnext/gh-aw#5948
+Fixes github/gh-aw#5948
 
 #### Add a new `bots` frontmatter field that allows listing GitHub Apps/bots authorized to trigger a workflow.
 
@@ -1005,7 +1005,7 @@ gh secret set COPILOT_GITHUB_TOKEN -a actions --body "(your-github-pat)"
 workflow completion comment so created assets appear as direct links with GitHub
 rich previews.
 
-> 🏴‍☠️ Ahoy! This treasure was crafted by [Changeset Generator](https://github.com/githubnext/gh-aw/actions/runs/20064257954)
+> 🏴‍☠️ Ahoy! This treasure was crafted by [Changeset Generator](https://github.com/github/gh-aw/actions/runs/20064257954)
 
 #### Convert the safe outputs MCP server to run as a Node process (follow safe inputs pattern). Refactor bootstrap, write modules as individual `.cjs` files, add tests, fix log directory and environment variables, improve ingestion logging, and remove premature config cleanup so ingestion can validate outputs correctly.
 
@@ -1081,7 +1081,7 @@ job saves those artifacts to the Actions cache only after threat detection passe
 This fixes a race where cache memories could be saved before detection validated
 the agent's output.
 
-Fixes githubnext/gh-aw#5763
+Fixes github/gh-aw#5763
 
 #### Detect and report detection job failures in the conclusion job. Adds support for a
 
@@ -1147,7 +1147,7 @@ config loading, tool handler resolution, and secure config cleanup.
 
 Adds a shared `safe_inputs_bootstrap.cjs` module and updates stdio/HTTP transports to use it.
 
-Fixes githubnext/gh-aw#5786
+Fixes github/gh-aw#5786
 
 #### Fix gh.md to explicitly reference the `safeinputs-gh` tool name instead of the ambiguous "gh" safe-input tool.
 
@@ -1177,7 +1177,7 @@ These are test and workflow changes only and do not modify the CLI API.
 
 invocations so workflows can opt out of slash command behavior in Claude Code sessions.
 
-Fixes githubnext/gh-aw#5669
+Fixes github/gh-aw#5669
 
 <!-- This changeset was generated automatically for PR #5672 -->
 
@@ -1200,7 +1200,7 @@ Changes:
 - Updated `pkg/constants/constants.go` to set `DefaultGitHubMCPServerVersion` to `v0.24.1`.
 - Recompiled workflow lock files to use `v0.24.1`.
 
-Fixes githubnext/gh-aw#5877
+Fixes github/gh-aw#5877
 
 
 ## v0.31.10 - 2025-12-05
@@ -1255,7 +1255,7 @@ avoid template-injection scanner false positives while keeping behavior
 unchanged. Documented that other flagged expressions use trusted GitHub
 context and require no change.
 
-Fixes: githubnext/gh-aw#5299
+Fixes: github/gh-aw#5299
 
 
 ## v0.31.4 - 2025-12-03

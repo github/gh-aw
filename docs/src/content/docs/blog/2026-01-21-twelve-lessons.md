@@ -43,17 +43,17 @@ With clear boundaries in place, we can prototype new agents without worrying abo
 
 Agents that watch other agents? Sounds meta, but they've become some of our most valuable workflows. They catch issues early and help us understand what's happening across the entire ecosystem.
 
-Once we passed 50 workflows, tracking everything manually became impossible. Meta-agents like [Audit Workflows](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) and [Agent Performance Analyzer](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md) give us the observability layer we desperately needed. They spot patterns across runs, identify struggling agents, and surface systemic issues we'd never catch looking at individual workflows.
+Once we passed 50 workflows, tracking everything manually became impossible. Meta-agents like [Audit Workflows](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/audit-workflows.md) and [Agent Performance Analyzer](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/agent-performance-analyzer.md) give us the observability layer we desperately needed. They spot patterns across runs, identify struggling agents, and surface systemic issues we'd never catch looking at individual workflows.
 
 ### Personality Matters
 
 Turns out, agents with distinct personalities - like the meticulous auditor, the helpful janitor, the creative poet - are way easier for teams to understand and trust.
 
-We noticed generic names like "issue-handler" or "code-checker" created confusion. But when we gave agents personalities - like [Grumpy Reviewer](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) or [Poem Bot](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/poem-bot.md) - their purpose became immediately clear. Team members actually started developing relationships with specific agents. It's kind of adorable.
+We noticed generic names like "issue-handler" or "code-checker" created confusion. But when we gave agents personalities - like [Grumpy Reviewer](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) or [Poem Bot](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/poem-bot.md) - their purpose became immediately clear. Team members actually started developing relationships with specific agents. It's kind of adorable.
 
 ### Cost-Quality Tradeoffs Are Real
 
-Longer, more thorough analyses cost more - but they're not always better. The [Portfolio Analyst](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md) helps us figure out which agents actually deliver value.
+Longer, more thorough analyses cost more - but they're not always better. The [Portfolio Analyst](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/portfolio-analyst.md) helps us figure out which agents actually deliver value.
 
 We discovered that some of our "thorough" agents were doing redundant work or generating reports nobody read. The Portfolio Analyst tracks cost-per-insight across all agents, revealing that simple, focused agents often deliver better ROI than complex ones. This led us to consolidate overlapping agents and tune prompt lengths to balance thoroughness with cost. AI isn't free, folks!
 
@@ -73,11 +73,11 @@ Instead of remembering complex webhook URLs or GitHub Actions syntax, team membe
 
 Frequent, lightweight validation tests (every 12 hours) catch regressions quickly. These "heartbeat" agents keep the infrastructure healthy without manual monitoring.
 
-Instead of waiting for production failures, we deploy multiple [smoke test workflows](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-copilot.md) that continuously validate core functionality. When a smoke test fails, we know immediately which component broke. This proactive monitoring prevents cascading failures and gives us confidence that the ecosystem is actually stable.
+Instead of waiting for production failures, we deploy multiple [smoke test workflows](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/smoke-copilot.md) that continuously validate core functionality. When a smoke test fails, we know immediately which component broke. This proactive monitoring prevents cascading failures and gives us confidence that the ecosystem is actually stable.
 
 ### MCP Inspection Is Essential
 
-As workflows start using multiple MCP servers, having agents that can validate and report on tool availability becomes critical. The [MCP Inspector](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mcp-inspector.md) pattern prevents those cryptic "tool not available" failures.
+As workflows start using multiple MCP servers, having agents that can validate and report on tool availability becomes critical. The [MCP Inspector](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/mcp-inspector.md) pattern prevents those cryptic "tool not available" failures.
 
 Early on, we'd see agents fail with vague errors like "connection refused." The MCP Inspector proactively checks all MCP server configurations, validates network access, and generates status reports. This visibility transformed debugging from hours of detective work into reading a dashboard.
 
@@ -91,7 +91,7 @@ Whether managing a backlog of refactoring work, coordinating security fixes, or 
 
 Applying clustering and NLP to agent interactions revealed usage patterns that weren't obvious from individual runs. This meta-analysis helped identify opportunities for consolidation and optimization.
 
-The [Prompt Clustering Analysis](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/prompt-clustering-analysis.md) and [Copilot PR NLP Analysis](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-pr-nlp-analysis.md) workflows discovered that many agents were asking similar questions or performing redundant analyses. This insight led to shared component libraries and consolidation opportunities we wouldn't have spotted through manual review.
+The [Prompt Clustering Analysis](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/prompt-clustering-analysis.md) and [Copilot PR NLP Analysis](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/copilot-pr-nlp-analysis.md) workflows discovered that many agents were asking similar questions or performing redundant analyses. This insight led to shared component libraries and consolidation opportunities we wouldn't have spotted through manual review.
 
 ## Challenges We've Encountered
 

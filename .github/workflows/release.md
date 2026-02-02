@@ -439,7 +439,7 @@ Structure:
 [Only if significant doc additions/improvements]
 
 ---
-For complete details, see [CHANGELOG](https://github.com/githubnext/gh-aw/blob/main/CHANGELOG.md).
+For complete details, see [CHANGELOG](https://github.com/github/gh-aw/blob/main/CHANGELOG.md).
 ```
 
 **Writing Guidelines:**

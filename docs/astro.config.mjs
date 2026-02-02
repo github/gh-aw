@@ -66,7 +66,7 @@ export default defineConfig({
 				'./src/styles/custom.css',
 			],
 			social: [
-				{ icon: 'github', label: 'GitHub', href: 'https://github.com/githubnext/gh-aw' },
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/github/gh-aw' },
 			],
 			tableOfContents: { 
 			minHeadingLevel: 2, 
@@ -130,7 +130,7 @@ export default defineConfig({
 					optionalLinks: [
 						{
 							label: 'GitHub Repository',
-							url: 'https://github.com/githubnext/gh-aw',
+							url: 'https://github.com/github/gh-aw',
 							description: 'Source code and development resources for gh-aw'
 						},
 						{

@@ -85,7 +85,7 @@ Don't store sensitive data. Cache follows repository permissions, logs access. W
 
 ## Examples
 
-See [Grumpy Code Reviewer](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md) for tracking PR review history.
+See [Grumpy Code Reviewer](https://github.com/github/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md) for tracking PR review history.
 
 ---
 
@@ -175,7 +175,7 @@ Memory branches follow repository permissions. Use private repos for sensitive d
 
 ## Examples
 
-See [Deep Report](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/deep-report.md) and [Daily Firewall Report](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/daily-firewall-report.md) for long-term insights and historical data tracking.
+See [Deep Report](https://github.com/github/gh-aw/blob/main/.github/workflows/deep-report.md) and [Daily Firewall Report](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-firewall-report.md) for long-term insights and historical data tracking.
 
 ---
 

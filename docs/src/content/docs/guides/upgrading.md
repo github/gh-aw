@@ -47,11 +47,11 @@ gh extension upgrade gh-aw
 > If the extension upgrade fails due to restricted permissions that prevent global npm installs, use the standalone installer instead:
 >
 > ```bash wrap
-> curl -sL https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh | bash
+> curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
 > ```
 >
 
-Check your version with `gh aw version` and compare against the [latest release](https://github.com/githubnext/gh-aw/releases). If you encounter issues, try a clean reinstall with `gh extension remove gh-aw` followed by `gh extension install githubnext/gh-aw`.
+Check your version with `gh aw version` and compare against the [latest release](https://github.com/github/gh-aw/releases). If you encounter issues, try a clean reinstall with `gh extension remove gh-aw` followed by `gh extension install github/gh-aw`.
 
 ## Step 2: Backup Your Workflows
 
@@ -175,7 +175,7 @@ For better traceability, consider separate commits for agent files, workflow mig
 
 ## Troubleshooting
 
-**Extension upgrade fails:** Try a clean reinstall with `gh extension remove gh-aw && gh extension install githubnext/gh-aw`.
+**Extension upgrade fails:** Try a clean reinstall with `gh extension remove gh-aw && gh extension install github/gh-aw`.
 
 **Codemods not applied:** Manually apply with `gh aw fix --write -v`.
 
@@ -183,11 +183,11 @@ For better traceability, consider separate commits for agent files, workflow mig
 
 **Workflows not running:** Verify `.lock.yml` files are committed, check status with `gh aw status`, and confirm secrets are valid with `gh aw secrets bootstrap`.
 
-**Breaking changes:** Revert with `git checkout backup-before-upgrade` and review [release notes](https://github.com/githubnext/gh-aw/releases).
+**Breaking changes:** Revert with `git checkout backup-before-upgrade` and review [release notes](https://github.com/github/gh-aw/releases).
 
 ## Advanced Topics
 
-**Upgrading across versions:** Review the [changelog](https://github.com/githubnext/gh-aw/blob/main/CHANGELOG.md) for cumulative changes.
+**Upgrading across versions:** Review the [changelog](https://github.com/github/gh-aw/blob/main/CHANGELOG.md) for cumulative changes.
 
 **Custom directories:** Use `gh aw upgrade --dir custom/workflows`.
 
@@ -201,6 +201,6 @@ Upgrade regularly to stay current with features and security fixes. Always revie
 
 ## What's Next?
 
-Learn about new features in the [changelog](https://github.com/githubnext/gh-aw/blob/main/CHANGELOG.md), explore the [frontmatter reference](/gh-aw/reference/frontmatter-full/), review [best practices](/gh-aw/guides/deterministic-agentic-patterns/), or browse the [agentics collection](https://github.com/githubnext/agentics).
+Learn about new features in the [changelog](https://github.com/github/gh-aw/blob/main/CHANGELOG.md), explore the [frontmatter reference](/gh-aw/reference/frontmatter-full/), review [best practices](/gh-aw/guides/deterministic-agentic-patterns/), or browse the [agentics collection](https://github.com/githubnext/agentics).
 
-Need help? Check the [troubleshooting guide](/gh-aw/troubleshooting/common-issues/) or [open an issue](https://github.com/githubnext/gh-aw/issues/new).
+Need help? Check the [troubleshooting guide](/gh-aw/troubleshooting/common-issues/) or [open an issue](https://github.com/github/gh-aw/issues/new).

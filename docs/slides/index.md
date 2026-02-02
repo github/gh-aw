@@ -7,7 +7,7 @@ marp: true
 ### Research Preview
 
 
-https://github.com/githubnext/gh-aw
+https://github.com/github/gh-aw
 
 
 
@@ -30,7 +30,7 @@ https://github.com/githubnext/gh-aw
 > https://githubnext.com/projects/continuous-ai/
 
 <!--
-https://github.com/githubnext/gh-aw/issues/1920
+https://github.com/github/gh-aw/issues/1920
 -->
 
 ---
@@ -191,11 +191,11 @@ Fetch latest TypeScript docs report findings in a comment.
 
 ```sh
 # Install GitHub Agentic Workflows extension
-gh extension install githubnext/gh-aw
+gh extension install github/gh-aw
 gh aw init
 
 # Agentic setup with Copilot CLI (optional)
-npx --yes @github/copilot -i "activate https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install.md"
+npx --yes @github/copilot -i "activate https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install.md"
 ```
 
 > Built with AI agents in mind from day 0

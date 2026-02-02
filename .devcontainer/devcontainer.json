@@ -38,5 +38,5 @@
       "version": "24"
     }
   },
-  "postCreateCommand": "curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash"
+  "postCreateCommand": "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash"
 }

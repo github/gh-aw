@@ -9,7 +9,7 @@ sidebar:
 
 **Version**: 1.0.0  
 **Status**: Candidate Recommendation  
-**Latest Version**: https://github.com/githubnext/gh-aw/blob/main/specs/security-architecture-spec.md  
+**Latest Version**: https://github.com/github/gh-aw/blob/main/specs/security-architecture-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
 
 ---
@@ -1718,11 +1718,11 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 
 - **[ZIZMOR]** "zizmor: Security scanner for GitHub Actions." https://github.com/woodruffw/zizmor
 
-- **[GHAW-DOCS]** "GitHub Agentic Workflows Documentation." https://github.com/githubnext/gh-aw
+- **[GHAW-DOCS]** "GitHub Agentic Workflows Documentation." https://github.com/github/gh-aw
 
-- **[GHAW-SECURITY]** "Security Best Practices for GitHub Agentic Workflows." https://github.com/githubnext/gh-aw/blob/main/docs/src/content/docs/guides/security.md
+- **[GHAW-SECURITY]** "Security Best Practices for GitHub Agentic Workflows." https://github.com/github/gh-aw/blob/main/docs/src/content/docs/guides/security.md
 
-- **[GHAW-ARCH]** "GitHub Agentic Workflows Architecture." https://github.com/githubnext/gh-aw/blob/main/docs/src/content/docs/introduction/architecture.mdx
+- **[GHAW-ARCH]** "GitHub Agentic Workflows Architecture." https://github.com/github/gh-aw/blob/main/docs/src/content/docs/introduction/architecture.mdx
 
 ---
 

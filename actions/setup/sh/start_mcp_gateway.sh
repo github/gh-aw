@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start MCP Gateway
 # This script starts the MCP gateway process that proxies MCP servers through a unified HTTP endpoint
-# Following the MCP Gateway Specification: https://github.com/githubnext/gh-aw/blob/main/docs/src/content/docs/reference/mcp-gateway.md
+# Following the MCP Gateway Specification: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/mcp-gateway.md
 # Per MCP Gateway Specification v1.0.0: Only container-based execution is supported.
 #
 # This script reads the MCP configuration from stdin and pipes it to the gateway container.

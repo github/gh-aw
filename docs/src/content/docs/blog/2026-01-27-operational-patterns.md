@@ -52,7 +52,7 @@ These workflows do the following:
 
 ### Example: Grumpy Reviewer
 
-The [`grumpy-reviewer`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) workflow is a perfect example of this pattern:
+The [`grumpy-reviewer`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/grumpy-reviewer.md) workflow is a perfect example of this pattern:
 
 - Triggered by `/grumpy` on PR comments
 - Performs critical code review with distinctive personality
@@ -150,7 +150,7 @@ These workflows do the following:
 
 ### Example: Issue Triage Agent
 
-The [`issue-triage-agent`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md) automatically labels and categorizes new issues:
+The [`issue-triage-agent`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/issue-triage-agent.md) automatically labels and categorizes new issues:
 
 - Analyzes issue title and body
 - Applies relevant labels (bug, feature, documentation, etc.)
@@ -314,7 +314,7 @@ These workflows do the following:
 
 ### Example: Duplicate Code Detection
 
-The [`duplicate-code-detector`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md) uses ResearchPlanAssign:
+The [`duplicate-code-detector`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md) uses ResearchPlanAssign:
 
 **Research**: Uses Serena MCP for semantic analysis, creates report
 **Plan**: Creates well-scoped issues (max 3 per run) with refactoring strategies
@@ -363,7 +363,7 @@ These workflows do the following:
 
 ### Example: Org Health Report
 
-The [`org-health-report`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/org-health-report.md) analyzes health metrics across all organization repositories:
+The [`org-health-report`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/org-health-report.md) analyzes health metrics across all organization repositories:
 
 - Checks for outdated dependencies
 - Validates security policies

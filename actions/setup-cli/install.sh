@@ -216,7 +216,7 @@ fetch_release_data() {
 
 # Get version (use provided version or fetch latest)
 # VERSION is already set from argument parsing
-REPO="githubnext/gh-aw"
+REPO="github/gh-aw"
 
 if [ -z "$VERSION" ]; then
     print_info "No version specified, fetching latest release information from GitHub..."

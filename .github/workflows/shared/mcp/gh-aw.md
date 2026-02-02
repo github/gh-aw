@@ -16,7 +16,7 @@ steps:
   - name: Install binary as 'gh-aw'
     run: |
       # Check if gh-aw extension is already installed
-      if gh extension list | grep -q "githubnext/gh-aw"; then
+      if gh extension list | grep -q "github/gh-aw"; then
         echo "gh-aw extension already installed, skipping installation..."
       else
         # Check if a different extension provides the 'aw' command

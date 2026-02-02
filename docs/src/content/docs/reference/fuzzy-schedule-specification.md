@@ -539,7 +539,7 @@ Where:
 - `repository_slug` is the format `owner/repo`
 - `workflow_file_path` is the relative path from repository root
 
-**Example**: `githubnext/gh-aw/.github/workflows/daily-report.md`
+**Example**: `github/gh-aw/.github/workflows/daily-report.md`
 
 This format ensures workflows with the same filename in different repositories receive different execution times.
 
@@ -555,7 +555,7 @@ For `FUZZY:DAILY * * *`:
 
 **Example**:
 ```
-hash("githubnext/gh-aw/workflow.md") % 1440 = 343
+hash("github/gh-aw/workflow.md") % 1440 = 343
 hour = 343 / 60 = 5
 minute = 343 % 60 = 43
 cron = "43 5 * * *"  (5:43 AM)

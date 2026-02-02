@@ -55,7 +55,7 @@ async function main(config = {}) {
             driver: {
               name: driverName,
               version: "1.0.0",
-              informationUri: "https://github.com/githubnext/gh-aw",
+              informationUri: "https://github.com/github/gh-aw",
             },
           },
           results: validFindings.map((finding, index) => ({

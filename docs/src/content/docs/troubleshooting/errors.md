@@ -148,7 +148,7 @@ invalid workflowspec: must be owner/repo/path[@ref]
 
 **Cause:** When using remote imports, the specification format is incorrect.
 
-**Solution:** Use the correct format: `owner/repo/path[@ref]`, for example `githubnext/gh-aw/.github/workflows/shared/example.md@main`.
+**Solution:** Use the correct format: `owner/repo/path[@ref]`, for example `github/gh-aw/.github/workflows/shared/example.md@main`.
 
 ### Section Not Found
 
@@ -543,4 +543,4 @@ tools:
 
 ## Getting Help
 
-If you encounter an error not documented here, search this page (Ctrl+F / Cmd+F) for keywords, review workflow examples in the documentation, enable verbose mode with `gh aw compile --verbose`, or [report issues on GitHub](https://github.com/githubnext/gh-aw/issues). See [Common Issues](/gh-aw/troubleshooting/common-issues/) for additional help.
+If you encounter an error not documented here, search this page (Ctrl+F / Cmd+F) for keywords, review workflow examples in the documentation, enable verbose mode with `gh aw compile --verbose`, or [report issues on GitHub](https://github.com/github/gh-aw/issues). See [Common Issues](/gh-aw/troubleshooting/common-issues/) for additional help.

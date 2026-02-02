@@ -328,8 +328,8 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
     it("should correctly match .jsonl files with *.jsonl pattern", () => {
       // Test case for validating .jsonl file pattern matching
-      // This validates the fix for: https://github.com/githubnext/gh-aw/actions/runs/20601784686/job/59169295542#step:7:1
-      // And: https://github.com/githubnext/gh-aw/actions/runs/20608399402/job/59188647531#step:7:1
+      // This validates the fix for: https://github.com/github/gh-aw/actions/runs/20601784686/job/59169295542#step:7:1
+      // And: https://github.com/github/gh-aw/actions/runs/20608399402/job/59188647531#step:7:1
       // The daily-code-metrics workflow uses file-glob: ["*.json", "*.jsonl", "*.csv", "*.md"]
       // and writes history.jsonl file to repo memory at memory/default/history.jsonl
 
@@ -927,7 +927,7 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
     });
 
     it("should match patterns against relative paths, not branch-prefixed paths", () => {
-      // This test validates the fix for: https://github.com/githubnext/gh-aw/actions/runs/20613564835
+      // This test validates the fix for: https://github.com/github/gh-aw/actions/runs/20613564835
       // Campaign workflows specify patterns relative to the memory directory,
       // not including the branch name prefix.
       //
@@ -1002,7 +1002,7 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
     });
 
     it("should match root-level files without branch name prefix (daily-code-metrics scenario)", () => {
-      // This test validates the fix for: https://github.com/githubnext/gh-aw/actions/runs/20623556740/job/59230494223#step:7:1
+      // This test validates the fix for: https://github.com/github/gh-aw/actions/runs/20623556740/job/59230494223#step:7:1
       // The daily-code-metrics workflow writes files to the artifact root (e.g., history.jsonl).
       // Previously, the workflow incorrectly specified patterns like "memory/code-metrics/*.jsonl",
       // which included the branch name prefix and failed to match root-level files.

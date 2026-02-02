@@ -91,7 +91,7 @@ allPassed &= assertContains(output, ".md)", "Workflow links point to .md files")
 // Test 6: Status badges are present
 allPassed &= assertContains(output, "badge.svg", "Status badges are present");
 
-allPassed &= assertContains(output, "https://github.com/githubnext/gh-aw/actions/workflows/", "Status badges link to workflow runs");
+allPassed &= assertContains(output, "https://github.com/github/gh-aw/actions/workflows/", "Status badges link to workflow runs");
 
 // Test 7: No "unknown" engine values
 allPassed &= assertNotContains(output, "| unknown |", "No workflows with unknown engine (should default to copilot)");
@@ -104,7 +104,7 @@ allPassed &= assertContains(output, "description: Experimental agentic workflows
 // Test 9: Introduction text is present (streamlined)
 allPassed &= assertContains(
   output,
-  "These are experimental agentic workflows used by the GitHub Next team to learn, build, and use agentic workflows. [Browse source files](https://github.com/githubnext/gh-aw/tree/main/.github/workflows).",
+  "These are experimental agentic workflows used by the GitHub Next team to learn, build, and use agentic workflows. [Browse source files](https://github.com/github/gh-aw/tree/main/.github/workflows).",
   "Introduction text is present (streamlined)"
 );
 
@@ -151,7 +151,7 @@ allPassed &= assertNotContains(output, "<CardGrid>", "No CardGrid component (sho
 allPassed &= assertNotContains(output, "<Card>", "No Card component (should be table now)");
 
 // Test 20: Verify source link is present (moved to intro text, streamlined)
-allPassed &= assertContains(output, "[Browse source files](https://github.com/githubnext/gh-aw/tree/main/.github/workflows)", "Source files link is present (streamlined)");
+allPassed &= assertContains(output, "[Browse source files](https://github.com/github/gh-aw/tree/main/.github/workflows)", "Source files link is present (streamlined)");
 
 // Test 21: Verify no separate "Workflow Link" column
 allPassed &= assertNotContains(output, "| Workflow Link |", "No separate 'Workflow Link' column (consolidated into first column)");

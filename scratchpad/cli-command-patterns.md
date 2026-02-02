@@ -31,8 +31,8 @@ import (
     "os"
     
     // Internal imports
-    "github.com/githubnext/gh-aw/pkg/console"
-    "github.com/githubnext/gh-aw/pkg/logger"
+    "github.com/github/gh-aw/pkg/console"
+    "github.com/github/gh-aw/pkg/logger"
     
     // External imports
     "github.com/spf13/cobra"
@@ -395,7 +395,7 @@ func RunCommand(arg string) error {
 ### Message Types
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Success messages
 fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Workflow compiled successfully"))
@@ -667,7 +667,7 @@ Examples:
 For commands that accept workflow IDs, include the standard explanation:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/cli"
+import "github.com/github/gh-aw/pkg/cli"
 
 Long: `Description of command...
 
@@ -817,8 +817,8 @@ import (
     "os"
     "path/filepath"
     
-    "github.com/githubnext/gh-aw/pkg/console"
-    "github.com/githubnext/gh-aw/pkg/logger"
+    "github.com/github/gh-aw/pkg/console"
+    "github.com/github/gh-aw/pkg/logger"
     "github.com/spf13/cobra"
 )
 

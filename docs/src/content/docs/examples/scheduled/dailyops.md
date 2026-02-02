@@ -60,7 +60,7 @@ safe-outputs:
     discussion: true
 ```
 
-This pattern is ideal for daily status posts, recurring reports, or community updates. The [daily-fact.md](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/daily-fact.md) workflow demonstrates this by posting daily facts about the repository to a pinned discussion thread.
+This pattern is ideal for daily status posts, recurring reports, or community updates. The [daily-fact.md](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-fact.md) workflow demonstrates this by posting daily facts about the repository to a pinned discussion thread.
 
 ### Persistent Memory
 

@@ -120,7 +120,7 @@ package workflow
 
 import (
 	"fmt"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var {domain}Log = logger.New("workflow:{domain}_validation")

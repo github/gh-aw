@@ -101,7 +101,7 @@ Add meaningful debug logging calls to Go files in the `pkg/` directory following
 If a file doesn't have a logger, add this at the top of the file (after imports):
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 var log = logger.New("pkg:filename")
 ```
@@ -199,7 +199,7 @@ For each selected file:
 For each file:
 
 1. **Add logger declaration if missing:**
-   - Add import: `"github.com/githubnext/gh-aw/pkg/logger"`
+   - Add import: `"github.com/github/gh-aw/pkg/logger"`
    - Add logger variable using correct naming: `var log = logger.New("pkg:filename")`
 
 2. **Add meaningful logging calls:**
@@ -282,7 +282,7 @@ import (
     "fmt"
     "os"
     
-    "github.com/githubnext/gh-aw/pkg/logger"
+    "github.com/github/gh-aw/pkg/logger"
 )
 
 var log = logger.New("workflow:compiler")

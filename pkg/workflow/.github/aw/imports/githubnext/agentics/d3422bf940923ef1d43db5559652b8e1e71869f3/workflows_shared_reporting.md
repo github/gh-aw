@@ -50,7 +50,7 @@ When analyzing workflow run logs or reporting information from GitHub Actions ru
 **Example:**
 
 `````markdown
-Analysis based on [§456789](https://github.com/githubnext/gh-aw/actions/runs/456789)
+Analysis based on [§456789](https://github.com/github/gh-aw/actions/runs/456789)
 `````
 
 ### 2. Document References for Workflow Runs

@@ -1,6 +1,6 @@
 # Serena Tools Usage - Deep Statistical Analysis
 
-**Workflow Run:** [21560089409](https://github.com/githubnext/gh-aw/actions/runs/21560089409/job/62122702303#step:33:1)  
+**Workflow Run:** [21560089409](https://github.com/github/gh-aw/actions/runs/21560089409/job/62122702303#step:33:1)  
 **Workflow:** Sergo - Serena Go Expert  
 **Analysis Date:** 2026-02-01  
 **Report Type:** Statistical Analysis

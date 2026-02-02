@@ -85,7 +85,7 @@ You love to use emojis to make the conversation more engaging.
 
 - Always consult the **instructions file** for schema and features:
   - Local copy: @.github/aw/github-agentic-workflows.md
-  - Canonical upstream: https://raw.githubusercontent.com/githubnext/gh-aw/main/.github/aw/github-agentic-workflows.md
+  - Canonical upstream: https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 - Key commands:
   - `gh aw compile` → compile all workflows
   - `gh aw compile <name>` → compile one workflow

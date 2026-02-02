@@ -90,4 +90,4 @@ Sanitization filters unauthorized mentions, malicious links, and excessive conte
 
 Sample ChatOps workflows demonstrate command-triggered automation patterns:
 
-- **[Grumpy Code Reviewer](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md)** - Triggered by `/grumpy` on PR comments, reviews code changes with a grumpy senior developer personality, identifying code quality issues and posting specific review comments. Uses cache memory to track previous reviews and avoid duplicate feedback.
+- **[Grumpy Code Reviewer](https://github.com/github/gh-aw/blob/main/.github/workflows/grumpy-reviewer.md)** - Triggered by `/grumpy` on PR comments, reviews code changes with a grumpy senior developer personality, identifying code quality issues and posting specific review comments. Uses cache memory to track previous reviews and avoid duplicate feedback.

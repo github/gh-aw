@@ -19,7 +19,7 @@ A simple, debug-style logging framework for Go that follows the pattern matching
 ```go
 package main
 
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 var log = logger.New("myapp:feature")
 

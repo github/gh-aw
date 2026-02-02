@@ -15,7 +15,7 @@ Configure this repository to use agentic workflows by:
 Run the installation script from the main branch of the gh-aw repository:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh | bash
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
 ```
 
 **What this does**: Downloads and installs the gh-aw binary to `~/.local/share/gh/extensions/gh-aw/`
@@ -109,7 +109,7 @@ After successful initialization, the user can:
 
 ## Reference
 
-- **Installation script**: `https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh`
+- **Installation script**: `https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh`
 - **Documentation**: `https://githubnext.github.io/gh-aw/`
-- **Repository**: `https://github.com/githubnext/gh-aw`
+- **Repository**: `https://github.com/github/gh-aw`
 - **Detailed setup guide**: See `install.md` in the gh-aw repository

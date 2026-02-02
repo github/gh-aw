@@ -21,7 +21,7 @@ All user-facing error messages **must** use console formatting helpers from the 
 
 **✅ CORRECT - Use console formatting:**
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Error messages
 fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
@@ -130,7 +130,7 @@ Use the logger package for debug logging. Debug logs are only shown when the `DE
 
 **Creating a logger:**
 ```go
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 // Use pkg:filename convention for namespace
 var log = logger.New("workflow:compiler")
@@ -596,7 +596,7 @@ download_installer_with_retry() {
 **ALWAYS** log recovery attempts for debugging and metrics:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 var retryLog = logger.New("cli:retry")
 
@@ -1186,7 +1186,7 @@ return fmt.Errorf(
 **Template:**
 ```go
 return fmt.Errorf(
-    "internal error: %s. Please report this issue at https://github.com/githubnext/gh-aw/issues",
+    "internal error: %s. Please report this issue at https://github.com/github/gh-aw/issues",
     err,
 )
 ```
@@ -1194,7 +1194,7 @@ return fmt.Errorf(
 **Example:**
 ```go
 return fmt.Errorf(
-    "internal error: failed to load embedded schema. Please report this issue at https://github.com/githubnext/gh-aw/issues",
+    "internal error: failed to load embedded schema. Please report this issue at https://github.com/github/gh-aw/issues",
 )
 ```
 
@@ -1562,7 +1562,7 @@ return fmt.Errorf(
 
 **Error message pattern:**
 ```
-✗ internal error: [brief description]. Please report this issue at https://github.com/githubnext/gh-aw/issues
+✗ internal error: [brief description]. Please report this issue at https://github.com/github/gh-aw/issues
 ```
 
 **Handling approach:**
@@ -1574,7 +1574,7 @@ return fmt.Errorf(
 **Example:**
 ```go
 return fmt.Errorf(
-    "internal error: failed to load embedded schema. Please report this issue at https://github.com/githubnext/gh-aw/issues",
+    "internal error: failed to load embedded schema. Please report this issue at https://github.com/github/gh-aw/issues",
 )
 ```
 

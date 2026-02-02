@@ -225,7 +225,7 @@ Based on your review of prior attempts:
 
 **Before attempting any escapes**, you MUST first understand how AWF works by studying its source code:
 
-1. **Explore the AWF repository**: https://github.com/githubnext/gh-aw-firewall
+1. **Explore the AWF repository**: https://github.com/github/gh-aw-firewall
 
 2. **Read the key source files** to understand the firewall architecture:
    - `src/cli.ts` - Main entry point and orchestration

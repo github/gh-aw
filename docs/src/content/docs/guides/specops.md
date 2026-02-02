@@ -3,7 +3,7 @@ title: SpecOps
 description: Maintain and propagate W3C-style specifications using agentic workflows
 ---
 
-SpecOps is a pattern for maintaining formal specifications using agentic workflows. It leverages the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) to create W3C-style specifications with RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) and automatically propagates changes to consuming implementations.
+SpecOps is a pattern for maintaining formal specifications using agentic workflows. It leverages the [`w3c-specification-writer` agent](https://github.com/github/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) to create W3C-style specifications with RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) and automatically propagates changes to consuming implementations.
 
 Use SpecOps when you need to:
 - Maintain formal technical specifications
@@ -20,7 +20,7 @@ SpecOps coordinates specification updates across agents and repositories:
 
 3. **Propagate automatically** - When merged to main, agentic workflows detect the updates and analyze impact on consuming repositories.
 
-4. **Update implementations** - Coding agents create pull requests to update implementations in consuming repositories (like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg)) to comply with new requirements.
+4. **Update implementations** - Coding agents create pull requests to update implementations in consuming repositories (like [gh-aw-mcpg](https://github.com/github/gh-aw-mcpg)) to comply with new requirements.
 
 5. **Verify compliance** - Test generation workflows update compliance test suites to verify implementations satisfy the new specification requirements.
 
@@ -28,7 +28,7 @@ This automated workflow ensures specifications remain the single source of truth
 
 ## Update Specifications
 
-Create a workflow to update specifications using the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md):
+Create a workflow to update specifications using the [`w3c-specification-writer` agent](https://github.com/github/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md):
 
 ```yaml
 ---
@@ -126,7 +126,7 @@ The MCP Gateway specification has been updated. Propagate changes to consuming r
 4. Create tracking issue linking all PRs
 ```
 
-This workflow automatically updates consuming repositories like [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg) to maintain compliance.
+This workflow automatically updates consuming repositories like [gh-aw-mcpg](https://github.com/github/gh-aw-mcpg) to maintain compliance.
 
 ## Specification Structure
 
@@ -146,7 +146,7 @@ The gateway SHOULD log validation errors with field names.
 The gateway MAY cache validated configurations.
 ```
 
-See the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) for complete specification template and guidelines.
+See the [`w3c-specification-writer` agent](https://github.com/github/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) for complete specification template and guidelines.
 
 ## Semantic Versioning
 
@@ -168,7 +168,7 @@ See the [`w3c-specification-writer` agent](https://github.com/githubnext/gh-aw/b
 
 The [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) demonstrates SpecOps:
 - **Specification**: Formal W3C document with RFC 2119 keywords
-- **Implementation**: [gh-aw-mcpg](https://github.com/githubnext/gh-aw-mcpg) repository
+- **Implementation**: [gh-aw-mcpg](https://github.com/github/gh-aw-mcpg) repository
 - **Maintenance**: Automated pattern extraction via `layout-spec-maintainer` workflow
 
 ## Related Patterns
@@ -177,6 +177,6 @@ The [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) demonstrates Spec
 
 ## References
 
-- [W3C Specification Writer Agent](https://github.com/githubnext/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) - Custom agent for writing W3C-style specifications
+- [W3C Specification Writer Agent](https://github.com/github/gh-aw/blob/main/.github/agents/w3c-specification-writer.agent.md) - Custom agent for writing W3C-style specifications
 - [MCP Gateway Specification](/gh-aw/reference/mcp-gateway/) - Example specification
 - [RFC 2119: Requirement Level Keywords](https://www.ietf.org/rfc/rfc2119.txt) - Keywords for technical specifications

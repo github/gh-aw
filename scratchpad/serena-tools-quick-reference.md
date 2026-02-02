@@ -1,7 +1,7 @@
 # Serena Tools Usage - Quick Reference
 
 **Workflow:** Sergo - Serena Go Expert  
-**Run ID:** [21560089409](https://github.com/githubnext/gh-aw/actions/runs/21560089409/job/62122702303#step:33:1)
+**Run ID:** [21560089409](https://github.com/github/gh-aw/actions/runs/21560089409/job/62122702303#step:33:1)
 
 ## At a Glance
 
@@ -114,7 +114,7 @@ GitHub:       0 (0.00%)
 ## Related Documents
 
 - 📄 [Full Statistical Analysis](./serena-tools-analysis.md) - Complete deep dive with all metrics
-- 🔗 [Workflow Run](https://github.com/githubnext/gh-aw/actions/runs/21560089409/job/62122702303) - Original workflow execution
+- 🔗 [Workflow Run](https://github.com/github/gh-aw/actions/runs/21560089409/job/62122702303) - Original workflow execution
 
 ---
 

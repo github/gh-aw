@@ -246,7 +246,7 @@ const hash3 = await computeFrontmatterHash('.github/workflows/ci.md', { fileRead
 
 **Go Usage**:
 ```go
-import "github.com/githubnext/gh-aw/pkg/parser"
+import "github.com/github/gh-aw/pkg/parser"
 
 // Option 1: Default file system reader (uses os.ReadFile)
 hash1, err := parser.ComputeFrontmatterHashFromFile("workflow.md", cache)

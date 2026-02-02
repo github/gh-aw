@@ -11,10 +11,10 @@ This reference documents frequently encountered issues when working with GitHub 
 
 ### Extension Installation Fails
 
-If `gh extension install githubnext/gh-aw` fails with authentication or permission errors (common in Codespaces outside the githubnext organization), use the standalone installer:
+If `gh extension install github/gh-aw` fails with authentication or permission errors (common in Codespaces outside the githubnext organization), use the standalone installer:
 
 ```bash wrap
-curl -sL https://raw.githubusercontent.com/githubnext/gh-aw/main/install-gh-aw.sh | bash
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
 ```
 
 After installation, the binary is installed to `~/.local/share/gh/extensions/gh-aw/gh-aw` and can be used with `gh aw` commands just like the extension installation.
@@ -24,7 +24,7 @@ After installation, the binary is installed to `~/.local/share/gh/extensions/gh-
 If you installed the extension but `gh aw` command is not found:
 
 1. Verify installation: `gh extension list`
-2. If not listed, reinstall: `gh extension install githubnext/gh-aw`
+2. If not listed, reinstall: `gh extension install github/gh-aw`
 3. If issues persist, use the standalone installer (see above)
 
 ### Codespace Authentication Issues
@@ -41,22 +41,22 @@ GitHub Codespaces may have limited permissions for installing GitHub CLI extensi
 **Error Message:**
 
 ```text
-The action githubnext/gh-aw/actions/setup@a933c835b5e2d12ae4dead665a0fdba420a2d421 is not allowed in {ORG} because all actions must be from a repository owned by your enterprise, created by GitHub, or verified in the GitHub Marketplace.
+The action github/gh-aw/actions/setup@a933c835b5e2d12ae4dead665a0fdba420a2d421 is not allowed in {ORG} because all actions must be from a repository owned by your enterprise, created by GitHub, or verified in the GitHub Marketplace.
 ```
 
-**Cause:** Your enterprise organization has policies that restrict which GitHub Actions can be used. By default, workflows compiled by gh-aw use the custom action `githubnext/gh-aw/actions/setup` which may not be allowed by your organization's policy.
+**Cause:** Your enterprise organization has policies that restrict which GitHub Actions can be used. By default, workflows compiled by gh-aw use the custom action `github/gh-aw/actions/setup` which may not be allowed by your organization's policy.
 
-**Solution:** Enterprise administrators need to allow the `githubnext/gh-aw` repository in the organization's action policies. There are two approaches:
+**Solution:** Enterprise administrators need to allow the `github/gh-aw` repository in the organization's action policies. There are two approaches:
 
 #### Option 1: Allow Specific Repositories (Recommended)
 
-Add `githubnext/gh-aw` to your organization's allowed actions list:
+Add `github/gh-aw` to your organization's allowed actions list:
 
 1. Navigate to your organization's settings: `https://github.com/organizations/YOUR_ORG/settings/actions`
 2. Under **Policies**, select **Allow select actions and reusable workflows**
 3. In the **Allow specified actions and reusable workflows** section, add:
    ```text
-   githubnext/gh-aw@*
+   github/gh-aw@*
    ```
 4. Save the changes
 
@@ -70,7 +70,7 @@ If your enterprise uses a centralized `policies/actions.yml` file, add the gh-aw
 # policies/actions.yml
 allowed_actions:
   - "actions/*"  # GitHub-created actions
-  - "githubnext/gh-aw@*"  # Allow gh-aw custom actions
+  - "github/gh-aw@*"  # Allow gh-aw custom actions
 ```
 
 Commit this file to your organization's `.github` repository. For more information about policy files, see GitHub's documentation on [creating a default community health file](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file).
@@ -85,7 +85,7 @@ After updating the policy:
 
 > [!TIP]
 > Security Consideration
-> The gh-aw custom actions are open source and can be audited at [github.com/githubnext/gh-aw/tree/main/actions](https://github.com/githubnext/gh-aw/tree/main/actions). The actions are pinned to specific commit SHAs in compiled workflows for security and reproducibility.
+> The gh-aw custom actions are open source and can be audited at [github.com/github/gh-aw/tree/main/actions](https://github.com/github/gh-aw/tree/main/actions). The actions are pinned to specific commit SHAs in compiled workflows for security and reproducibility.
 
 ## Workflow Compilation Issues
 
@@ -371,7 +371,7 @@ Default allowed domains include GitHub domains (`github.com`, `githubusercontent
 Verify network access and GitHub authentication:
 
 ```bash wrap
-curl -I https://raw.githubusercontent.com/githubnext/gh-aw/main/README.md
+curl -I https://raw.githubusercontent.com/github/gh-aw/main/README.md
 gh auth status
 ```
 
@@ -416,10 +416,10 @@ Enable verbose compilation (`gh aw compile --verbose`), set `ACTIONS_STEP_DEBUG 
 
 For systematic investigation and resolution of workflow health issues, see:
 
-- [**Workflow Health Monitoring Runbook**](https://github.com/githubnext/gh-aw/blob/main/.github/aw/runbooks/workflow-health.md) - Comprehensive guide for diagnosing missing-tool errors, authentication failures, and configuration issues
+- [**Workflow Health Monitoring Runbook**](https://github.com/github/gh-aw/blob/main/.github/aw/runbooks/workflow-health.md) - Comprehensive guide for diagnosing missing-tool errors, authentication failures, and configuration issues
 
 The runbook includes step-by-step procedures, case studies from real incidents, and quick reference commands for workflow troubleshooting.
 
 ## Getting Help
 
-Review [reference docs](/gh-aw/reference/workflow-structure/), search [existing issues](https://github.com/githubnext/gh-aw/issues), enable debugging with verbose flags, or create a new issue with reproduction steps. See also: [Error Reference](/gh-aw/troubleshooting/errors/) and [Frontmatter Reference](/gh-aw/reference/frontmatter/).
+Review [reference docs](/gh-aw/reference/workflow-structure/), search [existing issues](https://github.com/github/gh-aw/issues), enable debugging with verbose flags, or create a new issue with reproduction steps. See also: [Error Reference](/gh-aw/troubleshooting/errors/) and [Frontmatter Reference](/gh-aw/reference/frontmatter/).

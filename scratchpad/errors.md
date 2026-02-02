@@ -42,7 +42,7 @@ The error handling system provides:
 Use for input validation failures with field-level context.
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/workflow"
+import "github.com/github/gh-aw/pkg/workflow"
 
 // Create a validation error
 err := workflow.NewValidationError(
@@ -541,8 +541,8 @@ import (
     "fmt"
     "os"
     
-    "github.com/githubnext/gh-aw/pkg/console"
-    "github.com/githubnext/gh-aw/pkg/workflow"
+    "github.com/github/gh-aw/pkg/console"
+    "github.com/github/gh-aw/pkg/workflow"
 )
 
 type IssueConfig struct {

@@ -171,7 +171,7 @@ function generateMarkdown(workflows) {
   lines.push("");
 
   // Introduction
-  lines.push("These are experimental agentic workflows used by the GitHub Next team to learn, build, and use agentic workflows. [Browse source files](https://github.com/githubnext/gh-aw/tree/main/.github/workflows).");
+  lines.push("These are experimental agentic workflows used by the GitHub Next team to learn, build, and use agentic workflows. [Browse source files](https://github.com/github/gh-aw/tree/main/.github/workflows).");
   lines.push("");
 
   // Sort workflows alphabetically by name

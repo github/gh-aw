@@ -260,7 +260,7 @@ This is definitively a Copilot CLI bug, not a gh-aw configuration or schema issu
 
 ## References
 
-- Failed run: https://github.com/githubnext/gh-aw/actions/runs/21110741074
+- Failed run: https://github.com/github/gh-aw/actions/runs/21110741074
 - Copilot CLI version: 0.0.384
 - Gateway version: v0.0.62
 - MCP Server: safe-outputs (Node.js)

@@ -18,7 +18,7 @@ The tools output is not visible to the user unless you explicitly print it. Alwa
 
 **Example: Debugging from a workflow run URL**
 
-User: "Investigate the reason there is a missing tool call in this run: https://github.com/githubnext/gh-aw/actions/runs/20135841934"
+User: "Investigate the reason there is a missing tool call in this run: https://github.com/github/gh-aw/actions/runs/20135841934"
 
 Your response:
 ```
@@ -51,7 +51,7 @@ Report back with specific findings and actionable fixes.
 - The `gh aw` CLI is already installed in this environment.
 - Always consult the **instructions file** for schema and features:
   - Local copy: @.github/aw/github-agentic-workflows.md
-  - Canonical upstream: https://raw.githubusercontent.com/githubnext/gh-aw/main/.github/aw/github-agentic-workflows.md
+  - Canonical upstream: https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 
 **Key Commands Available**
 
@@ -136,7 +136,7 @@ Report back with specific findings and actionable fixes.
 
 ## Debug Flow: Workflow Run URL Analysis
 
-When the user provides a workflow run URL (e.g., `https://github.com/githubnext/gh-aw/actions/runs/20135841934`):
+When the user provides a workflow run URL (e.g., `https://github.com/github/gh-aw/actions/runs/20135841934`):
 
 1. **Extract Run ID**
    
@@ -339,7 +339,7 @@ Use these tactics when a run is still executing or finishes without artifacts:
 - **Polling in-progress runs**: If `gh aw audit <run-id> --json` returns `"status": "in_progress"`, wait ~45s and re-run the command or monitor the run URL directly. Avoid spamming the API—loop with `sleep` intervals.
 - **Check run annotations**: `gh run view <run-id>` reveals whether a maintainer cancelled the run. If a manual cancellation is noted, expect missing safe-output artifacts and recommend re-running instead of searching for nonexistent files.
 - **Inspect specific job logs**: Use `gh run view --job <job-id> --log` (job IDs are listed in `gh run view <run-id>`) to see the exact failure step.
-- **Download targeted artifacts**: When `gh aw logs` would fetch many runs, download only the needed artifact, e.g. `GH_REPO=githubnext/gh-aw gh run download <run-id> -n agent-stdio.log`.
+- **Download targeted artifacts**: When `gh aw logs` would fetch many runs, download only the needed artifact, e.g. `GH_REPO=github/gh-aw gh run download <run-id> -n agent-stdio.log`.
 - **Review cached run summaries**: `gh aw audit` stores artifacts under `logs/run-<run-id>/`. Inspect `run_summary.json` or `agent-stdio.log` there for offline analysis before re-running workflows.
 
 ## Common Issues to Look For

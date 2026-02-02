@@ -31,7 +31,7 @@ The following workflows demonstrate the ResearchPlanAssign pattern in practice:
 
 ### Static Analysis → Plan → Fix
 
-**Research Phase**: [`static-analysis-report.md`](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/static-analysis-report.md)
+**Research Phase**: [`static-analysis-report.md`](https://github.com/github/gh-aw/blob/main/.github/workflows/static-analysis-report.md)
 
 Runs daily to scan all agentic workflows with security tools (zizmor, poutine, actionlint), creating a comprehensive security discussion with clustered findings by tool and issue type, severity assessment, fix prompts, and historical trends.
 
@@ -41,7 +41,7 @@ Runs daily to scan all agentic workflows with security tools (zizmor, poutine, a
 
 ### Duplicate Code Detection → Plan → Refactor
 
-**Research Phase**: [`duplicate-code-detector.md`](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/duplicate-code-detector.md)
+**Research Phase**: [`duplicate-code-detector.md`](https://github.com/github/gh-aw/blob/main/.github/workflows/duplicate-code-detector.md)
 
 Runs daily using Serena MCP for semantic code analysis to identify exact, structural, and functional duplication. Creates one issue per distinct pattern (max 3 per run) that are [assigned to Copilot](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot) (via `assignees: copilot` in workflow config) since duplication fixes are typically straightforward.
 
@@ -51,7 +51,7 @@ Runs daily using Serena MCP for semantic code analysis to identify exact, struct
 
 ### File Size Analysis → Plan → Refactor
 
-**Research Phase**: [`daily-file-diet.md`](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/daily-file-diet.md)
+**Research Phase**: [`daily-file-diet.md`](https://github.com/github/gh-aw/blob/main/.github/workflows/daily-file-diet.md)
 
 Runs weekdays to monitor file sizes, identify files exceeding healthy size thresholds (1000+ lines), and analyze file structure to identify natural split boundaries. Creates a detailed refactoring issue with a suggested approach and file organization recommendations.
 
@@ -61,7 +61,7 @@ Runs weekdays to monitor file sizes, identify files exceeding healthy size thres
 
 ### Deep Research → Plan → Implementation
 
-**Research Phase**: [`scout.md`](https://github.com/githubnext/gh-aw/blob/main/.github/workflows/scout.md)
+**Research Phase**: [`scout.md`](https://github.com/github/gh-aw/blob/main/.github/workflows/scout.md)
 
 Performs deep research investigations using multiple research MCPs (Tavily, arXiv, DeepWiki) to gather information from diverse sources. Creates a structured research summary with recommendations posted as a comment on the triggering issue.
 

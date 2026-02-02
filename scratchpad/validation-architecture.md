@@ -508,7 +508,7 @@ Enable with: `DEBUG=workflow:validation gh aw compile`
 Use console formatting for user-facing messages:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Success
 fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("✓ Validation passed"))

@@ -217,7 +217,7 @@ Network permissions are enforced differently depending on the AI engine:
 
 ### Copilot Engine
 
-The Copilot engine supports network permissions through AWF (Agent Workflow Firewall). AWF is a network firewall wrapper sourced from [github.com/githubnext/gh-aw-firewall](https://github.com/githubnext/gh-aw-firewall) that wraps Copilot CLI execution and enforces domain-based access controls.
+The Copilot engine supports network permissions through AWF (Agent Workflow Firewall). AWF is a network firewall wrapper sourced from [github.com/github/gh-aw-firewall](https://github.com/github/gh-aw-firewall) that wraps Copilot CLI execution and enforces domain-based access controls.
 
 Enable network permissions in your workflow:
 

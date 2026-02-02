@@ -319,7 +319,7 @@ content
     describe("complex real-world scenarios", () => {
       // TODO: This test is currently skipped due to a known issue with the algorithm
       // The algorithm treats fences inside code blocks as real fences, causing incorrect escaping
-      // See: https://github.com/githubnext/gh-aw/issues/XXXXX
+      // See: https://github.com/github/gh-aw/issues/XXXXX
       it.skip("should handle AI-generated code with nested markdown", () => {
         const input = `# Example
 
@@ -374,7 +374,7 @@ generic code
 
       // TODO: This test is currently skipped due to a known issue with the algorithm
       // The algorithm treats fences inside code blocks as real fences, causing incorrect escaping
-      // See: https://github.com/githubnext/gh-aw/issues/XXXXX
+      // See: https://github.com/github/gh-aw/issues/XXXXX
       it.skip("should handle deeply nested example", () => {
         const input = `\`\`\`markdown
 # Tutorial

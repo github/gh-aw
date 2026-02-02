@@ -21,7 +21,7 @@ imports:
 strict: true
 sandbox:
   mcp:
-    container: "ghcr.io/githubnext/gh-aw-mcpg"
+    container: "ghcr.io/github/gh-aw-mcpg"
 tools:
   cache-memory: true
   github:

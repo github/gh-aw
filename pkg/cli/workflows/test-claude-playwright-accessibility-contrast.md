@@ -16,10 +16,10 @@ safe-outputs:
 
 # Test Playwright Accessibility Contrast
 
-This is a test workflow that uses Playwright to take a screenshot of github.com/githubnext/gh-aw and analyzes it for accessibility color contrast issues.
+This is a test workflow that uses Playwright to take a screenshot of github.com/github/gh-aw and analyzes it for accessibility color contrast issues.
 
 Please:
-1. Navigate to https://github.com/githubnext/gh-aw using Playwright
+1. Navigate to https://github.com/github/gh-aw using Playwright
 2. Take a screenshot of the page
 3. Analyze the screenshot for color contrast accessibility issues
 4. Check if text elements meet WCAG 2.1 AA contrast requirements (4.5:1 for normal text, 3:1 for large text)

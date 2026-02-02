@@ -6,7 +6,7 @@ This implementation adds a Golang base parser for firewall logs that mirrors the
 
 ## Implementation Reference
 
-**Reference Run:** https://github.com/githubnext/gh-aw/actions/runs/18795259023
+**Reference Run:** https://github.com/github/gh-aw/actions/runs/18795259023
 
 **JavaScript Parser:** `pkg/workflow/js/parse_firewall_logs.cjs`
 

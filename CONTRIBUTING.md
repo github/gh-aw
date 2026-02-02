@@ -26,7 +26,7 @@ This project practices what it preaches: agentic workflows are used to build age
 
 ### Step 1: Fork the Repository
 
-Fork <https://github.com/githubnext/gh-aw/> to your GitHub account
+Fork <https://github.com/github/gh-aw/> to your GitHub account
 
 ### Step 2: Open an Issue or Discussion
 
@@ -119,7 +119,7 @@ The agent runs `make lint-errors` to verify error message quality.
 The agent uses styled console functions from `pkg/console`:
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 fmt.Println(console.FormatSuccessMessage("Operation completed"))
 fmt.Println(console.FormatInfoMessage("Processing workflow..."))

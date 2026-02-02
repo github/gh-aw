@@ -84,6 +84,6 @@ Monitor Copilot CLI releases for a fix to the schema validation logic. This issu
 
 ## References
 
-- Workflow run example: https://github.com/githubnext/gh-aw/actions/runs/21110741074
+- Workflow run example: https://github.com/github/gh-aw/actions/runs/21110741074
 - Error logs show 6 retry attempts before final failure
 - Total retry wait time: ~93 seconds

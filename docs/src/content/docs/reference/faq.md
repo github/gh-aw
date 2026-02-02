@@ -212,7 +212,7 @@ The executing agentic workflow uses:
 
 - Your nominated **coding agent** (defaulting to GitHub Copilot CLI)
 - A **GitHub Actions VM** with NodeJS
-- A small library of **pinned Actions** distributed from releases of [githubnext/gh-aw](https://github.com/githubnext/gh-aw)
+- A small library of **pinned Actions** distributed from releases of [github/gh-aw](https://github.com/github/gh-aw)
 - An **Agent Workflow Firewall** container for network control (optional but default)
 
 The exact YAML workflow executed can always be inspected in the compiled `.lock.yml` file—there's no hidden configuration.
@@ -222,7 +222,7 @@ The exact YAML workflow executed can always be inspected in the compiled `.lock.
 If you want to use a coding agent that isn't currently supported (Copilot, Claude, or Codex), you can:
 
 1. **Use the custom engine**: Define your own GitHub Actions steps without AI interpretation
-2. **Contribute support**: Work with the coding agent's makers or community to contribute to the [gh-aw repository](https://github.com/githubnext/gh-aw)
+2. **Contribute support**: Work with the coding agent's makers or community to contribute to the [gh-aw repository](https://github.com/github/gh-aw)
 3. **Request support**: Open an issue describing your use case
 
 See [AI Engines](/gh-aw/reference/engines/) for current options.

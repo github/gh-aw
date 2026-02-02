@@ -243,7 +243,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install gh-aw
-        run: gh extension install githubnext/gh-aw
+        run: gh extension install github/gh-aw
       - name: Trial workflow
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

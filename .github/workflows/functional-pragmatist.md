@@ -434,7 +434,7 @@ package fp_test
 
 import (
     "testing"
-    "github.com/githubnext/gh-aw/pkg/fp"
+    "github.com/github/gh-aw/pkg/fp"
     "github.com/stretchr/testify/assert"
 )
 

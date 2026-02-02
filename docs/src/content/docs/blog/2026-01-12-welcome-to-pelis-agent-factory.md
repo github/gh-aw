@@ -28,7 +28,7 @@ Let's explore together!
 
 ## What Is Peli's Agent Factory?
 
-Peli's factory is a collection of [**automated agentic workflows**](https://githubnext.github.io/gh-aw) we use in practice. We have built and operated **over 100 automated agentic workflows** within the [`githubnext/gh-aw`](https://github.com/githubnext/gh-aw) repository and its companion [`githubnext/agentics`](https://github.com/githubnext/agentics) collection. These were used mostly in the context of the [`githubnext/gh-aw`](https://github.com/githubnext/gh-aw) project itself, but some have also been applied at scale in GitHub internal repositories. These weren't hypothetical demos - they were working agents that:
+Peli's factory is a collection of [**automated agentic workflows**](https://githubnext.github.io/gh-aw) we use in practice. We have built and operated **over 100 automated agentic workflows** within the [`github/gh-aw`](https://github.com/github/gh-aw) repository and its companion [`githubnext/agentics`](https://github.com/githubnext/agentics) collection. These were used mostly in the context of the [`github/gh-aw`](https://github.com/github/gh-aw) project itself, but some have also been applied at scale in GitHub internal repositories. These weren't hypothetical demos - they were working agents that:
 
 - [Triage incoming issues](/gh-aw/blog/2026-01-13-meet-the-workflows/)
 - [Diagnose CI failures](/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/)

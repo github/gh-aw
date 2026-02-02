@@ -191,9 +191,9 @@ Current version: **1.0.0** (Candidate Recommendation)
 
 For questions, feedback, or errata:
 
-- **Repository**: https://github.com/githubnext/gh-aw
-- **Issues**: https://github.com/githubnext/gh-aw/issues
-- **Discussions**: https://github.com/githubnext/gh-aw/discussions
+- **Repository**: https://github.com/github/gh-aw
+- **Issues**: https://github.com/github/gh-aw/issues
+- **Discussions**: https://github.com/github/gh-aw/discussions
 
 ## License
 

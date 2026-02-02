@@ -470,7 +470,7 @@ describe("searchEntitiesWithExpiration", () => {
   });
 
   it("should NOT find issue #12669 without XML workflow markers", async () => {
-    // Issue #12669: https://github.com/githubnext/gh-aw/issues/12669
+    // Issue #12669: https://github.com/github/gh-aw/issues/12669
     // This issue was not detected because it lacks XML comment markers
     // (gh-aw-workflow-id or gh-aw-agentic-workflow)
     // This is correct behavior - only issues with XML markers should be auto-closed
@@ -478,7 +478,7 @@ describe("searchEntitiesWithExpiration", () => {
       id: "I_kwDOPc1QR87m5TZ3",
       number: 12669,
       title: "Smoke Copilot - Issue Group",
-      url: "https://github.com/githubnext/gh-aw/issues/12669",
+      url: "https://github.com/github/gh-aw/issues/12669",
       body: `# Smoke Copilot
 
 Parent issue for grouping related issues from <a>Smoke Copilot</a>.

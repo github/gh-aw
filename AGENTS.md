@@ -368,7 +368,7 @@ See **[scratchpad/validation-refactoring.md](scratchpad/validation-refactoring.m
 **ALWAYS use console formatting for user output:**
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/console"
+import "github.com/github/gh-aw/pkg/console"
 
 // Success, info, warning, error messages
 fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Success!"))
@@ -417,7 +417,7 @@ fmt.Printf("Warning: %s\n", msg) // Should use stderr
 **ALWAYS use the logger package for debug logging:**
 
 ```go
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 // Create a logger with namespace following pkg:filename convention
 var log = logger.New("pkg:filename")
@@ -483,8 +483,8 @@ For developing new CLI commands, follow these patterns and conventions. See **[s
 package cli
 
 import (
-    "github.com/githubnext/gh-aw/pkg/console"
-    "github.com/githubnext/gh-aw/pkg/logger"
+    "github.com/github/gh-aw/pkg/console"
+    "github.com/github/gh-aw/pkg/logger"
     "github.com/spf13/cobra"
 )
 
@@ -1079,7 +1079,7 @@ Before EVERY commit:
 - Go project with Makefile-managed build/test/lint
 - Use `make test-unit` for fast development testing, `make test` for full coverage
 - Use console formatting for user output
-- Repository: `githubnext/gh-aw`
+- Repository: `github/gh-aw`
 - Include issue numbers in PR titles when fixing issues
 - Read issue comments for context before making changes
 - Use conventional commits for commit messages

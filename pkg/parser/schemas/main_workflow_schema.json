@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/githubnext/gh-aw/schemas/main_workflow_schema.json",
+  "$id": "https://github.com/github/gh-aw/schemas/main_workflow_schema.json",
   "title": "GitHub Agentic Workflow Schema",
   "description": "JSON Schema for validating agentic workflow frontmatter configuration",
   "version": "1.0.0",

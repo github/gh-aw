@@ -6,7 +6,7 @@ Campaign discovery uses **budget limits** to prevent unbounded API usage when se
 
 ## The Workflow Run
 
-**Example**: [Security Alert Burndown Run #21255054636](https://github.com/githubnext/gh-aw/actions/runs/21255054636)
+**Example**: [Security Alert Burndown Run #21255054636](https://github.com/github/gh-aw/actions/runs/21255054636)
 
 This workflow run was a no-op because:
 1. **Discovery found 0 items** matching the campaign criteria
@@ -125,7 +125,7 @@ Possible reasons:
 ```yaml
 # From .github/workflows/security-alert-burndown.md
 scope:
-  - githubnext/gh-aw  # Only searching this repo
+  - github/gh-aw  # Only searching this repo
 
 workflows:
   - code-scanning-fixer

@@ -687,7 +687,7 @@ The system is production-ready and extensible, with clear paths for enhancement 
 The action mode system enables the workflow compiler to generate different types of references to custom actions. Three modes are supported:
 
 1. **Dev mode** (`ActionModeDev`): References custom actions using local paths (e.g., `uses: ./actions/setup`)
-2. **Release mode** (`ActionModeRelease`): References custom actions using SHA-pinned remote paths (e.g., `uses: githubnext/gh-aw/actions/setup@sha`)
+2. **Release mode** (`ActionModeRelease`): References custom actions using SHA-pinned remote paths (e.g., `uses: github/gh-aw/actions/setup@sha`)
 3. **Script mode** (`ActionModeScript`): Generates direct shell script calls instead of using GitHub Actions `uses:` syntax
 
 This creates a complete development workflow:
@@ -747,7 +747,7 @@ Script mode implements direct shell script execution instead of using GitHub Act
 - name: Checkout actions folder
   uses: actions/checkout@v5
   with:
-    repository: githubnext/gh-aw
+    repository: github/gh-aw
     sparse-checkout: |
       actions
     path: /tmp/gh-aw/actions-source
@@ -765,9 +765,9 @@ Script mode implements direct shell script execution instead of using GitHub Act
 ```
 
 **Key differences from dev/release modes:**
-- Checks out the `githubnext/gh-aw` repository instead of the workflow repository
+- Checks out the `github/gh-aw` repository instead of the workflow repository
 - Uses sparse checkout to only fetch the `actions` folder
-- Runs setup.sh script directly instead of using `uses: ./actions/setup` or `uses: githubnext/gh-aw/actions/setup@sha`
+- Runs setup.sh script directly instead of using `uses: ./actions/setup` or `uses: github/gh-aw/actions/setup@sha`
 - Shallow clone (`depth: 1`) for efficiency
 - Environment variable `INPUT_DESTINATION` passed to setup script
 
@@ -869,7 +869,7 @@ jobs:
       - name: Checkout actions folder
         uses: actions/checkout@v5
         with:
-          repository: githubnext/gh-aw
+          repository: github/gh-aw
           sparse-checkout: |
             actions
           path: /tmp/gh-aw/actions-source
@@ -1028,7 +1028,7 @@ jobs:
 3. **Validation**: Add compile-time validation of action paths (check if action exists in `actions/` directory)
 4. **Cache support**: Cache compiled custom actions for faster subsequent compilations
 5. **Automatic action creation**: Generate action scaffold from script registry entries
-6. **Release mode**: Support versioned action references like `githubnext/gh-aw/.github/actions/create-issue@v1.0.0`
+6. **Release mode**: Support versioned action references like `github/gh-aw/.github/actions/create-issue@v1.0.0`
 7. **CLI integration**: Add `--action-mode=dev|inline` flag to compile command
 
 ### Testing

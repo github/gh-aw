@@ -86,8 +86,8 @@ See the [Peli's Agent Factory](https://githubnext.github.io/gh-aw/blog/2026-01-1
 
 GitHub Agentic Workflows is supported by companion projects that provide additional security and integration capabilities:
 
-- **[Agent Workflow Firewall (AWF)](https://github.com/githubnext/gh-aw-firewall)** - Network egress control for AI agents, providing domain-based access controls and activity logging for secure workflow execution
-- **[MCP Gateway](https://github.com/githubnext/gh-aw-mcpg)** - Routes Model Context Protocol (MCP) server calls through a unified HTTP gateway for centralized access management
+- **[Agent Workflow Firewall (AWF)](https://github.com/github/gh-aw-firewall)** - Network egress control for AI agents, providing domain-based access controls and activity logging for secure workflow execution
+- **[MCP Gateway](https://github.com/github/gh-aw-mcpg)** - Routes Model Context Protocol (MCP) server calls through a unified HTTP gateway for centralized access management
 - **[The Agentics](https://github.com/githubnext/agentics)** - A collection of reusable agentic workflow components, tools, and templates to accelerate workflow development
 
 ---

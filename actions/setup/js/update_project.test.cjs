@@ -1113,7 +1113,7 @@ describe("updateProject", () => {
       content_type: "issue",
       content_number: 95,
       fields: {
-        repository: "githubnext/gh-aw",
+        repository: "github/gh-aw",
       },
     };
 
@@ -1150,7 +1150,7 @@ describe("updateProject", () => {
       content_type: "issue",
       content_number: 96,
       fields: {
-        repository: "githubnext/gh-aw",
+        repository: "github/gh-aw",
       },
     };
 
@@ -1185,7 +1185,7 @@ describe("updateProject", () => {
       content_number: 97,
       fields: {
         // Using "repo" as field name, but it's actually a REPOSITORY type field in the project
-        repo: "githubnext/gh-aw",
+        repo: "github/gh-aw",
       },
     };
 

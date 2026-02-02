@@ -161,7 +161,7 @@ After rotation and invalidation:
 ### References
 
 - Alert: [§{alert_number}]({alert_url})
-- Workflow Run: [§{run_id}](https://github.com/githubnext/gh-aw/actions/runs/{run_id})
+- Workflow Run: [§{run_id}](https://github.com/github/gh-aw/actions/runs/{run_id})
 ```
 
 **Key formatting requirements**:

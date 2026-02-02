@@ -30,10 +30,10 @@ The `create-agentic-agent` migrates workflows through these steps:
 
 ## Example Migration
 
-The `release.md` workflow migration from `githubnext/gh-aw` to `githubnext/gh-aw-mcpg`:
+The `release.md` workflow migration from `github/gh-aw` to `github/gh-aw-mcpg`:
 
 ```yaml wrap title="Prompt for create-agentic-agent"
-Migrate the release.md workflow from githubnext/gh-aw to this repository.
+Migrate the release.md workflow from github/gh-aw to this repository.
 
 The workflow should:
 - Keep the same release automation logic
@@ -96,7 +96,7 @@ repository, adapting for internal MCP servers and security policies.
 
 ## Real-World Example
 
-The `release.md` migration from `githubnext/gh-aw` to `githubnext/gh-aw-mcpg` preserved release automation logic while adapting permissions, repository references, and structure for the target environment.
+The `release.md` migration from `github/gh-aw` to `github/gh-aw-mcpg` preserved release automation logic while adapting permissions, repository references, and structure for the target environment.
 
 ## Best Practices
 

@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-05  
 **oh-my-opencode Repository**: https://github.com/code-yeongyu/oh-my-opencode  
-**GitHub Agentic Workflows Repository**: https://github.com/githubnext/gh-aw  
+**GitHub Agentic Workflows Repository**: https://github.com/github/gh-aw  
 **Status**: Comprehensive Analysis
 
 ## Executive Summary
@@ -966,7 +966,7 @@ User: "ultrawork - Refactor authentication to use OAuth2"
 **Installation**:
 ```bash
 # Install gh-aw CLI extension
-gh extension install githubnext/gh-aw
+gh extension install github/gh-aw
 
 # Or use npm
 npm install -g gh-aw
@@ -1663,7 +1663,7 @@ The future likely involves both approaches: developers using AI agents locally f
 - **Reviews**: Multiple testimonials from professionals
 
 ### GitHub Agentic Workflows
-- **Repository**: https://github.com/githubnext/gh-aw
+- **Repository**: https://github.com/github/gh-aw
 - **Documentation**: https://githubnext.github.io/gh-aw/
 - **Security Guide**: https://githubnext.github.io/gh-aw/guides/security/
 - **Discord**: #continuous-ai in GitHub Next Discord

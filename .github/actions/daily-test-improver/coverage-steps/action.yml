@@ -119,7 +119,7 @@ runs:
         
         # Generate package coverage summary
         go tool cover -func=coverage.out | \
-          grep -E "^github.com/githubnext/gh-aw/pkg" | \
+          grep -E "^github.com/github/gh-aw/pkg" | \
           awk '{
             # Extract package path (everything before the last colon)
             idx = match($0, /:[0-9]+:/)

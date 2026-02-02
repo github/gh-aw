@@ -25,7 +25,7 @@ You are a helpful assistant.
 
 # User Task
 Please help me with this task.
-Repository: githubnext/gh-aw
+Repository: github/gh-aw
 Actor: octocat
 EOF
 

@@ -37,7 +37,7 @@ Imports provide several game-changing benefits that transformed how we develop a
 
 When we improve report formatting or update an MCP server configuration, the change automatically propagates to all workflows that import it. No need to update 46 workflows individually. That's huge!
 
-For example, when we enhanced the [`reporting.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/reporting.md) component with better formatting guidelines, all 46 workflows that imported it immediately benefited. One change, 46 workflows improved. Magic.
+For example, when we enhanced the [`reporting.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/reporting.md) component with better formatting guidelines, all 46 workflows that imported it immediately benefited. One change, 46 workflows improved. Magic.
 
 ### 🧩 Composable Workflow Capabilities
 
@@ -95,38 +95,38 @@ The factory organized shared components into two main directories:
 
 #### Most Popular Shared Components
 
-**[`reporting.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/reporting.md?plain=1)** (46 imports)
+**[`reporting.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/reporting.md?plain=1)** (46 imports)
 
 - Report formatting guidelines
 - Workflow run references
 - Footer standards
 - Consistent structure
 
-**[`jqschema.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/jqschema.md?plain=1)** (17 imports)
+**[`jqschema.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/jqschema.md?plain=1)** (17 imports)
 
 - JSON querying utilities
 - Schema validation
 - Data transformation patterns
 
-**[`python-dataviz.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/python-dataviz.md?plain=1)** (7 imports)
+**[`python-dataviz.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/python-dataviz.md?plain=1)** (7 imports)
 
 - Python environment with NumPy, Pandas, Matplotlib, Seaborn
 - Data visualization templates
 - Chart generation utilities
 
-**[`trending-charts-simple.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/trending-charts-simple.md?plain=1)** (6 imports)
+**[`trending-charts-simple.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/trending-charts-simple.md?plain=1)** (6 imports)
 
 - Quick setup for trend visualizations
 - Time-series analysis
 - Comparison charts
 
-**[`gh.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/gh.md?plain=1)** (4 imports)
+**[`gh.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/gh.md?plain=1)** (4 imports)
 
 - Safe-input wrapper for GitHub CLI
 - Authentication handling
 - Common gh commands
 
-**[`copilot-pr-data-fetch.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/copilot-pr-data-fetch.md?plain=1)** (4 imports)
+**[`copilot-pr-data-fetch.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/copilot-pr-data-fetch.md?plain=1)** (4 imports)
 
 - Fetch GitHub Copilot PR data
 - Cache management
@@ -136,14 +136,14 @@ The factory organized shared components into two main directories:
 
 **Data Analysis**
 
-- [`charts-with-trending.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/charts-with-trending.md) - Comprehensive trending with cache-memory
-- [`ci-data-analysis.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/ci-data-analysis.md) - CI workflow analysis
-- [`session-analysis-charts.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/session-analysis-charts.md) - Copilot session visualization
+- [`charts-with-trending.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/charts-with-trending.md) - Comprehensive trending with cache-memory
+- [`ci-data-analysis.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/ci-data-analysis.md) - CI workflow analysis
+- [`session-analysis-charts.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/session-analysis-charts.md) - Copilot session visualization
 
 **Prompting & Output**
 
-- [`keep-it-short.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/keep-it-short.md) - Guidance for concise responses
-- [`safe-output-app.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/safe-output-app.md) - Safe output patterns
+- [`keep-it-short.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/keep-it-short.md) - Guidance for concise responses
+- [`safe-output-app.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/safe-output-app.md) - Safe output patterns
 
 ### MCP Server Configurations: `.github/workflows/shared/mcp/`
 
@@ -151,31 +151,31 @@ The factory organized shared components into two main directories:
 
 #### Most Used MCP Servers
 
-**[`gh-aw.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/gh-aw.md?plain=1)** (12 imports)
+**[`gh-aw.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/gh-aw.md?plain=1)** (12 imports)
 
 - GitHub Agentic Workflows MCP server
 - `logs` command for workflow debugging
 - Workflow metadata access
 
-**[`tavily.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/tavily.md?plain=1)** (5 imports)
+**[`tavily.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/tavily.md?plain=1)** (5 imports)
 
 - Web search via Tavily API
 - Research capabilities
 - Current information access
 
-**[`markitdown.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/markitdown.md?plain=1)** (3 imports)
+**[`markitdown.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/markitdown.md?plain=1)** (3 imports)
 
 - Document conversion (PDF, Office, images to Markdown)
 - Content extraction
 - Multimedia analysis
 
-**[`ast-grep.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/ast-grep.md?plain=1)** (2 imports)
+**[`ast-grep.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/ast-grep.md?plain=1)** (2 imports)
 
 - Structural code search and analysis
 - Pattern matching
 - Refactoring support
 
-**[`brave.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/brave.md?plain=1)** (2 imports)
+**[`brave.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/brave.md?plain=1)** (2 imports)
 
 - Alternative web search via Brave API
 - Privacy-focused search
@@ -185,23 +185,23 @@ The factory organized shared components into two main directories:
 
 **Development Tools**
 
-- [`jupyter.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/jupyter.md) - Jupyter notebook environment with Docker services
-- [`skillz.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/skillz.md) - Dynamic skill loading from `.github/skills/`
-- [`serena.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/serena.md) - Semantic code analysis
+- [`jupyter.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/jupyter.md) - Jupyter notebook environment with Docker services
+- [`skillz.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/skillz.md) - Dynamic skill loading from `.github/skills/`
+- [`serena.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/serena.md) - Semantic code analysis
 
 **Knowledge & Search**
 
-- [`context7.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/context7.md) - Context-aware search
-- [`deepwiki.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/deepwiki.md) - Wikipedia deep search
-- [`microsoft-docs.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/microsoft-docs.md) - Microsoft documentation
-- [`arxiv.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/arxiv.md) - Academic paper research
+- [`context7.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/context7.md) - Context-aware search
+- [`deepwiki.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/deepwiki.md) - Wikipedia deep search
+- [`microsoft-docs.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/microsoft-docs.md) - Microsoft documentation
+- [`arxiv.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/arxiv.md) - Academic paper research
 
 **External Integrations**
 
-- [`slack.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/slack.md) - Slack workspace integration
-- [`notion.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/notion.md) - Notion workspace integration
-- [`sentry.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/sentry.md) - Error tracking
-- [`datadog.md`](https://github.com/githubnext/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/datadog.md) - Observability platform
+- [`slack.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/slack.md) - Slack workspace integration
+- [`notion.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/notion.md) - Notion workspace integration
+- [`sentry.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/sentry.md) - Error tracking
+- [`datadog.md`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/shared/mcp/datadog.md) - Observability platform
 
 ## Import Statistics
 
