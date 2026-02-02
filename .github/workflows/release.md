@@ -446,7 +446,7 @@ For complete details, see [CHANGELOG](https://github.com/github/gh-aw/blob/main/
 - Lead with benefits: "GitHub MCP now supports remote mode" not "Added remote mode"
 - Be specific: "Reduced compilation time by 40%" not "Faster compilation"
 - Skip internal changes unless they have user impact
-- Use docs links: `[Learn more](https://githubnext.github.io/gh-aw/path/)`
+- Use docs links: `[Learn more](https://github.github.io/gh-aw/path/)`
 - Keep breaking changes prominent with action items
 
 ### 4. Handle Special Cases
@@ -502,8 +502,8 @@ safeoutputs/update_release(
 **WARNING**: If you don't call the MCP tool properly, the release notes will NOT be updated!
 
 **Documentation Base URLs:**
-- User docs: `https://githubnext.github.io/gh-aw/`
-- Reference: `https://githubnext.github.io/gh-aw/reference/`
-- Setup: `https://githubnext.github.io/gh-aw/setup/`
+- User docs: `https://github.github.io/gh-aw/`
+- Reference: `https://github.github.io/gh-aw/reference/`
+- Setup: `https://github.github.io/gh-aw/setup/`
 
 Verify paths exist in `docs_files.txt` before linking.

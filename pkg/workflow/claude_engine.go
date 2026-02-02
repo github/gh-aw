@@ -69,7 +69,7 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	// Define engine configuration for shared validation
 	config := EngineInstallConfig{
 		Secrets:         []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"},
-		DocsURL:         "https://githubnext.github.io/gh-aw/reference/engines/#anthropic-claude-code",
+		DocsURL:         "https://github.github.io/gh-aw/reference/engines/#anthropic-claude-code",
 		NpmPackage:      "@anthropic-ai/claude-code",
 		Version:         string(constants.DefaultClaudeCodeVersion),
 		Name:            "Claude Code",

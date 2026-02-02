@@ -54,7 +54,7 @@ describe("generate_footer.cjs", () => {
 
     // Create the workflow install note template
     const templatePath = path.join(testPromptsDir, "workflow_install_note.md");
-    const templateContent = "To add this workflow in your repository, run `gh aw add {workflow_source}`. See [usage guide](https://githubnext.github.io/gh-aw/guides/packaging-imports/).";
+    const templateContent = "To add this workflow in your repository, run `gh aw add {workflow_source}`. See [usage guide](https://github.github.io/gh-aw/guides/packaging-imports/).";
     fs.writeFileSync(templatePath, templateContent, "utf8");
 
     // Set environment to use test directory
@@ -136,7 +136,7 @@ describe("generate_footer.cjs", () => {
       const result = generateFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "owner/repo/workflow.md@main", "https://github.com/owner/repo/blob/main/workflow.md", undefined, undefined, undefined);
 
       expect(result).toContain("gh aw add owner/repo/workflow.md@main");
-      expect(result).toContain("See [usage guide](https://githubnext.github.io/gh-aw/guides/packaging-imports/)");
+      expect(result).toContain("See [usage guide](https://github.github.io/gh-aw/guides/packaging-imports/)");
     });
 
     it("should not include installation instructions when source is empty", () => {

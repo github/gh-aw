@@ -17,7 +17,7 @@ async function main() {
 
   // Check if GH_TOKEN is present
   if (!ghToken?.trim()) {
-    const docsUrl = "https://githubnext.github.io/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot";
+    const docsUrl = "https://github.github.io/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot";
     core.setFailed(`GH_TOKEN environment variable is required but not set. This token is needed to assign issues. For more information on configuring Copilot tokens, see: ${docsUrl}`);
     return;
   }

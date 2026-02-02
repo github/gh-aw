@@ -11,7 +11,7 @@ In this guide you will add the automated [**Daily Repo Status Report**](https://
 
 Remember the aim here is _automated AI_: to install something that will run _automatically_ every day, in the context of your repository, and create a fresh status report issue in your repository without any further manual intervention. If you're familiar with GitHub Actions, you will be aware of the power of automation.
 
-There are hundreds of other ways to use GitHub Agentic Workflows, which you can explore in [Peli's Agent Factory](https://githubnext.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/). This workflow is just the start of what's possible.
+There are hundreds of other ways to use GitHub Agentic Workflows, which you can explore in [Peli's Agent Factory](https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/). This workflow is just the start of what's possible.
 
 ## Prerequisites
 
@@ -90,7 +90,7 @@ Some ideas for customization:
 - Request analysis of ways the repository could be modernized or simplified
 - And much more!
 
-Alternatively, you can browse some of the sample workflows in [Peli's Agent Factory](https://githubnext.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) and add them to your repository using `gh aw add <workflow-spec>`, or remix them to create your own workflows.
+Alternatively, you can browse some of the sample workflows in [Peli's Agent Factory](https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) and add them to your repository using `gh aw add <workflow-spec>`, or remix them to create your own workflows.
 
 ## What's next?
 

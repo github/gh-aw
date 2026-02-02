@@ -1,6 +1,6 @@
 # Meet the Workflows: Continuous Refactoring
 
-Blog URL: https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
+Blog URL: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
 Social Publish Date: 2026-01-24
 
 ## X (Twitter)
@@ -11,7 +11,7 @@ Learn about two GitHub Agentic Workflows that automate the refactoring of your c
 
 You'll learn an important pattern: use cheap tools (like ast-grep) to find candidates, then escalate only the interesting cases to AI analysis. This makes continuous refactoring affordable at scale.
 
-See how it works: https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
+See how it works: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
 
 #GitHubNext #AI #DevOps #PelisFactory
 
@@ -21,7 +21,7 @@ How do you automate cleanup of AI code as your project grows? 🏗️
 
 These GitHub Agentic Workflows look beyond "does it work?" to ask "is it in the right place?" One uses semantic analysis to spot organizational issues. The other shows you how to combine cheap AST scanning with targeted agent review.
 
-https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
+https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
 
 ## Mastodon
 
@@ -29,7 +29,7 @@ Wondering how to maintain good code organization at scale for AI-generated code?
 
 Discover two structural refactoring workflows built with GitHub Agentic Workflows: one uses semantic analysis to find misplaced code, the other combines AST pattern detection with agent review for cost-effective continuous improvement.
 
-https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #Automation #GitHub #PelisFactory
+https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #Automation #GitHub #PelisFactory
 
 ## LinkedIn
 
@@ -46,6 +46,6 @@ This workflow demonstrates a critical cost-optimization pattern: it uses ast-gre
 These workflows show you how to maintain good architecture continuously rather than through painful quarterly refactoring efforts.
 
 Read the tour + get the workflows:
-https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
+https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/
 
 #GitHubNext #AI #DevOps #Automation #PelisFactory

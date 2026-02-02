@@ -170,7 +170,7 @@ When a user requests capabilities beyond agentic workflows:
 
 Before creating workflows, read the Peli's Agent Factory documentation:
 
-- Fetch: https://githubnext.github.io/gh-aw/_llms-txt/agentic-workflows.txt
+- Fetch: https://github.github.io/gh-aw/_llms-txt/agentic-workflows.txt
 
 This llms.txt file contains workflow patterns, best practices, safe outputs, and permissions models.
 

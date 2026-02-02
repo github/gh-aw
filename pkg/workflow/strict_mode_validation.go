@@ -66,7 +66,7 @@ func (c *Compiler) validateStrictPermissions(frontmatter map[string]any) error {
 	for _, scope := range writePermissions {
 		if perms.IsAllowed(scope, "write") {
 			strictModeValidationLog.Printf("Write permission validation failed: scope=%s", scope)
-			return fmt.Errorf("strict mode: write permission '%s: write' is not allowed for security reasons. Use 'safe-outputs.create-issue', 'safe-outputs.create-pull-request', 'safe-outputs.add-comment', or 'safe-outputs.update-issue' to perform write operations safely. See: https://githubnext.github.io/gh-aw/reference/safe-outputs/", scope)
+			return fmt.Errorf("strict mode: write permission '%s: write' is not allowed for security reasons. Use 'safe-outputs.create-issue', 'safe-outputs.create-pull-request', 'safe-outputs.add-comment', or 'safe-outputs.update-issue' to perform write operations safely. See: https://github.github.io/gh-aw/reference/safe-outputs/", scope)
 		}
 	}
 
@@ -99,7 +99,7 @@ func (c *Compiler) validateStrictNetwork(networkPermissions *NetworkPermissions)
 	for _, domain := range networkPermissions.Allowed {
 		if domain == "*" {
 			strictModeValidationLog.Printf("Network validation failed: wildcard detected")
-			return fmt.Errorf("strict mode: wildcard '*' is not allowed in network.allowed domains to prevent unrestricted internet access. Specify explicit domains or use ecosystem identifiers like 'python', 'node', 'containers'. See: https://githubnext.github.io/gh-aw/reference/network/#available-ecosystem-identifiers")
+			return fmt.Errorf("strict mode: wildcard '*' is not allowed in network.allowed domains to prevent unrestricted internet access. Specify explicit domains or use ecosystem identifiers like 'python', 'node', 'containers'. See: https://github.github.io/gh-aw/reference/network/#available-ecosystem-identifiers")
 		}
 	}
 
@@ -141,7 +141,7 @@ func (c *Compiler) validateStrictMCPNetwork(frontmatter map[string]any, networkP
 			if _, hasContainer := serverConfig["container"]; hasContainer {
 				// Require top-level network configuration
 				if !hasTopLevelNetwork {
-					return fmt.Errorf("strict mode: custom MCP server '%s' with container must have top-level network configuration for security. Add 'network: { allowed: [...] }' to the workflow to restrict network access. See: https://githubnext.github.io/gh-aw/reference/network/", serverName)
+					return fmt.Errorf("strict mode: custom MCP server '%s' with container must have top-level network configuration for security. Add 'network: { allowed: [...] }' to the workflow to restrict network access. See: https://github.github.io/gh-aw/reference/network/", serverName)
 				}
 			}
 		}
@@ -172,7 +172,7 @@ func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
 			if mode, hasMode := serenaConfig["mode"]; hasMode {
 				if modeStr, ok := mode.(string); ok && modeStr == "local" {
 					strictModeValidationLog.Printf("Serena local mode validation failed")
-					return fmt.Errorf("strict mode: serena tool with 'mode: local' is not allowed for security reasons. Local mode runs the MCP server directly on the host without containerization, bypassing security isolation. Use 'mode: docker' (default) instead, which runs Serena in a container. See: https://githubnext.github.io/gh-aw/reference/tools/#serena")
+					return fmt.Errorf("strict mode: serena tool with 'mode: local' is not allowed for security reasons. Local mode runs the MCP server directly on the host without containerization, bypassing security isolation. Use 'mode: docker' (default) instead, which runs Serena in a container. See: https://github.github.io/gh-aw/reference/tools/#serena")
 				}
 			}
 		}
@@ -289,7 +289,7 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 	// In strict mode, this is not allowed for any engine as it disables the agent sandbox
 	if sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
 		strictModeValidationLog.Printf("sandbox: false is set, refusing in strict mode")
-		return fmt.Errorf("strict mode: 'sandbox: false' is not allowed because it disables all sandbox features including the firewall and gateway. This removes important security protections. Remove 'sandbox: false' or set 'strict: false' to disable strict mode. See: https://githubnext.github.io/gh-aw/reference/sandbox/")
+		return fmt.Errorf("strict mode: 'sandbox: false' is not allowed because it disables all sandbox features including the firewall and gateway. This removes important security protections. Remove 'sandbox: false' or set 'strict: false' to disable strict mode. See: https://github.github.io/gh-aw/reference/sandbox/")
 	}
 
 	// Only apply to copilot and codex engines
@@ -334,7 +334,7 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 	// In strict mode, firewall MUST be enabled
 	if networkPermissions.Firewall == nil || !networkPermissions.Firewall.Enabled {
 		strictModeValidationLog.Printf("Firewall validation failed: firewall not enabled in strict mode")
-		return fmt.Errorf("strict mode: firewall must be enabled for %s engine with network restrictions. The firewall should be enabled by default, but if you've explicitly disabled it with 'network.firewall: false' or 'sandbox.agent: false', this is not allowed in strict mode for security reasons. See: https://githubnext.github.io/gh-aw/reference/network/", engineID)
+		return fmt.Errorf("strict mode: firewall must be enabled for %s engine with network restrictions. The firewall should be enabled by default, but if you've explicitly disabled it with 'network.firewall: false' or 'sandbox.agent: false', this is not allowed in strict mode for security reasons. See: https://github.github.io/gh-aw/reference/network/", engineID)
 	}
 
 	strictModeValidationLog.Printf("Firewall validation passed")

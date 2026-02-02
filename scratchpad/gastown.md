@@ -962,6 +962,6 @@ These enhancements would position gh-aw as a full-featured agentic workflow plat
 **References**:
 - Gastown: https://github.com/steveyegge/gastown
 - Beads: https://github.com/steveyegge/beads
-- gh-aw Documentation: https://githubnext.github.io/gh-aw/
+- gh-aw Documentation: https://github.github.io/gh-aw/
 
 **Last Updated**: 2026-01-02

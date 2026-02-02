@@ -11,7 +11,7 @@ engine:
           echo "Error: OPENAI_API_KEY secret is not set"
           echo "The GenAIScript engine with openai:gpt-4o model requires OPENAI_API_KEY secret to be configured."
           echo "Please configure this secret in your repository settings."
-          echo "Documentation: https://githubnext.github.io/gh-aw/reference/engines/"
+          echo "Documentation: https://github.github.io/gh-aw/reference/engines/"
           exit 1
         fi
         echo "OPENAI_API_KEY secret is configured"

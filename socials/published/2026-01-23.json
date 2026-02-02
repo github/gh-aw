@@ -7,20 +7,20 @@
     "x": {
       "id": "dryrun-x-2026-01-23",
       "url": "https://twitter.com/i/web/status/dryrun-x-2026-01-23",
-      "content": "Day 3 in Peli’s Agent Factory 🍫✨: Continuous Simplicity.\nTwo agents that run continuously to keep code simple 🧹🤖\n- Automatic Code Simplifier\n- Duplicate Code Detector\nTour + source links: https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #GitHubNext #AI #DevOps"
+      "content": "Day 3 in Peli’s Agent Factory 🍫✨: Continuous Simplicity.\nTwo agents that run continuously to keep code simple 🧹🤖\n- Automatic Code Simplifier\n- Duplicate Code Detector\nTour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #GitHubNext #AI #DevOps"
     },
     "bluesky": {
       "uri": "at://dryrun/bluesky/2026-01-23",
-      "content": "Day 3 in Peli’s Agent Factory 🍫✨: Continuous Simplicity.\nWhile humans sprint ahead, these agents trail along simplifying recently-changed code and spotting semantic duplication (with Serena). Tour + source links: https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/"
+      "content": "Day 3 in Peli’s Agent Factory 🍫✨: Continuous Simplicity.\nWhile humans sprint ahead, these agents trail along simplifying recently-changed code and spotting semantic duplication (with Serena). Tour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/"
     },
     "mastodon": {
       "id": "dryrun-mastodon-2026-01-23",
       "url": "",
-      "content": "Day 3 in Peli’s Agent Factory 🍫🔧: Continuous Simplicity 🧹🤖\nTwo quiet maintainers:\n- Automatic Code Simplifier\n- Duplicate Code Detector\nTour + source links: https://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #Automation #GitHub"
+      "content": "Day 3 in Peli’s Agent Factory 🍫🔧: Continuous Simplicity 🧹🤖\nTwo quiet maintainers:\n- Automatic Code Simplifier\n- Duplicate Code Detector\nTour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #Automation #GitHub"
     },
     "linkedin": {
       "id": "dryrun-linkedin-2026-01-23",
-      "content": "Day 3 in Peli’s Agent Factory: Continuous Simplicity 🍫✨\nAfter issue triage, the next stop on our tour are agents that continuously simplify code!\nTwo workflows:\n- Automatic Code Simplifier 🧹 \n- Duplicate Code Detector 🤖\nTour + workflow source links:\nhttps://githubnext.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/\n#GitHubNext #AI #DevOps #Automation"
+      "content": "Day 3 in Peli’s Agent Factory: Continuous Simplicity 🍫✨\nAfter issue triage, the next stop on our tour are agents that continuously simplify code!\nTwo workflows:\n- Automatic Code Simplifier 🧹 \n- Duplicate Code Detector 🤖\nTour + workflow source links:\nhttps://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/\n#GitHubNext #AI #DevOps #Automation"
     }
   }
 }

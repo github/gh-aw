@@ -1511,7 +1511,7 @@ return fmt.Errorf(
 **Example:**
 ```go
 return fmt.Errorf(
-    "strict mode: write permission 'contents: write' is not allowed for security reasons. Use 'safe-outputs.create-issue' or 'safe-outputs.create-pull-request' to perform write operations safely. See: https://githubnext.github.io/gh-aw/reference/safe-outputs/",
+    "strict mode: write permission 'contents: write' is not allowed for security reasons. Use 'safe-outputs.create-issue' or 'safe-outputs.create-pull-request' to perform write operations safely. See: https://github.github.io/gh-aw/reference/safe-outputs/",
 )
 ```
 

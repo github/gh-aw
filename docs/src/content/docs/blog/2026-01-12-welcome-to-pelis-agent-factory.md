@@ -28,7 +28,7 @@ Let's explore together!
 
 ## What Is Peli's Agent Factory?
 
-Peli's factory is a collection of [**automated agentic workflows**](https://githubnext.github.io/gh-aw) we use in practice. We have built and operated **over 100 automated agentic workflows** within the [`github/gh-aw`](https://github.com/github/gh-aw) repository and its companion [`githubnext/agentics`](https://github.com/githubnext/agentics) collection. These were used mostly in the context of the [`github/gh-aw`](https://github.com/github/gh-aw) project itself, but some have also been applied at scale in GitHub internal repositories. These weren't hypothetical demos - they were working agents that:
+Peli's factory is a collection of [**automated agentic workflows**](https://github.github.io/gh-aw) we use in practice. We have built and operated **over 100 automated agentic workflows** within the [`github/gh-aw`](https://github.com/github/gh-aw) repository and its companion [`githubnext/agentics`](https://github.com/githubnext/agentics) collection. These were used mostly in the context of the [`github/gh-aw`](https://github.com/github/gh-aw) project itself, but some have also been applied at scale in GitHub internal repositories. These weren't hypothetical demos - they were working agents that:
 
 - [Triage incoming issues](/gh-aw/blog/2026-01-13-meet-the-workflows/)
 - [Diagnose CI failures](/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/)
@@ -101,13 +101,13 @@ We'll dive deeper into these lessons in upcoming articles.
 
 ## Try It Yourself
 
-Want to start with automated agentic workflows on GitHub? See our [Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/).
+Want to start with automated agentic workflows on GitHub? See our [Quick Start](https://github.github.io/gh-aw/setup/quick-start/).
 
 ## Learn More
 
 - **[Meet the Workflows](/gh-aw/blog/2026-01-13-meet-the-workflows/)** - The 19-part tour of the workflows
-- **[GitHub Agentic Workflows](https://githubnext.github.io/gh-aw/)** - The technology behind the workflows
-- **[Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/)** - How to write and compile workflows
+- **[GitHub Agentic Workflows](https://github.github.io/gh-aw/)** - The technology behind the workflows
+- **[Quick Start](https://github.github.io/gh-aw/setup/quick-start/)** - How to write and compile workflows
 
 ## Credits
 

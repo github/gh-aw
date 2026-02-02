@@ -167,7 +167,7 @@ gh aw audit 123456
 
 Complete documentation available at:
 
-https://githubnext.github.io/gh-aw/
+https://github.github.io/gh-aw/
 
 Topics covered:
 - Setup and installation

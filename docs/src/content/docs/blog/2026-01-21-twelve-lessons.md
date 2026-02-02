@@ -35,7 +35,7 @@ No single agent can do everything - and that's perfectly fine. A collection of f
 
 ### Guardrails Enable Innovation
 
-Something counter-intuitive we discovered is that strict constraints make it *easier* to experiment. [Safe outputs](https://githubnext.github.io/gh-aw/reference/safe-outputs/), limited permissions, allowlisted tools - they don't slow us down. They give us the confidence to move fast because we know the blast radius of any failure.
+Something counter-intuitive we discovered is that strict constraints make it *easier* to experiment. [Safe outputs](https://github.github.io/gh-aw/reference/safe-outputs/), limited permissions, allowlisted tools - they don't slow us down. They give us the confidence to move fast because we know the blast radius of any failure.
 
 With clear boundaries in place, we can prototype new agents without worrying about breaking production. Safe outputs prevent agents from accidentally deleting code or closing critical issues. Network allowlists ensure agents can't leak data to unauthorized services. These guardrails give us permission to innovate boldly.
 

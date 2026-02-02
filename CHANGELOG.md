@@ -1453,7 +1453,7 @@ strict: false      # Opt out
 - `gh aw compile --strict` still overrides frontmatter settings to force strict mode on all workflows
 - To opt out of strict mode, add `strict: false` to your workflow frontmatter
 
-See [Strict Mode Documentation](https://githubnext.github.io/gh-aw/reference/frontmatter/#strict-mode-strict) for details.
+See [Strict Mode Documentation](https://github.github.io/gh-aw/reference/frontmatter/#strict-mode-strict) for details.
 
 
 ## v0.30.5 - 2025-11-24

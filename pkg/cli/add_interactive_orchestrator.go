@@ -238,6 +238,6 @@ func (c *AddInteractiveConfig) showFinalInstructions() {
 	fmt.Fprintln(os.Stderr, console.FormatCommandMessage(fmt.Sprintf("  %s run <workflow>  # Trigger a workflow", string(constants.CLIExtensionPrefix))))
 	fmt.Fprintln(os.Stderr, console.FormatCommandMessage(fmt.Sprintf("  %s logs            # View workflow logs", string(constants.CLIExtensionPrefix))))
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "Learn more at: https://githubnext.github.io/gh-aw/")
+	fmt.Fprintln(os.Stderr, "Learn more at: https://github.github.io/gh-aw/")
 	fmt.Fprintln(os.Stderr, "")
 }

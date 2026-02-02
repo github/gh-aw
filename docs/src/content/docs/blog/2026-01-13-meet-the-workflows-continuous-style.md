@@ -52,7 +52,7 @@ You can add this workflow to your own repository and remix it as follows:
 gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/terminal-stylist.md
 ```
 
-Then edit and remix the workflow specification to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/) for further installation and setup instructions.
+Then edit and remix the workflow specification to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.io/gh-aw/setup/quick-start/) for further installation and setup instructions.
 
 ## Next Up: Continuous Improvement
 
@@ -62,7 +62,7 @@ Continue reading: [Continuous Improvement Workflows →](/gh-aw/blog/2026-01-13-
 
 ## Learn More
 
-Learn more about **[GitHub Agentic Workflows](https://githubnext.github.io/gh-aw/)**, try the **[Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/)** guide, and explore **[Charmbracelet](https://charm.sh/)**, the terminal UI ecosystem referenced by the Terminal Stylist.
+Learn more about **[GitHub Agentic Workflows](https://github.github.io/gh-aw/)**, try the **[Quick Start](https://github.github.io/gh-aw/setup/quick-start/)** guide, and explore **[Charmbracelet](https://charm.sh/)**, the terminal UI ecosystem referenced by the Terminal Stylist.
 
 ---
 

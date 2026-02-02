@@ -76,7 +76,7 @@ Here are our tips!
 - Add help text for `/command help`
 - Use cache-memory to track command history
 
-**Learn more**: [ChatOps Examples](https://githubnext.github.io/gh-aw/examples/comment-triggered/chatops/)
+**Learn more**: [ChatOps Examples](https://github.github.io/gh-aw/examples/comment-triggered/chatops/)
 
 ---
 
@@ -124,7 +124,7 @@ Here are our tips!
 - Include progress reports in PR descriptions
 - Allow human intervention at any phase
 
-**Learn more**: [DailyOps Examples](https://githubnext.github.io/gh-aw/examples/scheduled/dailyops/)
+**Learn more**: [DailyOps Examples](https://github.github.io/gh-aw/examples/scheduled/dailyops/)
 
 ---
 
@@ -174,7 +174,7 @@ Here are our tips!
 - Track triage accuracy
 - Update classification rules based on feedback
 
-**Learn more**: [IssueOps Examples](https://githubnext.github.io/gh-aw/examples/issue-pr-events/issueops/)
+**Learn more**: [IssueOps Examples](https://github.github.io/gh-aw/examples/issue-pr-events/issueops/)
 
 ---
 
@@ -223,7 +223,7 @@ Here are our tips!
 - Avoid label proliferation
 - Use label descriptions
 
-**Learn more**: [LabelOps Examples](https://githubnext.github.io/gh-aw/examples/issue-pr-events/labelops/)
+**Learn more**: [LabelOps Examples](https://github.github.io/gh-aw/examples/issue-pr-events/labelops/)
 
 ---
 
@@ -273,7 +273,7 @@ Here are our tips!
 - Allow manual overrides
 - Track automation accuracy
 
-**Learn more**: [ProjectOps Examples](https://githubnext.github.io/gh-aw/examples/issue-pr-events/projectops/)
+**Learn more**: [ProjectOps Examples](https://github.github.io/gh-aw/examples/issue-pr-events/projectops/)
 
 ---
 
@@ -336,7 +336,7 @@ Here are our tips!
 - Include acceptance criteria
 - Review and iterate
 
-**Learn more**: [ResearchPlanAssign Guide](https://githubnext.github.io/gh-aw/guides/researchplanassign/)
+**Learn more**: [ResearchPlanAssign Guide](https://github.github.io/gh-aw/guides/researchplanassign/)
 
 ---
 
@@ -387,7 +387,7 @@ Here are our tips!
 - Batch operations efficiently
 - Monitor cross-repo dependencies
 
-**Learn more**: [MultiRepoOps Guide](https://githubnext.github.io/gh-aw/guides/multirepoops/)
+**Learn more**: [MultiRepoOps Guide](https://github.github.io/gh-aw/guides/multirepoops/)
 
 ---
 
@@ -426,7 +426,7 @@ Here are our tips!
 - Set up appropriate notifications
 - Plan for eventual migration if successful
 
-**Learn more**: [SideRepoOps Guide](https://githubnext.github.io/gh-aw/guides/siderepoops/)
+**Learn more**: [SideRepoOps Guide](https://github.github.io/gh-aw/guides/siderepoops/)
 
 ---
 
@@ -451,7 +451,7 @@ These workflows do the following:
 5. Capture and validate outputs
 6. Delete trial repo or keep for reference
 
-**Learn more**: [TrialOps Guide](https://githubnext.github.io/gh-aw/guides/trialops/)
+**Learn more**: [TrialOps Guide](https://github.github.io/gh-aw/guides/trialops/)
 
 ---
 

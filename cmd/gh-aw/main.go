@@ -448,7 +448,7 @@ Use "` + string(constants.CLIExtensionPrefix) + ` help all" to show help for all
 				// Print footer
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("═══════════════════════════════════════════════════════════════"))
 				fmt.Fprintln(os.Stderr, "")
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("For more information, visit: https://githubnext.github.io/gh-aw/"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("For more information, visit: https://github.github.io/gh-aw/"))
 				return nil
 			}
 

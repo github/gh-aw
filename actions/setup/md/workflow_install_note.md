@@ -1,1 +1,1 @@
-To add this workflow in your repository, run `gh aw add {workflow_source}`. See [usage guide](https://githubnext.github.io/gh-aw/guides/packaging-imports/).
+To add this workflow in your repository, run `gh aw add {workflow_source}`. See [usage guide](https://github.github.io/gh-aw/guides/packaging-imports/).

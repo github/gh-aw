@@ -49,7 +49,7 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	// Define engine configuration for shared validation
 	config := EngineInstallConfig{
 		Secrets:         []string{"COPILOT_GITHUB_TOKEN"},
-		DocsURL:         "https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default",
+		DocsURL:         "https://github.github.io/gh-aw/reference/engines/#github-copilot-default",
 		NpmPackage:      "@github/copilot",
 		Version:         string(constants.DefaultCopilotVersion),
 		Name:            "GitHub Copilot CLI",

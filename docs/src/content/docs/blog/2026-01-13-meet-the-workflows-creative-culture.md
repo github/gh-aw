@@ -48,7 +48,7 @@ These communication workflows help build team cohesion and remind us that work c
 
 ## Using These Workflows
 
-You can add these workflows to your own repository and remix them. Get going with our [Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/), then run one of the following:
+You can add these workflows to your own repository and remix them. Get going with our [Quick Start](https://github.github.io/gh-aw/setup/quick-start/), then run one of the following:
 
 **Daily Team Status:**
 
@@ -80,12 +80,12 @@ gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/weekly-
 gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/daily-repo-chronicle.md
 ```
 
-Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/) for further installation and setup instructions.
+Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.io/gh-aw/setup/quick-start/) for further installation and setup instructions.
 
 ## Learn More
 
-- **[GitHub Agentic Workflows](https://githubnext.github.io/gh-aw/)** - The technology behind the workflows
-- **[Quick Start](https://githubnext.github.io/gh-aw/setup/quick-start/)** - How to write and compile workflows
+- **[GitHub Agentic Workflows](https://github.github.io/gh-aw/)** - The technology behind the workflows
+- **[Quick Start](https://github.github.io/gh-aw/setup/quick-start/)** - How to write and compile workflows
 
 ## Next Up: Summon an Agent on Demand
 
