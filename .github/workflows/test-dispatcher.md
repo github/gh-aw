@@ -1,6 +1,5 @@
 ---
 on: issues
-engine: copilot
 permissions:
   contents: read
   issues: read
