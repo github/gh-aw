@@ -34,13 +34,13 @@ safe-outputs:
       expires: 2h
       group: true
       close-older-issues: true
-      target-repo: github-agentic-workflows/demo-repository"  
+      target-repo: github-agentic-workflows/demo-repository  
     add-labels:
       allowed: [smoke-project]
-      target-repo: github-agentic-workflows/demo-repository"  
+      target-repo: github-agentic-workflows/demo-repository  
     remove-labels:
       allowed: [smoke-project]
-      target-repo: github-agentic-workflows/demo-repository"  
+      target-repo: github-agentic-workflows/demo-repository  
     update-project:
       max: 20
       project: "https://github.com/orgs/github-agentic-workflows/projects/1"
