@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   pull_request:
     types: [labeled]
-    names: ["smoke-project"]
+    names: ["smoke"]
   reaction: "eyes"
 permissions:
   contents: read
@@ -13,7 +13,7 @@ permissions:
   issues: read
   actions: read
 name: Smoke Project
-engine: copilot
+engine: codex
 imports:
   - shared/gh.md
   - shared/reporting.md
