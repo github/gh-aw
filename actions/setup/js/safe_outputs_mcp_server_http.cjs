@@ -120,7 +120,8 @@ function createMCPServer(options = {}) {
     } else {
       // Check if regular tool is enabled in configuration
       if (!enabledTools.has(tool.name)) {
-        logger.debug(`Skipping tool ${tool.name} - not enabled in config`);
+        // Log tool metadata to help diagnose registration issues
+        logger.debug(`Skipping tool ${tool.name} - not enabled in config (tool has ${Object.keys(tool).length} properties: ${Object.keys(tool).join(", ")})`);
         continue;
       }
     }
