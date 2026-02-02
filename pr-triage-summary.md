@@ -1,41 +1,57 @@
-# PR Triage Summary - Feb 1, 2026
+# PR Triage Summary - February 2, 2026
 
 ## Quick Stats
-- **Total Open Agent PRs:** 4
-- **Critical (Priority 70+):** 1
-- **Fast-track:** 3
-- **Batch Review:** 1
+- **7 PRs triaged** (3 new, 4 re-triaged)
+- **6 fast-track** (urgent review needed)
+- **1 deferred** (WIP, no code yet)
+- **0 auto-merge candidates**
 
-## Top Priorities
+## Top 3 Priorities
 
-### 🔴 Critical - PR #13149 (Priority: 88)
-**Investigation: Hash mismatch between Go and JavaScript frontmatter implementations**
-- Blocks ALL workflow compilation
-- Investigation complete, needs fix implementation
-- Action: Convert to fix with tests ASAP
+### 🔥 #13174 - Hash Consistency Fix (Score: 75)
+- **Status:** ✅ READY FOR IMMEDIATE REVIEW
+- **Why:** Fixes Go/JS hash mismatch affecting all 148 workflows
+- **Action:** Merge ASAP once CI passes
 
-### 🟡 High - PR #12827 (Priority: 62)
-**Update AWF to v0.13.0 and enable --enable-chroot**
-- Security infrastructure update
-- Wait for CI, then fast-track merge
-- Action: Review + merge after CI passes
+### 🔥 #13179 - dispatch_workflow Registration (Score: 72)
+- **Status:** 🚧 Draft, CI pending
+- **Why:** Critical safe outputs bug blocking workflow dispatch
+- **Action:** Fast-track review once ready
 
-### 🟡 High - PR #12664 (Priority: 58)
-**Fix MCP config generation when AWF firewall is disabled**
-- Critical functionality gap for no-firewall mode
-- Extensive discussion (23 comments)
-- Action: Verify smoke tests + merge
+### 🔥 #12664 - MCP Config No-Firewall (Score: 68)
+- **Status:** ✅ READY FOR REVIEW
+- **Why:** MCP doesn't work with firewall disabled
+- **Action:** Review ready, 24 comments of thorough discussion
 
-### 🟢 Medium - PR #12574 (Priority: 53)
-**Parallelize setup operations**
-- Performance feature (saves 8-12s)
-- 156 files changed, needs thorough review
-- Action: Comprehensive review when bandwidth available
+## All PRs by Priority
 
-## Trends
-- 3 PRs closed since last triage (from 7 to 4) ✅
-- New critical blocker introduced (#13149) 🔴
-- Urgency increased: 0 → 3 fast-track candidates ⚡
+| # | Title | Score | Category | Risk | Action | Status |
+|---|-------|-------|----------|------|--------|--------|
+| 13174 | Hash consistency | 75 | bug | medium | fast-track | ✅ Ready |
+| 13179 | dispatch_workflow | 72 | bug | high | fast-track | 🚧 Draft |
+| 12664 | MCP no-firewall | 68 | bug | medium | fast-track | ✅ Ready |
+| 12827 | AWF v0.13.0 chroot | 65 | chore | high | fast-track | ✅ Ready |
+| 12574 | Parallel setup | 62 | feature | high | fast-track | ✅ Ready |
+| 13182 | Shell redirects | 58 | refactor | medium | fast-track | 🚧 Draft |
+| 13183 | payloadDir validation | 35 | chore | medium | defer | 🚧 WIP |
+
+## Agent Performance
+- **All PRs from:** Copilot agent
+- **Draft rate:** 43% (3/7) - healthy pipeline
+- **Ready for review:** 57% (4/7)
+- **Average file changes:** 89 files (due to workflow recompilation)
+
+## Recommended Actions
+
+**Today:**
+1. Merge #13174 (hash fix) once CI passes
+2. Review #12664 (MCP fix) - ready now
+3. Review #12827 (AWF update) - ready now
+
+**This Week:**
+4. Monitor draft PRs for CI completion
+5. Review #12574 (performance) - ready now
+6. Fast-track #13179 once ready
 
 ---
-*Last updated: 2026-02-01 18:13:00 UTC*
+*Last updated: 2026-02-02T00:39:38Z*
