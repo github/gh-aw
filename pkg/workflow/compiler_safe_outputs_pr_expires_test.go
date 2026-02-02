@@ -20,12 +20,12 @@ import (
 // and push-to-pull-request-branch are present (regression test for issue #13285)
 func TestCreatePullRequestExpiresWithPushToPRBranch(t *testing.T) {
 	tests := []struct {
-		name                        string
-		createPRConfig              string
-		pushToPRBranchConfig        string
-		expectExpires               bool
-		expectTitlePrefix           bool
-		expectLabels                bool
+		name                 string
+		createPRConfig       string
+		pushToPRBranchConfig string
+		expectExpires        bool
+		expectTitlePrefix    bool
+		expectLabels         bool
 	}{
 		{
 			name: "with reviewers field (reproduces bug from issue #13285)",
@@ -124,7 +124,7 @@ Test workflow
 				expires, hasExpires := prConfig["expires"]
 				assert.True(t, hasExpires, "Should have expires field")
 				if hasExpires {
-					assert.Equal(t, float64(48), expires, "Expires should be 48 hours (2 days)")
+					assert.InDelta(t, 48.0, expires, 0.1, "Expires should be 48 hours (2 days)")
 				}
 			}
 
@@ -144,7 +144,7 @@ Test workflow
 				if hasLabels {
 					labelsList, ok := labels.([]any)
 					require.True(t, ok, "Labels should be an array")
-					assert.Equal(t, 2, len(labelsList), "Should have 2 labels")
+					assert.Len(t, labelsList, 2, "Should have 2 labels")
 				}
 			}
 		})
