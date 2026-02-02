@@ -29,7 +29,7 @@ safe-outputs:
     expires: 2d
     title-prefix: "[jsweep] "
     labels: [unbloat, automation]
-    draft: false
+    draft: true
     if-no-changes: "ignore"
 timeout-minutes: 20
 strict: true
