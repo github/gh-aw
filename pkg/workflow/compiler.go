@@ -391,30 +391,22 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 	} else {
 		log.Printf("Writing output to: %s", lockFile)
 
-		// Check if we need to force write to update timestamp
-		shouldForceWrite := false
-		if existingLockInfo, err := os.Stat(lockFile); err == nil {
-			if mdInfo, err := os.Stat(markdownPath); err == nil {
-				// If lock file is newer than source file, check if content changed
-				if existingLockInfo.ModTime().After(mdInfo.ModTime()) {
-					// Read existing content to compare
-					if existingContent, err := os.ReadFile(lockFile); err == nil {
-						if string(existingContent) == yamlContent {
-							// Content hasn't changed but timestamp is wrong - force write
-							shouldForceWrite = true
-							log.Printf("Lock file timestamp is newer than source, but content unchanged - forcing write to update timestamp")
-						}
-					}
-				}
+		// Check if content has actually changed
+		shouldSkipWrite := false
+		if existingContent, err := os.ReadFile(lockFile); err == nil {
+			if string(existingContent) == yamlContent {
+				// Content is identical - skip write to preserve timestamp
+				shouldSkipWrite = true
+				log.Print("Lock file content unchanged - skipping write to preserve timestamp")
 			}
 		}
 
-		if err := os.WriteFile(lockFile, []byte(yamlContent), 0644); err != nil {
-			return formatCompilerError(lockFile, "error", fmt.Sprintf("failed to write lock file: %v", err))
-		}
-
-		if shouldForceWrite {
-			log.Print("Updated lock file timestamp to match content generation")
+		// Only write if content has changed
+		if !shouldSkipWrite {
+			if err := os.WriteFile(lockFile, []byte(yamlContent), 0644); err != nil {
+				return formatCompilerError(lockFile, "error", fmt.Sprintf("failed to write lock file: %v", err))
+			}
+			log.Print("Lock file written successfully")
 		}
 
 		// Validate file size after writing
