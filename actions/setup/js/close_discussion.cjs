@@ -183,30 +183,16 @@ async function main(config = {}) {
 
     processedCount++;
 
-    const item = message;
-
     // Determine discussion number
-    let discussionNumber;
-    if (item.discussion_number !== undefined) {
-      discussionNumber = parseInt(String(item.discussion_number), 10);
-      if (isNaN(discussionNumber)) {
-        core.warning(`Invalid discussion number: ${item.discussion_number}`);
-        return {
-          success: false,
-          error: `Invalid discussion number: ${item.discussion_number}`,
-        };
-      }
-    } else {
-      // Use context discussion if available
-      const contextDiscussion = context.payload?.discussion?.number;
-      if (!contextDiscussion) {
-        core.warning("No discussion_number provided and not in discussion context");
-        return {
-          success: false,
-          error: "No discussion number available",
-        };
-      }
-      discussionNumber = contextDiscussion;
+    const discussionNumber = message.discussion_number !== undefined ? parseInt(String(message.discussion_number), 10) : context.payload?.discussion?.number;
+
+    if (!discussionNumber || isNaN(discussionNumber)) {
+      const errorMsg = message.discussion_number !== undefined ? `Invalid discussion number: ${message.discussion_number}` : "No discussion_number provided and not in discussion context";
+      core.warning(errorMsg);
+      return {
+        success: false,
+        error: errorMsg,
+      };
     }
 
     try {
@@ -215,14 +201,12 @@ async function main(config = {}) {
 
       // Validate required labels if configured
       if (requiredLabels.length > 0) {
-        const discussionLabels = discussion.labels.nodes.map(l => l.name);
-        const missingLabels = requiredLabels.filter(required => !discussionLabels.includes(required));
+        const discussionLabels = new Set(discussion.labels.nodes.map(l => l.name));
+        const missingLabels = requiredLabels.filter(required => !discussionLabels.has(required));
         if (missingLabels.length > 0) {
-          core.warning(`Discussion #${discussionNumber} missing required labels: ${missingLabels.join(", ")}`);
-          return {
-            success: false,
-            error: `Missing required labels: ${missingLabels.join(", ")}`,
-          };
+          const error = `Missing required labels: ${missingLabels.join(", ")}`;
+          core.warning(`Discussion #${discussionNumber} ${error}`);
+          return { success: false, error };
         }
       }
 
@@ -237,23 +221,23 @@ async function main(config = {}) {
 
       // Add comment if body is provided
       let commentUrl;
-      if (item.body) {
-        const comment = await addDiscussionComment(github, discussion.id, item.body);
+      if (message.body) {
+        const comment = await addDiscussionComment(github, discussion.id, message.body);
         core.info(`Added comment to discussion #${discussionNumber}: ${comment.url}`);
         commentUrl = comment.url;
       }
 
       // Close the discussion
-      const reason = item.reason || undefined;
+      const reason = message.reason ?? undefined;
       core.info(`Closing discussion #${discussionNumber} with reason: ${reason || "none"}`);
-      const closedDiscussion = await closeDiscussion(github, discussion.id, reason);
-      core.info(`Closed discussion #${discussionNumber}: ${closedDiscussion.url}`);
+      await closeDiscussion(github, discussion.id, reason);
+      core.info(`Closed discussion #${discussionNumber}: ${discussion.url}`);
 
       return {
         success: true,
         number: discussionNumber,
         url: discussion.url,
-        commentUrl: commentUrl,
+        commentUrl,
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
