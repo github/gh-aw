@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 const path = require("path");
 const fs = require("fs");
 const { computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
+const { getOctokit } = require("@actions/github");
 
 /**
  * Tests for frontmatter hash computation using GitHub's API to fetch real workflows.
@@ -241,6 +242,54 @@ describe("frontmatter_hash with GitHub API", () => {
 
       // The hash should include contributions from env./vars. expressions
       // but not from other GitHub context expressions
+    });
+  });
+
+  describe("live GitHub API integration", () => {
+    it("should compute hash using real GitHub API (no mocks)", async () => {
+      // Skip this test if no GitHub token is available
+      // Check multiple possible token environment variables
+      const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+      if (!token) {
+        console.log("Skipping live API test - no GITHUB_TOKEN or GH_TOKEN available");
+        console.log("To run this test, set GITHUB_TOKEN or GH_TOKEN environment variable");
+        console.log("Example: GITHUB_TOKEN=ghp_xxx npm test -- frontmatter_hash_github_api.test.cjs");
+        return;
+      }
+
+      // Use real GitHub API client
+      const octokit = getOctokit(token);
+      const owner = "githubnext";
+      const repo = "gh-aw";
+      const ref = "main";
+
+      // Create file reader with real GitHub API
+      const fileReader = createGitHubFileReader(octokit, owner, repo, ref);
+
+      // Test with a real public agentic workflow
+      const workflowPath = ".github/workflows/audit-workflows.md";
+
+      console.log(`\n🔍 Fetching live data from GitHub API: ${owner}/${repo}/${workflowPath}@${ref}`);
+
+      // Compute hash using live API data
+      const hash = await computeFrontmatterHash(workflowPath, {
+        fileReader,
+      });
+
+      // Verify hash format
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(hash).toHaveLength(64);
+
+      console.log(`✓ Live API hash for audit-workflows.md: ${hash}`);
+
+      // Verify determinism with second call to live API
+      const hash2 = await computeFrontmatterHash(workflowPath, {
+        fileReader,
+      });
+      expect(hash2).toBe(hash);
+
+      console.log("✓ Live API test passed - hash computation is deterministic");
+      console.log("✓ Successfully fetched and processed workflow with imports from real GitHub repository");
     });
   });
 });
