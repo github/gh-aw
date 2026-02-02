@@ -198,19 +198,16 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 }
 
 func splitContentIntoChunks(content string) []string {
-	const maxChunkSize = 20900        // 21000 - 100 character buffer
-	const indentSpaces = "          " // 10 spaces added to each line
-
 	lines := strings.Split(content, "\n")
 	var chunks []string
 	var currentChunk []string
 	currentSize := 0
 
 	for _, line := range lines {
-		lineSize := len(indentSpaces) + len(line) + 1 // +1 for newline
+		lineSize := len(YAMLHeredocIndent) + len(line) + 1 // +1 for newline
 
 		// If adding this line would exceed the limit, start a new chunk
-		if currentSize+lineSize > maxChunkSize && len(currentChunk) > 0 {
+		if currentSize+lineSize > MaxYAMLChunkSize && len(currentChunk) > 0 {
 			chunks = append(chunks, strings.Join(currentChunk, "\n"))
 			currentChunk = []string{line}
 			currentSize = lineSize

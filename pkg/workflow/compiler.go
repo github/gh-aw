@@ -32,6 +32,18 @@ const (
 	// MaxPromptChunks is the maximum number of chunks allowed when splitting prompt text
 	// This prevents excessive step generation for extremely large prompt texts
 	MaxPromptChunks = 5 // Maximum number of chunks
+
+	// MaxYAMLChunkSize is the maximum size in bytes for a single YAML chunk
+	// when splitting content in splitContentIntoChunks. GitHub Actions has a hard
+	// limit of 21KB per step output, so we use 20900 bytes (21000 - 100 byte buffer)
+	// to ensure we stay safely under the limit.
+	// See: https://docs.github.com/en/actions/learn-github-actions/usage-limits-billing-and-administration
+	MaxYAMLChunkSize = 20900 // 21KB limit minus 100 byte safety buffer
+
+	// YAMLHeredocIndent is the indentation string used for content within heredoc
+	// blocks in YAML workflow files. This consistent 10-space indentation ensures
+	// proper YAML formatting and readability of multi-line content in generated workflows.
+	YAMLHeredocIndent = "          " // 10 spaces for heredoc content indentation
 )
 
 //go:embed schemas/github-workflow.json
