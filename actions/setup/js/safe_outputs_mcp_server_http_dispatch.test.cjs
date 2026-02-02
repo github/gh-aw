@@ -3,11 +3,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 /**
  * Test for dispatch_workflow tool registration in HTTP server
- * 
+ *
  * This test validates that the HTTP server correctly registers dispatch_workflow tools
  * that have _workflow_name metadata. These tools use workflow-specific names
  * (e.g., "test_workflow") while the config key is "dispatch_workflow".
- * 
+ *
  * Reference: Issue where dispatch_workflow tools were not being registered because
  * the HTTP server's registration loop only checked if the tool name matched a config key,
  * but dispatch_workflow tools don't match - they have workflow-specific names with metadata.
