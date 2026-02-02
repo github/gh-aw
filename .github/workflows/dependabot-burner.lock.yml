@@ -1306,6 +1306,7 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"create_project_status_update\":{\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":10,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
           GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
+          GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

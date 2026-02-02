@@ -1186,6 +1186,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":100,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
           GH_AW_ASSIGN_COPILOT: "true"
           GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
+          GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

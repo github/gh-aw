@@ -1665,6 +1665,7 @@ jobs:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2,\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"add_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1,\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_project_status_update\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":1,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\"},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"update_project\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":20,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\",\"views\":[{\"name\":\"Smoke Test Board\",\"layout\":\"board\",\"filter\":\"is:open\"},{\"name\":\"Smoke Test Table\",\"layout\":\"table\"}]}}"
           GH_AW_PROJECT_URL: "https://github.com/orgs/github-agentic-workflows/projects/1"
+          GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

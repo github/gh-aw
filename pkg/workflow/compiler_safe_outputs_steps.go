@@ -172,24 +172,46 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	// Add all safe output configuration env vars (still needed by individual handlers)
 	c.addAllSafeOutputConfigEnvVars(&steps, data)
 
-	// Add GH_AW_PROJECT_URL environment variable for project operations
-	// This is set from the project URL configured in update-project or create-project-status-update safe-outputs
-	// The project field is REQUIRED in both configurations (enforced by schema validation)
+	// Add GH_AW_PROJECT_URL and GH_AW_PROJECT_GITHUB_TOKEN environment variables for project operations
+	// These are set from the project URL and token configured in any project-related safe-output:
+	// - update-project
+	// - create-project-status-update
+	// - create-project
+	//
+	// The project field is REQUIRED in update-project and create-project-status-update (enforced by schema validation)
 	// Agents can optionally override this per-message by including a project field in their output
 	//
-	// Note: If both update-project and create-project-status-update are configured, we prefer update-project's URL
-	// This is only relevant for the environment variable - each configuration must explicitly specify its own project URL
+	// Note: If multiple project configs are present, we prefer update-project > create-project-status-update > create-project
+	// This is only relevant for the environment variables - each configuration must explicitly specify its own settings
 	var projectURL string
+	var projectToken string
+
+	// Check update-project first (highest priority)
 	if data.SafeOutputs.UpdateProjects != nil && data.SafeOutputs.UpdateProjects.Project != "" {
 		projectURL = data.SafeOutputs.UpdateProjects.Project
+		projectToken = getEffectiveProjectGitHubToken(data.SafeOutputs.UpdateProjects.GitHubToken, data.GitHubToken)
 		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_URL from update-project config: %s", projectURL)
+		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_GITHUB_TOKEN from update-project config")
 	} else if data.SafeOutputs.CreateProjectStatusUpdates != nil && data.SafeOutputs.CreateProjectStatusUpdates.Project != "" {
 		projectURL = data.SafeOutputs.CreateProjectStatusUpdates.Project
+		projectToken = getEffectiveProjectGitHubToken(data.SafeOutputs.CreateProjectStatusUpdates.GitHubToken, data.GitHubToken)
 		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_URL from create-project-status-update config: %s", projectURL)
+		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_GITHUB_TOKEN from create-project-status-update config")
+	}
+
+	// Check create-project for token even if no URL is set (create-project doesn't have a project URL field)
+	// This ensures GH_AW_PROJECT_GITHUB_TOKEN is set when create-project is configured
+	if projectToken == "" && data.SafeOutputs.CreateProjects != nil {
+		projectToken = getEffectiveProjectGitHubToken(data.SafeOutputs.CreateProjects.GitHubToken, data.GitHubToken)
+		consolidatedSafeOutputsStepsLog.Printf("Setting GH_AW_PROJECT_GITHUB_TOKEN from create-project config")
 	}
 
 	if projectURL != "" {
 		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_URL: %q\n", projectURL))
+	}
+
+	if projectToken != "" {
+		steps = append(steps, fmt.Sprintf("          GH_AW_PROJECT_GITHUB_TOKEN: %s\n", projectToken))
 	}
 
 	// With section for github-token
