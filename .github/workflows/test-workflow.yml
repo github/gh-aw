@@ -3,13 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       test_param:
-        description: 'Test parameter'
+        description: 'Question from the dispatcher workflow'
         type: string
-        required: false
+        required: true
 permissions:
   contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Test workflow"
+      - run: echo "Test workflow dispatched with param: ${{ inputs.test_param }}"

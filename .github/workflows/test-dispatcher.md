@@ -37,12 +37,12 @@ on:
         required: true
 ```
 
-So you'll have a `test_workflow` tool available with an optional `test_param` input.
+So you'll have a `test_workflow` tool available with a required `test_param` input.
 
 ## Instructions
 
 1. **Call the MCP tool**: Use the `test_workflow` tool (automatically generated from the workflow name)
-2. **Provide inputs (optional)**: The `test_param` input is required
+2. **Provide inputs (required)**: The `test_param` input is required
 3. **The tool handles everything**: The MCP tool will automatically dispatch the workflow with the correct inputs
 
 ## Example Tool Call
