@@ -181,9 +181,7 @@ Topics covered:
 # Community & Support
 
 - **GitHub Repository**: github/gh-aw
-- **Documentation**: githubnext.github.io/gh-aw
-- **Issues**: Report bugs and request features
-- **Discussions**: Community support
+- **Documentation**: gh.io/gh-aw
 
 ---
 

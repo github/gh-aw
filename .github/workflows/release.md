@@ -26,7 +26,7 @@ network:
   allowed:
     - defaults
     - node
-    - "githubnext.github.io"
+    - "github.github.io"
 sandbox:
   agent: awf  # Firewall enabled (migrated from network.firewall)
 tools:
