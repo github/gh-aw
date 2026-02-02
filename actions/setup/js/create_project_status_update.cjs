@@ -200,7 +200,18 @@ async function resolveProjectV2(projectInfo, projectNumberInt) {
     core.warning(`Direct projectV2(number) query failed; falling back to projectsV2 list search: ${getErrorMessage(error)}`);
   }
 
-  const list = await listAccessibleProjectsV2(projectInfo);
+  // Wrap fallback query in try-catch to handle transient API errors gracefully
+  let list;
+  try {
+    list = await listAccessibleProjectsV2(projectInfo);
+  } catch (fallbackError) {
+    // Both direct query and fallback list query failed - this could be a transient API error
+    const who = projectInfo.scope === "orgs" ? `org ${projectInfo.ownerLogin}` : `user ${projectInfo.ownerLogin}`;
+    throw new Error(
+      `Unable to resolve project #${projectNumberInt} for ${who}. Both direct projectV2 query and fallback projectsV2 list query failed. ` + `This may be a transient GitHub API error. Error: ${getErrorMessage(fallbackError)}`
+    );
+  }
+
   const nodes = Array.isArray(list.nodes) ? list.nodes : [];
   const found = nodes.find(p => p && typeof p.number === "number" && p.number === projectNumberInt);
 

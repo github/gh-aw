@@ -480,6 +480,51 @@ describe("create_project_status_update", () => {
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("falling back to projectsV2 list search"));
   });
 
+  it("should fail gracefully when both direct query and fallback list query fail", async () => {
+    // Mock GraphQL responses - both queries fail
+    const notFoundError = new Error("Could not resolve to a ProjectV2 with the number 42.");
+    notFoundError.errors = [
+      {
+        type: "NOT_FOUND",
+        message: "Could not resolve to a ProjectV2 with the number 42.",
+        path: ["organization", "projectV2"],
+      },
+    ];
+
+    const apiError = new Error("Request failed due to following response errors:\n - Something went wrong while executing your query.");
+    apiError.errors = [
+      {
+        message: "Something went wrong while executing your query.",
+      },
+    ];
+
+    mockGithub.graphql
+      .mockRejectedValueOnce(notFoundError) // First call: direct query throws NOT_FOUND
+      .mockRejectedValueOnce(apiError); // Second call: list-based search also fails
+
+    const handler = await main({ max: 10 });
+
+    const result = await handler(
+      {
+        project: "https://github.com/orgs/test-org/projects/42",
+        body: "Test status update",
+        status: "ON_TRACK",
+        start_date: "2025-01-01",
+        target_date: "2025-12-31",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Unable to resolve project #42");
+    expect(result.error).toContain("Both direct projectV2 query and fallback projectsV2 list query failed");
+    expect(result.error).toContain("transient GitHub API error");
+
+    // Should have called graphql 2 times (direct query, list query - both failed)
+    expect(mockGithub.graphql).toHaveBeenCalledTimes(2);
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("falling back to projectsV2 list search"));
+  });
+
   it("should fail when project field is missing even if GH_AW_PROJECT_URL is set", async () => {
     // Set default project URL in environment (should be ignored)
     const defaultProjectUrl = "https://github.com/orgs/test-org/projects/42";

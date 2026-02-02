@@ -1318,4 +1318,47 @@ describe("updateProject", () => {
     // Cleanup
     delete process.env.GH_AW_PROJECT_URL;
   });
+
+  it("should fail gracefully when both direct query and fallback list query fail", async () => {
+    const messageHandler = await updateProjectHandlerFactory({});
+
+    // Mock GraphQL responses - both queries fail
+    const notFoundError = new Error("Could not resolve to a ProjectV2 with the number 146.");
+    notFoundError.errors = [
+      {
+        type: "NOT_FOUND",
+        message: "Could not resolve to a ProjectV2 with the number 146.",
+        path: ["organization", "projectV2"],
+      },
+    ];
+
+    const apiError = new Error("Request failed due to following response errors:\n - Something went wrong while executing your query.");
+    apiError.errors = [
+      {
+        message: "Something went wrong while executing your query.",
+      },
+    ];
+
+    // Setup mocks: repo query, viewer query, direct project query (fails), fallback list query (fails)
+    mockGithub.graphql
+      .mockResolvedValueOnce(repoResponse()) // Repository query
+      .mockResolvedValueOnce(viewerResponse()) // Viewer query
+      .mockRejectedValueOnce(notFoundError) // Direct projectV2 query fails
+      .mockRejectedValueOnce(apiError); // Fallback projectsV2 list query fails
+
+    const projectUrl = "https://github.com/orgs/testowner/projects/146";
+    const messageWithProject = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "issue",
+      content_number: 123,
+    };
+
+    const result = await messageHandler(messageWithProject, new Map());
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Unable to resolve project #146");
+    expect(result.error).toContain("Both direct projectV2 query and fallback projectsV2 list query failed");
+    expect(result.error).toContain("transient GitHub API error");
+  });
 });
