@@ -84,6 +84,25 @@ describe("ephemerals", () => {
       expect(result?.toISOString()).toBe("2026-01-20T09:20:00.000Z");
     });
 
+    it("should extract date from actual issue #12669 format with Workflow prefix", async () => {
+      const { extractExpirationDate } = await import("./ephemerals.cjs");
+      const body = `# Smoke Copilot
+
+Parent issue for grouping related issues from <a>Smoke Copilot</a>.
+
+
+
+Sub-issues are automatically linked below (max 64 per parent).
+
+
+> Workflow: [Smoke Copilot]()
+> - [x] expires  on Jan 31, 2026, 6:05 AM UTC`;
+      const result = extractExpirationDate(body);
+
+      expect(result).toBeInstanceOf(Date);
+      expect(result?.toISOString()).toBe("2026-01-31T06:05:00.000Z");
+    });
+
     it("should return null when no expiration marker found", async () => {
       const { extractExpirationDate } = await import("./ephemerals.cjs");
       const body = "Some text without expiration marker";
