@@ -30,6 +30,7 @@ safe-outputs:
     add-comment:
       hide-older-comments: true
       max: 2
+      target-repo: github-agentic-workflows/demo-repository 
     create-issue:
       expires: 2h
       group: true
