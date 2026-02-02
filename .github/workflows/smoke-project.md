@@ -1,12 +1,12 @@
 ---
 description: Smoke Project - Test project operations
 on: 
-  schedule: every 12h
   workflow_dispatch:
-  pull_request:
-    types: [labeled]
-    names: ["smoke"]
-  reaction: "eyes"
+  #schedule: every 12h
+  #pull_request:
+  #  types: [labeled]
+  #  names: ["smoke"]
+  #reaction: "eyes"
 permissions:
   contents: read
   pull-requests: read
@@ -27,18 +27,18 @@ tools:
   bash:
     - "*"
 safe-outputs:
-    add-comment:
-      hide-older-comments: true
-      max: 2
-      target-repo: github-agentic-workflows/demo-repository 
-    create-issue:
-      expires: 2h
-      group: true
-      close-older-issues: true
-    add-labels:
-      allowed: [smoke-project]
-    remove-labels:
-      allowed: [smoke-project]
+    #add-comment:
+    #  hide-older-comments: true
+    #  max: 2
+    #  target-repo: github-agentic-workflows/demo-repository 
+    #create-issue:
+    #  expires: 2h
+    #  group: true
+    #  close-older-issues: true
+    #add-labels:
+    #  allowed: [smoke-project]
+    #remove-labels:
+    #  allowed: [smoke-project]
     update-project:
       max: 20
       project: "https://github.com/orgs/githubnext/projects/146"
