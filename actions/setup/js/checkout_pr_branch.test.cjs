@@ -62,6 +62,47 @@ describe("checkout_pr_branch.cjs", () => {
       if (module === "./error_helpers.cjs") {
         return { getErrorMessage: error => (error instanceof Error ? error.message : String(error)) };
       }
+      if (module === "./messages_core.cjs") {
+        return {
+          renderTemplate: (template, context) => {
+            return template.replace(/\{(\w+)\}/g, (match, key) => {
+              const value = context[key];
+              return value !== undefined && value !== null ? String(value) : match;
+            });
+          },
+        };
+      }
+      if (module === "fs") {
+        return {
+          readFileSync: (path, encoding) => {
+            // Return mock template for pr_checkout_failure.md
+            if (path.includes("pr_checkout_failure.md")) {
+              return `## ❌ Failed to Checkout PR Branch
+
+**Error:** {error_message}
+
+### Possible Reasons
+
+This failure typically occurs when:
+- The pull request has been closed or merged
+- The branch has been deleted
+- There are insufficient permissions to access the PR
+
+### What to Do
+
+If the pull request is closed, you may need to:
+1. Reopen the pull request, or
+2. Create a new pull request with the changes
+
+If the pull request is still open, verify that:
+- The branch still exists in the repository
+- You have the necessary permissions to access it
+`;
+            }
+            throw new Error(`Unexpected file read: ${path}`);
+          },
+        };
+      }
       throw new Error(`Module ${module} not mocked in test`);
     };
 

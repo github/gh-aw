@@ -7,6 +7,8 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { renderTemplate } = require("./messages_core.cjs");
+const fs = require("fs");
 
 async function main() {
   const eventName = context.eventName;
@@ -42,28 +44,12 @@ async function main() {
   } catch (error) {
     const errorMsg = getErrorMessage(error);
 
-    // Write to step summary to provide context about the failure
-    const summaryContent = `## ❌ Failed to Checkout PR Branch
-
-**Error:** ${errorMsg}
-
-### Possible Reasons
-
-This failure typically occurs when:
-- The pull request has been closed or merged
-- The branch has been deleted
-- There are insufficient permissions to access the PR
-
-### What to Do
-
-If the pull request is closed, you may need to:
-1. Reopen the pull request, or
-2. Create a new pull request with the changes
-
-If the pull request is still open, verify that:
-- The branch still exists in the repository
-- You have the necessary permissions to access it
-`;
+    // Load and render step summary template
+    const templatePath = "/opt/gh-aw/prompts/pr_checkout_failure.md";
+    const template = fs.readFileSync(templatePath, "utf8");
+    const summaryContent = renderTemplate(template, {
+      error_message: errorMsg,
+    });
 
     await core.summary.addRaw(summaryContent).write();
     core.setFailed(`Failed to checkout PR branch: ${errorMsg}`);
