@@ -215,10 +215,17 @@ func (c *Compiler) buildHandlerManagerStep(data *WorkflowData) []string {
 	}
 
 	// With section for github-token
-	// Use the standard safe outputs token for all operations
-	// Project-specific handlers (create_project) will use custom tokens from their handler config
+	// Use the standard safe outputs token for all operations.
+	// If project operations are configured, prefer the project token for the github-script client.
+	// Rationale: update_project/create_project_status_update call the Projects v2 GraphQL API, which
+	// cannot be accessed with the default GITHUB_TOKEN. GH_AW_PROJECT_GITHUB_TOKEN is the required
+	// token for Projects v2 operations.
 	steps = append(steps, "        with:\n")
-	c.addSafeOutputGitHubTokenForConfig(&steps, data, "")
+	configToken := ""
+	if projectToken != "" {
+		configToken = projectToken
+	}
+	c.addSafeOutputGitHubTokenForConfig(&steps, data, configToken)
 
 	steps = append(steps, "          script: |\n")
 	steps = append(steps, "            const { setupGlobals } = require('"+SetupActionDestination+"/setup_globals.cjs');\n")

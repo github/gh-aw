@@ -406,6 +406,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
     const ownerType = repoResult.repository.owner.__typename;
     core.info(`✓ Repository: ${owner}/${repo} (${ownerType})`);
 
+    let viewerLogin;
     try {
       const viewerResult = await github.graphql(`query {
           viewer {
@@ -413,10 +414,21 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
           }
         }`);
       if (viewerResult?.viewer?.login) {
-        core.info(`✓ Authenticated as: ${viewerResult.viewer.login}`);
+        viewerLogin = viewerResult.viewer.login;
+        core.info(`✓ Authenticated as: ${viewerLogin}`);
       }
     } catch (viewerError) {
       core.warning(`Could not resolve token identity (viewer.login): ${getErrorMessage(viewerError)}`);
+    }
+
+    // Projects v2 GraphQL API does not work with the default GITHUB_TOKEN.
+    // If we are authenticated as github-actions[bot], fail fast with a clear error
+    // rather than attempting project resolution and falling back.
+    if (viewerLogin === "github-actions[bot]") {
+      throw new Error(
+        "GitHub Projects v2 operations require a PAT or GitHub App token with Projects access, but this run is authenticated as github-actions[bot] (default GITHUB_TOKEN). " +
+          "Fix: set secrets.GH_AW_PROJECT_GITHUB_TOKEN (or configure safe-outputs.update-project.github-token) so the safe-outputs step uses that token for github-script."
+      );
     }
 
     let projectId;

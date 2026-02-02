@@ -121,6 +121,39 @@ describe("update_project handler config: field_definitions", () => {
   });
 });
 
+describe("update_project token guardrails", () => {
+  it("fails fast with a clear error when authenticated as github-actions[bot]", async () => {
+    delete process.env.GH_AW_PROJECT_GITHUB_TOKEN;
+
+    const projectUrl = "https://github.com/orgs/githubnext/projects/146";
+
+    mockGithub.graphql.mockImplementation(async (query, vars) => {
+      const q = String(query);
+
+      if (q.includes("repository(owner:") || q.includes("repository(owner:")) {
+        return repoResponse("Organization");
+      }
+      if (q.includes("viewer") && !vars) {
+        return viewerResponse("github-actions[bot]");
+      }
+
+      throw new Error(`Unexpected graphql query in test (should fail fast before project resolution): ${q}`);
+    });
+
+    await expect(
+      updateProject(
+        {
+          project: projectUrl,
+          content_type: "issue",
+          content_number: 1,
+        },
+        new Map(),
+        mockGithub
+      )
+    ).rejects.toThrow(/Projects v2 operations require.*github-actions\[bot\].*GH_AW_PROJECT_GITHUB_TOKEN/i);
+  });
+});
+
 function clearMock(fn) {
   if (fn && typeof fn.mockClear === "function") {
     fn.mockClear();

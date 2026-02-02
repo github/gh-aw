@@ -17,6 +17,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 		name                string
 		frontmatter         map[string]any
 		expectedEnvVarValue string
+		expectedWithToken   string
 		shouldHaveToken     bool
 	}{
 		{
@@ -31,6 +32,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.PROJECTS_PAT }}",
+			expectedWithToken:   "github-token: ${{ secrets.PROJECTS_PAT }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -44,6 +46,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
+			expectedWithToken:   "github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -58,6 +61,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.CUSTOM_TOKEN }}",
+			expectedWithToken:   "github-token: ${{ secrets.CUSTOM_TOKEN }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -72,6 +76,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.STATUS_PAT }}",
+			expectedWithToken:   "github-token: ${{ secrets.STATUS_PAT }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -85,6 +90,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.CREATE_PAT }}",
+			expectedWithToken:   "github-token: ${{ secrets.CREATE_PAT }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -106,6 +112,7 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				},
 			},
 			expectedEnvVarValue: "GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.UPDATE_PAT }}",
+			expectedWithToken:   "github-token: ${{ secrets.UPDATE_PAT }}",
 			shouldHaveToken:     true,
 		},
 		{
@@ -146,6 +153,11 @@ func TestHandlerManagerProjectGitHubTokenEnvVar(t *testing.T) {
 				assert.Contains(t, yamlStr, tt.expectedEnvVarValue,
 					"Expected environment variable %q to be set in handler manager step",
 					tt.expectedEnvVarValue)
+
+				// Check that the github-script token matches the effective project token
+				assert.Contains(t, yamlStr, tt.expectedWithToken,
+					"Expected github-script token %q to be set in handler manager step",
+					tt.expectedWithToken)
 			} else {
 				// Check that GH_AW_PROJECT_GITHUB_TOKEN is NOT set
 				assert.NotContains(t, yamlStr, "GH_AW_PROJECT_GITHUB_TOKEN",
