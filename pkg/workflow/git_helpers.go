@@ -34,7 +34,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var gitHelpersLog = logger.New("workflow:git_helpers")

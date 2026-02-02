@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // TestFrontmatterSyntaxErrors provides extensive test suite for frontmatter syntax errors

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var urlLog = logger.New("parser:github_urls")

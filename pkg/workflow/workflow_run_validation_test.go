@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestWorkflowRunBranchValidation tests the validation of workflow_run triggers with and without branch restrictions

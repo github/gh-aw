@@ -72,7 +72,7 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var promptStepHelperLog = logger.New("workflow:prompt_step_helper")

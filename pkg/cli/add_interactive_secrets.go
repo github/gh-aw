@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // checkExistingSecrets fetches which secrets already exist in the repository

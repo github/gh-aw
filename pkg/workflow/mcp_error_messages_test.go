@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // TestMCPErrorMessageQuality verifies that MCP configuration error messages follow

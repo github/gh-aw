@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // applyChanges creates the PR, merges it, and adds the secret

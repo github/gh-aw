@@ -30,7 +30,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var fileModeLog = logger.New("workflow:bundler_file_mode")

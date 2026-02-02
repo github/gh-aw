@@ -5,7 +5,7 @@ package workflow
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestExtractBaseRepo(t *testing.T) {

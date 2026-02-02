@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func TestResolveWorkflowPath(t *testing.T) {

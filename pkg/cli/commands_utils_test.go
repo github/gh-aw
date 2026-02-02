@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/sliceutil"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestExtractWorkflowNameFromFile(t *testing.T) {

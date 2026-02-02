@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // SKIPPED: Scripts now use require() pattern and are loaded at runtime from external files

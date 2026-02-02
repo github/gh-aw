@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestAddWorkflowsFromCurrentRepository tests that adding workflows from the current repository is prevented

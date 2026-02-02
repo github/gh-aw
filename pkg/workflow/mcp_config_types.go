@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // WellKnownContainer represents a container configuration for a well-known command

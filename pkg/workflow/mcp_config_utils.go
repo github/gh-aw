@@ -45,7 +45,7 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpUtilsLog = logger.New("workflow:mcp-config-utils")

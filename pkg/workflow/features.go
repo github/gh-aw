@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var featuresLog = logger.New("workflow:features")

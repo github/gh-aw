@@ -82,8 +82,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpRendererLog = logger.New("workflow:mcp_renderer")

@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var ansiStripLog = logger.New("parser:ansi_strip")

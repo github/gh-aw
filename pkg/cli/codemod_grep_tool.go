@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 var grepToolCodemodLog = logger.New("cli:codemod_grep_tool")
 

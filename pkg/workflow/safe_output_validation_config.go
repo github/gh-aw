@@ -3,7 +3,7 @@ package workflow
 import (
 	"encoding/json"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var safeOutputValidationLog = logger.New("workflow:safe_output_validation_config")

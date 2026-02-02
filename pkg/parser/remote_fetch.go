@@ -10,8 +10,8 @@ import (
 
 	"github.com/cli/go-gh/v2"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/githubnext/gh-aw/pkg/gitutil"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/gitutil"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var remoteLog = logger.New("parser:remote_fetch")

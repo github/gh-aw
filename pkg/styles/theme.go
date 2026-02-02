@@ -31,7 +31,7 @@
 //
 // # Usage Example
 //
-//	import "github.com/githubnext/gh-aw/pkg/styles"
+//	import "github.com/github/gh-aw/pkg/styles"
 //
 //	// Using pre-configured styles
 //	fmt.Println(styles.Error.Render("Something went wrong"))

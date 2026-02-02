@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // TestEnsureLocalhostDomainsWorkflow tests the parser.ensureLocalhostDomains function integration

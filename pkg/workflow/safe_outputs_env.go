@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var safeOutputsEnvLog = logger.New("workflow:safe_outputs_env")

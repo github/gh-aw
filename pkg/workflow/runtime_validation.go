@@ -52,8 +52,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var runtimeValidationLog = logger.New("workflow:runtime_validation")

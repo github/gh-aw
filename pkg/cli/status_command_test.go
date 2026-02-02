@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 func TestStatusWorkflows_JSONOutput(t *testing.T) {

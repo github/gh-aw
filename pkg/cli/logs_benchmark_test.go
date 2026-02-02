@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // Sample log content for benchmarking

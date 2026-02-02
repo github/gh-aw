@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 func TestImportError(t *testing.T) {

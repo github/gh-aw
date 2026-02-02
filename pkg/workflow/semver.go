@@ -3,7 +3,7 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 	"golang.org/x/mod/semver"
 )
 

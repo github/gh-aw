@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // checkGHAuthStatus verifies the user is logged in to GitHub CLI

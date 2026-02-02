@@ -1,6 +1,6 @@
 package workflow
 
-import "github.com/githubnext/gh-aw/pkg/logger"
+import "github.com/github/gh-aw/pkg/logger"
 
 var safeOutputsConfigGenLog = logger.New("workflow:safe_outputs_config_generation_helpers")
 

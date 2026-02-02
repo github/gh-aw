@@ -5,7 +5,7 @@ package workflow
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // TestGitHubToolsModeSeparation verifies that local and remote GitHub tools lists are properly separated

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var slashCommandParserLog = logger.New("workflow:slash_command_parser")

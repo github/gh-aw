@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/timeutil"
-	"github.com/githubnext/gh-aw/pkg/tty"
+	"github.com/github/gh-aw/pkg/timeutil"
+	"github.com/github/gh-aw/pkg/tty"
 )
 
 // Logger represents a debug logger for a specific namespace.

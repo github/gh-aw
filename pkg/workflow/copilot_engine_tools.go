@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // computeCopilotToolArguments computes the --allow-tool arguments for Copilot CLI based on tool configurations.

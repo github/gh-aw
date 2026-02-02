@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var githubToolsetValidationLog = logger.New("workflow:github_toolset_validation_error")

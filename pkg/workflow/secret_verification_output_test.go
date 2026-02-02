@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestSecretVerificationOutput tests that the agent job outputs include secret_verification_result

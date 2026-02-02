@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 func TestCopilotAgentDetector_IsGitHubCopilotAgent(t *testing.T) {

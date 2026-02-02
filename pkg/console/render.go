@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var renderLog = logger.New("console:render")

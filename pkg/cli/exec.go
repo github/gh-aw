@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/go-gh/v2"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var execLog = logger.New("cli:exec")

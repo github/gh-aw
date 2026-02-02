@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var safeInputsLog = logger.New("workflow:safe_inputs")

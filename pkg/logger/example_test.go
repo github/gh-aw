@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 // Note: Example functions cannot use t.Setenv() as they don't have access to *testing.T

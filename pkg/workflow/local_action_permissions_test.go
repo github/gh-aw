@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestLocalActionPermissions tests that jobs using local path actions (./actions/setup)

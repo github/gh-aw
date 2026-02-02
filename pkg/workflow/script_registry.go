@@ -58,7 +58,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var registryLog = logger.New("workflow:script_registry")

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestActivationJobNoCheckoutStep tests that the activation job uses GitHub API

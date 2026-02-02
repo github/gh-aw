@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestSecureMarkdownRendering_Integration(t *testing.T) {

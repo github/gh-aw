@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/cli"
+	"github.com/github/gh-aw/pkg/cli"
 )
 
 func TestValidateEngine(t *testing.T) {

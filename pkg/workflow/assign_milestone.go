@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var assignMilestoneLog = logger.New("workflow:assign_milestone")

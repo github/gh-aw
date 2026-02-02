@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestDisplayAvailableWorkflows tests that displayAvailableWorkflows shows the list of available workflows

@@ -51,7 +51,7 @@
 package workflow
 
 import (
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 // CloseEntityType represents the type of entity being closed

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 // TestMainJobAlwaysHasAgentID verifies that the main job always gets the ID "agent"

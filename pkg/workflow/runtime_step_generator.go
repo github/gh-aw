@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var runtimeStepGeneratorLog = logger.New("workflow:runtime_step_generator")

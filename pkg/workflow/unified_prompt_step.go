@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var unifiedPromptLog = logger.New("workflow:unified_prompt_step")

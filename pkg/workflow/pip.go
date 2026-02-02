@@ -30,7 +30,7 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var pipLog = logger.New("workflow:pip")

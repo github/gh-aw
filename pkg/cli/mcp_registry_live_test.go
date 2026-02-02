@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // TestMCPRegistryClient_LiveSearchServers tests SearchServers against the live GitHub MCP registry

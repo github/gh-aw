@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
-	"github.com/githubnext/gh-aw/pkg/types"
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/types"
 )
 
 // TestHeaderRoundTripper tests the custom RoundTripper that adds headers

@@ -5,7 +5,7 @@ package workflow
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func TestIsFeatureEnabled(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 func TestParseRedactedDomainsLog(t *testing.T) {

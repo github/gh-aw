@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
-	"github.com/githubnext/gh-aw/pkg/testutil"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 func TestExtractRunID(t *testing.T) {

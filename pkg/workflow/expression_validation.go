@@ -50,9 +50,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 var expressionValidationLog = logger.New("workflow:expression_validation")

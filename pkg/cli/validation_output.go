@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // FormatValidationError formats validation errors for console output

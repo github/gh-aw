@@ -3,8 +3,8 @@ package workflow
 import (
 	"fmt"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var threatLog = logger.New("workflow:threat_detection")

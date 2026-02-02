@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var featuresValidationLog = logger.New("workflow:features_validation")

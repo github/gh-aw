@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/spf13/cobra"
 )
 

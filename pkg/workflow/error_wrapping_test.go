@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // internalHTTPError is a custom error type used in tests to demonstrate

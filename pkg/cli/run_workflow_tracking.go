@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // WorkflowRunInfo contains information about a workflow run

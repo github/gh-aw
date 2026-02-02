@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var actionCacheLog = logger.New("workflow:action_cache")

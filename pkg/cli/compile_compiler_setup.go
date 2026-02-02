@@ -33,8 +33,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 var compileCompilerSetupLog = logger.New("cli:compile_compiler_setup")

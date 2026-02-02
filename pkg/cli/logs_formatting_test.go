@@ -5,7 +5,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 func TestFormatNumber(t *testing.T) {

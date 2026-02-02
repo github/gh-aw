@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 // TestProtocolSpecificDomainsIntegration tests protocol-specific domain filtering end-to-end

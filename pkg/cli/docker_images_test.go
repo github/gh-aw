@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 func TestCheckAndPrepareDockerImages_NoToolsRequested(t *testing.T) {

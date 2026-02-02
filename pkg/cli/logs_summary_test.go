@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 func TestSaveAndLoadRunSummary(t *testing.T) {

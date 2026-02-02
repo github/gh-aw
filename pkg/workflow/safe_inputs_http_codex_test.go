@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 // TestCodexSafeInputsHTTPTransport verifies that Codex engine uses HTTP transport for safe-inputs

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // TestKeyFindingsGeneration verifies key findings are generated correctly

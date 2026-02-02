@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // BenchmarkCompileWithActionlint benchmarks workflow compilation with actionlint validation

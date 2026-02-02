@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // TestMissingToolSummaryDisplayFields verifies that Display fields are used by console rendering

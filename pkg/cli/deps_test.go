@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 func TestFormatAge(t *testing.T) {

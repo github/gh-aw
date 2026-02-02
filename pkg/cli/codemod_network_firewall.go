@@ -3,7 +3,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var networkFirewallCodemodLog = logger.New("cli:codemod_network_firewall")
