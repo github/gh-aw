@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -158,6 +159,20 @@ func buildCanonicalFrontmatter(frontmatter map[string]any, result *ImportsResult
 	return canonical
 }
 
+// marshalJSONWithoutHTMLEscape marshals a value to JSON without HTML escaping
+// This matches JavaScript's JSON.stringify behavior
+func marshalJSONWithoutHTMLEscape(v any) (string, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	// Remove the trailing newline that Encoder adds
+	result := buf.String()
+	return strings.TrimSuffix(result, "\n"), nil
+}
+
 // marshalCanonicalJSON marshals a map to canonical JSON with sorted keys
 func marshalCanonicalJSON(data map[string]any) (string, error) {
 	// Use a custom encoder to ensure sorted keys
@@ -186,13 +201,13 @@ func marshalSorted(data any) string {
 			if i > 0 {
 				result.WriteString(",")
 			}
-			// Marshal the key
-			keyJSON, err := json.Marshal(key)
+			// Marshal the key without HTML escaping
+			keyJSON, err := marshalJSONWithoutHTMLEscape(key)
 			if err != nil {
 				frontmatterHashLog.Printf("Warning: failed to marshal key %s: %v", key, err)
 				continue
 			}
-			result.Write(keyJSON)
+			result.WriteString(keyJSON)
 			result.WriteString(":")
 			// Marshal the value recursively
 			result.WriteString(marshalSorted(v[key]))
@@ -217,23 +232,23 @@ func marshalSorted(data any) string {
 		return result.String()
 
 	case string, int, int64, float64, bool, nil:
-		// Use standard JSON marshaling for primitives
-		jsonBytes, err := json.Marshal(v)
+		// Use JSON marshaling without HTML escaping to match JavaScript behavior
+		jsonStr, err := marshalJSONWithoutHTMLEscape(v)
 		if err != nil {
 			// This should rarely happen for primitives, but log it for debugging
 			frontmatterHashLog.Printf("Warning: failed to marshal primitive value: %v", err)
 			return "null"
 		}
-		return string(jsonBytes)
+		return jsonStr
 
 	default:
-		// Fallback to standard JSON marshaling
-		jsonBytes, err := json.Marshal(v)
+		// Fallback to JSON marshaling without HTML escaping
+		jsonStr, err := marshalJSONWithoutHTMLEscape(v)
 		if err != nil {
 			frontmatterHashLog.Printf("Warning: failed to marshal value of type %T: %v", v, err)
 			return "null"
 		}
-		return string(jsonBytes)
+		return jsonStr
 	}
 }
 

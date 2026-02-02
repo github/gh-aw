@@ -20,7 +20,7 @@
 # For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 6159286d454ea4fe1c9c258e6e906dbd8ee71e2b4154ba2dec939209cbbd62db
+# frontmatter-hash: 919aa9db316c03def96f98fa19bea30f29ce46d039263de87340d928180c4ab8
 
 name: "Test Project URL Explicit Requirement"
 "on":
