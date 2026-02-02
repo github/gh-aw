@@ -79,7 +79,7 @@ This is DIFFERENT markdown content that should not affect the lock file.
 	require.NoError(t, err, "Failed to stat lock file after recompilation")
 	afterModTime := afterInfo.ModTime()
 
-	assert.Equal(t, initialModTime, afterModTime, 
+	assert.Equal(t, initialModTime, afterModTime,
 		"Lock file timestamp should be preserved when content is unchanged")
 }
 
@@ -147,7 +147,7 @@ This is the initial markdown content.
 	require.NoError(t, err, "Failed to stat lock file after recompilation")
 	afterModTime := afterInfo.ModTime()
 
-	assert.True(t, afterModTime.After(initialModTime), 
+	assert.True(t, afterModTime.After(initialModTime),
 		"Lock file timestamp should be updated when content changes")
 }
 
