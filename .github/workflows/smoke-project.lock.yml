@@ -26,7 +26,7 @@
 #     - shared/gh.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e2adb97de556588add90176dae304bba42740080826ce1c6ccee40282b8a77c6
+# frontmatter-hash: b71cadbca1d82cdc747852953ee1f969eef94ed46e507d218256621ddefa5f74
 
 name: "Smoke Project"
 "on":
@@ -240,7 +240,7 @@ jobs:
               "name": "create_issue"
             },
             {
-              "description": "Add a comment to an existing GitHub issue, pull request, or discussion. Use this to provide feedback, answer questions, or add information to an existing conversation. For creating new items, use create_issue, create_discussion, or create_pull_request instead. CONSTRAINTS: Maximum 2 comment(s) can be added.",
+              "description": "Add a comment to an existing GitHub issue, pull request, or discussion. Use this to provide feedback, answer questions, or add information to an existing conversation. For creating new items, use create_issue, create_discussion, or create_pull_request instead. CONSTRAINTS: Maximum 2 comment(s) can be added. Comments will be added in repository \"github-agentic-workflows/demo-repository\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -1663,7 +1663,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1,\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_project_status_update\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":1,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\"},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"update_project\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":20,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\",\"views\":[{\"name\":\"Smoke Test Board\",\"layout\":\"board\",\"filter\":\"is:open\"},{\"name\":\"Smoke Test Table\",\"layout\":\"table\"}]}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2,\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"add_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1,\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"create_project_status_update\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":1,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\"},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke-project\"],\"target-repo\":\"github-agentic-workflows/demo-repository\"},\"update_project\":{\"github-token\":\"${{ secrets.SMOKE_PROJECT_GITHUB_TOKEN }}\",\"max\":20,\"project\":\"https://github.com/orgs/github-agentic-workflows/projects/1\",\"views\":[{\"name\":\"Smoke Test Board\",\"layout\":\"board\",\"filter\":\"is:open\"},{\"name\":\"Smoke Test Table\",\"layout\":\"table\"}]}}"
           GH_AW_PROJECT_URL: "https://github.com/orgs/github-agentic-workflows/projects/1"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
