@@ -149,14 +149,16 @@ This will help you avoid re-cleaning files that were recently processed.
 
 ### 2. Find Documentation Files
 
-Scan the `docs/` directory for markdown files, excluding code-generated files:
+Scan the `docs/` directory for markdown files, excluding code-generated files and blog posts:
 ```bash
-find docs/src/content/docs -name '*.md' -type f ! -name 'frontmatter-full.md'
+find docs/src/content/docs -path 'docs/src/content/docs/blog' -prune -o -name '*.md' -type f ! -name 'frontmatter-full.md' -print
 ```
 
-**IMPORTANT**: Exclude `frontmatter-full.md` as it is automatically generated from the JSON schema by `scripts/generate-schema-docs.js` and should not be manually edited.
+**IMPORTANT**: Exclude these directories and files:
+- `docs/src/content/docs/blog/` - Blog posts have a different writing style and purpose
+- `frontmatter-full.md` - Automatically generated from the JSON schema by `scripts/generate-schema-docs.js` and should not be manually edited
 
-Focus on files that were recently modified or are in the `docs/src/content/docs/samples/` directory.
+Focus on files that were recently modified or are in the `docs/src/content/docs/` directory (excluding blog).
 
 {{#if ${{ github.event.pull_request.number }}}}
 **Pull Request Context**: Since this workflow is running in the context of PR #${{ github.event.pull_request.number }}, prioritize reviewing the documentation files that were modified in this pull request. Use the GitHub API to get the list of changed files:
@@ -172,7 +174,8 @@ Focus on markdown files in the `docs/` directory that appear in the PR's changed
 
 **IMPORTANT**: Work on only **ONE file at a time** to keep changes small and reviewable.
 
-**NEVER select these code-generated files**:
+**NEVER select these directories or code-generated files**:
+- `docs/src/content/docs/blog/` - Blog posts have a different writing style and should not be unbloated
 - `docs/src/content/docs/reference/frontmatter-full.md` - Auto-generated from JSON schema
 
 Choose the file most in need of improvement based on:
