@@ -160,6 +160,53 @@ describe("Unified Safe Output Handler Manager", () => {
       // Explicit config should take precedence
       expect(config.project.update_project).toEqual({ max: 50, project: "url2" });
     });
+
+    it("should handle smoke-project workflow scenario correctly", () => {
+      // Simulate the exact config from smoke-project workflow
+      // where Go compiler puts all handlers (including project handlers) in one config
+      process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
+        add_comment: { hide_older_comments: true, max: 2 },
+        add_labels: { allowed: ["smoke-project"], "target-repo": "github-agentic-workflows/demo-repository" },
+        create_issue: { close_older_issues: true, expires: 2, group: true, max: 1, "target-repo": "github-agentic-workflows/demo-repository" },
+        create_project_status_update: { "github-token": "***", max: 1, project: "https://github.com/orgs/github-agentic-workflows/projects/1" },
+        missing_data: {},
+        missing_tool: {},
+        remove_labels: { allowed: ["smoke-project"], "target-repo": "github-agentic-workflows/demo-repository" },
+        update_project: {
+          "github-token": "***",
+          max: 20,
+          project: "https://github.com/orgs/github-agentic-workflows/projects/1",
+          views: [
+            { name: "Smoke Test Board", layout: "board", filter: "is:open" },
+            { name: "Smoke Test Table", layout: "table" },
+          ],
+        },
+      });
+
+      const config = loadConfig();
+
+      // Regular handlers should stay in regular config
+      expect(config.regular).toHaveProperty("add_comment");
+      expect(config.regular).toHaveProperty("add_labels");
+      expect(config.regular).toHaveProperty("create_issue");
+      expect(config.regular).toHaveProperty("missing_data");
+      expect(config.regular).toHaveProperty("missing_tool");
+      expect(config.regular).toHaveProperty("remove_labels");
+
+      // Project handlers should be automatically moved to project config
+      expect(config.project).toHaveProperty("update_project");
+      expect(config.project).toHaveProperty("create_project_status_update");
+
+      // Regular handlers should NOT contain project handlers
+      expect(config.regular).not.toHaveProperty("update_project");
+      expect(config.regular).not.toHaveProperty("create_project_status_update");
+
+      // Verify project handler configs are intact
+      expect(config.project.update_project).toHaveProperty("max", 20);
+      expect(config.project.update_project).toHaveProperty("project");
+      expect(config.project.update_project).toHaveProperty("views");
+      expect(config.project.create_project_status_update).toHaveProperty("max", 1);
+    });
   });
 
   describe("setupProjectGitHubClient", () => {
