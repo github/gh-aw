@@ -104,10 +104,25 @@ function createMCPServer(options = {}) {
 
   // Register predefined tools
   for (const tool of toolsWithHandlers) {
-    // Check if tool is enabled in configuration
-    if (!enabledTools.has(tool.name)) {
-      logger.debug(`Skipping tool ${tool.name} - not enabled in config`);
-      continue;
+    // Check if this is a dispatch_workflow tool (has _workflow_name metadata)
+    // These tools are dynamically generated with workflow-specific names
+    const isDispatchWorkflowTool = !!tool._workflow_name;
+    
+    if (isDispatchWorkflowTool) {
+      logger.debug(`Found dispatch_workflow tool: ${tool.name} (_workflow_name: ${tool._workflow_name})`);
+      if (!safeOutputsConfig.dispatch_workflow) {
+        logger.debug(`  WARNING: dispatch_workflow config is missing or falsy - tool will NOT be registered`);
+        logger.debug(`  Config keys: ${Object.keys(safeOutputsConfig).join(", ")}`);
+        logger.debug(`  config.dispatch_workflow value: ${JSON.stringify(safeOutputsConfig.dispatch_workflow)}`);
+        continue;
+      }
+      logger.debug(`  dispatch_workflow config exists, registering tool`);
+    } else {
+      // Check if regular tool is enabled in configuration
+      if (!enabledTools.has(tool.name)) {
+        logger.debug(`Skipping tool ${tool.name} - not enabled in config`);
+        continue;
+      }
     }
 
     logger.debug(`Registering tool: ${tool.name}`);
