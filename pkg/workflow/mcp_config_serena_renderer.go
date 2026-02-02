@@ -176,3 +176,68 @@ func renderSerenaMCPConfigWithOptions(yaml *strings.Builder, serenaTool any, isL
 		yaml.WriteString("              },\n")
 	}
 }
+
+// renderSerenaMCPDirectDocker generates Serena MCP configuration using direct Docker command format.
+// This format uses "command": "docker" with all args inline, allowing CLIs to spawn containers directly
+// without the MCP Gateway.
+func renderSerenaMCPDirectDocker(yaml *strings.Builder, serenaTool any, isLast bool, includeCopilotFields bool) {
+	mcpSerenaLog.Print("Rendering Serena MCP with direct docker command")
+
+	customArgs := getSerenaCustomArgs(serenaTool)
+
+	// Determine the mode
+	mode := "docker" // default
+	if toolMap, ok := serenaTool.(map[string]any); ok {
+		if modeStr, ok := toolMap["mode"].(string); ok {
+			mode = modeStr
+		}
+	}
+
+	yaml.WriteString("              \"serena\": {\n")
+
+	if mode == "local" {
+		// Local mode: use HTTP transport (same as regular config)
+		if includeCopilotFields {
+			yaml.WriteString("                \"type\": \"http\",\n")
+		}
+		yaml.WriteString("                \"url\": \"http://localhost:$GH_AW_SERENA_PORT\"\n")
+	} else {
+		// Docker mode: use direct docker command format
+		if includeCopilotFields {
+			yaml.WriteString("                \"type\": \"stdio\",\n")
+		}
+
+		// Select the appropriate Serena container
+		containerImage := selectSerenaContainer(serenaTool)
+
+		yaml.WriteString("                \"command\": \"docker\",\n")
+		yaml.WriteString("                \"args\": [\n")
+		yaml.WriteString("                  \"run\",\n")
+		yaml.WriteString("                  \"-i\",\n")
+		yaml.WriteString("                  \"--rm\",\n")
+		yaml.WriteString("                  \"--network\", \"host\",\n")
+		yaml.WriteString("                  \"-v\", \"${{ github.workspace }}:${{ github.workspace }}:rw\",\n")
+		yaml.WriteString("                  \"--entrypoint\", \"serena\",\n")
+		yaml.WriteString("                  \"" + containerImage + ":latest\",\n")
+		yaml.WriteString("                  \"start-mcp-server\",\n")
+		yaml.WriteString("                  \"--context\", \"codex\",\n")
+		yaml.WriteString("                  \"--project\", \"${{ github.workspace }}\"")
+
+		// Append custom args if present
+		if len(customArgs) > 0 {
+			for _, arg := range customArgs {
+				yaml.WriteString(",\n")
+				yaml.WriteString("                  \"" + arg + "\"")
+			}
+		}
+
+		yaml.WriteString("\n")
+		yaml.WriteString("                ]\n")
+	}
+
+	if isLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}

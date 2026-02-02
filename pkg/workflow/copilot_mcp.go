@@ -38,9 +38,8 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 
 // RenderMCPConfigWithoutGateway generates MCP server configuration for Copilot CLI
 // without the MCP gateway proxy. This is used when sandbox is disabled and
-// MCP servers run in their configured mode (stdio, Docker, or HTTP) and communicate directly with the agent.
-// Note: Container-based MCP servers (playwright, serena, agentic-workflows) are filtered out
-// because they require Docker/container runtime which is not available without the sandbox.
+// MCP servers run directly via Docker (for container-based servers) or HTTP.
+// The config uses "command": "docker" format that Copilot CLI can execute directly.
 func (e *CopilotEngine) RenderMCPConfigWithoutGateway(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) {
 	copilotMCPLog.Printf("Rendering MCP config without gateway for Copilot engine: mcpTools=%d", len(mcpTools))
 
@@ -48,39 +47,20 @@ func (e *CopilotEngine) RenderMCPConfigWithoutGateway(yaml *strings.Builder, too
 	yaml.WriteString("          mkdir -p /home/runner/.copilot\n")
 
 	// Create unified renderer with Copilot-specific options
+	// UseDirectDockerCommand=true: Use "command": "docker" format instead of "container" field
+	// This allows Copilot CLI to spawn Docker containers directly without MCP Gateway
 	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
 		return NewMCPConfigRenderer(MCPRendererOptions{
-			IncludeCopilotFields: true,
-			InlineArgs:           true,
-			Format:               "json",
-			IsLast:               isLast,
+			IncludeCopilotFields:   true,
+			InlineArgs:             true,
+			Format:                 "json",
+			IsLast:                 isLast,
+			UseDirectDockerCommand: true,
 		})
 	}
 
 	// Build base options without gateway
 	options := e.buildCopilotMCPConfigOptions(createRenderer, nil, workflowData, true)
-
-	// Override the FilterTool to also filter out container-based MCP servers
-	// These require Docker/container runtime which is not available when sandbox is disabled
-	baseFilter := options.FilterTool
-	options.FilterTool = func(toolName string) bool {
-		// First apply base filter (e.g., cache-memory)
-		if baseFilter != nil && !baseFilter(toolName) {
-			return false
-		}
-		// Filter out container-based MCP servers that won't work without Docker
-		// playwright, serena, and agentic-workflows all require container runtime
-		containerBasedTools := map[string]bool{
-			"playwright":        true,
-			"serena":            true,
-			"agentic-workflows": true,
-		}
-		if containerBasedTools[toolName] {
-			copilotMCPLog.Printf("Filtering out container-based MCP tool '%s' (sandbox disabled, no Docker)", toolName)
-			return false
-		}
-		return true
-	}
 
 	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
 }

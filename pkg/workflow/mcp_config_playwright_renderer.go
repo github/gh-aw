@@ -174,3 +174,63 @@ func renderPlaywrightMCPConfigWithOptions(yaml *strings.Builder, playwrightConfi
 		yaml.WriteString("              },\n")
 	}
 }
+
+// renderPlaywrightMCPDirectDocker generates Playwright MCP configuration using direct Docker command format.
+// This format uses "command": "docker" with all args inline, allowing CLIs to spawn containers directly
+// without the MCP Gateway.
+func renderPlaywrightMCPDirectDocker(yaml *strings.Builder, playwrightConfig *PlaywrightToolConfig, isLast bool, includeCopilotFields bool) {
+	mcpPlaywrightLog.Print("Rendering Playwright MCP with direct docker command")
+
+	args := generatePlaywrightDockerArgs(playwrightConfig)
+	customArgs := getPlaywrightCustomArgs(playwrightConfig)
+
+	// Use official Playwright MCP Docker image
+	playwrightImage := "mcr.microsoft.com/playwright/mcp"
+
+	yaml.WriteString("              \"playwright\": {\n")
+
+	// Add type field for Copilot
+	if includeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+	}
+
+	// Use direct docker command format
+	yaml.WriteString("                \"command\": \"docker\",\n")
+	yaml.WriteString("                \"args\": [\n")
+	yaml.WriteString("                  \"run\",\n")
+	yaml.WriteString("                  \"-i\",\n")
+	yaml.WriteString("                  \"--rm\",\n")
+	yaml.WriteString("                  \"--init\",\n")
+	yaml.WriteString("                  \"--network\", \"host\",\n")
+	yaml.WriteString("                  \"-v\", \"/tmp/gh-aw/mcp-logs:/tmp/gh-aw/mcp-logs:rw\",\n")
+
+	// Docker image
+	yaml.WriteString("                  \"" + playwrightImage + "\",\n")
+
+	// Entrypoint args for Playwright MCP server
+	yaml.WriteString("                  \"--output-dir\", \"/tmp/gh-aw/mcp-logs/playwright\"")
+
+	if len(args.AllowedDomains) > 0 {
+		domainsStr := strings.Join(args.AllowedDomains, ";")
+		yaml.WriteString(",\n")
+		yaml.WriteString("                  \"--allowed-hosts\", \"" + domainsStr + "\",\n")
+		yaml.WriteString("                  \"--allowed-origins\", \"" + domainsStr + "\"")
+	}
+
+	// Append custom args if present
+	if len(customArgs) > 0 {
+		for _, arg := range customArgs {
+			yaml.WriteString(",\n")
+			yaml.WriteString("                  \"" + arg + "\"")
+		}
+	}
+
+	yaml.WriteString("\n")
+	yaml.WriteString("                ]\n")
+
+	if isLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
+}

@@ -98,6 +98,10 @@ type MCPRendererOptions struct {
 	Format string
 	// IsLast indicates if this is the last server in the configuration (affects trailing comma)
 	IsLast bool
+	// UseDirectDockerCommand indicates if container-based MCP servers should use "command": "docker"
+	// format instead of "container" field format. This is used when MCP Gateway is not running
+	// and the CLI needs to spawn Docker containers directly.
+	UseDirectDockerCommand bool
 }
 
 // MCPConfigRendererUnified provides unified rendering methods for MCP configurations
@@ -108,8 +112,8 @@ type MCPConfigRendererUnified struct {
 
 // NewMCPConfigRenderer creates a new unified MCP config renderer with the specified options
 func NewMCPConfigRenderer(opts MCPRendererOptions) *MCPConfigRendererUnified {
-	mcpRendererLog.Printf("Creating MCP renderer: format=%s, copilot_fields=%t, inline_args=%t, is_last=%t",
-		opts.Format, opts.IncludeCopilotFields, opts.InlineArgs, opts.IsLast)
+	mcpRendererLog.Printf("Creating MCP renderer: format=%s, copilot_fields=%t, inline_args=%t, is_last=%t, direct_docker=%t",
+		opts.Format, opts.IncludeCopilotFields, opts.InlineArgs, opts.IsLast, opts.UseDirectDockerCommand)
 	return &MCPConfigRendererUnified{
 		options: opts,
 	}
@@ -120,13 +124,6 @@ func NewMCPConfigRenderer(opts MCPRendererOptions) *MCPConfigRendererUnified {
 func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, githubTool any, workflowData *WorkflowData) {
 	githubType := getGitHubType(githubTool)
 	readOnly := getGitHubReadOnly(githubTool)
-
-	// When sandbox is disabled, force remote mode for GitHub MCP server
-	// Docker-based (local) MCP servers require the sandbox/container runtime to function
-	if isSandboxDisabled(workflowData) && githubType == "local" {
-		mcpRendererLog.Print("Sandbox disabled - forcing GitHub MCP to remote mode (Docker containers not available)")
-		githubType = "remote"
-	}
 
 	// Get lockdown value - use detected value if lockdown wasn't explicitly set
 	lockdown := getGitHubLockdown(githubTool)
@@ -143,8 +140,8 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 
 	toolsets := getGitHubToolsets(githubTool)
 
-	mcpRendererLog.Printf("Rendering GitHub MCP: type=%s, read_only=%t, lockdown=%t (explicit=%t, use_step=%t), toolsets=%v, format=%s",
-		githubType, readOnly, lockdown, hasGitHubLockdownExplicitlySet(githubTool), shouldUseStepOutput, toolsets, r.options.Format)
+	mcpRendererLog.Printf("Rendering GitHub MCP: type=%s, read_only=%t, lockdown=%t (explicit=%t, use_step=%t), toolsets=%v, format=%s, direct_docker=%t",
+		githubType, readOnly, lockdown, hasGitHubLockdownExplicitlySet(githubTool), shouldUseStepOutput, toolsets, r.options.Format, r.options.UseDirectDockerCommand)
 
 	if r.options.Format == "toml" {
 		r.renderGitHubTOML(yaml, githubTool, workflowData)
@@ -173,8 +170,23 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 			AllowedTools:       getGitHubAllowedTools(githubTool),
 			IncludeEnvSection:  r.options.IncludeCopilotFields,
 		})
+	} else if r.options.UseDirectDockerCommand {
+		// Direct Docker command format - for CLI consumption without MCP Gateway
+		// Uses "command": "docker" with args instead of "container" field
+		githubDockerImageVersion := getGitHubDockerImageVersion(githubTool)
+
+		RenderGitHubMCPDirectDockerConfig(yaml, GitHubMCPDockerOptions{
+			ReadOnly:           readOnly,
+			Lockdown:           lockdown,
+			LockdownFromStep:   shouldUseStepOutput,
+			Toolsets:           toolsets,
+			DockerImageVersion: githubDockerImageVersion,
+			IncludeTypeField:   r.options.IncludeCopilotFields,
+			AllowedTools:       getGitHubAllowedTools(githubTool),
+		})
 	} else {
 		// Local mode - use Docker-based GitHub MCP server (default)
+		// Uses "container" field format for MCP Gateway
 		githubDockerImageVersion := getGitHubDockerImageVersion(githubTool)
 		customArgs := getGitHubCustomArgs(githubTool)
 		mounts := getGitHubMounts(githubTool)
@@ -202,7 +214,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 
 // RenderPlaywrightMCP generates the Playwright MCP server configuration
 func (r *MCPConfigRendererUnified) RenderPlaywrightMCP(yaml *strings.Builder, playwrightTool any) {
-	mcpRendererLog.Printf("Rendering Playwright MCP: format=%s, inline_args=%t", r.options.Format, r.options.InlineArgs)
+	mcpRendererLog.Printf("Rendering Playwright MCP: format=%s, inline_args=%t, direct_docker=%t", r.options.Format, r.options.InlineArgs, r.options.UseDirectDockerCommand)
 
 	// Parse playwright tool configuration to strongly-typed struct
 	playwrightConfig := parsePlaywrightTool(playwrightTool)
@@ -213,7 +225,11 @@ func (r *MCPConfigRendererUnified) RenderPlaywrightMCP(yaml *strings.Builder, pl
 	}
 
 	// JSON format
-	renderPlaywrightMCPConfigWithOptions(yaml, playwrightConfig, r.options.IsLast, r.options.IncludeCopilotFields, r.options.InlineArgs)
+	if r.options.UseDirectDockerCommand {
+		renderPlaywrightMCPDirectDocker(yaml, playwrightConfig, r.options.IsLast, r.options.IncludeCopilotFields)
+	} else {
+		renderPlaywrightMCPConfigWithOptions(yaml, playwrightConfig, r.options.IsLast, r.options.IncludeCopilotFields, r.options.InlineArgs)
+	}
 }
 
 // renderPlaywrightTOML generates Playwright MCP configuration in TOML format
@@ -262,7 +278,7 @@ func (r *MCPConfigRendererUnified) renderPlaywrightTOML(yaml *strings.Builder, p
 
 // RenderSerenaMCP generates Serena MCP server configuration
 func (r *MCPConfigRendererUnified) RenderSerenaMCP(yaml *strings.Builder, serenaTool any) {
-	mcpRendererLog.Printf("Rendering Serena MCP: format=%s, inline_args=%t", r.options.Format, r.options.InlineArgs)
+	mcpRendererLog.Printf("Rendering Serena MCP: format=%s, inline_args=%t, direct_docker=%t", r.options.Format, r.options.InlineArgs, r.options.UseDirectDockerCommand)
 
 	if r.options.Format == "toml" {
 		r.renderSerenaTOML(yaml, serenaTool)
@@ -270,7 +286,11 @@ func (r *MCPConfigRendererUnified) RenderSerenaMCP(yaml *strings.Builder, serena
 	}
 
 	// JSON format
-	renderSerenaMCPConfigWithOptions(yaml, serenaTool, r.options.IsLast, r.options.IncludeCopilotFields, r.options.InlineArgs)
+	if r.options.UseDirectDockerCommand {
+		renderSerenaMCPDirectDocker(yaml, serenaTool, r.options.IsLast, r.options.IncludeCopilotFields)
+	} else {
+		renderSerenaMCPConfigWithOptions(yaml, serenaTool, r.options.IsLast, r.options.IncludeCopilotFields, r.options.InlineArgs)
+	}
 }
 
 // renderSerenaTOML generates Serena MCP configuration in TOML format
@@ -402,7 +422,7 @@ func (r *MCPConfigRendererUnified) renderSafeInputsTOML(yaml *strings.Builder, s
 
 // RenderAgenticWorkflowsMCP generates the Agentic Workflows MCP server configuration
 func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Builder) {
-	mcpRendererLog.Printf("Rendering Agentic Workflows MCP: format=%s", r.options.Format)
+	mcpRendererLog.Printf("Rendering Agentic Workflows MCP: format=%s, direct_docker=%t", r.options.Format, r.options.UseDirectDockerCommand)
 
 	if r.options.Format == "toml" {
 		r.renderAgenticWorkflowsTOML(yaml)
@@ -410,7 +430,11 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 	}
 
 	// JSON format
-	renderAgenticWorkflowsMCPConfigWithOptions(yaml, r.options.IsLast, r.options.IncludeCopilotFields)
+	if r.options.UseDirectDockerCommand {
+		r.renderAgenticWorkflowsMCPDirectDocker(yaml)
+	} else {
+		renderAgenticWorkflowsMCPConfigWithOptions(yaml, r.options.IsLast, r.options.IncludeCopilotFields)
+	}
 }
 
 // renderAgenticWorkflowsTOML generates Agentic Workflows MCP configuration in TOML format
@@ -423,6 +447,38 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\"]\n")
 	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
+}
+
+// renderAgenticWorkflowsMCPDirectDocker generates Agentic Workflows MCP configuration using direct Docker command format.
+// This format uses "command": "docker" with all args inline, allowing CLIs to spawn containers directly.
+func (r *MCPConfigRendererUnified) renderAgenticWorkflowsMCPDirectDocker(yaml *strings.Builder) {
+	mcpRendererLog.Print("Rendering Agentic Workflows MCP with direct docker command")
+
+	yaml.WriteString("              \"agentic_workflows\": {\n")
+
+	if r.options.IncludeCopilotFields {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+	}
+
+	yaml.WriteString("                \"command\": \"docker\",\n")
+	yaml.WriteString("                \"args\": [\n")
+	yaml.WriteString("                  \"run\",\n")
+	yaml.WriteString("                  \"-i\",\n")
+	yaml.WriteString("                  \"--rm\",\n")
+	yaml.WriteString("                  \"-v\", \"" + constants.DefaultGhAwMount + "\",\n")
+	yaml.WriteString("                  \"-v\", \"${{ github.workspace }}:${{ github.workspace }}:rw\",\n")
+	yaml.WriteString("                  \"-v\", \"/tmp/gh-aw:/tmp/gh-aw:rw\",\n")
+	yaml.WriteString("                  \"-e\", \"GITHUB_TOKEN=${GITHUB_TOKEN}\",\n")
+	yaml.WriteString("                  \"--entrypoint\", \"/opt/gh-aw/gh-aw\",\n")
+	yaml.WriteString("                  \"" + constants.DefaultAlpineImage + "\",\n")
+	yaml.WriteString("                  \"mcp-server\"\n")
+	yaml.WriteString("                ]\n")
+
+	if r.options.IsLast {
+		yaml.WriteString("              }\n")
+	} else {
+		yaml.WriteString("              },\n")
+	}
 }
 
 // renderGitHubTOML generates GitHub MCP configuration in TOML format (for Codex engine)
@@ -731,6 +787,57 @@ func RenderGitHubMCPDockerConfig(yaml *strings.Builder, options GitHubMCPDockerO
 	}
 
 	yaml.WriteString("                }\n")
+}
+
+// RenderGitHubMCPDirectDockerConfig renders the GitHub MCP server configuration using direct Docker command format.
+// This format uses "command": "docker" with args instead of "container" field, allowing CLIs
+// (Copilot, Claude Code, Codex) to spawn Docker containers directly without the MCP Gateway.
+//
+// Parameters:
+//   - yaml: The string builder for YAML output
+//   - options: GitHub MCP Docker rendering options
+func RenderGitHubMCPDirectDockerConfig(yaml *strings.Builder, options GitHubMCPDockerOptions) {
+	mcpRendererLog.Printf("Rendering GitHub MCP with direct docker command: version=%s, read_only=%t, lockdown=%t",
+		options.DockerImageVersion, options.ReadOnly, options.Lockdown)
+
+	// Add type field for stdio (Copilot requires this)
+	if options.IncludeTypeField {
+		yaml.WriteString("                \"type\": \"stdio\",\n")
+	}
+
+	// Use direct docker command format instead of "container" field
+	yaml.WriteString("                \"command\": \"docker\",\n")
+	yaml.WriteString("                \"args\": [\n")
+	yaml.WriteString("                  \"run\",\n")
+	yaml.WriteString("                  \"-i\",\n")
+	yaml.WriteString("                  \"--rm\",\n")
+
+	// Add environment variables as -e flags
+	// GitHub token
+	if options.IncludeTypeField {
+		yaml.WriteString("                  \"-e\", \"GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_MCP_SERVER_TOKEN}\",\n")
+	} else {
+		yaml.WriteString("                  \"-e\", \"GITHUB_PERSONAL_ACCESS_TOKEN=$GITHUB_MCP_SERVER_TOKEN\",\n")
+	}
+
+	// Read-only mode
+	if options.ReadOnly {
+		yaml.WriteString("                  \"-e\", \"GITHUB_READ_ONLY=1\",\n")
+	}
+
+	// Lockdown mode
+	if options.LockdownFromStep {
+		yaml.WriteString("                  \"-e\", \"GITHUB_LOCKDOWN_MODE=$GITHUB_MCP_LOCKDOWN\",\n")
+	} else if options.Lockdown {
+		yaml.WriteString("                  \"-e\", \"GITHUB_LOCKDOWN_MODE=1\",\n")
+	}
+
+	// Toolsets
+	yaml.WriteString("                  \"-e\", \"GITHUB_TOOLSETS=" + options.Toolsets + "\",\n")
+
+	// Docker image (last arg)
+	yaml.WriteString("                  \"ghcr.io/github/github-mcp-server:" + options.DockerImageVersion + "\"\n")
+	yaml.WriteString("                ]\n")
 }
 
 // GitHubMCPRemoteOptions defines configuration for GitHub MCP remote mode rendering
