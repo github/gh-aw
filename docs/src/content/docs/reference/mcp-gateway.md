@@ -245,7 +245,7 @@ The `gateway` section is required and configures gateway-specific behavior:
 | `apiKey` | string | Yes | API key for authentication |
 | `startupTimeout` | integer | No | Server startup timeout in seconds (default: 30) |
 | `toolTimeout` | integer | No | Tool invocation timeout in seconds (default: 60) |
-| `payloadDir` | string | No | Directory path where the gateway places large payload JSON files for authenticated clients. Each client (identified by API key) can access their respective payload files from this directory. The gateway MUST ensure proper isolation between clients' payload files. |
+| `payloadDir` | string | No | Directory path for storing large payload JSON files for authenticated clients |
 
 #### 4.1.3a Top-Level Configuration Fields
 

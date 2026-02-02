@@ -228,7 +228,7 @@
         },
         "payloadDir": {
           "type": "string",
-          "description": "Directory path where the gateway places large payload JSON files for authenticated clients. Each client (identified by API key) can access their respective payload files from this directory. The gateway MUST ensure proper isolation between clients' payload files.",
+          "description": "Directory path for storing large payload JSON files for authenticated clients.",
           "minLength": 1
         }
       },
