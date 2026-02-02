@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestCJSFilesNoActionsRequires verifies that .cjs files in actions/setup/js
+// TestCJSFilesNoActionsRequires verifies that production .cjs files in actions/setup/js
 // do not use require() statements with "actions/" paths or "@actions/*" npm packages.
 //
 // When these .cjs files are deployed to GitHub Actions runners, they are copied
@@ -19,6 +19,9 @@ import (
 // 1. There's no parent "actions/" directory in the runtime environment
 // 2. All files are in the same flat directory
 // 3. The @actions/* npm packages are not installed in the runtime environment
+//
+// Note: Test files (*.test.cjs, test-*.cjs) are excluded from this validation as they
+// are not deployed to GitHub Actions runners and may use @actions/* packages for testing.
 //
 // Valid requires:
 //   - require("./file.cjs") - relative paths within the same directory
@@ -51,8 +54,12 @@ func TestCJSFilesNoActionsRequires(t *testing.T) {
 			continue
 		}
 		name := entry.Name()
-		// Include all .cjs files (both production and test files should follow the same rules)
-		if strings.HasSuffix(name, ".cjs") {
+		// Include .cjs files but exclude test files
+		// Test files (*.test.cjs, test-*.cjs) are not deployed to GitHub Actions runners
+		// and may use @actions/* packages for testing purposes
+		if strings.HasSuffix(name, ".cjs") &&
+			!strings.HasSuffix(name, ".test.cjs") &&
+			!strings.HasPrefix(name, "test-") {
 			cjsFiles = append(cjsFiles, name)
 		}
 	}
