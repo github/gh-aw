@@ -4,20 +4,30 @@ description: Agent workflows that orchestrate work and track progress.
 sidebar:
   label: Campaigns
 banner:
-  content: '<strong>⚠️ Experimental:</strong> This feature is under active development and may change or behave unpredictably.'
+  content: '<strong>Experimental:</strong> This feature is still in development and may change or behave unpredictably.'
 ---
 
 ## What are Agentic Campaigns?
 
-Agentic Campaigns are workflows that coordinate work across one or more repositories to drive progress toward a shared goal and make that progress easy to track.
+Agentic campaigns are scheduled workflows for work that spans multiple steps and is easier to manage with shared coordination and progress tracking.
 
-They run on a schedule and include:
-- **Natural language coordination** with defaults being imported from `shared/campaign.md`
-- **Progress tracking** with optional automatic [GitHub Projects](/gh-aw/reference/glossary/#github-projects-projects-v2)
+Campaigns can be large (like migrations) or small (like a one-week cleanup) initiatives.
 
-## When should this just be a workflow?
+Each campaign includes:
+- **Markdown** to document the goal, work breakdown, and reporting
+- **Worker agents** that autonomously execute the work
+- **Progress tracking** to show status and next steps
 
-**Rule of thumb:** If you're not tracking work items in a GitHub Project or coordinating multiple agents, you probably just need a regular workflow.
+## When should I use an agentic campaign?
+
+Use a campaign when you want a clear plan and ongoing progress updates, for example: 
+- Large-scale migrations (e.g., framework upgrades, API deprecations)
+- Cross-cutting refactors (e.g., module splits, dependency cleanup)
+- Smaller initiatives (e.g., reliability cleanup week, docs refresh)
+
+Don't use a campaign for simple tasks that don't need coordination, such as:
+- Single tasks (e.g., triaging issues, writing a blog post)
+- One-off processes (e.g., code reviews, generating documentation)
 
 ## How it works
 
