@@ -527,4 +527,373 @@ jobs:
       expect(mockCore.setFailed).toHaveBeenCalled(); // Should fail because timestamp check failed
     });
   });
+
+  describe("coarse timestamp handling", () => {
+    beforeEach(() => {
+      process.env.GH_AW_WORKFLOW_FILE = "test.lock.yml";
+    });
+
+    it("should use hash comparison when timestamps are equal and hashes match", async () => {
+      // Hash for frontmatter "engine: copilot"
+      const validHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
+      const lockFileContent = `# frontmatter-hash: ${validHash}
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test"`;
+
+      const mdFileContent = `---
+engine: copilot
+---
+# Test Workflow`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456", // Different commit SHA
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Timestamps are equal"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash comparison"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (hashes match)"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should fail when timestamps are equal but hashes differ", async () => {
+      const storedHash = "cdb5fdf551a14f93f6a8bb32b4f8ee5a6e93a8075052ecd915180be7fbc168ca";
+      const lockFileContent = `# frontmatter-hash: ${storedHash}
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test"`;
+
+      // Different frontmatter - will produce different hash
+      const mdFileContent = `---
+engine: claude
+model: claude-sonnet-4
+---
+# Test Workflow`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456", // Different commit SHA
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Timestamps are equal"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Hashes differ"));
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Frontmatter hash mismatch"));
+      expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("frontmatter hash mismatch"));
+    });
+
+    it("should pass when timestamps are equal and hash comparison fails", async () => {
+      const lockFileContent = `name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456", // Different commit SHA
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Same timestamp
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(lockFileContent).toString("base64"),
+        },
+      });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Timestamps are equal"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No frontmatter hash found"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compare frontmatter hashes"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("lock file newer than source file", () => {
+    beforeEach(() => {
+      process.env.GH_AW_WORKFLOW_FILE = "test.lock.yml";
+    });
+
+    it("should pass when lock file is newer and hashes match", async () => {
+      // Hash for frontmatter "engine: copilot"
+      const validHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
+      const lockFileContent = `# frontmatter-hash: ${validHash}
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test"`;
+
+      const mdFileContent = `---
+engine: copilot
+---
+# Test Workflow`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Source is older
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" }, // Lock is newer
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (lock is newer and hashes match)"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should pass when lock file is newer but hashes differ", async () => {
+      const storedHash = "c2a79263dc72f28c76177afda9bf0935481b26da094407a50155a6e0244084e3";
+      const lockFileContent = `# frontmatter-hash: ${storedHash}
+name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test"`;
+
+      // Different frontmatter - will produce different hash
+      const mdFileContent = `---
+engine: claude
+model: claude-sonnet-4
+---
+# Test Workflow`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Source is older
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" }, // Lock is newer
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(lockFileContent).toString("base64"),
+          },
+        })
+        .mockResolvedValueOnce({
+          data: {
+            type: "file",
+            encoding: "base64",
+            content: Buffer.from(mdFileContent).toString("base64"),
+          },
+        });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("⚠️  Frontmatter hash mismatch"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should pass when lock file is newer and hash comparison fails", async () => {
+      const lockFileContent = `name: Test Workflow
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest`;
+
+      mockGithub.rest.repos.listCommits
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "src123",
+              commit: {
+                committer: { date: "2024-01-01T12:00:00Z" }, // Source is older
+                message: "Source commit",
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              sha: "lock456",
+              commit: {
+                committer: { date: "2024-01-01T13:00:00Z" }, // Lock is newer
+                message: "Lock commit",
+              },
+            },
+          ],
+        });
+
+      mockGithub.rest.repos.getContent.mockResolvedValueOnce({
+        data: {
+          type: "file",
+          encoding: "base64",
+          content: Buffer.from(lockFileContent).toString("base64"),
+        },
+      });
+
+      await main();
+
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Lock file is newer"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No frontmatter hash found"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Could not compare frontmatter hashes"));
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("✅ Lock file is up to date (lock is newer than source)"));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+  });
 });

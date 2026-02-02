@@ -129,8 +129,8 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
   const sortedImports = [...imports].sort();
 
   for (const importPath of sortedImports) {
-    // Resolve import path relative to base directory
-    const fullPath = path.resolve(baseDir, importPath);
+    // Join import path with base directory (preserves relative paths for GitHub API compatibility)
+    const fullPath = path.join(baseDir, importPath);
 
     // Skip if already visited (cycle detection)
     if (visited.has(fullPath)) continue;
