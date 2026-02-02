@@ -141,7 +141,7 @@ describe("Unified Safe Output Handler Manager", () => {
       expect(config.project).toHaveProperty("create_project_status_update");
     });
 
-    it("should merge explicit project config with auto-split handlers", () => {
+    it("should prioritize explicit project config over auto-split handlers", () => {
       // Both configs provided - explicit project config should take precedence
       process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG = JSON.stringify({
         create_issue: { max: 5 },

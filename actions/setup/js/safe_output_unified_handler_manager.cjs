@@ -177,7 +177,7 @@ function loadConfig() {
       for (const [key, value] of normalizedEntries) {
         if (PROJECT_RELATED_TYPES.has(key)) {
           project[key] = value;
-          core.info(`Moved ${key} from regular to project config (requires project token)`);
+          core.info(`Auto-moved ${key} from unified config to project config (requires project token)`);
         } else {
           regular[key] = value;
         }
