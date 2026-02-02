@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// timestampDifferentiationDelay is the delay used in tests to ensure
+// filesystem timestamps would be different if a file is written
+const timestampDifferentiationDelay = 100 * time.Millisecond
+
 // TestCompilerSkipsWriteWhenContentUnchanged verifies that the compiler skips writing
 // the lock file when the content hasn't changed, preserving the timestamp.
 // This prevents unnecessary git diffs when only markdown content (not frontmatter) changes.
@@ -51,7 +55,7 @@ This is the initial markdown content.
 	initialModTime := initialInfo.ModTime()
 
 	// Wait a bit to ensure timestamp would be different if file is written
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(timestampDifferentiationDelay)
 
 	// Change ONLY the markdown content (not frontmatter)
 	workflowContentV2 := `---
@@ -119,7 +123,7 @@ This is the initial markdown content.
 	initialModTime := initialInfo.ModTime()
 
 	// Wait to ensure timestamp will be different
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(timestampDifferentiationDelay)
 
 	// Change the FRONTMATTER (add permissions)
 	workflowContentV2 := `---
