@@ -32,9 +32,9 @@ on:
   workflow_dispatch:
     inputs:
       test_param:
-        description: 'Test parameter'
+        description: 'Question to the worker workflow'
         type: string
-        required: false
+        required: true
 ```
 
 So you'll have a `test_workflow` tool available with an optional `test_param` input.
@@ -42,17 +42,17 @@ So you'll have a `test_workflow` tool available with an optional `test_param` in
 ## Instructions
 
 1. **Call the MCP tool**: Use the `test_workflow` tool (automatically generated from the workflow name)
-2. **Provide inputs (optional)**: The `test_param` input is optional, but you can provide it if you want
+2. **Provide inputs (optional)**: The `test_param` input is required
 3. **The tool handles everything**: The MCP tool will automatically dispatch the workflow with the correct inputs
 
 ## Example Tool Call
 
-The agent should call the `test_workflow` MCP tool directly:
+The agent should call the `test_workflow` MCP tool directly and send it a question to answer via the `test_param` input:
 
 ```javascript
 // The MCP tool is named after the workflow (underscores replace hyphens)
 test_workflow({
-  test_param: "example value"
+  test_param: "question to the worker workflow"
 })
 ```
 
@@ -63,7 +63,7 @@ Or in the agent's output format:
   "type": "dispatch_workflow",
   "workflow_name": "test-workflow",
   "inputs": {
-    "test_param": "example value"
+    "test_param": "question to the worker workflow"
   }
 }
 ```
