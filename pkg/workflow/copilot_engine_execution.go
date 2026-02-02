@@ -278,50 +278,14 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		awfArgs = append(awfArgs, "--mount", "\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"")
 		copilotExecLog.Print("Added workspace mount to AWF")
 
-		// Mount host binaries into the container so they're available inside the sandboxed environment
-		// These are organized by priority based on usage frequency in workflows:
-		//
-		// Essential utilities (most commonly used):
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cat:/usr/bin/cat:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/curl:/usr/bin/curl:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/date:/usr/bin/date:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/find:/usr/bin/find:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/gh:/usr/bin/gh:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/grep:/usr/bin/grep:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/jq:/usr/bin/jq:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/yq:/usr/bin/yq:ro")
-		//
-		// Common utilities (frequently used for file operations):
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cp:/usr/bin/cp:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cut:/usr/bin/cut:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/diff:/usr/bin/diff:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/head:/usr/bin/head:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/ls:/usr/bin/ls:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/mkdir:/usr/bin/mkdir:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/rm:/usr/bin/rm:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/sed:/usr/bin/sed:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/sort:/usr/bin/sort:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/tail:/usr/bin/tail:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/wc:/usr/bin/wc:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/which:/usr/bin/which:ro")
-
-		// Mount copilot CLI binary from /usr/local/bin (where the installer script places it)
-		awfArgs = append(awfArgs, "--mount", "/usr/local/bin/copilot:/usr/local/bin/copilot:ro")
-
 		// Mount .copilot directory for MCP configuration
 		// XDG_CONFIG_HOME is set to /home/runner, so Copilot CLI looks for config at /home/runner/.copilot/mcp-config.json
 		// Mount host /home/runner/.copilot to container /home/runner/.copilot with read-write access for CLI state/logs
 		awfArgs = append(awfArgs, "--mount", "/home/runner/.copilot:/home/runner/.copilot:rw")
-		copilotExecLog.Print("Added host binaries, copilot binary, and .copilot config directory mounts to AWF container")
+		copilotExecLog.Print("Added .copilot config directory mount to AWF container")
 
-		// Mount the hostedtoolcache directory (where actions/setup-* installs tools like Go, Node, Python, etc.)
-		// The PATH is already passed via --env-all, so tools installed by setup actions are accessible
-		awfArgs = append(awfArgs, "--mount", "/opt/hostedtoolcache:/opt/hostedtoolcache:ro")
-		copilotExecLog.Print("Added hostedtoolcache mount to AWF container")
-
-		// Mount /opt/gh-aw as readonly for script and configuration files
-		awfArgs = append(awfArgs, "--mount", "/opt/gh-aw:/opt/gh-aw:ro")
-		copilotExecLog.Print("Added /opt/gh-aw mount as readonly to AWF container")
+		// Note: Individual binary mounts, /opt/hostedtoolcache, and /opt/gh-aw mounts are no longer needed
+		// because --enable-chroot provides transparent host filesystem access via chroot /host
 
 		// Add custom mounts from agent config if specified
 		if agentConfig != nil && len(agentConfig.Mounts) > 0 {

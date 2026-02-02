@@ -311,14 +311,8 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		awfArgs = append(awfArgs, "--mount", "\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"")
 		claudeLog.Print("Added workspace mount to AWF")
 
-		// Mount the hostedtoolcache directory (where actions/setup-* installs tools like Go, Node, Python, etc.)
-		// The PATH is already passed via --env-all, so tools installed by setup actions are accessible
-		awfArgs = append(awfArgs, "--mount", "/opt/hostedtoolcache:/opt/hostedtoolcache:ro")
-		claudeLog.Print("Added hostedtoolcache mount to AWF container")
-
-		// Mount /opt/gh-aw as readonly for script and configuration files
-		awfArgs = append(awfArgs, "--mount", "/opt/gh-aw:/opt/gh-aw:ro")
-		claudeLog.Print("Added /opt/gh-aw mount as readonly to AWF container")
+		// Note: /opt/hostedtoolcache and /opt/gh-aw mounts are no longer needed
+		// because --enable-chroot provides transparent host filesystem access via chroot /host
 
 		// Add custom mounts from agent config if specified
 		if agentConfig != nil && len(agentConfig.Mounts) > 0 {

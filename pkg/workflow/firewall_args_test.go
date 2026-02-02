@@ -128,7 +128,7 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 		}
 	})
 
-	t.Run("gh CLI binary is mounted to AWF container", func(t *testing.T) {
+	t.Run("individual binary mounts are NOT present with enable-chroot", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -150,9 +150,15 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that gh CLI binary mount is included in AWF command
-		if !strings.Contains(stepContent, "--mount /usr/bin/gh:/usr/bin/gh:ro") {
-			t.Error("Expected AWF command to contain gh CLI binary mount '--mount /usr/bin/gh:/usr/bin/gh:ro'")
+		// With --enable-chroot, individual binary mounts are no longer needed
+		// Verify gh CLI binary mount is NOT present (chroot provides transparent access)
+		if strings.Contains(stepContent, "--mount /usr/bin/gh:/usr/bin/gh:ro") {
+			t.Error("Expected AWF command to NOT contain gh CLI binary mount (--enable-chroot provides transparent access)")
+		}
+
+		// Verify --enable-chroot is present instead
+		if !strings.Contains(stepContent, "--enable-chroot") {
+			t.Error("Expected AWF command to contain '--enable-chroot' flag")
 		}
 	})
 
