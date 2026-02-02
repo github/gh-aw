@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { EXPIRATION_PATTERN } = require("./ephemerals.cjs");
+const { EXPIRATION_PATTERN, LEGACY_EXPIRATION_PATTERN } = require("./ephemerals.cjs");
 
 /**
  * Configuration for entity-specific GraphQL search
@@ -109,10 +109,11 @@ async function searchEntitiesWithExpiration(github, owner, repo, config) {
         continue;
       }
 
-      // Check if has expiration marker with checked checkbox
+      // Check if has expiration marker with checked checkbox (try both new and legacy formats)
       const match = entity.body ? entity.body.match(EXPIRATION_PATTERN) : null;
+      const legacyMatch = !match && entity.body ? entity.body.match(LEGACY_EXPIRATION_PATTERN) : null;
 
-      if (match) {
+      if (match || legacyMatch) {
         withExpirationCount++;
 
         // Deduplicate if enabled (discussions may have duplicates across pages)
@@ -125,7 +126,9 @@ async function searchEntitiesWithExpiration(github, owner, repo, config) {
           seenIds.add(entity.id);
         }
 
-        core.info(`  Found ${config.entityType.slice(0, -1)} #${entity.number} with expiration marker: "${match[1]}" - ${entity.title}`);
+        const expirationValue = match ? match[1] : legacyMatch ? legacyMatch[1] : "unknown";
+        const format = match ? "new" : "legacy";
+        core.info(`  Found ${config.entityType.slice(0, -1)} #${entity.number} with expiration marker (${format} format): "${expirationValue}" - ${entity.title}`);
         items.push(entity);
       }
     }
