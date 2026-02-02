@@ -30,7 +30,7 @@ function createAuthors(authors) {
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://githubnext.github.io',
+	site: 'https://github.github.io',
 	base: '/gh-aw/',
 	vite: {
 		server: {
