@@ -245,6 +245,93 @@ describe("frontmatter_hash with GitHub API", () => {
     });
   });
 
+  describe("path resolution with GitHub API", () => {
+    it("should use repository-relative paths for imports (not absolute filesystem paths)", async () => {
+      // This test validates the fix for issue where path.resolve() created absolute paths
+      // that broke GitHub API calls
+      const owner = "githubnext";
+      const repo = "gh-aw";
+      const ref = "main";
+
+      // Track all paths requested from GitHub API
+      const requestedPaths = [];
+      const trackingMockGitHub = {
+        rest: {
+          repos: {
+            getContent: async ({ path: filePath }) => {
+              requestedPaths.push(filePath);
+
+              // Verify path is repository-relative (not absolute)
+              if (path.isAbsolute(filePath)) {
+                throw new Error(`GitHub API should not receive absolute paths: ${filePath}`);
+              }
+
+              // Read from local filesystem for testing
+              const fsPath = require("path");
+              const repoRoot = fsPath.resolve(__dirname, "../../..");
+              const fullPath = fsPath.join(repoRoot, filePath);
+
+              if (!fs.existsSync(fullPath)) {
+                const error = new Error(`Not Found: ${filePath}`);
+                error.status = 404;
+                throw error;
+              }
+
+              const content = fs.readFileSync(fullPath, "utf8");
+              const base64Content = Buffer.from(content).toString("base64");
+
+              return {
+                data: {
+                  content: base64Content,
+                  encoding: "base64",
+                },
+              };
+            },
+          },
+        },
+      };
+
+      const fileReader = createGitHubFileReader(trackingMockGitHub, owner, repo, ref);
+
+      // Test with smoke-codex.md which has imports
+      const workflowPath = ".github/workflows/smoke-codex.md";
+      const hash = await computeFrontmatterHash(workflowPath, { fileReader });
+
+      // Verify hash was computed successfully
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+
+      // Verify all requested paths are repository-relative
+      expect(requestedPaths.length).toBeGreaterThan(1); // Should include main file + imports
+      for (const requestedPath of requestedPaths) {
+        expect(path.isAbsolute(requestedPath)).toBe(false);
+        expect(requestedPath).toMatch(/^\.github\/workflows\//);
+      }
+
+      // Log the paths for debugging
+      console.log("Requested paths from GitHub API:", requestedPaths);
+    });
+
+    it("should compute same hash with GitHub API reader as with filesystem reader", async () => {
+      const owner = "githubnext";
+      const repo = "gh-aw";
+      const ref = "main";
+
+      // Compute hash with filesystem reader (absolute path)
+      const repoRoot = path.resolve(__dirname, "../../..");
+      const absolutePath = path.join(repoRoot, ".github/workflows/smoke-codex.md");
+      const fsHash = await computeFrontmatterHash(absolutePath);
+
+      // Compute hash with GitHub API reader (relative path)
+      const fileReader = createGitHubFileReader(mockGitHub, owner, repo, ref);
+      const apiHash = await computeFrontmatterHash(".github/workflows/smoke-codex.md", {
+        fileReader,
+      });
+
+      // Hashes should match (this was broken before the fix)
+      expect(apiHash).toBe(fsHash);
+    });
+  });
+
   describe("live GitHub API integration", () => {
     it("should compute hash using real GitHub API (no mocks)", async () => {
       // Skip this test if no GitHub token is available
