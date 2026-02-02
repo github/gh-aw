@@ -103,9 +103,10 @@ function parseProjectUrl(projectUrl) {
 /**
  * List accessible Projects v2 for org or user
  * @param {{ scope: string, ownerLogin: string, projectNumber: string }} projectInfo - Project info
+ * @param {Object} github - GitHub client (Octokit instance) to use for GraphQL queries
  * @returns {Promise<{ nodes: Array<{ id: string, number: number, title: string, closed?: boolean, url: string }>, totalCount?: number, diagnostics: { rawNodesCount: number, nullNodesCount: number, rawEdgesCount: number, nullEdgeNodesCount: number } }>} List result
  */
-async function listAccessibleProjectsV2(projectInfo) {
+async function listAccessibleProjectsV2(projectInfo, github) {
   const baseQuery = `projectsV2(first: 100) {
     totalCount
     nodes {
@@ -204,9 +205,10 @@ function summarizeEmptyProjectsV2List(list) {
  * Resolve a project by number
  * @param {{ scope: string, ownerLogin: string, projectNumber: string }} projectInfo - Project info
  * @param {number} projectNumberInt - Project number
+ * @param {Object} github - GitHub client (Octokit instance) to use for GraphQL queries
  * @returns {Promise<{ id: string, number: number, title: string, url: string }>} Project details
  */
-async function resolveProjectV2(projectInfo, projectNumberInt) {
+async function resolveProjectV2(projectInfo, projectNumberInt, github) {
   try {
     const query =
       projectInfo.scope === "orgs"
@@ -243,7 +245,7 @@ async function resolveProjectV2(projectInfo, projectNumberInt) {
     core.warning(`Direct projectV2(number) query failed; falling back to projectsV2 list search: ${getErrorMessage(error)}`);
   }
 
-  const list = await listAccessibleProjectsV2(projectInfo);
+  const list = await listAccessibleProjectsV2(projectInfo, github);
   const nodes = Array.isArray(list.nodes) ? list.nodes : [];
   const found = nodes.find(p => p && typeof p.number === "number" && p.number === projectNumberInt);
 
@@ -337,15 +339,17 @@ function checkFieldTypeMismatch(fieldName, field, expectedDataType) {
 /**
  * Update a GitHub Project v2
  * @param {any} output - Safe output configuration
- * @returns {Promise<void>}
- */
-/**
- * Update a GitHub Project v2
- * @param {any} output - Safe output configuration
  * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for GraphQL queries
  * @returns {Promise<void>}
  */
-async function updateProject(output, temporaryIdMap) {
+async function updateProject(output, temporaryIdMap = new Map(), githubClient = null) {
+  // Use the provided github client, or fall back to the global github object
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
+  const github = githubClient || global.github;
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to updateProject() or ensure global.github is set.");
+  }
   const { owner, repo } = context.repo;
   const projectInfo = parseProjectUrl(output.project);
   const projectNumberFromUrl = projectInfo.projectNumber;
@@ -415,7 +419,7 @@ async function updateProject(output, temporaryIdMap) {
       if (!Number.isFinite(projectNumberInt)) {
         throw new Error(`Invalid project number parsed from URL: ${projectNumberFromUrl}`);
       }
-      const project = await resolveProjectV2(projectInfo, projectNumberInt);
+      const project = await resolveProjectV2(projectInfo, projectNumberInt, github);
       projectId = project.id;
       resolvedProjectNumber = String(project.number);
       core.info(`✓ Resolved project #${resolvedProjectNumber} (${projectInfo.ownerLogin}) (ID: ${projectId})`);
@@ -997,9 +1001,19 @@ async function updateProject(output, temporaryIdMap) {
  * @param {number} [config.max] - Maximum number of update_project items to process
  * @param {Array<Object>} [config.views] - Views to create from configuration
  * @param {Array<Object>} [config.field_definitions] - Field definitions to create from configuration
+ * @param {Object} githubClient - GitHub client (Octokit instance) to use for API calls
  * @returns {Promise<Function>} Message handler function
  */
-async function main(config = {}) {
+async function main(config = {}, githubClient = null) {
+  // Use the provided github client, or fall back to the global github object
+  // The global github object is available when running via github-script action
+  // @ts-ignore - global.github is set by setupGlobals() from github-script context
+  const github = githubClient || global.github;
+
+  if (!github) {
+    throw new Error("GitHub client is required but not provided. Either pass a github client to main() or ensure global.github is set by github-script action.");
+  }
+
   // Extract configuration
   // Default is intentionally configurable via safe-outputs.update-project.max,
   // but we keep a sane global default to avoid surprising truncation.
@@ -1113,7 +1127,7 @@ async function main(config = {}) {
           };
 
           try {
-            await updateProject(fieldsOutput, temporaryIdMap);
+            await updateProject(fieldsOutput, temporaryIdMap, github);
             core.info("✓ Created configured fields");
           } catch (err) {
             // prettier-ignore
@@ -1131,7 +1145,7 @@ async function main(config = {}) {
       }
 
       // Process the update_project message
-      await updateProject(effectiveMessage, temporaryIdMap);
+      await updateProject(effectiveMessage, temporaryIdMap, github);
 
       // After processing the first message, create configured views if any
       // Views are created after the first item is processed to ensure the project exists
@@ -1156,7 +1170,7 @@ async function main(config = {}) {
               },
             };
 
-            await updateProject(viewOutput, temporaryIdMap);
+            await updateProject(viewOutput, temporaryIdMap, github);
             core.info(`✓ Created view ${i + 1}/${configuredViews.length}: ${viewConfig.name} (${viewConfig.layout})`);
           } catch (err) {
             // prettier-ignore
