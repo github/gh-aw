@@ -92,8 +92,8 @@ The three-phase approach takes longer than direct execution and requires develop
 ## Related Strategies
 
 - **[Agentic campaigns](/gh-aw/guides/campaigns/)**: Coordinate multiple ResearchPlanAssign cycles toward a shared goal
-- **[Threat Detection](/gh-aw/guides/threat-detection/)**: Continuous monitoring without planning phase
-- **[Custom Safe Outputs](/gh-aw/guides/custom-safe-outputs/)**: Create custom actions for plan phase
+- **[Threat Detection](/gh-aw/reference/threat-detection/)**: Continuous monitoring without planning phase
+- **[Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/)**: Create custom actions for plan phase
 
 > [!NOTE]
 > The ResearchPlanAssign strategy works best when research findings vary in relevance and priority. For issues that always require immediate action, consider using direct execution workflows instead.

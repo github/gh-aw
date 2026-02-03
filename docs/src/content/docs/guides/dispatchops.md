@@ -353,5 +353,5 @@ Add `workflow_dispatch` to event-triggered workflows for testing without creatin
 - [TrialOps Guide](/gh-aw/guides/trialops/) - Testing workflows in isolation
 - [CLI Commands](/gh-aw/setup/cli/) - Complete gh aw run command reference
 - [Templating](/gh-aw/reference/templating/) - Using expressions and conditionals
-- [Security Best Practices](/gh-aw/guides/security/) - Securing workflow execution
+- [Security Best Practices](/gh-aw/introduction/architecture/) - Securing workflow execution
 - [Quick Start](/gh-aw/setup/quick-start/) - Getting started with agentic workflows

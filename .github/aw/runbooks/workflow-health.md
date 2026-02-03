@@ -438,6 +438,6 @@ tools:
 ## Additional Resources
 
 - [Getting Started with MCP](/docs/src/content/docs/guides/getting-started-mcp.md)
-- [Security Guide](/docs/src/content/docs/guides/security.md)
+- [Security Guide](/docs/src/content/docs/introduction/architecture.md)
 - [Error Reference](/docs/src/content/docs/troubleshooting/errors.md)
 - [Common Issues](/docs/src/content/docs/troubleshooting/common-issues.md)

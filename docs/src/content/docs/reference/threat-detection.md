@@ -2,7 +2,7 @@
 title: Threat Detection
 description: Configure automated threat detection to analyze agent output and code changes for security issues before they are applied.
 sidebar:
-  order: 14
+  order: 40
 ---
 
 GitHub Agentic Workflows includes automatic threat detection to analyze agent output and code changes for potential security issues before they are applied. When safe outputs are configured, a threat detection job automatically runs to identify prompt injection attempts, secret leaks, and malicious code patches.
@@ -307,6 +307,6 @@ If the detection process itself fails (e.g., network issues, tool errors), the w
 ## Related Documentation
 
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Complete safe outputs configuration
-- [Security Guide](/gh-aw/guides/security/) - Overall security best practices
-- [Custom Safe Outputs](/gh-aw/guides/custom-safe-outputs/) - Creating custom output types
+- [Security Guide](/gh-aw/introduction/architecture/) - Overall security best practices
+- [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/) - Creating custom output types
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - All configuration options

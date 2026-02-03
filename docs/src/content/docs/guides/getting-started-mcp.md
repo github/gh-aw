@@ -329,7 +329,7 @@ Continue learning with these resources:
 
 - [Using MCPs](/gh-aw/guides/mcps/) — Complete MCP configuration reference
 - [Tools Reference](/gh-aw/reference/tools/) — All available tools and options
-- [Security Guide](/gh-aw/guides/security/) — MCP security best practices
+- [Security Guide](/gh-aw/introduction/architecture/) — MCP security best practices
 - [CLI Commands](/gh-aw/setup/cli/) — Full CLI documentation including `mcp` commands
 - [Imports](/gh-aw/reference/imports/) — Modularize configurations with shared MCP files
 

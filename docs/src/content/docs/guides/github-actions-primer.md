@@ -286,7 +286,7 @@ While agentic workflows compile to GitHub Actions YAML and run on the same infra
 Now that you understand GitHub Actions fundamentals, explore how agentic workflows build upon this foundation:
 
 - **[Quick Start](/gh-aw/setup/quick-start/)** - Create your first agentic workflow
-- **[Security Best Practices](/gh-aw/guides/security/)** - Deep dive into agentic security model
+- **[Security Best Practices](/gh-aw/introduction/architecture/)** - Deep dive into agentic security model
 - **[Safe Outputs](/gh-aw/reference/safe-outputs/)** - Learn about validated GitHub operations
 - **[Workflow Structure](/gh-aw/reference/workflow-structure/)** - Understand markdown workflow syntax
 - **[Examples](/gh-aw/examples/scheduled/research-planning/)** - Real-world agentic workflow patterns

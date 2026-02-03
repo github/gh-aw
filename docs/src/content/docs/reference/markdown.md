@@ -103,4 +103,4 @@ This design enables rapid iteration on AI instructions while maintaining strict 
 - [Editing Workflows](/gh-aw/guides/editing-workflows/) - When to recompile vs edit directly
 - [Workflow Structure](/gh-aw/reference/workflow-structure/) - Overall workflow file organization
 - [Frontmatter](/gh-aw/reference/frontmatter/) - YAML configuration options
-- [Security Notes](/gh-aw/guides/security/) - Comprehensive security guidance
+- [Security Guide](/gh-aw/introduction/architecture/) - Comprehensive security guidance

@@ -292,4 +292,4 @@ gh aw trial ./workflow.md --clone-repo myorg/production --trigger-context "https
 - [CLI Commands](/gh-aw/setup/cli/) - Complete CLI reference
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Configuration options
 - [Workflow Triggers](/gh-aw/reference/triggers/) - Including workflow_dispatch
-- [Security Best Practices](/gh-aw/guides/security/) - Authentication and security
+- [Security Best Practices](/gh-aw/introduction/architecture/) - Authentication and security

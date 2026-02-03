@@ -75,11 +75,11 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 - [**Missing Data**](#missing-data-reporting-missing-data) (`missing-data`) — Report missing data required to achieve goals (max: unlimited, same-repo only)
 
 > [!TIP]
-> Custom safe output types: [Custom Safe Output Jobs](/gh-aw/guides/custom-safe-outputs/). See [Deterministic & Agentic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) for combining computation and AI reasoning.
+> Custom safe output types: [Custom Safe Output Jobs](/gh-aw/reference/custom-safe-outputs/). See [Deterministic & Agentic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) for combining computation and AI reasoning.
 
 ### Custom Safe Output Jobs (`jobs:`)
 
-Create custom post-processing jobs registered as Model Context Protocol (MCP) tools. Support standard GitHub Actions properties and auto-access agent output via `$GH_AW_AGENT_OUTPUT`. See [Custom Safe Output Jobs](/gh-aw/guides/custom-safe-outputs/).
+Create custom post-processing jobs registered as Model Context Protocol (MCP) tools. Support standard GitHub Actions properties and auto-access agent output via `$GH_AW_AGENT_OUTPUT`. See [Custom Safe Output Jobs](/gh-aw/reference/custom-safe-outputs/).
 
 > [!NOTE]
 > **Internal Implementation**: Custom safe output jobs are internally referred to as "safe-jobs" in the compiler code (`pkg/workflow/safe_jobs.go`), but they are user-facing only through the `safe-outputs.jobs:` configuration. The top-level `safe-jobs:` key is deprecated and not supported.
@@ -1317,7 +1317,7 @@ Specify custom runner for safe output jobs (default: `ubuntu-slim`): `runs-on: u
 
 ## Threat Detection
 
-Auto-enabled. Analyzes output for prompt injection, secret leaks, malicious patches. See [Threat Detection Guide](/gh-aw/guides/threat-detection/).
+Auto-enabled. Analyzes output for prompt injection, secret leaks, malicious patches. See [Threat Detection Guide](/gh-aw/reference/threat-detection/).
 
 ## Agentic Campaign Workflows
 
@@ -1346,7 +1346,7 @@ safe-outputs:
 
 ## Related Documentation
 
-- [Threat Detection Guide](/gh-aw/guides/threat-detection/) - Complete threat detection documentation and examples
+- [Threat Detection Guide](/gh-aw/reference/threat-detection/) - Complete threat detection documentation and examples
 - [Frontmatter](/gh-aw/reference/frontmatter/) - All configuration options for workflows
 - [Workflow Structure](/gh-aw/reference/workflow-structure/) - Directory layout and organization
 - [Command Triggers](/gh-aw/reference/command-triggers/) - Special /my-bot triggers and context text

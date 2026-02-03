@@ -295,5 +295,5 @@ echo '{"user": "alice", "email": "alice@example.com"}' > users.json
 
 - [MCP Servers](/gh-aw/guides/mcps/) - Memory MCP server configuration
 - [Deterministic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) - Data preprocessing
-- [Safe Outputs](/gh-aw/guides/custom-safe-outputs/) - Storing workflow outputs
+- [Safe Outputs](/gh-aw/reference/custom-safe-outputs/) - Storing workflow outputs
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - Configuration options
