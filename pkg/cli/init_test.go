@@ -56,7 +56,7 @@ func TestInitRepository(t *testing.T) {
 			}
 
 			// Call the function (no MCP or campaign)
-			err = InitRepository(false, false, false, false, "", []string{}, false, false, false, false, nil)
+			err = InitRepository(false, false, false, "", []string{}, false, false, false, false, nil)
 
 			// Check error expectation
 			if tt.wantError {
@@ -163,13 +163,13 @@ func TestInitRepository_Idempotent(t *testing.T) {
 	}
 
 	// Call the function first time
-	err = InitRepository(false, false, false, false, "", []string{}, false, false, false, false, nil)
+	err = InitRepository(false, false, false, "", []string{}, false, false, false, false, nil)
 	if err != nil {
 		t.Fatalf("InitRepository(, false, false, false, nil) returned error on first call: %v", err)
 	}
 
 	// Call the function second time
-	err = InitRepository(false, false, false, false, "", []string{}, false, false, false, false, nil)
+	err = InitRepository(false, false, false, "", []string{}, false, false, false, false, nil)
 	if err != nil {
 		t.Fatalf("InitRepository(, false, false, false, nil) returned error on second call: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestInitRepository_Verbose(t *testing.T) {
 	}
 
 	// Call the function with verbose=true (should not error)
-	err = InitRepository(true, false, false, false, "", []string{}, false, false, false, false, nil)
+	err = InitRepository(true, false, false, "", []string{}, false, false, false, false, nil)
 	if err != nil {
 		t.Fatalf("InitRepository(, false, false, false, nil) returned error with verbose=true: %v", err)
 	}

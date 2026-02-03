@@ -171,14 +171,13 @@ gh aw init --no-mcp                     # Skip MCP server integration
 gh aw init --tokens --engine copilot    # Check Copilot token configuration
 gh aw init --codespaces                 # Configure devcontainer for current repo
 gh aw init --codespaces repo1,repo2     # Configure devcontainer for additional repos
-gh aw init --campaign                   # Enable campaign functionality
 gh aw init --completions                # Install shell completions
 gh aw init --push                       # Initialize and automatically commit/push changes
 ```
 
 **Interactive Mode:** When invoked without `--engine`, prompts you to select an engine and optionally configure repository secrets using the `gh` CLI.
 
-**Options:** `--engine` (copilot, claude, codex), `--no-mcp`, `--tokens`, `--codespaces`, `--campaign`, `--completions`, `--push`
+**Options:** `--engine` (copilot, claude, codex), `--no-mcp`, `--tokens`, `--codespaces`, `--completions`, `--push`
 
 ##### `--push` Flag
 
