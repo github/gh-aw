@@ -4,7 +4,7 @@
     "@actions/exec": "^2.0.0",
     "@actions/github": "^7.0.0",
     "@actions/github-script": "github:actions/github-script",
-    "@actions/glob": "^0.5.0",
+    "@actions/glob": "^0.6.1",
     "@actions/io": "^2.0.0",
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^4.0.17",
