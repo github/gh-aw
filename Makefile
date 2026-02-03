@@ -651,11 +651,6 @@ dev: build
 watch: build
 	./$(BINARY_NAME) compile --watch
 
-# Changeset management targets
-.PHONY: version
-version:
-	@node scripts/changeset.js version
-
 .PHONY: pull-main
 pull-main:
 	@echo "check on main branch"
@@ -758,6 +753,5 @@ help:
 	@echo "  clean-docs       - Clean documentation artifacts (dist, node_modules, .astro)"
 
 	@echo "  agent-finish     - Complete validation sequence (build, test, fix, recompile, fmt, lint, security-scan)"
-	@echo "  version   - Preview next version from changesets"
 	@echo "  sbom             - Generate SBOM in SPDX and CycloneDX formats (requires syft)"
 	@echo "  help             - Show this help message"

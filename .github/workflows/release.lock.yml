@@ -21,7 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# frontmatter-hash: 18a570c83464128f8326c803778eb84389b01975e3d23481ba4ac53b03329de3
+# frontmatter-hash: 64ebb339205b1d1d98a5c197f071562adc84fef0036eefe88bc8daa3a6d43102
 
 name: "Release"
 "on":
@@ -769,7 +769,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
       - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
       - name: Update CHANGELOG with changesets
@@ -782,9 +782,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Run changeset script to update CHANGELOG.md and delete changeset files
-          # The script will use GH_AW_CURRENT_VERSION to determine current version
-          # It will process all .changeset/*.md files and update CHANGELOG.md
-          node scripts/changeset.js release --yes
+          # Pass the release tag as an argument
+          node scripts/changeset.js release "$RELEASE_TAG" --yes
 
           # Check if there are any changes to commit
           if git diff --quiet CHANGELOG.md && [ -z "$(git ls-files --others --exclude-standard .changeset/)" ]; then
@@ -800,7 +799,6 @@ jobs:
             echo "✓ CHANGELOG.md updated and committed to main"
           fi
         env:
-          GH_AW_CURRENT_VERSION: ${{ needs.config.outputs.release_tag }}
           RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
 
   conclusion:

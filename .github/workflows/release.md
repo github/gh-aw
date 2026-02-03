@@ -322,7 +322,6 @@ jobs:
       - name: Update CHANGELOG with changesets
         env:
           RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
-          GH_AW_CURRENT_VERSION: ${{ needs.config.outputs.release_tag }}
         run: |
           set -e
           echo "Updating CHANGELOG.md for release: $RELEASE_TAG"
@@ -332,9 +331,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           # Run changeset script to update CHANGELOG.md and delete changeset files
-          # The script will use GH_AW_CURRENT_VERSION to determine current version
-          # It will process all .changeset/*.md files and update CHANGELOG.md
-          node scripts/changeset.js release --yes
+          # Pass the release tag as an argument
+          node scripts/changeset.js release "$RELEASE_TAG" --yes
           
           # Check if there are any changes to commit
           if git diff --quiet CHANGELOG.md && [ -z "$(git ls-files --others --exclude-standard .changeset/)" ]; then

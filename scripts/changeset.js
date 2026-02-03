@@ -5,9 +5,10 @@
  * Inspired by @changesets/cli
  *
  * Usage:
- *   node changeset.js version    - Preview next version from changesets
- *   node changeset.js release    - Create release and update CHANGELOG
- *   GH_AW_CURRENT_VERSION=v1.2.3 node changeset.js release to force current version
+ *   node changeset.js release <version> [--yes]  - Update CHANGELOG and delete changesets for a specific version
+ *
+ * Example:
+ *   node changeset.js release v1.2.3 --yes
  */
 
 const fs = require("fs");
@@ -139,107 +140,6 @@ function readChangesets() {
   }
 
   return changesets;
-}
-
-/**
- * Determine the highest priority version bump from changesets
- * @param {Array} changesets - Array of changeset entries
- * @returns {string} Version bump type (major, minor, or patch)
- */
-function determineVersionBump(changesets) {
-  if (changesets.length === 0) {
-    return "";
-  }
-
-  // Priority: major > minor > patch
-  let hasMajor = false;
-  let hasMinor = false;
-  let hasPatch = false;
-
-  for (const cs of changesets) {
-    switch (cs.bumpType) {
-      case "major":
-        hasMajor = true;
-        break;
-      case "minor":
-        hasMinor = true;
-        break;
-      case "patch":
-        hasPatch = true;
-        break;
-    }
-  }
-
-  if (hasMajor) return "major";
-  if (hasMinor) return "minor";
-  if (hasPatch) return "patch";
-
-  return "";
-}
-
-/**
- * Get current version from git tags
- * @returns {Object} Version info {major, minor, patch}
- */
-function getCurrentVersion() {
-  try {
-    const output = process.env.GH_AW_CURRENT_VERSION || execSync("git describe --tags --abbrev=0", { encoding: "utf8" });
-    const versionStr = output.trim().replace(/^v/, "");
-    const parts = versionStr.split(".");
-
-    if (parts.length !== 3) {
-      throw new Error(`Invalid version format: ${versionStr}`);
-    }
-
-    return {
-      major: parseInt(parts[0], 10),
-      minor: parseInt(parts[1], 10),
-      patch: parseInt(parts[2], 10),
-    };
-  } catch (error) {
-    // No tags exist, start from v0.0.0
-    return { major: 0, minor: 0, patch: 0 };
-  }
-}
-
-/**
- * Bump version based on bump type
- * @param {Object} current - Current version
- * @param {string} bumpType - Type of bump (major, minor, patch)
- * @returns {Object} New version
- */
-function bumpVersion(current, bumpType) {
-  const next = {
-    major: current.major,
-    minor: current.minor,
-    patch: current.patch,
-  };
-
-  switch (bumpType) {
-    case "major":
-      next.major++;
-      next.minor = 0;
-      next.patch = 0;
-      break;
-    case "minor":
-      next.minor++;
-      next.patch = 0;
-      break;
-    case "patch":
-      next.patch++;
-      break;
-  }
-
-  return next;
-}
-
-/**
- * Format version as string
- * @param {Object} version - Version object
- * @returns {string} Formatted version string
- */
-function formatVersion(version) {
-  return `v${version.major}.${version.minor}.${version.patch}`;
 }
 
 /**
@@ -504,91 +404,29 @@ function deleteChangesetFiles(changesets, dryRun = false) {
 }
 
 /**
- * Run the version command
- */
-function runVersion() {
-  const changesets = readChangesets();
-
-  if (changesets.length === 0) {
-    console.log(formatInfoMessage("No changesets found"));
-    return;
-  }
-
-  const bumpType = determineVersionBump(changesets);
-  const currentVersion = getCurrentVersion();
-  const nextVersion = bumpVersion(currentVersion, bumpType);
-  const versionString = formatVersion(nextVersion);
-
-  console.log(formatInfoMessage(`Current version: ${formatVersion(currentVersion)}`));
-  console.log(formatInfoMessage(`Bump type: ${bumpType}`));
-  console.log(formatInfoMessage(`Next version: ${versionString}`));
-  console.log(formatInfoMessage("\nChanges:"));
-
-  for (const cs of changesets) {
-    console.log(`  [${cs.bumpType}] ${extractFirstLine(cs.description)}`);
-  }
-
-  // Generate changelog preview (never write in version command)
-  const changelogEntry = updateChangelog(versionString, changesets, true);
-
-  console.log("");
-  console.log(formatInfoMessage("Would add to CHANGELOG.md:"));
-  console.log("---");
-  console.log(changelogEntry);
-  console.log("---");
-
-  // Extract and display consolidated codemods
-  const codemodPrompt = extractCodemods(changesets);
-  if (codemodPrompt) {
-    console.log("");
-    console.log(formatInfoMessage("Consolidated Codemod Instructions (copy for Copilot agent task):"));
-    console.log("---");
-    console.log(codemodPrompt);
-    console.log("---");
-  }
-}
-
-/**
  * Run the release command
- * @param {string} releaseType - Optional release type (patch, minor, major)
+ * @param {string} versionTag - Version tag (e.g., "v1.2.3")
  * @param {boolean} skipConfirmation - If true, skip confirmation prompt
  */
-async function runRelease(releaseType, skipConfirmation = false) {
+async function runRelease(versionTag, skipConfirmation = false) {
+  // Validate version tag format
+  if (!versionTag || !versionTag.match(/^v?\d+\.\d+\.\d+$/)) {
+    throw new Error(`Invalid version tag: ${versionTag}. Expected format: v1.2.3 or 1.2.3`);
+  }
+
+  // Ensure version has 'v' prefix
+  const versionString = versionTag.startsWith("v") ? versionTag : `v${versionTag}`;
+
   // Check git prerequisites (clean tree, main branch)
   checkGitPrerequisites();
 
   const changesets = readChangesets();
 
   if (changesets.length === 0) {
-    // If no changesets exist, default to patch release
-    if (!releaseType) {
-      releaseType = "patch";
-      console.log(formatInfoMessage("No changesets found - defaulting to patch release"));
-    } else {
-      console.log(formatInfoMessage("No changesets found - creating release without changeset entries"));
-    }
+    console.log(formatInfoMessage("No changesets found - creating release without changeset entries"));
   }
 
-  // Determine bump type
-  let bumpType = releaseType;
-  if (!bumpType) {
-    bumpType = determineVersionBump(changesets);
-  }
-
-  // Safety check for major releases
-  if (bumpType === "major" && !releaseType) {
-    console.error(formatErrorMessage("Major releases must be explicitly specified with 'node changeset.js release major' for safety"));
-    process.exit(1);
-  }
-
-  const currentVersion = getCurrentVersion();
-  const nextVersion = bumpVersion(currentVersion, bumpType);
-  const versionString = formatVersion(nextVersion);
-
-  console.log(formatInfoMessage(`Current version: ${formatVersion(currentVersion)}`));
-  console.log(formatInfoMessage(`Bump type: ${bumpType}`));
-  console.log(formatInfoMessage(`Next version: ${versionString}`));
-  console.log(formatInfoMessage(`Creating ${bumpType} release: ${versionString}`));
+  console.log(formatInfoMessage(`Creating release: ${versionString}`));
 
   // Show what will be included in the release
   if (changesets.length > 0) {
@@ -694,22 +532,15 @@ function showHelp() {
   console.log("Changeset CLI - Manage version releases");
   console.log("");
   console.log("Usage:");
-  console.log("  node scripts/changeset.js version      - Preview next version from changesets");
-  console.log("  node scripts/changeset.js release [type] [--yes] - Create release and update CHANGELOG");
-  console.log("");
-  console.log("Release types: patch, minor, major");
+  console.log("  node scripts/changeset.js release <version> [--yes] - Update CHANGELOG for specific version");
   console.log("");
   console.log("Flags:");
   console.log("  --yes, -y    Skip confirmation prompt and proceed automatically");
   console.log("");
   console.log("Examples:");
-  console.log("  node scripts/changeset.js version");
-  console.log("  node scripts/changeset.js release");
-  console.log("  node scripts/changeset.js release patch");
-  console.log("  node scripts/changeset.js release minor");
-  console.log("  node scripts/changeset.js release major");
-  console.log("  node scripts/changeset.js release --yes");
-  console.log("  node scripts/changeset.js release patch --yes");
+  console.log("  node scripts/changeset.js release v1.2.3");
+  console.log("  node scripts/changeset.js release v1.2.3 --yes");
+  console.log("  node scripts/changeset.js release 1.2.3 --yes");
 }
 
 // Main entry point
@@ -725,24 +556,25 @@ async function main() {
 
   try {
     switch (command) {
-      case "version":
-        runVersion();
-        break;
       case "release":
-        // Parse release type and flags
-        let releaseType = null;
+        // Parse version tag and flags
+        let versionTag = null;
         let skipConfirmation = false;
 
         for (let i = 1; i < args.length; i++) {
           const arg = args[i];
           if (arg === "--yes" || arg === "-y") {
             skipConfirmation = true;
-          } else if (!releaseType && ["patch", "minor", "major"].includes(arg)) {
-            releaseType = arg;
+          } else if (!versionTag) {
+            versionTag = arg;
           }
         }
 
-        await runRelease(releaseType, skipConfirmation);
+        if (!versionTag) {
+          throw new Error("Version tag is required. Usage: node scripts/changeset.js release <version> [--yes]");
+        }
+
+        await runRelease(versionTag, skipConfirmation);
         break;
       default:
         console.error(formatErrorMessage(`Unknown command: ${command}`));
