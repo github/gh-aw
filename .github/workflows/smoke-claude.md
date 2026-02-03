@@ -104,11 +104,11 @@ timeout-minutes: 15
      - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
      - Timestamp
 
-2. Add a **very brief** comment (max 5-10 lines) to the current pull request with:
+2. **Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with:
    - PR titles only (no descriptions)
    - ✅ or ❌ for each test result
    - Overall status: PASS or FAIL
 
-3. Use the `add_comment` tool to add a **fun comic-book style comment** to the latest discussion (using the `discussion_number` you extracted in step 9) - be playful and use comic-book language like "💥 WHOOSH!"
+3. Use the `add_comment` tool with `item_number` set to the discussion number you extracted in step 9 to add a **fun comic-book style comment** to that discussion - be playful and use comic-book language like "💥 WHOOSH!"
 
-If all tests pass, add the label `smoke-claude` to the pull request.
+If all tests pass, use the `add_labels` tool to add the label `smoke-claude` to the pull request (omit the `item_number` parameter to auto-target the triggering PR if this workflow was triggered by a pull_request event).
