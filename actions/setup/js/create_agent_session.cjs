@@ -132,7 +132,7 @@ async function main() {
           core.error(`Task ${index + 1}: Failed to create agent session due to authentication/permission error.`);
           core.error(`The default GITHUB_TOKEN does not have permission to create agent sessions.`);
           core.error(`You must configure a Personal Access Token (PAT) as COPILOT_GITHUB_TOKEN or GH_AW_GITHUB_TOKEN.`);
-          core.error(`See documentation: https://github.github.io/gh-aw/reference/safe-outputs/#agent-task-creation-create-agent-session`);
+          core.error(`See documentation: https://github.github.com/gh-aw/reference/safe-outputs/#agent-task-creation-create-agent-session`);
         } else {
           core.error(`Task ${index + 1}: Failed to create agent session: ${errorMessage}`);
         }

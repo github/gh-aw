@@ -7,20 +7,20 @@
     "x": {
       "id": "dryrun-x-2026-01-22",
       "url": "https://twitter.com/i/web/status/dryrun-x-2026-01-22",
-      "content": "Next stop in Peli’s Agent Factory 🍫✨: Issue Triage 🍬🧠 — an agent that reads new issues, replies with context, and applies labels automatically. Tour + workflow source: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/ #GitHubNext #AI"
+      "content": "Next stop in Peli’s Agent Factory 🍫✨: Issue Triage 🍬🧠 — an agent that reads new issues, replies with context, and applies labels automatically. Tour + workflow source: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/ #GitHubNext #AI"
     },
     "bluesky": {
       "uri": "at://dryrun/bluesky/2026-01-22",
-      "content": "Day 2 on the tour of Peli's Agent Factory! 🍫✨: Issue Triage 🍬🛠️ — a practical “starter” for new issues: summarize, label, and suggest next steps. https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/"
+      "content": "Day 2 on the tour of Peli's Agent Factory! 🍫✨: Issue Triage 🍬🛠️ — a practical “starter” for new issues: summarize, label, and suggest next steps. https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/"
     },
     "mastodon": {
       "id": "dryrun-mastodon-2026-01-22",
       "url": "",
-      "content": "Day 2 on the tour of Peli's Agent Factory! 🍫✨: Issue Triage 🍬🔍 — one of the simplest, highest-leverage agents. It analyzes new issues fast and applies consistent labels so maintainers can breathe. Tour + source: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/ #Automation #GitHub"
+      "content": "Day 2 on the tour of Peli's Agent Factory! 🍫✨: Issue Triage 🍬🔍 — one of the simplest, highest-leverage agents. It analyzes new issues fast and applies consistent labels so maintainers can breathe. Tour + source: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/ #Automation #GitHub"
     },
     "linkedin": {
       "id": "dryrun-linkedin-2026-01-22",
-      "content": "Meet the Workflows (1): Issue Triage 🍬✨\nWelcome back to the tour of Peli’s Agent Factory. Day 2 is our first stop on the factory floor: Issue Triage.\nIt’s one of the most immediately useful agentic workflows we run: when a new issue lands, the agent analyzes the report, replies with helpful context, and applies labels consistently — so maintainers can spend more time building and less time sorting.\nTour + links to the workflow source:\nhttps://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/\n#GitHubNext #AI #DevOps"
+      "content": "Meet the Workflows (1): Issue Triage 🍬✨\nWelcome back to the tour of Peli’s Agent Factory. Day 2 is our first stop on the factory floor: Issue Triage.\nIt’s one of the most immediately useful agentic workflows we run: when a new issue lands, the agent analyzes the report, replies with helpful context, and applies labels consistently — so maintainers can spend more time building and less time sorting.\nTour + links to the workflow source:\nhttps://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/\n#GitHubNext #AI #DevOps"
     }
   }
 }

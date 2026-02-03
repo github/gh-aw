@@ -75,7 +75,7 @@ jobs:
     steps:
       - name: Install gh-aw extension
         run: |
-          curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
 `
 }
 
@@ -101,7 +101,7 @@ jobs:
     steps:
       - name: Install gh-aw extension
         run: |
-          curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
 `
 
 // CopilotWorkflowStep represents a GitHub Actions workflow step for Copilot setup scaffolding
@@ -330,7 +330,7 @@ func injectExtensionInstallStep(workflow *Workflow, actionMode workflow.ActionMo
 		// In dev/script mode, use curl to download install script
 		installStep = CopilotWorkflowStep{
 			Name: "Install gh-aw extension",
-			Run:  "curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
+			Run:  "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
 		}
 	}
 

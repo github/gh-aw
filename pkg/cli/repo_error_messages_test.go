@@ -100,7 +100,7 @@ func TestParseRepoSpecErrorMessages(t *testing.T) {
 			repoSpec: "https://github.com/owner",
 			expectInMessage: []string{
 				"invalid GitHub URL",
-				"Example: https://github.com/githubnext/gh-aw",
+				"Example: https://github.com/github/gh-aw",
 			},
 		},
 	}

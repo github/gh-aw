@@ -53,7 +53,7 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 							},
 							{
 								Name: "Install gh-aw extension",
-								Run:  "curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
+								Run:  "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
 							},
 						},
 					},
@@ -911,7 +911,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gh-aw extension
-        run: curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+        run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
 	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
@@ -1154,7 +1154,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gh-aw extension
-        run: curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+        run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
       - name: Verify gh-aw installation
         run: gh aw version
 `

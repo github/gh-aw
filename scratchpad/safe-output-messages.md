@@ -97,12 +97,12 @@ graph TD
 **Markdown Source:**
 ```markdown
 >
-> To add this workflow in your repository, run `gh aw add owner/repo/path@ref`. See [usage guide](https://github.github.io/gh-aw/setup/cli/).
+> To add this workflow in your repository, run `gh aw add owner/repo/path@ref`. See [usage guide](https://github.github.com/gh-aw/setup/cli/).
 ```text
 
 **Rendered Output:**
 >
-> To add this workflow in your repository, run `gh aw add github/gh-aw/.github/workflows/example@main`. See [usage guide](https://github.github.io/gh-aw/setup/cli/).
+> To add this workflow in your repository, run `gh aw add github/gh-aw/.github/workflows/example@main`. See [usage guide](https://github.github.com/gh-aw/setup/cli/).
 
 **When shown**: Appears when workflow has a known source location.
 

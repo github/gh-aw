@@ -110,6 +110,6 @@ After successful initialization, the user can:
 ## Reference
 
 - **Installation script**: `https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh`
-- **Documentation**: `https://github.github.io/gh-aw/`
+- **Documentation**: `https://github.github.com/gh-aw/`
 - **Repository**: `https://github.com/github/gh-aw`
 - **Detailed setup guide**: See `install.md` in the gh-aw repository

@@ -3466,7 +3466,7 @@ bots: []
 # per-workflow via 'strict: true' in frontmatter, or disabled via 'strict: false'.
 # CLI flag takes precedence over frontmatter (gh aw compile --strict enforces
 # strict mode). Defaults to true. See:
-# https://github.github.io/gh-aw/reference/frontmatter/#strict-mode-strict
+# https://github.github.com/gh-aw/reference/frontmatter/#strict-mode-strict
 # (optional)
 strict: true
 

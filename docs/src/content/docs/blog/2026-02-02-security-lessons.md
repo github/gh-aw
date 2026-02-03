@@ -343,9 +343,9 @@ The factory experienced a few security-adjacent incidents that taught valuable l
 
 For deeper technical details, see:
 
-- [Security Architecture](https://github.github.io/gh-aw/introduction/architecture/)
-- [Security Guide](https://github.github.io/gh-aw/guides/security/)
-- [Safe Outputs Documentation](https://github.github.io/gh-aw/reference/safe-outputs/)
+- [Security Architecture](https://github.github.com/gh-aw/introduction/architecture/)
+- [Security Guide](https://github.github.com/gh-aw/guides/security/)
+- [Safe Outputs Documentation](https://github.github.com/gh-aw/reference/safe-outputs/)
 
 ## Defense in Depth
 

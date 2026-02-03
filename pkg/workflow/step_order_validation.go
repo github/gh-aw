@@ -116,7 +116,7 @@ func (t *StepOrderTracker) ValidateStepOrdering() error {
 			"workflow steps",
 			"artifact uploads without secret redaction",
 			fmt.Errorf("artifact uploads found but no secret redaction step was added"),
-			"This is a critical security issue - a compiler bug. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/githubnext/gh-aw/issues/new",
+			"This is a critical security issue - a compiler bug. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/github/gh-aw/issues/new",
 		)
 	}
 
@@ -136,7 +136,7 @@ func (t *StepOrderTracker) ValidateStepOrdering() error {
 			"workflow steps",
 			"incorrect step ordering",
 			fmt.Errorf("found %d upload(s) before secret redaction: %s", len(uploadsBeforeRedaction), strings.Join(uploadsBeforeRedaction, ", ")),
-			"This is a compiler bug - secret redaction must happen before artifact uploads. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/githubnext/gh-aw/issues/new",
+			"This is a compiler bug - secret redaction must happen before artifact uploads. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/github/gh-aw/issues/new",
 		)
 	}
 
@@ -149,7 +149,7 @@ func (t *StepOrderTracker) ValidateStepOrdering() error {
 			"workflow steps",
 			"artifact paths not covered by secret redaction",
 			fmt.Errorf("paths not covered: %s", strings.Join(unscannable, ", ")),
-			"This is a compiler bug - all artifact uploads must be covered by secret redaction. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/githubnext/gh-aw/issues/new",
+			"This is a compiler bug - all artifact uploads must be covered by secret redaction. Please report this issue to the gh-aw maintainers with your workflow file:\nhttps://github.com/github/gh-aw/issues/new",
 		)
 	}
 

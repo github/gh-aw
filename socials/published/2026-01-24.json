@@ -7,20 +7,20 @@
     "x": {
       "id": "dryrun-x-2026-01-24",
       "url": "https://twitter.com/i/web/status/dryrun-x-2026-01-24",
-      "content": "Day 4 in Peli’s Agent Factory 🍫✨: Continuous Refactoring.\nTwo agents that keep codebases structurally tidy 🧠🔧\n- Semantic Function Refactor (finds functions in the “wrong” file)\n- Go Pattern Detector (fast AST scan + deep agent review)\nTour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #GitHubNext #AI #DevOps"
+      "content": "Day 4 in Peli’s Agent Factory 🍫✨: Continuous Refactoring.\nTwo agents that keep codebases structurally tidy 🧠🔧\n- Semantic Function Refactor (finds functions in the “wrong” file)\n- Go Pattern Detector (fast AST scan + deep agent review)\nTour + source links: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #GitHubNext #AI #DevOps"
     },
     "bluesky": {
       "uri": "at://dryrun/bluesky/2026-01-24",
-      "content": "Day 4 in Peli’s Agent Factory 🍫✨: Continuous Refactoring.\nThese agents look past “does it work?” and ask “does it live in the right place?” One does whole-repo semantic grouping (with Serena) to spot misplaced/outlier functions; the other uses ast-grep to cheaply detect patterns, then escalates to an agent only when needed.\nTour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/"
+      "content": "Day 4 in Peli’s Agent Factory 🍫✨: Continuous Refactoring.\nThese agents look past “does it work?” and ask “does it live in the right place?” One does whole-repo semantic grouping (with Serena) to spot misplaced/outlier functions; the other uses ast-grep to cheaply detect patterns, then escalates to an agent only when needed.\nTour + source links: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/"
     },
     "mastodon": {
       "id": "dryrun-mastodon-2026-01-24",
       "url": "",
-      "content": "Day 4 in Peli’s Agent Factory 🍫🔧: Continuous Refactoring 🧠🧹\nTwo maintainers with a structural view:\n- Semantic Function Refactor (whole-repo organization)\n- Go Pattern Detector (AST pattern scan → agent review)\nTour + source links: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #Automation #GitHub"
+      "content": "Day 4 in Peli’s Agent Factory 🍫🔧: Continuous Refactoring 🧠🧹\nTwo maintainers with a structural view:\n- Semantic Function Refactor (whole-repo organization)\n- Go Pattern Detector (AST pattern scan → agent review)\nTour + source links: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/ #Automation #GitHub"
     },
     "linkedin": {
       "id": "dryrun-linkedin-2026-01-24",
-      "content": "Day 4 in Peli’s Agent Factory: Continuous Refactoring 🍫✨\nAfter continuous simplification, the next stop on our tour is structural refactoring: agents that scan the whole codebase and flag opportunities to improve organization and consistency.\nTwo workflows:\n- Semantic Function Refactor 🧠 — groups functions by purpose and highlights “outliers” that likely belong elsewhere\n- Go Pattern Detector 🔍 — uses fast AST pattern matching (ast-grep), and only triggers deeper agent analysis when it finds a match\nTour + workflow source links:\nhttps://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/\n#GitHubNext #AI #DevOps #Automation"
+      "content": "Day 4 in Peli’s Agent Factory: Continuous Refactoring 🍫✨\nAfter continuous simplification, the next stop on our tour is structural refactoring: agents that scan the whole codebase and flag opportunities to improve organization and consistency.\nTwo workflows:\n- Semantic Function Refactor 🧠 — groups functions by purpose and highlights “outliers” that likely belong elsewhere\n- Go Pattern Detector 🔍 — uses fast AST pattern matching (ast-grep), and only triggers deeper agent analysis when it finds a match\nTour + workflow source links:\nhttps://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/\n#GitHubNext #AI #DevOps #Automation"
     }
   }
 }

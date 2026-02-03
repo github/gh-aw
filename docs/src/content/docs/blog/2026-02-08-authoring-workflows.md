@@ -555,10 +555,10 @@ Browse the factory for inspiration:
 
 ### Documentation
 
-- [Workflow Reference](https://github.github.io/gh-aw/reference/workflows/)
-- [Safe Outputs Guide](https://github.github.io/gh-aw/reference/safe-outputs/)
-- [Tools Reference](https://github.github.io/gh-aw/reference/tools/)
-- [Examples Gallery](https://github.github.io/gh-aw/examples/)
+- [Workflow Reference](https://github.github.com/gh-aw/reference/workflows/)
+- [Safe Outputs Guide](https://github.github.com/gh-aw/reference/safe-outputs/)
+- [Tools Reference](https://github.github.com/gh-aw/reference/tools/)
+- [Examples Gallery](https://github.github.com/gh-aw/examples/)
 
 ### Community
 

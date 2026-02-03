@@ -260,9 +260,9 @@ gh aw campaign validate <campaign-id>
 ## Documentation Links
 
 Point users to these resources:
-- **Getting started**: https://github.github.io/gh-aw/guides/campaigns/getting-started/
-- **Campaign flow**: https://github.github.io/gh-aw/guides/campaigns/flow/
-- **Spec format**: https://github.github.io/gh-aw/guides/campaigns/scratchpad/
+- **Getting started**: https://github.github.com/gh-aw/guides/campaigns/getting-started/
+- **Campaign flow**: https://github.github.com/gh-aw/guides/campaigns/flow/
+- **Spec format**: https://github.github.com/gh-aw/guides/campaigns/scratchpad/
 - **Workflow catalog**: https://github.com/githubnext/agentics
 
 ## Success Criteria
@@ -357,7 +357,7 @@ Agent: 🎉 Your agentic campaign spec is ready!
    gh aw campaign new security-2025 --project --owner mycompany
    ```
 
-📚 **Learn more**: https://github.github.io/gh-aw/guides/campaigns/getting-started/
+📚 **Learn more**: https://github.github.com/gh-aw/guides/campaigns/getting-started/
 ```
 
 ## Remember

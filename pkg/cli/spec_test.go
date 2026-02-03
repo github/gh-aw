@@ -137,7 +137,7 @@ func TestParseWorkflowSpec(t *testing.T) {
 	}{
 		{
 			name:             "GitHub URL - blob with main branch",
-			spec:             "https://github.com/githubnext/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
+			spec:             "https://github.com/github/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
 			wantRepo:         "githubnext/gh-aw-trial",
 			wantWorkflowPath: "workflows/release-issue-linker.md",
 			wantWorkflowName: "release-issue-linker",

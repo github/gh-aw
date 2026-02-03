@@ -30,7 +30,7 @@ describe("update_issue.cjs - campaign generator payload", () => {
     const { success, data } = updateIssueModule.buildIssueUpdateData(
       {
         // This is representative of how the campaign generator should update the triggering issue.
-        body: "## Campaign setup status\n\n**Status:** Ready for PR review\n\nDocs: https://github.github.io/gh-aw/guides/campaigns/getting-started/\n",
+        body: "## Campaign setup status\n\n**Status:** Ready for PR review\n\nDocs: https://github.github.com/gh-aw/guides/campaigns/getting-started/\n",
       },
       {}
     );

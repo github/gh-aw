@@ -182,7 +182,7 @@ func TestDockerImage_RunsSuccessfully(t *testing.T) {
 
 	// Test running the Docker image with --help
 	t.Log("Testing Docker image with --help...")
-	dockerRunCmd := exec.Command("docker", "run", "--rm", "ghcr.io/githubnext/gh-aw:latest", "--help")
+	dockerRunCmd := exec.Command("docker", "run", "--rm", "ghcr.io/github/gh-aw:latest", "--help")
 	output, err := dockerRunCmd.CombinedOutput()
 	if err != nil {
 		t.Logf("Docker run output: %s", output)
@@ -196,7 +196,7 @@ func TestDockerImage_RunsSuccessfully(t *testing.T) {
 
 	// Test running with --version
 	t.Log("Testing Docker image with --version...")
-	dockerVersionCmd := exec.Command("docker", "run", "--rm", "ghcr.io/githubnext/gh-aw:latest", "--version")
+	dockerVersionCmd := exec.Command("docker", "run", "--rm", "ghcr.io/github/gh-aw:latest", "--version")
 	versionOutput, err := dockerVersionCmd.CombinedOutput()
 	if err != nil {
 		t.Logf("Docker version output: %s", versionOutput)
@@ -254,7 +254,7 @@ func TestDockerImage_HasRequiredTools(t *testing.T) {
 		t.Run(tool, func(t *testing.T) {
 			// Use --entrypoint to override the default entrypoint and run shell command
 			cmd := exec.Command("docker", "run", "--rm", "--entrypoint", "sh",
-				"ghcr.io/githubnext/gh-aw:latest", "-c", "which "+tool)
+				"ghcr.io/github/gh-aw:latest", "-c", "which "+tool)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Errorf("Tool %s not found in Docker image. Output: %s", tool, output)

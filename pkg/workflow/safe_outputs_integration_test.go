@@ -188,7 +188,7 @@ func TestSafeOutputJobsIntegration(t *testing.T) {
 
 	// Known issue: Individual job builders are missing GH_AW_WORKFLOW_ID
 	// These job builders need to be fixed to include the environment variable
-	// Tracked in: https://github.com/githubnext/gh-aw/issues/7023
+	// Tracked in: https://github.com/github/gh-aw/issues/7023
 	knownMissingEnvVar := map[string]bool{
 		"create_issue":               true,
 		"create_discussion":          true,

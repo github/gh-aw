@@ -150,7 +150,7 @@ func ensureDevcontainerConfig(verbose bool, additionalRepos []string) error {
 
 		// Update postCreateCommand if not set or if it doesn't include gh-aw install
 		if config.PostCreateCommand == "" || !strings.Contains(config.PostCreateCommand, "install-gh-aw.sh") {
-			ghAwInstall := "curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash"
+			ghAwInstall := "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash"
 			if config.PostCreateCommand == "" {
 				config.PostCreateCommand = ghAwInstall
 			} else {
@@ -183,7 +183,7 @@ func ensureDevcontainerConfig(verbose bool, additionalRepos []string) error {
 				"ghcr.io/devcontainers/features/github-cli:1":       map[string]any{},
 				"ghcr.io/devcontainers/features/copilot-cli:latest": map[string]any{},
 			},
-			PostCreateCommand: "curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
+			PostCreateCommand: "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
 		}
 
 		if verbose {

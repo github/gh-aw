@@ -642,7 +642,7 @@ func (c *Compiler) generateGoMod(path string, deps []GoDependency, forceOverwrit
 	} else {
 		// New go.mod
 		dependabotLog.Print("Creating new go.mod")
-		lines = append(lines, "module github.com/githubnext/gh-aw-workflows-deps")
+		lines = append(lines, "module github.com/github/gh-aw-workflows-deps")
 		lines = append(lines, "")
 		lines = append(lines, "go 1.21")
 	}

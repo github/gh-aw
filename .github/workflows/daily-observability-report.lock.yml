@@ -30,7 +30,7 @@
 name: "Daily Observability Report for AWF Firewall and MCP Gateway"
 "on":
   schedule:
-  - cron: "19 16 * * *"
+  - cron: "54 6 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
@@ -142,7 +142,7 @@ jobs:
             await main();
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -166,18 +166,18 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Install gh-aw extension
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           # Check if gh-aw extension is already installed
-          if gh extension list | grep -q "github/gh-aw"; then
+          if gh extension list | grep -q "githubnext/gh-aw"; then
             echo "gh-aw extension already installed, upgrading..."
             gh extension upgrade gh-aw || true
           else
             echo "Installing gh-aw extension..."
-            gh extension install github/gh-aw
+            gh extension install githubnext/gh-aw
           fi
           gh aw --version
           # Copy the gh-aw binary to /opt/gh-aw for MCP server containerization
@@ -1085,7 +1085,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

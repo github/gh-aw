@@ -78,7 +78,7 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 	// Use base installation steps (secret validation + npm install)
 	steps := GetBaseInstallationSteps(EngineInstallConfig{
 		Secrets:    []string{"CODEX_API_KEY", "OPENAI_API_KEY"},
-		DocsURL:    "https://github.github.io/gh-aw/reference/engines/#openai-codex",
+		DocsURL:    "https://github.github.com/gh-aw/reference/engines/#openai-codex",
 		NpmPackage: "@openai/codex",
 		Version:    string(constants.DefaultCodexVersion),
 		Name:       "Codex",
@@ -152,7 +152,7 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		webSearchParam = "--search "
 	}
 
-	// See https://github.com/githubnext/gh-aw/issues/892
+	// See https://github.com/github/gh-aw/issues/892
 	// --dangerously-bypass-approvals-and-sandbox: Skips all confirmation prompts and disables sandboxing
 	// This is safe because AWF already provides a container-level sandbox layer
 	// --skip-git-repo-check: Allows running in directories without a git repo

@@ -295,10 +295,10 @@ const DefaultFirewallVersion Version = "v0.11.2"
 const DefaultMCPGatewayVersion Version = "v0.0.90"
 
 // DefaultMCPGatewayContainer is the default container image for the MCP Gateway
-const DefaultMCPGatewayContainer = "ghcr.io/githubnext/gh-aw-mcpg"
+const DefaultMCPGatewayContainer = "ghcr.io/github/gh-aw-mcpg"
 
 // DefaultSerenaMCPServerContainer is the default container image for the Serena MCP server
-const DefaultSerenaMCPServerContainer = "ghcr.io/githubnext/serena-mcp-server"
+const DefaultSerenaMCPServerContainer = "ghcr.io/github/serena-mcp-server"
 
 // OraiosSerenaContainer is the Oraios Serena MCP server container image (legacy)
 const OraiosSerenaContainer = "ghcr.io/oraios/serena"

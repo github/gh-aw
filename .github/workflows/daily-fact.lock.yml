@@ -46,7 +46,7 @@ jobs:
       comment_repo: ""
     steps:
       - name: Setup Scripts
-        uses: github/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
+        uses: githubnext/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
         with:
           destination: /opt/gh-aw/actions
       - name: Check workflow file timestamps
@@ -88,7 +88,7 @@ jobs:
       secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}
     steps:
       - name: Setup Scripts
-        uses: github/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
+        uses: githubnext/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
         with:
           destination: /opt/gh-aw/actions
       - name: Checkout repository
@@ -123,7 +123,7 @@ jobs:
             await main();
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -147,7 +147,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -724,7 +724,7 @@ jobs:
       total_count: ${{ steps.missing_tool.outputs.total_count }}
     steps:
       - name: Setup Scripts
-        uses: github/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
+        uses: githubnext/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
         with:
           destination: /opt/gh-aw/actions
       - name: Debug job inputs
@@ -829,7 +829,7 @@ jobs:
       success: ${{ steps.parse_results.outputs.success }}
     steps:
       - name: Setup Scripts
-        uses: github/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
+        uses: githubnext/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
         with:
           destination: /opt/gh-aw/actions
       - name: Download agent artifacts
@@ -867,7 +867,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -933,7 +933,7 @@ jobs:
       process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
     steps:
       - name: Setup Scripts
-        uses: github/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
+        uses: githubnext/gh-aw/actions/setup@623e612ff6a684e9a8634449508bdda21e2c178c # 623e612ff6a684e9a8634449508bdda21e2c178c
         with:
           destination: /opt/gh-aw/actions
       - name: Download agent output artifact

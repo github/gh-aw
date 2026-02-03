@@ -247,7 +247,7 @@ on: issues
 engine: claude
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     version: v0.0.5
 tools:
   github:
@@ -283,7 +283,7 @@ on: issues
 engine: claude
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     version: latest
 tools:
   github:
@@ -303,7 +303,7 @@ on: issues
 engine: claude
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     version: "1.2.3"
 tools:
   github:
@@ -466,7 +466,7 @@ Test that TAVILY_API_KEY is passed to gateway container.
 
 	// Verify the docker command includes the -e flag before the container image
 	// This ensures proper docker run command structure
-	dockerCmdPattern := `docker run.*-e TAVILY_API_KEY.*ghcr\.io/githubnext/gh-aw-mcpg`
+	dockerCmdPattern := `docker run.*-e TAVILY_API_KEY.*ghcr\.io/github/gh-aw-mcpg`
 	assert.Regexp(t, dockerCmdPattern, yamlStr,
 		"Docker command should include -e TAVILY_API_KEY before the container image")
 }

@@ -26,7 +26,7 @@
 name: "Duplicate Code Detector"
 "on":
   schedule:
-  - cron: "19 19 * * *"
+  - cron: "28 5 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
@@ -134,7 +134,7 @@ jobs:
             await main();
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -158,7 +158,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -434,7 +434,7 @@ jobs:
           Authorization = "$GH_AW_SAFE_OUTPUTS_API_KEY"
           
           [mcp_servers.serena]
-          container = "ghcr.io/githubnext/serena-mcp-server:latest"
+          container = "ghcr.io/github/serena-mcp-server:latest"
           args = [
             "--network",
             "host",
@@ -471,7 +471,7 @@ jobs:
                 }
               },
               "serena": {
-                "container": "ghcr.io/githubnext/serena-mcp-server:latest",
+                "container": "ghcr.io/github/serena-mcp-server:latest",
                 "args": [
                   "--network",
                   "host"
@@ -955,7 +955,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

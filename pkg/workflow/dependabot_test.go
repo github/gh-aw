@@ -745,7 +745,7 @@ func TestGenerateGoMod(t *testing.T) {
 	}
 
 	content := string(data)
-	if !strings.Contains(content, "module github.com/githubnext/gh-aw-workflows-deps") {
+	if !strings.Contains(content, "module github.com/github/gh-aw-workflows-deps") {
 		t.Error("go.mod should contain module declaration")
 	}
 	if !strings.Contains(content, "require (") {

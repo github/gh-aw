@@ -197,7 +197,7 @@ func TestParseGitHubURL_FileURLs(t *testing.T) {
 	}{
 		{
 			name:      "Blob URL with main branch",
-			url:       "https://github.com/githubnext/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
+			url:       "https://github.com/github/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
 			wantType:  URLTypeBlob,
 			wantOwner: "githubnext",
 			wantRepo:  "gh-aw-trial",
@@ -227,7 +227,7 @@ func TestParseGitHubURL_FileURLs(t *testing.T) {
 		},
 		{
 			name:      "Raw githubusercontent with refs/heads/branch",
-			url:       "https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/.github/workflows/shared/mcp/serena.md",
+			url:       "https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/.github/workflows/shared/mcp/serena.md",
 			wantType:  URLTypeRawContent,
 			wantOwner: "githubnext",
 			wantRepo:  "gh-aw",
@@ -237,7 +237,7 @@ func TestParseGitHubURL_FileURLs(t *testing.T) {
 		},
 		{
 			name:      "Raw githubusercontent with commit SHA",
-			url:       "https://raw.githubusercontent.com/githubnext/gh-aw/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
+			url:       "https://raw.githubusercontent.com/github/gh-aw/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
 			wantType:  URLTypeRawContent,
 			wantOwner: "githubnext",
 			wantRepo:  "gh-aw",
@@ -471,7 +471,7 @@ func TestParseRunURL(t *testing.T) {
 		},
 		{
 			name:        "Job URL with step fragment (no line)",
-			input:       "https://github.com/githubnext/gh-aw/actions/runs/20623556740/job/59230494223#step:7",
+			input:       "https://github.com/github/gh-aw/actions/runs/20623556740/job/59230494223#step:7",
 			wantRunID:   20623556740,
 			wantOwner:   "githubnext",
 			wantRepo:    "gh-aw",
