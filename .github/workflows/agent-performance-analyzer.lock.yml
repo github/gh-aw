@@ -175,12 +175,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           # Check if gh-aw extension is already installed
-          if gh extension list | grep -q "githubnext/gh-aw"; then
+          if gh extension list | grep -q "github/gh-aw"; then
             echo "gh-aw extension already installed, upgrading..."
             gh extension upgrade gh-aw || true
           else
             echo "Installing gh-aw extension..."
-            gh extension install githubnext/gh-aw
+            gh extension install github/gh-aw
           fi
           gh aw --version
           # Copy the gh-aw binary to /opt/gh-aw for MCP server containerization

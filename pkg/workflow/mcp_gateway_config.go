@@ -13,7 +13,7 @@
 //   - Managing gateway port, domain, and API key settings
 //
 // The gateway configuration includes:
-//   - Container image and version (defaults to githubnext/gh-aw-mcpg)
+//   - Container image and version (defaults to github/gh-aw-mcpg)
 //   - Network port (default: 80)
 //   - Domain for gateway access (localhost or host.docker.internal)
 //   - API key for authentication
@@ -36,7 +36,7 @@
 //
 //	sandbox:
 //	  mcp:
-//	    container: githubnext/gh-aw-mcpg
+//	    container: github/gh-aw-mcpg
 //	    version: v0.0.12
 //	    port: 80
 //	    domain: host.docker.internal
@@ -53,7 +53,7 @@ import (
 var mcpGatewayConfigLog = logger.New("workflow:mcp_gateway_config")
 
 // ensureDefaultMCPGatewayConfig ensures MCP gateway has default configuration if not provided
-// The MCP gateway is mandatory and defaults to GitHubnext/gh-aw-mcpg
+// The MCP gateway is mandatory and defaults to github/gh-aw-mcpg
 func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 	if workflowData == nil {
 		return

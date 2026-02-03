@@ -14,7 +14,7 @@ func TestSplitRepoSlug(t *testing.T) {
 	}{
 		{
 			name:          "valid slug",
-			slug:          "githubnext/gh-aw",
+			slug:          "github/gh-aw",
 			expectedOwner: "githubnext",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
@@ -33,7 +33,7 @@ func TestSplitRepoSlug(t *testing.T) {
 		},
 		{
 			name:        "invalid slug - multiple separators",
-			slug:        "githubnext/gh-aw/extra",
+			slug:        "github/gh-aw/extra",
 			expectError: true,
 		},
 		{
@@ -80,7 +80,7 @@ func TestParseGitHubURL(t *testing.T) {
 	}{
 		{
 			name:          "SSH format with .git",
-			url:           "git@github.com:githubnext/gh-aw.git",
+			url:           "git@github.com:github/gh-aw.git",
 			expectedOwner: "githubnext",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
@@ -153,7 +153,7 @@ func TestSanitizeForFilename(t *testing.T) {
 	}{
 		{
 			name:     "normal slug",
-			slug:     "githubnext/gh-aw",
+			slug:     "github/gh-aw",
 			expected: "githubnext-gh-aw",
 		},
 		{
@@ -184,7 +184,7 @@ func TestSanitizeForFilename(t *testing.T) {
 }
 
 func BenchmarkSplitRepoSlug(b *testing.B) {
-	slug := "githubnext/gh-aw"
+	slug := "github/gh-aw"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = SplitRepoSlug(slug)
 	}
@@ -198,7 +198,7 @@ func BenchmarkParseGitHubURL(b *testing.B) {
 }
 
 func BenchmarkSanitizeForFilename(b *testing.B) {
-	slug := "githubnext/gh-aw"
+	slug := "github/gh-aw"
 	for i := 0; i < b.N; i++ {
 		_ = SanitizeForFilename(slug)
 	}
@@ -446,7 +446,7 @@ func TestSplitRepoSlug_Idempotent(t *testing.T) {
 }
 
 func BenchmarkSplitRepoSlug_Valid(b *testing.B) {
-	slug := "githubnext/gh-aw"
+	slug := "github/gh-aw"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = SplitRepoSlug(slug)
 	}
@@ -460,7 +460,7 @@ func BenchmarkSplitRepoSlug_Invalid(b *testing.B) {
 }
 
 func BenchmarkParseGitHubURL_SSH(b *testing.B) {
-	url := "git@github.com:githubnext/gh-aw.git"
+	url := "git@github.com:github/gh-aw.git"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = ParseGitHubURL(url)
 	}

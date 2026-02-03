@@ -999,8 +999,8 @@ func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
 		{
 			name:               "with repository slug",
 			workflowIdentifier: "test-workflow.md",
-			repositorySlug:     "githubnext/gh-aw",
-			expectedSeedFormat: "githubnext/gh-aw/test-workflow.md",
+			repositorySlug:     "github/gh-aw",
+			expectedSeedFormat: "github/gh-aw/test-workflow.md",
 		},
 		{
 			name:               "with different org, same workflow name",
@@ -1071,7 +1071,7 @@ func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
 
 	// Verify that different org/repo combinations produce different schedules
 	// for the same workflow name
-	sameWorkflowDifferentOrg := results["githubnext/gh-aw/test-workflow.md"]
+	sameWorkflowDifferentOrg := results["github/gh-aw/test-workflow.md"]
 	sameWorkflowOtherOrg := results["otherorg/gh-aw/test-workflow.md"]
 	sameWorkflowOtherRepo := results["githubnext/other-repo/test-workflow.md"]
 	workflowWithoutSlug := results["test-workflow.md"]

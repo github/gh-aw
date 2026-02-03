@@ -20,7 +20,7 @@ func TestRepoSlugErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
@@ -29,7 +29,7 @@ func TestRepoSlugErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
@@ -38,7 +38,7 @@ func TestRepoSlugErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
@@ -47,7 +47,7 @@ func TestRepoSlugErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 	}
@@ -84,7 +84,7 @@ func TestParseRepoSpecErrorMessages(t *testing.T) {
 			repoSpec: "justname",
 			expectInMessage: []string{
 				"must be in format",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
@@ -92,7 +92,7 @@ func TestParseRepoSpecErrorMessages(t *testing.T) {
 			repoSpec: "owner/repo/extra",
 			expectInMessage: []string{
 				"must be in format",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{

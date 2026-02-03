@@ -59,8 +59,8 @@ func TestCodexParseLogMetricsMultipleToolsWithOutputSizes(t *testing.T) {
   ],
   "isError": false
 }
-[2025-08-31T12:38:18] tool github.search_pull_requests({"query":"is:pr repo:githubnext/gh-aw codex","perPage":10})
-[2025-08-31T12:38:20] github.search_pull_requests({"query":"is:pr repo:githubnext/gh-aw codex","perPage":10}) success in 331ms:
+[2025-08-31T12:38:18] tool github.search_pull_requests({"query":"is:pr repo:github/gh-aw codex","perPage":10})
+[2025-08-31T12:38:20] github.search_pull_requests({"query":"is:pr repo:github/gh-aw codex","perPage":10}) success in 331ms:
 {
   "content": [
     {

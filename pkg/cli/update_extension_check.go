@@ -16,7 +16,7 @@ func checkExtensionUpdate(verbose bool) error {
 	}
 
 	// Run gh extension upgrade --dry-run to check for updates
-	output, err := workflow.RunGHCombined("Checking for extension updates...", "extension", "upgrade", "githubnext/gh-aw", "--dry-run")
+	output, err := workflow.RunGHCombined("Checking for extension updates...", "extension", "upgrade", "github/gh-aw", "--dry-run")
 	if err != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check for extension updates: %v", err)))
@@ -35,7 +35,7 @@ func checkExtensionUpdate(verbose bool) error {
 	for _, line := range lines {
 		if strings.Contains(line, "[agentics]: would have upgraded from") {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(line))
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run 'gh extension upgrade githubnext/gh-aw' to update"))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Run 'gh extension upgrade github/gh-aw' to update"))
 			return nil
 		}
 	}
@@ -70,7 +70,7 @@ func ensureLatestExtensionVersion(verbose bool) error {
 	}
 
 	// Run gh extension upgrade --dry-run to check for updates
-	output, err := workflow.RunGHCombined("Checking for extension updates...", "extension", "upgrade", "githubnext/gh-aw", "--dry-run")
+	output, err := workflow.RunGHCombined("Checking for extension updates...", "extension", "upgrade", "github/gh-aw", "--dry-run")
 	outputStr := strings.TrimSpace(string(output))
 
 	// Check for authentication errors (missing or invalid token)
@@ -100,7 +100,7 @@ func ensureLatestExtensionVersion(verbose bool) error {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(line))
 			fmt.Fprintln(os.Stderr, "")
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Please upgrade the gh extension first:"))
-			fmt.Fprintln(os.Stderr, console.FormatCommandMessage("  gh extension upgrade githubnext/gh-aw"))
+			fmt.Fprintln(os.Stderr, console.FormatCommandMessage("  gh extension upgrade github/gh-aw"))
 			fmt.Fprintln(os.Stderr, "")
 			return fmt.Errorf("gh-aw extension must be upgraded before running this command")
 		}

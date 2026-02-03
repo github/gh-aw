@@ -22,7 +22,7 @@ func TestRepositoryFormatErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository format",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
@@ -32,12 +32,12 @@ func TestRepositoryFormatErrorMessages(t *testing.T) {
 			expectInMessage: []string{
 				"invalid repository format",
 				"Expected format: owner/repo",
-				"Example: githubnext/gh-aw",
+				"Example: github/gh-aw",
 			},
 		},
 		{
 			name:        "valid format",
-			repo:        "githubnext/gh-aw",
+			repo:        "github/gh-aw",
 			expectError: false,
 		},
 	}

@@ -288,7 +288,7 @@ func TestParseLogFileWithCodexFormat(t *testing.T) {
 I need to analyze the pull request details first.
 [2025-08-13T00:24:50] codex
 
-I'm ready to generate a Codex PR summary, but I need the pull request number to fetch its details. Could you please share the PR number (and confirm the repo/owner if it isn't ` + "`githubnext/gh-aw`" + `)?
+I'm ready to generate a Codex PR summary, but I need the pull request number to fetch its details. Could you please share the PR number (and confirm the repo/owner if it isn't ` + "`github/gh-aw`" + `)?
 [2025-08-13T00:24:50] thinking  
 Now I need to wait for the user's response.
 [2025-08-13T00:24:50] tokens used: 13934
@@ -546,7 +546,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 		"run_id": 123456789,
 		"run_number": 42,
 		"run_attempt": "1",
-		"repository": "githubnext/gh-aw",
+		"repository": "github/gh-aw",
 		"ref": "refs/heads/main",
 		"sha": "abc123",
 		"actor": "testuser",
@@ -591,7 +591,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 		"run_id": 987654321,
 		"run_number": 7,
 		"run_attempt": "1",
-		"repository": "githubnext/gh-aw",
+		"repository": "github/gh-aw",
 		"ref": "refs/heads/copilot/fix-24",
 		"sha": "def456",
 		"actor": "testuser2",

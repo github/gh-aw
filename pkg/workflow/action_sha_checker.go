@@ -201,9 +201,6 @@ func ValidateActionSHAsInLockFile(lockFilePath string, cache *ActionCache, verbo
 		}
 	} else {
 		actionSHACheckerLog.Print("All actions are up to date")
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatVerboseMessage("All pinned actions are up to date"))
-		}
 	}
 
 	return nil

@@ -128,9 +128,9 @@ func TestGetCurrentRepository(t *testing.T) {
 }
 
 func TestCheckRepositoryHasDiscussions(t *testing.T) {
-	// Test with the current repository (githubnext/gh-aw)
+	// Test with the current repository (github/gh-aw)
 	// This test will only pass when GitHub CLI is authenticated
-	repo := "githubnext/gh-aw"
+	repo := "github/gh-aw"
 
 	hasDiscussions, err := checkRepositoryHasDiscussions(repo, false)
 	if err != nil {
@@ -143,9 +143,9 @@ func TestCheckRepositoryHasDiscussions(t *testing.T) {
 }
 
 func TestCheckRepositoryHasIssues(t *testing.T) {
-	// Test with the current repository (githubnext/gh-aw)
+	// Test with the current repository (github/gh-aw)
 	// This test will only pass when GitHub CLI is authenticated
-	repo := "githubnext/gh-aw"
+	repo := "github/gh-aw"
 
 	hasIssues, err := checkRepositoryHasIssues(repo, false)
 	if err != nil {
@@ -156,9 +156,9 @@ func TestCheckRepositoryHasIssues(t *testing.T) {
 
 	t.Logf("Repository %s has issues enabled: %v", repo, hasIssues)
 
-	// Issues should definitely be enabled for githubnext/gh-aw
+	// Issues should definitely be enabled for github/gh-aw
 	if !hasIssues {
-		t.Error("Expected githubnext/gh-aw to have issues enabled")
+		t.Error("Expected github/gh-aw to have issues enabled")
 	}
 }
 
@@ -179,7 +179,7 @@ func TestCheckRepositoryInvalidFormat(t *testing.T) {
 func TestCheckRepositoryHasIssuesUncached(t *testing.T) {
 	// Test the REST client code path directly
 	// This test exercises the api.DefaultRESTClient() and client.Get() path
-	repo := "githubnext/gh-aw"
+	repo := "github/gh-aw"
 
 	hasIssues, err := checkRepositoryHasIssuesUncached(repo)
 	if err != nil {
@@ -190,9 +190,9 @@ func TestCheckRepositoryHasIssuesUncached(t *testing.T) {
 
 	t.Logf("Repository %s has issues enabled: %v", repo, hasIssues)
 
-	// Issues should definitely be enabled for githubnext/gh-aw
+	// Issues should definitely be enabled for github/gh-aw
 	if !hasIssues {
-		t.Error("Expected githubnext/gh-aw to have issues enabled")
+		t.Error("Expected github/gh-aw to have issues enabled")
 	}
 }
 
@@ -220,7 +220,7 @@ func TestCheckRepositoryHasIssuesWithCaching(t *testing.T) {
 	// Clear cache first to ensure clean state
 	ClearRepositoryFeaturesCache()
 
-	repo := "githubnext/gh-aw"
+	repo := "github/gh-aw"
 
 	// First call - should fetch from API
 	hasIssues1, err1 := checkRepositoryHasIssues(repo, false)
@@ -241,8 +241,8 @@ func TestCheckRepositoryHasIssuesWithCaching(t *testing.T) {
 		t.Errorf("cached result differs from first result: first=%v, second=%v", hasIssues1, hasIssues2)
 	}
 
-	// Issues should definitely be enabled for githubnext/gh-aw
+	// Issues should definitely be enabled for github/gh-aw
 	if !hasIssues1 {
-		t.Error("Expected githubnext/gh-aw to have issues enabled")
+		t.Error("Expected github/gh-aw to have issues enabled")
 	}
 }

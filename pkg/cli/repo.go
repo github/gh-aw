@@ -84,7 +84,7 @@ func getCurrentRepoSlugUncached() (string, error) {
 	parts := strings.Split(repoPath, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		repoLog.Printf("Invalid repository format: %s", repoPath)
-		return "", fmt.Errorf("invalid repository format: %s. Expected format: owner/repo. Example: githubnext/gh-aw", repoPath)
+		return "", fmt.Errorf("invalid repository format: %s. Expected format: owner/repo. Example: github/gh-aw", repoPath)
 	}
 
 	repoLog.Printf("Successfully parsed repository slug from git remote: %s", repoPath)

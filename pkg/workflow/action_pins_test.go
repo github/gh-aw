@@ -1214,7 +1214,7 @@ func TestActionPinWarningDeduplication(t *testing.T) {
 		},
 		{
 			name:          "unknown action called 6 times - warn once",
-			repo:          "githubnext/gh-aw/actions/setup",
+			repo:          "github/gh-aw/actions/setup",
 			version:       "v0.37.0",
 			callCount:     6,
 			expectedWarns: 1,

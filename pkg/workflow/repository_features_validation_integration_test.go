@@ -51,9 +51,9 @@ func TestRepositoryFeaturesValidationIntegration(t *testing.T) {
 		}
 		t.Logf("Repository %s has issues enabled: %v", repo, hasIssues)
 
-		// Issues should be enabled for githubnext/gh-aw
-		if repo == "githubnext/gh-aw" && !hasIssues {
-			t.Error("Expected githubnext/gh-aw to have issues enabled")
+		// Issues should be enabled for github/gh-aw
+		if repo == "github/gh-aw" && !hasIssues {
+			t.Error("Expected github/gh-aw to have issues enabled")
 		}
 	})
 

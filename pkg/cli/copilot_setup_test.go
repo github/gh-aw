@@ -852,7 +852,7 @@ jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
     steps:
-      - uses: githubnext/gh-aw/actions/setup-cli@v1.0.0
+      - uses: github/gh-aw/actions/setup-cli@v1.0.0
         with:
           version: v1.0.0
 `
@@ -972,7 +972,7 @@ func TestInjectExtensionInstallStep_ReleaseMode(t *testing.T) {
 	if job.Steps[1].Name != "Install gh-aw extension" {
 		t.Errorf("Second step should be install, got: %s", job.Steps[1].Name)
 	}
-	expectedUses := "githubnext/gh-aw/actions/setup-cli@v4.5.6"
+	expectedUses := "github/gh-aw/actions/setup-cli@v4.5.6"
 	if job.Steps[1].Uses != expectedUses {
 		t.Errorf("Install should use %s, got: %s", expectedUses, job.Steps[1].Uses)
 	}
@@ -1056,7 +1056,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install gh-aw extension
-        uses: githubnext/gh-aw/actions/setup-cli@v1.0.0
+        uses: github/gh-aw/actions/setup-cli@v1.0.0
         with:
           version: v1.0.0
       - name: Verify gh-aw installation
@@ -1203,7 +1203,7 @@ func TestUpgradeSetupCliVersion(t *testing.T) {
 							},
 							{
 								Name: "Install gh-aw",
-								Uses: "githubnext/gh-aw/actions/setup-cli@v1.0.0",
+								Uses: "github/gh-aw/actions/setup-cli@v1.0.0",
 								With: map[string]any{"version": "v1.0.0"},
 							},
 						},

@@ -162,7 +162,7 @@ func TestAgenticWorkflowsInstallStepIncludesGHToken(t *testing.T) {
 		"install step should use default GH_TOKEN fallback chain when no custom token is specified")
 
 	// Verify the install commands are present
-	assert.Contains(t, result, "gh extension install githubnext/gh-aw",
+	assert.Contains(t, result, "gh extension install github/gh-aw",
 		"install step should include command to install gh-aw extension")
 	assert.Contains(t, result, "gh aw --version",
 		"install step should include command to verify gh-aw installation")
@@ -222,7 +222,7 @@ func TestAgenticWorkflowsInstallStepSkippedWithImport(t *testing.T) {
 		"install step should be skipped when shared/mcp/gh-aw.md is imported")
 
 	// Verify the install command is also not present
-	assert.NotContains(t, result, "gh extension install githubnext/gh-aw",
+	assert.NotContains(t, result, "gh extension install github/gh-aw",
 		"gh extension install command should be absent when shared/mcp/gh-aw.md is imported")
 }
 
@@ -247,7 +247,7 @@ func TestAgenticWorkflowsInstallStepPresentWithoutImport(t *testing.T) {
 		"install step should be present when shared/mcp/gh-aw.md is NOT imported")
 
 	// Verify the install command is present
-	assert.Contains(t, result, "gh extension install githubnext/gh-aw",
+	assert.Contains(t, result, "gh extension install github/gh-aw",
 		"gh extension install command should be present when shared/mcp/gh-aw.md is NOT imported")
 }
 

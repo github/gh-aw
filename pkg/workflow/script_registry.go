@@ -168,7 +168,7 @@ func (r *ScriptRegistry) RegisterWithMode(name string, source string, mode Runti
 //
 // The actionPath should be a relative path from the repository root for development mode.
 // In the future, this can be extended to support versioned references like
-// "githubnext/gh-aw/.github/actions/create-issue@SHA" for release mode.
+// "github/gh-aw/.github/actions/create-issue@SHA" for release mode.
 //
 // Returns an error if validation fails, allowing the caller to handle gracefully
 // instead of crashing the process.

@@ -11,7 +11,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.2.3")
 		data := &WorkflowData{}
 		ref := compiler.convertToRemoteActionRef("./actions/create-issue", data)
-		expected := "githubnext/gh-aw/actions/create-issue@v1.2.3"
+		expected := "github/gh-aw/actions/create-issue@v1.2.3"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -21,7 +21,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.0.0")
 		data := &WorkflowData{}
 		ref := compiler.convertToRemoteActionRef("actions/create-issue", data)
-		expected := "githubnext/gh-aw/actions/create-issue@v1.0.0"
+		expected := "github/gh-aw/actions/create-issue@v1.0.0"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -31,7 +31,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v2.0.0")
 		data := &WorkflowData{}
 		ref := compiler.convertToRemoteActionRef("./actions/nested/action", data)
-		expected := "githubnext/gh-aw/actions/nested/action@v2.0.0"
+		expected := "github/gh-aw/actions/nested/action@v2.0.0"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -59,7 +59,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.0.0")
 		data := &WorkflowData{Features: map[string]any{"action-tag": "latest"}}
 		ref := compiler.convertToRemoteActionRef("./actions/create-issue", data)
-		expected := "githubnext/gh-aw/actions/create-issue@latest"
+		expected := "github/gh-aw/actions/create-issue@latest"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -69,7 +69,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.0.0")
 		data := &WorkflowData{Features: map[string]any{"action-tag": "abc123def456"}}
 		ref := compiler.convertToRemoteActionRef("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@abc123def456"
+		expected := "github/gh-aw/actions/setup@abc123def456"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -79,7 +79,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.0.0")
 		data := &WorkflowData{Features: map[string]any{"action-tag": "v2.5.0"}}
 		ref := compiler.convertToRemoteActionRef("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@v2.5.0"
+		expected := "github/gh-aw/actions/setup@v2.5.0"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -89,7 +89,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.5.0")
 		data := &WorkflowData{Features: map[string]any{"action-tag": ""}}
 		ref := compiler.convertToRemoteActionRef("./actions/create-issue", data)
-		expected := "githubnext/gh-aw/actions/create-issue@v1.5.0"
+		expected := "github/gh-aw/actions/create-issue@v1.5.0"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -98,7 +98,7 @@ func TestConvertToRemoteActionRef(t *testing.T) {
 	t.Run("nil data falls back to version", func(t *testing.T) {
 		compiler := NewCompilerWithVersion("v1.5.0")
 		ref := compiler.convertToRemoteActionRef("./actions/create-issue", nil)
-		expected := "githubnext/gh-aw/actions/create-issue@v1.5.0"
+		expected := "github/gh-aw/actions/create-issue@v1.5.0"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -129,7 +129,7 @@ func TestResolveActionReference(t *testing.T) {
 			actionMode:  ActionModeRelease,
 			localPath:   "./actions/create-issue",
 			version:     "v1.0.0",
-			expectedRef: "githubnext/gh-aw/actions/create-issue@v1.0.0",
+			expectedRef: "github/gh-aw/actions/create-issue@v1.0.0",
 			description: "Release mode should return version-based reference",
 		},
 		{
@@ -146,7 +146,7 @@ func TestResolveActionReference(t *testing.T) {
 			localPath:   "./actions/setup",
 			version:     "v1.0.0",
 			actionTag:   "latest",
-			expectedRef: "githubnext/gh-aw/actions/setup@latest",
+			expectedRef: "github/gh-aw/actions/setup@latest",
 			description: "Release mode with action-tag should use action-tag instead of version",
 		},
 		{
@@ -155,7 +155,7 @@ func TestResolveActionReference(t *testing.T) {
 			localPath:   "./actions/setup",
 			version:     "v1.0.0",
 			actionTag:   "abc123def456789",
-			expectedRef: "githubnext/gh-aw/actions/setup@abc123def456789",
+			expectedRef: "github/gh-aw/actions/setup@abc123def456789",
 			description: "Release mode with action-tag SHA should use the SHA",
 		},
 		{
@@ -164,7 +164,7 @@ func TestResolveActionReference(t *testing.T) {
 			localPath:   "./actions/setup",
 			version:     "v1.0.0",
 			actionTag:   "latest",
-			expectedRef: "githubnext/gh-aw/actions/setup@latest",
+			expectedRef: "github/gh-aw/actions/setup@latest",
 			description: "Dev mode with action-tag should override and use remote reference",
 		},
 	}
@@ -202,7 +202,7 @@ func TestCompilerActionTag(t *testing.T) {
 		// Frontmatter has action-tag but compiler actionTag should take precedence
 		data := &WorkflowData{Features: map[string]any{"action-tag": "v1.5.0"}}
 		ref := compiler.convertToRemoteActionRef("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@v2.0.0"
+		expected := "github/gh-aw/actions/setup@v2.0.0"
 		if ref != expected {
 			t.Errorf("Expected compiler actionTag to take precedence: got %q, want %q", ref, expected)
 		}
@@ -215,7 +215,7 @@ func TestCompilerActionTag(t *testing.T) {
 
 		data := &WorkflowData{}
 		ref := compiler.convertToRemoteActionRef("./actions/create-issue", data)
-		expected := "githubnext/gh-aw/actions/create-issue@abc123def456"
+		expected := "github/gh-aw/actions/create-issue@abc123def456"
 		if ref != expected {
 			t.Errorf("Expected %q, got %q", expected, ref)
 		}
@@ -230,7 +230,7 @@ func TestCompilerActionTag(t *testing.T) {
 
 		data := &WorkflowData{}
 		ref := compiler.resolveActionReference("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@v2.0.0"
+		expected := "github/gh-aw/actions/setup@v2.0.0"
 		if ref != expected {
 			t.Errorf("Expected compiler actionTag with release mode: got %q, want %q", ref, expected)
 		}
@@ -243,7 +243,7 @@ func TestCompilerActionTag(t *testing.T) {
 
 		data := &WorkflowData{Features: map[string]any{"action-tag": "v1.5.0"}}
 		ref := compiler.convertToRemoteActionRef("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@v1.5.0"
+		expected := "github/gh-aw/actions/setup@v1.5.0"
 		if ref != expected {
 			t.Errorf("Expected frontmatter action-tag to be used: got %q, want %q", ref, expected)
 		}
@@ -255,7 +255,7 @@ func TestCompilerActionTag(t *testing.T) {
 
 		data := &WorkflowData{}
 		ref := compiler.convertToRemoteActionRef("./actions/setup", data)
-		expected := "githubnext/gh-aw/actions/setup@v1.2.3"
+		expected := "github/gh-aw/actions/setup@v1.2.3"
 		if ref != expected {
 			t.Errorf("Expected compiler version to be used: got %q, want %q", ref, expected)
 		}
@@ -284,7 +284,7 @@ func TestResolveSetupActionReference(t *testing.T) {
 			actionMode:  ActionModeRelease,
 			version:     "v1.0.0",
 			actionTag:   "",
-			expectedRef: "githubnext/gh-aw/actions/setup@v1.0.0",
+			expectedRef: "github/gh-aw/actions/setup@v1.0.0",
 			description: "Release mode should return remote reference with version",
 		},
 		{
@@ -292,7 +292,7 @@ func TestResolveSetupActionReference(t *testing.T) {
 			actionMode:  ActionModeRelease,
 			version:     "v1.0.0",
 			actionTag:   "v2.5.0",
-			expectedRef: "githubnext/gh-aw/actions/setup@v2.5.0",
+			expectedRef: "github/gh-aw/actions/setup@v2.5.0",
 			description: "Release mode with actionTag should use actionTag instead of version",
 		},
 		{
@@ -300,7 +300,7 @@ func TestResolveSetupActionReference(t *testing.T) {
 			actionMode:  ActionModeRelease,
 			version:     "v1.0.0",
 			actionTag:   "abc123def456789012345678901234567890abcd",
-			expectedRef: "githubnext/gh-aw/actions/setup@abc123def456789012345678901234567890abcd",
+			expectedRef: "github/gh-aw/actions/setup@abc123def456789012345678901234567890abcd",
 			description: "Release mode with SHA actionTag should use the SHA",
 		},
 		{
@@ -316,7 +316,7 @@ func TestResolveSetupActionReference(t *testing.T) {
 			actionMode:  ActionModeRelease,
 			version:     "dev",
 			actionTag:   "v2.0.0",
-			expectedRef: "githubnext/gh-aw/actions/setup@v2.0.0",
+			expectedRef: "github/gh-aw/actions/setup@v2.0.0",
 			description: "Release mode with actionTag should work even with 'dev' version",
 		},
 		{
@@ -352,12 +352,12 @@ func TestResolveSetupActionReferenceWithData(t *testing.T) {
 			StrictMode:     false,
 		}
 
-		// The resolver will fail to resolve githubnext/gh-aw/actions/setup@v1.0.0
+		// The resolver will fail to resolve github/gh-aw/actions/setup@v1.0.0
 		// since it's not a real tag, but it should fall back gracefully
 		ref := ResolveSetupActionReference(ActionModeRelease, "v1.0.0", "", data)
 
 		// Without a valid pin or successful resolution, should return tag-based reference
-		expectedRef := "githubnext/gh-aw/actions/setup@v1.0.0"
+		expectedRef := "github/gh-aw/actions/setup@v1.0.0"
 		if ref != expectedRef {
 			t.Errorf("Expected %q, got %q", expectedRef, ref)
 		}
@@ -365,7 +365,7 @@ func TestResolveSetupActionReferenceWithData(t *testing.T) {
 
 	t.Run("release mode with nil data returns tag-based reference", func(t *testing.T) {
 		ref := ResolveSetupActionReference(ActionModeRelease, "v1.0.0", "", nil)
-		expectedRef := "githubnext/gh-aw/actions/setup@v1.0.0"
+		expectedRef := "github/gh-aw/actions/setup@v1.0.0"
 		if ref != expectedRef {
 			t.Errorf("Expected %q, got %q", expectedRef, ref)
 		}

@@ -46,7 +46,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install gh-aw extension
-        uses: githubnext/gh-aw/actions/setup-cli%s
+        uses: github/gh-aw/actions/setup-cli%s
         with:
           version: %s
 `, actionRef, version)
@@ -281,7 +281,7 @@ func upgradeSetupCliVersion(workflow *Workflow, actionMode workflow.ActionMode, 
 			oldUses := step.Uses
 			if actionMode.IsRelease() {
 				// Update to the new version tag
-				newUses := fmt.Sprintf("githubnext/gh-aw/actions/setup-cli%s", actionRef)
+				newUses := fmt.Sprintf("github/gh-aw/actions/setup-cli%s", actionRef)
 				step.Uses = newUses
 
 				// Update the with.version parameter
@@ -321,7 +321,7 @@ func injectExtensionInstallStep(workflow *Workflow, actionMode workflow.ActionMo
 		}
 		installStep = CopilotWorkflowStep{
 			Name: "Install gh-aw extension",
-			Uses: fmt.Sprintf("githubnext/gh-aw/actions/setup-cli%s", actionRef),
+			Uses: fmt.Sprintf("github/gh-aw/actions/setup-cli%s", actionRef),
 			With: map[string]any{
 				"version": version,
 			},

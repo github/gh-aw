@@ -101,7 +101,7 @@ mcp-servers:
 ```yaml
 mcp-servers:
   serena:
-    container: "ghcr.io/githubnext/serena-mcp-server"
+    container: "ghcr.io/github/serena-mcp-server"
     version: "latest"
     args: # args come before the docker image argument
       - "-v"

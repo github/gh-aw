@@ -138,7 +138,7 @@ func TestParseWorkflowSpec(t *testing.T) {
 		{
 			name:             "GitHub URL - blob with main branch",
 			spec:             "https://github.com/github/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
-			wantRepo:         "githubnext/gh-aw-trial",
+			wantRepo:         "github/gh-aw-trial",
 			wantWorkflowPath: "workflows/release-issue-linker.md",
 			wantWorkflowName: "release-issue-linker",
 			wantVersion:      "main",
@@ -272,8 +272,8 @@ func TestParseWorkflowSpec(t *testing.T) {
 		},
 		{
 			name:             "/files/ format with branch",
-			spec:             "githubnext/gh-aw/files/main/.github/workflows/shared/mcp/serena.md",
-			wantRepo:         "githubnext/gh-aw",
+			spec:             "github/gh-aw/files/main/.github/workflows/shared/mcp/serena.md",
+			wantRepo:         "github/gh-aw",
 			wantWorkflowPath: ".github/workflows/shared/mcp/serena.md",
 			wantWorkflowName: "serena",
 			wantVersion:      "main",
@@ -281,8 +281,8 @@ func TestParseWorkflowSpec(t *testing.T) {
 		},
 		{
 			name:             "/files/ format with commit SHA",
-			spec:             "githubnext/gh-aw/files/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
-			wantRepo:         "githubnext/gh-aw",
+			spec:             "github/gh-aw/files/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
+			wantRepo:         "github/gh-aw",
 			wantWorkflowPath: ".github/workflows/shared/mcp/serena.md",
 			wantWorkflowName: "serena",
 			wantVersion:      "fc7992627494253a869e177e5d1985d25f3bb316",

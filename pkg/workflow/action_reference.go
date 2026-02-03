@@ -11,7 +11,7 @@ var actionRefLog = logger.New("workflow:action_reference")
 
 const (
 	// GitHubOrgRepo is the organization and repository name for custom action references
-	GitHubOrgRepo = "githubnext/gh-aw"
+	GitHubOrgRepo = "github/gh-aw"
 )
 
 // ResolveSetupActionReference resolves the actions/setup action reference based on action mode and version.
@@ -26,8 +26,8 @@ const (
 //
 // Returns:
 //   - For dev mode: "./actions/setup" (local path)
-//   - For release mode with data: "githubnext/gh-aw/actions/setup@<sha> # <version>" (SHA-pinned)
-//   - For release mode without data: "githubnext/gh-aw/actions/setup@<version>" (tag-based, SHA resolved later)
+//   - For release mode with data: "github/gh-aw/actions/setup@<sha> # <version>" (SHA-pinned)
+//   - For release mode without data: "github/gh-aw/actions/setup@<version>" (tag-based, SHA resolved later)
 //   - Falls back to local path if version is invalid in release mode
 func ResolveSetupActionReference(actionMode ActionMode, version string, actionTag string, data *WorkflowData) string {
 	localPath := "./actions/setup"
@@ -54,7 +54,7 @@ func ResolveSetupActionReference(actionMode ActionMode, version string, actionTa
 			return localPath
 		}
 
-		// Construct the remote reference with tag: githubnext/gh-aw/actions/setup@tag
+		// Construct the remote reference with tag: github/gh-aw/actions/setup@tag
 		remoteRef := fmt.Sprintf("%s/%s@%s", GitHubOrgRepo, actionPath, tag)
 
 		// If WorkflowData is available, try to resolve the SHA
@@ -88,7 +88,7 @@ func ResolveSetupActionReference(actionMode ActionMode, version string, actionTa
 // based on the current action mode (dev vs release).
 // If action-tag is specified in features, it overrides the mode check and enables release mode behavior.
 // For dev mode: returns the local path as-is (e.g., "./actions/create-issue")
-// For release mode: converts to SHA-pinned remote reference (e.g., "githubnext/gh-aw/actions/create-issue@SHA # tag")
+// For release mode: converts to SHA-pinned remote reference (e.g., "github/gh-aw/actions/create-issue@SHA # tag")
 func (c *Compiler) resolveActionReference(localActionPath string, data *WorkflowData) string {
 	// Check if action-tag is specified in features - if so, override mode and use release behavior
 	hasActionTag := false
@@ -170,7 +170,7 @@ func (c *Compiler) resolveActionReference(localActionPath string, data *Workflow
 // that will be resolved to a SHA later in the release pipeline using action pins.
 // Uses the action-tag from WorkflowData.Features if specified (for testing), otherwise uses the version stored in the compiler binary.
 // If compiler has actionTag set, it takes priority over both.
-// Example: "./actions/create-issue" -> "githubnext/gh-aw/actions/create-issue@v1.0.0"
+// Example: "./actions/create-issue" -> "github/gh-aw/actions/create-issue@v1.0.0"
 func (c *Compiler) convertToRemoteActionRef(localPath string, data *WorkflowData) string {
 	// Strip the leading "./" if present
 	actionPath := strings.TrimPrefix(localPath, "./")
@@ -205,7 +205,7 @@ func (c *Compiler) convertToRemoteActionRef(localPath string, data *WorkflowData
 		actionRefLog.Printf("Using tag from binary version: %s", tag)
 	}
 
-	// Construct the remote reference with tag: githubnext/gh-aw/actions/name@tag
+	// Construct the remote reference with tag: github/gh-aw/actions/name@tag
 	// The SHA will be resolved later by action pinning infrastructure
 	remoteRef := fmt.Sprintf("%s/%s@%s", GitHubOrgRepo, actionPath, tag)
 	actionRefLog.Printf("Remote reference: %s (SHA will be resolved via action pins)", remoteRef)

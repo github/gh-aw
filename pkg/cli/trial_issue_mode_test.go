@@ -85,8 +85,8 @@ func TestTrialWorkflowSpecParsing(t *testing.T) {
 	}{
 		{
 			name:         "GitHub URL workflow spec",
-			spec:         "githubnext/gh-aw-trial/.github/workflows/release-issue-linker.md",
-			expectedRepo: "githubnext/gh-aw-trial",
+			spec:         "github/gh-aw-trial/.github/workflows/release-issue-linker.md",
+			expectedRepo: "github/gh-aw-trial",
 			expectedName: "release-issue-linker",
 			shouldError:  false,
 		},

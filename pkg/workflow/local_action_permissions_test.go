@@ -199,7 +199,7 @@ command: /fix
 	}
 
 	// Should use remote action references instead
-	if !strings.Contains(lockContentStr, "githubnext/gh-aw/actions/setup@v1.0.0") {
-		t.Error("Release mode should use remote action references like 'githubnext/gh-aw/actions/setup@v1.0.0'")
+	if !strings.Contains(lockContentStr, "github/gh-aw/actions/setup@v1.0.0") {
+		t.Error("Release mode should use remote action references like 'github/gh-aw/actions/setup@v1.0.0'")
 	}
 }

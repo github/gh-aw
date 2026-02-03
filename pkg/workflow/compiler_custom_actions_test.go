@@ -389,9 +389,9 @@ Test workflow with script mode.
 	lockStr := string(lockContent)
 
 	// Verify script mode behavior:
-	// 1. Checkout should use repository: githubnext/gh-aw
-	if !strings.Contains(lockStr, "repository: githubnext/gh-aw") {
-		t.Error("Expected 'repository: githubnext/gh-aw' in checkout step for script mode")
+	// 1. Checkout should use repository: github/gh-aw
+	if !strings.Contains(lockStr, "repository: github/gh-aw") {
+		t.Error("Expected 'repository: github/gh-aw' in checkout step for script mode")
 	}
 
 	// 2. Checkout should target path: /tmp/gh-aw/actions-source

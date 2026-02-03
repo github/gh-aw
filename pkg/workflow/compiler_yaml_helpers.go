@@ -114,13 +114,13 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 		}
 	}
 
-	// Script mode: checkout .github folder from githubnext/gh-aw to /tmp/gh-aw/actions-source/
+	// Script mode: checkout .github folder from github/gh-aw to /tmp/gh-aw/actions-source/
 	if c.actionMode.IsScript() {
 		return []string{
 			"      - name: Checkout actions folder\n",
 			fmt.Sprintf("        uses: %s\n", GetActionPin("actions/checkout")),
 			"        with:\n",
-			"          repository: githubnext/gh-aw\n",
+			"          repository: github/gh-aw\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
 			"          path: /tmp/gh-aw/actions-source\n",
@@ -169,7 +169,7 @@ func generateGitHubScriptWithRequire(scriptPath string) string {
 // In other modes (dev/release), it uses the setup action.
 //
 // Parameters:
-//   - setupActionRef: The action reference for setup action (e.g., "./actions/setup" or "githubnext/gh-aw/actions/setup@sha")
+//   - setupActionRef: The action reference for setup action (e.g., "./actions/setup" or "github/gh-aw/actions/setup@sha")
 //   - destination: The destination path where files should be copied (e.g., SetupActionDestination)
 //   - enableSafeOutputProjects: Whether to enable safe-output-projects support (installs @actions/github for project handlers)
 //

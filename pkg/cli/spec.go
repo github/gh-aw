@@ -117,7 +117,7 @@ func parseRepoSpec(repoSpec string) (*RepoSpec, error) {
 		// Validate repository format (org/repo)
 		repoParts := strings.Split(repo, "/")
 		if len(repoParts) != 2 || repoParts[0] == "" || repoParts[1] == "" {
-			return nil, fmt.Errorf("repository must be in format 'owner/repo'. Example: githubnext/gh-aw")
+			return nil, fmt.Errorf("repository must be in format 'owner/repo'. Example: github/gh-aw")
 		}
 	}
 
