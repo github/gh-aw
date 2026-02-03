@@ -276,25 +276,29 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		}
 
 		// Build the command with agent file handling if specified
-		// Add PATH setup inside the AWF command to find npm-installed binaries and runtimes
+		// Add PATH setup and INSTRUCTION reading inside the AWF command
+		// This avoids Docker Compose interpolation issues with $ characters in the prompt
 		pathSetup := GetHostedToolcachePathSetup()
-		codexCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, codexCommand)
-		// Escape single quotes in the command by replacing ' with '\''
-		escapedCodexCommand := strings.ReplaceAll(codexCommandWithPath, "'", "'\\''")
-		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
 
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
+			// Read agent file and prompt inside AWF container
+			codexCommandWithSetup := fmt.Sprintf(`AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s && %s`, agentPath, pathSetup, codexCommand)
+			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
+			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
+
 			command = fmt.Sprintf(`set -o pipefail
-AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)"
-export INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
+			// Read prompt inside AWF container to avoid Docker Compose interpolation issues
+			codexCommandWithSetup := fmt.Sprintf(`INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s && %s`, pathSetup, codexCommand)
+			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
+			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
+
 			command = fmt.Sprintf(`set -o pipefail
-export INSTRUCTION="$(cat "$GH_AW_PROMPT")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
