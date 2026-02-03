@@ -1263,6 +1263,7 @@ Import shared components using the `imports:` field in frontmatter:
 on: issues
 engine: copilot
 imports:
+  - copilot-setup-steps.yml    # Import setup steps from copilot-setup-steps.yml
   - shared/security-notice.md
   - shared/tool-setup.md
   - shared/mcp/tavily.md
@@ -1289,6 +1290,31 @@ safe-outputs:
 
 Additional instructions for the coding agent.
 ```
+
+### Special Import: copilot-setup-steps.yml
+
+The `copilot-setup-steps.yml` file receives special handling when imported. Instead of importing the entire job structure, **only the steps** from the `copilot-setup-steps` job are extracted and inserted into your workflow's agent job.
+
+**Key behaviors:**
+- Only the steps array is imported (job metadata like `runs-on`, `permissions` is ignored)
+- Imported steps are placed **after** any custom steps defined in your workflow's frontmatter
+- Supports both `.yml` and `.yaml` extensions
+- Enables clean reuse of common setup configurations across workflows
+
+**Example:**
+```yaml
+---
+on: issue_comment
+engine: copilot
+imports:
+  - copilot-setup-steps.yml
+steps:
+  - name: Custom environment setup
+    run: echo "My custom setup runs first"
+---
+```
+
+In the compiled workflow, your custom steps run first, followed by the imported setup steps from `copilot-setup-steps.yml`.
 
 ## Permission Patterns
 
