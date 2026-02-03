@@ -243,13 +243,11 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// This handles already-quoted arguments correctly and prevents double-escaping
 	claudeCommand := shellJoinArgs(commandParts)
 
-	// In chroot mode (firewall enabled), PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
-	// which contains the complete host PATH with all setup-* action additions.
-	// For non-firewall mode, we still need the PATH setup.
-	if !isFirewallEnabled(workflowData) {
-		pathSetup := GetHostedToolcachePathSetup()
-		claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
-	}
+	// Prepend PATH setup to find claude binary and all runtimes
+	// Unlike Copilot which uses /usr/local/bin/copilot (full path), Claude uses 'claude' which
+	// needs PATH to be set. The PATH setup ensures npm-installed binaries are found.
+	pathSetup := GetHostedToolcachePathSetup()
+	claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 
 	// Add conditional model flag if not explicitly configured
 	// Check if this is a detection job (has no SafeOutputs config)

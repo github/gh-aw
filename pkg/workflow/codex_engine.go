@@ -273,10 +273,11 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			codexEngineLog.Print("Using standard AWF command")
 		}
 
-		// In chroot mode, PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
-		// which contains the complete host PATH with all setup-* action additions.
-		// No need for additional PATH reconstruction.
-		codexCommandWithPath := codexCommand
+		// Prepend PATH setup to find codex binary and all runtimes
+		// Unlike Copilot which uses /usr/local/bin/copilot (full path), Codex uses 'codex' which
+		// needs PATH to be set. The PATH setup ensures npm-installed binaries are found.
+		pathSetup := GetHostedToolcachePathSetup()
+		codexCommandWithPath := fmt.Sprintf("%s && %s", pathSetup, codexCommand)
 
 		// Build the command with agent file handling if specified
 		// With chroot mode, the host environment is inherited, so no setup commands are needed
