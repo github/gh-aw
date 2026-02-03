@@ -568,6 +568,7 @@ jobs:
       - name: Start Safe Outputs MCP HTTP Server
         id: safe-outputs-start
         env:
+          DEBUG: '*'
           GH_AW_SAFE_OUTPUTS_PORT: ${{ steps.safe-outputs-config.outputs.safe_outputs_port }}
           GH_AW_SAFE_OUTPUTS_API_KEY: ${{ steps.safe-outputs-config.outputs.safe_outputs_api_key }}
           GH_AW_SAFE_OUTPUTS_TOOLS_PATH: /opt/gh-aw/safeoutputs/tools.json
@@ -575,6 +576,7 @@ jobs:
           GH_AW_MCP_LOG_DIR: /tmp/gh-aw/mcp-logs/safeoutputs
         run: |
           # Environment variables are set above to prevent template injection
+          export DEBUG
           export GH_AW_SAFE_OUTPUTS_PORT
           export GH_AW_SAFE_OUTPUTS_API_KEY
           export GH_AW_SAFE_OUTPUTS_TOOLS_PATH
@@ -1063,6 +1065,7 @@ jobs:
       - name: Start Safe Inputs MCP HTTP Server
         id: safe-inputs-start
         env:
+          DEBUG: '*'
           GH_AW_SAFE_INPUTS_PORT: ${{ steps.safe-inputs-config.outputs.safe_inputs_port }}
           GH_AW_SAFE_INPUTS_API_KEY: ${{ steps.safe-inputs-config.outputs.safe_inputs_api_key }}
           GH_AW_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1070,6 +1073,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Environment variables are set above to prevent template injection
+          export DEBUG
           export GH_AW_SAFE_INPUTS_PORT
           export GH_AW_SAFE_INPUTS_API_KEY
           
