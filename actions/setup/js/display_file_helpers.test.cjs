@@ -24,8 +24,8 @@ describe("display_file_helpers", () => {
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.txt"));
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("Content of test.txt");
+        // Check group was started with just the filename
+        expect(mockCore.startGroup).toHaveBeenCalledWith("test.txt");
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("Line 1");

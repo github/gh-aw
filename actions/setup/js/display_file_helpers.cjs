@@ -45,8 +45,8 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
     const contentToDisplay = content.length > maxBytes ? content.substring(0, maxBytes) : content;
     const wasTruncated = content.length > maxBytes;
 
-    // Use collapsible group for file content
-    core.startGroup(`Content of ${fileName}`);
+    // Use collapsible group for file content with just the filename as title
+    core.startGroup(fileName);
     const lines = contentToDisplay.split("\n");
     for (const line of lines) {
       core.info(line);
