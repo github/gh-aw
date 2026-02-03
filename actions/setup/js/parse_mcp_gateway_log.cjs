@@ -56,17 +56,18 @@ function printAllGatewayFiles() {
                 const contentToDisplay = content.length > maxOutputBytes ? content.substring(0, maxOutputBytes) : content;
                 const wasTruncated = content.length > maxOutputBytes;
 
-                core.info(`    --- Content of ${file} ---`);
+                // Use collapsible group for file content
+                core.startGroup(`Content of ${file}`);
                 // Split content into lines without indentation
                 const lines = contentToDisplay.split("\n");
                 for (const line of lines) {
                   core.info(line);
                 }
                 if (wasTruncated) {
-                  core.info(`    ...`);
-                  core.info(`    (truncated, showing first ${maxOutputBytes} bytes of ${content.length} total)`);
+                  core.info(`...`);
+                  core.info(`(truncated, showing first ${maxOutputBytes} bytes of ${content.length} total)`);
                 }
-                core.info(`    --- End of ${file} ---`);
+                core.endGroup();
               } catch (/** @type {unknown} */ readError) {
                 const errorMessage = readError instanceof Error ? readError.message : String(readError);
                 core.info(`    (could not read file as text: ${errorMessage})`);

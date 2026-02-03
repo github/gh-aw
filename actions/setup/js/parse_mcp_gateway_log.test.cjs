@@ -343,7 +343,7 @@ Some content here.`;
         fs.writeFileSync(path.join(logsDir, "gateway.md"), "# Gateway Summary");
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to redirect to our test directories
@@ -416,7 +416,7 @@ Some content here.`;
 
     test("handles missing directories gracefully", () => {
       // Mock core
-      const mockCore = { info: vi.fn() };
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
       global.core = mockCore;
 
       // Mock fs to return false for directory existence
@@ -455,7 +455,7 @@ Some content here.`;
         fs.mkdirSync(logsDir, { recursive: true });
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
@@ -509,7 +509,7 @@ Some content here.`;
         fs.writeFileSync(path.join(logsDir, "large.log"), largeContent);
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
