@@ -356,7 +356,10 @@ From the prioritized and filtered list (issues WITHOUT Copilot assignments or op
 - ❌ **BAD**: Related issues that might have conflicting changes
 
 **If all issues are already being worked on:**
-- Output a message: "🍽️ All issues are already being worked on!"
+- Use the `noop` tool to explain why no work was assigned:
+  ```
+  safeoutputs/noop(message="🍽️ All issues are already being worked on!")
+  ```
 - **STOP** and do not proceed further
 
 **If fewer than 3 suitable separate issues are available:**
@@ -405,6 +408,7 @@ safeoutputs/add_comment(item_number=<issue_number>, body="🍪 **Issue Monster h
 - ✅ **Check assignments**: Skip issues already assigned to Copilot
 - ✅ **Sibling awareness**: For "task" or "plan" sub-issues, skip if any sibling already has an open Copilot PR
 - ✅ **Process in order**: For sub-issues of the same parent, process oldest first
+- ✅ **Always report outcome**: If no issues are assigned, use the `noop` tool to explain why
 - ❌ **Don't force batching**: If only 1-2 clearly separate issues exist, assign only those
 
 ## Success Criteria
@@ -425,9 +429,12 @@ A successful run means:
 
 ## Error Handling
 
-If anything goes wrong:
-- **No issues found**: Output a friendly message and stop gracefully
-- **All issues assigned**: Output a message and stop gracefully
-- **API errors**: Log the error clearly
+If anything goes wrong or no work can be assigned:
+- **No issues found**: Use the `noop` tool with message: "🍽️ No suitable candidate issues - the plate is empty!"
+- **All issues assigned**: Use the `noop` tool with message: "🍽️ All issues are already being worked on!"
+- **No suitable separate issues**: Use the `noop` tool explaining which issues were considered and why they couldn't be assigned (e.g., overlapping topics, sibling PRs, etc.)
+- **API errors**: Use the `missing_tool` or `missing_data` tool to report the issue
+
+**CRITICAL**: You MUST call at least one safe output tool every run. If you don't assign any issues, you MUST call the `noop` tool to explain why. Never complete a run without making at least one tool call.
 
 Remember: You're the Issue Monster! Stay hungry, work methodically, and let Copilot do the heavy lifting! 🍪 Om nom nom!
