@@ -21,7 +21,7 @@
 #
 # Reviews project documentation from the perspective of a Claude Code user who does not use GitHub Copilot or Copilot CLI
 #
-# frontmatter-hash: a0c1e1be42f2e76f584a2a87d03275b0c6b134011d2034f5e0feab0f30875cee
+# frontmatter-hash: 4cb214a25fb23e96a0adea565dceabe92bae49a644d773af070238a524f1c5d6
 
 name: "Claude Code User Documentation Review"
 "on":
@@ -415,7 +415,7 @@ jobs:
                   "GITHUB_LOCKDOWN_MODE": "$GITHUB_MCP_LOCKDOWN",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN",
                   "GITHUB_READ_ONLY": "1",
-                  "GITHUB_TOOLSETS": "context,repos,issues,pull_requests,discussions"
+                  "GITHUB_TOOLSETS": "context,repos,issues,pull_requests"
                 }
               },
               "safeoutputs": {

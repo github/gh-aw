@@ -31,7 +31,7 @@ safe-outputs:
 tools:
   cache-memory: true
   github:
-    toolsets: [default, discussions]
+    toolsets: [default]
   bash:
     - "*"
 
