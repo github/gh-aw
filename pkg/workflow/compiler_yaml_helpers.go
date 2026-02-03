@@ -99,6 +99,10 @@ func generatePlaceholderSubstitutionStep(yaml *strings.Builder, expressionMappin
 // when running in dev mode and not using the action-tag feature. This is used to
 // checkout the local actions before running the setup action.
 //
+// The checkout includes both the actions folder (for setup scripts) and the .github
+// folder (for workflow configurations and runtime imports). This ensures workflows
+// have access to .github folder content even when they don't have full repository checkout.
+//
 // Returns a slice of strings that can be appended to a steps array, where each
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - Not in dev or script mode
@@ -123,13 +127,14 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 			"          repository: github/gh-aw\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
+			"            .github\n",
 			"          path: /tmp/gh-aw/actions-source\n",
 			"          depth: 1\n",
 			"          persist-credentials: false\n",
 		}
 	}
 
-	// Dev mode: checkout local actions folder
+	// Dev mode: checkout local actions and .github folders
 	if c.actionMode.IsDev() {
 		return []string{
 			"      - name: Checkout actions folder\n",
@@ -137,6 +142,8 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 			"        with:\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
+			"            .github\n",
+			"          depth: 1\n",
 			"          persist-credentials: false\n",
 		}
 	}

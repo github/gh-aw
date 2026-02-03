@@ -61,6 +61,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -110,6 +112,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1591,6 +1595,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1703,6 +1709,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1798,6 +1806,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1842,6 +1852,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1886,6 +1898,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1921,6 +1935,8 @@ jobs:
         with:
           sparse-checkout: |
             actions
+            .github
+          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
