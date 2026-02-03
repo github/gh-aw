@@ -303,7 +303,7 @@ jobs:
           provenance: mode=max
 
   changesets:
-    needs: ["activation", "config", "release"]
+    needs: ["activation", "config", "release", "agent"]
     runs-on: ubuntu-latest
     permissions:
       contents: write

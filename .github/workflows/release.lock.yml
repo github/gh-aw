@@ -21,7 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# frontmatter-hash: c9708bda21d12a9562aa015ec98e9b1e13ed12edc2c85b192f054fa73d025c8b
+# frontmatter-hash: 62a5857122b3a2ff00cac78bc5db9fd961177658cbee4eba8187769c0fd15b7b
 
 name: "Release"
 "on":
@@ -78,7 +78,6 @@ jobs:
   agent:
     needs:
       - activation
-      - changesets
       - config
       - release
     runs-on: ubuntu-latest
@@ -757,6 +756,7 @@ jobs:
   changesets:
     needs:
       - activation
+      - agent
       - config
       - release
     runs-on: ubuntu-latest
