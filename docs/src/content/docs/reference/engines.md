@@ -33,16 +33,16 @@ Configuration options: `model` (gpt-5 or claude-sonnet-4), `version` (CLI versio
 
 ### Running Copilot CLI Locally
 
-To run the GitHub Copilot CLI on your local machine, use the GitHub CLI extension:
+To run the GitHub Copilot CLI on your local machine, use the `gh copilot` command:
 
 ```bash wrap
 gh copilot
 ```
 
-The `gh copilot` command automatically downloads and manages the Copilot CLI installation. No manual installation required!
+The `gh copilot` command is built into the GitHub CLI and automatically downloads and manages the Copilot CLI installation. No additional installation required - just install the [GitHub CLI](https://cli.github.com/)!
 
 > [!TIP]
-> The `gh copilot` command is built into the GitHub CLI and handles installation automatically. If the Copilot CLI is not already installed, it will be downloaded to `~/.local/share/gh/copilot`. To remove it, use `gh copilot --remove`.
+> If the Copilot CLI is not already installed, `gh copilot` will automatically download it to `~/.local/share/gh/copilot`. To remove it, use `gh copilot --remove`.
 
 ### Required Secrets
 

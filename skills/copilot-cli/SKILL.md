@@ -19,13 +19,13 @@ The GitHub Copilot CLI is an experimental AI-powered command-line interface that
 
 ## Installation and Setup
 
-The easiest way to run the Copilot CLI is through the GitHub CLI extension:
+The easiest way to run the Copilot CLI is through the built-in `gh copilot` command:
 
 ```bash
 gh copilot
 ```
 
-The `gh copilot` command automatically downloads and manages the Copilot CLI installation. No manual installation required! If the Copilot CLI is not already installed, it will be downloaded to `~/.local/share/gh/copilot`.
+The `gh copilot` command is built into the GitHub CLI and automatically downloads and manages the Copilot CLI installation. Just install the [GitHub CLI](https://cli.github.com/) and you're ready to go! If the Copilot CLI is not already installed, it will be downloaded to `~/.local/share/gh/copilot`.
 
 **Alternative: Manual npm installation** (for advanced users):
 
@@ -218,7 +218,7 @@ copilot --add-dir /tmp/gh-aw \
 ## Troubleshooting
 
 ### CLI Not Found
-When running locally, use the GitHub CLI extension which handles installation automatically:
+When running locally, use the built-in `gh copilot` command which handles installation automatically:
 ```bash
 gh copilot
 ```
