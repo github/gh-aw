@@ -1297,8 +1297,10 @@ The `copilot-setup-steps.yml` file receives special handling when imported. Inst
 
 **Key behaviors:**
 - Only the steps array is imported (job metadata like `runs-on`, `permissions` is ignored)
-- Imported steps are placed **at the start** of the agent job (before any custom steps)
-- Other imported steps (non-copilot-setup) are placed after custom steps
+- Imported steps are placed **at the start** of the agent job (before all other steps)
+- Other imported steps are placed after copilot-setup-steps but before main frontmatter steps
+- Main frontmatter steps come last
+- Final order: **copilot-setup-steps → other imported steps → main frontmatter steps**
 - Supports both `.yml` and `.yaml` extensions
 - Enables clean reuse of common setup configurations across workflows
 
@@ -1309,13 +1311,14 @@ on: issue_comment
 engine: copilot
 imports:
   - copilot-setup-steps.yml
+  - shared/common-tools.md
 steps:
   - name: Custom environment setup
-    run: echo "My custom setup runs after copilot setup"
+    run: echo "Main frontmatter step runs last"
 ---
 ```
 
-In the compiled workflow, the imported setup steps from `copilot-setup-steps.yml` run first, followed by your custom steps.
+In the compiled workflow, the order is: copilot-setup-steps → imported steps from shared/common-tools.md → main frontmatter steps.
 
 ## Permission Patterns
 

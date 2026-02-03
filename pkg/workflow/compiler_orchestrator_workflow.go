@@ -180,7 +180,7 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 		}
 	}
 
-	// Parse other imported steps if present (these go after custom steps)
+	// Parse other imported steps if present (these go after copilot-setup but before main steps)
 	var otherImportedSteps []any
 	if importsResult.MergedSteps != "" {
 		if err := yaml.Unmarshal([]byte(importsResult.MergedSteps), &otherImportedSteps); err == nil {
@@ -222,11 +222,12 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 
 	// Merge steps in the correct order:
 	// 1. copilot-setup-steps (at start)
-	// 2. custom steps (from frontmatter)
-	// 3. other imported steps (after custom steps)
+	// 2. other imported steps (after copilot-setup)
+	// 3. main frontmatter steps (last)
 	var allSteps []any
 	if len(copilotSetupSteps) > 0 || len(mainSteps) > 0 || len(otherImportedSteps) > 0 {
 		allSteps = append(allSteps, copilotSetupSteps...)
+		allSteps = append(allSteps, otherImportedSteps...)
 		allSteps = append(allSteps, mainSteps...)
 		allSteps = append(allSteps, otherImportedSteps...)
 
