@@ -18,6 +18,7 @@ engine:
   id: claude
   max-turns: 100
 imports:
+  - shared/structured-logging.md
   - shared/jqschema.md
 tools:
   agentic-workflows:
@@ -105,18 +106,35 @@ Analyze the comment content above and determine what action the user is requesti
 
 ### If Code Changes Are Needed:
 1. Use the **Serena MCP** for code analysis and understanding
+   ```bash
+   log_session_step "Phase 1: Analysis" "Analyzing code with Serena MCP"
+   ```
 2. Use the **gh-aw MCP** to inspect existing workflows if relevant
 3. Make necessary code changes using the **edit** tool
+   ```bash
+   log_session_step "Phase 2: Implementation" "Making code changes"
+   log_tool_call "edit" "true" "Modified N files"
+   ```
 4. **ALWAYS create a new pull request** via the `create-pull-request` safe output (do not push directly to existing branches)
+   ```bash
+   log_session_step "Phase 3: PR Creation" "Creating pull request"
+   ```
 5. **ALWAYS add a glamorous comment** on the original conversation thread with a summary of changes made (using the `add-comment` safe output)
 
 ### If Web Automation Is Needed:
 1. Use **Playwright** to interact with web pages
+   ```bash
+   log_session_step "Web Automation" "Using Playwright for web interaction"
+   log_tool_call "playwright" "true" "Successfully automated web task"
+   ```
 2. Gather required information
 3. **ALWAYS add a comment** with your findings and summary
 
 ### If Analysis/Response Is Needed:
 1. Analyze the request using available tools
+   ```bash
+   log_session_step "Analysis" "Analyzing request and gathering data"
+   ```
 2. Use **JQ schema** for JSON structure discovery if working with API data
 3. Store context in **cache memory** if needed for multi-step reasoning
 4. **ALWAYS provide a comprehensive response** via the `add-comment` safe output
@@ -192,3 +210,31 @@ Now analyze the content above and execute the appropriate action. Remember:
 - ✅ Add 👍 reaction after posting comments
 - ❌ Never modify `.github/.workflows` directory
 - ❌ Don't make changes without understanding the request
+
+**CRITICAL - Log Session Completion:**
+
+When your work is complete, log the session end:
+
+```bash
+# If successful:
+log_session_end "success" "Completed task: [brief summary of what was done]"
+
+# If failed:
+log_session_end "failure" "Error during task: [brief description]"
+```
+
+This ensures your session is captured in the session analysis for learning and improvement.
+
+**CRITICAL - Log Session Completion:**
+
+When your work is complete, log the session end:
+
+```bash
+# If successful:
+log_session_end "success" "Completed task: [brief summary of what was done]"
+
+# If failed:
+log_session_end "failure" "Error during task: [brief description]"
+```
+
+This ensures your session is captured in the session analysis for learning and improvement.

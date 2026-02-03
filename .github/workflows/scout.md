@@ -16,6 +16,7 @@ permissions:
 roles: [admin, maintainer, write]
 engine: claude
 imports:
+  - shared/structured-logging.md
   - shared/reporting.md
   - shared/mcp/arxiv.md
   - shared/mcp/tavily.md
@@ -65,10 +66,25 @@ When invoked with the `/scout` command in an issue or pull request comment, OR m
 
 ## Research Process
 
+### 0. Initialize Logging
+
+**IMPORTANT - Start Session Logging:**
+
+Before beginning research, initialize structured logging:
+
+```bash
+source /tmp/gh-aw/log-helpers.sh
+log_session_start "Scout" "Research: ${{ needs.activation.outputs.text }}"
+```
+
 ### 1. Context Analysis
 - Read the issue/PR title and body to understand the topic
 - Analyze the triggering comment to understand the specific research request
 - Identify key topics, questions, or problems that need investigation
+
+```bash
+log_session_step "Phase 1: Context Analysis" "Analyzed research request and identified key topics"
+```
 
 ### 2. Research Strategy
 - Formulate targeted search queries based on the context
@@ -79,7 +95,15 @@ When invoked with the `/scout` command in an issue or pull request comment, OR m
   - **arXiv**: Academic research papers and preprints for scientific and technical topics
 - Conduct multiple searches from different angles if needed
 
+```bash
+log_session_step "Phase 2: Research Strategy" "Formulated search queries and research plan"
+```
+
 ### 3. Deep Investigation
+
+```bash
+log_session_step "Phase 3: Investigation" "Conducting research using available tools"
+```
 - For each search result, evaluate:
   - **Relevance**: How directly it addresses the issue
   - **Authority**: Source credibility and expertise
@@ -88,7 +112,17 @@ When invoked with the `/scout` command in an issue or pull request comment, OR m
 - Follow up on promising leads with additional searches
 - Cross-reference information from multiple sources
 
+```bash
+# Log each tool usage
+log_tool_call "tavily_search" "true" "Found N relevant results"
+log_tool_call "arxiv_search" "true" "Found M academic papers"
+```
+
 ### 4. Synthesis and Reporting
+
+```bash
+log_session_step "Phase 4: Synthesis" "Synthesizing findings and creating report"
+```
 Create a comprehensive research summary that includes:
 - **Executive Summary**: Quick overview of key findings
 - **Main Findings**: Detailed research results organized by topic
@@ -185,3 +219,20 @@ Focus on the most relevant and actionable information. Avoid overwhelming detail
 - **Attribution**: Always cite your sources with proper links
 
 Remember: Your goal is to provide valuable, actionable intelligence that helps resolve the issue or improve the pull request. Make every search count and synthesize information effectively.
+
+**CRITICAL - Log Session Completion:**
+
+When your research is complete, log the session end:
+
+```bash
+# If research successful:
+log_session_end "success" "Completed research, found N sources, posted comprehensive report"
+
+# If no findings:
+log_session_end "success" "Completed research, no relevant findings, posted null result report"
+
+# If failed:
+log_session_end "failure" "Error during research: [brief description]"
+```
+
+This ensures your session is captured in the session analysis for learning and improvement.

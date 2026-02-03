@@ -28,6 +28,7 @@ safe-outputs:
     run-failure: "🔬 Lens cracked! [{workflow_name}]({run_url}) {status}. Some nitpicks remain undetected..."
 timeout-minutes: 15
 imports:
+  - shared/structured-logging.md
   - shared/reporting.md
 ---
 
@@ -54,7 +55,20 @@ You are a detail-oriented code reviewer specialized in identifying subtle, non-l
 
 Review the code changes in this pull request for subtle nitpicks that linters typically miss, then generate a comprehensive report.
 
+**IMPORTANT - Initialize Session Logging:**
+
+Before starting your review, initialize structured logging:
+
+```bash
+source /tmp/gh-aw/log-helpers.sh
+log_session_start "PR Nitpick Reviewer" "Review PR #${{ github.event.pull_request.number }}"
+```
+
 ### Step 1: Check Memory Cache
+
+```bash
+log_session_step "Step 1: Memory Cache" "Loading previous review patterns from cache"
+```
 
 Use the cache memory at `/tmp/gh-aw/cache-memory/` to:
 - Check if you've reviewed this repository before
@@ -90,6 +104,10 @@ Use the cache memory at `/tmp/gh-aw/cache-memory/` to:
 
 ### Step 2: Fetch Pull Request Details
 
+```bash
+log_session_step "Step 2: Fetch PR Data" "Fetching PR details and changed files"
+```
+
 Use the GitHub tools to get complete PR information:
 
 1. **Get PR details** for PR #${{ github.event.pull_request.number }}
@@ -97,7 +115,15 @@ Use the GitHub tools to get complete PR information:
 3. **Get PR diff** to see exact line-by-line changes
 4. **Review PR comments** to avoid duplicating existing feedback
 
+```bash
+log_tool_call "github_pr_read" "true" "Fetched PR data: N files, M lines changed"
+```
+
 ### Step 3: Analyze Code for Nitpicks
+
+```bash
+log_session_step "Step 3: Analysis" "Analyzing code for nitpicks"
+```
 
 Look for **non-linter** issues such as:
 
@@ -141,6 +167,10 @@ Look for **non-linter** issues such as:
 - **Code grouping** - Related functions not grouped together
 
 ### Step 4: Create Review Feedback
+
+```bash
+log_session_step "Step 4: Feedback" "Creating review comments and summary"
+```
 
 For each nitpick found, decide on the appropriate output type:
 
@@ -190,6 +220,10 @@ For each nitpick found, decide on the appropriate output type:
 - **Learning resources** - Links and explanations for common issues
 
 ### Step 5: Generate Daily Summary Report
+
+```bash
+log_session_step "Step 5: Report" "Generating comprehensive summary report"
+```
 
 Create a comprehensive markdown report using the imported `reporting.md` format:
 
@@ -270,6 +304,10 @@ Things done well in this PR:
 ```
 
 ### Step 6: Update Memory Cache
+
+```bash
+log_session_step "Step 6: Cache Update" "Updating memory cache with review patterns"
+```
 
 After completing the review, update cache memory files:
 
@@ -384,3 +422,20 @@ A successful review:
 - **Respect time** - Author's time is valuable; make feedback count
 
 Now begin your review! 🔍
+
+**CRITICAL - Log Session Completion:**
+
+When your review is complete, log the session end:
+
+```bash
+# If successful:
+log_session_end "success" "Reviewed PR #N, found X nitpicks, posted Y comments"
+
+# If no nitpicks found:
+log_session_end "success" "Reviewed PR #N, no nitpicks found, code quality excellent"
+
+# If failed:
+log_session_end "failure" "Error during review: [brief description]"
+```
+
+This ensures your session is captured in the session analysis for learning and improvement.

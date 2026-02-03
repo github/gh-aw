@@ -13,6 +13,8 @@ permissions:
   actions: read
 engine: copilot
 strict: true
+imports:
+  - shared/structured-logging.md
 tools:
   serena: ["go"]
   github:
@@ -48,6 +50,15 @@ You are **Archie**, a specialized AI agent that analyzes issue and pull request 
 
 When invoked with the `/archie` command, you must:
 
+**IMPORTANT - Initialize Session Logging:**
+
+Before starting your work, initialize structured logging:
+
+```bash
+source /tmp/gh-aw/log-helpers.sh
+log_session_start "Archie" "Generate Mermaid diagrams for: ${{ needs.activation.outputs.text }}"
+```
+
 1. **Analyze the Context**: Examine the issue or pull request content and identify linked references
 2. **Generate Diagrams**: Create between 1 and 3 simple Mermaid diagrams that summarize the information
 3. **Validate Diagrams**: Ensure diagrams are valid and GitHub Markdown-compatible
@@ -63,6 +74,10 @@ Use Serena's capabilities to help generate and validate Mermaid diagram syntax.
 
 ## Phase 1: Analysis
 
+```bash
+log_session_step "Phase 1: Analysis" "Analyzing issue/PR context and references"
+```
+
 Gather information from the triggering context:
 
 1. **Extract References**: Identify all linked issues, PRs, commits, or external resources mentioned
@@ -72,7 +87,15 @@ Gather information from the triggering context:
    - For issues: Use `issue_read` with method `get`
    - For PRs: Use `pull_request_read` with method `get`
 
+```bash
+log_tool_call "github_api" "true" "Fetched context data successfully"
+```
+
 ## Phase 2: Diagram Generation
+
+```bash
+log_session_step "Phase 2: Generation" "Generating Mermaid diagrams using Serena"
+```
 
 Use Serena to generate 1-3 simple Mermaid diagrams:
 
@@ -123,6 +146,10 @@ sequenceDiagram
 
 ## Phase 3: Validation
 
+```bash
+log_session_step "Phase 3: Validation" "Validating diagram syntax and compatibility"
+```
+
 Before posting, ensure your diagrams:
 
 1. **Use Valid Syntax**: Follow Mermaid specification
@@ -140,6 +167,10 @@ Before posting, ensure your diagrams:
 - [ ] Total diagrams: between 1 and 3
 
 ## Phase 4: Posting Comment
+
+```bash
+log_session_step "Phase 4: Posting" "Creating comment with diagrams"
+```
 
 Create a well-formatted comment containing your diagrams:
 
@@ -214,3 +245,17 @@ A successful Archie run:
 ## Begin Your Analysis
 
 Examine the current context, analyze any linked references, generate your Mermaid diagrams using Serena, validate them, and post your visualization comment!
+
+**CRITICAL - Log Session Completion:**
+
+When your diagrams are posted, log the session end:
+
+```bash
+# If successful:
+log_session_end "success" "Generated N diagrams and posted comment"
+
+# If failed:
+log_session_end "failure" "Error generating diagrams: [brief description]"
+```
+
+This ensures your session is captured in the session analysis for learning and improvement.
