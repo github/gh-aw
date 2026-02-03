@@ -41,7 +41,7 @@ Test workflow that should get a full repository checkout.
 			description:          "When full repo checkout is added, .github sparse checkout should be skipped",
 		},
 		{
-			name: "custom_checkout_keeps_github_sparse",
+			name: "custom_checkout_skips_github_sparse",
 			workflowContent: `---
 on: push
 permissions:
@@ -55,9 +55,9 @@ steps:
 # Test workflow with custom checkout
 Test workflow with custom checkout in steps.
 `,
-			expectGitHubCheckout: true,
+			expectGitHubCheckout: false,
 			expectFullCheckout:   false,
-			description:          "When custom checkout exists, .github sparse checkout is still needed (no automatic full checkout)",
+			description:          "When custom checkout exists, .github sparse checkout is skipped (redundant with full checkout)",
 		},
 		{
 			name: "no_permissions_no_checkouts",
