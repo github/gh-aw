@@ -162,7 +162,7 @@ func TestParseDiscussionsConfigFallbackToIssue(t *testing.T) {
 		{
 			name: "explicit fallback-to-issue true",
 			config: map[string]any{
-				"category":           "general",
+				"category":          "general",
 				"fallback-to-issue": true,
 			},
 			expectedFallback: boolPtr(true),
@@ -170,7 +170,7 @@ func TestParseDiscussionsConfigFallbackToIssue(t *testing.T) {
 		{
 			name: "explicit fallback-to-issue false",
 			config: map[string]any{
-				"category":           "general",
+				"category":          "general",
 				"fallback-to-issue": false,
 			},
 			expectedFallback: boolPtr(false),
