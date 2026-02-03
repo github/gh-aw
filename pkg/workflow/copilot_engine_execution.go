@@ -247,82 +247,17 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// Get allowed domains (copilot defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetCopilotAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: mount points + standard flags + custom args from config
+		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
+		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
+		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
 		var awfArgs []string
-		awfArgs = append(awfArgs, "--env-all")
-
-		// Add mirrored environment variables from the runner
-		// These runner-level env vars (JAVA_HOME_*, ANDROID_HOME, etc.) need explicit --env flags
-		// to be passed through to the container. AWF only passes them if they exist on the host.
-		mirroredEnvArgs := GetMirroredEnvArgs()
-		awfArgs = append(awfArgs, mirroredEnvArgs...)
-		copilotExecLog.Printf("Added %d mirrored environment variable arguments", len(mirroredEnvArgs)/2)
-
-		// Add GH_AW_TOOL_BINS env arg for PATH priority (computed by GetToolBinsSetup on runner)
-		// This passes the pre-computed tool bin paths to the container, avoiding shell injection
-		awfArgs = append(awfArgs, GetToolBinsEnvArg()...)
+		awfArgs = append(awfArgs, "--enable-chroot")
+		copilotExecLog.Print("Enabled chroot mode for transparent host access")
 
 		// Set container working directory to match GITHUB_WORKSPACE
 		// This ensures pwd inside the container matches what the prompt tells the AI
 		awfArgs = append(awfArgs, "--container-workdir", "\"${GITHUB_WORKSPACE}\"")
 		copilotExecLog.Print("Set container working directory to GITHUB_WORKSPACE")
-
-		// Add mount arguments for required paths
-		// Always mount /tmp for temporary files and cache
-		awfArgs = append(awfArgs, "--mount", "/tmp:/tmp:rw")
-
-		// Mount the user's cache directory for Go build cache, npm cache, etc.
-		awfArgs = append(awfArgs, "--mount", "\"${HOME}/.cache:${HOME}/.cache:rw\"")
-
-		// Always mount the workspace directory so Copilot CLI can access it
-		// Use double quotes to allow shell variable expansion
-		awfArgs = append(awfArgs, "--mount", "\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"")
-		copilotExecLog.Print("Added workspace mount to AWF")
-
-		// Mount host binaries into the container so they're available inside the sandboxed environment
-		// These are organized by priority based on usage frequency in workflows:
-		//
-		// Essential utilities (most commonly used):
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cat:/usr/bin/cat:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/curl:/usr/bin/curl:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/date:/usr/bin/date:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/find:/usr/bin/find:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/gh:/usr/bin/gh:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/grep:/usr/bin/grep:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/jq:/usr/bin/jq:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/yq:/usr/bin/yq:ro")
-		//
-		// Common utilities (frequently used for file operations):
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cp:/usr/bin/cp:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/cut:/usr/bin/cut:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/diff:/usr/bin/diff:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/head:/usr/bin/head:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/ls:/usr/bin/ls:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/mkdir:/usr/bin/mkdir:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/rm:/usr/bin/rm:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/sed:/usr/bin/sed:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/sort:/usr/bin/sort:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/tail:/usr/bin/tail:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/wc:/usr/bin/wc:ro")
-		awfArgs = append(awfArgs, "--mount", "/usr/bin/which:/usr/bin/which:ro")
-
-		// Mount copilot CLI binary from /usr/local/bin (where the installer script places it)
-		awfArgs = append(awfArgs, "--mount", "/usr/local/bin/copilot:/usr/local/bin/copilot:ro")
-
-		// Mount .copilot directory for MCP configuration
-		// XDG_CONFIG_HOME is set to /home/runner, so Copilot CLI looks for config at /home/runner/.copilot/mcp-config.json
-		// Mount host /home/runner/.copilot to container /home/runner/.copilot with read-write access for CLI state/logs
-		awfArgs = append(awfArgs, "--mount", "/home/runner/.copilot:/home/runner/.copilot:rw")
-		copilotExecLog.Print("Added host binaries, copilot binary, and .copilot config directory mounts to AWF container")
-
-		// Mount the hostedtoolcache directory (where actions/setup-* installs tools like Go, Node, Python, etc.)
-		// The PATH is already passed via --env-all, so tools installed by setup actions are accessible
-		awfArgs = append(awfArgs, "--mount", "/opt/hostedtoolcache:/opt/hostedtoolcache:ro")
-		copilotExecLog.Print("Added hostedtoolcache mount to AWF container")
-
-		// Mount /opt/gh-aw as readonly for script and configuration files
-		awfArgs = append(awfArgs, "--mount", "/opt/gh-aw:/opt/gh-aw:ro")
-		copilotExecLog.Print("Added /opt/gh-aw mount as readonly to AWF container")
 
 		// Add custom mounts from agent config if specified
 		if agentConfig != nil && len(agentConfig.Mounts) > 0 {
@@ -409,16 +344,11 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// With escaping, the entire command is passed to AWF as a single argument
 		escapedCommand := shellEscapeArg(copilotCommandWithPath)
 
-		// Get the tool bins setup command that computes GH_AW_TOOL_BINS on the runner side
-		// This avoids shell injection by computing paths where they are trusted
-		toolBinsSetup := GetToolBinsSetup()
-
+		// With chroot mode, the host environment is inherited, so no setup commands are needed
 		command = fmt.Sprintf(`set -o pipefail
-%s
-mkdir -p "$HOME/.cache"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), escapedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), escapedCommand, shellEscapeArg(logFile))
 	} else {
 		// Run copilot command without AWF wrapper
 		command = fmt.Sprintf(`set -o pipefail
