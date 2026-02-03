@@ -30,6 +30,7 @@ func generateSerenaLocalModeSteps(yaml *strings.Builder) {
 	yaml.WriteString("      - name: Start Serena MCP HTTP Server\n")
 	yaml.WriteString("        id: serena-start\n")
 	yaml.WriteString("        env:\n")
+	yaml.WriteString("          DEBUG: '*'\n")
 	yaml.WriteString("          GH_AW_SERENA_PORT: ${{ steps.serena-config.outputs.serena_port }}\n")
 	yaml.WriteString("          GITHUB_WORKSPACE: ${{ github.workspace }}\n")
 	yaml.WriteString("        run: bash /opt/gh-aw/actions/start_serena_server.sh\n")

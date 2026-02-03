@@ -20,8 +20,8 @@ echo "  Project: $GITHUB_WORKSPACE"
   echo ""
 } > /tmp/gh-aw/serena/logs/server.log
 
-# Start Serena with uvx in background
-nohup uvx --from git+https://github.com/oraios/serena serena start-mcp-server \
+# Start Serena with uvx in background with DEBUG enabled
+nohup env DEBUG="*" uvx --from git+https://github.com/oraios/serena serena start-mcp-server \
   --transport streamable-http \
   --port "${GH_AW_SERENA_PORT}" \
   --context copilot \
@@ -45,6 +45,13 @@ for i in {1..30}; do
   # Check if server is responding
   if curl -s -o /dev/null -w '%{http_code}' "http://localhost:${GH_AW_SERENA_PORT}/health" | grep -q "200"; then
     echo "Serena MCP server is ready (attempt $i/30)"
+    
+    # Print the startup log for debugging
+    echo "::notice::Serena MCP Server Startup Log"
+    echo "::group::Server Log Contents"
+    cat /tmp/gh-aw/serena/logs/server.log
+    echo "::endgroup::"
+    
     break
   fi
   

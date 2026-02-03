@@ -81,9 +81,9 @@ mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
   echo ""
 } > /tmp/gh-aw/mcp-logs/safeoutputs/server.log
 
-# Start the HTTP server in the background
+# Start the HTTP server in the background with DEBUG enabled
 echo "Starting safe-outputs MCP HTTP server..."
-node mcp-server.cjs >> /tmp/gh-aw/mcp-logs/safeoutputs/server.log 2>&1 &
+DEBUG="*" node mcp-server.cjs >> /tmp/gh-aw/mcp-logs/safeoutputs/server.log 2>&1 &
 SERVER_PID=$!
 echo "Started safe-outputs MCP server with PID $SERVER_PID"
 
@@ -101,6 +101,13 @@ for i in {1..60}; do
   # Check if server is responding
   if curl -s -f "http://localhost:$GH_AW_SAFE_OUTPUTS_PORT/health" > /dev/null 2>&1; then
     echo "Safe Outputs MCP server is ready (attempt $i/60)"
+    
+    # Print the startup log for debugging
+    echo "::notice::Safe Outputs MCP Server Startup Log"
+    echo "::group::Server Log Contents"
+    cat /tmp/gh-aw/mcp-logs/safeoutputs/server.log
+    echo "::endgroup::"
+    
     break
   fi
   

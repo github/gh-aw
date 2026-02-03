@@ -81,9 +81,9 @@ mkdir -p /tmp/gh-aw/safe-inputs/logs
   echo ""
 } > /tmp/gh-aw/safe-inputs/logs/server.log
 
-# Start the HTTP server in the background
+# Start the HTTP server in the background with DEBUG enabled
 echo "Starting safe-inputs MCP HTTP server..."
-node mcp-server.cjs >> /tmp/gh-aw/safe-inputs/logs/server.log 2>&1 &
+DEBUG="*" node mcp-server.cjs >> /tmp/gh-aw/safe-inputs/logs/server.log 2>&1 &
 SERVER_PID=$!
 echo "Started safe-inputs MCP server with PID $SERVER_PID"
 
@@ -101,6 +101,13 @@ for i in {1..10}; do
   # Check if server is responding
   if curl -s -f "http://localhost:$GH_AW_SAFE_INPUTS_PORT/health" > /dev/null 2>&1; then
     echo "Safe Inputs MCP server is ready (attempt $i/10)"
+    
+    # Print the startup log for debugging
+    echo "::notice::Safe Inputs MCP Server Startup Log"
+    echo "::group::Server Log Contents"
+    cat /tmp/gh-aw/safe-inputs/logs/server.log
+    echo "::endgroup::"
+    
     break
   fi
   
