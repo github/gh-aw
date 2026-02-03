@@ -111,6 +111,54 @@ function isPermissionsError(errorMessage) {
 }
 
 /**
+ * Handles fallback to create-issue when discussion creation fails
+ * @param {Function} createIssueHandler - The create_issue handler function
+ * @param {Object} item - The original discussion message item
+ * @param {string} qualifiedItemRepo - The qualified repository name (owner/repo)
+ * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
+ * @param {string} contextMessage - Context-specific error message prefix
+ * @returns {Promise<Object>} Result with success/error status
+ */
+async function handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, contextMessage) {
+  try {
+    // Prepare issue message with a note about the fallback
+    const fallbackNote = `\n\n---\n\n> **Note:** This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.\n`;
+    const issueMessage = {
+      ...item,
+      body: (item.body || "") + fallbackNote,
+      repo: qualifiedItemRepo,
+    };
+
+    // Call the create_issue handler
+    const issueResult = await createIssueHandler(issueMessage, resolvedTemporaryIds);
+
+    if (issueResult.success) {
+      core.info(`✓ Successfully created issue ${issueResult.repo}#${issueResult.number} as fallback`);
+      return {
+        success: true,
+        repo: issueResult.repo,
+        number: issueResult.number,
+        url: issueResult.url,
+        fallback: "issue", // Indicate this was a fallback
+      };
+    } else {
+      core.error(`Fallback to create-issue also failed: ${issueResult.error}`);
+      return {
+        success: false,
+        error: `${contextMessage} and fallback to issue also failed: ${issueResult.error}`,
+      };
+    }
+  } catch (fallbackError) {
+    const fallbackErrorMessage = getErrorMessage(fallbackError);
+    core.error(`Fallback to create-issue failed: ${fallbackErrorMessage}`);
+    return {
+      success: false,
+      error: `${contextMessage} and fallback to issue threw an error: ${fallbackErrorMessage}`,
+    };
+  }
+}
+
+/**
  * Main handler factory for create_discussion
  * Returns a message handler function that processes individual create_discussion messages
  * @type {HandlerFactoryFunction}
@@ -245,42 +293,7 @@ async function main(config = {}) {
           core.warning(`Failed to fetch discussion info due to permissions: ${errorMessage}`);
           core.info(`Falling back to create-issue for ${qualifiedItemRepo}`);
 
-          try {
-            // Prepare issue message with a note about the fallback
-            const fallbackNote = `\n\n---\n\n> **Note:** This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.\n`;
-            const issueMessage = {
-              ...item,
-              body: (item.body || "") + fallbackNote,
-              repo: qualifiedItemRepo,
-            };
-
-            // Call the create_issue handler
-            const issueResult = await createIssueHandler(issueMessage, resolvedTemporaryIds);
-
-            if (issueResult.success) {
-              core.info(`✓ Successfully created issue ${issueResult.repo}#${issueResult.number} as fallback`);
-              return {
-                success: true,
-                repo: issueResult.repo,
-                number: issueResult.number,
-                url: issueResult.url,
-                fallback: "issue", // Indicate this was a fallback
-              };
-            } else {
-              core.error(`Fallback to create-issue also failed: ${issueResult.error}`);
-              return {
-                success: false,
-                error: `Failed to fetch discussion info and fallback to issue also failed: ${issueResult.error}`,
-              };
-            }
-          } catch (fallbackError) {
-            const fallbackErrorMessage = getErrorMessage(fallbackError);
-            core.error(`Fallback to create-issue failed: ${fallbackErrorMessage}`);
-            return {
-              success: false,
-              error: `Failed to fetch discussion info and fallback to issue threw an error: ${fallbackErrorMessage}`,
-            };
-          }
+          return await handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, "Failed to fetch discussion info");
         }
 
         // No fallback or not a permissions error - return original error
@@ -410,42 +423,7 @@ async function main(config = {}) {
         core.warning(`Discussion creation failed due to permissions: ${errorMessage}`);
         core.info(`Falling back to create-issue for ${qualifiedItemRepo}`);
 
-        try {
-          // Prepare issue message with a note about the fallback
-          const fallbackNote = `\n\n---\n\n> **Note:** This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.\n`;
-          const issueMessage = {
-            ...item,
-            body: (item.body || "") + fallbackNote,
-            repo: qualifiedItemRepo,
-          };
-
-          // Call the create_issue handler
-          const issueResult = await createIssueHandler(issueMessage, resolvedTemporaryIds);
-
-          if (issueResult.success) {
-            core.info(`✓ Successfully created issue ${issueResult.repo}#${issueResult.number} as fallback`);
-            return {
-              success: true,
-              repo: issueResult.repo,
-              number: issueResult.number,
-              url: issueResult.url,
-              fallback: "issue", // Indicate this was a fallback
-            };
-          } else {
-            core.error(`Fallback to create-issue also failed: ${issueResult.error}`);
-            return {
-              success: false,
-              error: `Discussion creation failed and fallback to issue also failed: ${issueResult.error}`,
-            };
-          }
-        } catch (fallbackError) {
-          const fallbackErrorMessage = getErrorMessage(fallbackError);
-          core.error(`Fallback to create-issue failed: ${fallbackErrorMessage}`);
-          return {
-            success: false,
-            error: `Discussion creation failed and fallback to issue threw an error: ${fallbackErrorMessage}`,
-          };
-        }
+        return await handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, "Discussion creation failed");
       }
 
       // No fallback or not a permissions error - return original error
