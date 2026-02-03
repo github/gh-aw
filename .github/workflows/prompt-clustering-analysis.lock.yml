@@ -119,6 +119,19 @@ jobs:
           persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
+      - name: Install additional ML libraries
+        run: |
+          pip3 install --user scikit-learn nltk
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Download full PR data with comments and reviews
+        run: "# Create output directory for full PR data\nmkdir -p /tmp/gh-aw/prompt-cache/pr-full-data\n\n# Download full data for each PR including comments, reviews, commits, and files\necho \"Downloading full PR data for each PR...\"\n\nPR_COUNT=$(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)\necho \"Processing $PR_COUNT PRs...\"\n\n# Extract PR numbers and download full data for each\njq -r '.[].number' /tmp/gh-aw/pr-data/copilot-prs.json | while read -r pr_number; do\n  echo \"Downloading full data for PR #$pr_number...\"\n  \n  # Download full PR data with essential fields only\n  gh pr view \"$pr_number\" \\\n    --repo \"${{ github.repository }}\" \\\n    --json number,title,body,state,createdAt,closedAt,mergedAt,url,comments,reviews,commits,changedFiles,additions,deletions,reviewDecision \\\n    > \"/tmp/gh-aw/prompt-cache/pr-full-data/pr-${pr_number}.json\"\n  \n  echo \"Downloaded PR #$pr_number\"\ndone\n\n# Create an index file listing all downloaded PRs\nfind /tmp/gh-aw/prompt-cache/pr-full-data/ -maxdepth 1 -name 'pr-[0-9]*.json' -type f -printf '%f\\n' | \\\n  sed 's/pr-\\([0-9]*\\)\\.json/\\1/' | sort -n > /tmp/gh-aw/prompt-cache/pr-full-data/index.txt\n\necho \"Full PR data cached in /tmp/gh-aw/prompt-cache/pr-full-data/\"\necho \"Total PRs with full data: $(wc -l < /tmp/gh-aw/prompt-cache/pr-full-data/index.txt)\"\n"
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Download workflow logs for PR analysis
+        run: "# Create logs directory\nmkdir -p /tmp/gh-aw/workflow-logs\n\necho \"Downloading workflow logs to extract turn counts...\"\n\n# Download logs for the last 30 days of copilot workflows\n# This will give us the aw_info.json which contains turn counts\n./gh-aw logs --engine copilot --start-date -30d -o /tmp/gh-aw/workflow-logs\n\n# Verify logs were downloaded\necho \"Downloaded workflow logs:\"\nfind /tmp/gh-aw/workflow-logs -maxdepth 1 -ls\n"
       - name: Setup jq utilities directory
         run: "mkdir -p /tmp/gh-aw\ncat > /tmp/gh-aw/jqschema.sh << 'EOF'\n#!/usr/bin/env bash\n# jqschema.sh\njq -c '\ndef walk(f):\n  . as $in |\n  if type == \"object\" then\n    reduce keys[] as $k ({}; . + {($k): ($in[$k] | walk(f))})\n  elif type == \"array\" then\n    if length == 0 then [] else [.[0] | walk(f)] end\n  else\n    type\n  end;\nwalk(.)\n'\nEOF\nchmod +x /tmp/gh-aw/jqschema.sh"
       - env:
@@ -148,19 +161,6 @@ jobs:
             /tmp/gh-aw/python/*.py
             /tmp/gh-aw/python/data/*
           retention-days: 30
-      - name: Install additional ML libraries
-        run: |
-          pip3 install --user scikit-learn nltk
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Download full PR data with comments and reviews
-        run: "# Create output directory for full PR data\nmkdir -p /tmp/gh-aw/prompt-cache/pr-full-data\n\n# Download full data for each PR including comments, reviews, commits, and files\necho \"Downloading full PR data for each PR...\"\n\nPR_COUNT=$(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)\necho \"Processing $PR_COUNT PRs...\"\n\n# Extract PR numbers and download full data for each\njq -r '.[].number' /tmp/gh-aw/pr-data/copilot-prs.json | while read -r pr_number; do\n  echo \"Downloading full data for PR #$pr_number...\"\n  \n  # Download full PR data with essential fields only\n  gh pr view \"$pr_number\" \\\n    --repo \"${{ github.repository }}\" \\\n    --json number,title,body,state,createdAt,closedAt,mergedAt,url,comments,reviews,commits,changedFiles,additions,deletions,reviewDecision \\\n    > \"/tmp/gh-aw/prompt-cache/pr-full-data/pr-${pr_number}.json\"\n  \n  echo \"Downloaded PR #$pr_number\"\ndone\n\n# Create an index file listing all downloaded PRs\nfind /tmp/gh-aw/prompt-cache/pr-full-data/ -maxdepth 1 -name 'pr-[0-9]*.json' -type f -printf '%f\\n' | \\\n  sed 's/pr-\\([0-9]*\\)\\.json/\\1/' | sort -n > /tmp/gh-aw/prompt-cache/pr-full-data/index.txt\n\necho \"Full PR data cached in /tmp/gh-aw/prompt-cache/pr-full-data/\"\necho \"Total PRs with full data: $(wc -l < /tmp/gh-aw/prompt-cache/pr-full-data/index.txt)\"\n"
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Download workflow logs for PR analysis
-        run: "# Create logs directory\nmkdir -p /tmp/gh-aw/workflow-logs\n\necho \"Downloading workflow logs to extract turn counts...\"\n\n# Download logs for the last 30 days of copilot workflows\n# This will give us the aw_info.json which contains turn counts\n./gh-aw logs --engine copilot --start-date -30d -o /tmp/gh-aw/workflow-logs\n\n# Verify logs were downloaded\necho \"Downloaded workflow logs:\"\nfind /tmp/gh-aw/workflow-logs -maxdepth 1 -ls\n"
 
       # Cache configuration from frontmatter processed below
       - name: Cache (prompt-clustering-cache-${{ github.run_id }})
