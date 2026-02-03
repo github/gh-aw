@@ -256,6 +256,52 @@ func initializeBasicRepository(verbose bool) error {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
 	}
 
+	// Write campaign prompts
+	initLog.Print("Writing agentic campaigns prompt")
+	if err := ensureAgenticCampaignsPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write agentic campaigns prompt: %v", err)
+		return fmt.Errorf("failed to write agentic campaigns prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created agentic campaigns prompt"))
+	}
+
+	initLog.Print("Writing create agentic campaign prompt")
+	if err := ensureCreateAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write create agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write create agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing update agentic campaign prompt")
+	if err := ensureUpdateAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write update agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write update agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created update agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing debug agentic campaign prompt")
+	if err := ensureDebugAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write debug agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write debug agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created debug agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing create campaign project prompt")
+	if err := ensureCreateCampaignProjectPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write create campaign project prompt: %v", err)
+		return fmt.Errorf("failed to write create campaign project prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create campaign project prompt"))
+	}
+
 	return nil
 }
 
@@ -582,6 +628,52 @@ func InitRepository(verbose bool, mcp bool, tokens bool, engine string, codespac
 	}
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
+	}
+
+	// Write campaign prompts
+	initLog.Print("Writing agentic campaigns prompt")
+	if err := ensureAgenticCampaignsPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write agentic campaigns prompt: %v", err)
+		return fmt.Errorf("failed to write agentic campaigns prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created agentic campaigns prompt"))
+	}
+
+	initLog.Print("Writing create agentic campaign prompt")
+	if err := ensureCreateAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write create agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write create agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing update agentic campaign prompt")
+	if err := ensureUpdateAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write update agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write update agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created update agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing debug agentic campaign prompt")
+	if err := ensureDebugAgenticCampaignPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write debug agentic campaign prompt: %v", err)
+		return fmt.Errorf("failed to write debug agentic campaign prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created debug agentic campaign prompt"))
+	}
+
+	initLog.Print("Writing create campaign project prompt")
+	if err := ensureCreateCampaignProjectPrompt(verbose, false); err != nil {
+		initLog.Printf("Failed to write create campaign project prompt: %v", err)
+		return fmt.Errorf("failed to write create campaign project prompt: %w", err)
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create campaign project prompt"))
 	}
 
 	// Configure MCP if requested

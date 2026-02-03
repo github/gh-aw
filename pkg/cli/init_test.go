@@ -128,6 +128,32 @@ func TestInitRepository(t *testing.T) {
 				t.Errorf("Expected debug workflow prompt file to exist")
 			}
 
+			// Verify campaign prompts were created
+			campaignDispatcherPromptPath := filepath.Join(tempDir, ".github", "aw", "agentic-campaigns.md")
+			if _, err := os.Stat(campaignDispatcherPromptPath); os.IsNotExist(err) {
+				t.Errorf("Expected agentic campaigns prompt file to exist")
+			}
+
+			createCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "create-agentic-campaign.md")
+			if _, err := os.Stat(createCampaignPromptPath); os.IsNotExist(err) {
+				t.Errorf("Expected create agentic campaign prompt file to exist")
+			}
+
+			updateCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "update-agentic-campaign.md")
+			if _, err := os.Stat(updateCampaignPromptPath); os.IsNotExist(err) {
+				t.Errorf("Expected update agentic campaign prompt file to exist")
+			}
+
+			debugCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "debug-agentic-campaign.md")
+			if _, err := os.Stat(debugCampaignPromptPath); os.IsNotExist(err) {
+				t.Errorf("Expected debug agentic campaign prompt file to exist")
+			}
+
+			createCampaignProjectPromptPath := filepath.Join(tempDir, ".github", "aw", "create-campaign-project.md")
+			if _, err := os.Stat(createCampaignProjectPromptPath); os.IsNotExist(err) {
+				t.Errorf("Expected create campaign project prompt file to exist")
+			}
+
 			// Verify .gitattributes contains the correct entry
 			content, err := os.ReadFile(gitAttributesPath)
 			if err != nil {
@@ -203,6 +229,32 @@ func TestInitRepository_Idempotent(t *testing.T) {
 	debugPromptPath := filepath.Join(tempDir, ".github", "aw", "debug-agentic-workflow.md")
 	if _, err := os.Stat(debugPromptPath); os.IsNotExist(err) {
 		t.Errorf("Expected debug workflow prompt file to exist after second call")
+	}
+
+	// Verify campaign prompts were created
+	campaignDispatcherPromptPath := filepath.Join(tempDir, ".github", "aw", "agentic-campaigns.md")
+	if _, err := os.Stat(campaignDispatcherPromptPath); os.IsNotExist(err) {
+		t.Errorf("Expected agentic campaigns prompt file to exist after second call")
+	}
+
+	createCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "create-agentic-campaign.md")
+	if _, err := os.Stat(createCampaignPromptPath); os.IsNotExist(err) {
+		t.Errorf("Expected create agentic campaign prompt file to exist after second call")
+	}
+
+	updateCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "update-agentic-campaign.md")
+	if _, err := os.Stat(updateCampaignPromptPath); os.IsNotExist(err) {
+		t.Errorf("Expected update agentic campaign prompt file to exist after second call")
+	}
+
+	debugCampaignPromptPath := filepath.Join(tempDir, ".github", "aw", "debug-agentic-campaign.md")
+	if _, err := os.Stat(debugCampaignPromptPath); os.IsNotExist(err) {
+		t.Errorf("Expected debug agentic campaign prompt file to exist after second call")
+	}
+
+	createCampaignProjectPromptPath := filepath.Join(tempDir, ".github", "aw", "create-campaign-project.md")
+	if _, err := os.Stat(createCampaignProjectPromptPath); os.IsNotExist(err) {
+		t.Errorf("Expected create campaign project prompt file to exist after second call")
 	}
 
 	// Verify logs .gitignore still exists after second call
