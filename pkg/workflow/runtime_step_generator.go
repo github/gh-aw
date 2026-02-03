@@ -17,10 +17,29 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement) []GitHubAction
 
 	for _, req := range requirements {
 		steps = append(steps, generateSetupStep(&req))
+
+		// Add GOROOT capture step after Go setup
+		// GitHub Actions uses "trimmed" Go binaries that require GOROOT to be explicitly set.
+		// actions/setup-go does NOT export GOROOT to the environment, so we must capture it.
+		// This is required for AWF chroot mode which passes GOROOT as AWF_GOROOT to the container.
+		if req.Runtime.ID == "go" {
+			runtimeStepGeneratorLog.Print("Adding GOROOT capture step for chroot mode compatibility")
+			steps = append(steps, generateGOROOTCaptureStep())
+		}
 	}
 
 	runtimeStepGeneratorLog.Printf("Generated %d runtime setup steps", len(steps))
 	return steps
+}
+
+// generateGOROOTCaptureStep creates a step to capture GOROOT and export it to the environment.
+// This is required because actions/setup-go does not export GOROOT, but AWF chroot mode
+// needs it to be set in the environment to pass it to the container.
+func generateGOROOTCaptureStep() GitHubActionStep {
+	return GitHubActionStep{
+		"      - name: Capture GOROOT for AWF chroot mode",
+		"        run: echo \"GOROOT=$(go env GOROOT)\" >> $GITHUB_ENV",
+	}
 }
 
 // GenerateSerenaLanguageServiceSteps creates installation steps for Serena language services

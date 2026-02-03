@@ -26,7 +26,7 @@
 name: "Ubuntu Actions Image Analyzer"
 "on":
   schedule:
-  - cron: "6 6 * * 6"
+  - cron: "21 15 * * 0"
     # Friendly format: weekly (scattered)
   # skip-if-match: is:pr is:open in:title "[ubuntu-image]" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:

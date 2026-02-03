@@ -31,7 +31,7 @@ name: "Agent Container Smoke Test"
     types:
     - labeled
   schedule:
-  - cron: "54 */12 * * *"
+  - cron: "23 */12 * * *"
     # Friendly format: every 12h (scattered)
   workflow_dispatch:
 
@@ -123,6 +123,8 @@ jobs:
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: '1.24'
+      - name: Capture GOROOT for AWF chroot mode
+        run: echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
       - name: Setup Java
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:

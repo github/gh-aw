@@ -37,7 +37,7 @@ name: "Smoke OpenCode"
     types:
     - labeled
   schedule:
-  - cron: "3 3 * * *"
+  - cron: "10 11 * * *"
   workflow_dispatch: null
 
 permissions: {}
@@ -141,6 +141,8 @@ jobs:
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version: '1.25'
+      - name: Capture GOROOT for AWF chroot mode
+        run: echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
       - name: Setup Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
