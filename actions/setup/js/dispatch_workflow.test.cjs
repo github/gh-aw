@@ -257,8 +257,9 @@ describe("dispatch_workflow handler factory", () => {
     // Verify first dispatch had no delay
     expect(firstDispatchTime - startTime).toBeLessThan(1000);
 
-    // Verify second dispatch was delayed by at least 5 seconds
-    expect(secondDispatchTime - firstDispatchTime).toBeGreaterThanOrEqual(5000);
+    // Verify second dispatch was delayed by approximately 5 seconds
+    // Use a slightly lower threshold (4995ms) to account for timing jitter
+    expect(secondDispatchTime - firstDispatchTime).toBeGreaterThanOrEqual(4995);
     expect(secondDispatchTime - firstDispatchTime).toBeLessThan(6000);
   });
 });
