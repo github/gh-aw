@@ -33,5 +33,6 @@ func GetAllCodemods() []Codemod {
 		getMCPNetworkMigrationCodemod(),
 		getDiscussionFlagRemovalCodemod(),
 		getMCPModeToTypeCodemod(),
+		getInstallScriptURLCodemod(),
 	}
 }
