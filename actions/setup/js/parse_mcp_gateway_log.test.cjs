@@ -404,10 +404,14 @@ Some content here.`;
         expect(allOutput).toContain("stderr.log");
         expect(allOutput).toContain("gateway.md");
 
-        // Check file contents are printed
+        // Check file contents are printed for .log files
         expect(allOutput).toContain("Gateway log content");
         expect(allOutput).toContain("Error message");
-        expect(allOutput).toContain("# Gateway Summary");
+        
+        // Check .md file is listed but content is not displayed
+        expect(allOutput).toContain("gateway.md");
+        expect(allOutput).toContain("content not displayed for .md files");
+        expect(allOutput).not.toContain("# Gateway Summary");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;

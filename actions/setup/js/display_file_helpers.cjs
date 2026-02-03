@@ -40,6 +40,16 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
       return;
     }
 
+    // Only show content for specific file types
+    const displayExtensions = [".json", ".jsonl", ".log", ".txt"];
+    const fileExtension = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+    const shouldDisplayContent = displayExtensions.includes(fileExtension);
+
+    if (!shouldDisplayContent) {
+      core.info(`    (content not displayed for ${fileExtension} files)`);
+      return;
+    }
+
     // Read and display file content
     const content = fs.readFileSync(filePath, "utf8");
     const contentToDisplay = content.length > maxBytes ? content.substring(0, maxBytes) : content;

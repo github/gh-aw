@@ -159,6 +159,80 @@ describe("display_file_helpers", () => {
         delete global.core;
       }
     });
+
+    test("skips content display for unsupported file extensions", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "test.md");
+      fs.writeFileSync(filePath, "# Markdown content");
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "test.md");
+
+        // Check file info was displayed
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.md"));
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("bytes"));
+
+        // Check message about not displaying content
+        expect(mockCore.info).toHaveBeenCalledWith("    (content not displayed for .md files)");
+
+        // Should not start group for unsupported file type
+        expect(mockCore.startGroup).not.toHaveBeenCalled();
+
+        // Content should not be displayed
+        expect(mockCore.info).not.toHaveBeenCalledWith("# Markdown content");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .json files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "test.json");
+      fs.writeFileSync(filePath, '{"key": "value"}');
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "test.json");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("test.json");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith('{"key": "value"}');
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .log files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "test.log");
+      fs.writeFileSync(filePath, "Log entry 1\nLog entry 2");
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "test.log");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("test.log");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("Log entry 1");
+        expect(mockCore.info).toHaveBeenCalledWith("Log entry 2");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("displayDirectory", () => {
