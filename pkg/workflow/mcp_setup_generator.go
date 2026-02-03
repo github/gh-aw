@@ -502,6 +502,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		} else {
 			yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + apiKey + "\"\n")
 		}
+		yaml.WriteString("          export DEBUG=\"*\"\n")
 		yaml.WriteString("          \n")
 		yaml.WriteString("          # Register API key as secret to mask it from logs\n")
 		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
@@ -543,7 +544,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		containerCmd += " -e MCP_GATEWAY_PORT"
 		containerCmd += " -e MCP_GATEWAY_DOMAIN"
 		containerCmd += " -e MCP_GATEWAY_API_KEY"
-		containerCmd += " -e DEBUG=\"*\""
+		containerCmd += " -e DEBUG"
 		// Pass environment variables that MCP servers reference in their config
 		// These are needed because awmg v0.0.12+ validates and resolves ${VAR} patterns at config load time
 		// Environment variables used by MCP gateway

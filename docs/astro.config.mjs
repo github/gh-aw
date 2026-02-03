@@ -157,7 +157,7 @@ export default defineConfig({
 					label: 'Setup',
 					items: [
 						{ label: 'Quick Start', link: '/setup/quick-start/' },
-						{ label: 'Authoring Workflows with AI', link: '/setup/agentic-authoring/' },
+						{ label: 'Creating Workflows', link: '/setup/creating-workflows/' },
 						{ label: 'CLI Commands', link: '/setup/cli/' },
 					],
 				},

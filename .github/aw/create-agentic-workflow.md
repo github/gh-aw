@@ -192,7 +192,7 @@ This llms.txt file contains workflow patterns, best practices, safe outputs, and
    - What should the agent do (comment, triage, create PR, fetch API data, etc.)?
    - ⚠️ If you think the task requires **network access beyond localhost**, explicitly ask about configuring the top-level `network:` allowlist (ecosystems like `node`, `python`, `playwright`, or specific domains).
    - 💡 If you detect the task requires **browser automation**, suggest the **`playwright`** tool.
-   - 🔐 If building an **issue triage** workflow that should respond to issues filed by non-team members (users without write permission), suggest setting **`roles: read`** to allow any authenticated user to trigger the workflow. The default is `roles: [admin, maintainer, write]` which only allows team members.
+   - 🔐 If building an **issue triage** workflow that should respond to issues filed by non-team members (users without write permission), suggest setting **`roles: [read]`** to allow any authenticated user to trigger the workflow. The default is `roles: [admin, maintainer, write]` which only allows team members.
 
    **Scheduling Best Practices:**
 
@@ -478,8 +478,8 @@ Based on the parsed requirements, determine:
 5. **Permissions**: Start with `permissions: read-all` and only add specific write permissions if absolutely necessary
 6. **Repository Access Roles**: Consider who should be able to trigger the workflow:
    - Default: `roles: [admin, maintainer, write]` (only team members with write access)
-   - **Issue triage workflows**: Use `roles: read` to allow any authenticated user (including non-team members) to file issues that trigger the workflow
-   - For public repositories where you want community members to trigger workflows via issues/PRs, setting `roles: read` is recommended
+   - **Issue triage workflows**: Use `roles: [read]` to allow any authenticated user (including non-team members) to file issues that trigger the workflow
+   - For public repositories where you want community members to trigger workflows via issues/PRs, setting `roles: [read]` is recommended
 7. **Defaults to Omit**: Do NOT include fields with sensible defaults:
    - `engine: copilot` - Copilot is the default, only specify if user wants Claude/Codex/Custom
    - `timeout-minutes:` - Has sensible defaults, only specify if user needs custom timeout
@@ -510,7 +510,7 @@ description: <Brief description of what this workflow does>
 on:
   issues:
     types: [opened, edited]
-roles: read  # Allow any authenticated user to trigger (important for issue triage)
+roles: [read]  # Allow any authenticated user to trigger (important for issue triage)
 permissions:
   contents: read
   issues: read
@@ -554,7 +554,7 @@ When you successfully complete your work:
 - Users can edit the markdown body to change agent behavior without recompilation
 - Changes to frontmatter require recompilation with `gh aw compile <workflow-id>`
 
-**Note**: This example omits `workflow_dispatch:` (auto-added by compiler), `timeout-minutes:` (has sensible default), and `engine:` (Copilot is default). The `roles: read` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage.
+**Note**: This example omits `workflow_dispatch:` (auto-added by compiler), `timeout-minutes:` (has sensible default), and `engine:` (Copilot is default). The `roles: [read]` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage.
 
 ### Step 4: Compile the Workflow
 

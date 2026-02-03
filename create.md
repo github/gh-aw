@@ -35,11 +35,16 @@ You should see version information displayed. If you encounter an error, check t
 
 Follow the instructions in the appropriate prompt based on the user's request.
 
+Here ROOT is the location where you found this file. For example,
+
+* if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the ROOT is `https://github.com/github/gh-aw/blob/main/`
+* if this file is at `https://github.com/github/gh-aw/blob/v0.35.1/create.md` then the ROOT is `https://github.com/github/gh-aw/v0.35.1/main/`
+
 ### Create New Workflow
 
 **Load when**: User wants to create a new workflow from scratch, add automation, or design a workflow that doesn't exist yet
 
-**Prompt file**: `https://github.com/github/gh-aw/blob/main/.github/aw/create-agentic-workflow.md`
+**Prompt file**: `ROOT/.github/aw/create-agentic-workflow.md`
 
 **Use cases**:
 
@@ -51,7 +56,7 @@ Follow the instructions in the appropriate prompt based on the user's request.
 
 **Load when**: User wants to modify, improve, or refactor an existing workflow
 
-**Prompt file**: `https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md`
+**Prompt file**: `ROOT/.github/aw/update-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md)
 
 **Use cases**:
 
@@ -63,7 +68,7 @@ Follow the instructions in the appropriate prompt based on the user's request.
 
 **Load when**: User needs to investigate, audit, debug, or understand a workflow, troubleshoot issues, analyze logs, or fix errors
 
-**Prompt file**: `https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md`
+**Prompt file**: `ROOT/.github/aw/debug-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md)
 
 **Use cases**:
 
@@ -75,7 +80,7 @@ Follow the instructions in the appropriate prompt based on the user's request.
 
 **Load when**: User wants to upgrade workflows to a new gh-aw version or fix deprecations
 
-**Prompt file**: `https://github.com/github/gh-aw/blob/main/.github/aw/upgrade-agentic-workflows.md`
+**Prompt file**: `ROOT/.github/aw/upgrade-agentic-workflows.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md)
 
 **Use cases**:
 
@@ -87,7 +92,7 @@ Follow the instructions in the appropriate prompt based on the user's request.
 
 **Load when**: User wants to create a reusable workflow component or wrap an MCP server
 
-**Prompt file**: `https://github.com/github/gh-aw/blob/main/.github/aw/create-shared-agentic-workflow.md`
+**Prompt file**: `ROOT/.github/aw/create-shared-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md)
 
 **Use cases**:
 
@@ -105,21 +110,26 @@ Check what files were changed or created:
 git status
 ```
 
-If creating workflows, the actual workflow files you created will be under `.github/workflows/`. There should be at least one workflow file and one lock file.
+If creating a workflow, the actual files you created will be under `.github/workflows/`. There should be at least one workflow file and one lock file.
 
 - `.github/workflows/<workflow-name>.md`
 - `.github/workflows/<workflow-name>.lock.yml`
 
-In general you do not need to run `gh aw init` as part of your workflow creation. However if you did you may also see:
+If creating a workflow, check the .gitattributes file and make sure it exists and contains at least the following line:
 
-- `.gitattributes`
+```text
+.github/workflows/*.lock.yml linguist-generated=true merge=ours
+```
+
+You do not need to run `gh aw init` as part of your workflow creation. However if you did run this you may also see:
+
 - `.github/aw/github-agentic-workflows.md`
 - `.github/agents/agentic-workflows.agent.md`
 - `.vscode/settings.json`
 - `.vscode/mcp.json`
 - And several other configuration files
 
-Unless instructed otherwise do NOT commit the changes to ANY files except the gitattributes file and workflow files.
+Don't remove these but don't add them if not already present in the repo. Unless instructed otherwise do NOT commit the changes to ANY files except the gitattributes file and workflow files.
 
 - `.gitattributes`
 - `.github/workflows/<workflow-name>.md`
