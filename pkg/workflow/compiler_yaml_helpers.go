@@ -182,6 +182,13 @@ func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
 		return nil
 	}
 
+	// Skip .github checkout if an automatic full repository checkout will be added
+	// The shouldAddCheckoutStep function returns true when a checkout step will be automatically added
+	if c.shouldAddCheckoutStep(data) {
+		compilerYamlLog.Print("Skipping .github sparse checkout: full repository checkout will be added automatically")
+		return nil
+	}
+
 	// For all modes (dev, script, release), checkout .github folder
 	// This works in release mode where actions aren't checked out
 	return []string{
