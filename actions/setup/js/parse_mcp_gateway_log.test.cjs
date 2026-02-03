@@ -269,6 +269,12 @@ Some content here.`;
         // Mock core and fs for the test
         const mockCore = {
           info: vi.fn(),
+          startGroup: vi.fn(),
+          endGroup: vi.fn(),
+          notice: vi.fn(),
+          warning: vi.fn(),
+          error: vi.fn(),
+          setFailed: vi.fn(),
           summary: {
             addRaw: vi.fn().mockReturnThis(),
             write: vi.fn(),
@@ -343,7 +349,7 @@ Some content here.`;
         fs.writeFileSync(path.join(logsDir, "gateway.md"), "# Gateway Summary");
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to redirect to our test directories
@@ -384,23 +390,28 @@ Some content here.`;
         // Verify the output
         const infoMessages = mockCore.info.mock.calls.map(call => call[0]);
         const allOutput = infoMessages.join("\n");
+        const startGroupCalls = mockCore.startGroup.mock.calls.map(call => call[0]);
+        const allGroups = startGroupCalls.join("\n");
 
-        // Check header
-        expect(allOutput).toContain("=== Listing All Gateway-Related Files ===");
-        expect(allOutput).toContain("=== End of Gateway-Related Files ===");
+        // Check header group was started
+        expect(allGroups).toContain("=== Listing All Gateway-Related Files ===");
 
         // Check directories are listed
-        expect(allOutput).toContain("Directory: /tmp/gh-aw/mcp-logs");
+        expect(allGroups).toContain("/tmp/gh-aw/mcp-logs");
 
         // Check files are listed
         expect(allOutput).toContain("gateway.log");
         expect(allOutput).toContain("stderr.log");
         expect(allOutput).toContain("gateway.md");
 
-        // Check file contents are printed
+        // Check file contents are printed for .log files
         expect(allOutput).toContain("Gateway log content");
         expect(allOutput).toContain("Error message");
-        expect(allOutput).toContain("# Gateway Summary");
+
+        // Check .md file is listed but content is not displayed
+        expect(allOutput).toContain("gateway.md");
+        expect(allOutput).toContain("content not displayed for .md files");
+        expect(allOutput).not.toContain("# Gateway Summary");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;
@@ -416,7 +427,7 @@ Some content here.`;
 
     test("handles missing directories gracefully", () => {
       // Mock core
-      const mockCore = { info: vi.fn() };
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
       global.core = mockCore;
 
       // Mock fs to return false for directory existence
@@ -430,11 +441,11 @@ Some content here.`;
         printAllGatewayFiles();
 
         // Verify the output
-        const infoMessages = mockCore.info.mock.calls.map(call => call[0]);
-        const allOutput = infoMessages.join("\n");
+        const noticeMessages = mockCore.notice.mock.calls.map(call => call[0]);
+        const allOutput = noticeMessages.join("\n");
 
         // Check that it reports missing directories
-        expect(allOutput).toContain("Directory does not exist: /tmp/gh-aw/mcp-logs");
+        expect(allOutput).toContain("Directory does not exist");
       } finally {
         // Restore original functions
         fs.existsSync = originalExistsSync;
@@ -455,7 +466,7 @@ Some content here.`;
         fs.mkdirSync(logsDir, { recursive: true });
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
@@ -492,7 +503,7 @@ Some content here.`;
       }
     });
 
-    test("truncates files larger than 10KB", () => {
+    test("truncates files larger than 64KB", () => {
       const fs = require("fs");
       const path = require("path");
       const os = require("os");
@@ -504,12 +515,12 @@ Some content here.`;
       try {
         fs.mkdirSync(logsDir, { recursive: true });
 
-        // Create a large file (15KB)
-        const largeContent = "A".repeat(15 * 1024);
+        // Create a large file (70KB)
+        const largeContent = "A".repeat(70 * 1024);
         fs.writeFileSync(path.join(logsDir, "large.log"), largeContent);
 
         // Mock core
-        const mockCore = { info: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
@@ -554,8 +565,8 @@ Some content here.`;
         // Check that file was truncated
         expect(allOutput).toContain("...");
         expect(allOutput).toContain("truncated");
-        expect(allOutput).toContain("10240 bytes");
-        expect(allOutput).toContain("15360 total");
+        expect(allOutput).toContain("65536 bytes");
+        expect(allOutput).toContain("71680 total");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;

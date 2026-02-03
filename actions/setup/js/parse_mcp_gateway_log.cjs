@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { displayDirectories } = require("./display_file_helpers.cjs");
 
 /**
  * Parses MCP gateway logs and creates a step summary
@@ -16,81 +17,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * Prints all gateway-related files to core.info for debugging
  */
 function printAllGatewayFiles() {
-  core.info("=== Listing All Gateway-Related Files ===");
-  core.info("");
-
   const gatewayDirs = ["/tmp/gh-aw/mcp-logs"];
-
-  for (const dir of gatewayDirs) {
-    if (!fs.existsSync(dir)) {
-      core.info(`Directory does not exist: ${dir}`);
-      core.info("");
-      continue;
-    }
-
-    core.info(`Directory: ${dir}`);
-    try {
-      const files = fs.readdirSync(dir);
-      if (files.length === 0) {
-        core.info("  (empty directory)");
-        core.info("");
-        continue;
-      }
-
-      for (const file of files) {
-        const filePath = `${dir}/${file}`;
-        try {
-          const stats = fs.statSync(filePath);
-
-          if (stats.isDirectory()) {
-            core.info(`  ${file}/ (directory)`);
-          } else {
-            core.info(`  ${file} (${stats.size} bytes)`);
-
-            // Print file content if it's a text file and not too large
-            if (stats.size > 0 && stats.size < 1024 * 1024) {
-              // Max 1MB
-              try {
-                const content = fs.readFileSync(filePath, "utf8");
-                const maxOutputBytes = 10 * 1024; // 10KB limit per file
-                const contentToDisplay = content.length > maxOutputBytes ? content.substring(0, maxOutputBytes) : content;
-                const wasTruncated = content.length > maxOutputBytes;
-
-                core.info(`    --- Content of ${file} ---`);
-                // Split content into lines and prefix each line for readability
-                const lines = contentToDisplay.split("\n");
-                for (const line of lines) {
-                  core.info(`    ${line}`);
-                }
-                if (wasTruncated) {
-                  core.info(`    ...`);
-                  core.info(`    (truncated, showing first ${maxOutputBytes} bytes of ${content.length} total)`);
-                }
-                core.info(`    --- End of ${file} ---`);
-              } catch (/** @type {unknown} */ readError) {
-                const errorMessage = readError instanceof Error ? readError.message : String(readError);
-                core.info(`    (could not read file as text: ${errorMessage})`);
-              }
-            } else if (stats.size === 0) {
-              core.info(`    (empty file)`);
-            } else {
-              core.info(`    (file too large to display, ${stats.size} bytes)`);
-            }
-          }
-        } catch (/** @type {unknown} */ statError) {
-          const errorMessage = statError instanceof Error ? statError.message : String(statError);
-          core.info(`  ${file} (error reading file info: ${errorMessage})`);
-        }
-      }
-    } catch (/** @type {unknown} */ readError) {
-      const errorMessage = readError instanceof Error ? readError.message : String(readError);
-      core.info(`  Error reading directory: ${errorMessage}`);
-    }
-    core.info("");
-  }
-
-  core.info("=== End of Gateway-Related Files ===");
-  core.info("");
+  displayDirectories(gatewayDirs, 64 * 1024);
 }
 
 /**

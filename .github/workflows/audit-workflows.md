@@ -18,11 +18,6 @@ tools:
     file-glob: ["memory/audit-workflows/*.json", "memory/audit-workflows/*.jsonl", "memory/audit-workflows/*.csv", "memory/audit-workflows/*.md"]
     max-file-size: 102400  # 100KB
   timeout: 300
-steps:
-  - name: Download logs from last 24 hours
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: ./gh-aw logs --start-date -1d -o /tmp/gh-aw/aw-mcp/logs
 safe-outputs:
   upload-asset:
   create-discussion:
@@ -64,7 +59,12 @@ Upload charts, embed in discussion with 2-3 sentence analysis each.
 
 Use gh-aw MCP server (not CLI directly). Run `status` tool to verify.
 
-**Collect Logs**: Use MCP `logs` tool with start date "-1d" → `/tmp/gh-aw/aw-mcp/logs`
+**Collect Logs**: Use MCP `logs` tool to download workflow logs:
+```
+Use the agentic-workflows MCP tool `logs` with parameters:
+- start_date: "-1d" (last 24 hours)
+Output is saved to: /tmp/gh-aw/aw-mcp/logs
+```
 
 **Analyze**: Review logs for:
 - Missing tools (patterns, frequency, legitimacy)
