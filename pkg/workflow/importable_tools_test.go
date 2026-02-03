@@ -156,7 +156,7 @@ Uses imported serena tool.
 	}
 
 	// Verify serena container (now using Docker instead of uvx)
-	if !strings.Contains(workflowData, "ghcr.io/githubnext/serena-mcp-server:latest") {
+	if !strings.Contains(workflowData, "ghcr.io/github/serena-mcp-server:latest") {
 		t.Error("Expected compiled workflow to contain serena Docker container")
 	}
 
@@ -321,7 +321,7 @@ Uses all imported tools.
 	if !strings.Contains(workflowData, "mcr.microsoft.com/playwright/mcp") {
 		t.Error("Expected compiled workflow to contain playwright Docker image")
 	}
-	if !strings.Contains(workflowData, "ghcr.io/githubnext/serena-mcp-server:latest") {
+	if !strings.Contains(workflowData, "ghcr.io/github/serena-mcp-server:latest") {
 		t.Error("Expected compiled workflow to contain serena Docker container")
 	}
 	if !strings.Contains(workflowData, "example.com") {
@@ -405,7 +405,7 @@ Uses imported serena with language config.
 	}
 
 	// Verify serena container is present
-	if !strings.Contains(workflowData, "ghcr.io/githubnext/serena-mcp-server") {
+	if !strings.Contains(workflowData, "ghcr.io/github/serena-mcp-server") {
 		t.Error("Expected serena to use Docker container")
 	}
 }
@@ -1015,7 +1015,7 @@ Uses imported serena in local mode.
 	}
 
 	// Verify NO container is used
-	if strings.Contains(workflowData, "ghcr.io/githubnext/serena-mcp-server:latest") {
+	if strings.Contains(workflowData, "ghcr.io/github/serena-mcp-server:latest") {
 		t.Error("Did not expect serena local mode to use Docker container")
 	}
 }

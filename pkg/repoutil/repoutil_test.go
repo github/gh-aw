@@ -95,7 +95,7 @@ func TestParseGitHubURL(t *testing.T) {
 		{
 			name:          "HTTPS format with .git",
 			url:           "https://github.com/github/gh-aw.git",
-			expectedOwner: "githubnext",
+			expectedOwner: "github",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
 		},

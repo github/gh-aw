@@ -576,7 +576,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 			inlineArgs:           false,
 			expectedContent: []string{
 				`"serena": {`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 				`"entrypoint": "serena"`,
 				`"entrypointArgs"`,
 				`"start-mcp-server"`,
@@ -595,7 +595,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 			inlineArgs:           false,
 			expectedContent: []string{
 				`"serena": {`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 				`              }`,
 			},
 			unexpectedContent: []string{
@@ -613,7 +613,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"serena": {`,
 				`"type": "stdio"`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 			},
 			unexpectedContent: []string{},
 		},
@@ -626,7 +626,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"serena": {`,
 				`"type": "stdio"`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 				`"entrypointArgs": ["start-mcp-server", "--context", "codex", "--project", "${{ github.workspace }}"]`,
 			},
 			unexpectedContent: []string{},
@@ -641,7 +641,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 			inlineArgs:           false,
 			expectedContent: []string{
 				`"serena": {`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 				`"--verbose"`,
 				`"--debug"`,
 			},
@@ -1163,7 +1163,7 @@ func TestRenderSerenaMCPConfigLocalMode(t *testing.T) {
 			expectedContent: []string{
 				`"serena": {`,
 				`"type": "stdio"`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 			},
 			unexpectedContent: []string{
 				`"url"`,
@@ -1183,7 +1183,7 @@ func TestRenderSerenaMCPConfigLocalMode(t *testing.T) {
 			expectedContent: []string{
 				`"serena": {`,
 				`"type": "stdio"`,
-				`"container": "ghcr.io/githubnext/serena-mcp-server:latest"`,
+				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
 			},
 			unexpectedContent: []string{
 				`"url"`,

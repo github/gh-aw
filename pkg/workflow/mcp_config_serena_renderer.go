@@ -97,7 +97,7 @@ func selectSerenaContainer(serenaTool any) string {
 
 // renderSerenaMCPConfigWithOptions generates the Serena MCP server configuration with engine-specific options
 // Supports two modes:
-// - "docker" (default): Uses Docker container with stdio transport (ghcr.io/githubnext/serena-mcp-server:latest)
+// - "docker" (default): Uses Docker container with stdio transport (ghcr.io/github/serena-mcp-server:latest)
 // - "local": Uses local uvx with HTTP transport on fixed port
 func renderSerenaMCPConfigWithOptions(yaml *strings.Builder, serenaTool any, isLast bool, includeCopilotFields bool, inlineArgs bool) {
 	customArgs := getSerenaCustomArgs(serenaTool)
