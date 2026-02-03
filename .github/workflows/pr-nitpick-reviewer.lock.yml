@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/reporting.md
+#     - shared/structured-logging.md
 #
-# frontmatter-hash: 3755e21d8e5a0add665c8853b7087d700f82e811dc89990a3f626bf933f52158
+# frontmatter-hash: e7908b30eb898cb0b28dfd5ab644680a7df45354ef4a1a662da007aa6dd96a76
 
 name: "PR Nitpick Reviewer 🔍"
 "on":
@@ -161,6 +162,9 @@ jobs:
           persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
+      - name: Initialize structured logging
+        run: "#!/bin/bash\nset -e\n\n# Create logging directory\nmkdir -p /tmp/gh-aw\n\n# Initialize session log file\nSESSION_LOG=\"/tmp/gh-aw/session.log\"\n\n# Create log file with session metadata\ncat > \"$SESSION_LOG\" << 'EOF'\n========================================\nAGENT SESSION LOG\n========================================\nWorkflow: ${{ github.workflow }}\nRun ID: ${{ github.run_id }}\nRun Number: ${{ github.run_number }}\nRepository: ${{ github.repository }}\nActor: ${{ github.actor }}\nEvent: ${{ github.event_name }}\nStarted: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n========================================\nEOF\n\necho \"✓ Structured logging initialized at $SESSION_LOG\"\n\n# Create logging helper functions script\ncat > /tmp/gh-aw/log-helpers.sh << 'HELPERS_EOF'\n#!/bin/bash\n# Structured logging helper functions\n\nSESSION_LOG=\"/tmp/gh-aw/session.log\"\n\nlog_session_start() {\n  local agent_name=\"${1:-Unknown Agent}\"\n  local task=\"${2:-No task specified}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  echo \"SESSION START\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  echo \"Agent: $agent_name\" >> \"$SESSION_LOG\"\n  echo \"Task: $task\" >> \"$SESSION_LOG\"\n  echo \"Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"::notice::Session started - $agent_name\"\n}\n\nlog_session_step() {\n  local step_name=\"${1:-Unnamed Step}\"\n  local details=\"${2:-No details}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"--- STEP: $step_name ---\" >> \"$SESSION_LOG\"\n  echo \"Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n  echo \"Details: $details\" >> \"$SESSION_LOG\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"::notice::Step completed - $step_name\"\n}\n\nlog_session_end() {\n  local status=\"${1:-unknown}\"\n  local summary=\"${2:-No summary provided}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  echo \"SESSION END\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  echo \"Status: $status\" >> \"$SESSION_LOG\"\n  echo \"Summary: $summary\" >> \"$SESSION_LOG\"\n  echo \"Ended: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n  echo \"========================================\" >> \"$SESSION_LOG\"\n  \n  if [ \"$status\" = \"success\" ]; then\n    echo \"::notice::Session completed successfully - $summary\"\n  else\n    echo \"::warning::Session ended with status: $status - $summary\"\n  fi\n  \n  # Output log summary to GitHub Actions\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"--- SESSION SUMMARY ---\" >> \"$SESSION_LOG\"\n  cat \"$SESSION_LOG\" >> \"$SESSION_LOG\"\n}\n\nlog_tool_call() {\n  local tool_name=\"${1:-unknown_tool}\"\n  local success=\"${2:-unknown}\"\n  local details=\"${3:-No details}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"TOOL CALL: $tool_name\" >> \"$SESSION_LOG\"\n  echo \"  Success: $success\" >> \"$SESSION_LOG\"\n  echo \"  Details: $details\" >> \"$SESSION_LOG\"\n  echo \"  Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n  \n  if [ \"$success\" = \"true\" ] || [ \"$success\" = \"yes\" ]; then\n    echo \"::notice::Tool call succeeded - $tool_name\"\n  else\n    echo \"::warning::Tool call failed - $tool_name: $details\"\n  fi\n}\n\nlog_error() {\n  local error_type=\"${1:-Unknown Error}\"\n  local message=\"${2:-No message}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"ERROR: $error_type\" >> \"$SESSION_LOG\"\n  echo \"  Message: $message\" >> \"$SESSION_LOG\"\n  echo \"  Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n  echo \"::error::$error_type - $message\"\n}\n\nlog_context_update() {\n  local context_type=\"${1:-general}\"\n  local update=\"${2:-No update}\"\n  echo \"\" >> \"$SESSION_LOG\"\n  echo \"CONTEXT UPDATE: $context_type\" >> \"$SESSION_LOG\"\n  echo \"  Update: $update\" >> \"$SESSION_LOG\"\n  echo \"  Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\" >> \"$SESSION_LOG\"\n}\n\n# Export functions for use in agent scripts\nexport -f log_session_start\nexport -f log_session_step\nexport -f log_session_end\nexport -f log_tool_call\nexport -f log_error\nexport -f log_context_update\nHELPERS_EOF\n\nchmod +x /tmp/gh-aw/log-helpers.sh\necho \"✓ Log helper functions created at /tmp/gh-aw/log-helpers.sh\"\n\n# Source the helpers so they're available\nsource /tmp/gh-aw/log-helpers.sh"
+
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
         run: bash /opt/gh-aw/actions/create_cache_memory_dir.sh
@@ -713,6 +717,195 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          # Structured Logging Component
+          
+          This shared component provides structured logging capabilities for all agent workflows to ensure session logs are always collected and analyzable.
+          
+          ## Purpose
+          
+          **Problem**: 56% of agent sessions produce no analyzable log content, making it impossible to:
+          - Diagnose issues in failed sessions
+          - Learn from successful patterns
+          - Track agent behavior over time
+          - Measure improvement in agent performance
+          
+          **Solution**: This component ensures every agent workflow produces structured, analyzable logs by:
+          1. Initializing a session log file at `/tmp/gh-aw/session.log`
+          2. Providing helper functions for logging key events
+          3. Capturing session metadata automatically
+          4. Making logs available for downstream analysis
+          
+          ## Usage in Agent Workflows
+          
+          ### 1. Import the Component
+          
+          Add to your workflow frontmatter:
+          
+          ```yaml
+          imports:
+            - shared/structured-logging.md
+          ```
+          
+          ### 2. Call Logging Functions
+          
+          In your agent prompt, instruct the agent to call these bash functions at appropriate times:
+          
+          ```markdown
+          ## Your Mission
+          
+          Before starting your work, log the session start:
+          ```bash
+          source /tmp/gh-aw/log-helpers.sh
+          log_session_start "Agent Name" "Task description"
+          ```
+          
+          As you work, log each major step:
+          ```bash
+          log_session_step "Phase 1: Analysis" "Analyzing repository structure"
+          ```
+          
+          After each tool call:
+          ```bash
+          log_tool_call "github_api" "true" "Successfully fetched issue data"
+          ```
+          
+          If errors occur:
+          ```bash
+          log_error "API Error" "Failed to fetch PR details: 404 Not Found"
+          ```
+          
+          When complete, log the session end:
+          ```bash
+          log_session_end "success" "Completed analysis and posted comment"
+          ```
+          ```
+          
+          ## Available Functions
+          
+          ### `log_session_start <agent_name> <task>`
+          Records the start of an agent session with metadata.
+          - **agent_name**: Name of the agent (e.g., "Q", "Scout", "Archie")
+          - **task**: Brief description of the task being performed
+          
+          ### `log_session_step <step_name> <details>`
+          Records completion of a major step in the workflow.
+          - **step_name**: Name of the step (e.g., "Phase 1: Data Collection")
+          - **details**: Brief description of what was done
+          
+          ### `log_session_end <status> <summary>`
+          Records the end of an agent session.
+          - **status**: One of: "success", "failure", "partial", "abandoned"
+          - **summary**: Brief summary of what was accomplished
+          
+          ### `log_tool_call <tool_name> <success> <details>`
+          Records a tool invocation.
+          - **tool_name**: Name of the tool used (e.g., "github_api", "serena", "playwright")
+          - **success**: "true" or "false" indicating if the tool call succeeded
+          - **details**: Brief description of what the tool did or any errors
+          
+          ### `log_error <error_type> <message>`
+          Records an error that occurred during execution.
+          - **error_type**: Type of error (e.g., "API Error", "Permission Denied", "Timeout")
+          - **message**: Detailed error message
+          
+          ### `log_context_update <context_type> <update>`
+          Records changes to agent context or state.
+          - **context_type**: Type of context update (e.g., "memory", "state", "configuration")
+          - **update**: Description of the update
+          
+          ## Log File Location
+          
+          Logs are written to `/tmp/gh-aw/session.log` and automatically captured by GitHub Actions as part of the workflow run logs.
+          
+          ## Benefits
+          
+          1. **Consistent Format**: All agent sessions use the same structured log format
+          2. **Easy Analysis**: Logs can be parsed and analyzed programmatically
+          3. **Debugging**: Failed sessions have detailed information for troubleshooting
+          4. **Learning**: Successful patterns can be identified and replicated
+          5. **Metrics**: Session performance can be tracked over time
+          6. **Minimal Overhead**: Logging adds negligible runtime cost
+          
+          ## Integration with Session Analysis
+          
+          The `copilot-session-insights` workflow automatically collects these logs and analyzes them to:
+          - Calculate session success rates
+          - Identify behavioral patterns
+          - Detect common failure modes
+          - Generate actionable recommendations
+          
+          ## Example Agent Integration
+          
+          Here's how to integrate structured logging into an agent workflow:
+          
+          ```markdown
+          ---
+          name: Example Agent
+          imports:
+            - shared/structured-logging.md
+          ---
+          
+          # Example Agent
+          
+          You are an example agent that demonstrates structured logging.
+          
+          ## Mission
+          
+          When you start, initialize logging:
+          
+          ```bash
+          source /tmp/gh-aw/log-helpers.sh
+          log_session_start "Example Agent" "Demonstrate structured logging"
+          ```
+          
+          For each phase of work:
+          
+          ```bash
+          # Phase 1
+          log_session_step "Phase 1: Setup" "Configuring environment"
+          # ... do work ...
+          
+          # Phase 2
+          log_session_step "Phase 2: Execution" "Running analysis"
+          # ... do work ...
+          
+          # Log tool calls
+          log_tool_call "github_api" "true" "Fetched repository data"
+          
+          # Log any errors
+          log_error "Validation Error" "Invalid input format"
+          ```
+          
+          When complete:
+          
+          ```bash
+          log_session_end "success" "Analysis complete, report generated"
+          ```
+          ```
+          
+          ## Implementation Notes
+          
+          - **Automatic Initialization**: The log file is created automatically when this component is imported
+          - **Helper Functions**: Bash functions are sourced and available throughout the workflow
+          - **GitHub Actions Integration**: Logs use `::notice::` and `::warning::` annotations for visibility
+          - **Timestamp Format**: All timestamps use UTC in ISO 8601 format for consistency
+          - **Error Visibility**: Errors are logged both to the log file and as GitHub Actions error annotations
+          
+          ## Troubleshooting
+          
+          **No log file created?**
+          - Check that the `bash` tool is enabled in your workflow frontmatter
+          - Verify the initialization step ran successfully
+          
+          **Functions not available?**
+          - Ensure you're sourcing the helpers: `source /tmp/gh-aw/log-helpers.sh`
+          - Check that the initialization step completed before trying to call functions
+          
+          **Logs not appearing in analysis?**
+          - Verify the workflow is running on a `copilot/*` branch (required for session data fetch)
+          - Check that the workflow run completed (logs are only available after completion)
+          - Ensure the session log file has content (check `/tmp/gh-aw/session.log`)
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels
@@ -845,13 +1038,32 @@ jobs:
       - name: Execute GitHub Copilot CLI
         id: agentic_execution
         # Copilot CLI tool arguments (sorted):
+        # --allow-tool github
+        # --allow-tool safeoutputs
+        # --allow-tool shell(cat /tmp/gh-aw/session.log)
+        # --allow-tool shell(cat)
+        # --allow-tool shell(date *)
+        # --allow-tool shell(date)
+        # --allow-tool shell(echo *)
+        # --allow-tool shell(echo)
+        # --allow-tool shell(grep)
+        # --allow-tool shell(head)
+        # --allow-tool shell(ls)
+        # --allow-tool shell(mkdir -p /tmp/gh-aw)
+        # --allow-tool shell(pwd)
+        # --allow-tool shell(sort)
+        # --allow-tool shell(tail)
+        # --allow-tool shell(uniq)
+        # --allow-tool shell(wc)
+        # --allow-tool shell(yq)
+        # --allow-tool write
         timeout-minutes: 15
         run: |
           set -o pipefail
           GH_AW_TOOL_BINS=""; command -v go >/dev/null 2>&1 && GH_AW_TOOL_BINS="$(go env GOROOT)/bin:$GH_AW_TOOL_BINS"; [ -n "$JAVA_HOME" ] && GH_AW_TOOL_BINS="$JAVA_HOME/bin:$GH_AW_TOOL_BINS"; [ -n "$CARGO_HOME" ] && GH_AW_TOOL_BINS="$CARGO_HOME/bin:$GH_AW_TOOL_BINS"; [ -n "$GEM_HOME" ] && GH_AW_TOOL_BINS="$GEM_HOME/bin:$GH_AW_TOOL_BINS"; [ -n "$CONDA" ] && GH_AW_TOOL_BINS="$CONDA/bin:$GH_AW_TOOL_BINS"; [ -n "$PIPX_BIN_DIR" ] && GH_AW_TOOL_BINS="$PIPX_BIN_DIR:$GH_AW_TOOL_BINS"; [ -n "$SWIFT_PATH" ] && GH_AW_TOOL_BINS="$SWIFT_PATH:$GH_AW_TOOL_BINS"; [ -n "$DOTNET_ROOT" ] && GH_AW_TOOL_BINS="$DOTNET_ROOT:$GH_AW_TOOL_BINS"; export GH_AW_TOOL_BINS
           mkdir -p "$HOME/.cache"
           sudo -E awf --env-all --env "ANDROID_HOME=${ANDROID_HOME}" --env "ANDROID_NDK=${ANDROID_NDK}" --env "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" --env "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME}" --env "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}" --env "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}" --env "AZURE_EXTENSION_DIR=${AZURE_EXTENSION_DIR}" --env "CARGO_HOME=${CARGO_HOME}" --env "CHROMEWEBDRIVER=${CHROMEWEBDRIVER}" --env "CONDA=${CONDA}" --env "DOTNET_ROOT=${DOTNET_ROOT}" --env "EDGEWEBDRIVER=${EDGEWEBDRIVER}" --env "GECKOWEBDRIVER=${GECKOWEBDRIVER}" --env "GEM_HOME=${GEM_HOME}" --env "GEM_PATH=${GEM_PATH}" --env "GOPATH=${GOPATH}" --env "GOROOT=${GOROOT}" --env "HOMEBREW_CELLAR=${HOMEBREW_CELLAR}" --env "HOMEBREW_PREFIX=${HOMEBREW_PREFIX}" --env "HOMEBREW_REPOSITORY=${HOMEBREW_REPOSITORY}" --env "JAVA_HOME=${JAVA_HOME}" --env "JAVA_HOME_11_X64=${JAVA_HOME_11_X64}" --env "JAVA_HOME_17_X64=${JAVA_HOME_17_X64}" --env "JAVA_HOME_21_X64=${JAVA_HOME_21_X64}" --env "JAVA_HOME_25_X64=${JAVA_HOME_25_X64}" --env "JAVA_HOME_8_X64=${JAVA_HOME_8_X64}" --env "NVM_DIR=${NVM_DIR}" --env "PIPX_BIN_DIR=${PIPX_BIN_DIR}" --env "PIPX_HOME=${PIPX_HOME}" --env "RUSTUP_HOME=${RUSTUP_HOME}" --env "SELENIUM_JAR_PATH=${SELENIUM_JAR_PATH}" --env "SWIFT_PATH=${SWIFT_PATH}" --env "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" --env "GH_AW_TOOL_BINS=$GH_AW_TOOL_BINS" --container-workdir "${GITHUB_WORKSPACE}" --mount /tmp:/tmp:rw --mount "${HOME}/.cache:${HOME}/.cache:rw" --mount "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw" --mount /usr/bin/cat:/usr/bin/cat:ro --mount /usr/bin/curl:/usr/bin/curl:ro --mount /usr/bin/date:/usr/bin/date:ro --mount /usr/bin/find:/usr/bin/find:ro --mount /usr/bin/gh:/usr/bin/gh:ro --mount /usr/bin/grep:/usr/bin/grep:ro --mount /usr/bin/jq:/usr/bin/jq:ro --mount /usr/bin/yq:/usr/bin/yq:ro --mount /usr/bin/cp:/usr/bin/cp:ro --mount /usr/bin/cut:/usr/bin/cut:ro --mount /usr/bin/diff:/usr/bin/diff:ro --mount /usr/bin/head:/usr/bin/head:ro --mount /usr/bin/ls:/usr/bin/ls:ro --mount /usr/bin/mkdir:/usr/bin/mkdir:ro --mount /usr/bin/rm:/usr/bin/rm:ro --mount /usr/bin/sed:/usr/bin/sed:ro --mount /usr/bin/sort:/usr/bin/sort:ro --mount /usr/bin/tail:/usr/bin/tail:ro --mount /usr/bin/wc:/usr/bin/wc:ro --mount /usr/bin/which:/usr/bin/which:ro --mount /usr/local/bin/copilot:/usr/local/bin/copilot:ro --mount /home/runner/.copilot:/home/runner/.copilot:rw --mount /opt/hostedtoolcache:/opt/hostedtoolcache:ro --mount /opt/gh-aw:/opt/gh-aw:ro --allow-domains api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.13.1 --agent-image act \
-            -- 'source /opt/gh-aw/actions/sanitize_path.sh "$GH_AW_TOOL_BINS$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\''\n'\'' '\'':'\'')$PATH" && /usr/local/bin/copilot --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --add-dir "${GITHUB_WORKSPACE}" --disable-builtin-mcps --allow-all-tools --add-dir /tmp/gh-aw/cache-memory/ --allow-all-paths --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"${GH_AW_MODEL_AGENT_COPILOT:+ --model "$GH_AW_MODEL_AGENT_COPILOT"}' \
+            -- 'source /opt/gh-aw/actions/sanitize_path.sh "$GH_AW_TOOL_BINS$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\''\n'\'' '\'':'\'')$PATH" && /usr/local/bin/copilot --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --add-dir "${GITHUB_WORKSPACE}" --disable-builtin-mcps --allow-tool github --allow-tool safeoutputs --allow-tool '\''shell(cat /tmp/gh-aw/session.log)'\'' --allow-tool '\''shell(cat)'\'' --allow-tool '\''shell(date *)'\'' --allow-tool '\''shell(date)'\'' --allow-tool '\''shell(echo *)'\'' --allow-tool '\''shell(echo)'\'' --allow-tool '\''shell(grep)'\'' --allow-tool '\''shell(head)'\'' --allow-tool '\''shell(ls)'\'' --allow-tool '\''shell(mkdir -p /tmp/gh-aw)'\'' --allow-tool '\''shell(pwd)'\'' --allow-tool '\''shell(sort)'\'' --allow-tool '\''shell(tail)'\'' --allow-tool '\''shell(uniq)'\'' --allow-tool '\''shell(wc)'\'' --allow-tool '\''shell(yq)'\'' --allow-tool write --add-dir /tmp/gh-aw/cache-memory/ --allow-all-paths --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"${GH_AW_MODEL_AGENT_COPILOT:+ --model "$GH_AW_MODEL_AGENT_COPILOT"}' \
             2>&1 | tee /tmp/gh-aw/agent-stdio.log
         env:
           COPILOT_AGENT_RUNNER_TYPE: STANDALONE
