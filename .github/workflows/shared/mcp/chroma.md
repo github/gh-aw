@@ -10,13 +10,10 @@ tools:
 
 mcp-servers:
   chroma:
-    command: "uvx"
-    args:
-      - "chroma-mcp-server"
-      - "--client-type"
-      - "persistent"
-      - "--data-dir"
-      - "/tmp/gh-aw/cache-memory-chroma"
+    container: "mcp/chroma"
+    env:
+      CHROMA_CLIENT_TYPE: "persistent"
+      CHROMA_DATA_DIR: "/tmp/gh-aw/cache-memory-chroma"
     allowed:
       - chroma_list_collections
       - chroma_create_collection
