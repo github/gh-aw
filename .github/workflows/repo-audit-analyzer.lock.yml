@@ -27,7 +27,7 @@
 #
 # frontmatter-hash: 53e8f611f290c904288a97423cdb9aa1b8655defdfd44d856397e8fb5e447e38
 
-name: "Repo Audit Analyzer"
+name: "Repository Audit & Agentic Workflow Opportunity Analyzer"
 "on":
   workflow_dispatch:
     inputs:
@@ -42,7 +42,7 @@ permissions: {}
 concurrency:
   group: "gh-aw-${{ github.workflow }}"
 
-run-name: "Repo Audit Analyzer"
+run-name: "Repository Audit & Agentic Workflow Opportunity Analyzer"
 
 jobs:
   activation:
@@ -451,7 +451,7 @@ jobs:
               model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
               version: "",
               agent_version: "0.0.400",
-              workflow_name: "Repo Audit Analyzer",
+              workflow_name: "Repository Audit & Agentic Workflow Opportunity Analyzer",
               experimental: false,
               supports_tools_allowlist: true,
               supports_http_transport: true,
@@ -907,7 +907,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_NOOP_MAX: 1
-          GH_AW_WORKFLOW_NAME: "Repo Audit Analyzer"
+          GH_AW_WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -923,7 +923,7 @@ jobs:
           GH_AW_MISSING_TOOL_CREATE_ISSUE: "true"
           GH_AW_MISSING_TOOL_TITLE_PREFIX: "[missing tool]"
           GH_AW_MISSING_TOOL_LABELS: "[\"cookie\"]"
-          GH_AW_WORKFLOW_NAME: "Repo Audit Analyzer"
+          GH_AW_WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -936,7 +936,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Repo Audit Analyzer"
+          GH_AW_WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
@@ -958,7 +958,7 @@ jobs:
           GH_AW_COMMENT_ID: ${{ needs.activation.outputs.comment_id }}
           GH_AW_COMMENT_REPO: ${{ needs.activation.outputs.comment_repo }}
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GH_AW_WORKFLOW_NAME: "Repo Audit Analyzer"
+          GH_AW_WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_DETECTION_CONCLUSION: ${{ needs.detection.result }}
         with:
@@ -1010,7 +1010,7 @@ jobs:
       - name: Setup threat detection
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          WORKFLOW_NAME: "Repo Audit Analyzer"
+          WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
           WORKFLOW_DESCRIPTION: "Comprehensive repository audit to identify productivity improvement opportunities using agentic workflows"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
@@ -1089,7 +1089,7 @@ jobs:
     env:
       GH_AW_ENGINE_ID: "copilot"
       GH_AW_WORKFLOW_ID: "repo-audit-analyzer"
-      GH_AW_WORKFLOW_NAME: "Repo Audit Analyzer"
+      GH_AW_WORKFLOW_NAME: "Repository Audit & Agentic Workflow Opportunity Analyzer"
     outputs:
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
