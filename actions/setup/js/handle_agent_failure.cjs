@@ -252,14 +252,20 @@ async function main() {
     const secretVerificationResult = process.env.GH_AW_SECRET_VERIFICATION_RESULT || "";
     const assignmentErrors = process.env.GH_AW_ASSIGNMENT_ERRORS || "";
     const assignmentErrorCount = process.env.GH_AW_ASSIGNMENT_ERROR_COUNT || "0";
+    const createDiscussionErrors = process.env.GH_AW_CREATE_DISCUSSION_ERRORS || "";
+    const createDiscussionErrorCount = process.env.GH_AW_CREATE_DISCUSSION_ERROR_COUNT || "0";
 
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Secret verification result: ${secretVerificationResult}`);
     core.info(`Assignment error count: ${assignmentErrorCount}`);
+    core.info(`Create discussion error count: ${createDiscussionErrorCount}`);
 
     // Check if there are assignment errors (regardless of agent job status)
     const hasAssignmentErrors = parseInt(assignmentErrorCount, 10) > 0;
+
+    // Check if there are create_discussion errors (regardless of agent job status)
+    const hasCreateDiscussionErrors = parseInt(createDiscussionErrorCount, 10) > 0;
 
     // Check if agent succeeded but produced no safe outputs
     let hasMissingSafeOutputs = false;
@@ -273,9 +279,9 @@ async function main() {
       }
     }
 
-    // Only proceed if the agent job actually failed OR there are assignment errors OR missing safe outputs
-    if (agentConclusion !== "failure" && !hasAssignmentErrors && !hasMissingSafeOutputs) {
-      core.info(`Agent job did not fail and no assignment errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`);
+    // Only proceed if the agent job actually failed OR there are assignment errors OR create_discussion errors OR missing safe outputs
+    if (agentConclusion !== "failure" && !hasAssignmentErrors && !hasCreateDiscussionErrors && !hasMissingSafeOutputs) {
+      core.info(`Agent job did not fail and no assignment/discussion errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`);
       return;
     }
 
@@ -342,6 +348,25 @@ async function main() {
           assignmentErrorsContext += "\n";
         }
 
+        // Build create_discussion errors context
+        let createDiscussionErrorsContext = "";
+        if (hasCreateDiscussionErrors && createDiscussionErrors) {
+          createDiscussionErrorsContext = "\n**⚠️ Create Discussion Failed**: Failed to create one or more discussions.\n\n**Discussion Errors:**\n";
+          const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
+          for (const errorLine of errorLines) {
+            const parts = errorLine.split(":");
+            if (parts.length >= 4) {
+              const type = parts[0]; // "discussion"
+              const index = parts[1];
+              const repo = parts[2];
+              const title = parts[3];
+              const error = parts.slice(4).join(":"); // Rest is the error message
+              createDiscussionErrorsContext += `- Discussion "${title}" in ${repo}: ${error}\n`;
+            }
+          }
+          createDiscussionErrorsContext += "\n";
+        }
+
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
         if (hasMissingSafeOutputs) {
@@ -362,6 +387,7 @@ async function main() {
           secret_verification_context:
             secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
           assignment_errors_context: assignmentErrorsContext,
+          create_discussion_errors_context: createDiscussionErrorsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };
 
@@ -417,6 +443,25 @@ async function main() {
           assignmentErrorsContext += "\n";
         }
 
+        // Build create_discussion errors context
+        let createDiscussionErrorsContext = "";
+        if (hasCreateDiscussionErrors && createDiscussionErrors) {
+          createDiscussionErrorsContext = "\n**⚠️ Create Discussion Failed**: Failed to create one or more discussions.\n\n**Discussion Errors:**\n";
+          const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
+          for (const errorLine of errorLines) {
+            const parts = errorLine.split(":");
+            if (parts.length >= 4) {
+              const type = parts[0]; // "discussion"
+              const index = parts[1];
+              const repo = parts[2];
+              const title = parts[3];
+              const error = parts.slice(4).join(":"); // Rest is the error message
+              createDiscussionErrorsContext += `- Discussion "${title}" in ${repo}: ${error}\n`;
+            }
+          }
+          createDiscussionErrorsContext += "\n";
+        }
+
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
         if (hasMissingSafeOutputs) {
@@ -437,6 +482,7 @@ async function main() {
           secret_verification_context:
             secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
           assignment_errors_context: assignmentErrorsContext,
+          create_discussion_errors_context: createDiscussionErrorsContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };
 

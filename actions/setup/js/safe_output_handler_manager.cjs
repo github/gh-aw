@@ -904,6 +904,27 @@ async function main() {
       core.setOutput("issues_to_assign_copilot", "");
     }
 
+    // Export create_discussion errors for conclusion job
+    const createDiscussionErrors = processingResult.results
+      .filter(r => r.type === "create_discussion" && !r.success && !r.deferred && !r.skipped)
+      .map((r, index) => {
+        const message = agentOutput.items[r.messageIndex];
+        const title = message?.title || "Discussion";
+        const repo = message?.repo || "unknown";
+        const errorMsg = r.error || "Unknown error";
+        return `discussion:${index}:${repo}:${title}:${errorMsg}`;
+      })
+      .join("\n");
+
+    const createDiscussionErrorCount = processingResult.results.filter(r => r.type === "create_discussion" && !r.success && !r.deferred && !r.skipped).length;
+
+    core.setOutput("create_discussion_errors", createDiscussionErrors);
+    core.setOutput("create_discussion_error_count", createDiscussionErrorCount.toString());
+
+    if (createDiscussionErrorCount > 0) {
+      core.info(`Exported ${createDiscussionErrorCount} create_discussion error(s)`);
+    }
+
     core.info("Safe Output Handler Manager completed");
   } catch (error) {
     core.setFailed(`Handler manager failed: ${getErrorMessage(error)}`);
