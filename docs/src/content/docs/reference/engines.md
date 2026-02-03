@@ -41,9 +41,6 @@ gh copilot
 
 The `gh copilot` command is built into the GitHub CLI and automatically downloads and manages the Copilot CLI installation. No additional installation required - just install the [GitHub CLI](https://cli.github.com/)!
 
-> [!TIP]
-> If the Copilot CLI is not already installed, `gh copilot` will automatically download it to `~/.local/share/gh/copilot`. To remove it, use `gh copilot --remove`.
-
 ### Required Secrets
 
 Create a fine-grained PAT at <https://github.com/settings/personal-access-tokens/new>.
