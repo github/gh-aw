@@ -23,7 +23,7 @@ const WORKFLOWS_DIR = path.join(__dirname, "../.github/workflows");
 const OUTPUT_PATH = path.join(__dirname, "../docs/src/content/docs/agent-factory-status.mdx");
 
 // Repository owner and name
-const REPO_OWNER = "githubnext";
+const REPO_OWNER = "github";
 const REPO_NAME = "gh-aw";
 
 /**
