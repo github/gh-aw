@@ -60,9 +60,12 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []str
 	}
 
 	// Collect sandbox.mcp container (MCP gateway)
-	// sandbox is always enabled (sandbox: false no longer supported)
+	// Skip if sandbox is disabled (sandbox: false)
 	if workflowData != nil && workflowData.SandboxConfig != nil {
-		if workflowData.SandboxConfig.MCP != nil {
+		// Check if sandbox is disabled
+		sandboxDisabled := workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled
+
+		if !sandboxDisabled && workflowData.SandboxConfig.MCP != nil {
 			mcpGateway := workflowData.SandboxConfig.MCP
 			if mcpGateway.Container != "" {
 				image := mcpGateway.Container
@@ -78,6 +81,8 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []str
 					dockerLog.Printf("Added sandbox.mcp container: %s", image)
 				}
 			}
+		} else if sandboxDisabled {
+			dockerLog.Print("Sandbox disabled, skipping MCP gateway container image")
 		}
 	}
 

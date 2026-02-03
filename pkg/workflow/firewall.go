@@ -22,15 +22,22 @@ type FirewallConfig struct {
 }
 
 // isFirewallDisabledBySandboxAgent checks if the firewall is disabled via sandbox.agent: false
-// Note: sandbox.agent: false is no longer supported, so this always returns false
 func isFirewallDisabledBySandboxAgent(workflowData *WorkflowData) bool {
-	// sandbox.agent: false is no longer supported
-	return false
+	return workflowData != nil &&
+		workflowData.SandboxConfig != nil &&
+		workflowData.SandboxConfig.Agent != nil &&
+		workflowData.SandboxConfig.Agent.Disabled
 }
 
 // isFirewallEnabled checks if AWF firewall is enabled for the workflow
 // Firewall is enabled if network.firewall is explicitly set to true or an object
+// Firewall is disabled if sandbox.agent is explicitly set to false
 func isFirewallEnabled(workflowData *WorkflowData) bool {
+	// Check if sandbox.agent: false (new way to disable firewall)
+	if isFirewallDisabledBySandboxAgent(workflowData) {
+		firewallLog.Print("Firewall disabled via sandbox.agent: false")
+		return false
+	}
 
 	// Check network.firewall configuration (deprecated)
 	if workflowData != nil && workflowData.NetworkPermissions != nil && workflowData.NetworkPermissions.Firewall != nil {
@@ -117,6 +124,13 @@ func enableFirewallByDefaultForClaude(engineID string, networkPermissions *Netwo
 func enableFirewallByDefaultForEngine(engineID string, networkPermissions *NetworkPermissions, sandboxConfig *SandboxConfig) {
 	// Check if network permissions exist
 	if networkPermissions == nil {
+		return
+	}
+
+	// Check if sandbox.agent: false is set (disables firewall)
+	// Use a minimal check here since we don't have WorkflowData
+	if sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
+		firewallLog.Print("sandbox.agent: false is set, skipping AWF auto-enablement")
 		return
 	}
 

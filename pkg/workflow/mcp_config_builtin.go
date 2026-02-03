@@ -122,8 +122,12 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 	// Add type field for HTTP (required by MCP specification for HTTP transport)
 	yaml.WriteString("                \"type\": \"http\",\n")
 
-	// Use host.docker.internal when agent sandbox is enabled (which is always now)
+	// Determine host based on whether agent is disabled
 	host := "host.docker.internal"
+	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
+		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
+		host = "localhost"
+	}
 
 	// HTTP URL using environment variable - NOT escaped so shell expands it before awmg validation
 	// Use host.docker.internal to allow access from firewall container (or localhost if agent disabled)

@@ -2173,9 +2173,14 @@
               "description": "Legacy sandbox type field (use agent instead)"
             },
             "agent": {
-              "description": "Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses Anthropic Sandbox Runtime. Defaults to 'awf' if not specified.",
+              "description": "Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses Anthropic Sandbox Runtime. Set to false to disable the firewall. Defaults to 'awf' if not specified.",
               "default": "awf",
               "oneOf": [
+                {
+                  "type": "boolean",
+                  "const": false,
+                  "description": "Set to false to disable the AWF firewall (sandbox.agent: false)"
+                },
                 {
                   "type": "string",
                   "enum": ["awf", "srt"],

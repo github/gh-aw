@@ -48,8 +48,10 @@ func renderCustomMCPConfigWrapperWithContext(yaml *strings.Builder, toolName str
 	fmt.Fprintf(yaml, "              \"%s\": {\n", toolName)
 
 	// Determine if localhost URLs should be rewritten to host.docker.internal
-	// This is always needed now since agent sandbox is always enabled
-	rewriteLocalhost := true
+	// This is needed when firewall is enabled (agent is not disabled)
+	rewriteLocalhost := workflowData != nil && (workflowData.SandboxConfig == nil ||
+		workflowData.SandboxConfig.Agent == nil ||
+		!workflowData.SandboxConfig.Agent.Disabled)
 
 	// Use the shared MCP config renderer with JSON format
 	renderer := MCPConfigRenderer{

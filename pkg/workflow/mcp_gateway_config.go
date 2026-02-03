@@ -123,9 +123,11 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 	}
 }
 
-// isSandboxDisabled checks if sandbox features are completely disabled
-// Note: sandbox: false is no longer supported, so this always returns false
+// isSandboxDisabled checks if sandbox features are completely disabled (sandbox: false)
 func isSandboxDisabled(workflowData *WorkflowData) bool {
-	// sandbox: false is no longer supported, so sandbox is never disabled
-	return false
+	if workflowData == nil || workflowData.SandboxConfig == nil {
+		return false
+	}
+	// Check if sandbox was explicitly disabled via sandbox: false
+	return workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled
 }

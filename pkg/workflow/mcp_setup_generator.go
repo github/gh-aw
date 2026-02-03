@@ -475,8 +475,11 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 		domain := gatewayConfig.Domain
 		if domain == "" {
-			// Agent sandbox is always enabled, so use host.docker.internal
-			domain = "host.docker.internal"
+			if workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
+				domain = "localhost"
+			} else {
+				domain = "host.docker.internal"
+			}
 		}
 
 		apiKey := gatewayConfig.APIKey

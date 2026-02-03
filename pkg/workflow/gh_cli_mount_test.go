@@ -50,7 +50,9 @@ func TestGhCLIMountInAWFContainer(t *testing.T) {
 				ID: "copilot",
 			},
 			SandboxConfig: &SandboxConfig{
-				Agent: &AgentSandboxConfig{},
+				Agent: &AgentSandboxConfig{
+					Disabled: true,
+				},
 			},
 		}
 
@@ -278,7 +280,9 @@ func TestUtilityBinaryMountsInAWFContainer(t *testing.T) {
 				ID: "copilot",
 			},
 			SandboxConfig: &SandboxConfig{
-				Agent: &AgentSandboxConfig{},
+				Agent: &AgentSandboxConfig{
+					Disabled: true,
+				},
 			},
 		}
 

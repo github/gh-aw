@@ -289,7 +289,9 @@ func TestIsSandboxEnabled(t *testing.T) {
 		{
 			name: "agent disabled",
 			sandboxConfig: &SandboxConfig{
-				Agent: &AgentSandboxConfig{},
+				Agent: &AgentSandboxConfig{
+					Disabled: true,
+				},
 			},
 			networkPermissions: nil,
 			expected:           false,
@@ -379,7 +381,9 @@ func TestIsSandboxEnabled(t *testing.T) {
 		{
 			name: "agent disabled overrides auto-enabled firewall",
 			sandboxConfig: &SandboxConfig{
-				Agent: &AgentSandboxConfig{},
+				Agent: &AgentSandboxConfig{
+					Disabled: true,
+				},
 			},
 			networkPermissions: &NetworkPermissions{
 				Firewall: &FirewallConfig{

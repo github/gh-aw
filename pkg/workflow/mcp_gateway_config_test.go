@@ -155,6 +155,17 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 			expected:     nil,
 		},
 		{
+			name: "sandbox disabled",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Disabled: true,
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
 			name:         "creates default gateway config",
 			workflowData: &WorkflowData{},
 			expected: &MCPGatewayRuntimeConfig{
@@ -167,7 +178,9 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 			name: "with sandbox enabled",
 			workflowData: &WorkflowData{
 				SandboxConfig: &SandboxConfig{
-					Agent: &AgentSandboxConfig{},
+					Agent: &AgentSandboxConfig{
+						Disabled: false,
+					},
 				},
 			},
 			expected: &MCPGatewayRuntimeConfig{
@@ -210,11 +223,22 @@ func TestIsSandboxDisabled(t *testing.T) {
 			expected:     false,
 		},
 		{
-			name: "sandbox always enabled",
+			name: "sandbox disabled",
 			workflowData: &WorkflowData{
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
-						Type: SandboxTypeAWF,
+						Disabled: true,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "sandbox enabled",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Disabled: false,
 					},
 				},
 			},
@@ -232,8 +256,7 @@ func TestIsSandboxDisabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isSandboxDisabled(tt.workflowData)
-			// isSandboxDisabled should always return false now
-			assert.False(t, result, "isSandboxDisabled should always return false")
+			assert.Equal(t, tt.expected, result, "isSandboxDisabled result should match expected")
 		})
 	}
 }

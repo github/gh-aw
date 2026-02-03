@@ -341,8 +341,12 @@ func (r *MCPConfigRendererUnified) RenderSafeOutputsMCP(yaml *strings.Builder, w
 // renderSafeOutputsTOML generates Safe Outputs MCP configuration in TOML format
 // Now uses HTTP transport instead of stdio, similar to safe-inputs
 func (r *MCPConfigRendererUnified) renderSafeOutputsTOML(yaml *strings.Builder, workflowData *WorkflowData) {
-	// Use host.docker.internal when agent sandbox is enabled (which is always now)
+	// Determine host based on whether agent is disabled
 	host := "host.docker.internal"
+	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
+		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
+		host = "localhost"
+	}
 
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers." + constants.SafeOutputsMCPServerID + "]\n")
@@ -373,9 +377,15 @@ func (r *MCPConfigRendererUnified) renderSafeInputsTOML(yaml *strings.Builder, s
 	yaml.WriteString("          [mcp_servers." + constants.SafeInputsMCPServerID + "]\n")
 	yaml.WriteString("          type = \"http\"\n")
 
-	// Use host.docker.internal when agent sandbox is enabled (which is always now)
+	// Determine host based on whether agent is disabled
 	host := "host.docker.internal"
-	mcpRendererLog.Print("Using host.docker.internal for safe-inputs (agent always enabled)")
+	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
+		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
+		host = "localhost"
+		mcpRendererLog.Print("Using localhost for safe-inputs (agent disabled)")
+	} else {
+		mcpRendererLog.Print("Using host.docker.internal for safe-inputs (agent enabled)")
+	}
 
 	yaml.WriteString("          url = \"http://" + host + ":$GH_AW_SAFE_INPUTS_PORT\"\n")
 	yaml.WriteString("          headers = { Authorization = \"$GH_AW_SAFE_INPUTS_API_KEY\" }\n")

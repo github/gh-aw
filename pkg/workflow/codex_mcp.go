@@ -159,9 +159,11 @@ func (e *CodexEngine) renderCodexMCPConfigWithContext(yaml *strings.Builder, too
 	yaml.WriteString("          \n")
 	fmt.Fprintf(yaml, "          [mcp_servers.%s]\n", toolName)
 
-	// localhost URLs should be rewritten to host.docker.internal
-	// This is always needed now since agent sandbox is always enabled
-	rewriteLocalhost := true
+	// Determine if localhost URLs should be rewritten to host.docker.internal
+	// This is needed when firewall is enabled (agent is not disabled)
+	rewriteLocalhost := workflowData != nil && (workflowData.SandboxConfig == nil ||
+		workflowData.SandboxConfig.Agent == nil ||
+		!workflowData.SandboxConfig.Agent.Disabled)
 
 	// Use the shared MCP config renderer with TOML format
 	renderer := MCPConfigRenderer{
@@ -181,9 +183,10 @@ func (e *CodexEngine) renderCodexMCPConfigWithContext(yaml *strings.Builder, too
 // renderCodexJSONMCPConfigWithContext generates custom MCP server configuration in JSON format for gateway
 // This is used to generate the JSON config file that the MCP gateway reads
 func (e *CodexEngine) renderCodexJSONMCPConfigWithContext(yaml *strings.Builder, toolName string, toolConfig map[string]any, isLast bool, workflowData *WorkflowData) error {
-	// localhost URLs should be rewritten to host.docker.internal
-	// This is always needed now since agent sandbox is always enabled
-	rewriteLocalhost := true
+	// Determine if localhost URLs should be rewritten to host.docker.internal
+	rewriteLocalhost := workflowData != nil && (workflowData.SandboxConfig == nil ||
+		workflowData.SandboxConfig.Agent == nil ||
+		!workflowData.SandboxConfig.Agent.Disabled)
 
 	// Use the shared renderer with JSON format for gateway
 	renderer := MCPConfigRenderer{

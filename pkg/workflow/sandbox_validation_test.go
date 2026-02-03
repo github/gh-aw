@@ -392,7 +392,9 @@ func TestSandboxMCPGatewayValidation(t *testing.T) {
 			workflowData: &WorkflowData{
 				Name: "test-workflow",
 				SandboxConfig: &SandboxConfig{
-					Agent: &AgentSandboxConfig{},
+					Agent: &AgentSandboxConfig{
+						Disabled: true,
+					},
 				},
 				Tools: map[string]any{}, // No tools configured
 			},
@@ -403,7 +405,9 @@ func TestSandboxMCPGatewayValidation(t *testing.T) {
 			workflowData: &WorkflowData{
 				Name: "test-workflow",
 				SandboxConfig: &SandboxConfig{
-					Agent: &AgentSandboxConfig{},
+					Agent: &AgentSandboxConfig{
+						Disabled: true,
+					},
 				},
 				Tools: map[string]any{
 					"github": map[string]any{}, // GitHub tool uses MCP

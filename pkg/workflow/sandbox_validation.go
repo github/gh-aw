@@ -21,36 +21,29 @@ import (
 var sandboxValidationLog = logger.New("workflow:sandbox_validation")
 
 // validateUnsupportedSandboxSyntax validates that unsupported sandbox syntaxes are not used
-// This should be called early in the parsing process, before extractSandboxConfig
+// This function only rejects:
+// - sandbox: false (top-level boolean false)
+// - sandbox.gateway: false (gateway cannot be disabled)
+// - sandbox.mcp: false (MCP gateway cannot be disabled)
+// Note: sandbox.agent: false IS SUPPORTED and disables the AWF firewall
 func validateUnsupportedSandboxSyntax(frontmatter map[string]any) error {
 	sandbox, exists := frontmatter["sandbox"]
 	if !exists {
 		return nil
 	}
 
-	// Check for sandbox: false (boolean false is not supported)
+	// Check for sandbox: false (top-level boolean false is NOT supported)
 	if sandboxBool, ok := sandbox.(bool); ok && !sandboxBool {
 		return NewConfigurationError(
 			"sandbox",
 			"false",
-			"'sandbox: false' is not supported. The sandbox is required for security and cannot be disabled.",
-			"Remove the 'sandbox: false' line from your workflow. The agent sandbox is mandatory.",
+			"'sandbox: false' (top-level) is not supported. Use 'sandbox.agent: false' to disable the firewall instead.",
+			"Replace 'sandbox: false' with:\nsandbox:\n  agent: false  # Disables AWF firewall",
 		)
 	}
 
-	// Check for sandbox.agent: false (nested boolean false is not supported)
+	// Check for sandbox.gateway: false or sandbox.mcp: false (MCP gateway cannot be disabled)
 	if sandboxObj, ok := sandbox.(map[string]any); ok {
-		if agentVal, hasAgent := sandboxObj["agent"]; hasAgent {
-			if agentBool, ok := agentVal.(bool); ok && !agentBool {
-				return NewConfigurationError(
-					"sandbox.agent",
-					"false",
-					"'sandbox.agent: false' is not supported. The agent sandbox is required and cannot be disabled.",
-					"Remove the 'sandbox.agent: false' line. Use 'sandbox.agent: awf' (default) or 'sandbox.agent: srt' instead.",
-				)
-			}
-		}
-
 		// Check for sandbox.gateway: false (this field doesn't exist, but users might try it)
 		if gatewayVal, hasGateway := sandboxObj["gateway"]; hasGateway {
 			if gatewayBool, ok := gatewayVal.(bool); ok && !gatewayBool {
@@ -147,6 +140,15 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 
 	sandboxConfig := workflowData.SandboxConfig
 
+	// Check if sandbox: false or sandbox.agent: false was specified
+	// In non-strict mode, this is allowed (with a warning shown at compile time)
+	// The strict mode check happens in validateStrictFirewall()
+	if sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
+		// sandbox: false is allowed in non-strict mode, so we don't error here
+		// The warning is emitted in compiler.go
+		sandboxValidationLog.Print("sandbox: false detected, will be validated by strict mode check")
+	}
+
 	// Validate mounts syntax if specified in agent config
 	agentConfig := getAgentConfig(workflowData)
 	if agentConfig != nil && len(agentConfig.Mounts) > 0 {
@@ -215,21 +217,24 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 	// The MCP gateway is enabled when MCP servers are configured (tools that use MCP)
 	// Only validate this when sandbox is explicitly configured (not nil)
 	// If SandboxConfig is nil, defaults will be applied later and MCP check doesn't apply yet
-	// Check if MCP gateway is enabled
-	// Only enforce this if sandbox was explicitly configured (has agent or type set)
-	// This prevents false positives for workflows where sandbox defaults haven't been applied yet
-	hasExplicitSandboxConfig := (sandboxConfig.Agent != nil) || sandboxConfig.Type != ""
+	if !isSandboxDisabled(workflowData) {
+		// Sandbox is enabled - check if MCP gateway is enabled
+		// Only enforce this if sandbox was explicitly configured (has agent or type set)
+		// This prevents false positives for workflows where sandbox defaults haven't been applied yet
+		hasExplicitSandboxConfig := (sandboxConfig.Agent != nil && !sandboxConfig.Agent.Disabled) ||
+			sandboxConfig.Type != ""
 
-	if hasExplicitSandboxConfig && !HasMCPServers(workflowData) {
-		return NewConfigurationError(
-			"sandbox",
-			"enabled without MCP servers",
-			"agent sandbox requires MCP servers to be configured",
-			"Add MCP tools to your workflow:\n\ntools:\n  github:\n    mode: remote\n  playwright:\n    allowed_domains: [\"example.com\"]",
-		)
-	}
-	if hasExplicitSandboxConfig {
-		sandboxValidationLog.Print("Sandbox enabled with MCP gateway - validation passed")
+		if hasExplicitSandboxConfig && !HasMCPServers(workflowData) {
+			return NewConfigurationError(
+				"sandbox",
+				"enabled without MCP servers",
+				"agent sandbox requires MCP servers to be configured",
+				"Add MCP tools to your workflow:\n\ntools:\n  github:\n    mode: remote\n  playwright:\n    allowed_domains: [\"example.com\"]\n\nOr disable the sandbox:\nsandbox: false",
+			)
+		}
+		if hasExplicitSandboxConfig {
+			sandboxValidationLog.Print("Sandbox enabled with MCP gateway - validation passed")
+		}
 	}
 
 	return nil
