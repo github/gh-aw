@@ -39,6 +39,7 @@ safe-outputs:
     group: true
 
 tools:
+  agentic-workflows:
   repo-memory:
     branch-name: memory/deep-report
     description: "Long-term insights, patterns, and trend data"
@@ -54,7 +55,6 @@ tools:
 imports:
   - shared/jqschema.md
   - shared/weekly-issues-data-fetch.md
-  - shared/mcp/gh-aw.md
   - shared/reporting.md
 ---
 

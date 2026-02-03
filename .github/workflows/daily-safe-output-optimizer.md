@@ -14,6 +14,7 @@ permissions:
 
 engine: claude
 tools:
+  agentic-workflows:
   cache-memory: true
   timeout: 300
 
@@ -34,7 +35,6 @@ timeout-minutes: 30
 strict: true
 
 imports:
-  - shared/mcp/gh-aw.md
   - shared/jqschema.md
   - shared/reporting.md
 ---

@@ -24,11 +24,10 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/jqschema.md
-#     - shared/mcp/gh-aw.md
 #     - shared/reporting.md
 #     - shared/weekly-issues-data-fetch.md
 #
-# frontmatter-hash: f2d379a0420b0a9e8a7fe7cefc13ada73199cb631c2ead7be720e3d8f42c27aa
+# frontmatter-hash: b715dd1e67cdc8621dab57a8d1bb653504503e4c8bf61f7b8bbe999421a41a08
 
 name: "DeepReport - Intelligence Gathering Agent"
 "on":
@@ -125,21 +124,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Fetch weekly issues data
         run: "# Create output directories\nmkdir -p /tmp/gh-aw/weekly-issues-data\nmkdir -p /tmp/gh-aw/cache-memory\n\n# Get today's date for cache identification\nTODAY=$(date '+%Y-%m-%d')\nCACHE_DIR=\"/tmp/gh-aw/cache-memory\"\n\n# Check if cached data exists from today\nif [ -f \"$CACHE_DIR/weekly-issues-${TODAY}.json\" ] && [ -s \"$CACHE_DIR/weekly-issues-${TODAY}.json\" ]; then\n  echo \"✓ Found cached weekly issues data from ${TODAY}\"\n  cp \"$CACHE_DIR/weekly-issues-${TODAY}.json\" /tmp/gh-aw/weekly-issues-data/issues.json\n  \n  # Regenerate schema if missing\n  if [ ! -f \"$CACHE_DIR/weekly-issues-${TODAY}-schema.json\" ]; then\n    /tmp/gh-aw/jqschema.sh < /tmp/gh-aw/weekly-issues-data/issues.json > \"$CACHE_DIR/weekly-issues-${TODAY}-schema.json\"\n  fi\n  cp \"$CACHE_DIR/weekly-issues-${TODAY}-schema.json\" /tmp/gh-aw/weekly-issues-data/issues-schema.json\n  \n  echo \"Using cached data from ${TODAY}\"\n  echo \"Total issues in cache: $(jq 'length' /tmp/gh-aw/weekly-issues-data/issues.json)\"\nelse\n  echo \"⬇ Downloading fresh weekly issues data...\"\n  \n  # Calculate date 7 days ago (cross-platform: GNU date first, BSD fallback)\n  DATE_7_DAYS_AGO=$(date -d '7 days ago' '+%Y-%m-%d' 2>/dev/null || date -v-7d '+%Y-%m-%d')\n  \n  echo \"Fetching issues created or updated since ${DATE_7_DAYS_AGO}...\"\n  \n  # Fetch issues from the last 7 days using gh CLI\n  # Using --search with updated filter to get recent activity\n  gh issue list --repo ${{ github.repository }} \\\n    --search \"updated:>=${DATE_7_DAYS_AGO}\" \\\n    --state all \\\n    --json number,title,author,createdAt,state,url,body,labels,updatedAt,closedAt,milestone,assignees,comments \\\n    --limit 500 \\\n    > /tmp/gh-aw/weekly-issues-data/issues.json\n\n  # Generate schema for reference\n  /tmp/gh-aw/jqschema.sh < /tmp/gh-aw/weekly-issues-data/issues.json > /tmp/gh-aw/weekly-issues-data/issues-schema.json\n\n  # Store in cache with today's date\n  cp /tmp/gh-aw/weekly-issues-data/issues.json \"$CACHE_DIR/weekly-issues-${TODAY}.json\"\n  cp /tmp/gh-aw/weekly-issues-data/issues-schema.json \"$CACHE_DIR/weekly-issues-${TODAY}-schema.json\"\n\n  echo \"✓ Weekly issues data saved to cache: weekly-issues-${TODAY}.json\"\n  echo \"Total issues found: $(jq 'length' /tmp/gh-aw/weekly-issues-data/issues.json)\"\nfi\n\n# Always ensure data is available at expected locations for backward compatibility\necho \"Weekly issues data available at: /tmp/gh-aw/weekly-issues-data/issues.json\"\necho \"Schema available at: /tmp/gh-aw/weekly-issues-data/issues-schema.json\""
-      - name: Setup Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
-        with:
-          cache: true
-          go-version-file: go.mod
-      - name: Install dependencies
-        run: make deps-dev
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Install binary as 'gh-aw'
-        run: "# Check if gh-aw extension is already installed\nif gh extension list | grep -q \"github/gh-aw\"; then\n  echo \"gh-aw extension already installed, skipping installation...\"\nelse\n  # Check if a different extension provides the 'aw' command\n  # gh extension list format: NAME  COMMAND  VERSION\n  EXISTING_EXTENSION=$(gh extension list | awk '$2 == \"aw\" {print $1}' | head -n1)\n  if [ -n \"$EXISTING_EXTENSION\" ]; then\n    echo \"Found conflicting extension providing 'aw' command: $EXISTING_EXTENSION\"\n    echo \"Removing conflicting extension...\"\n    gh extension remove \"$EXISTING_EXTENSION\" || true\n  fi\n  \n  # Install the extension\n  echo \"Installing gh-aw extension...\"\n  make install\nfi\n\n# Verify installation\ngh aw --version\n"
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Start MCP server
-        run: "set -e\n./gh-aw mcp-server --cmd ./gh-aw --port 8765 &\nMCP_PID=$!\n\n# Robust health check with TCP connection test\necho \"Waiting for MCP server to start (PID: $MCP_PID)...\"\nfor i in {1..15}; do\n  # Check if process is still running\n  if ! kill -0 $MCP_PID 2>/dev/null; then\n    echo \"Error: MCP server process died unexpectedly\"\n    exit 1\n  fi\n  \n  # Try to connect to the server port\n  if timeout 1 bash -c \"echo > /dev/tcp/localhost/8765\" 2>/dev/null; then\n    echo \"MCP server is accepting connections on port 8765\"\n    echo \"MCP server started successfully with PID $MCP_PID\"\n    exit 0\n  fi\n  \n  echo \"Waiting for server to accept connections... (attempt $i/15)\"\n  sleep 1\ndone\n\necho \"Error: MCP server failed to accept connections after 15 seconds\"\nexit 1\n"
 
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
@@ -213,7 +197,31 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.94 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-mcpg:v0.0.94 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
+      - name: Install gh-aw extension
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if gh-aw extension is already installed
+          if gh extension list | grep -q "github/gh-aw"; then
+            echo "gh-aw extension already installed, upgrading..."
+            gh extension upgrade gh-aw || true
+          else
+            echo "Installing gh-aw extension..."
+            gh extension install github/gh-aw
+          fi
+          gh aw --version
+          # Copy the gh-aw binary to /opt/gh-aw for MCP server containerization
+          mkdir -p /opt/gh-aw
+          GH_AW_BIN=$(which gh-aw 2>/dev/null || find ~/.local/share/gh/extensions/gh-aw -name 'gh-aw' -type f 2>/dev/null | head -1)
+          if [ -n "$GH_AW_BIN" ] && [ -f "$GH_AW_BIN" ]; then
+            cp "$GH_AW_BIN" /opt/gh-aw/gh-aw
+            chmod +x /opt/gh-aw/gh-aw
+            echo "Copied gh-aw binary to /opt/gh-aw/gh-aw"
+          else
+            echo "::error::Failed to find gh-aw binary for MCP server"
+            exit 1
+          fi
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -532,6 +540,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_PORT: ${{ steps.safe-outputs-start.outputs.port }}
           GITHUB_MCP_LOCKDOWN: ${{ steps.determine-automatic-lockdown.outputs.lockdown == 'true' && '1' || '0' }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           mkdir -p /tmp/gh-aw/mcp-config
@@ -554,10 +563,14 @@ jobs:
           
           [shell_environment_policy]
           inherit = "core"
-          include_only = ["CODEX_API_KEY", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_SAFE_OUTPUTS", "GITHUB_PERSONAL_ACCESS_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "HOME", "OPENAI_API_KEY", "PATH"]
+          include_only = ["CODEX_API_KEY", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_SAFE_OUTPUTS", "GITHUB_PERSONAL_ACCESS_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_TOKEN", "HOME", "OPENAI_API_KEY", "PATH"]
           
-          [mcp_servers.gh-aw]
-          url = "http://host.docker.internal:8765"
+          [mcp_servers.agentic_workflows]
+          container = "alpine:latest"
+          entrypoint = "/opt/gh-aw/gh-aw"
+          entrypointArgs = ["mcp-server"]
+          mounts = ["/opt/gh-aw:/opt/gh-aw:ro"]
+          env_vars = ["GITHUB_TOKEN"]
           
           [mcp_servers.github]
           user_agent = "deepreport-intelligence-gathering-agent"
@@ -579,9 +592,14 @@ jobs:
           cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
-              "gh-aw": {
-              "type": "http",
-              "url": "http://host.docker.internal:8765"
+              "agentic_workflows": {
+                "container": "alpine:latest",
+                "entrypoint": "/opt/gh-aw/gh-aw",
+                "entrypointArgs": ["mcp-server"],
+                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "env": {
+                  "GITHUB_TOKEN": "$GITHUB_TOKEN"
+                }
               },
               "github": {
                 "container": "ghcr.io/github/github-mcp-server:v0.30.2",
@@ -936,8 +954,6 @@ jobs:
           jq 'sort_by(.updatedAt) | reverse' /tmp/gh-aw/weekly-issues-data/issues.json
           ```
           
-          
-          
           ## Report Structure Guidelines
           
           ### 1. Header Levels
@@ -1072,7 +1088,7 @@ jobs:
           mkdir -p "$HOME/.cache"
           INSTRUCTION="$(cat "$GH_AW_PROMPT")"
           mkdir -p "$CODEX_HOME/logs"
-          sudo -E awf --env-all --env "ANDROID_HOME=${ANDROID_HOME}" --env "ANDROID_NDK=${ANDROID_NDK}" --env "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" --env "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME}" --env "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}" --env "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}" --env "AZURE_EXTENSION_DIR=${AZURE_EXTENSION_DIR}" --env "CARGO_HOME=${CARGO_HOME}" --env "CHROMEWEBDRIVER=${CHROMEWEBDRIVER}" --env "CONDA=${CONDA}" --env "DOTNET_ROOT=${DOTNET_ROOT}" --env "EDGEWEBDRIVER=${EDGEWEBDRIVER}" --env "GECKOWEBDRIVER=${GECKOWEBDRIVER}" --env "GEM_HOME=${GEM_HOME}" --env "GEM_PATH=${GEM_PATH}" --env "GOPATH=${GOPATH}" --env "GOROOT=${GOROOT}" --env "HOMEBREW_CELLAR=${HOMEBREW_CELLAR}" --env "HOMEBREW_PREFIX=${HOMEBREW_PREFIX}" --env "HOMEBREW_REPOSITORY=${HOMEBREW_REPOSITORY}" --env "JAVA_HOME=${JAVA_HOME}" --env "JAVA_HOME_11_X64=${JAVA_HOME_11_X64}" --env "JAVA_HOME_17_X64=${JAVA_HOME_17_X64}" --env "JAVA_HOME_21_X64=${JAVA_HOME_21_X64}" --env "JAVA_HOME_25_X64=${JAVA_HOME_25_X64}" --env "JAVA_HOME_8_X64=${JAVA_HOME_8_X64}" --env "NVM_DIR=${NVM_DIR}" --env "PIPX_BIN_DIR=${PIPX_BIN_DIR}" --env "PIPX_HOME=${PIPX_HOME}" --env "RUSTUP_HOME=${RUSTUP_HOME}" --env "SELENIUM_JAR_PATH=${SELENIUM_JAR_PATH}" --env "SWIFT_PATH=${SWIFT_PATH}" --env "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" --env "GH_AW_TOOL_BINS=$GH_AW_TOOL_BINS" --container-workdir "${GITHUB_WORKSPACE}" --mount /tmp:/tmp:rw --mount "${HOME}/.cache:${HOME}/.cache:rw" --mount "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw" --mount /opt/hostedtoolcache:/opt/hostedtoolcache:ro --mount /opt/gh-aw:/opt/gh-aw:ro --allow-domains '*.jsr.io,*.pythonhosted.org,anaconda.org,api.npms.io,api.openai.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,binstar.org,bootstrap.pypa.io,bun.sh,conda.anaconda.org,conda.binstar.org,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,deb.nodesource.com,deno.land,files.pythonhosted.org,get.pnpm.io,host.docker.internal,json-schema.org,json.schemastore.org,jsr.io,keyserver.ubuntu.com,localhost,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,openai.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pip.pypa.io,ppa.launchpad.net,pypi.org,pypi.python.org,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.anaconda.com,repo.continuum.io,repo.yarnpkg.com,s.symcb.com,s.symcd.com,security.ubuntu.com,skimdb.npmjs.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.npmjs.com,www.npmjs.org,yarnpkg.com' --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.13.1 --agent-image act \
+          sudo -E awf --env-all --env "ANDROID_HOME=${ANDROID_HOME}" --env "ANDROID_NDK=${ANDROID_NDK}" --env "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" --env "ANDROID_NDK_LATEST_HOME=${ANDROID_NDK_LATEST_HOME}" --env "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}" --env "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}" --env "AZURE_EXTENSION_DIR=${AZURE_EXTENSION_DIR}" --env "CARGO_HOME=${CARGO_HOME}" --env "CHROMEWEBDRIVER=${CHROMEWEBDRIVER}" --env "CONDA=${CONDA}" --env "DOTNET_ROOT=${DOTNET_ROOT}" --env "EDGEWEBDRIVER=${EDGEWEBDRIVER}" --env "GECKOWEBDRIVER=${GECKOWEBDRIVER}" --env "GEM_HOME=${GEM_HOME}" --env "GEM_PATH=${GEM_PATH}" --env "GOPATH=${GOPATH}" --env "GOROOT=${GOROOT}" --env "HOMEBREW_CELLAR=${HOMEBREW_CELLAR}" --env "HOMEBREW_PREFIX=${HOMEBREW_PREFIX}" --env "HOMEBREW_REPOSITORY=${HOMEBREW_REPOSITORY}" --env "JAVA_HOME=${JAVA_HOME}" --env "JAVA_HOME_11_X64=${JAVA_HOME_11_X64}" --env "JAVA_HOME_17_X64=${JAVA_HOME_17_X64}" --env "JAVA_HOME_21_X64=${JAVA_HOME_21_X64}" --env "JAVA_HOME_25_X64=${JAVA_HOME_25_X64}" --env "JAVA_HOME_8_X64=${JAVA_HOME_8_X64}" --env "NVM_DIR=${NVM_DIR}" --env "PIPX_BIN_DIR=${PIPX_BIN_DIR}" --env "PIPX_HOME=${PIPX_HOME}" --env "RUSTUP_HOME=${RUSTUP_HOME}" --env "SELENIUM_JAR_PATH=${SELENIUM_JAR_PATH}" --env "SWIFT_PATH=${SWIFT_PATH}" --env "VCPKG_INSTALLATION_ROOT=${VCPKG_INSTALLATION_ROOT}" --env "GH_AW_TOOL_BINS=$GH_AW_TOOL_BINS" --container-workdir "${GITHUB_WORKSPACE}" --mount /tmp:/tmp:rw --mount "${HOME}/.cache:${HOME}/.cache:rw" --mount "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw" --mount /opt/hostedtoolcache:/opt/hostedtoolcache:ro --mount /opt/gh-aw:/opt/gh-aw:ro --allow-domains '*.jsr.io,*.pythonhosted.org,anaconda.org,api.npms.io,api.openai.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,binstar.org,bootstrap.pypa.io,bun.sh,conda.anaconda.org,conda.binstar.org,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,deb.nodesource.com,deno.land,files.pythonhosted.org,get.pnpm.io,host.docker.internal,json-schema.org,json.schemastore.org,jsr.io,keyserver.ubuntu.com,nodejs.org,npm.pkg.github.com,npmjs.com,npmjs.org,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,openai.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pip.pypa.io,ppa.launchpad.net,pypi.org,pypi.python.org,registry.bower.io,registry.npmjs.com,registry.npmjs.org,registry.yarnpkg.com,repo.anaconda.com,repo.continuum.io,repo.yarnpkg.com,s.symcb.com,s.symcd.com,security.ubuntu.com,skimdb.npmjs.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.npmjs.com,www.npmjs.org,yarnpkg.com' --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.13.1 --agent-image act \
             -- source /opt/gh-aw/actions/sanitize_path.sh "$GH_AW_TOOL_BINS$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH" && codex ${GH_AW_MODEL_AGENT_CODEX:+-c model="$GH_AW_MODEL_AGENT_CODEX" }exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check "$INSTRUCTION" \
             2>&1 | tee /tmp/gh-aw/agent-stdio.log
         env:
