@@ -28,7 +28,7 @@ func getInstallScriptURLCodemod() Codemod {
 				"https://raw.githubusercontent.com/githubnext/gh-aw/",
 				"githubnext/gh-aw",
 			}
-			
+
 			newReplacements := []string{
 				"https://raw.githubusercontent.com/github/gh-aw/",
 				"github/gh-aw",
@@ -39,7 +39,7 @@ func getInstallScriptURLCodemod() Codemod {
 
 			for i, line := range frontmatterLines {
 				modifiedLine := line
-				
+
 				// Try to replace each old pattern with the new one in all lines
 				for j, oldPattern := range oldPatterns {
 					if strings.Contains(modifiedLine, oldPattern) {
@@ -48,7 +48,7 @@ func getInstallScriptURLCodemod() Codemod {
 						installScriptURLCodemodLog.Printf("Replaced '%s' with '%s' on line %d", oldPattern, newReplacements[j], i+1)
 					}
 				}
-				
+
 				result[i] = modifiedLine
 			}
 
