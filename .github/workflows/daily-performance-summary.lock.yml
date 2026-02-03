@@ -139,6 +139,28 @@ jobs:
             /tmp/gh-aw/python/*.py
             /tmp/gh-aw/python/data/*
           retention-days: 30
+      - name: Setup Python environment
+        run: |
+          mkdir -p /tmp/gh-aw/python/{data,charts,artifacts}
+          pip install --user --quiet numpy pandas matplotlib seaborn scipy
+      - if: always()
+        name: Upload charts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          if-no-files-found: warn
+          name: trending-charts
+          path: /tmp/gh-aw/python/charts/*.png
+          retention-days: 30
+      - if: always()
+        name: Upload source and data
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          if-no-files-found: warn
+          name: trending-source-and-data
+          path: |
+            /tmp/gh-aw/python/*.py
+            /tmp/gh-aw/python/data/*
+          retention-days: 30
 
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory

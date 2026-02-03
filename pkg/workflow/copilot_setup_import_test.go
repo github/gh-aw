@@ -61,7 +61,7 @@ steps:
 
 # Test Copilot Setup Import
 
-This workflow imports copilot-setup-steps.yml and should have the imported steps after the custom step.
+This workflow imports copilot-setup-steps.yml and should have the imported steps before the custom step.
 `
 	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
 	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)

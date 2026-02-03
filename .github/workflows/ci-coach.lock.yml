@@ -154,6 +154,37 @@ jobs:
           go test -v -json -count=1 -timeout=3m -tags '!integration' -run='^Test' ./... | tee /tmp/gh-aw/test-results.json
       - name: Setup jq utilities directory
         run: "mkdir -p /tmp/gh-aw\ncat > /tmp/gh-aw/jqschema.sh << 'EOF'\n#!/usr/bin/env bash\n# jqschema.sh\njq -c '\ndef walk(f):\n  . as $in |\n  if type == \"object\" then\n    reduce keys[] as $k ({}; . + {($k): ($in[$k] | walk(f))})\n  elif type == \"array\" then\n    if length == 0 then [] else [.[0] | walk(f)] end\n  else\n    type\n  end;\nwalk(.)\n'\nEOF\nchmod +x /tmp/gh-aw/jqschema.sh"
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Download CI workflow runs from last 7 days
+        run: "# Download workflow runs for the ci workflow\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,displayTitle,headBranch,event,url,workflowDatabaseId,number > /tmp/ci-runs.json\n\n# Create directory for artifacts\nmkdir -p /tmp/ci-artifacts\n\n# Download artifacts from recent runs (last 5 successful runs)\necho \"Downloading artifacts from recent CI runs...\"\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --status success --limit 5 --json databaseId | jq -r '.[].databaseId' | while read -r run_id; do\n  echo \"Processing run $run_id\"\n  gh run download \"$run_id\" --repo ${{ github.repository }} --dir \"/tmp/ci-artifacts/$run_id\" 2>/dev/null || echo \"No artifacts for run $run_id\"\ndone\n\necho \"CI runs data saved to /tmp/ci-runs.json\"\necho \"Artifacts saved to /tmp/ci-artifacts/\"\n\n# Summarize downloaded artifacts\necho \"## Downloaded Artifacts\" >> $GITHUB_STEP_SUMMARY\nfind /tmp/ci-artifacts -type f -name \"*.txt\" -o -name \"*.html\" -o -name \"*.json\" | head -20 | while read -r f; do\n  echo \"- $(basename $f)\" >> $GITHUB_STEP_SUMMARY\ndone\n"
+      - name: Setup Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        with:
+          cache: true
+          go-version-file: go.mod
+      - name: Install dev dependencies
+        run: make deps-dev
+      - name: Run linter
+        run: make lint
+      - name: Lint error messages
+        run: make lint-errors
+      - name: Install npm dependencies
+        run: npm ci
+        working-directory: ./actions/setup/js
+      - name: Build code
+        run: make build
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Rebuild lock files
+        run: make recompile
+      - continue-on-error: true
+        name: Run unit tests
+        run: |-
+          mkdir -p /tmp/gh-aw
+          go test -v -json -count=1 -timeout=3m -tags '!integration' -run='^Test' ./... | tee /tmp/gh-aw/test-results.json
+      - name: Setup jq utilities directory
+        run: "mkdir -p /tmp/gh-aw\ncat > /tmp/gh-aw/jqschema.sh << 'EOF'\n#!/usr/bin/env bash\n# jqschema.sh\njq -c '\ndef walk(f):\n  . as $in |\n  if type == \"object\" then\n    reduce keys[] as $k ({}; . + {($k): ($in[$k] | walk(f))})\n  elif type == \"array\" then\n    if length == 0 then [] else [.[0] | walk(f)] end\n  else\n    type\n  end;\nwalk(.)\n'\nEOF\nchmod +x /tmp/gh-aw/jqschema.sh"
 
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory

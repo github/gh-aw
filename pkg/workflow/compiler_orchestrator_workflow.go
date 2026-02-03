@@ -166,7 +166,9 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 	// Parse copilot-setup-steps if present (these go at the start)
 	var copilotSetupSteps []any
 	if importsResult.CopilotSetupSteps != "" {
-		if err := yaml.Unmarshal([]byte(importsResult.CopilotSetupSteps), &copilotSetupSteps); err == nil {
+		if err := yaml.Unmarshal([]byte(importsResult.CopilotSetupSteps), &copilotSetupSteps); err != nil {
+			orchestratorWorkflowLog.Printf("Failed to unmarshal copilot-setup steps: %v", err)
+		} else {
 			// Convert to typed steps for action pinning
 			typedCopilotSteps, err := SliceToSteps(copilotSetupSteps)
 			if err != nil {
@@ -229,7 +231,6 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 		allSteps = append(allSteps, copilotSetupSteps...)
 		allSteps = append(allSteps, otherImportedSteps...)
 		allSteps = append(allSteps, mainSteps...)
-		allSteps = append(allSteps, otherImportedSteps...)
 
 		// Convert back to YAML with "steps:" wrapper
 		stepsWrapper := map[string]any{"steps": allSteps}

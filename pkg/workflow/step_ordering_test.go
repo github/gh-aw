@@ -146,4 +146,19 @@ This workflow tests the correct ordering of all three types of steps:
 	// Summary verification: copilot < imported < main
 	assert.Less(t, copilotStep2Index, importedStep1Index, "All copilot steps should come before all imported steps")
 	assert.Less(t, importedStep2Index, mainStep1Index, "All imported steps should come before all main steps")
+
+	// Verify no double inclusion - each step should appear exactly once
+	copilotStep1Count := strings.Count(yamlStr, "Copilot Step 1")
+	copilotStep2Count := strings.Count(yamlStr, "Copilot Step 2")
+	importedStep1Count := strings.Count(yamlStr, "Imported Step 1")
+	importedStep2Count := strings.Count(yamlStr, "Imported Step 2")
+	mainStep1Count := strings.Count(yamlStr, "Main Step 1")
+	mainStep2Count := strings.Count(yamlStr, "Main Step 2")
+
+	assert.Equal(t, 1, copilotStep1Count, "Copilot Step 1 should appear exactly once")
+	assert.Equal(t, 1, copilotStep2Count, "Copilot Step 2 should appear exactly once")
+	assert.Equal(t, 1, importedStep1Count, "Imported Step 1 should appear exactly once")
+	assert.Equal(t, 1, importedStep2Count, "Imported Step 2 should appear exactly once")
+	assert.Equal(t, 1, mainStep1Count, "Main Step 1 should appear exactly once")
+	assert.Equal(t, 1, mainStep2Count, "Main Step 2 should appear exactly once")
 }

@@ -105,8 +105,8 @@ func processYAMLWorkflowImport(filePath string) (jobs string, services string, e
 		if err != nil {
 			return "", "", fmt.Errorf("failed to extract steps from copilot-setup-steps.yml: %w", err)
 		}
-		// Return steps as "jobs" string for compatibility with import processor
-		// The import processor will place this in MergedSteps
+		// Return steps as "jobs" string for compatibility with the import processor.
+		// The import processor will route this to ImportsResult.CopilotSetupSteps.
 		return stepsYAML, "", nil
 	}
 
@@ -191,9 +191,15 @@ func extractStepsFromCopilotSetup(workflow map[string]any) (string, error) {
 		return "", fmt.Errorf("no steps found in copilot-setup-steps job")
 	}
 
+	// Verify steps is actually a list
+	stepsSlice, ok := stepsValue.([]any)
+	if !ok {
+		return "", fmt.Errorf("steps field is not a list in copilot-setup-steps job")
+	}
+
 	// Marshal steps array directly to YAML format (without "steps:" wrapper)
 	// This matches the format expected by the compiler which unmarshals into []any
-	stepsYAML, err := yaml.Marshal(stepsValue)
+	stepsYAML, err := yaml.Marshal(stepsSlice)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal steps to YAML: %w", err)
 	}
