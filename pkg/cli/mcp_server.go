@@ -507,8 +507,6 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 		outputStr := string(stdout)
 
 		if err != nil {
-			mcpLog.Printf("Logs command exited with error: %v (output length: %d)", err, len(outputStr))
-
 			// Try to get stderr and exit code for detailed error reporting
 			var stderr string
 			var exitCode int
@@ -516,6 +514,9 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 				stderr = string(exitErr.Stderr)
 				exitCode = exitErr.ExitCode()
 			}
+
+			mcpLog.Printf("Logs command exited with error: %v (stdout length: %d, stderr length: %d, exit_code: %d)",
+				err, len(outputStr), len(stderr), exitCode)
 
 			// Build detailed error data
 			errorData := map[string]any{
