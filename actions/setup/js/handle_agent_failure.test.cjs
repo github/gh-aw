@@ -1112,174 +1112,10 @@ When prompted, instruct the agent to debug this workflow failure.`;
     });
   });
 
-  describe("checkout PR failure detection", () => {
-    let isCheckoutPRFailure;
-
-    beforeEach(async () => {
-      // Import the function we want to test
-      const module = await import("./handle_agent_failure.cjs");
-      isCheckoutPRFailure = module.isCheckoutPRFailure;
-
-      // Set up context for checkout tests
-      mockContext.runId = 123456;
-    });
-
-    it("should detect checkout PR failure when step fails", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "agent",
-                status: "completed",
-                conclusion: "failure",
-                steps: [
-                  { name: "Checkout actions folder", conclusion: "success" },
-                  { name: "Setup Scripts", conclusion: "success" },
-                  { name: "Checkout repository", conclusion: "success" },
-                  { name: "Create gh-aw temp directory", conclusion: "success" },
-                  { name: "Configure Git credentials", conclusion: "success" },
-                  { name: "Checkout PR branch", conclusion: "failure" },
-                  { name: "Validate COPILOT_GITHUB_TOKEN secret", conclusion: "skipped" },
-                  { name: "Install GitHub Copilot CLI", conclusion: "skipped" },
-                ],
-              },
-            ],
-          },
-        }),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(true);
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Detected checkout PR failure"));
-    });
-
-    it("should return false when checkout step succeeds", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "agent",
-                status: "completed",
-                conclusion: "failure",
-                steps: [
-                  { name: "Checkout actions folder", conclusion: "success" },
-                  { name: "Setup Scripts", conclusion: "success" },
-                  { name: "Checkout repository", conclusion: "success" },
-                  { name: "Checkout PR branch", conclusion: "success" },
-                  { name: "Install GitHub Copilot CLI", conclusion: "failure" },
-                ],
-              },
-            ],
-          },
-        }),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false when agent job succeeds", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "agent",
-                status: "completed",
-                conclusion: "success",
-                steps: [
-                  { name: "Checkout actions folder", conclusion: "success" },
-                  { name: "Checkout PR branch", conclusion: "success" },
-                ],
-              },
-            ],
-          },
-        }),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false when agent job not found", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "other-job",
-                status: "completed",
-                conclusion: "failure",
-                steps: [],
-              },
-            ],
-          },
-        }),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(false);
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Agent job not found"));
-    });
-
-    it("should return false when checkout step not found", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "agent",
-                status: "completed",
-                conclusion: "failure",
-                steps: [
-                  { name: "Checkout actions folder", conclusion: "success" },
-                  { name: "Other step", conclusion: "failure" },
-                ],
-              },
-            ],
-          },
-        }),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(false);
-      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Checkout PR branch step not found"));
-    });
-
-    it("should handle API errors gracefully", async () => {
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockRejectedValue(new Error("API Error")),
-      };
-
-      const result = await isCheckoutPRFailure();
-
-      expect(result).toBe(false);
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Error checking for checkout failure"));
-    });
-
-    it("should skip issue creation when checkout fails", async () => {
-      // Mock the checkout failure detection to return true
-      mockGithub.rest.actions = {
-        listJobsForWorkflowRun: vi.fn().mockResolvedValue({
-          data: {
-            jobs: [
-              {
-                name: "agent",
-                status: "completed",
-                conclusion: "failure",
-                steps: [{ name: "Checkout PR branch", conclusion: "failure" }],
-              },
-            ],
-          },
-        }),
-      };
+  describe("checkout PR failure via output", () => {
+    it("should skip issue creation when checkout_pr_success is false", async () => {
+      // Set the checkout PR failure environment variable
+      process.env.GH_AW_CHECKOUT_PR_SUCCESS = "false";
 
       await main();
 
@@ -1287,6 +1123,84 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
       expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping failure handling - failure was due to PR checkout"));
+    });
+
+    it("should create issue when checkout_pr_success is true", async () => {
+      // Set the checkout PR success environment variable
+      process.env.GH_AW_CHECKOUT_PR_SUCCESS = "true";
+
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Third search: failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      mockGithub.rest.issues.create
+        .mockResolvedValueOnce({
+          data: { number: 1, html_url: "https://example.com/1", node_id: "I_1" },
+        })
+        .mockResolvedValueOnce({
+          data: { number: 2, html_url: "https://example.com/2", node_id: "I_2" },
+        });
+
+      mockGithub.graphql = vi.fn().mockResolvedValue({
+        addSubIssue: {
+          issue: { id: "I_1", number: 1 },
+          subIssue: { id: "I_2", number: 2 },
+        },
+      });
+
+      await main();
+
+      // Verify issue was created
+      expect(mockGithub.rest.issues.create).toHaveBeenCalled();
+    });
+
+    it("should create issue when checkout_pr_success is not set", async () => {
+      // Don't set GH_AW_CHECKOUT_PR_SUCCESS (workflow without PR checkout)
+      delete process.env.GH_AW_CHECKOUT_PR_SUCCESS;
+
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Third search: failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      mockGithub.rest.issues.create
+        .mockResolvedValueOnce({
+          data: { number: 1, html_url: "https://example.com/1", node_id: "I_1" },
+        })
+        .mockResolvedValueOnce({
+          data: { number: 2, html_url: "https://example.com/2", node_id: "I_2" },
+        });
+
+      mockGithub.graphql = vi.fn().mockResolvedValue({
+        addSubIssue: {
+          issue: { id: "I_1", number: 1 },
+          subIssue: { id: "I_2", number: 2 },
+        },
+      });
+
+      await main();
+
+      // Verify issue was created (normal failure handling)
+      expect(mockGithub.rest.issues.create).toHaveBeenCalled();
     });
   });
 });

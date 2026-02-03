@@ -10,6 +10,7 @@ describe("checkout_pr_branch.cjs", () => {
     mockCore = {
       info: vi.fn(),
       setFailed: vi.fn(),
+      setOutput: vi.fn(),
       summary: {
         addRaw: vi.fn().mockReturnThis(),
         write: vi.fn().mockResolvedValue(undefined),
@@ -325,6 +326,42 @@ If the pull request is still open, verify that:
       await runScript();
 
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", longBranchName]);
+    });
+  });
+
+  describe("checkout output", () => {
+    it("should set output to true on successful checkout (pull_request event)", async () => {
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should set output to true on successful checkout (comment event)", async () => {
+      mockContext.eventName = "issue_comment";
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should set output to false on checkout failure", async () => {
+      mockExec.exec.mockRejectedValueOnce(new Error("checkout failed"));
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+      expect(mockCore.setFailed).toHaveBeenCalledWith("Failed to checkout PR branch: checkout failed");
+    });
+
+    it("should set output to true when no PR context", async () => {
+      mockContext.payload.pull_request = null;
+
+      await runScript();
+
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
   });
 });

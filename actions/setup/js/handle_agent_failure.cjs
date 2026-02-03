@@ -237,67 +237,6 @@ async function linkSubIssue(parentNodeId, subIssueNodeId, parentNumber, subIssue
 }
 
 /**
- * Check if the agent job failed due to PR checkout failure
- * This typically happens when a PR is merged and the branch is deleted
- * @returns {Promise<boolean>} True if failure was due to checkout step
- */
-async function isCheckoutPRFailure() {
-  try {
-    const runId = context.runId;
-    const { owner, repo } = context.repo;
-
-    core.info(`Checking if failure was due to PR checkout (run ID: ${runId})`);
-
-    // Get all jobs for this workflow run
-    const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
-      owner,
-      repo,
-      run_id: runId,
-    });
-
-    // Find the agent job
-    const agentJob = jobs.jobs.find(job => job.name === "agent");
-    if (!agentJob) {
-      core.info("Agent job not found, cannot determine checkout failure");
-      return false;
-    }
-
-    core.info(`Agent job status: ${agentJob.status}, conclusion: ${agentJob.conclusion}`);
-
-    // Check if agent job failed
-    if (agentJob.conclusion !== "failure") {
-      return false;
-    }
-
-    // Check if steps array exists
-    if (!agentJob.steps || agentJob.steps.length === 0) {
-      core.info("Agent job has no steps");
-      return false;
-    }
-
-    // Find the "Checkout PR branch" step
-    const checkoutStep = agentJob.steps.find(step => step.name === "Checkout PR branch");
-    if (!checkoutStep) {
-      core.info("Checkout PR branch step not found");
-      return false;
-    }
-
-    core.info(`Checkout PR branch step conclusion: ${checkoutStep.conclusion}`);
-
-    // If checkout step failed, this is a checkout failure
-    if (checkoutStep.conclusion === "failure") {
-      core.info("✓ Detected checkout PR failure - this is expected when PR is merged");
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    core.warning(`Error checking for checkout failure: ${getErrorMessage(error)}`);
-    return false;
-  }
-}
-
-/**
  * Handle agent job failure by creating or updating a failure tracking issue
  * This script is called from the conclusion job when the agent job has failed
  * or when the agent succeeded but produced no safe outputs
@@ -313,11 +252,13 @@ async function main() {
     const secretVerificationResult = process.env.GH_AW_SECRET_VERIFICATION_RESULT || "";
     const assignmentErrors = process.env.GH_AW_ASSIGNMENT_ERRORS || "";
     const assignmentErrorCount = process.env.GH_AW_ASSIGNMENT_ERROR_COUNT || "0";
+    const checkoutPRSuccess = process.env.GH_AW_CHECKOUT_PR_SUCCESS || "";
 
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Secret verification result: ${secretVerificationResult}`);
     core.info(`Assignment error count: ${assignmentErrorCount}`);
+    core.info(`Checkout PR success: ${checkoutPRSuccess}`);
 
     // Check if there are assignment errors (regardless of agent job status)
     const hasAssignmentErrors = parseInt(assignmentErrorCount, 10) > 0;
@@ -340,14 +281,11 @@ async function main() {
       return;
     }
 
-    // Check if this is a checkout PR failure (e.g., PR was merged and branch deleted)
-    // If so, skip creating an issue as this is expected behavior
-    if (agentConclusion === "failure") {
-      const isCheckoutFailure = await isCheckoutPRFailure();
-      if (isCheckoutFailure) {
-        core.info("Skipping failure handling - failure was due to PR checkout (likely PR merged)");
-        return;
-      }
+    // Check if the failure was due to PR checkout (e.g., PR was merged and branch deleted)
+    // If checkout_pr_success is "false", skip creating an issue as this is expected behavior
+    if (agentConclusion === "failure" && checkoutPRSuccess === "false") {
+      core.info("Skipping failure handling - failure was due to PR checkout (likely PR merged)");
+      return;
     }
 
     const { owner, repo } = context.repo;
@@ -564,4 +502,4 @@ async function main() {
   }
 }
 
-module.exports = { main, isCheckoutPRFailure };
+module.exports = { main };

@@ -16,6 +16,7 @@ async function main() {
 
   if (!pullRequest) {
     core.info("No pull request context available, skipping checkout");
+    core.setOutput("checkout_pr_success", "true");
     return;
   }
 
@@ -41,8 +42,14 @@ async function main() {
 
       core.info(`✅ Successfully checked out PR #${prNumber}`);
     }
+
+    // Set output to indicate successful checkout
+    core.setOutput("checkout_pr_success", "true");
   } catch (error) {
     const errorMsg = getErrorMessage(error);
+
+    // Set output to indicate checkout failure
+    core.setOutput("checkout_pr_success", "false");
 
     // Load and render step summary template
     const templatePath = "/opt/gh-aw/prompts/pr_checkout_failure.md";
