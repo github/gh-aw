@@ -356,8 +356,7 @@ async function main() {
           for (const errorLine of errorLines) {
             const parts = errorLine.split(":");
             if (parts.length >= 4) {
-              const type = parts[0]; // "discussion"
-              const index = parts[1];
+              // parts[0] is "discussion", parts[1] is index - both unused
               const repo = parts[2];
               const title = parts[3];
               const error = parts.slice(4).join(":"); // Rest is the error message
@@ -451,8 +450,7 @@ async function main() {
           for (const errorLine of errorLines) {
             const parts = errorLine.split(":");
             if (parts.length >= 4) {
-              const type = parts[0]; // "discussion"
-              const index = parts[1];
+              // parts[0] is "discussion", parts[1] is index - both unused
               const repo = parts[2];
               const title = parts[3];
               const error = parts.slice(4).join(":"); // Rest is the error message
