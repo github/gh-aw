@@ -175,10 +175,17 @@ func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
 		return nil
 	}
 
-	// Skip .github checkout if full repository checkout will be performed
+	// Skip .github checkout if custom steps already contain a full repository checkout
 	// The full checkout already includes the .github folder, making sparse checkout redundant
+	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
+		compilerYamlLog.Print("Skipping .github sparse checkout: custom steps contain full repository checkout")
+		return nil
+	}
+
+	// Skip .github checkout if an automatic full repository checkout will be added
+	// The shouldAddCheckoutStep function returns true when a checkout step will be automatically added
 	if c.shouldAddCheckoutStep(data) {
-		compilerYamlLog.Print("Skipping .github sparse checkout: full repository checkout will be performed")
+		compilerYamlLog.Print("Skipping .github sparse checkout: full repository checkout will be added automatically")
 		return nil
 	}
 

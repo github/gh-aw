@@ -143,6 +143,170 @@ func TestExtractStepsFromCopilotSetup_NoSteps(t *testing.T) {
 	assert.Contains(t, err.Error(), "no steps found", "Error should mention missing steps")
 }
 
+func TestExtractStepsFromCopilotSetup_EnsuresCheckoutFirst(t *testing.T) {
+	// Test workflow with checkout step NOT first
+	workflow := map[string]any{
+		"name": "Copilot Setup Steps",
+		"on":   "workflow_dispatch",
+		"jobs": map[string]any{
+			"copilot-setup-steps": map[string]any{
+				"runs-on": "ubuntu-latest",
+				"steps": []any{
+					map[string]any{
+						"name": "Install gh-aw extension",
+						"run":  "curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash",
+					},
+					map[string]any{
+						"name": "Checkout code",
+						"uses": "actions/checkout@v4",
+					},
+					map[string]any{
+						"name": "Set up Node.js",
+						"uses": "actions/setup-node@v4",
+						"with": map[string]any{
+							"node-version": "20",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	stepsYAML, err := extractStepsFromCopilotSetup(workflow)
+	require.NoError(t, err, "Should extract steps without error")
+	require.NotEmpty(t, stepsYAML, "Should return non-empty steps YAML")
+
+	// Verify checkout step is first
+	lines := strings.Split(stepsYAML, "\n")
+	var firstStepName string
+	for _, line := range lines {
+		if strings.Contains(line, "name:") {
+			firstStepName = line
+			break
+		}
+	}
+	assert.Contains(t, firstStepName, "Checkout code", "First step should be the checkout step")
+
+	// Verify all steps are present
+	assert.Contains(t, stepsYAML, "Install gh-aw extension", "Should contain install step")
+	assert.Contains(t, stepsYAML, "Checkout code", "Should contain checkout step")
+	assert.Contains(t, stepsYAML, "Set up Node.js", "Should contain Node.js setup step")
+
+	// Verify checkout comes before install (order should be: checkout, install, node)
+	checkoutIndex := strings.Index(stepsYAML, "Checkout code")
+	installIndex := strings.Index(stepsYAML, "Install gh-aw extension")
+	nodeIndex := strings.Index(stepsYAML, "Set up Node.js")
+	assert.Less(t, checkoutIndex, installIndex, "Checkout should come before install")
+	assert.Less(t, installIndex, nodeIndex, "Install should come before Node.js setup")
+}
+
+func TestExtractStepsFromCopilotSetup_AddsCheckoutIfMissing(t *testing.T) {
+	// Test workflow without any checkout step
+	workflow := map[string]any{
+		"name": "Copilot Setup Steps",
+		"on":   "workflow_dispatch",
+		"jobs": map[string]any{
+			"copilot-setup-steps": map[string]any{
+				"runs-on": "ubuntu-latest",
+				"steps": []any{
+					map[string]any{
+						"name": "Install dependencies",
+						"run":  "npm install",
+					},
+					map[string]any{
+						"name": "Run linter",
+						"run":  "npm run lint",
+					},
+				},
+			},
+		},
+	}
+
+	stepsYAML, err := extractStepsFromCopilotSetup(workflow)
+	require.NoError(t, err, "Should extract steps without error")
+	require.NotEmpty(t, stepsYAML, "Should return non-empty steps YAML")
+
+	// Verify checkout step was added
+	assert.Contains(t, stepsYAML, "Checkout code", "Should contain added checkout step")
+	assert.Contains(t, stepsYAML, "actions/checkout@v4", "Should contain checkout action")
+
+	// Verify checkout step is first
+	lines := strings.Split(stepsYAML, "\n")
+	var firstStepName string
+	for _, line := range lines {
+		if strings.Contains(line, "name:") {
+			firstStepName = line
+			break
+		}
+	}
+	assert.Contains(t, firstStepName, "Checkout code", "First step should be the checkout step")
+
+	// Verify original steps are still present
+	assert.Contains(t, stepsYAML, "Install dependencies", "Should contain original install step")
+	assert.Contains(t, stepsYAML, "Run linter", "Should contain original linter step")
+
+	// Verify checkout comes before other steps
+	checkoutIndex := strings.Index(stepsYAML, "Checkout code")
+	installIndex := strings.Index(stepsYAML, "Install dependencies")
+	lintIndex := strings.Index(stepsYAML, "Run linter")
+	assert.Less(t, checkoutIndex, installIndex, "Checkout should come before install")
+	assert.Less(t, checkoutIndex, lintIndex, "Checkout should come before lint")
+}
+
+func TestExtractStepsFromCopilotSetup_CheckoutAlreadyFirst(t *testing.T) {
+	// Test workflow with checkout step already first
+	workflow := map[string]any{
+		"name": "Copilot Setup Steps",
+		"on":   "workflow_dispatch",
+		"jobs": map[string]any{
+			"copilot-setup-steps": map[string]any{
+				"runs-on": "ubuntu-latest",
+				"steps": []any{
+					map[string]any{
+						"name": "Checkout code",
+						"uses": "actions/checkout@v4",
+					},
+					map[string]any{
+						"name": "Install dependencies",
+						"run":  "npm install",
+					},
+					map[string]any{
+						"name": "Run tests",
+						"run":  "npm test",
+					},
+				},
+			},
+		},
+	}
+
+	stepsYAML, err := extractStepsFromCopilotSetup(workflow)
+	require.NoError(t, err, "Should extract steps without error")
+	require.NotEmpty(t, stepsYAML, "Should return non-empty steps YAML")
+
+	// Verify checkout step is first
+	lines := strings.Split(stepsYAML, "\n")
+	var firstStepName string
+	for _, line := range lines {
+		if strings.Contains(line, "name:") {
+			firstStepName = line
+			break
+		}
+	}
+	assert.Contains(t, firstStepName, "Checkout code", "First step should be the checkout step")
+
+	// Verify all steps are present
+	assert.Contains(t, stepsYAML, "Checkout code", "Should contain checkout step")
+	assert.Contains(t, stepsYAML, "Install dependencies", "Should contain install step")
+	assert.Contains(t, stepsYAML, "Run tests", "Should contain test step")
+
+	// Verify order is maintained
+	checkoutIndex := strings.Index(stepsYAML, "Checkout code")
+	installIndex := strings.Index(stepsYAML, "Install dependencies")
+	testIndex := strings.Index(stepsYAML, "Run tests")
+	assert.Less(t, checkoutIndex, installIndex, "Checkout should come before install")
+	assert.Less(t, installIndex, testIndex, "Install should come before tests")
+}
+
 func TestProcessYAMLWorkflowImport_CopilotSetupSteps(t *testing.T) {
 	// Create a temporary copilot-setup-steps.yml file
 	tmpDir, err := os.MkdirTemp("", "copilot-setup-test*")
