@@ -31,7 +31,7 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 89325051fa9e87793872702eecc32883b93418eb84554c9339ead297222c25ac
+# frontmatter-hash: ce8a3d0dc475ddadadf2f7a44f9c96c4686d5dab00e046595fbbcfd7c2bcdebd
 
 name: "Smoke Claude"
 "on":
@@ -107,6 +107,7 @@ jobs:
     needs: activation
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       discussions: read
       issues: read
@@ -210,7 +211,31 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.94 ghcr.io/github/github-mcp-server:v0.30.2 mcr.microsoft.com/playwright/mcp node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-mcpg:v0.0.94 ghcr.io/github/github-mcp-server:v0.30.2 mcr.microsoft.com/playwright/mcp node:lts-alpine
+      - name: Install gh-aw extension
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if gh-aw extension is already installed
+          if gh extension list | grep -q "github/gh-aw"; then
+            echo "gh-aw extension already installed, upgrading..."
+            gh extension upgrade gh-aw || true
+          else
+            echo "Installing gh-aw extension..."
+            gh extension install github/gh-aw
+          fi
+          gh aw --version
+          # Copy the gh-aw binary to /opt/gh-aw for MCP server containerization
+          mkdir -p /opt/gh-aw
+          GH_AW_BIN=$(which gh-aw 2>/dev/null || find ~/.local/share/gh/extensions/gh-aw -name 'gh-aw' -type f 2>/dev/null | head -1)
+          if [ -n "$GH_AW_BIN" ] && [ -f "$GH_AW_BIN" ]; then
+            cp "$GH_AW_BIN" /opt/gh-aw/gh-aw
+            chmod +x /opt/gh-aw/gh-aw
+            echo "Copied gh-aw binary to /opt/gh-aw/gh-aw"
+          else
+            echo "::error::Failed to find gh-aw binary for MCP server"
+            exit 1
+          fi
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -1079,6 +1104,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MCP_LOCKDOWN: ${{ steps.determine-automatic-lockdown.outputs.lockdown == 'true' && '1' || '0' }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
           set -eo pipefail
@@ -1099,6 +1125,15 @@ jobs:
           cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
+              "agentic_workflows": {
+                "container": "alpine:latest",
+                "entrypoint": "/opt/gh-aw/gh-aw",
+                "entrypointArgs": ["mcp-server"],
+                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "env": {
+                  "GITHUB_TOKEN": "$GITHUB_TOKEN"
+                }
+              },
               "github": {
                 "container": "ghcr.io/github/github-mcp-server:v0.30.2",
                 "env": {

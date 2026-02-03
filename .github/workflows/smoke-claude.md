@@ -12,6 +12,7 @@ permissions:
   issues: read
   pull-requests: read
   discussions: read
+  actions: read
   
 name: Smoke Claude
 engine:
@@ -35,6 +36,7 @@ sandbox:
   mcp:
     container: "ghcr.io/github/gh-aw-mcpg"
 tools:
+  agentic-workflows:
   cache-memory: true
   github:
     toolsets: [repos, pull_requests]
@@ -86,6 +88,11 @@ timeout-minutes: 15
    - Use the `github-discussion-query` safe-input tool with params: `limit=1, jq=".[0]"` to get the latest discussion from ${{ github.repository }}
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here
+10. **Agentic Workflows MCP Testing**: 
+   - Use the `agentic-workflows` MCP tool with the `status` method to query the status of the "smoke-claude" workflow in ${{ github.repository }}
+   - Extract key information: total runs, recent success/failure status, last run time
+   - Write a summary of the smoke-claude workflow status to `/tmp/gh-aw/agent/smoke-claude-status-${{ github.run_id }}.txt`
+   - Use bash to display the file contents
 
 ## Output
 
