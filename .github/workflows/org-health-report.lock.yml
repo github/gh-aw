@@ -32,7 +32,7 @@
 name: "Organization Health Report"
 "on":
   schedule:
-  - cron: "33 9 * * 1"
+  - cron: "50 9 * * 1"
     # Friendly format: weekly on monday around 09:00 (scattered)
   workflow_dispatch:
 
@@ -178,7 +178,7 @@ jobs:
             await main();
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
@@ -186,7 +186,7 @@ jobs:
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.11.2
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -1386,7 +1386,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI

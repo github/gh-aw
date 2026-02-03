@@ -28,12 +28,12 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: b7a03734f5f5f1e6cbf47f4292ad07e5c63fdde891a5ee30aaf86d8293957718
+# frontmatter-hash: 26a4e095972116bb4fb8b9374c276f2bb3bdccc5786341e9ab400d78b1b426bc
 
 name: "Automated Portfolio Analyst"
 "on":
   schedule:
-  - cron: "8 8 * * 1"
+  - cron: "39 8 * * 1"
     # Friendly format: weekly on monday around 09:00 (scattered)
   workflow_dispatch:
 
@@ -200,7 +200,7 @@ jobs:
             await main();
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
@@ -218,7 +218,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -1226,7 +1226,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI

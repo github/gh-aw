@@ -30,7 +30,7 @@
 name: "Sergo - Serena Go Expert"
 "on":
   schedule:
-  - cron: "53 8 * * *"
+  - cron: "34 21 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
@@ -150,7 +150,7 @@ jobs:
             await main();
       - name: Validate CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY 'Claude Code' https://githubnext.github.io/gh-aw/reference/engines/#anthropic-claude-code
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY 'Claude Code' https://github.github.com/gh-aw/reference/engines/#anthropic-claude-code
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -174,7 +174,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -425,7 +425,7 @@ jobs:
                 }
               },
               "serena": {
-                "container": "ghcr.io/githubnext/serena-mcp-server:latest",
+                "container": "ghcr.io/github/serena-mcp-server:latest",
                 "args": [
                   "--network",
                   "host"
@@ -1083,7 +1083,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY 'Claude Code' https://githubnext.github.io/gh-aw/reference/engines/#anthropic-claude-code
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY 'Claude Code' https://github.github.com/gh-aw/reference/engines/#anthropic-claude-code
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

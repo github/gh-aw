@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mcp/gh-aw.md
 #
-# frontmatter-hash: 19634801cb62806af794d106bc7e2cd2f1438fd25da4e7b547e82297f2b1cee9
+# frontmatter-hash: b51aac2dd72b1d5d9d61b297d8cd8e8e934256b7a03fda0e0a1272ed5650b6fa
 
 name: "Dev Hawk"
 "on":
@@ -164,7 +164,7 @@ jobs:
             await main();
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
@@ -182,7 +182,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -947,7 +947,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://githubnext.github.io/gh-aw/reference/engines/#github-copilot-default
+        run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI

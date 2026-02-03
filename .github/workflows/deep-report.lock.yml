@@ -28,7 +28,7 @@
 #     - shared/reporting.md
 #     - shared/weekly-issues-data-fetch.md
 #
-# frontmatter-hash: 4e4df997431c90ad9e7d1add052cef9804b381031d92a11fec88f589e403b191
+# frontmatter-hash: f2d379a0420b0a9e8a7fe7cefc13ada73199cb631c2ead7be720e3d8f42c27aa
 
 name: "DeepReport - Intelligence Gathering Agent"
 "on":
@@ -187,7 +187,7 @@ jobs:
             await main();
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -211,7 +211,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -1388,7 +1388,7 @@ jobs:
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Validate CODEX_API_KEY or OPENAI_API_KEY secret
         id: validate-secret
-        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://githubnext.github.io/gh-aw/reference/engines/#openai-codex
+        run: /opt/gh-aw/actions/validate_multi_secret.sh CODEX_API_KEY OPENAI_API_KEY Codex https://github.github.com/gh-aw/reference/engines/#openai-codex
         env:
           CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
