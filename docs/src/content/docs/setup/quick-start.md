@@ -91,7 +91,7 @@ With that, you are up and running with your first automated agentic workflow!
 
 Explore further with:
 
-- [Authoring Agentic Workflows using AI](/gh-aw/setup/agentic-authoring/) where you will learn how to create automated workflows with AI assistance.
+- [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/) where you will learn how to create automated workflows using your coding agent
 - Explore the samples in [Peli's Agent Factory](/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/).
 - Understand [How Agentic Workflows Work](/gh-aw/introduction/how-they-work/).
 - Check the [Frequently Asked Questions](/gh-aw/reference/faq/) for answers to common questions.

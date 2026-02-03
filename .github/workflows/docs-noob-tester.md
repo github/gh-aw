@@ -82,7 +82,7 @@ Using Playwright, navigate through the documentation site as if you're a complet
    - Note: Are the most important commands highlighted?
    - Note: Are examples provided for common use cases?
 
-4. **Explore Creating Workflows guide** at http://localhost:4321/gh-aw/setup/agentic-authoring/
+4. **Explore Creating Workflows guide** at http://localhost:4321/gh-aw/setup/creating-workflows/
    - Take screenshots of confusing sections
    - Note: Is the workflow format explained clearly?
    - Note: Are there enough examples?
