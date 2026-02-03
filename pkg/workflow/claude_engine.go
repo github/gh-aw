@@ -230,12 +230,8 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		commandName = workflowData.EngineConfig.Command
 		claudeLog.Printf("Using custom command: %s", commandName)
-	} else if isFirewallEnabled(workflowData) {
-		// AWF chroot mode - use full path to avoid PATH setup
-		// npm install -g installs to /usr/local/bin on GitHub runners
-		commandName = "/usr/local/bin/claude"
 	} else {
-		// Non-firewall mode: use regular claude command
+		// Use regular claude command - PATH is inherited via --env-all in AWF mode
 		commandName = "claude"
 	}
 
@@ -361,14 +357,16 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Build the command with AWF wrapper
 		// AWF requires the command to be wrapped in a shell invocation because the claude command
 		// contains && chains that need shell interpretation. We use bash -c with properly escaped command.
+		// Add PATH setup inside the AWF command to find npm-installed binaries and runtimes
+		pathSetup := GetHostedToolcachePathSetup()
+		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 		// Escape single quotes in the command by replacing ' with '\''
-		escapedClaudeCommand := strings.ReplaceAll(claudeCommand, "'", "'\\''")
+		escapedClaudeCommand := strings.ReplaceAll(claudeCommandWithPath, "'", "'\\''")
 		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedClaudeCommand)
 
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
 		// Use tee to capture stdout (stream-json output) to the log file while also displaying on console
 		// The combined output (debug logs + JSON) will be in the log file for parsing
-		// With chroot mode, the host environment is inherited, so no setup commands are needed
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s

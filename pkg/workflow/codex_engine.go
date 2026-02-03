@@ -172,12 +172,8 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		commandName = workflowData.EngineConfig.Command
 		codexEngineLog.Printf("Using custom command: %s", commandName)
-	} else if firewallEnabled {
-		// AWF chroot mode - use full path to avoid PATH setup
-		// npm install -g installs to /usr/local/bin on GitHub runners
-		commandName = "/usr/local/bin/codex"
 	} else {
-		// Non-firewall mode: use regular codex command
+		// Use regular codex command - PATH is inherited via --env-all in AWF mode
 		commandName = "codex"
 	}
 
@@ -280,7 +276,13 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		}
 
 		// Build the command with agent file handling if specified
-		// With chroot mode and full path (/usr/local/bin/codex), no PATH setup is needed
+		// Add PATH setup inside the AWF command to find npm-installed binaries and runtimes
+		pathSetup := GetHostedToolcachePathSetup()
+		codexCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, codexCommand)
+		// Escape single quotes in the command by replacing ' with '\''
+		escapedCodexCommand := strings.ReplaceAll(codexCommandWithPath, "'", "'\\''")
+		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
+
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
 			command = fmt.Sprintf(`set -o pipefail
@@ -289,14 +291,14 @@ INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), codexCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
 INSTRUCTION="$(cat "$GH_AW_PROMPT")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), codexCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		}
 	} else {
 		// Build the command without AWF wrapping
