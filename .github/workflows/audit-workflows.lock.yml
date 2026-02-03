@@ -32,7 +32,7 @@
 name: "Agentic Workflow Audit Agent"
 "on":
   schedule:
-  - cron: "6 13 * * *"
+  - cron: "37 3 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 

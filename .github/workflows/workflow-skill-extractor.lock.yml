@@ -30,7 +30,7 @@
 name: "Workflow Skill Extractor"
 "on":
   schedule:
-  - cron: "52 23 * * 3"
+  - cron: "5 0 * * 2"
     # Friendly format: weekly (scattered)
   workflow_dispatch:
 

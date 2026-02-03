@@ -34,7 +34,7 @@ name: "Auto-Triage Issues"
     - opened
     - edited
   schedule:
-  - cron: "59 */6 * * *"
+  - cron: "2 */6 * * *"
     # Friendly format: every 6h (scattered)
   workflow_dispatch:
 

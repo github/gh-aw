@@ -41,7 +41,7 @@ name: "Smoke Claude"
     types:
     - labeled
   schedule:
-  - cron: "18 */12 * * *"
+  - cron: "27 */12 * * *"
   workflow_dispatch: null
 
 permissions: {}

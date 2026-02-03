@@ -26,7 +26,7 @@
 name: "Instructions Janitor"
 "on":
   schedule:
-  - cron: "59 7 * * *"
+  - cron: "18 20 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
