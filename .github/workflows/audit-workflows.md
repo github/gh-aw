@@ -18,11 +18,6 @@ tools:
     file-glob: ["memory/audit-workflows/*.json", "memory/audit-workflows/*.jsonl", "memory/audit-workflows/*.csv", "memory/audit-workflows/*.md"]
     max-file-size: 102400  # 100KB
   timeout: 300
-steps:
-  - name: Download logs from last 24 hours
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: ./gh-aw logs --start-date -1d -o /tmp/gh-aw/aw-mcp/logs
 safe-outputs:
   upload-asset:
   create-discussion:

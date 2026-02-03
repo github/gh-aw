@@ -27,7 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 468877fb1f25dd0bac0170aeda68f9092b87a01862303e030f655839abb9e72a
+# frontmatter-hash: ff56a35b191afe28f76a09217de1597695a225e8f41502cc815a0a9e0eb2f96e
 
 name: "Agentic Workflow Audit Agent"
 "on":
@@ -140,10 +140,6 @@ jobs:
             /tmp/gh-aw/python/*.py
             /tmp/gh-aw/python/data/*
           retention-days: 30
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Download logs from last 24 hours
-        run: ./gh-aw logs --start-date -1d -o /tmp/gh-aw/aw-mcp/logs
 
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
