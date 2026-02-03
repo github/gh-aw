@@ -21,11 +21,7 @@
 #
 # Burns down open Dependabot pull requests.
 #
-# Resolved workflow manifest:
-#   Imports:
-#     - shared/campaign.md
-#
-# frontmatter-hash: 65143901567b280ebaad300b981c1318ab24662afac9986b325544780b733aaf
+# frontmatter-hash: 015986c27a0d2cdc88bb37f54058127e36d9f0221d573d269b686e4a6c747396
 
 name: "Dependabot Burner"
 "on":
@@ -163,50 +159,10 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"expires":48,"max":5},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":10}}
+          {"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":10}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
-            {
-              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 5 issue(s) can be created.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "body": {
-                    "description": "Detailed issue description in Markdown. Do NOT repeat the title as a heading since it already appears as the issue's h1. Include context, reproduction steps, or acceptance criteria as appropriate.",
-                    "type": "string"
-                  },
-                  "labels": {
-                    "description": "Labels to categorize the issue (e.g., 'bug', 'enhancement'). Labels must exist in the repository.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  },
-                  "parent": {
-                    "description": "Parent issue number for creating sub-issues. This is the numeric ID from the GitHub URL (e.g., 42 in github.com/owner/repo/issues/42). Can also be a temporary_id (e.g., 'aw_abc123def456') from a previously created issue in the same workflow run.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  },
-                  "temporary_id": {
-                    "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation.",
-                    "type": "string"
-                  },
-                  "title": {
-                    "description": "Concise issue title summarizing the bug, feature, or task. The title appears as the main heading, so keep it brief and descriptive.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "title",
-                  "body"
-                ],
-                "type": "object"
-              },
-              "name": "create_issue"
-            },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
               "inputSchema": {
@@ -402,127 +358,11 @@ jobs:
                 "type": "object"
               },
               "name": "missing_data"
-            },
-            {
-              "description": "Create a status update on a GitHub Projects v2 board to communicate project progress. Use this when you need to provide stakeholder updates with status indicators, timeline information, and progress summaries. Status updates create a historical record of project progress tracked over time. Requires project URL, status indicator, dates, and markdown body describing progress/trends/findings.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "body": {
-                    "description": "Status update body in markdown format describing progress, findings, trends, and next steps. Should provide stakeholders with clear understanding of project state.",
-                    "type": "string"
-                  },
-                  "project": {
-                    "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'). Project names or numbers alone are NOT accepted.",
-                    "pattern": "^https://github\\\\.com/(orgs|users)/[^/]+/projects/\\\\d+$",
-                    "type": "string"
-                  },
-                  "start_date": {
-                    "description": "Optional project start date in YYYY-MM-DD format (e.g., '2026-01-06').",
-                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$",
-                    "type": "string"
-                  },
-                  "status": {
-                    "description": "Status indicator for the project. Defaults to ON_TRACK. Values: ON_TRACK (progressing well), AT_RISK (has issues/blockers), OFF_TRACK (significantly behind), COMPLETE (finished), INACTIVE (paused/cancelled).",
-                    "enum": [
-                      "ON_TRACK",
-                      "AT_RISK",
-                      "OFF_TRACK",
-                      "COMPLETE",
-                      "INACTIVE"
-                    ],
-                    "type": "string"
-                  },
-                  "target_date": {
-                    "description": "Optional project target/end date in YYYY-MM-DD format (e.g., '2026-12-31').",
-                    "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}$",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "project",
-                  "body"
-                ],
-                "type": "object"
-              },
-              "name": "create_project_status_update"
             }
           ]
           EOF
           cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
           {
-            "create_issue": {
-              "defaultMax": 1,
-              "fields": {
-                "body": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 65000
-                },
-                "labels": {
-                  "type": "array",
-                  "itemType": "string",
-                  "itemSanitize": true,
-                  "itemMaxLength": 128
-                },
-                "parent": {
-                  "issueOrPRNumber": true
-                },
-                "repo": {
-                  "type": "string",
-                  "maxLength": 256
-                },
-                "temporary_id": {
-                  "type": "string"
-                },
-                "title": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                }
-              }
-            },
-            "create_project_status_update": {
-              "defaultMax": 10,
-              "fields": {
-                "body": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 65536
-                },
-                "project": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 512,
-                  "pattern": "^https://github\\.com/(orgs|users)/[^/]+/projects/\\d+",
-                  "patternError": "must be a full GitHub project URL (e.g., https://github.com/orgs/myorg/projects/42)"
-                },
-                "start_date": {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                  "patternError": "must be in YYYY-MM-DD format"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "INACTIVE",
-                    "ON_TRACK",
-                    "AT_RISK",
-                    "OFF_TRACK",
-                    "COMPLETE"
-                  ]
-                },
-                "target_date": {
-                  "type": "string",
-                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                  "patternError": "must be in YYYY-MM-DD format"
-                }
-              }
-            },
             "missing_tool": {
               "defaultMax": 20,
               "fields": {
@@ -814,41 +654,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          # Campaign Orchestrator
-          
-          You are a campaign orchestrator that coordinates a single campaign by:
-          
-          1. Discovering work items
-          2. Making decisions
-          3. Assigning/Dispatching work items
-          4. Generating a report
-          
-          - Use only allowlisted safe outputs.
-          - Do not interleave reads and writes.
-          
-          ## Memory & Metrics
-          
-          If the campaign uses repo-memory:
-          
-          **Cursor file path**: `/tmp/gh-aw/repo-memory/campaigns/<campaign_id>/cursor.json`
-          
-          - If it exists: read first and continue from its boundary.
-          - If it does not exist: create it by end of run.
-          - Always write the updated cursor back to the same path.
-          
-          **Metrics snapshots path**: `/tmp/gh-aw/repo-memory/campaigns/<campaign_id>/metrics/*.json`
-          
-          - Write **one new** append-only JSON snapshot per run (do not rewrite history).
-          - Use UTC date in the filename (example: `metrics/<YYYY-MM-DD>.json`).
-          
-          ## Reporting
-          
-          Always report:
-          - Failures (with reasons)
-          
-          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import workflows/dependabot-burner.md}}
@@ -1273,7 +1078,6 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-      issues: write
     timeout-minutes: 15
     env:
       GH_AW_ENGINE_ID: "copilot"
@@ -1312,7 +1116,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":48,\"max\":5},\"create_project_status_update\":{\"max\":1},\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":10,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"update_project\":{\"max\":10,\"project\":\"https://github.com/orgs/githubnext/projects/144\"}}"
           GH_AW_PROJECT_URL: "https://github.com/orgs/githubnext/projects/144"
           GH_AW_PROJECT_GITHUB_TOKEN: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
         with:
