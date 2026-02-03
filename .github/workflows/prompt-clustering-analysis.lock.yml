@@ -161,35 +161,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Download workflow logs for PR analysis
         run: "# Create logs directory\nmkdir -p /tmp/gh-aw/workflow-logs\n\necho \"Downloading workflow logs to extract turn counts...\"\n\n# Download logs for the last 30 days of copilot workflows\n# This will give us the aw_info.json which contains turn counts\n./gh-aw logs --engine copilot --start-date -30d -o /tmp/gh-aw/workflow-logs\n\n# Verify logs were downloaded\necho \"Downloaded workflow logs:\"\nfind /tmp/gh-aw/workflow-logs -maxdepth 1 -ls\n"
-      - name: Setup jq utilities directory
-        run: "mkdir -p /tmp/gh-aw\ncat > /tmp/gh-aw/jqschema.sh << 'EOF'\n#!/usr/bin/env bash\n# jqschema.sh\njq -c '\ndef walk(f):\n  . as $in |\n  if type == \"object\" then\n    reduce keys[] as $k ({}; . + {($k): ($in[$k] | walk(f))})\n  elif type == \"array\" then\n    if length == 0 then [] else [.[0] | walk(f)] end\n  else\n    type\n  end;\nwalk(.)\n'\nEOF\nchmod +x /tmp/gh-aw/jqschema.sh"
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Fetch Copilot PR data
-        run: "# Create output directories\nmkdir -p /tmp/gh-aw/pr-data\nmkdir -p /tmp/gh-aw/cache-memory\n\n# Get today's date for cache identification\nTODAY=$(date '+%Y-%m-%d')\nCACHE_DIR=\"/tmp/gh-aw/cache-memory\"\n\n# Check if cached data exists from today\nif [ -f \"$CACHE_DIR/copilot-prs-${TODAY}.json\" ] && [ -s \"$CACHE_DIR/copilot-prs-${TODAY}.json\" ]; then\n  echo \"✓ Found cached PR data from ${TODAY}\"\n  cp \"$CACHE_DIR/copilot-prs-${TODAY}.json\" /tmp/gh-aw/pr-data/copilot-prs.json\n  \n  # Regenerate schema if missing\n  if [ ! -f \"$CACHE_DIR/copilot-prs-${TODAY}-schema.json\" ]; then\n    /tmp/gh-aw/jqschema.sh < /tmp/gh-aw/pr-data/copilot-prs.json > \"$CACHE_DIR/copilot-prs-${TODAY}-schema.json\"\n  fi\n  cp \"$CACHE_DIR/copilot-prs-${TODAY}-schema.json\" /tmp/gh-aw/pr-data/copilot-prs-schema.json\n  \n  echo \"Using cached data from ${TODAY}\"\n  echo \"Total PRs in cache: $(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)\"\nelse\n  echo \"⬇ Downloading fresh PR data...\"\n  \n  # Calculate date 30 days ago\n  DATE_30_DAYS_AGO=$(date -d '30 days ago' '+%Y-%m-%d' 2>/dev/null || date -v-30d '+%Y-%m-%d')\n\n  # Search for PRs from copilot/* branches in the last 30 days using gh CLI\n  # Using branch prefix search (head:copilot/) instead of author for reliability\n  echo \"Fetching Copilot PRs from the last 30 days...\"\n  gh pr list --repo ${{ github.repository }} \\\n    --search \"head:copilot/ created:>=${DATE_30_DAYS_AGO}\" \\\n    --state all \\\n    --json number,title,author,headRefName,createdAt,state,url,body,labels,updatedAt,closedAt,mergedAt \\\n    --limit 1000 \\\n    > /tmp/gh-aw/pr-data/copilot-prs.json\n\n  # Generate schema for reference\n  /tmp/gh-aw/jqschema.sh < /tmp/gh-aw/pr-data/copilot-prs.json > /tmp/gh-aw/pr-data/copilot-prs-schema.json\n\n  # Store in cache with today's date\n  cp /tmp/gh-aw/pr-data/copilot-prs.json \"$CACHE_DIR/copilot-prs-${TODAY}.json\"\n  cp /tmp/gh-aw/pr-data/copilot-prs-schema.json \"$CACHE_DIR/copilot-prs-${TODAY}-schema.json\"\n\n  echo \"✓ PR data saved to cache: copilot-prs-${TODAY}.json\"\n  echo \"Total PRs found: $(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)\"\nfi\n\n# Always ensure data is available at expected locations for backward compatibility\necho \"PR data available at: /tmp/gh-aw/pr-data/copilot-prs.json\"\necho \"Schema available at: /tmp/gh-aw/pr-data/copilot-prs-schema.json\""
-      - name: Setup Python environment
-        run: |
-          mkdir -p /tmp/gh-aw/python/{data,charts,artifacts}
-          pip install --user --quiet numpy pandas matplotlib seaborn scipy
-      - if: always()
-        name: Upload charts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          if-no-files-found: warn
-          name: trending-charts
-          path: /tmp/gh-aw/python/charts/*.png
-          retention-days: 30
-      - if: always()
-        name: Upload source and data
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          if-no-files-found: warn
-          name: trending-source-and-data
-          path: |
-            /tmp/gh-aw/python/*.py
-            /tmp/gh-aw/python/data/*
-          retention-days: 30
 
       # Cache configuration from frontmatter processed below
       - name: Cache (prompt-clustering-cache-${{ github.run_id }})
