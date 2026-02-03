@@ -295,16 +295,17 @@ This workflow imports copilot-setup-steps.yml.
 	importsResult, err := ProcessImportsFromFrontmatterWithManifest(result.Frontmatter, workflowsDir, nil)
 	require.NoError(t, err, "Failed to process imports")
 
-	// Verify that steps were extracted (not jobs)
-	assert.NotEmpty(t, importsResult.MergedSteps, "Should have merged steps from copilot-setup-steps.yml")
+	// Verify that steps were extracted to CopilotSetupSteps (not MergedSteps or MergedJobs)
+	assert.NotEmpty(t, importsResult.CopilotSetupSteps, "Should have copilot-setup steps from copilot-setup-steps.yml")
+	assert.Empty(t, importsResult.MergedSteps, "Should not have regular merged steps (copilot-setup goes to separate field)")
 	assert.Empty(t, importsResult.MergedJobs, "Should not have merged jobs from copilot-setup-steps.yml")
 
-	// Verify the merged steps contain expected content
-	assert.Contains(t, importsResult.MergedSteps, "Install gh-aw extension", "Should contain install step")
-	assert.Contains(t, importsResult.MergedSteps, "Set up Node.js", "Should contain Node.js setup step")
+	// Verify the copilot-setup steps contain expected content
+	assert.Contains(t, importsResult.CopilotSetupSteps, "Install gh-aw extension", "Should contain install step")
+	assert.Contains(t, importsResult.CopilotSetupSteps, "Set up Node.js", "Should contain Node.js setup step")
 
 	// Verify it doesn't contain job-level fields
-	stepsLower := strings.ToLower(importsResult.MergedSteps)
+	stepsLower := strings.ToLower(importsResult.CopilotSetupSteps)
 	assert.NotContains(t, stepsLower, "runs-on", "Should not contain runs-on in steps")
 	assert.NotContains(t, stepsLower, "permissions", "Should not contain permissions in steps")
 }

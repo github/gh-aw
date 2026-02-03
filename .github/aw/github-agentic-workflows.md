@@ -1293,11 +1293,12 @@ Additional instructions for the coding agent.
 
 ### Special Import: copilot-setup-steps.yml
 
-The `copilot-setup-steps.yml` file receives special handling when imported. Instead of importing the entire job structure, **only the steps** from the `copilot-setup-steps` job are extracted and inserted into your workflow's agent job.
+The `copilot-setup-steps.yml` file receives special handling when imported. Instead of importing the entire job structure, **only the steps** from the `copilot-setup-steps` job are extracted and inserted **at the start** of your workflow's agent job.
 
 **Key behaviors:**
 - Only the steps array is imported (job metadata like `runs-on`, `permissions` is ignored)
-- Imported steps are placed **after** any custom steps defined in your workflow's frontmatter
+- Imported steps are placed **at the start** of the agent job (before any custom steps)
+- Other imported steps (non-copilot-setup) are placed after custom steps
 - Supports both `.yml` and `.yaml` extensions
 - Enables clean reuse of common setup configurations across workflows
 
@@ -1310,11 +1311,11 @@ imports:
   - copilot-setup-steps.yml
 steps:
   - name: Custom environment setup
-    run: echo "My custom setup runs first"
+    run: echo "My custom setup runs after copilot setup"
 ---
 ```
 
-In the compiled workflow, your custom steps run first, followed by the imported setup steps from `copilot-setup-steps.yml`.
+In the compiled workflow, the imported setup steps from `copilot-setup-steps.yml` run first, followed by your custom steps.
 
 ## Permission Patterns
 

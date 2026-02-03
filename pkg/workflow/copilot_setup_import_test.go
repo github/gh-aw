@@ -97,7 +97,7 @@ This workflow imports copilot-setup-steps.yml and should have the imported steps
 	assert.Contains(t, yamlStr, "Set up Node.js", "Imported Node.js step should be in compiled workflow")
 	assert.Contains(t, yamlStr, "Set up Go", "Imported Go step should be in compiled workflow")
 
-	// Verify the order: custom step should come before imported steps
+	// Verify the order: copilot-setup-steps should come FIRST (before custom steps)
 	customStepIndex := strings.Index(yamlStr, "My custom step")
 	installStepIndex := strings.Index(yamlStr, "Install gh-aw extension")
 	nodeStepIndex := strings.Index(yamlStr, "Set up Node.js")
@@ -108,10 +108,10 @@ This workflow imports copilot-setup-steps.yml and should have the imported steps
 	require.NotEqual(t, -1, nodeStepIndex, "Node.js step not found")
 	require.NotEqual(t, -1, goStepIndex, "Go step not found")
 
-	// Custom step should come before all imported steps
-	assert.Less(t, customStepIndex, installStepIndex, "Custom step should come before imported install step")
-	assert.Less(t, customStepIndex, nodeStepIndex, "Custom step should come before imported Node.js step")
-	assert.Less(t, customStepIndex, goStepIndex, "Custom step should come before imported Go step")
+	// Copilot-setup-steps should come BEFORE custom steps (inserted at start)
+	assert.Less(t, installStepIndex, customStepIndex, "Install step should come before custom step (copilot-setup at start)")
+	assert.Less(t, nodeStepIndex, customStepIndex, "Node.js step should come before custom step (copilot-setup at start)")
+	assert.Less(t, goStepIndex, customStepIndex, "Go step should come before custom step (copilot-setup at start)")
 
 	// Verify the imported steps maintain their order
 	assert.Less(t, installStepIndex, nodeStepIndex, "Install step should come before Node.js step")
