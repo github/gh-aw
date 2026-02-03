@@ -254,9 +254,6 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		awfArgs = append(awfArgs, "--enable-chroot")
 		copilotExecLog.Print("Enabled chroot mode for transparent host access")
 
-		// Pass all environment variables to the container
-		awfArgs = append(awfArgs, "--env-all")
-
 		// Set container working directory to match GITHUB_WORKSPACE
 		// This ensures pwd inside the container matches what the prompt tells the AI
 		awfArgs = append(awfArgs, "--container-workdir", "\"${GITHUB_WORKSPACE}\"")
