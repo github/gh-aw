@@ -287,14 +287,14 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
 			command = fmt.Sprintf(`set -o pipefail
 AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)"
-INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
+export INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
   2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
-INSTRUCTION="$(cat "$GH_AW_PROMPT")"
+export INSTRUCTION="$(cat "$GH_AW_PROMPT")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
