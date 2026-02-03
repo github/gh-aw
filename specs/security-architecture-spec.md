@@ -1720,8 +1720,6 @@ roles: [admin, maintainer]  # Restrict to trusted roles
 
 - **[GHAW-DOCS]** "GitHub Agentic Workflows Documentation." https://github.com/github/gh-aw
 
-- **[GHAW-SECURITY]** "Security Best Practices for GitHub Agentic Workflows." https://github.com/github/gh-aw/blob/main/docs/src/content/docs/guides/security.md
-
 - **[GHAW-ARCH]** "GitHub Agentic Workflows Architecture." https://github.com/github/gh-aw/blob/main/docs/src/content/docs/introduction/architecture.mdx
 
 ---

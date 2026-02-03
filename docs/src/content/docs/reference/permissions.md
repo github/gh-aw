@@ -169,6 +169,6 @@ The compiler validates these requirements and provides clear error messages when
 ## Related Documentation
 
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Secure write operations with content sanitization
-- [Security Guide](/gh-aw/guides/security/) - Security best practices and permission strategies
+- [Security Guide](/gh-aw/introduction/architecture/) - Security best practices and permission strategies
 - [Tools](/gh-aw/reference/tools/) - GitHub API tools and their permission requirements
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Complete frontmatter configuration reference

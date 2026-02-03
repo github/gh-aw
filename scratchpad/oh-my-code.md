@@ -1665,7 +1665,7 @@ The future likely involves both approaches: developers using AI agents locally f
 ### GitHub Agentic Workflows
 - **Repository**: https://github.com/github/gh-aw
 - **Documentation**: https://github.github.com/gh-aw/
-- **Security Guide**: https://github.github.com/gh-aw/guides/security/
+- **Security Guide**: https://github.github.com/gh-aw/introduction/architecture/
 - **Discord**: #continuous-ai in GitHub Next Discord
 
 ### Related Comparisons

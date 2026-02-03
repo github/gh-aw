@@ -1009,7 +1009,7 @@ Use this checklist when creating or reviewing GitHub Actions workflows:
 - [Supply Chain Attacks via Actions](https://blog.gitguardian.com/github-actions-security-cheat-sheet/)
 
 ### Related Documentation (gh-aw specific)
-- [Security Guide](../docs/src/content/docs/guides/security.md)
+- [Security Guide](../docs/src/content/docs/introduction/architecture.md)
 - [Safe Outputs](../docs/src/content/docs/reference/safe-outputs/)
 - [Network Configuration](../docs/src/content/docs/reference/network/)
 - [GitHub Agentic Workflows Instructions](../.github/aw/github-agentic-workflows.md)

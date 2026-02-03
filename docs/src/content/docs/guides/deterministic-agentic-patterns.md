@@ -188,7 +188,7 @@ Reference in prompts: "Analyze issues in `/tmp/gh-aw/agent/issues.json` and PRs 
 
 ## Related Documentation
 
-- [Custom Safe Outputs](/gh-aw/guides/custom-safe-outputs/) - Custom post-processing jobs
+- [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/) - Custom post-processing jobs
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - Configuration options
 - [Compilation Process](/gh-aw/reference/compilation-process/) - How jobs are orchestrated
 - [Imports](/gh-aw/reference/imports/) - Sharing configurations across workflows

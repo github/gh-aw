@@ -170,5 +170,5 @@ For comprehensive documentation on the MultiRepoOps design pattern, see:
 
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Configuration options
 - [GitHub Tools](/gh-aw/reference/tools/#github-tools-github) - API access configuration
-- [Security Best Practices](/gh-aw/guides/security/) - Authentication and security
+- [Security Best Practices](/gh-aw/introduction/architecture/) - Authentication and security
 - [Packaging & Distribution](/gh-aw/guides/packaging-imports/) - Sharing workflows

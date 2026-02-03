@@ -284,7 +284,7 @@ on:
 - `["owner/repo"]` - Allow specific repository
 - Omit `forks` field - Default behavior (same-repository PRs only)
 
-The compiler uses repository ID comparison for reliable fork detection that is not affected by repository renames. See the [Security Guide](/gh-aw/guides/security/#fork-protection-for-pull-request-triggers) for detailed security implications.
+The compiler uses repository ID comparison for reliable fork detection that is not affected by repository renames.
 
 ### Comment Triggers
 ```yaml wrap
@@ -335,7 +335,7 @@ Workflows with `workflow_run` triggers include automatic security protections:
 
 **Branch restrictions required:** Include `branches` to limit which branch workflows can trigger the event. Without branch restrictions, the compiler emits warnings (or errors in strict mode). This prevents unexpected execution for workflow runs on all branches.
 
-See the [Security Guide](/gh-aw/guides/security/#workflow_run-trigger-security) for detailed security behavior and implementation.
+See the [Security Architecture](/gh-aw/introduction/architecture/) for detailed security behavior and implementation.
 
 ### Command Triggers (`slash_command:`)
 

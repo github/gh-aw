@@ -563,6 +563,6 @@ Analyze issue and create implementation PR
 - Network Configuration Reference
 - Safe Outputs Reference
 
-**Visit:** https://github.github.com/gh-aw/guides/security/
+**Visit:** https://github.github.com/gh-aw/introduction/architecture/
 
 Security is foundational to GitHub Agentic Workflows. We continuously evolve our security controls and welcome community feedback.

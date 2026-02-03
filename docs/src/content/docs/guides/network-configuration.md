@@ -144,5 +144,5 @@ View complete ecosystem domain lists in the [ecosystem domains source](https://g
 ## Related Documentation
 
 - [Network Permissions Reference](/gh-aw/reference/network/) - Complete network configuration reference
-- [Security Guide](/gh-aw/guides/security/) - Security best practices
+- [Security Guide](/gh-aw/introduction/architecture/) - Security best practices
 - [Troubleshooting](/gh-aw/troubleshooting/common-issues/) - Common issues and solutions

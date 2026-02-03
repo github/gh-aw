@@ -96,7 +96,7 @@ github-token: ${{ secrets.CUSTOM_PAT }}
 3. Top-level `github-token`
 4. Default: `${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}`
 
-See the [Security Guide](/gh-aw/guides/security/#authorization-and-token-management) for complete documentation.
+See [GitHub Tokens](/gh-aw/reference/tokens/) for complete documentation.
 
 ### Permissions (`permissions:`)
 
@@ -183,7 +183,7 @@ strict: false  # Disable for development/testing
 - **Frontmatter**: `strict: true/false` (per-workflow)
 - **CLI flag**: `gh aw compile --strict` (all workflows, overrides frontmatter)
 
-See [CLI Commands](/gh-aw/setup/cli/#compile) and [Security Guide](/gh-aw/guides/security/#strict-mode-validation) for details.
+See [CLI Commands](/gh-aw/setup/cli/#compile) for details.
 
 ### Feature Flags (`features:`)
 

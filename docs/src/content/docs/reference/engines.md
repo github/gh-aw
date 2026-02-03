@@ -112,5 +112,5 @@ Arguments are added in order and placed before the `--prompt` flag. Common uses 
 
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Complete configuration reference
 - [Tools](/gh-aw/reference/tools/) - Available tools and MCP servers
-- [Security Guide](/gh-aw/guides/security/) - Security considerations for AI engines
+- [Security Guide](/gh-aw/introduction/architecture/) - Security considerations for AI engines
 - [MCPs](/gh-aw/guides/mcps/) - Model Context Protocol setup and configuration

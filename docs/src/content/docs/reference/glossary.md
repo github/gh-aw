@@ -365,5 +365,5 @@ For detailed documentation on specific topics, see:
 - [Safe Inputs Reference](/gh-aw/reference/safe-inputs/)
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/)
 - [Using MCPs Guide](/gh-aw/guides/mcps/)
-- [Security Guide](/gh-aw/guides/security/)
+- [Security Guide](/gh-aw/introduction/architecture/)
 - [AI Engines Reference](/gh-aw/reference/engines/)

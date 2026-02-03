@@ -339,4 +339,4 @@ Use `gh aw logs --run-id <run-id>` to view firewall activity and identify blocke
 - [Network Configuration Guide](/gh-aw/guides/network-configuration/) - Practical examples and common patterns
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Complete frontmatter configuration guide
 - [Tools](/gh-aw/reference/tools/) - Tool-specific network access configuration
-- [Security Notes](/gh-aw/guides/security/) - Comprehensive security guidance
+- [Security Guide](/gh-aw/introduction/architecture/) - Comprehensive security guidance
