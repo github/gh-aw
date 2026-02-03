@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
+
+var runWorkflowTrackingLog = logger.New("cli:run_workflow_tracking")
 
 // WorkflowRunInfo contains information about a workflow run
 type WorkflowRunInfo struct {
@@ -23,6 +26,7 @@ type WorkflowRunInfo struct {
 // getLatestWorkflowRunWithRetry gets information about the most recent run of the specified workflow
 // with retry logic to handle timing issues when a workflow has just been triggered
 func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose bool) (*WorkflowRunInfo, error) {
+	runWorkflowTrackingLog.Printf("Getting latest workflow run: workflow=%s, repo=%s, max_retries=6", lockFileName, repo)
 	const maxRetries = 6
 	const initialDelay = 2 * time.Second
 	const maxDelay = 10 * time.Second
@@ -36,6 +40,7 @@ func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose boo
 	// Capture the current time before we start polling
 	// This helps us identify runs that were created after the workflow was triggered
 	startTime := time.Now().UTC()
+	runWorkflowTrackingLog.Printf("Start time for polling: %s", startTime.Format(time.RFC3339))
 
 	// Create spinner outside the loop so we can update it
 	var spinner *console.SpinnerWrapper
@@ -81,6 +86,7 @@ func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose boo
 		output, err := cmd.Output()
 		if err != nil {
 			lastErr = fmt.Errorf("failed to get workflow runs: %w", err)
+			runWorkflowTrackingLog.Printf("Attempt %d/%d failed to get runs: %v", attempt+1, maxRetries, err)
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Attempt %d/%d failed: %v", attempt+1, maxRetries, err)))
 			}
@@ -89,6 +95,7 @@ func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose boo
 
 		if len(output) == 0 || string(output) == "[]" {
 			lastErr = fmt.Errorf("no runs found for workflow")
+			runWorkflowTrackingLog.Printf("Attempt %d/%d: no runs found, output empty or []", attempt+1, maxRetries)
 			console.LogVerbose(verbose, fmt.Sprintf("Attempt %d/%d: no runs found yet", attempt+1, maxRetries))
 			continue
 		}
@@ -139,6 +146,7 @@ func getLatestWorkflowRunWithRetry(lockFileName string, repo string, verbose boo
 		// If we found a run and it was created after we started (within 30 seconds tolerance),
 		// it's likely the run we just triggered
 		if !createdAt.IsZero() && createdAt.After(startTime.Add(-30*time.Second)) {
+			runWorkflowTrackingLog.Printf("Found matching run: id=%d, created_at=%s, within_tolerance=true", run.DatabaseID, createdAt.Format(time.RFC3339))
 			console.LogVerbose(verbose, fmt.Sprintf("Found recent run (ID: %d) created at %v (started polling at %v)",
 				run.DatabaseID, createdAt.Format(time.RFC3339), startTime.Format(time.RFC3339)))
 			if spinner != nil {

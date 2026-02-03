@@ -5,7 +5,10 @@ import (
 	"os"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var validationOutputLog = logger.New("cli:validation_output")
 
 // FormatValidationError formats validation errors for console output
 // Preserves structured error content while applying console styling
@@ -24,6 +27,7 @@ func FormatValidationError(err error) string {
 	}
 
 	errMsg := err.Error()
+	validationOutputLog.Printf("Formatting validation error: %s", errMsg)
 
 	// Apply console formatting to the entire error message
 	// This preserves structured multi-line errors while adding visual styling

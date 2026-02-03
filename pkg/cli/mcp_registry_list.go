@@ -5,10 +5,14 @@ import (
 	"os"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var mcpRegistryListLog = logger.New("cli:mcp_registry_list")
 
 // listAvailableServers shows a list of available MCP servers from the registry
 func listAvailableServers(registryURL string, verbose bool) error {
+	mcpRegistryListLog.Printf("Listing available MCP servers: registry_url=%s", registryURL)
 	// Create registry client
 	registryClient := NewMCPRegistryClient(registryURL)
 
@@ -19,8 +23,11 @@ func listAvailableServers(registryURL string, verbose bool) error {
 
 	servers, err := registryClient.SearchServers("")
 	if err != nil {
+		mcpRegistryListLog.Printf("Failed to fetch MCP servers: %v", err)
 		return fmt.Errorf("failed to fetch MCP servers: %w", err)
 	}
+
+	mcpRegistryListLog.Printf("Retrieved %d servers from registry", len(servers))
 
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatVerboseMessage(fmt.Sprintf("Retrieved %d servers from registry", len(servers))))
