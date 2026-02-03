@@ -187,13 +187,8 @@ export default defineConfig({
 						{ label: 'SideRepoOps', link: '/guides/siderepoops/' },
 						{ label: 'SpecOps', link: '/guides/specops/' },
 						{ label: 'TrialOps', link: '/guides/trialops/' },
-					],
-				},
-				{
-						label: 'Campaigns',
-					items: [
-						{ label: 'About Campaigns', link: '/guides/campaigns/' },
-						{ label: 'Getting Started', link: '/guides/campaigns/getting-started/' },
+						{ label: 'Monitoring', link: '/guides/monitoring/' },
+						{ label: 'Orchestration', link: '/guides/orchestration/' },
 					],
 				},
 					{

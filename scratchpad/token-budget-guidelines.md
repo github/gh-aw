@@ -308,5 +308,4 @@ When adding token budgets to a workflow:
 
 - [Daily Copilot Token Report](.github/workflows/daily-copilot-token-report.md)
 - [Token Cost Analysis Module](.github/workflows/shared/token-cost-analysis.md)
-- [Campaign Discovery Budgets](docs/campaign-discovery-budgets.md)
 - [DeepReport Intelligence Briefing 2026-01-26](https://github.com/github/gh-aw/actions/runs/21355400856)

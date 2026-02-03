@@ -233,7 +233,7 @@ Available codemods: `timeout_minutes` → `timeout-minutes`, `network.firewall` 
 
 #### `compile`
 
-Compile Markdown workflows to GitHub Actions YAML. Remote imports cached in `.github/aw/imports/`. Validates campaign specs and generates coordinator workflows when present.
+Compile Markdown workflows to GitHub Actions YAML. Remote imports cached in `.github/aw/imports/`.
 
 ```bash wrap
 gh aw compile                              # Compile all workflows
@@ -345,10 +345,9 @@ Download and analyze logs with tool usage, network patterns, errors, warnings. R
 gh aw logs workflow                        # Download logs for workflow
 gh aw logs -c 10 --start-date -1w         # Filter by count and date
 gh aw logs --ref main --parse --json      # With markdown/JSON output for branch
-gh aw logs --campaign                      # Campaign orchestrators only
 ```
 
-**Options:** `-c`, `--count`, `-e`, `--engine`, `--campaign`, `--start-date`, `--end-date`, `--ref`, `--parse`, `--json`, `--repo`
+**Options:** `-c`, `--count`, `-e`, `--engine`, `--start-date`, `--end-date`, `--ref`, `--parse`, `--json`, `--repo`
 
 #### `audit`
 

@@ -36,11 +36,22 @@ An AI-powered workflow that can reason, make decisions, and take autonomous acti
 
 **Example:** Instead of "if issue has label X, do Y", you write "analyze this issue and provide helpful context", and the AI decides what's helpful based on the specific issue content.
 
-### Agentic Campaign
+### Orchestration
 
-Workflows that coordinate one or more workers toward a shared goal, with built-in progress tracking.
+Workflows that coordinate one or more **worker workflows** toward a shared goal. A typical orchestrator/worker design:
 
-See the [Campaigns Guide](/gh-aw/guides/campaigns/) for implementation patterns.
+- An **orchestrator** decides what work to do next and dispatches workers
+- **Workers** execute the concrete tasks with scoped tools and limits
+
+See the [Orchestration guide](/gh-aw/guides/orchestration/) for implementation patterns.
+
+### Orchestrator Workflow
+
+A workflow that fans out work by dispatching other workflows (workers), aggregates results, and optionally posts summaries.
+
+### Worker Workflow
+
+A workflow dispatched by an orchestrator that performs a focused unit of work (triage, analysis, code changes, validation).
 
 ### Agentic Engine or Coding Agent
 
@@ -220,7 +231,7 @@ GitHub's built-in automation platform that runs workflows in response to reposit
 
 ### GitHub Projects (Projects v2)
 
-GitHub's project management and tracking system that organizes issues and pull requests using customizable boards, tables, and roadmaps. Projects v2 provides flexible custom fields (text, number, date, single-select, iteration), automation, and GraphQL API access. Agentic workflows can manage project boards using the `update-project` safe output to add items, update fields, and maintain campaign tracking. Requires organization-level Projects permissions for API access.
+GitHub's project management and tracking system that organizes issues and pull requests using customizable boards, tables, and roadmaps. Projects v2 provides flexible custom fields (text, number, date, single-select, iteration), automation, and GraphQL API access. Agentic workflows can manage project boards using the `update-project` safe output to add items, update fields, and maintain ongoing monitoring/tracking. Requires organization-level Projects permissions for API access.
 
 ```yaml
 safe-outputs:
@@ -323,7 +334,7 @@ timeout-minutes: 45
 
 ### Tracker ID
 
-A unique identifier assigned to workflows that enables external monitoring and coordination without bidirectional coupling. Campaign orchestrators use tracker IDs to query the GitHub Actions API for workflow runs and discover outputs without workers needing to know about the campaign. This enables tracker-based monitoring where campaigns have knowledge of their workers, but workers operate independently.
+A unique identifier assigned to workflows that enables external monitoring and coordination without bidirectional coupling. Orchestrator workflows can use tracker IDs to correlate worker runs and discover outputs without workers needing to know about the orchestrator. This enables tracker-based monitoring where the orchestrator can observe its workers, but workers operate independently.
 
 ```yaml
 tracker-id: daily-file-diet-v1

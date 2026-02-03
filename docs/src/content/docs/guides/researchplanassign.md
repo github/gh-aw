@@ -91,7 +91,7 @@ The three-phase approach takes longer than direct execution and requires develop
 
 ## Related Strategies
 
-- **[Agentic campaigns](/gh-aw/guides/campaigns/)**: Coordinate multiple ResearchPlanAssign cycles toward a shared goal
+- **[Orchestration](/gh-aw/guides/orchestration/)**: Coordinate multiple ResearchPlanAssign cycles toward a shared goal
 - **[Threat Detection](/gh-aw/guides/threat-detection/)**: Continuous monitoring without planning phase
 - **[Custom Safe Outputs](/gh-aw/guides/custom-safe-outputs/)**: Create custom actions for plan phase
 

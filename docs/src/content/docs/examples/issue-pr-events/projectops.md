@@ -113,11 +113,10 @@ Each safe output operates in a separate job with minimal, scoped permissions. Se
 - Configure view filters and visible fields
 - Support for swimlane grouping by custom fields
 
-**Campaign Integration**
-- Automatic tracking label application
-- Project status updates with health indicators
-- Cross-repository project coordination
-- Worker/workflow field population for multi-agent campaigns
+**Orchestration & Monitoring**
+- Use Projects as a shared dashboard across runs/workflows
+- Post status updates with health indicators
+- Coordinate work across repositories and workflows (optionally with an orchestrator/worker setup)
 
 See the [Safe Outputs reference](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) for project field and view configuration.
 
@@ -128,22 +127,22 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 - **Content-based routing** - Analyze issue content to determine which project board and what priority (native automation only supports label/status triggers)
 - **Multi-issue coordination** - Add related issues/PRs to projects and apply consistent tracking labels
 - **Dynamic field assignment** - Set priority, effort, and custom fields based on AI analysis
-- **Automated project creation** - Create new project boards programmatically based on campaign needs
+- **Automated project creation** - Create new project boards programmatically based on initiative needs
 - **Status tracking** - Generate automated progress summaries with health indicators
 
 ## Best Practices
 
-**Create projects programmatically** when launching campaigns to ensure consistent structure and field configuration. Use `create-project` with optional first issue to initialize tracking.
+**Create projects programmatically** when launching an initiative to ensure consistent structure and field configuration. Use `create-project` with an optional first issue to initialize tracking.
 
 **Use descriptive project names** that clearly indicate purpose and scope. Prefer "Performance Optimization Q1 2026" over "Project 1".
 
-**Leverage tracking labels** (`z_campaign_<id>`) for grouping related work across issues and PRs, enabling campaign discovery.
+**Prefer Projects fields over ad-hoc labels** for grouping related work across issues and PRs.
 
 **Set meaningful field values** like status, priority, and effort to enable effective filtering and sorting on boards.
 
-**Create custom views automatically** using the `views` configuration in frontmatter for consistent board setup across campaigns.
+**Create custom views automatically** using the `views` configuration in frontmatter for consistent board setup.
 
-**Post regular status updates** using `create-project-status-update` to keep stakeholders informed of campaign progress and health.
+**Post regular status updates** using `create-project-status-update` to keep stakeholders informed of progress and health.
 
 **Combine with issue creation** for initiative workflows that generate multiple tracked tasks automatically.
 
@@ -166,7 +165,8 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 ## Additional Resources
 
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Complete safe output configuration and API details
-- [Campaign Guides](/gh-aw/guides/campaigns/) - Campaign setup and lifecycle
+- [Projects & Monitoring](/gh-aw/guides/monitoring/) - Design pattern guide
+- [Orchestration](/gh-aw/guides/orchestration/) - Design pattern guide
 - [Trigger Events](/gh-aw/reference/triggers/) - Event trigger configuration options
 - [IssueOps Guide](/gh-aw/examples/issue-pr-events/issueops/) - Related issue automation patterns
 - [Token Reference](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) - GitHub Projects token setup
