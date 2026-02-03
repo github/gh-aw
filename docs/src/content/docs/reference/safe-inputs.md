@@ -363,4 +363,4 @@ Tools provide secret isolation (only specified env vars), process isolation (sep
 - [Imports](/gh-aw/reference/imports/) - Importing shared workflows
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Automated post-workflow actions
 - [MCPs](/gh-aw/guides/mcps/) - External MCP server integration
-- [Custom Safe Output Jobs](/gh-aw/guides/custom-safe-outputs/) - Post-workflow custom jobs
+- [Custom Safe Output Jobs](/gh-aw/reference/custom-safe-outputs/) - Post-workflow custom jobs

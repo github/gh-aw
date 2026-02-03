@@ -172,36 +172,6 @@ See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#hide-older-comments)
 
 Run agentic workflows from a separate "side" repository that targets your main codebase. This isolates AI-generated issues, comments, and workflow runs from your main repository, keeping automation infrastructure separate from production code.
 
-```yaml wrap
-safe-outputs:
-  github-token: ${{ secrets.MAIN_REPO_PAT }}
-  create-issue:
-    target-repo: "my-org/main-repo"
-    title-prefix: "[automation] "
-    labels: [automation, ai-generated]
-```
-
-**Key benefits**:
-- **Zero friction** - No changes needed to main repository
-- **Clean separation** - AI-generated issues stay separate from organic development
-- **Private workflows** - Store sensitive automation logic in private repository
-- **Safe experimentation** - Test workflows without affecting production
-- **Centralized automation** - Manage workflows for multiple repositories
-
-**Architecture**:
-```text
-┌─────────────────┐          ┌──────────────────┐
-│  Side Repo      │          │  Main Repo       │
-│  (workflows)    │ ────────>│  (target code)   │
-│                 │   Uses   │                  │
-│  - automation/  │   PAT    │  - src/          │
-│  - .github/     │          │  - tests/        │
-│    workflows/   │          │  - docs/         │
-└─────────────────┘          └──────────────────┘
-```
-
-The workflows run in GitHub Actions on the side repository but perform operations (create issues, PRs, comments) on the main repository using cross-repository authentication.
-
 See [SideRepoOps Guide](/gh-aw/guides/siderepoops/) for complete setup and usage documentation.
 
 ### Allowed GitHub References
@@ -216,6 +186,7 @@ safe-outputs:
 ```
 
 **Configuration options**:
+
 - `[]` — Escape all references (prevents all timeline items)
 - `["repo"]` — Allow only the target repository's references
 - `["repo", "owner/other-repo"]` — Allow specific repositories
@@ -224,12 +195,14 @@ safe-outputs:
 **How it works**: References like `#123` become `` `#123` `` and `other/repo#456` becomes `` `other/repo#456` ``, preventing timeline clutter while preserving the information.
 
 **Use cases**:
+
 - **SideRepoOps**: Prevent automation from cluttering main repository timeline
 - **Cross-repository operations**: Avoid unwanted cross-references
 - **Clean automation**: Maintain readable issue/PR timelines
 - **Reporting workflows**: Share information without creating link noise
 
 **Example with SideRepoOps**:
+
 ```yaml wrap
 safe-outputs:
   github-token: ${{ secrets.MAIN_REPO_PAT }}
@@ -266,6 +239,7 @@ safe-outputs:
 | **Timeline noise** | Can clutter project tracking | Separate from development work |
 
 **Use cases for ephemeral discussions**:
+
 - Weekly status reports
 - Periodic analysis results
 - Temporary announcements
@@ -274,6 +248,7 @@ safe-outputs:
 - Community updates
 
 **Combining features**:
+
 ```yaml wrap
 safe-outputs:
   create-discussion:
@@ -285,106 +260,11 @@ safe-outputs:
 ```
 
 This configuration ensures:
+
 1. Only the latest weekly status discussion is open
 2. Previous reports are closed when new ones are created
 3. All discussions auto-close after 14 days
 4. The "Status Updates" category stays clean and focused
-
-## Best Practices
-
-### Combining Expiration Features
-
-Use multiple expiration features together for comprehensive cleanup:
-
-```yaml wrap
-on: weekly on monday
-  stop-after: "+30d"  # Stop workflow after 30 days
-
-safe-outputs:
-  create-discussion:
-    title-prefix: "[experiment]"
-    expires: 7  # Close discussions after 7 days
-    close-older-discussions: true  # Close older when creating new
-  add-comment:
-    hide-older-comments: true  # Minimize old status updates
-```
-
-This ensures the workflow stops after 30 days, created discussions expire after 7 days, and older discussions/comments are cleaned up automatically.
-
-### Labeling Ephemeral Content
-
-Use consistent labels to identify and track ephemeral content:
-
-```yaml wrap
-safe-outputs:
-  create-issue:
-    expires: 7
-    labels: [ephemeral, automation, expires-7d]
-```
-
-This makes it easy to:
-- Identify ephemeral content at a glance
-- Filter by expiration timeframe
-- Audit what content will expire soon
-- Track automation-generated content
-
-### SideRepoOps with Reference Escaping
-
-When using SideRepoOps, always configure `allowed-github-references` to prevent timeline noise:
-
-```yaml wrap
-safe-outputs:
-  github-token: ${{ secrets.MAIN_REPO_PAT }}
-  allowed-github-references: []  # Escape all references
-  create-issue:
-    target-repo: "my-org/main-repo"
-    expires: 7  # Auto-close after 7 days
-    labels: [automation, ephemeral]
-```
-
-This combination ensures:
-- Issues are created in the main repo but tracked separately
-- No cross-references clutter the main repo timeline
-- Content auto-expires after 7 days
-- Clear labeling identifies automated content
-
-### Status Update Workflows
-
-For workflows that post repeated status updates, use comment hiding:
-
-```yaml wrap
-safe-outputs:
-  add-comment:
-    hide-older-comments: true
-    allowed-reasons: [outdated, resolved]
-```
-
-This ensures:
-- Only the latest status is prominently visible
-- Historical status updates are preserved but minimized
-- Timeline stays clean and focused
-- Multiple status reasons available (outdated, resolved)
-
-### Maintenance Workflow Monitoring
-
-The auto-generated `agentics-maintenance.yml` workflow handles expiration. Monitor its runs to ensure proper cleanup:
-
-```bash
-# View maintenance workflow runs
-gh run list --workflow=agentics-maintenance.yml
-
-# Check for failures
-gh run list --workflow=agentics-maintenance.yml --status=failure
-
-# View a specific run
-gh run view RUN_ID
-```
-
-If expiration isn't working as expected:
-- Verify the maintenance workflow is enabled
-- Check workflow permissions (needs `issues: write` or `discussions: write`)
-- Review failed runs for permission errors
-- Ensure PAT tokens have appropriate scopes for cross-repository operations
 
 ## Related Documentation
 
