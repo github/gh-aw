@@ -109,17 +109,8 @@ jobs:
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
-      - name: Checkout .github folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            .github
-          depth: 1
-          persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
-      - name: Install gh-aw extension
-        run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
       - name: Checkout code
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Setup Go
@@ -133,6 +124,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'actions/setup/js/package-lock.json'
           package-manager-cache: false
+      - name: Install gh-aw extension
+        run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
       - name: Install JavaScript dependencies
         run: cd actions/setup/js && npm ci
       - name: Install development dependencies
