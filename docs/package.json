@@ -17,7 +17,7 @@
     "test:debug": "playwright test --debug"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.37.3",
+    "@astrojs/starlight": "^0.37.6",
     "@primer/octicons": "^19.21.2",
     "astro": "^5.16.12",
     "astro-mermaid": "^1.2.0",
