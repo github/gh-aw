@@ -315,7 +315,7 @@ jobs:
           persist-credentials: true
           
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           

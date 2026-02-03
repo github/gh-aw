@@ -21,7 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# frontmatter-hash: 64ebb339205b1d1d98a5c197f071562adc84fef0036eefe88bc8daa3a6d43102
+# frontmatter-hash: c9708bda21d12a9562aa015ec98e9b1e13ed12edc2c85b192f054fa73d025c8b
 
 name: "Release"
 "on":
@@ -769,7 +769,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           node-version: "20"
       - name: Update CHANGELOG with changesets
