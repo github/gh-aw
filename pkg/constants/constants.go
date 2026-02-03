@@ -289,7 +289,7 @@ const DefaultCodexVersion Version = "0.94.0"
 const DefaultGitHubMCPServerVersion Version = "v0.30.2"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
-const DefaultFirewallVersion Version = "v0.13.1"
+const DefaultFirewallVersion Version = "v0.13.2"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
 const DefaultMCPGatewayVersion Version = "v0.0.94"
