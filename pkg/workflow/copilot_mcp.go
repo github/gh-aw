@@ -84,11 +84,9 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 func (e *CopilotEngine) renderCopilotMCPConfigWithContext(yaml *strings.Builder, toolName string, toolConfig map[string]any, isLast bool, workflowData *WorkflowData) error {
 	copilotMCPLog.Printf("Rendering custom MCP config for tool: %s", toolName)
 
-	// Determine if localhost URLs should be rewritten to host.docker.internal
-	// This is needed when firewall is enabled (agent is not disabled)
-	rewriteLocalhost := workflowData != nil && (workflowData.SandboxConfig == nil ||
-		workflowData.SandboxConfig.Agent == nil ||
-		!workflowData.SandboxConfig.Agent.Disabled)
+	// localhost URLs should be rewritten to host.docker.internal
+	// This is always needed now since agent sandbox is always enabled
+	rewriteLocalhost := true
 
 	// Use the shared renderer with copilot-specific requirements
 	renderer := MCPConfigRenderer{

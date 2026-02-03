@@ -204,11 +204,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		c.IncrementWarningCount()
 	}
 
-	// Emit warning for sandbox: false (disables all sandbox features)
-	if isSandboxDisabled(workflowData) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("⚠️  WARNING: Sandbox disabled (sandbox: false). This removes important security protections including the firewall and MCP gateway. The AI agent will have direct network access without any filtering. Only use this for testing or in controlled environments where you trust the AI agent completely."))
-		c.IncrementWarningCount()
-	}
+	// sandbox: false is no longer supported - no warning needed
 
 	// Emit experimental warning for safe-inputs feature
 	if IsSafeInputsEnabled(workflowData.SafeInputs, workflowData) {

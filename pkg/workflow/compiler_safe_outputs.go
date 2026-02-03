@@ -461,13 +461,9 @@ func needsGitCommands(safeOutputs *SafeOutputsConfig) bool {
 // - Firewall is auto-enabled (networkPermissions.Firewall is set and enabled)
 // - SRT sandbox is enabled
 // Returns false when:
-// - sandbox.agent is false (explicitly disabled)
 // - No sandbox configuration and no auto-enabled firewall
 func isSandboxEnabled(sandboxConfig *SandboxConfig, networkPermissions *NetworkPermissions) bool {
-	// Check if sandbox.agent is explicitly disabled
-	if sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
-		return false
-	}
+	// sandbox.agent: false is no longer supported, so it's never explicitly disabled
 
 	// Check if sandbox.agent is explicitly configured with a type
 	if sandboxConfig != nil && sandboxConfig.Agent != nil {

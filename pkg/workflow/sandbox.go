@@ -48,14 +48,13 @@ type SandboxConfig struct {
 
 // AgentSandboxConfig represents the agent sandbox configuration
 type AgentSandboxConfig struct {
-	ID       string                `yaml:"id,omitempty"`      // Agent ID: "awf" or "srt" (replaces Type in new object format)
-	Type     SandboxType           `yaml:"type,omitempty"`    // Sandbox type: "awf" or "srt" (legacy, use ID instead)
-	Disabled bool                  `yaml:"-"`                 // True when agent is explicitly set to false (disables firewall). This is a runtime flag, not serialized to YAML.
-	Config   *SandboxRuntimeConfig `yaml:"config,omitempty"`  // Custom SRT config (optional)
-	Command  string                `yaml:"command,omitempty"` // Custom command to replace AWF or SRT installation
-	Args     []string              `yaml:"args,omitempty"`    // Additional arguments to append to the command
-	Env      map[string]string     `yaml:"env,omitempty"`     // Environment variables to set on the step
-	Mounts   []string              `yaml:"mounts,omitempty"`  // Container mounts to add for AWF (format: "source:dest:mode")
+	ID      string                `yaml:"id,omitempty"`      // Agent ID: "awf" or "srt" (replaces Type in new object format)
+	Type    SandboxType           `yaml:"type,omitempty"`    // Sandbox type: "awf" or "srt" (legacy, use ID instead)
+	Config  *SandboxRuntimeConfig `yaml:"config,omitempty"`  // Custom SRT config (optional)
+	Command string                `yaml:"command,omitempty"` // Custom command to replace AWF or SRT installation
+	Args    []string              `yaml:"args,omitempty"`    // Additional arguments to append to the command
+	Env     map[string]string     `yaml:"env,omitempty"`     // Environment variables to set on the step
+	Mounts  []string              `yaml:"mounts,omitempty"`  // Container mounts to add for AWF (format: "source:dest:mode")
 }
 
 // SandboxRuntimeConfig represents the Anthropic Sandbox Runtime configuration
@@ -240,14 +239,8 @@ func generateSRTConfigJSON(workflowData *WorkflowData) (string, error) {
 
 // applySandboxDefaults applies default values to sandbox configuration
 // If no sandbox config exists, creates one with awf as default agent
-// If sandbox config exists but has no agent, sets agent to awf (unless using legacy Type field or sandbox: false)
+// If sandbox config exists but has no agent, sets agent to awf (unless using legacy Type field)
 func applySandboxDefaults(sandboxConfig *SandboxConfig, engineConfig *EngineConfig) *SandboxConfig {
-	// If sandbox is explicitly disabled (sandbox: false), preserve that setting
-	if sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
-		sandboxLog.Print("Sandbox explicitly disabled with sandbox: false, preserving disabled state")
-		return sandboxConfig
-	}
-
 	// If no sandbox config exists, create one with awf as default
 	if sandboxConfig == nil {
 		sandboxLog.Print("No sandbox config found, creating default with agent: awf")

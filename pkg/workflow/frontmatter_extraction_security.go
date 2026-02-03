@@ -142,16 +142,12 @@ func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConf
 		return nil
 	}
 
-	// Handle boolean format: sandbox: false (disables all sandbox features)
+	// Handle boolean format: sandbox: false is NOT supported
 	if sandboxBool, ok := sandbox.(bool); ok {
 		if !sandboxBool {
-			frontmatterExtractionSecurityLog.Print("Sandbox explicitly disabled with sandbox: false")
-			// Return a marker config with Disabled flag set
-			return &SandboxConfig{
-				Agent: &AgentSandboxConfig{
-					Disabled: true,
-				},
-			}
+			frontmatterExtractionSecurityLog.Print("Sandbox: false is not supported")
+			// Return a validation error that will be caught during validation
+			return nil
 		}
 		// sandbox: true is not meaningful, treat as no configuration
 		frontmatterExtractionSecurityLog.Print("Sandbox: true specified but has no effect, treating as unconfigured")
@@ -186,14 +182,11 @@ func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConf
 	if agentVal, hasAgent := sandboxObj["agent"]; hasAgent {
 		frontmatterExtractionSecurityLog.Print("Extracting agent sandbox configuration")
 
-		// Check if agent is set to false (boolean) - this is no longer supported
+		// Check if agent is set to false (boolean) - this is NOT supported
 		if agentBool, ok := agentVal.(bool); ok && !agentBool {
-			// Return a marker config that will be caught during validation
-			return &SandboxConfig{
-				Agent: &AgentSandboxConfig{
-					Disabled: true, // This will be caught by validation
-				},
-			}
+			frontmatterExtractionSecurityLog.Print("sandbox.agent: false is not supported")
+			// Return nil - validation will catch this as an error
+			return nil
 		}
 
 		config.Agent = c.extractAgentSandboxConfig(agentVal)
@@ -227,7 +220,7 @@ func (c *Compiler) extractSandboxConfig(frontmatter map[string]any) *SandboxConf
 
 // extractAgentSandboxConfig extracts agent sandbox configuration
 func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
-	// Handle boolean format: REJECTED - sandbox.agent: false is no longer supported
+	// Handle boolean format: NOT SUPPORTED - must use string or object format
 	if _, ok := agentVal.(bool); ok {
 		// Both true and false are invalid - must use string or object format
 		return nil
@@ -318,12 +311,15 @@ func (c *Compiler) extractAgentSandboxConfig(agentVal any) *AgentSandboxConfig {
 // extractMCPGatewayConfig extracts MCP gateway configuration from frontmatter
 // Per MCP Gateway Specification v1.0.0: Only container-based execution is supported.
 // Direct command execution is not supported.
+// Note: sandbox.mcp: false is NOT supported - MCP gateway cannot be disabled.
 func (c *Compiler) extractMCPGatewayConfig(mcpVal any) *MCPGatewayRuntimeConfig {
-	// Handle nil or boolean false
+	// Handle nil - no MCP gateway configuration
 	if mcpVal == nil {
 		return nil
 	}
+	// Boolean false is NOT supported - log and return nil (validation will catch this)
 	if mcpBool, ok := mcpVal.(bool); ok && !mcpBool {
+		frontmatterExtractionSecurityLog.Print("sandbox.mcp: false is not supported")
 		return nil
 	}
 
