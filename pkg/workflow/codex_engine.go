@@ -273,11 +273,10 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			codexEngineLog.Print("Using standard AWF command")
 		}
 
-		// Prepend PATH setup to find all runtimes in hostedtoolcache
-		// This ensures codex, python, go, ruby, node and all dependencies (including MCP servers) are accessible
-		// The PATH setup finds all bin directories in /opt/hostedtoolcache/<tool>/<version>/<arch>/bin
-		pathSetup := GetHostedToolcachePathSetup()
-		codexCommandWithPath := fmt.Sprintf("%s && %s", pathSetup, codexCommand)
+		// In chroot mode, PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
+		// which contains the complete host PATH with all setup-* action additions.
+		// No need for additional PATH reconstruction.
+		codexCommandWithPath := codexCommand
 
 		// Build the command with agent file handling if specified
 		// With chroot mode, the host environment is inherited, so no setup commands are needed

@@ -329,20 +329,10 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// AWF v0.2.0 uses -- to separate AWF args from the actual command
 		// The command arguments should be passed as individual shell arguments, not as a single string
 
-		// Add PATH setup to find all runtimes in hostedtoolcache
-		// This ensures copilot, python, go, ruby, node and all dependencies (including MCP servers) are accessible
-		// The PATH setup finds all bin directories in /opt/hostedtoolcache/<tool>/<version>/<arch>/bin
-		pathSetup := GetHostedToolcachePathSetup()
-
-		// Wrap copilot command with PATH setup
-		copilotCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, copilotCommand)
-
-		// Escape the compound command so the && operator is passed to AWF, not interpreted by
-		// the outer shell. Without this, the shell would run:
-		//   1. sudo -E awf ... -- export PATH="..."  (just exports, then AWF exits)
-		//   2. && /usr/local/bin/copilot ...         (runs on host, not in container!)
-		// With escaping, the entire command is passed to AWF as a single argument
-		escapedCommand := shellEscapeArg(copilotCommandWithPath)
+		// In chroot mode, PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
+		// which contains the complete host PATH with all setup-* action additions.
+		// No need for additional PATH reconstruction.
+		escapedCommand := shellEscapeArg(copilotCommand)
 
 		// With chroot mode, the host environment is inherited, so no setup commands are needed
 		command = fmt.Sprintf(`set -o pipefail

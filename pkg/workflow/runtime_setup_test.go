@@ -328,12 +328,11 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("dotnet"), Version: "8.0"},
 			},
-			expectSteps: 2, // setup + DOTNET_ROOT capture for AWF chroot mode
+			expectSteps: 1, // setup only - PATH inherited via AWF_HOST_PATH in chroot mode
 			checkContent: []string{
 				"Setup .NET",
 				"actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9",
 				"dotnet-version: '8.0'",
-				"Capture DOTNET_ROOT for AWF chroot mode",
 			},
 		},
 		{
@@ -341,13 +340,12 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("java"), Version: "21"},
 			},
-			expectSteps: 2, // setup + JAVA_HOME capture for AWF chroot mode
+			expectSteps: 1, // setup only - PATH inherited via AWF_HOST_PATH in chroot mode
 			checkContent: []string{
 				"Setup Java",
 				"actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9",
 				"java-version: '21'",
 				"distribution: temurin",
-				"Capture JAVA_HOME for AWF chroot mode",
 			},
 		},
 		{

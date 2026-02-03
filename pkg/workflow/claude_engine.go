@@ -243,11 +243,13 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// This handles already-quoted arguments correctly and prevents double-escaping
 	claudeCommand := shellJoinArgs(commandParts)
 
-	// Prepend PATH setup to find all runtimes in hostedtoolcache
-	// This ensures claude, python, go, ruby, node and all dependencies (including MCP servers) are accessible
-	// The PATH setup finds all bin directories in /opt/hostedtoolcache/<tool>/<version>/<arch>/bin
-	pathSetup := GetHostedToolcachePathSetup()
-	claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
+	// In chroot mode (firewall enabled), PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
+	// which contains the complete host PATH with all setup-* action additions.
+	// For non-firewall mode, we still need the PATH setup.
+	if !isFirewallEnabled(workflowData) {
+		pathSetup := GetHostedToolcachePathSetup()
+		claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
+	}
 
 	// Add conditional model flag if not explicitly configured
 	// Check if this is a detection job (has no SafeOutputs config)

@@ -186,9 +186,9 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 	})
 }
 
-// TestChrootModeNoEnvFlags tests that --env-all and individual --env flags are not used with chroot mode
-func TestChrootModeNoEnvFlags(t *testing.T) {
-	t.Run("env flags are not needed with chroot mode", func(t *testing.T) {
+// TestChrootModeEnvFlags tests that --env-all is used with chroot mode to pass env vars to AWF
+func TestChrootModeEnvFlags(t *testing.T) {
+	t.Run("env-all is required for AWF to receive host env vars", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -210,14 +210,14 @@ func TestChrootModeNoEnvFlags(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify --enable-chroot is present (provides environment inheritance)
+		// Verify --enable-chroot is present (provides transparent host access)
 		if !strings.Contains(stepContent, "--enable-chroot") {
 			t.Error("Expected --enable-chroot to be present")
 		}
 
-		// Verify --env-all is NOT used (chroot inherits environment)
-		if strings.Contains(stepContent, "--env-all") {
-			t.Error("--env-all should not be used with chroot mode (environment is inherited)")
+		// Verify --env-all IS used (required for AWF to receive host environment variables)
+		if !strings.Contains(stepContent, "--env-all") {
+			t.Error("--env-all is required for AWF to receive host environment variables")
 		}
 	})
 }
