@@ -9,61 +9,25 @@ The `gh aw` CLI extension enables developers to create, manage, and execute AI-p
 
 ## 🚀 Most Common Commands
 
-95% of users only need these 5 commands:
-
-> [!TIP]
-> New to gh-aw?
-> Start here! These commands cover the essential workflow lifecycle from setup to monitoring.
+Most users only need these 6 commands:
 
 - **`gh aw init`** - Set up your repository for agentic workflows  
   [→ Documentation](#init)
 
-- **`gh aw add (workflow)`** - Add workflows from The Agentics collection or other repositories  
+- **`gh aw add (workflow)`** - Add workflows from other repositories  
   [→ Documentation](#add)
+
+- **`gh aw compile`** - Convert markdown to GitHub Actions YAML after editing  
+  [→ Documentation](#compile)
 
 - **`gh aw list`** - Quick listing of all workflows without status checks  
   [→ Documentation](#list)
 
-- **`gh aw status`** - Check current state of all workflows  
-  [→ Documentation](#status)
-
-- **`gh aw compile`** - Convert markdown to GitHub Actions YAML  
-  [→ Documentation](#compile)
-
 - **`gh aw run (workflow)`** - Execute workflows immediately in GitHub Actions  
   [→ Documentation](#run)
 
-**Complete command reference below** ↓
-
-## Common Workflows for Beginners
-
-### After creating a new workflow
-
-```bash wrap
-gh aw compile my-workflow           # Validate markdown and generate .lock.yml
-gh aw run my-workflow                # Test it manually (requires workflow_dispatch)
-gh aw run my-workflow --push         # Auto-commit, push, and run (all-in-one)
-gh aw logs my-workflow               # Download and analyze execution logs
-```
-
-### Troubleshooting
-
-```bash wrap
-gh aw status                    # Check workflow state and configuration
-gh aw logs my-workflow          # Review execution logs (AI decisions, tool usage, errors)
-gh aw audit (run-id-or-url)     # Analyze specific run in detail
-
-# Fix issues
-gh aw secrets bootstrap --engine copilot   # Check token configuration
-gh aw compile my-workflow --validate       # Detailed validation
-gh aw fix my-workflow --write              # Auto-fix deprecated fields
-```
-
-The audit command accepts run IDs, workflow URLs, job URLs, or step URLs:
-- Run ID from URL: `github.com/owner/repo/actions/runs/12345678` → `12345678`
-- Or use the full URL: `https://github.com/owner/repo/actions/runs/12345678`
-- Job URL: `https://github.com/owner/repo/actions/runs/123/job/456` (extracts first failing step)
-- Step URL: `https://github.com/owner/repo/actions/runs/123/job/456#step:7:1` (extracts specific step)
+- **`gh aw status`** - Check current state of all workflows  
+  [→ Documentation](#status)
 
 ## Installation
 

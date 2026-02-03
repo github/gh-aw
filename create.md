@@ -4,7 +4,19 @@ This prompt guides you, a coding agent, to create, debug, update or do other act
 
 ## Step 1: Install GitHub Agentic Workflows CLI Extension
 
-Run the installation script from the main branch of the gh-aw repository:
+Check if `gh aw` is installed by running
+
+```bash
+gh aw version
+```
+
+If it is installed, run:
+
+```bash
+gh extension upgrade aw
+```
+
+to upgrade to latest. If it is not installed, run the installation script from the main branch of the gh-aw repository:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
@@ -16,13 +28,6 @@ curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | 
 
 ```bash
 gh aw version
-```
-
-
-If already installed, you can update to the latest version by running
-
-```bash
-gh extension upgrade gh-aw
 ```
 
 You should see version information displayed. If you encounter an error, check that:
