@@ -221,8 +221,8 @@ func ensureCheckoutStepFirst(steps []any) []any {
 		if stepMap, ok := step.(map[string]any); ok {
 			if uses, hasUses := stepMap["uses"]; hasUses {
 				if usesStr, ok := uses.(string); ok {
-					// Check if this is a checkout action (actions/checkout@...)
-					if strings.HasPrefix(usesStr, "actions/checkout@") || strings.HasPrefix(usesStr, "actions/checkout") {
+					// Check if this is a checkout action (actions/checkout@... or exactly "actions/checkout")
+					if strings.HasPrefix(usesStr, "actions/checkout@") || usesStr == "actions/checkout" {
 						checkoutIndex = i
 						break
 					}
