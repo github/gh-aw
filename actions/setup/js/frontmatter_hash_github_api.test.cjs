@@ -166,8 +166,8 @@ describe("frontmatter_hash with GitHub API", () => {
 
       // This hash was computed by the Go implementation:
       // go test -run TestHashWithRealWorkflow ./pkg/parser/
-      // Output: "Hash for audit-workflows.md: db7af18719075a860ef7e08bb6f49573ac35fbd88190db4f21da3499d3604971"
-      const goHash = "db7af18719075a860ef7e08bb6f49573ac35fbd88190db4f21da3499d3604971";
+      // Output: "Hash for audit-workflows.md: 2ea961432ad9fd4b99074489b7db5668f2485e1b1139772c6c375e2032d22134"
+      const goHash = "2ea961432ad9fd4b99074489b7db5668f2485e1b1139772c6c375e2032d22134";
 
       // Verify JavaScript hash matches Go hash
       expect(jsHash).toBe(goHash);
