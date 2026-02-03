@@ -55,11 +55,13 @@ func isActionDefinitionFile(filePath string, content []byte) (bool, error) {
 	return false, nil
 }
 
-// isCopilotSetupStepsFile checks if a file is the special copilot-setup-steps.yml file
+// isCopilotSetupStepsFile checks if a file is the special copilot-setup-steps file
 // This file receives special handling - only steps are extracted from the setup job
+// Supports both .yml and .yaml extensions for consistency with GitHub Actions
 func isCopilotSetupStepsFile(filePath string) bool {
 	base := filepath.Base(filePath)
-	return strings.ToLower(base) == "copilot-setup-steps.yml"
+	lower := strings.ToLower(base)
+	return lower == "copilot-setup-steps.yml" || lower == "copilot-setup-steps.yaml"
 }
 
 // processYAMLWorkflowImport processes an imported YAML workflow file

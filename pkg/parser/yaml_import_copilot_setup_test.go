@@ -34,9 +34,9 @@ func TestIsCopilotSetupStepsFile(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "copilot-setup-steps.yaml (not yml)",
+			name:     "copilot-setup-steps.yaml (also supported)",
 			filePath: ".github/workflows/copilot-setup-steps.yaml",
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "just filename",

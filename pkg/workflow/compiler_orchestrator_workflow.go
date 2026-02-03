@@ -198,6 +198,8 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 							}
 
 							// Append imported steps after main steps (imported steps come after custom steps)
+							// This is critical for copilot-setup-steps.yml: custom setup should run first,
+							// then imported setup steps (like installing gh-aw extension) can use that environment
 							allSteps := append(mainSteps, importedSteps...)
 							// Convert back to YAML with "steps:" wrapper
 							stepsWrapper := map[string]any{"steps": allSteps}
