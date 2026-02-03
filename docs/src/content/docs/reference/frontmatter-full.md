@@ -1671,11 +1671,6 @@ tools:
     # (optional)
     create-orphan: true
 
-    # Campaign ID for campaign-specific repo-memory (optional, used to correlate
-    # memory with campaign workflows)
-    # (optional)
-    campaign-id: "example-value"
-
   # Option 4: Array of repo-memory configurations for multiple memory locations
   repo-memory: []
     # Array items: object
@@ -1934,11 +1929,10 @@ safe-outputs:
   # github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT)
   # or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be
   # used for Projects v2. Safe output items produced by the agent use
-  # type=update_project Configuration also supports an optional views array for
+  # type=update_project. Configuration also supports an optional views array for
   # declaring project views to create. Safe output items produced by the agent use
   # type=update_project and may include: project (board name), content_type
-  # (issue|pull_request), content_number, fields, campaign_id, and
-  # create_if_missing.
+  # (issue|pull_request), content_number, fields, and create_if_missing.
   update-project:
     # Maximum number of project operations to perform (default: 10). Each operation
     # may add a project item, or update its fields.
@@ -1961,7 +1955,7 @@ safe-outputs:
     # (optional)
     views: []
       # Array items:
-        # The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')
+        # The name of the view (e.g., 'Sprint Board', 'Roadmap')
         name: "My Workflow"
 
         # The layout type of the view
@@ -1981,12 +1975,11 @@ safe-outputs:
         # (optional)
         description: "Description of the workflow"
 
-    # Optional array of project custom fields to create up-front. Useful for campaign
-    # projects that require a fixed set of fields.
+    # Optional array of project custom fields to create up-front.
     # (optional)
     field-definitions: []
       # Array items:
-        # The field name to create (e.g., 'status', 'campaign_id')
+        # The field name to create (e.g., 'status', 'priority')
         name: "My Workflow"
 
         # The GitHub Projects v2 custom field type
@@ -2030,8 +2023,8 @@ safe-outputs:
     # (optional)
     target-owner: "example-value"
 
-    # Optional prefix for auto-generated project titles (default: 'Campaign'). When
-    # the agent doesn't provide a title, the project title is auto-generated as
+    # Optional prefix for auto-generated project titles (default: 'Project'). When the
+    # agent doesn't provide a title, the project title is auto-generated as
     # '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the
     # issue context.
     # (optional)
@@ -2043,7 +2036,7 @@ safe-outputs:
     # (optional)
     views: []
       # Array items:
-        # The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')
+        # The name of the view (e.g., 'Sprint Board', 'Roadmap')
         name: "My Workflow"
 
         # The layout type of the view
@@ -2064,11 +2057,11 @@ safe-outputs:
         description: "Description of the workflow"
 
     # Optional array of project custom fields to create automatically after project
-    # creation. Useful for campaign projects that require a fixed set of fields.
+    # creation.
     # (optional)
     field-definitions: []
       # Array items:
-        # The field name to create (e.g., 'Campaign Id', 'Priority')
+        # The field name to create (e.g., 'Priority', 'Classification')
         name: "My Workflow"
 
         # The GitHub Projects v2 custom field type
@@ -2094,7 +2087,7 @@ safe-outputs:
   # progress. Requires a Personal Access Token (PAT) or GitHub App token with
   # Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects
   # v2. Status updates are created on the specified project board and appear in the
-  # Updates tab. Typically used by campaign orchestrators to post run summaries with
+  # Updates tab. Typically used by orchestrators to post run summaries with
   # progress, findings, and next steps.
   create-project-status-update:
     # Maximum number of status updates to create (default: 1). Typically 1 per
