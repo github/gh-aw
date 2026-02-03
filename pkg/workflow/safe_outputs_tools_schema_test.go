@@ -184,7 +184,7 @@ func TestToolsJSONStructureMatchesMCPSpecification(t *testing.T) {
 
 // TestNoTopLevelOneOfAllOfAnyOf validates that no tools have oneOf/allOf/anyOf at the top level
 // of their inputSchema, as these are not supported by Claude's API and other AI engines.
-// This is a regression test for https://github.com/githubnext/gh-aw/actions/runs/21142123455
+// This is a regression test for https://github.com/github/gh-aw/actions/runs/21142123455
 func TestNoTopLevelOneOfAllOfAnyOf(t *testing.T) {
 	// Get the safe outputs tools JSON
 	toolsJSON := GetSafeOutputsToolsJSON()
@@ -209,19 +209,19 @@ func TestNoTopLevelOneOfAllOfAnyOf(t *testing.T) {
 				"Tool '%s' has 'oneOf' at top level of inputSchema. "+
 					"Claude API does not support oneOf/allOf/anyOf at the top level. "+
 					"Use optional fields with validation documented in descriptions instead. "+
-					"See: https://github.com/githubnext/gh-aw/actions/runs/21142123455", name)
+					"See: https://github.com/github/gh-aw/actions/runs/21142123455", name)
 
 			assert.NotContains(t, inputSchema, "allOf",
 				"Tool '%s' has 'allOf' at top level of inputSchema. "+
 					"Claude API does not support oneOf/allOf/anyOf at the top level. "+
 					"Use optional fields with validation documented in descriptions instead. "+
-					"See: https://github.com/githubnext/gh-aw/actions/runs/21142123455", name)
+					"See: https://github.com/github/gh-aw/actions/runs/21142123455", name)
 
 			assert.NotContains(t, inputSchema, "anyOf",
 				"Tool '%s' has 'anyOf' at top level of inputSchema. "+
 					"Claude API does not support oneOf/allOf/anyOf at the top level. "+
 					"Use optional fields with validation documented in descriptions instead. "+
-					"See: https://github.com/githubnext/gh-aw/actions/runs/21142123455", name)
+					"See: https://github.com/github/gh-aw/actions/runs/21142123455", name)
 		})
 	}
 }

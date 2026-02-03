@@ -19,7 +19,7 @@ func TestExtractIssueNumberFromURL(t *testing.T) {
 		},
 		{
 			name:     "Another valid issue URL",
-			url:      "https://github.com/githubnext/gh-aw-trial/issues/123",
+			url:      "https://github.com/github/gh-aw-trial/issues/123",
 			expected: "123",
 		},
 		{

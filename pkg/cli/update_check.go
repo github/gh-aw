@@ -217,7 +217,7 @@ func getLatestRelease() (string, error) {
 
 	// Query the latest release
 	var release Release
-	err = client.Get("repos/githubnext/gh-aw/releases/latest", &release)
+	err = client.Get("repos/github/gh-aw/releases/latest", &release)
 	if err != nil {
 		return "", fmt.Errorf("failed to query latest release: %w", err)
 	}

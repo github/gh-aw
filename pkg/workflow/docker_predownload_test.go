@@ -51,7 +51,7 @@ tools:
 # Test
 Test workflow.`,
 			expectedImages: []string{
-				"ghcr.io/githubnext/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
+				"ghcr.io/github/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
 			},
 			expectStep: true,
 		},
@@ -71,7 +71,7 @@ mcp-servers:
 Test workflow with custom MCP container.`,
 			expectedImages: []string{
 				"ghcr.io/github/github-mcp-server:v0.30.2",
-				"ghcr.io/githubnext/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
+				"ghcr.io/github/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
 				"myorg/custom-mcp:v1.0.0",
 			},
 			expectStep: true,
@@ -90,7 +90,7 @@ network:
 # Test
 Test workflow - safe outputs MCP server without GitHub tool.`,
 			expectedImages: []string{
-				"ghcr.io/githubnext/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
+				"ghcr.io/github/gh-aw-mcpg:" + string(constants.DefaultMCPGatewayVersion),
 				"node:lts-alpine",
 			},
 			expectStep: true,

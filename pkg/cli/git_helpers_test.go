@@ -14,12 +14,12 @@ func TestParseGitHubRepoSlugFromURL(t *testing.T) {
 	}{
 		{
 			name:     "HTTPS URL with .git",
-			url:      "https://github.com/githubnext/gh-aw.git",
+			url:      "https://github.com/github/gh-aw.git",
 			expected: "githubnext/gh-aw",
 		},
 		{
 			name:     "HTTPS URL without .git",
-			url:      "https://github.com/githubnext/gh-aw",
+			url:      "https://github.com/github/gh-aw",
 			expected: "githubnext/gh-aw",
 		},
 		{

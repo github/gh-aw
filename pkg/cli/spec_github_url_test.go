@@ -20,7 +20,7 @@ func TestParseGitHubURL(t *testing.T) {
 	}{
 		{
 			name:             "blob URL with main branch",
-			url:              "https://github.com/githubnext/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
+			url:              "https://github.com/github/gh-aw-trial/blob/main/workflows/release-issue-linker.md",
 			wantRepo:         "githubnext/gh-aw-trial",
 			wantWorkflowPath: "workflows/release-issue-linker.md",
 			wantWorkflowName: "release-issue-linker",
@@ -71,7 +71,7 @@ func TestParseGitHubURL(t *testing.T) {
 		},
 		{
 			name:             "raw.githubusercontent.com with refs/heads/branch",
-			url:              "https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/.github/workflows/shared/mcp/serena.md",
+			url:              "https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/.github/workflows/shared/mcp/serena.md",
 			wantRepo:         "githubnext/gh-aw",
 			wantWorkflowPath: ".github/workflows/shared/mcp/serena.md",
 			wantWorkflowName: "serena",
@@ -80,7 +80,7 @@ func TestParseGitHubURL(t *testing.T) {
 		},
 		{
 			name:             "raw.githubusercontent.com with commit SHA",
-			url:              "https://raw.githubusercontent.com/githubnext/gh-aw/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
+			url:              "https://raw.githubusercontent.com/github/gh-aw/fc7992627494253a869e177e5d1985d25f3bb316/.github/workflows/shared/mcp/serena.md",
 			wantRepo:         "githubnext/gh-aw",
 			wantWorkflowPath: ".github/workflows/shared/mcp/serena.md",
 			wantWorkflowName: "serena",

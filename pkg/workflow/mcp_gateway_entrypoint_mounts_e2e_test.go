@@ -21,7 +21,7 @@ on: workflow_dispatch
 engine: copilot
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /custom/start.sh
     entrypointArgs:
       - --verbose
@@ -66,7 +66,7 @@ Test that entrypoint is properly extracted and included in the compiled workflow
 	// Verify all elements are present (ordering can vary due to multiple mentions of container)
 	assert.Positive(t, strings.Index(yamlStr, "--entrypoint"), "Entrypoint flag should be in YAML")
 	assert.Positive(t, strings.Index(yamlStr, "/custom/start.sh"), "Entrypoint value should be in YAML")
-	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/githubnext/gh-aw-mcpg"), "Container should be in YAML")
+	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/github/gh-aw-mcpg"), "Container should be in YAML")
 }
 
 // TestMCPGatewayMountsE2E tests end-to-end compilation with mounts configuration
@@ -76,7 +76,7 @@ on: workflow_dispatch
 engine: copilot
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     mounts:
       - /host/data:/container/data:ro
       - /host/config:/container/config:rw
@@ -113,7 +113,7 @@ Test that mounts are properly extracted and included in the compiled workflow.
 
 	// Verify all elements are present (ordering can vary due to multiple mentions of container)
 	assert.Positive(t, strings.Index(yamlStr, "-v /host/data:/container/data:ro"), "First mount should be in YAML")
-	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/githubnext/gh-aw-mcpg"), "Container should be in YAML")
+	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/github/gh-aw-mcpg"), "Container should be in YAML")
 }
 
 // TestMCPGatewayEntrypointAndMountsE2E tests end-to-end compilation with both entrypoint and mounts
@@ -123,7 +123,7 @@ on: workflow_dispatch
 engine: copilot
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /bin/bash
     entrypointArgs:
       - -c
@@ -175,7 +175,7 @@ Test that both entrypoint and mounts are properly extracted and included in the 
 	// The important thing is that all elements are present
 	assert.Positive(t, strings.Index(yamlStr, "-v /var/data:/app/data:rw"), "Mount should be in the YAML")
 	assert.Positive(t, strings.Index(yamlStr, "--entrypoint"), "Entrypoint should be in the YAML")
-	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/githubnext/gh-aw-mcpg"), "Container should be in the YAML")
+	assert.Positive(t, strings.Index(yamlStr, "ghcr.io/github/gh-aw-mcpg"), "Container should be in the YAML")
 }
 
 // TestMCPGatewayWithoutEntrypointOrMountsE2E tests that workflows without these fields compile correctly
@@ -212,7 +212,7 @@ Test that workflows without entrypoint or mounts still compile correctly.
 
 	// Should still have the MCP gateway setup but without custom entrypoint
 	// The default container should be present
-	assert.Contains(t, yamlStr, "ghcr.io/githubnext/gh-aw-mcpg", "Compiled YAML should contain default container")
+	assert.Contains(t, yamlStr, "ghcr.io/github/gh-aw-mcpg", "Compiled YAML should contain default container")
 
 	// Should have default mounts (from ensureDefaultMCPGatewayConfig)
 	assert.Contains(t, yamlStr, "-v", "Compiled YAML should contain volume mount flags for defaults")
@@ -225,7 +225,7 @@ on: workflow_dispatch
 engine: copilot
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     entrypoint: /usr/bin/env
     entrypointArgs:
       - bash
@@ -276,7 +276,7 @@ on: workflow_dispatch
 engine: copilot
 sandbox:
   mcp:
-    container: ghcr.io/githubnext/gh-aw-mcpg
+    container: ghcr.io/github/gh-aw-mcpg
     mounts:
       - ${GITHUB_WORKSPACE}:/workspace:rw
       - /tmp:/tmp:rw

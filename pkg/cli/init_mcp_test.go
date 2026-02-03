@@ -335,7 +335,7 @@ jobs:
 
       - name: Install gh-aw extension
         run: |
-          curl -fsSL https://raw.githubusercontent.com/githubnext/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
 
       - name: Build code
         run: make build

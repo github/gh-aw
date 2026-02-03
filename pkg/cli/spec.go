@@ -98,7 +98,7 @@ func parseRepoSpec(repoSpec string) (*RepoSpec, error) {
 		pathParts := strings.Split(strings.Trim(repoURL.Path, "/"), "/")
 		if len(pathParts) != 2 || pathParts[0] == "" || pathParts[1] == "" {
 			specLog.Printf("Invalid GitHub URL path parts: %v", pathParts)
-			return nil, fmt.Errorf("invalid GitHub URL: must be https://github.com/owner/repo. Example: https://github.com/githubnext/gh-aw")
+			return nil, fmt.Errorf("invalid GitHub URL: must be https://github.com/owner/repo. Example: https://github.com/github/gh-aw")
 		}
 
 		repo = fmt.Sprintf("%s/%s", pathParts[0], pathParts[1])

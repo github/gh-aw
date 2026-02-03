@@ -221,7 +221,7 @@ func TestSpinnerStopWithoutStart(t *testing.T) {
 
 // TestSpinnerStopBeforeStartRaceCondition tests that calling Stop immediately
 // after Start (before the goroutine initializes) does not cause a deadlock.
-// This reproduces the issue from https://github.com/githubnext/gh-aw/issues/XXX
+// This reproduces the issue from https://github.com/github/gh-aw/issues/XXX
 func TestSpinnerStopBeforeStartRaceCondition(t *testing.T) {
 	// Create a spinner that will be enabled (we need to simulate TTY for this test)
 	// Since we can't control TTY in tests, we'll test the mutex logic directly

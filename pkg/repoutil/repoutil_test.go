@@ -94,7 +94,7 @@ func TestParseGitHubURL(t *testing.T) {
 		},
 		{
 			name:          "HTTPS format with .git",
-			url:           "https://github.com/githubnext/gh-aw.git",
+			url:           "https://github.com/github/gh-aw.git",
 			expectedOwner: "githubnext",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
@@ -191,7 +191,7 @@ func BenchmarkSplitRepoSlug(b *testing.B) {
 }
 
 func BenchmarkParseGitHubURL(b *testing.B) {
-	url := "https://github.com/githubnext/gh-aw.git"
+	url := "https://github.com/github/gh-aw.git"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = ParseGitHubURL(url)
 	}
@@ -467,7 +467,7 @@ func BenchmarkParseGitHubURL_SSH(b *testing.B) {
 }
 
 func BenchmarkParseGitHubURL_HTTPS(b *testing.B) {
-	url := "https://github.com/githubnext/gh-aw.git"
+	url := "https://github.com/github/gh-aw.git"
 	for i := 0; i < b.N; i++ {
 		_, _, _ = ParseGitHubURL(url)
 	}

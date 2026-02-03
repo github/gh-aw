@@ -152,7 +152,7 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		webSearchParam = "--search "
 	}
 
-	// See https://github.com/githubnext/gh-aw/issues/892
+	// See https://github.com/github/gh-aw/issues/892
 	// --dangerously-bypass-approvals-and-sandbox: Skips all confirmation prompts and disables sandboxing
 	// This is safe because AWF already provides a container-level sandbox layer
 	// --skip-git-repo-check: Allows running in directories without a git repo
