@@ -382,5 +382,5 @@ jobs:
 
 - [GitHub Copilot Documentation](https://docs.github.com/en/copilot)
 - [GitHub CLI Extensions](https://docs.github.com/en/github-cli/github-cli/using-github-cli-extensions)
-- [Safe Outputs Documentation](https://github.github.io/gh-aw/reference/safe-outputs/)
+- [Safe Outputs Documentation](https://github.github.com/gh-aw/reference/safe-outputs/)
 - [Personal Access Tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)

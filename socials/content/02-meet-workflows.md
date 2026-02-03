@@ -1,6 +1,6 @@
 # Meet the Workflows: Issue Triage
 
-Blog URL: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/
+Blog URL: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
 Social Publish Date: 2026-01-22
 
 ## X (Twitter)
@@ -11,7 +11,7 @@ Using GitHub Agentic Workflows, our Issue Triage agent does the first pass for y
 
 You'll learn how this workflow saves hours of maintainer time and why it's one of the highest-leverage agents we run. We're sharing the actual workflow source so you can see exactly how it works and adapt it for your repos.
 
-See the tour + workflow source: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/
+See the tour + workflow source: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
 
 #GitHubNext #AI #PelisFactory
 
@@ -21,7 +21,7 @@ How much time do you spend manually labeling and triaging issues? ✍️
 
 Our Issue Triage workflow (built with GitHub Agentic Workflows) handles the first pass automatically — analyzing context, replying with helpful information, and applying consistent labels. You'll see how it works and get the source code.
 
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
 
 ## Mastodon
 
@@ -29,7 +29,7 @@ Want to automate your issue triage? ✍️
 
 Using GitHub Agentic Workflows, this is one of the simplest but highest-leverage agents we run. It analyzes new issues, applies consistent labels, and replies with context — giving you back hours of maintainer time. Source code included.
 
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/ #Automation #GitHub #PelisFactory
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/ #Automation #GitHub #PelisFactory
 
 ## LinkedIn
 
@@ -47,6 +47,6 @@ The result? Your team spends less time on repetitive triage and more time on act
 You'll see exactly how it works, learn the patterns that make it reliable, and get access to the complete workflow source code.
 
 Read the tour + get the source:
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows/
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows/
 
 #GitHubNext #AI #DevOps #PelisFactory

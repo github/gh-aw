@@ -7,20 +7,20 @@
     "x": {
       "id": "dryrun-x-2026-01-21",
       "url": "https://twitter.com/i/web/status/dryrun-x-2026-01-21",
-      "content": "Welcome to our blog series, about our new technology for automated agentics on GitHub - GitHub Agentic Workflows!\nAutomated agentics are powerful, but what are they useful for in software repositories?\nIn this series we'd like to take you on a tour of ✨🍫 Peli’s Agent Factory 🍫✨ — where 100+ agentic workflows keep real repos humming. Take the tour: https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ \nAutomation isn't just about scripts—it's about creating intelligent agents that keep projects moving and achieve continuous improvement.\n#GitHubNext #AI #devops #continuousai"
+      "content": "Welcome to our blog series, about our new technology for automated agentics on GitHub - GitHub Agentic Workflows!\nAutomated agentics are powerful, but what are they useful for in software repositories?\nIn this series we'd like to take you on a tour of ✨🍫 Peli’s Agent Factory 🍫✨ — where 100+ agentic workflows keep real repos humming. Take the tour: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ \nAutomation isn't just about scripts—it's about creating intelligent agents that keep projects moving and achieve continuous improvement.\n#GitHubNext #AI #devops #continuousai"
     },
     "bluesky": {
       "uri": "at://dryrun/bluesky/2026-01-21",
-      "content": "Welcome to ✨🍫 Peli’s Agent Factory 🍫✨ — a magical yet very practical tour of the agentic workflows we actually run in real repos. Start here: https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/"
+      "content": "Welcome to ✨🍫 Peli’s Agent Factory 🍫✨ — a magical yet very practical tour of the agentic workflows we actually run in real repos. Start here: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/"
     },
     "mastodon": {
       "id": "dryrun-mastodon-2026-01-21",
       "url": "",
-      "content": "Welcome to ✨🍫Peli’s Agent Factory 🍫✨ — not demos, but real agentic workflows doing real work to keep a repo moving. Come wander the assembly line: https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ #GitHubNext #Automation"
+      "content": "Welcome to ✨🍫Peli’s Agent Factory 🍫✨ — not demos, but real agentic workflows doing real work to keep a repo moving. Come wander the assembly line: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ #GitHubNext #Automation"
     },
     "linkedin": {
       "id": "dryrun-linkedin-2026-01-21",
-      "content": "Welcome to our blog series from GitHub Next on GitHub Agentic Workflows — a practical look at “automated agentics” in software repos. 🍫✨\nAutomated agentics are powerful… but what are they actually useful for day-to-day engineering?\nIn this series, we’d like to take you on a tour of Peli’s Agent Factory: a slightly magical (but very real) place where 100+ agentic workflows help keep real repositories humming — from triage and maintenance to continuous improvement.\nStart the tour here:\nhttps://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/\n#GitHubNext #AI #DevOps #ContinuousAI"
+      "content": "Welcome to our blog series from GitHub Next on GitHub Agentic Workflows — a practical look at “automated agentics” in software repos. 🍫✨\nAutomated agentics are powerful… but what are they actually useful for day-to-day engineering?\nIn this series, we’d like to take you on a tour of Peli’s Agent Factory: a slightly magical (but very real) place where 100+ agentic workflows help keep real repositories humming — from triage and maintenance to continuous improvement.\nStart the tour here:\nhttps://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/\n#GitHubNext #AI #DevOps #ContinuousAI"
     }
   }
 }

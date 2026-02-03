@@ -72,7 +72,7 @@ Search the web for information.
 		t.Errorf("Expected warning about web-search not being supported, but got: %s", stderrOutput)
 	}
 
-	if !strings.Contains(stderrOutput, "https://github.github.io/gh-aw/guides/web-search/") {
+	if !strings.Contains(stderrOutput, "https://github.github.com/gh-aw/guides/web-search/") {
 		t.Errorf("Expected warning to include documentation link, but got: %s", stderrOutput)
 	}
 

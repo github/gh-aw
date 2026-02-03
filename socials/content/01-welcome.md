@@ -1,6 +1,6 @@
 # Welcome to Peli's Agent Factory
 
-Blog URL: https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+Blog URL: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
 Social Publish Date: 2026-01-21
 
 ## X (Twitter)
@@ -11,7 +11,7 @@ We're launching a blog series that shows how to use GitHub Agentic Workflows to 
 
 This isn't about demos or toy examples. You'll learn practical patterns you can adapt for your own repos, see the actual workflow code, and understand when agents work (and when they don't).
 
-Start your tour of Peli's Agent Factory: https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+Start your tour of Peli's Agent Factory: https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
 
 #GitHubNext #AI #DevOps #ContinuousAI #PelisFactory
 
@@ -21,7 +21,7 @@ What if you could use automated agentic workflows to maintain and improve your r
 
 In our new blog series, we'll take you inside Peli's Agent Factory — where 50+ GitHub Agentic Workflows handle everything from issue triage to code refactoring. You'll learn practical patterns and see the source code for workflows we run every day.
 
-https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
 
 ## Mastodon
 
@@ -29,7 +29,7 @@ What if you could use automated agents to maintain and improve your repository? 
 
 Using GitHub Agentic Workflows, we'll introduce you to 50+ agents that triage issues, simplify code, detect patterns, and keep repos healthy. You'll see real examples with source code you can learn from.
 
-https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ #GitHubNext #Automation #PelisFactory
+https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/ #GitHubNext #Automation #PelisFactory
 
 ## LinkedIn
 
@@ -46,6 +46,6 @@ This series isn't about theoretical possibilities. You'll learn:
 Whether you're exploring repository automation for the first time or looking to level up your existing practices, you'll find actionable insights you can apply immediately.
 
 Start your tour of Peli's Agent Factory:
-https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
+https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/
 
 #GitHubNext #AI #DevOps #ContinuousAI #PelisFactory

@@ -1,6 +1,6 @@
 # Meet the Workflows: Continuous Simplicity
 
-Blog URL: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
+Blog URL: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
 Social Publish Date: 2026-01-23
 
 ## X (Twitter)
@@ -11,7 +11,7 @@ Learn about two agents that continuously combat code complexity. The Code Simpli
 
 You'll learn how these workflows prevent technical debt from accumulating instead of fighting it after the fact. We're sharing both workflows so you can see how continuous simplification works in practice.
 
-Tour + source code: https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
+Tour + source code: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
 
 #GitHubNext #AI #DevOps #PelisFactory
 
@@ -21,7 +21,7 @@ What if your codebase could stay simple instead of gradually becoming more compl
 
 These two GitHub Agentic Workflows run continuously: one simplifies recently changed code, the other uses semantic analysis to spot hidden duplication. You'll see how they prevent technical debt before it accumulates.
 
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
 
 ## Mastodon
 
@@ -29,7 +29,7 @@ Struggling with growing code complexity? 🧹
 
 Discover two GitHub Agentic Workflows that continuously simplify your codebase: one targets recent changes for clarity improvements, the other uses semantic analysis to detect hidden duplication. Source code included.
 
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #Automation #GitHub #PelisFactory
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/ #Automation #GitHub #PelisFactory
 
 ## LinkedIn
 
@@ -46,6 +46,6 @@ Using semantic analysis (powered by Serena embeddings), this workflow spots conc
 You'll learn why continuous simplification is more effective than periodic cleanup, see the techniques that make these agents reliable, and get the complete workflow source code.
 
 Read the tour + get the workflows:
-https://github.github.io/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
+https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/
 
 #GitHubNext #AI #DevOps #Automation #PelisFactory

@@ -200,7 +200,7 @@ npx --yes @github/copilot -i "activate https://raw.githubusercontent.com/github/
 
 > Built with AI agents in mind from day 0
 
-> Quick Start: https://github.github.io/gh-aw/setup/quick-start/
+> Quick Start: https://github.github.com/gh-aw/setup/quick-start/
 
 ---
 
@@ -563,6 +563,6 @@ Analyze issue and create implementation PR
 - Network Configuration Reference
 - Safe Outputs Reference
 
-**Visit:** https://github.github.io/gh-aw/guides/security/
+**Visit:** https://github.github.com/gh-aw/guides/security/
 
 Security is foundational to GitHub Agentic Workflows. We continuously evolve our security controls and welcome community feedback.

@@ -9,7 +9,7 @@ sidebar:
 
 **Version**: 1.0.0  
 **Status**: Recommendation  
-**Latest Version**: https://github.github.io/gh-aw/scratchpad/safe-outputs-specification/  
+**Latest Version**: https://github.github.com/gh-aw/scratchpad/safe-outputs-specification/  
 **Editors**: GitHub Next Team
 
 ---

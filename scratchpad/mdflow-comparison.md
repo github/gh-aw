@@ -818,7 +818,7 @@ Neither is "better" - they're optimized for different use cases and user needs.
 ## References
 
 - mdflow Repository: https://github.com/johnlindquist/mdflow
-- GitHub Agentic Workflows Documentation: https://github.github.io/gh-aw/
+- GitHub Agentic Workflows Documentation: https://github.github.com/gh-aw/
 - mdflow README: Full documentation of syntax and features
 - gh-aw Reference: `/docs/src/content/docs/reference/`
 

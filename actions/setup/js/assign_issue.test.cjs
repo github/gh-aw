@@ -49,7 +49,7 @@ const mockCore = {
             delete process.env.GH_TOKEN,
             await eval(`(async () => { ${assignIssueScript}; await main(); })()`),
             expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("GH_TOKEN environment variable is required but not set")),
-            expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("https://github.github.io/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot")),
+            expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("https://github.github.com/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot")),
             expect(mockExec.exec).not.toHaveBeenCalled());
         }),
           it("should fail when GH_TOKEN is empty string", async () => {
@@ -181,7 +181,7 @@ const mockCore = {
           it("should include documentation link in error message", async () => {
             (delete process.env.GH_TOKEN, (process.env.ASSIGNEE = "test-user"), (process.env.ISSUE_NUMBER = "123"), await eval(`(async () => { ${assignIssueScript}; await main(); })()`));
             const failedCall = mockCore.setFailed.mock.calls[0][0];
-            expect(failedCall).toContain("https://github.github.io/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot");
+            expect(failedCall).toContain("https://github.github.com/gh-aw/reference/safe-outputs/#assigning-issues-to-copilot");
           }));
       }));
   }));

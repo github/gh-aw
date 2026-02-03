@@ -16,11 +16,11 @@ Write agentic workflows in natural language markdown, and run them in GitHub Act
 
 ## Quick Start
 
-Ready to get your first agentic workflow running? Follow our step-by-step [Quick Start Guide](https://github.github.io/gh-aw/setup/quick-start/) to install the extension, add a sample workflow, and see it in action.
+Ready to get your first agentic workflow running? Follow our step-by-step [Quick Start Guide](https://github.github.com/gh-aw/setup/quick-start/) to install the extension, add a sample workflow, and see it in action.
 
 ## Overview
 
-Learn about the concepts behind agentic workflows, explore available workflow types, and understand how AI can automate your repository tasks. See [How It Works](https://github.github.io/gh-aw/introduction/how-it-works/).
+Learn about the concepts behind agentic workflows, explore available workflow types, and understand how AI can automate your repository tasks. See [How It Works](https://github.github.com/gh-aw/introduction/how-it-works/).
 
 ## How It Works
 
@@ -52,14 +52,14 @@ The AI agent reads your repository context, analyzes issues, generates visualiza
 
 ## Safe Agentic Workflows
 
-Security is foundational to GitHub Agentic Workflows. Workflows run with read-only permissions by default, with write operations only allowed through sanitized `safe-outputs`. The system implements multiple layers of protection including sandboxed execution, input sanitization, network isolation, supply chain security (SHA-pinned dependencies), tool allow-listing, and compile-time validation. Access can be gated to team members only, with human approval gates for critical operations, ensuring AI agents operate safely within controlled boundaries. See the [Security Guide](https://github.github.io/gh-aw/guides/security/) for comprehensive details on threat modeling, implementation guidelines, and best practices.
+Security is foundational to GitHub Agentic Workflows. Workflows run with read-only permissions by default, with write operations only allowed through sanitized `safe-outputs`. The system implements multiple layers of protection including sandboxed execution, input sanitization, network isolation, supply chain security (SHA-pinned dependencies), tool allow-listing, and compile-time validation. Access can be gated to team members only, with human approval gates for critical operations, ensuring AI agents operate safely within controlled boundaries. See the [Security Guide](https://github.github.com/gh-aw/guides/security/) for comprehensive details on threat modeling, implementation guidelines, and best practices.
 
 > [!WARNING]
 > Using agentic workflows in your repository requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.
 
 ## Documentation
 
-For complete documentation, examples, and guides, see the [Documentation](https://github.github.io/gh-aw/).
+For complete documentation, examples, and guides, see the [Documentation](https://github.github.com/gh-aw/).
 
 ## Contributing
 
@@ -80,7 +80,7 @@ and share your thoughts in the `#continuous-ai` channel in the [GitHub Next Disc
 
 ## Peli's Agent Factory
 
-See the [Peli's Agent Factory](https://github.github.io/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) for a guided tour through many uses of agentic workflows.
+See the [Peli's Agent Factory](https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) for a guided tour through many uses of agentic workflows.
 
 ## Related Projects
 
