@@ -69,8 +69,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -129,13 +127,18 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
+      - name: Checkout .github folder
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          sparse-checkout: |
+            .github
+          depth: 1
+          persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       - name: Checkout repository
@@ -1178,8 +1181,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1300,8 +1301,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1428,8 +1427,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1501,8 +1498,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1573,8 +1568,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1610,8 +1603,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup

@@ -47,8 +47,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -94,13 +92,18 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
+      - name: Checkout .github folder
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          sparse-checkout: |
+            .github
+          depth: 1
+          persist-credentials: false
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
@@ -955,8 +958,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1063,8 +1064,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
@@ -1180,8 +1179,6 @@ jobs:
         with:
           sparse-checkout: |
             actions
-            .github
-          depth: 1
           persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup

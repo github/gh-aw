@@ -620,6 +620,10 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		steps = append(steps, c.generateSetupStep(setupActionRef, SetupActionDestination, false)...)
 	}
 
+	// Checkout .github folder for agent job to access workflow configurations and runtime imports
+	// This works in all modes including release mode where actions aren't checked out
+	steps = append(steps, c.generateCheckoutGitHubFolder(data)...)
+
 	// Find custom jobs that depend on pre_activation - these are handled by the activation job
 	customJobsBeforeActivation := c.getCustomJobsDependingOnPreActivation(data.Jobs)
 

@@ -99,10 +99,6 @@ func generatePlaceholderSubstitutionStep(yaml *strings.Builder, expressionMappin
 // when running in dev mode and not using the action-tag feature. This is used to
 // checkout the local actions before running the setup action.
 //
-// The checkout includes both the actions folder (for setup scripts) and the .github
-// folder (for workflow configurations and runtime imports). This ensures workflows
-// have access to .github folder content even when they don't have full repository checkout.
-//
 // Returns a slice of strings that can be appended to a steps array, where each
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - Not in dev or script mode
@@ -127,14 +123,13 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 			"          repository: github/gh-aw\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
-			"            .github\n",
 			"          path: /tmp/gh-aw/actions-source\n",
 			"          depth: 1\n",
 			"          persist-credentials: false\n",
 		}
 	}
 
-	// Dev mode: checkout local actions and .github folders
+	// Dev mode: checkout local actions folder
 	if c.actionMode.IsDev() {
 		return []string{
 			"      - name: Checkout actions folder\n",
@@ -142,14 +137,46 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 			"        with:\n",
 			"          sparse-checkout: |\n",
 			"            actions\n",
-			"            .github\n",
-			"          depth: 1\n",
 			"          persist-credentials: false\n",
 		}
 	}
 
 	// Release mode or other modes: no checkout needed
 	return nil
+}
+
+// generateCheckoutGitHubFolder generates the checkout step for the .github folder
+// for the agent job. This ensures workflows have access to workflow configurations
+// and runtime imports even when they don't do a full repository checkout.
+//
+// This checkout works in all modes (dev, script, release) and uses shallow clone
+// for minimal overhead. It should only be called in the main agent job.
+//
+// Returns a slice of strings that can be appended to a steps array, where each
+// string represents a line of YAML for the checkout step. Returns nil if:
+// - action-tag feature is specified (uses remote actions instead)
+func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
+	// Check if action-tag is specified - if so, skip checkout
+	if data != nil && data.Features != nil {
+		if actionTagVal, exists := data.Features["action-tag"]; exists {
+			if actionTagStr, ok := actionTagVal.(string); ok && actionTagStr != "" {
+				// action-tag is set, no checkout needed
+				return nil
+			}
+		}
+	}
+
+	// For all modes (dev, script, release), checkout .github folder
+	// This works in release mode where actions aren't checked out
+	return []string{
+		"      - name: Checkout .github folder\n",
+		fmt.Sprintf("        uses: %s\n", GetActionPin("actions/checkout")),
+		"        with:\n",
+		"          sparse-checkout: |\n",
+		"            .github\n",
+		"          depth: 1\n",
+		"          persist-credentials: false\n",
+	}
 }
 
 // generateGitHubScriptWithRequire generates a github-script step that loads a module using require().
