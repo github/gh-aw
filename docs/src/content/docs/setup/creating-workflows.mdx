@@ -15,9 +15,13 @@ In this guide, we show you how to create agentic workflows in the GitHub web int
 
 Follow these steps to create an agentic workflow using VSCode or your coding agent.
 
-1. **Start your coding agent**. Start [VSCode Agent Mode](https://code.visualstudio.com/docs/copilot/agents/overview) or your coding agent in your repository
+1. **Start your coding agent**.
 
-2. **Create an agentic workflow**. Enter the following prompt:
+   Start [VSCode Agent Mode](https://code.visualstudio.com/docs/copilot/agents/overview) or your coding agent in your repository
+
+2. **Create an agentic workflow**.
+
+   Enter the following prompt into your coding agent:
 
    ```text wrap
    Create a workflow for GitHub Agentic Workflows using https://github.com/github/gh-aw/blob/main/create.md
@@ -27,7 +31,9 @@ Follow these steps to create an agentic workflow using VSCode or your coding age
 
    You can replace the last line with your desired workflow purpose and as much additional detail, context, goals, guardrails and purpose as you like.
 
-3. **Setup required secrets**. If you haven't done so already, [set up your repository secrets](/gh-aw/reference/engines/) for the coding agent your workflow will be using (Copilot, Claude, Codex). Also need to adjust the `engine:` setting in your generated workflow to match if not using Copilot CLI.
+3. **Setup required secrets**.
+
+   If you haven't done so already, [set up your repository secrets](/gh-aw/reference/engines/) for the coding agent your workflow will be using (Copilot, Claude, Codex). Also need to adjust the `engine:` setting in your generated workflow to match if not using Copilot CLI.
 
 Optionally you can also install the [Custom Agent for Agentic Workflows](/gh-aw/reference/custom-agent/) by entering this into your coding agent:
 
@@ -94,7 +100,28 @@ This prompt helps rephrase text captured through speech-to-text recognition by:
 
 Load the dictation prompt into your AI assistant before or after dictating your workflow instructions to improve accuracy and clarity.
 
+### Migrating Workflows Between Repositories
+
+When you need to adapt an existing workflow from another repository, use the `create-agentic-agent` to perform AI-assisted migration. The agent analyzes the source workflow, identifies dependencies, adapts configuration for your repository, and validates the result. This is useful for forking workflows as starting points or one-time migrations requiring substantial changes. For synchronized updates across repositories, use [Packaging & Distribution](/gh-aw/guides/packaging-imports/) with `gh aw add` instead.
+
+Example prompt for migration:
+```text wrap
+Migrate the release.md workflow from github/gh-aw to this repository.
+Adapt permissions and repository-specific references for our structure.
+```
+
+### Remixing Existing Workflows
+
+You can also remix existing workflows from other repositories by prompting your coding agent to modify or enhance them. For example, you might want to add new features, improve efficiency, or adjust to new requirements. Use prompts like:
+
+```text wrap
+Create a workflow for GitHub Agentic Workflows using https://github.com/github/gh-aw/blob/main/create.md
+
+Remix the issue-triage.md workflow from github/gh-aw to add automatic labeling based on issue content and priority.
+```
+
 ## Going Further
+
 
 See [Using the Custom Agent for Agentic Workflows](/gh-aw/reference/custom-agent/) for more information on installing and using the custom agent to create, update, upgrade and debug agentic workflows.
 
