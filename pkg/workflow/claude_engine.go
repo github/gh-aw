@@ -230,8 +230,12 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		commandName = workflowData.EngineConfig.Command
 		claudeLog.Printf("Using custom command: %s", commandName)
+	} else if isFirewallEnabled(workflowData) {
+		// AWF chroot mode - use full path to avoid PATH setup
+		// npm install -g installs to /usr/local/bin on GitHub runners
+		commandName = "/usr/local/bin/claude"
 	} else {
-		// Use claude command directly (available in PATH from hostedtoolcache mount)
+		// Non-firewall mode: use regular claude command
 		commandName = "claude"
 	}
 
@@ -242,12 +246,6 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// Join command parts with proper escaping using shellJoinArgs helper
 	// This handles already-quoted arguments correctly and prevents double-escaping
 	claudeCommand := shellJoinArgs(commandParts)
-
-	// Prepend PATH setup to find claude binary and all runtimes
-	// Unlike Copilot which uses /usr/local/bin/copilot (full path), Claude uses 'claude' which
-	// needs PATH to be set. The PATH setup ensures npm-installed binaries are found.
-	pathSetup := GetHostedToolcachePathSetup()
-	claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 
 	// Add conditional model flag if not explicitly configured
 	// Check if this is a detection job (has no SafeOutputs config)
@@ -285,6 +283,9 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 
 		// TTY is required for Claude Code CLI
 		awfArgs = append(awfArgs, "--tty")
+
+		// Pass all environment variables to the container
+		awfArgs = append(awfArgs, "--env-all")
 
 		// Set container working directory to match GITHUB_WORKSPACE
 		// This ensures pwd inside the container matches what the prompt tells the AI
@@ -383,15 +384,18 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
 		// Use tee to capture stdout (stream-json output) to the log file while also displaying on console
 		// The combined output (debug logs + JSON) will be in the log file for parsing
+		// Prepend PATH setup to find claude binary and all runtimes
+		pathSetup := GetHostedToolcachePathSetup()
+		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s
           # Execute Claude Code CLI with prompt from file
-          %s 2>&1 | tee -a %s`, promptSetup, claudeCommand, logFile)
+          %s 2>&1 | tee -a %s`, promptSetup, claudeCommandWithPath, logFile)
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
           # Execute Claude Code CLI with prompt from file
-          %s 2>&1 | tee -a %s`, claudeCommand, logFile)
+          %s 2>&1 | tee -a %s`, claudeCommandWithPath, logFile)
 		}
 	}
 

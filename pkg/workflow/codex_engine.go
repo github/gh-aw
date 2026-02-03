@@ -172,9 +172,12 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Command != "" {
 		commandName = workflowData.EngineConfig.Command
 		codexEngineLog.Printf("Using custom command: %s", commandName)
+	} else if firewallEnabled {
+		// AWF chroot mode - use full path to avoid PATH setup
+		// npm install -g installs to /usr/local/bin on GitHub runners
+		commandName = "/usr/local/bin/codex"
 	} else {
-		// Use regular codex command regardless of firewall status
-		// PATH will be set to find codex in hostedtoolcache when firewall is enabled
+		// Non-firewall mode: use regular codex command
 		commandName = "codex"
 	}
 
@@ -201,6 +204,9 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		var awfArgs []string
 		awfArgs = append(awfArgs, "--enable-chroot")
 		codexEngineLog.Print("Enabled chroot mode for transparent host access")
+
+		// Pass all environment variables to the container
+		awfArgs = append(awfArgs, "--env-all")
 
 		// Set container working directory to match GITHUB_WORKSPACE
 		awfArgs = append(awfArgs, "--container-workdir", "\"${GITHUB_WORKSPACE}\"")
@@ -273,14 +279,8 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			codexEngineLog.Print("Using standard AWF command")
 		}
 
-		// Prepend PATH setup to find codex binary and all runtimes
-		// Unlike Copilot which uses /usr/local/bin/copilot (full path), Codex uses 'codex' which
-		// needs PATH to be set. The PATH setup ensures npm-installed binaries are found.
-		pathSetup := GetHostedToolcachePathSetup()
-		codexCommandWithPath := fmt.Sprintf("%s && %s", pathSetup, codexCommand)
-
 		// Build the command with agent file handling if specified
-		// With chroot mode, the host environment is inherited, so no setup commands are needed
+		// With chroot mode and full path (/usr/local/bin/codex), no PATH setup is needed
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
 			command = fmt.Sprintf(`set -o pipefail
@@ -289,14 +289,14 @@ INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), codexCommandWithPath, shellEscapeArg(logFile))
+  2>&1 | tee %s`, agentPath, awfCommand, shellJoinArgs(awfArgs), codexCommand, shellEscapeArg(logFile))
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
 INSTRUCTION="$(cat "$GH_AW_PROMPT")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), codexCommandWithPath, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), codexCommand, shellEscapeArg(logFile))
 		}
 	} else {
 		// Build the command without AWF wrapping
