@@ -269,6 +269,12 @@ Some content here.`;
         // Mock core and fs for the test
         const mockCore = {
           info: vi.fn(),
+          startGroup: vi.fn(),
+          endGroup: vi.fn(),
+          notice: vi.fn(),
+          warning: vi.fn(),
+          error: vi.fn(),
+          setFailed: vi.fn(),
           summary: {
             addRaw: vi.fn().mockReturnThis(),
             write: vi.fn(),
@@ -384,13 +390,14 @@ Some content here.`;
         // Verify the output
         const infoMessages = mockCore.info.mock.calls.map(call => call[0]);
         const allOutput = infoMessages.join("\n");
+        const startGroupCalls = mockCore.startGroup.mock.calls.map(call => call[0]);
+        const allGroups = startGroupCalls.join("\n");
 
-        // Check header
-        expect(allOutput).toContain("=== Listing All Gateway-Related Files ===");
-        expect(allOutput).toContain("=== End of Gateway-Related Files ===");
+        // Check header group was started
+        expect(allGroups).toContain("=== Listing All Gateway-Related Files ===");
 
         // Check directories are listed
-        expect(allOutput).toContain("Directory: /tmp/gh-aw/mcp-logs");
+        expect(allGroups).toContain("/tmp/gh-aw/mcp-logs");
 
         // Check files are listed
         expect(allOutput).toContain("gateway.log");
@@ -416,7 +423,7 @@ Some content here.`;
 
     test("handles missing directories gracefully", () => {
       // Mock core
-      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
       global.core = mockCore;
 
       // Mock fs to return false for directory existence
@@ -430,11 +437,11 @@ Some content here.`;
         printAllGatewayFiles();
 
         // Verify the output
-        const infoMessages = mockCore.info.mock.calls.map(call => call[0]);
-        const allOutput = infoMessages.join("\n");
+        const noticeMessages = mockCore.notice.mock.calls.map(call => call[0]);
+        const allOutput = noticeMessages.join("\n");
 
         // Check that it reports missing directories
-        expect(allOutput).toContain("Directory does not exist: /tmp/gh-aw/mcp-logs");
+        expect(allOutput).toContain("Directory does not exist");
       } finally {
         // Restore original functions
         fs.existsSync = originalExistsSync;
@@ -455,7 +462,7 @@ Some content here.`;
         fs.mkdirSync(logsDir, { recursive: true });
 
         // Mock core
-        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
@@ -509,7 +516,7 @@ Some content here.`;
         fs.writeFileSync(path.join(logsDir, "large.log"), largeContent);
 
         // Mock core
-        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn() };
+        const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), notice: vi.fn(), warning: vi.fn(), error: vi.fn() };
         global.core = mockCore;
 
         // Mock fs to use our test directories
