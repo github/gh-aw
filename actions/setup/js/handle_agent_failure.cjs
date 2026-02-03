@@ -280,12 +280,14 @@ async function main() {
     const assignmentErrorCount = process.env.GH_AW_ASSIGNMENT_ERROR_COUNT || "0";
     const createDiscussionErrors = process.env.GH_AW_CREATE_DISCUSSION_ERRORS || "";
     const createDiscussionErrorCount = process.env.GH_AW_CREATE_DISCUSSION_ERROR_COUNT || "0";
+    const checkoutPRSuccess = process.env.GH_AW_CHECKOUT_PR_SUCCESS || "";
 
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Secret verification result: ${secretVerificationResult}`);
     core.info(`Assignment error count: ${assignmentErrorCount}`);
     core.info(`Create discussion error count: ${createDiscussionErrorCount}`);
+    core.info(`Checkout PR success: ${checkoutPRSuccess}`);
 
     // Check if there are assignment errors (regardless of agent job status)
     const hasAssignmentErrors = parseInt(assignmentErrorCount, 10) > 0;
@@ -308,6 +310,13 @@ async function main() {
     // Only proceed if the agent job actually failed OR there are assignment errors OR create_discussion errors OR missing safe outputs
     if (agentConclusion !== "failure" && !hasAssignmentErrors && !hasCreateDiscussionErrors && !hasMissingSafeOutputs) {
       core.info(`Agent job did not fail and no assignment/discussion errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`);
+      return;
+    }
+
+    // Check if the failure was due to PR checkout (e.g., PR was merged and branch deleted)
+    // If checkout_pr_success is "false", skip creating an issue as this is expected behavior
+    if (agentConclusion === "failure" && checkoutPRSuccess === "false") {
+      core.info("Skipping failure handling - failure was due to PR checkout (likely PR merged)");
       return;
     }
 

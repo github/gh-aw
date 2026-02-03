@@ -1179,4 +1179,96 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(createCall.body).toContain("Discussions not enabled");
     });
   });
+
+  describe("checkout PR failure via output", () => {
+    it("should skip issue creation when checkout_pr_success is false", async () => {
+      // Set the checkout PR failure environment variable
+      process.env.GH_AW_CHECKOUT_PR_SUCCESS = "false";
+
+      await main();
+
+      // Verify that no issue was created
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+      expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping failure handling - failure was due to PR checkout"));
+    });
+
+    it("should create issue when checkout_pr_success is true", async () => {
+      // Set the checkout PR success environment variable
+      process.env.GH_AW_CHECKOUT_PR_SUCCESS = "true";
+
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Third search: failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      mockGithub.rest.issues.create
+        .mockResolvedValueOnce({
+          data: { number: 1, html_url: "https://example.com/1", node_id: "I_1" },
+        })
+        .mockResolvedValueOnce({
+          data: { number: 2, html_url: "https://example.com/2", node_id: "I_2" },
+        });
+
+      mockGithub.graphql = vi.fn().mockResolvedValue({
+        addSubIssue: {
+          issue: { id: "I_1", number: 1 },
+          subIssue: { id: "I_2", number: 2 },
+        },
+      });
+
+      await main();
+
+      // Verify issue was created
+      expect(mockGithub.rest.issues.create).toHaveBeenCalled();
+    });
+
+    it("should create issue when checkout_pr_success is not set", async () => {
+      // Don't set GH_AW_CHECKOUT_PR_SUCCESS (workflow without PR checkout)
+      delete process.env.GH_AW_CHECKOUT_PR_SUCCESS;
+
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Third search: failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      mockGithub.rest.issues.create
+        .mockResolvedValueOnce({
+          data: { number: 1, html_url: "https://example.com/1", node_id: "I_1" },
+        })
+        .mockResolvedValueOnce({
+          data: { number: 2, html_url: "https://example.com/2", node_id: "I_2" },
+        });
+
+      mockGithub.graphql = vi.fn().mockResolvedValue({
+        addSubIssue: {
+          issue: { id: "I_1", number: 1 },
+          subIssue: { id: "I_2", number: 2 },
+        },
+      });
+
+      await main();
+
+      // Verify issue was created (normal failure handling)
+      expect(mockGithub.rest.issues.create).toHaveBeenCalled();
+    });
+  });
 });

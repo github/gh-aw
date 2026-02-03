@@ -25,6 +25,7 @@ func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data 
 
 	// Always add the step with a condition that checks if PR context is available
 	yaml.WriteString("      - name: Checkout PR branch\n")
+	yaml.WriteString("        id: checkout-pr\n")
 
 	// Build condition that checks if github.event.pull_request exists
 	// This will be true for pull_request events and comment events on PRs

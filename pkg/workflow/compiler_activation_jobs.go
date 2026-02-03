@@ -734,6 +734,12 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		outputs["has_patch"] = "${{ steps.collect_output.outputs.has_patch }}"
 	}
 
+	// Add checkout_pr_success output to track PR checkout status
+	// This is used by the conclusion job to skip failure handling when checkout fails
+	// (e.g., when PR is merged and branch is deleted)
+	outputs["checkout_pr_success"] = "${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}"
+	compilerActivationJobsLog.Print("Added checkout_pr_success output")
+
 	// Build job-level environment variables for safe outputs
 	var env map[string]string
 	if data.SafeOutputs != nil {
