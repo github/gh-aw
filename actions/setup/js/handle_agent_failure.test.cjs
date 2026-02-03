@@ -26,7 +26,7 @@ describe("handle_agent_failure.cjs", () => {
 **Branch:** {branch}  
 **Run URL:** {run_url}{pull_request_info}
 
-{secret_verification_context}{assignment_errors_context}{missing_safe_outputs_context}
+{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_safe_outputs_context}
 
 ### Action Required
 
@@ -40,7 +40,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
       } else if (filePath.includes("agent_failure_comment.md")) {
         return `Agent job [{run_id}]({run_url}) failed.
 
-{secret_verification_context}{assignment_errors_context}{missing_safe_outputs_context}`;
+{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_safe_outputs_context}`;
       }
       return originalReadFileSync.call(fs, filePath, encoding);
     });
@@ -1109,6 +1109,74 @@ When prompted, instruct the agent to debug this workflow failure.`;
       // Verify parent issue was still used (graceful degradation)
       expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Found existing parent issue #5"));
+    });
+
+    it("should include create_discussion errors in failure issue", async () => {
+      // Set up create_discussion errors
+      process.env.GH_AW_CREATE_DISCUSSION_ERRORS = "discussion:0:github/gh-aw:Test Discussion:Failed to create discussion in 'github/gh-aw': Discussions not enabled";
+      process.env.GH_AW_CREATE_DISCUSSION_ERROR_COUNT = "1";
+
+      // Mock searches
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue exists
+          data: {
+            total_count: 1,
+            items: [
+              {
+                number: 5,
+                html_url: "https://github.com/test-owner/test-repo/issues/5",
+                node_id: "I_parent_5",
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce({
+          // Third search: no failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      // Mock GraphQL for sub-issue count
+      mockGithub.graphql = vi
+        .fn()
+        .mockResolvedValueOnce({
+          // First call: check sub-issue count
+          repository: {
+            issue: {
+              trackedIssues: {
+                totalCount: 5,
+              },
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          // Second call: link sub-issue
+          addSubIssue: {
+            issue: { id: "I_parent_5", number: 5 },
+            subIssue: { id: "I_sub_42", number: 42 },
+          },
+        });
+
+      // Mock failure issue creation
+      mockGithub.rest.issues.create.mockResolvedValueOnce({
+        data: {
+          number: 42,
+          html_url: "https://github.com/test-owner/test-repo/issues/42",
+          node_id: "I_sub_42",
+        },
+      });
+
+      await main();
+
+      // Verify failure issue includes create_discussion errors
+      const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
+      expect(createCall.body).toContain("Create Discussion Failed");
+      expect(createCall.body).toContain("Discussion \"Test Discussion\" in github/gh-aw");
+      expect(createCall.body).toContain("Discussions not enabled");
     });
   });
 });
