@@ -537,21 +537,21 @@ Browse the factory for inspiration:
 
 **Simple Examples:**
 
-- [`poem-bot`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/poem-bot.md) - ChatOps personality
-- [`daily-repo-chronicle`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/daily-repo-chronicle.md) - Daily summary
-- [`issue-triage-agent`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/issue-triage-agent.md) - Event-driven
+- [`poem-bot`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/poem-bot.md) - ChatOps personality
+- [`daily-repo-chronicle`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/daily-repo-chronicle.md) - Daily summary
+- [`issue-triage-agent`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-triage-agent.md) - Event-driven
 
 **Intermediate Examples:**
 
-- [`ci-doctor`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/ci-doctor.md) - Diagnostic analysis
-- [`glossary-maintainer`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/glossary-maintainer.md) - Content sync
-- [`terminal-stylist`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/terminal-stylist.md) - Code analysis
+- [`ci-doctor`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/ci-doctor.md) - Diagnostic analysis
+- [`glossary-maintainer`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/glossary-maintainer.md) - Content sync
+- [`terminal-stylist`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/terminal-stylist.md) - Code analysis
 
 **Advanced Examples:**
 
 - [`daily-test-improver`](https://github.com/githubnext/agentics/blob/main/workflows/daily-test-improver.md) - Multi-phase
-- [`agent-performance-analyzer`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/agent-performance-analyzer.md) - Meta-agent
-- [`workflow-health-manager`](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/workflow-health-manager.md) - Orchestration
+- [`agent-performance-analyzer`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/agent-performance-analyzer.md) - Meta-agent
+- [`workflow-health-manager`](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/workflow-health-manager.md) - Orchestration
 
 ### Documentation
 

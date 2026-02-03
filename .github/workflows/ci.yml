@@ -77,7 +77,16 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           set -o pipefail
-          go test -v -parallel=8 -timeout=3m -run='^Test' -tags '!integration' -coverprofile=coverage.out -json ./... > test-result-unit.json
+          # Run tests with JSON output for artifacts, but also show failures
+          go test -v -parallel=8 -timeout=3m -run='^Test' -tags '!integration' -coverprofile=coverage.out -json ./... | tee test-result-unit.json
+          
+          # Check if tests failed by looking at JSON output
+          if grep -q '"Action":"fail"' test-result-unit.json; then
+            echo "❌ Tests failed - see output above"
+            exit 1
+          fi
+          
+          # Generate coverage HTML report
           go tool cover -html=coverage.out -o coverage.html
 
       # Coverage reports for recent builds only - 7 days is sufficient for debugging recent changes

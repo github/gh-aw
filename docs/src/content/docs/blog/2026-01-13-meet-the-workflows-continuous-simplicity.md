@@ -28,8 +28,8 @@ Now let's meet the agents that work quietly in the background to keep code simpl
 
 The next two agents represent different aspects of  code simplicity: detecting *overcomplicated code* and *duplicated logic*:
 
-- **[Automatic Code Simplifier](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/code-simplifier.md?plain=1)** - Analyzes recently modified code and creates PRs with simplifications  
-- **[Duplicate Code Detector](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/duplicate-code-detector.md?plain=1)** - Uses Serena's semantic analysis to identify duplicate code patterns  
+- **[Automatic Code Simplifier](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/code-simplifier.md?plain=1)** - Analyzes recently modified code and creates PRs with simplifications  
+- **[Duplicate Code Detector](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/duplicate-code-detector.md?plain=1)** - Uses Serena's semantic analysis to identify duplicate code patterns  
 
 The **Automatic Code Simplifier** runs daily, analyzing recently modified code for opportunities to simplify without changing functionality. It looks at what changed in the last few commits and asks: "Could this be clearer? Could it be shorter? Could it be more idiomatic?"
 
@@ -61,13 +61,13 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Automatic Code Simplifier:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/code-simplifier.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/code-simplifier.md
 ```
 
 **Duplicate Code Detector:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/duplicate-code-detector.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/duplicate-code-detector.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

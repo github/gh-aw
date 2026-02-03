@@ -26,10 +26,10 @@ In our [previous posts](/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-sim
 
 Today's agents analyze higher-level concerns and long-term health:
 
-- **[Go Fan](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer that analyzes direct dependencies  
-- **[Typist](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/typist.md?plain=1)** - Analyzes Go type usage patterns to improve type safety  
+- **[Go Fan](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer that analyzes direct dependencies  
+- **[Typist](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/typist.md?plain=1)** - Analyzes Go type usage patterns to improve type safety  
 - **[Functional Pragmatist](https://github.com/github/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md?plain=1)** - Applies moderate functional programming techniques for clarity and safety  
-- **[Repository Quality Improver](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/repository-quality-improver.md?plain=1)** - Takes a holistic view of code quality and suggests improvements  
+- **[Repository Quality Improver](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/repository-quality-improver.md?plain=1)** - Takes a holistic view of code quality and suggests improvements  
 
 ### Go Fan: The Dependency Enthusiast 🐹
 
@@ -110,13 +110,13 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Go Fan:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/go-fan.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/go-fan.md
 ```
 
 **Typist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/typist.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/typist.md
 ```
 
 **Functional Pragmatist:**
@@ -128,7 +128,7 @@ gh aw add https://github.com/github/gh-aw/blob/main/.github/workflows/functional
 **Repository Quality Improver:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/repository-quality-improver.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/repository-quality-improver.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

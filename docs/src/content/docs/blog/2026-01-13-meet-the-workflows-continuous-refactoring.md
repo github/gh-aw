@@ -26,8 +26,8 @@ In our [previous post](/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simp
 
 Our next two agents continuously analyze code structure, suggesting systematic improvements:
 
-- **[Semantic Function Refactor](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/semantic-function-refactor.md?plain=1)** - Spots refactoring opportunities we might have missed  
-- **[Go Pattern Detector](https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/go-pattern-detector.md?plain=1)** - Detects common Go patterns and anti-patterns for consistency  
+- **[Semantic Function Refactor](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/semantic-function-refactor.md?plain=1)** - Spots refactoring opportunities we might have missed  
+- **[Go Pattern Detector](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/go-pattern-detector.md?plain=1)** - Detects common Go patterns and anti-patterns for consistency  
 
 The **Semantic Function Refactor** workflow combines agentic AI with code analysis tools to analyze and address the structure of the entire codebase. It analyzes all Go source files in the `pkg/` directory to identify functions that might be in the wrong place.
 
@@ -73,13 +73,13 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Semantic Function Refactor:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/semantic-function-refactor.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/semantic-function-refactor.md
 ```
 
 **Go Pattern Detector:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.37.7/.github/workflows/go-pattern-detector.md
+gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/go-pattern-detector.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
