@@ -984,6 +984,8 @@ jobs:
       GH_AW_WORKFLOW_ID: "security-guard"
       GH_AW_WORKFLOW_NAME: "Security Guard Agent 🛡️"
     outputs:
+      create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
+      create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
     steps:

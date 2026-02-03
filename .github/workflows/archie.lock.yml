@@ -129,6 +129,7 @@ jobs:
       GH_AW_SAFE_OUTPUTS_CONFIG_PATH: /opt/gh-aw/safeoutputs/config.json
       GH_AW_SAFE_OUTPUTS_TOOLS_PATH: /opt/gh-aw/safeoutputs/tools.json
     outputs:
+      checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
       has_patch: ${{ steps.collect_output.outputs.has_patch }}
       model: ${{ steps.generate_aw_info.outputs.model }}
       output: ${{ steps.collect_output.outputs.output }}
@@ -163,6 +164,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${{ github.token }}@${SERVER_URL_STRIPPED}/${REPO_NAME}.git"
           echo "Git configured with standard GitHub Actions identity"
       - name: Checkout PR branch
+        id: checkout-pr
         if: |
           github.event.pull_request
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
@@ -866,6 +868,7 @@ jobs:
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
+          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📊 *Diagram rendered by [{workflow_name}]({run_url})*\",\"footerWorkflowRecompile\":\"\\u003e 🔧 *Workflow sync report by [{workflow_name}]({run_url}) for {repository}*\",\"footerWorkflowRecompileComment\":\"\\u003e 🔄 *Update from [{workflow_name}]({run_url}) for {repository}*\",\"runStarted\":\"📐 Archie here! [{workflow_name}]({run_url}) is sketching the architecture on this {event_type}...\",\"runSuccess\":\"🎨 Blueprint complete! [{workflow_name}]({run_url}) has visualized the connections. The architecture speaks for itself! ✅\",\"runFailure\":\"📐 Drafting interrupted! [{workflow_name}]({run_url}) {status}. The diagram remains incomplete...\"}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
