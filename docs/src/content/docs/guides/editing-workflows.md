@@ -7,7 +7,7 @@ sidebar:
 
 Agentic workflows consist of two distinct parts with different editing requirements: the **YAML frontmatter** (configuration) and the **markdown body** (AI instructions). Understanding when changes require recompilation helps you iterate quickly and efficiently.
 
-See [Creating Workflows](/gh-aw/setup/creating-workflows/) for guidance on creating workflows with AI assistance.
+See [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/) for guidance on creating workflows with AI assistance.
 
 ## Overview
 
