@@ -181,7 +181,7 @@ func initializeBasicRepository(verbose bool) error {
 
 	// Write dispatcher agent
 	initLog.Print("Writing agentic workflows dispatcher agent")
-	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
+	if err := ensureAgenticWorkflowsDispatcher(verbose, false, false); err != nil {
 		initLog.Printf("Failed to write dispatcher agent: %v", err)
 		return fmt.Errorf("failed to write dispatcher agent: %w", err)
 	}
@@ -509,7 +509,7 @@ func InitRepository(verbose bool, mcp bool, campaign bool, tokens bool, engine s
 
 	// Write dispatcher agent
 	initLog.Print("Writing agentic workflows dispatcher agent")
-	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
+	if err := ensureAgenticWorkflowsDispatcher(verbose, false, campaign); err != nil {
 		initLog.Printf("Failed to write dispatcher agent: %v", err)
 		return fmt.Errorf("failed to write dispatcher agent: %w", err)
 	}

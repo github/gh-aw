@@ -265,7 +265,7 @@ func updateAgentFiles(verbose bool) error {
 	}
 
 	// Update dispatcher agent
-	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
+	if err := ensureAgenticWorkflowsDispatcher(verbose, false, false); err != nil {
 		upgradeLog.Printf("Failed to update dispatcher agent: %v", err)
 		return fmt.Errorf("failed to update dispatcher agent: %w", err)
 	}

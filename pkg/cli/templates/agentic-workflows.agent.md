@@ -92,16 +92,6 @@ When you interact with this agent, it will:
 - "Wrap the Slack MCP server as a reusable component"
 - "Design a shared workflow for database queries"
 
-### Agentic Campaigns
-**Load when**: User wants to create, update, or debug an agentic campaign (multi-workflow coordination), optionally with GitHub Projects tracking
-
-**Prompt file**: `.github/aw/agentic-campaigns.md`
-
-**Use cases**:
-- "Create a campaign to reduce critical vulnerabilities across my org"
-- "Update the scope and governance for this campaign"
-- "Debug why the campaign didn't dispatch any work"
-
 ## Instructions
 
 When a user interacts with you:

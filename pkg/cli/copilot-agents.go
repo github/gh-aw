@@ -147,9 +147,33 @@ func cleanupOldCopilotInstructions(verbose bool) error {
 	return nil
 }
 
+// buildAgenticWorkflowsDispatcherTemplate builds the dispatcher template with optional campaign support
+func buildAgenticWorkflowsDispatcherTemplate(includeCampaigns bool) string {
+	template := agenticWorkflowsDispatcherTemplate
+
+	if includeCampaigns {
+		// Add the campaigns section before the "## Instructions" heading
+		campaignsSection := `### Agentic Campaigns
+**Load when**: User wants to create, update, or debug an agentic campaign (multi-workflow coordination), optionally with GitHub Projects tracking
+
+**Prompt file**: ` + "`.github/aw/agentic-campaigns.md`" + `
+
+**Use cases**:
+- "Create a campaign to reduce critical vulnerabilities across my org"
+- "Update the scope and governance for this campaign"
+- "Debug why the campaign didn't dispatch any work"
+
+`
+		template = strings.Replace(template, "## Instructions", campaignsSection+"## Instructions", 1)
+	}
+
+	return template
+}
+
 // ensureAgenticWorkflowsDispatcher ensures that .github/agents/agentic-workflows.agent.md contains the dispatcher agent
-func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool) error {
-	return ensureAgentFromTemplate("agentic-workflows.agent.md", agenticWorkflowsDispatcherTemplate, verbose, skipInstructions)
+func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool, includeCampaigns bool) error {
+	template := buildAgenticWorkflowsDispatcherTemplate(includeCampaigns)
+	return ensureAgentFromTemplate("agentic-workflows.agent.md", template, verbose, skipInstructions)
 }
 
 // ensureCreateWorkflowPrompt ensures that .github/aw/create-agentic-workflow.md contains the new workflow creation prompt

@@ -192,7 +192,7 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	}
 
 	// Update dispatcher agent
-	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
+	if err := ensureAgenticWorkflowsDispatcher(verbose, false, false); err != nil {
 		fixLog.Printf("Failed to update dispatcher agent: %v", err)
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update dispatcher agent: %v", err)))
 	}
