@@ -20,21 +20,11 @@ See [Editing Workflows](/gh-aw/guides/editing-workflows/) for complete guidance 
 
 ### What's the difference between agentic workflows and regular GitHub Actions workflows?
 
-Agentic workflows are a special type of GitHub Actions workflow that use AI agentic processing to interpret natural language instructions and make decisions. Key differences include
-
-- **Natural language prompts**: You write instructions in plain markdown instead of complex YAML
-- **AI-powered reasoning**: The workflow uses an AI engine (coding agent) to understand context and adapt to situations
-- **Tool usage**: The AI can call pre-approved tools to perform tasks like creating issues, analyzing code, and generating content
-- **Safety controls**: Built-in security features like read-only default permissions, safe outputs, and sandboxed execution ensure safe operation
+Agentic workflows use AI to interpret natural language instructions in markdown instead of complex YAML. The AI engine can call pre-approved tools to perform tasks while running with read-only default permissions, safe outputs, and sandboxed execution.
 
 ### What's the difference between agentic workflows and just running a coding agent in GitHub Actions?
 
-Agentic workflows provide a structured framework for building AI-powered automations within GitHub Actions. While you could run just install and run a coding agent directly in a standard GitHub Actions workflow, agentic workflows offer:
-
-- **Simpler format**: Write in markdown with natural language prompts
-- **Built-in security**: Read-only defaults, safe outputs, and sandboxing
-- **Tool integration**: Pre-defined tools for common GitHub operations
-- **Engine independence**: Easily switch between supported AI engines
+While you could install and run a coding agent directly in a standard GitHub Actions workflow, agentic workflows provide a structured framework with simpler markdown format, built-in security controls, pre-defined tools for GitHub operations, and easy switching between AI engines.
 
 ### Can agentic workflows write code and create pull requests?
 
@@ -44,16 +34,7 @@ Some organizations may completely disable the creation of pull requests from Git
 
 ### Can agentic workflows do more than code?
 
-Yes! Agentic workflows can perform a wide variety of tasks beyond writing code:
-
-- **Analyze repositories**: Review issues, PRs, discussions, and commit history
-- **Generate reports**: Create status reports, metrics summaries, and documentation
-- **Triage issues**: Classify, label, and route issues to appropriate teams
-- **Research**: Gather information from repository content, web sources, and APIs
-- **Create content**: Write documentation, release notes, and issue descriptions
-- **Coordinate work**: Track progress, create follow-up issues, and manage projects
-
-The AI interprets natural language instructions and uses available [tools](/gh-aw/reference/tools/) to accomplish tasks.
+Yes! Agentic workflows can analyze repositories, generate reports, triage issues, research information, create documentation, and coordinate work. The AI interprets natural language instructions and uses available [tools](/gh-aw/reference/tools/) to accomplish tasks.
 
 ### Can agentic workflows mix regular GitHub Actions steps with AI agentic steps?
 
@@ -70,29 +51,15 @@ See [MultiRepoOps](/gh-aw/guides/multirepoops/) for coordinating across reposito
 
 ### Can I use agentic workflows in private repositories?
 
-Yes, and in many cases we recommend it. Private repositories are ideal for:
-
-- Operating over proprietary source code
-- Creating a "sidecar" repository with limited access for automation
-- Testing workflows before deploying to public repositories
-- Organization-internal automation
-
-See [SideRepoOps](/gh-aw/guides/siderepoops/) for patterns using private repositories for automation.
+Yes, and in many cases we recommend it. Private repositories are ideal for proprietary code, creating a "sidecar" repository with limited access, testing workflows, and organization-internal automation. See [SideRepoOps](/gh-aw/guides/siderepoops/) for patterns using private repositories.
 
 ## Security & Privacy
 
 ### Agentic workflows run in GitHub Actions. Can they access my repository secrets?
 
-Repository secrets are not available to the agentic step by default. The AI agent runs with read-only permissions and cannot directly access your repository secrets unless explicitly configured. However, you should still:
+Repository secrets are not available to the agentic step by default. The AI agent runs with read-only permissions and cannot directly access your repository secrets unless explicitly configured. You should review workflows carefully, follow [GitHub Actions security guidelines](https://docs.github.com/en/actions/reference/security/secure-use), use least-privilege permissions, and inspect the compiled `.lock.yml` file. See the [Security Guide](/gh-aw/guides/security/) for details.
 
-- Review workflows carefully before installation
-- Follow all existing [GitHub Actions security guidelines](https://docs.github.com/en/actions/reference/security/secure-use)
-- Use least-privilege permissions
-- Inspect the compiled `.lock.yml` file to understand actual permissions
-
-See the [Security Guide](/gh-aw/guides/security/) guide for details.
-
-Some MCP tools may be configured using secrets (for example, an MCP tool that can send a Slack message), but these are only accessible to the specific tool steps, not the AI agent itself. However care should be taken to minimize the use of tools equipped with highly privileged secrets.
+Some MCP tools may be configured using secrets, but these are only accessible to the specific tool steps, not the AI agent itself. Minimize the use of tools equipped with highly privileged secrets.
 
 ### Agentic workflows run in GitHub Actions. Can they write to the repository?
 
@@ -110,15 +77,7 @@ See [Safe Outputs - Security and Sanitization](/gh-aw/reference/safe-outputs/#se
 
 ### Tell me more about security
 
-Security is foundational to the design. Agentic workflows implement defense-in-depth through multiple layers:
-
-- **Compilation-time validation**: Schema validation, expression safety checks, and action SHA pinning
-- **Runtime isolation**: Agents run in sandboxed containers with network egress controls
-- **Permission separation**: Read-only default permissions with [safe outputs](/gh-aw/reference/safe-outputs/) for write operations
-- **Tool allowlisting**: Explicit control over which tools the AI can access
-- **Output sanitization**: Content validation before applying changes
-
-For documentation, see the [Security Architecture](/gh-aw/introduction/architecture/) and [Security Guide](/gh-aw/guides/security/).
+Security is foundational to the design. Agentic workflows implement defense-in-depth through compilation-time validation (schema checks, expression safety, action SHA pinning), runtime isolation (sandboxed containers with network controls), permission separation (read-only defaults with [safe outputs](/gh-aw/reference/safe-outputs/) for writes), tool allowlisting, and output sanitization. See the [Security Architecture](/gh-aw/introduction/architecture/) and [Security Guide](/gh-aw/guides/security/).
 
 ### How is my code and data processed?
 
@@ -131,14 +90,7 @@ See the [Security Architecture](/gh-aw/introduction/architecture/) for details o
 
 ### Does the underlying AI engine run in a sandbox?
 
-Yes, the [AI engine](/gh-aw/reference/engines/) (coding agent) runs in a containerized sandbox environment by default. The sandbox provides:
-
-- **Network egress control**: Domain-based access restrictions via the [Agent Workflow Firewall (AWF)](/gh-aw/reference/sandbox/)
-- **Container isolation**: The agent process runs in an isolated container
-- **Resource constraints**: CPU and memory limits of GitHub Actions
-- **Limited filesystem access**: Only workspace and temporary directories are accessible
-
-The sandbox container itself runs inside a GitHub Actions VM, providing an additional layer of isolation. See [Sandbox Configuration](/gh-aw/reference/sandbox/) for configuration options.
+Yes, the [AI engine](/gh-aw/reference/engines/) runs in a containerized sandbox with network egress control via the [Agent Workflow Firewall](/gh-aw/reference/sandbox/), container isolation, GitHub Actions resource constraints, and limited filesystem access to workspace and temporary directories. The sandbox container runs inside a GitHub Actions VM for additional isolation. See [Sandbox Configuration](/gh-aw/reference/sandbox/).
 
 ### Can an agentic workflow use outbound network requests?
 
@@ -166,15 +118,9 @@ This depends on the AI engine (coding agent) you use:
 
 ### What's the approximate cost per workflow run?
 
-Costs vary depending on workflow complexity, AI model used, and execution time. When using GitHub Copilot CLI, 1 or 2 premium requests are used per workflow execution that includes agentic processing. To track usage:
+Costs vary depending on workflow complexity, AI model, and execution time. GitHub Copilot CLI uses 1-2 premium requests per workflow execution with agentic processing. Track usage with `gh aw logs` for runs and metrics, `gh aw audit <run-id>` for detailed token usage and costs, or check your AI provider's usage portal. Consider creating separate PAT/API keys per repository for tracking.
 
-- Use `gh aw logs` to analyze workflow runs and metrics
-- Use `gh aw audit <run-id>` to see detailed token usage and estimated costs
-- Check your AI provider's usage portal for account-level tracking
-
-Consider creating a separate PAT/API key for each repository to help track usage across projects.
-
-Costs can be reduced by optimizing prompts, using smaller models where appropriate, limiting unnecessary tool calls, reducing frequency of runs, and caching results.
+Reduce costs by optimizing prompts, using smaller models, limiting tool calls, reducing run frequency, and caching results.
 
 ### Can I change the model being used, e.g., use a cheaper or more advanced one?
 
@@ -198,73 +144,25 @@ See [AI Engines](/gh-aw/reference/engines/) for all configuration options.
 
 ### Why do I need a token or key?
 
-When using **GitHub Copilot CLI**, a Personal Access Token (PAT) with "Copilot Requests" permission is needed to authenticate and associate the automation work with your GitHub account. This ensures:
-
-- Usage is tracked against your Copilot subscription
-- The AI has appropriate permissions for requested operations
-- Actions are auditable and attributable
-
-In the future, this restriction may be lifted to allow organization-level association. See [GitHub Tokens](/gh-aw/reference/tokens/) for complete token documentation.
+When using **GitHub Copilot CLI**, a Personal Access Token (PAT) with "Copilot Requests" permission authenticates and associates automation work with your GitHub account. This ensures usage tracking against your subscription, appropriate AI permissions, and auditable actions. In the future, this may support organization-level association. See [GitHub Tokens](/gh-aw/reference/tokens/).
 
 ### What hidden runtime dependencies does this have?
 
-The executing agentic workflow uses:
-
-- Your nominated **coding agent** (defaulting to GitHub Copilot CLI)
-- A **GitHub Actions VM** with NodeJS
-- A small library of **pinned Actions** distributed from releases of [github/gh-aw](https://github.com/github/gh-aw)
-- An **Agent Workflow Firewall** container for network control (optional but default)
-
-The exact YAML workflow executed can always be inspected in the compiled `.lock.yml` file—there's no hidden configuration.
+The executing agentic workflow uses your nominated coding agent (defaulting to GitHub Copilot CLI), a GitHub Actions VM with NodeJS, pinned Actions from [github/gh-aw](https://github.com/github/gh-aw) releases, and an Agent Workflow Firewall container for network control (optional but default). The exact YAML workflow can be inspected in the compiled `.lock.yml` file—there's no hidden configuration.
 
 ### I'm not using a supported AI Engine (coding agent). What should I do?
 
-If you want to use a coding agent that isn't currently supported (Copilot, Claude, or Codex), you can:
-
-1. **Use the custom engine**: Define your own GitHub Actions steps without AI interpretation
-2. **Contribute support**: Work with the coding agent's makers or community to contribute to the [gh-aw repository](https://github.com/github/gh-aw)
-3. **Request support**: Open an issue describing your use case
-
-See [AI Engines](/gh-aw/reference/engines/) for current options.
+If you want to use a coding agent that isn't currently supported (Copilot, Claude, or Codex), you can use the custom engine to define your own GitHub Actions steps, contribute support to the [gh-aw repository](https://github.com/github/gh-aw), or open an issue describing your use case. See [AI Engines](/gh-aw/reference/engines/).
 
 ## Workflow Design
 
 ### Should I focus on one workflow, or write many different ones?
 
-This depends on your style and goals:
-
-**One workflow approach**:
-
-- Simpler to maintain and understand
-- Good for learning and experimentation
-- Easier to track costs and behavior
-
-**Multiple workflows approach**:
-
-- Better separation of concerns
-- Different triggers and permissions per task
-- Easier to enable/disable specific automations
-- Clearer audit trails per function
-
-We recommend starting with one or two workflows, then expanding as you understand the patterns. See [Peli's Agent Factory](/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) for workflow examples and inspiration.
+One workflow is simpler to maintain and good for learning, while multiple workflows provide better separation of concerns, different triggers and permissions per task, and clearer audit trails. Start with one or two workflows, then expand as you understand the patterns. See [Peli's Agent Factory](/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/) for examples.
 
 ### Should I create agentic workflows by hand editing or using AI?
 
-Either approach works well:
-
-**AI-assisted authoring**:
-
-- Use `/agent agentic-workflows create` in GitHub Copilot Chat
-- Interactive guidance through the creation process
-- Automatic best practices and security configuration
-
-**Manual editing**:
-
-- Full control over every configuration option
-- Good for learning the workflow format deeply
-- Essential for advanced customizations
-
-See [Creating Workflows](/gh-aw/setup/creating-workflows/) for the AI-assisted approach, or browse the [Reference documentation](/gh-aw/reference/frontmatter/) for manual configuration.
+Either approach works well. AI-assisted authoring using `/agent agentic-workflows create` in GitHub Copilot Chat provides interactive guidance with automatic best practices, while manual editing gives full control and is essential for advanced customizations. See [Creating Workflows](/gh-aw/setup/creating-workflows/) for AI-assisted approach, or [Reference documentation](/gh-aw/reference/frontmatter/) for manual configuration.
 
 ### You use 'agent' and 'agentic workflow' interchangeably. Are they the same thing?
 
@@ -274,23 +172,11 @@ Yes, for the purpose of this technology. An **"agent"** is an agentic workflow i
 
 ### Why did my workflow fail?
 
-Common failure reasons include:
-
-1. **Missing secrets**: Ensure required tokens (e.g., `COPILOT_GITHUB_TOKEN`) are configured or are incorrect
-2. **Permission issues**: Check that workflow permissions match required operations
-3. **Network restrictions**: Verify required domains are in the `network.allowed` list
-4. **Tool access**: Ensure needed tools are enabled in the `tools:` configuration
-5. **Rate limits**: AI API rate limits may cause failures during high usage
-
-Use `gh aw audit <run-id>` to investigate specific failures. See [Common Issues](/gh-aw/troubleshooting/common-issues/) for detailed debugging guides.
+Common failure reasons include missing or incorrect tokens (e.g., `COPILOT_GITHUB_TOKEN`), permission mismatches, network restrictions (verify domains in `network.allowed`), disabled tools in the `tools:` configuration, and AI API rate limits. Use `gh aw audit <run-id>` to investigate failures. See [Common Issues](/gh-aw/troubleshooting/common-issues/).
 
 ### How do I debug a failing workflow?
 
-1. **Check the logs**: View workflow logs in GitHub Actions or use `gh aw logs`. A high level summary is shown for the run.
-2. **Audit the run**: Use `gh aw audit <run-id>` for detailed analysis
-3. **Inspect the lock file**: Review the compiled `.lock.yml` for unexpected configuration
-4. **Use the debug agent**: Run `/agent agentic-workflows debug` in Copilot Chat
-5. **Test locally**: Use `gh aw compile --watch` during development
+Check workflow logs in GitHub Actions or use `gh aw logs`, audit the run with `gh aw audit <run-id>`, inspect the compiled `.lock.yml` for unexpected configuration, run `/agent agentic-workflows debug` in Copilot Chat, or test locally with `gh aw compile --watch`.
 
 ### Can I test workflows without affecting my repository?
 
