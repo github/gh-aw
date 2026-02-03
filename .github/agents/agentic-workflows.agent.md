@@ -17,6 +17,11 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 - **Upgrading workflows**: Routes to `upgrade-agentic-workflows` prompt
 - **Creating shared components**: Routes to `create-shared-agentic-workflow` prompt
 
+Workflows may optionally include:
+
+- **Project tracking / monitoring** (GitHub Projects updates, status reporting)
+- **Orchestration / coordination** (one workflow assigning agents or dispatching and coordinating other workflows)
+
 ## Files This Applies To
 
 - Workflow files: `.github/workflows/*.md` and `.github/workflows/**/*.md`

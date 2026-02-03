@@ -202,7 +202,7 @@ describe("log_parser_shared.cjs", () => {
       expect(isLikelyCustomAgent("add-safe-output-type")).toBe(true);
       expect(isLikelyCustomAgent("cli-consistency-checker")).toBe(true);
       expect(isLikelyCustomAgent("agentic-workflows")).toBe(true);
-      expect(isLikelyCustomAgent("agentic-campaign-designer")).toBe(true);
+      expect(isLikelyCustomAgent("interactive-agent-designer")).toBe(true);
       expect(isLikelyCustomAgent("technical-doc-writer")).toBe(true);
       expect(isLikelyCustomAgent("shell-2-script")).toBe(true);
     });
@@ -626,7 +626,7 @@ describe("log_parser_shared.cjs", () => {
       const { formatInitializationSummary } = await import("./log_parser_shared.cjs");
 
       const initEntry = {
-        tools: ["add-safe-output-type", "cli-consistency-checker", "agentic-workflows", "agentic-campaign-designer", "technical-doc-writer"],
+        tools: ["add-safe-output-type", "cli-consistency-checker", "agentic-workflows", "interactive-agent-designer", "technical-doc-writer"],
       };
 
       const result = formatInitializationSummary(initEntry);
@@ -635,7 +635,7 @@ describe("log_parser_shared.cjs", () => {
       expect(result.markdown).toContain("add-safe-output-type");
       expect(result.markdown).toContain("cli-consistency-checker");
       expect(result.markdown).toContain("agentic-workflows");
-      expect(result.markdown).toContain("agentic-campaign-designer");
+      expect(result.markdown).toContain("interactive-agent-designer");
       expect(result.markdown).toContain("technical-doc-writer");
     });
 
@@ -1562,7 +1562,7 @@ describe("log_parser_shared.cjs", () => {
             "safeoutputs-create_issue",
             "safeoutputs-add_comment",
             "agentic-workflows",
-            "agentic-campaign-designer",
+            "interactive-agent-designer",
           ],
         },
         { type: "result", num_turns: 1 },

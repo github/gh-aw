@@ -444,7 +444,7 @@ func attemptSetSecret(secretName, repoSlug string, verbose bool) error {
 }
 
 // InitRepository initializes the repository for agentic workflows
-func InitRepository(verbose bool, mcp bool, campaign bool, tokens bool, engine string, codespaceRepos []string, codespaceEnabled bool, completions bool, push bool, shouldCreatePR bool, rootCmd CommandProvider) error {
+func InitRepository(verbose bool, mcp bool, tokens bool, engine string, codespaceRepos []string, codespaceEnabled bool, completions bool, push bool, shouldCreatePR bool, rootCmd CommandProvider) error {
 	initLog.Print("Starting repository initialization for agentic workflows")
 
 	// If --push or --create-pull-request is enabled, ensure git status is clean before starting

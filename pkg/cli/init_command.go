@@ -59,10 +59,6 @@ With --codespaces flag:
 - Adds GitHub Copilot extensions and gh aw CLI installation
 - Use without value (--codespaces) for current repo only, or with comma-separated repos (--codespaces repo1,repo2)
 
-With --campaign flag:
-- Enables campaign-related prompts and functionality for multi-workflow coordination
-- Note: Campaign creation is now handled through the agentic-campaign-designer custom agent (use @agentic-campaign-designer in Copilot Chat)
-
 With --completions flag:
 - Automatically detects your shell (bash, zsh, fish, or PowerShell)
 - Installs shell completion configuration for the CLI
@@ -90,7 +86,6 @@ Examples:
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			mcpFlag, _ := cmd.Flags().GetBool("mcp")
 			noMcp, _ := cmd.Flags().GetBool("no-mcp")
-			campaign, _ := cmd.Flags().GetBool("campaign")
 			tokens, _ := cmd.Flags().GetBool("tokens")
 			engine, _ := cmd.Flags().GetString("engine")
 			codespaceReposStr, _ := cmd.Flags().GetString("codespaces")
@@ -125,7 +120,7 @@ Examples:
 			// Check if we should enter interactive mode
 			// Interactive mode: no flags provided at all (only verbose is allowed)
 			if !cmd.Flags().Changed("mcp") && !cmd.Flags().Changed("no-mcp") &&
-				!cmd.Flags().Changed("campaign") && !cmd.Flags().Changed("tokens") &&
+				!cmd.Flags().Changed("tokens") &&
 				!cmd.Flags().Changed("engine") && !cmd.Flags().Changed("codespaces") &&
 				!cmd.Flags().Changed("completions") && !cmd.Flags().Changed("push") &&
 				!cmd.Flags().Changed("create-pull-request") && !cmd.Flags().Changed("pr") {
@@ -135,8 +130,8 @@ Examples:
 				return InitRepositoryInteractive(verbose, cmd.Root())
 			}
 
-			initCommandLog.Printf("Executing init command: verbose=%v, mcp=%v, campaign=%v, tokens=%v, engine=%v, codespaces=%v, codespaceEnabled=%v, completions=%v, push=%v, createPR=%v", verbose, mcp, campaign, tokens, engine, codespaceRepos, codespaceEnabled, completions, push, createPR)
-			if err := InitRepository(verbose, mcp, campaign, tokens, engine, codespaceRepos, codespaceEnabled, completions, push, createPR, cmd.Root()); err != nil {
+			initCommandLog.Printf("Executing init command: verbose=%v, mcp=%v, tokens=%v, engine=%v, codespaces=%v, codespaceEnabled=%v, completions=%v, push=%v, createPR=%v", verbose, mcp, tokens, engine, codespaceRepos, codespaceEnabled, completions, push, createPR)
+			if err := InitRepository(verbose, mcp, tokens, engine, codespaceRepos, codespaceEnabled, completions, push, createPR, cmd.Root()); err != nil {
 				initCommandLog.Printf("Init command failed: %v", err)
 				return err
 			}
@@ -147,7 +142,6 @@ Examples:
 
 	cmd.Flags().Bool("no-mcp", false, "Skip configuring GitHub Copilot Agent MCP server integration")
 	cmd.Flags().Bool("mcp", false, "Configure GitHub Copilot Agent MCP server integration (deprecated, MCP is enabled by default)")
-	cmd.Flags().Bool("campaign", false, "Install the Campaign Designer agent for gh-aw campaigns in this repository")
 	cmd.Flags().Bool("tokens", false, "Validate required secrets for agentic workflows")
 	cmd.Flags().String("engine", "", "AI engine to check tokens for (copilot, claude, codex) - requires --tokens flag")
 	cmd.Flags().String("codespaces", "", "Create devcontainer.json for GitHub Codespaces with agentic workflows support. Specify comma-separated repository names in the same organization (e.g., repo1,repo2), or use without value for current repo only")

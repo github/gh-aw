@@ -531,7 +531,7 @@ repo-memory:
     create-orphan: true
     allow-artifacts: true
 
-  - id: campaigns
+  - id: orchestration
     create-orphan: true
     max-file-size: 1MB
     max-files: 100
@@ -555,13 +555,13 @@ The hierarchical agent system provides meta-orchestration capabilities to manage
 
 ```mermaid
 graph TD
-    A[Meta-Orchestrators] --> B[Campaign Manager]
+  A[Meta-Orchestrators] --> B[Orchestration Manager]
     A --> C[Workflow Health Manager]
     A --> D[Agent Performance Analyzer]
 
-    B --> E[Campaign 1]
-    B --> F[Campaign 2]
-    B --> G[Campaign N]
+  B --> E[Coordinator 1]
+  B --> F[Coordinator 2]
+  B --> G[Coordinator N]
 
     C --> H[Workflow Monitoring]
     C --> I[Dependency Mapping]
@@ -580,7 +580,7 @@ graph TD
 | **Agent Performance Analyzer** | `agent-performance-analyzer.md` | Analyze agent quality | Daily |
 
 **Key Capabilities**:
-- Cross-campaign coordination
+- Cross-workflow coordination
 - Workflow health monitoring
 - Performance trend analysis
 - Strategic priority management

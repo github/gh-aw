@@ -13,9 +13,6 @@ permissions:
   contents: read
   security-events: read
 
-imports:
-  - shared/campaign.md
-
 safe-outputs:
   update-project:
     project: https://github.com/orgs/githubnext/projects/144

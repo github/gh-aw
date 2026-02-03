@@ -6,7 +6,7 @@ test.describe('Copy Entire File Button', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Navigate to the agentic authoring page
-    await page.goto('/gh-aw/tools/agentic-authoring/');
+    await page.goto('/gh-aw/tools/creating-workflows/');
     
     // Debug: print URL and take screenshot
     console.log('Current URL:', page.url());
@@ -56,7 +56,7 @@ test.describe('Copy Entire File Button', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Navigate to the agentic authoring page
-    await page.goto('/gh-aw/tools/agentic-authoring/');
+    await page.goto('/gh-aw/tools/creating-workflows/');
 
     // Wait for the page to be fully loaded
     await page.waitForLoadState('networkidle');
@@ -108,7 +108,7 @@ test.describe('Copy Entire File Button', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Navigate to the agentic authoring page
-    await page.goto('/gh-aw/tools/agentic-authoring/');
+    await page.goto('/gh-aw/tools/creating-workflows/');
 
     // Wait for the page to be fully loaded
     await page.waitForLoadState('networkidle');
