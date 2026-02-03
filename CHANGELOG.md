@@ -2,6 +2,260 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.40.1 - 2026-02-03
+
+### Bug Fixes
+
+#### Handle 502 Bad Gateway errors in assign_to_agent handler by treating them as success. The cloud gateway may return 502 errors during agent assignment, but the assignment typically succeeds despite the error. The handler now logs 502 errors for troubleshooting but does not fail the workflow.
+
+#### Add discussion interaction to smoke workflows and serialize the discussion
+
+flag in safe-outputs handler config.
+
+Smoke workflows now select a random discussion and post thematic comments to
+validate discussion comment functionality. The compiler now emits the
+`"discussion": true` flag in `GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG` when a
+workflow requests discussion output, and lock files include `discussions: write`
+permission where applicable.
+
+#### Add discussion interaction to smoke workflows; compiler now serializes the `discussion` flag into the safe-outputs handler config so workflows can post comments to discussions. Lock files include `discussions: write` where applicable.
+
+Smoke workflows pick a random discussion and post a thematic comment (copilot: playful, claude: comic-book, codex: mystical oracle, opencode: space mission). This is a non-breaking tooling/workflow change.
+
+#### Add discussion interaction to smoke workflows; deprecate the `discussion` flag and
+
+add a codemod to remove it. Smoke workflows now query discussions and post
+comments to both discussions and PRs to validate discussion functionality.
+
+The compiler no longer emits a `discussion` boolean flag in compiled handler
+configs; the `add_comment` handler auto-detects target type or accepts a
+`discussion_number` parameter. A codemod `add-comment-discussion-removal` is
+available via `gh aw fix --write` to remove the deprecated field from workflows.
+
+#### Add GitHub App token minting for the GitHub MCP server tooling and workflows.
+
+#### Add expires support to `safe-outputs.create-pull-request` so PRs can mark, describe, and auto-close expired runs.
+
+#### Add safe-inputs gh CLI testing to smoke workflows; updates `shared/gh.md` to remove the `network.allowed` restriction and validate GitHub CLI access using `GITHUB_TOKEN`.
+
+This changeset accompanies the PR that adds `safeinputs-gh` testing to all smoke workflows (smoke-copilot.md, smoke-claude.md, smoke-codex.md, smoke-opencode.md) and adjusts `shared/gh.md` accordingly.
+
+#### Add safe-inputs gh CLI testing to smoke workflows.
+
+This patch adds validation to the smoke workflows to exercise the GitHub CLI
+integration via the `safeinputs-gh` tool. It also updates `shared/gh.md`
+to remove the `network.allowed` restriction so the `safeinputs-gh` tool can
+query PRs using the provided `GITHUB_TOKEN`.
+
+#### Add step summaries for safe-output processing results.
+
+Safe-output handlers now generate collapsible step summaries for each processed
+message, providing visibility into what was created or updated during workflow
+execution. Body previews are truncated at 500 characters to avoid bloat. The
+feature is implemented for both regular safe-outputs and project-based
+safe-outputs via a shared helper module.
+
+#### Add built-in pattern detection and extensive tests for secret redaction in compiled logs.
+
+This change adds built-in regex patterns for common credential types (GitHub, Azure, Google, AWS, OpenAI, Anthropic) to `redact_secrets.cjs` and includes comprehensive tests covering these patterns and combinations with custom secrets.
+
+#### Added a stub `send_slack_message` safe-output job and workflow configuration so the smoke Copilot run can exercise Slack tooling without actually sending messages.
+
+#### Add a `Build and Test gh-aw` task to every smoke workflow so each run verifies `make build` and `make test` before succeeding.
+
+#### Aggregate validation errors so compilation reports all issues together and add the `--fail-fast` flag to preserve the legacy behavior when needed.
+
+#### Update the workflow compiler so prompt steps emit separate `[ ... ]` tests joined with `&&` and recompile affected workflows to avoid deprecated `-a` usage.
+
+#### Added a build-only smoke workflow task plus wider timeouts and explicit Go runtimes so the smoke jobs can reliably run `make build` before continuing.
+
+#### Consolidate shell escaping utilities into `shell.go` and remove the duplicate helpers in `mcp_utilities.go` so the generator and tests use a single source of truth.
+
+#### Convert the safe-outputs MCP server from stdio transport to HTTP transport. This change
+
+follows the safe-inputs pattern and includes:
+
+- HTTP server implementation and startup scripts for safe-outputs
+- Updated MCP configuration rendering to use HTTP transport and Authorization header
+- Added environment variables and startup steps for the safe-outputs server
+- Tests and TOML rendering updated to match HTTP transport
+
+This is an internal implementation change; there are no user-facing CLI breaking
+changes.
+
+#### Convert safe-outputs MCP server to HTTP transport and update generated
+
+startup steps and MCP configuration to use HTTP (Authorization header,
+port, and URL). This is an internal implementation change that moves the
+safe-outputs MCP server from stdio to an HTTP transport and updates the
+workflow generation to start and configure the HTTP server.
+
+Changes include:
+- New HTTP server JavaScript and startup scripts for safe-outputs
+- Updated MCP config rendering to use `type: http`, `url`, and `headers`
+- Workflow step outputs for `port` and `api_key` and changes to env vars
+
+No public CLI behavior or user-facing flags were changed; this is an
+internal/backend change and therefore marked as a `patch`.
+
+#### Convert the `safe-outputs` MCP server from stdio/container transport to an HTTP-based transport and update generated workflow steps to start the HTTP server before the agent. This migrates to a stateful HTTP service, removes stdio/container fields from the generated MCP configuration, and exposes `GH_AW_SAFE_OUTPUTS_PORT` and `GH_AW_SAFE_OUTPUTS_API_KEY` for MCP gateway resolution.
+
+This is an internal/tooling change and does not change public CLI APIs.
+
+#### Document the `remove-labels` safe output type and add examples and a table-of-contents entry.
+
+#### Document the two-file agentic workflow structure (separate `.github/agentics/<id>.md` prompt file and `.github/workflows/<id>.md` + runtime import) in the templates and docs, and teach the compiler to validate dispatch-workflow references while dynamically building the dispatch tools from compiled/yml files.
+
+#### Documented the `remove-labels` safe output type: added reference documentation, examples, and a table-of-contents entry.
+
+#### Documented the `remove-labels` safe output type, added examples and a table-of-contents entry.
+
+#### Enable append-only comments for the `smoke-copilot` workflow.
+
+The workflow now posts new status comments for each run instead of editing
+the original activation comment. This adds `append-only-comments: true`
+to the messages configuration so timeline updates create discrete comments.
+
+Files changed: schema and `.github/workflows/smoke-copilot.md` (compiled lock updated).
+
+#### Escape single quotes and backslashes when embedding JSON into shell environment
+
+variables to prevent shell injection. This fixes a code-scanning finding
+(`go/unsafe-quoting`) by properly escaping backslashes and single quotes
+before inserting JSON into a single-quoted shell string.
+
+Files changed:
+- `pkg/workflow/update_project_job.go` (apply POSIX-compatible escaping)
+
+This is an internal security fix and does not change the public CLI API.
+
+#### Add more diagnostic logging around safe-outputs MCP server initialization and extend the startup timeout from 10s to 60s to reduce CI flakes.
+
+#### Claude steps now use `--output-format stream-json` so the execution log stays newline-delimited JSON, matching the parser expectation.
+
+#### Handle GitHub Actions PR creation permission errors by setting an `error_message` output
+
+and adding an auto-filed issue handler with guidance when Actions cannot create or
+approve pull requests in the repository.
+
+This patch documents the change: the create-pull-request flow now emits a helpful
+`error_message` output when permissions block PR creation, and the conclusion job
+can use that to file or update an issue with next steps and links to documentation.
+
+#### Sanitize the PATH export used by AWF firewall agents by sourcing a new `sanitize_path.sh` helper so empty elements and stray colons are removed before updating PATH.
+
+#### Add more informative progress logging to the MCP gateway health check script so retries show elapsed time and total attempts.
+
+#### Mirror runner-provided environment variables (Java, Android, browsers, package managers, and language toolchains) into the AWF agent container so workflows keep access to their expected tool paths.
+
+#### Mirror essential GitHub Actions runner environment variables into the agent container so workflows retain access to tool paths.
+
+#### Add the audited essential and common binaries (cat, curl, date, find, gh, grep, jq, yq, cp, cut, diff, head, ls, mkdir, rm, sed, sort, tail, wc, which) as read-only mounts inside the AWF agent container so workflows can rely on the expected utilities.
+
+#### Move safe-output storage from `/tmp` to `/opt` and update the agent intake and secret-redaction
+
+scripts to read from the new path `/opt/gh-aw/safeoutputs/outputs.jsonl`. This keeps the file writable
+by the MCP server while making it read-only inside the agent container.
+
+#### Pin workflows to the latest `actions/checkout` (v6.0.2) and `actions/download-artifact` (v7.0.0) releases and regenerate the lockfiles for the new SHAs.
+
+#### Ensure the compound Copilot command is quoted before being passed to AWF/SRT so it runs inside the firewall container.
+
+#### Quote the compound Copilot command passed to AWF/SRT so it runs inside the firewall container.
+
+#### Refactored `ParseWorkflowFile`, added helper functions, and simplified network permissions.
+
+#### Removed the redundant `workdir` field from generated MCP server configurations so the JSON/TOML configs match expectations.
+
+#### Removed MCP gateway JSON validation from `gh aw compile --validate` to simplify MCP configuration rendering.
+
+#### Removed the stray `workdir` field from generated MCP server configurations for agentic workflows so the output matches the expected schema.
+
+#### Add retry logic to the GitHub Copilot CLI installer by moving the
+
+installation steps into a dedicated shell script and invoking it from
+workflows. This prevents intermittent download failures during setup.
+
+The change includes creating `actions/setup/sh/install_copilot_cli.sh`,
+updating `pkg/workflow/copilot_srt.go` to call the script, and
+recompiling workflows that now reference the retry-enabled installer.
+
+#### Use runtime-import macros for the main workflow markdown so the lock file can stay small and workflows remain editable without recompiling; frontmatter imports stay inlined and the compiler/runtime-import helper now track the original markdown path, clean expressions, and cache recursive imports while the updated tests verify the new behavior.
+
+#### Migrate the `safe-outputs` MCP server from stdio transport to an HTTP transport and
+
+update the generated workflow steps to start the HTTP server before the agent.
+
+This change adds the HTTP server implementation and startup scripts, replaces the
+stdio-based MCP server configuration with an HTTP-based configuration, and updates
+environment variables and MCP host resolution to support the new transport.
+
+#### Add diagnostic logging and widen the safe-outputs MCP server startup timeout to 60 seconds to tame CI flakiness.
+
+#### Added a build-only verification step, explicit Go runtimes, and longer timeouts to every smoke workflow so `make build` can finish reliably.
+
+#### Added build-and-test verification steps to each smoke workflow so failures surface early.
+
+#### Added a build-only verification step and extended timeouts across the smoke workflows so the new task can finish reliably.
+
+#### Added a build-only verification step plus longer timeouts and explicit Go runtimes to every smoke workflow so `make build` can finish reliably.
+
+#### Added a build-only verification step and generous timeouts to every smoke workflow so the compiler validates `make build` reliably.
+
+#### Added a build-only verification step, extended smoke workflow timeouts, and ensured each smoke frontmatter declares the Go runtime so `make build` can complete reliably.
+
+#### Sort safe output tool messages by their temporary ID dependencies before dispatching them so single-pass handlers can resolve every reference without multiple retries.
+
+#### Split the temporary ID helpers into their own `temporary_id.cjs` module and adjust the associated tests.
+
+#### Document the new two-file agentic workflow structure (separating `.github/agentics/` prompts from `.github/workflows/` frontmatter) and update runtime imports so the noop safe output is kept out of the handler manager config.
+
+#### Moved the update-project and create-project-status-update safe-output configs into the unified handler manager so workflows no longer run a separate project handler step for those types.
+
+#### Bump the pinned versions for `actions/checkout` and `actions/download-artifact` to match the regenerated workflow locks.
+
+#### Updated the AWF firewall to v0.11.2 and switched the AWF agent container to act.
+
+#### Updated the AWF firewall to v0.11.2 and switched the agent container to act.
+
+#### Update the default versions for Claude Code, Codex, GitHub MCP Server, Playwright MCP, and MCP Gateway to the latest releases.
+
+#### Updated the embedded agentic tooling stack:
+
+- Claude Code → 2.1.19
+- Copilot CLI → 0.0.394
+- Codex → 0.91.0
+- Playwright MCP → 0.0.58 / Browser → v1.58.0
+- Sandbox runtime → 0.0.32
+
+Recompiled workflows and refreshed constants tests to match the new expectations.
+
+#### Update the OpenAI Codex CLI from 0.89.0 to 0.91.0, regen the compiled workflows, and note the reduced sub-agent limit.
+
+#### Update the default Copilot, MCP server, Playwright, and Gateway versions after their 2026-01-26 releases.
+
+#### Bump MCP Gateway to v0.0.76: update `DefaultMCPGatewayVersion` and
+
+recompiled workflow lock files to reference `ghcr.io/github/gh-aw-mcpg:v0.0.76`.
+This is a non-breaking dependency bump.
+
+#### Bump the MCP gateway reference to `v0.0.78` and regenerate all compiled workflow locks so they pull the latest container release.
+
+#### Update `smoke-claude` workflow to import the shared `go-make` workflow and
+
+expose `safeinputs-go` and `safeinputs-make` tools for running Go and Make
+commands used by CI and local testing. This is an internal tooling update and
+does not change public APIs.
+
+The workflow now validates the `safeinputs-make` tool by running `make build`.
+
+#### Update the `smoke-claude` workflow to import the shared `go-make` workflow and expose `safeinputs-go` and `safeinputs-make` tools for running Go and Make commands used by CI and local testing.
+
+This is an internal/tooling workflow update and does not change public APIs.
+
+#### Switch Claude CLI log capture to use `--debug-file /tmp/gh-aw/agent-stdio.log` directly instead of shell redirection.
+
+
 ## v0.36.0 - 2026-01-08
 
 ### Features
