@@ -16,7 +16,11 @@ This is a **dispatcher agent** that routes your request to the appropriate speci
 - **Debugging workflows**: Routes to `debug` prompt  
 - **Upgrading workflows**: Routes to `upgrade-agentic-workflows` prompt
 - **Creating shared components**: Routes to `create-shared-agentic-workflow` prompt
-- **Working on campaigns**: Routes to `agentic-campaigns` prompt
+
+Workflows may optionally include:
+
+- **Project tracking / monitoring** (GitHub Projects updates, status reporting)
+- **Orchestration / coordination** (one workflow assigning agents or dispatching and coordinating other workflows)
 
 ## Files This Applies To
 
@@ -91,16 +95,6 @@ When you interact with this agent, it will:
 - "Create a shared component for Notion integration"
 - "Wrap the Slack MCP server as a reusable component"
 - "Design a shared workflow for database queries"
-
-### Agentic Campaigns
-**Load when**: User wants to create, update, or debug an agentic campaign (multi-workflow coordination), optionally with GitHub Projects tracking
-
-**Prompt file**: `.github/aw/agentic-campaigns.md`
-
-**Use cases**:
-- "Create a campaign to reduce critical vulnerabilities across my org"
-- "Update the scope and governance for this campaign"
-- "Debug why the campaign didn't dispatch any work"
 
 ## Instructions
 

@@ -52,21 +52,6 @@ var upgradeAgenticWorkflowsPromptTemplate string
 //go:embed templates/serena-tool.md
 var serenaToolTemplate string
 
-//go:embed templates/agentic-campaigns.md
-var agenticCampaignsPromptTemplate string
-
-//go:embed templates/create-agentic-campaign.md
-var createAgenticCampaignPromptTemplate string
-
-//go:embed templates/update-agentic-campaign.md
-var updateAgenticCampaignPromptTemplate string
-
-//go:embed templates/debug-agentic-campaign.md
-var debugAgenticCampaignPromptTemplate string
-
-//go:embed templates/create-campaign-project.md
-var createCampaignProjectPromptTemplate string
-
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
 	version = v

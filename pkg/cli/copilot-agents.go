@@ -224,66 +224,6 @@ func ensureSerenaTool(verbose bool, skipInstructions bool) error {
 	)
 }
 
-// ensureAgenticCampaignsPrompt ensures that .github/aw/agentic-campaigns.md contains campaign routing instructions
-func ensureAgenticCampaignsPrompt(verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "aw"),
-		"agentic-campaigns.md",
-		agenticCampaignsPromptTemplate,
-		"agentic campaigns prompt",
-		verbose,
-		skipInstructions,
-	)
-}
-
-// ensureCreateAgenticCampaignPrompt ensures that .github/aw/create-agentic-campaign.md contains the campaign creation prompt
-func ensureCreateAgenticCampaignPrompt(verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "aw"),
-		"create-agentic-campaign.md",
-		createAgenticCampaignPromptTemplate,
-		"create agentic campaign prompt",
-		verbose,
-		skipInstructions,
-	)
-}
-
-// ensureUpdateAgenticCampaignPrompt ensures that .github/aw/update-agentic-campaign.md contains the campaign update prompt
-func ensureUpdateAgenticCampaignPrompt(verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "aw"),
-		"update-agentic-campaign.md",
-		updateAgenticCampaignPromptTemplate,
-		"update agentic campaign prompt",
-		verbose,
-		skipInstructions,
-	)
-}
-
-// ensureDebugAgenticCampaignPrompt ensures that .github/aw/debug-agentic-campaign.md contains the campaign debug prompt
-func ensureDebugAgenticCampaignPrompt(verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "aw"),
-		"debug-agentic-campaign.md",
-		debugAgenticCampaignPromptTemplate,
-		"debug agentic campaign prompt",
-		verbose,
-		skipInstructions,
-	)
-}
-
-// ensureCreateCampaignProjectPrompt ensures that .github/aw/create-campaign-project.md contains the campaign project setup prompt
-func ensureCreateCampaignProjectPrompt(verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "aw"),
-		"create-campaign-project.md",
-		createCampaignProjectPromptTemplate,
-		"create campaign project prompt",
-		verbose,
-		skipInstructions,
-	)
-}
-
 // deleteSetupAgenticWorkflowsAgent deletes the setup-agentic-workflows.agent.md file if it exists
 func deleteSetupAgenticWorkflowsAgent(verbose bool) error {
 	gitRoot, err := findGitRoot()
