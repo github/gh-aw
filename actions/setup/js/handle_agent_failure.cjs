@@ -237,6 +237,32 @@ async function linkSubIssue(parentNodeId, subIssueNodeId, parentNumber, subIssue
 }
 
 /**
+ * Build create_discussion errors context string from error environment variable
+ * @param {string} createDiscussionErrors - Newline-separated error strings
+ * @returns {string} Formatted error context for display
+ */
+function buildCreateDiscussionErrorsContext(createDiscussionErrors) {
+  if (!createDiscussionErrors) {
+    return "";
+  }
+
+  let context = "\n**⚠️ Create Discussion Failed**: Failed to create one or more discussions.\n\n**Discussion Errors:**\n";
+  const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
+  for (const errorLine of errorLines) {
+    const parts = errorLine.split(":");
+    if (parts.length >= 4) {
+      // parts[0] is "discussion", parts[1] is index - both unused
+      const repo = parts[2];
+      const title = parts[3];
+      const error = parts.slice(4).join(":"); // Rest is the error message
+      context += `- Discussion "${title}" in ${repo}: ${error}\n`;
+    }
+  }
+  context += "\n";
+  return context;
+}
+
+/**
  * Handle agent job failure by creating or updating a failure tracking issue
  * This script is called from the conclusion job when the agent job has failed
  * or when the agent succeeded but produced no safe outputs
@@ -349,22 +375,7 @@ async function main() {
         }
 
         // Build create_discussion errors context
-        let createDiscussionErrorsContext = "";
-        if (hasCreateDiscussionErrors && createDiscussionErrors) {
-          createDiscussionErrorsContext = "\n**⚠️ Create Discussion Failed**: Failed to create one or more discussions.\n\n**Discussion Errors:**\n";
-          const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
-          for (const errorLine of errorLines) {
-            const parts = errorLine.split(":");
-            if (parts.length >= 4) {
-              // parts[0] is "discussion", parts[1] is index - both unused
-              const repo = parts[2];
-              const title = parts[3];
-              const error = parts.slice(4).join(":"); // Rest is the error message
-              createDiscussionErrorsContext += `- Discussion "${title}" in ${repo}: ${error}\n`;
-            }
-          }
-          createDiscussionErrorsContext += "\n";
-        }
+        const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
@@ -443,22 +454,7 @@ async function main() {
         }
 
         // Build create_discussion errors context
-        let createDiscussionErrorsContext = "";
-        if (hasCreateDiscussionErrors && createDiscussionErrors) {
-          createDiscussionErrorsContext = "\n**⚠️ Create Discussion Failed**: Failed to create one or more discussions.\n\n**Discussion Errors:**\n";
-          const errorLines = createDiscussionErrors.split("\n").filter(line => line.trim());
-          for (const errorLine of errorLines) {
-            const parts = errorLine.split(":");
-            if (parts.length >= 4) {
-              // parts[0] is "discussion", parts[1] is index - both unused
-              const repo = parts[2];
-              const title = parts[3];
-              const error = parts.slice(4).join(":"); // Rest is the error message
-              createDiscussionErrorsContext += `- Discussion "${title}" in ${repo}: ${error}\n`;
-            }
-          }
-          createDiscussionErrorsContext += "\n";
-        }
+        const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
 
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
