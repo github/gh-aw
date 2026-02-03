@@ -323,16 +323,27 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		if isYAMLWorkflowFile(item.fullPath) {
 			log.Printf("Detected YAML workflow file: %s", item.fullPath)
 
-			// Process YAML workflow import to extract jobs and services
-			jobsJSON, servicesJSON, err := processYAMLWorkflowImport(item.fullPath)
+			// Process YAML workflow import to extract jobs/steps and services
+			// Special case: copilot-setup-steps.yml returns steps YAML instead of jobs JSON
+			jobsOrStepsData, servicesJSON, err := processYAMLWorkflowImport(item.fullPath)
 			if err != nil {
 				return nil, fmt.Errorf("failed to process YAML workflow '%s': %w", item.importPath, err)
 			}
 
-			// Append jobs to merged jobs
-			if jobsJSON != "" && jobsJSON != "{}" {
-				jobsBuilder.WriteString(jobsJSON + "\n")
-				log.Printf("Added jobs from YAML workflow: %s", item.importPath)
+			// Check if this is copilot-setup-steps.yml (returns steps YAML instead of jobs JSON)
+			if isCopilotSetupStepsFile(item.fullPath) {
+				// For copilot-setup-steps.yml, jobsOrStepsData contains steps in YAML format
+				// Add to MergedSteps instead of MergedJobs
+				if jobsOrStepsData != "" {
+					stepsBuilder.WriteString(jobsOrStepsData + "\n")
+					log.Printf("Added steps from copilot-setup-steps.yml: %s", item.importPath)
+				}
+			} else {
+				// For regular YAML workflows, jobsOrStepsData contains jobs in JSON format
+				if jobsOrStepsData != "" && jobsOrStepsData != "{}" {
+					jobsBuilder.WriteString(jobsOrStepsData + "\n")
+					log.Printf("Added jobs from YAML workflow: %s", item.importPath)
+				}
 			}
 
 			// Append services to merged services (services from YAML are already in JSON format)

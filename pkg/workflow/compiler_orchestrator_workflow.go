@@ -197,8 +197,8 @@ func (c *Compiler) processAndMergeSteps(frontmatter map[string]any, workflowData
 								mainSteps = StepsToSlice(typedMainSteps)
 							}
 
-							// Prepend imported steps to main steps
-							allSteps := append(importedSteps, mainSteps...)
+							// Append imported steps after main steps (imported steps come after custom steps)
+							allSteps := append(mainSteps, importedSteps...)
 							// Convert back to YAML with "steps:" wrapper
 							stepsWrapper := map[string]any{"steps": allSteps}
 							stepsYAML, err := yaml.Marshal(stepsWrapper)
