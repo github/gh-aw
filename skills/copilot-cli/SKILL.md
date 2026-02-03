@@ -19,7 +19,15 @@ The GitHub Copilot CLI is an experimental AI-powered command-line interface that
 
 ## Installation and Setup
 
-The CLI is installed via npm and requires authentication:
+The easiest way to run the Copilot CLI is through the GitHub CLI extension:
+
+```bash
+gh copilot
+```
+
+The `gh copilot` command automatically downloads and manages the Copilot CLI installation. No manual installation required! If the Copilot CLI is not already installed, it will be downloaded to `~/.local/share/gh/copilot`.
+
+**Alternative: Manual npm installation** (for advanced users):
 
 ```bash
 npm install -g @github/copilot
@@ -210,9 +218,20 @@ copilot --add-dir /tmp/gh-aw \
 ## Troubleshooting
 
 ### CLI Not Found
+When running locally, use the GitHub CLI extension which handles installation automatically:
+```bash
+gh copilot
+```
+
+If you installed manually via npm and need to troubleshoot:
 - Verify npm global installation: `npm list -g @github/copilot`
 - Check PATH includes npm global bin directory
 - Try reinstalling: `npm uninstall -g @github/copilot && npm install -g @github/copilot`
+
+To remove the gh copilot managed installation:
+```bash
+gh copilot --remove
+```
 
 ### Authentication Issues
 - **GitHub Actions Token Incompatibility**: The default `GITHUB_TOKEN` does NOT work with Copilot CLI

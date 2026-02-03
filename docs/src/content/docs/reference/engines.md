@@ -31,6 +31,21 @@ engine:
 
 Configuration options: `model` (gpt-5 or claude-sonnet-4), `version` (CLI version), `args` (command-line arguments). Alternatively set model via `COPILOT_MODEL` environment variable.
 
+### Running Copilot CLI Locally
+
+To run the GitHub Copilot CLI on your local machine, use the GitHub CLI extension:
+
+```bash wrap
+gh copilot
+```
+
+The `gh copilot` command automatically downloads and manages the Copilot CLI installation. No manual installation required!
+
+> [!TIP]
+> The `gh copilot` command is built into the GitHub CLI and handles installation automatically. If the Copilot CLI is not already installed, it will be downloaded to `~/.local/share/gh/copilot`. To remove it, use `gh copilot --remove`.
+
+### Required Secrets
+
 Create a fine-grained PAT at <https://github.com/settings/personal-access-tokens/new>.
 
 - **IMPORTANT:** Select your user account, NOT an organization
@@ -46,11 +61,9 @@ gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
 > [!NOTE]
 > You **must** have "Public repositories" selected; otherwise, you will not have access to the Copilot Requests permission option.
 
-### Required Secrets
-
 **`COPILOT_GITHUB_TOKEN`**: GitHub [Personal Access Token](/gh-aw/reference/glossary/#personal-access-token-pat) (PAT, a token that authenticates you to GitHub's APIs) with "Copilot Requests" permission. **`GH_AW_GITHUB_TOKEN`** (optional): Required for [GitHub Tools Remote Mode](/gh-aw/reference/tools/#modes-and-restrictions).
 
-For more information about GitHub Copilot CLI authentication, see the [official documentation](https://github.com/github/copilot-cli?tab=readme-ov-file#authenticate-with-a-personal-access-token-pat).
+For more information about GitHub Copilot CLI, see the [official documentation](https://gh.io/copilot-cli).
 
 > [!NOTE]
 > The Copilot engine does not have built-in `web-search` support. You can add web search capabilities using third-party MCP servers. See the [Using Web Search](/gh-aw/guides/web-search/) for available options and setup instructions.
