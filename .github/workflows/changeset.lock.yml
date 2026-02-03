@@ -189,7 +189,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex
-        run: npm install -g --silent @openai/codex@0.93.0
+        run: npm install -g --silent @openai/codex@0.94.0
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.1
       - name: Determine automatic lockdown mode for GitHub MCP server
@@ -555,7 +555,7 @@ jobs:
               engine_name: "Codex",
               model: "gpt-5.1-codex-mini",
               version: "",
-              agent_version: "0.93.0",
+              agent_version: "0.94.0",
               workflow_name: "Changeset Generator",
               experimental: false,
               supports_tools_allowlist: true,
