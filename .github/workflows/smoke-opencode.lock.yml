@@ -17,7 +17,7 @@
 #
 # To update this file, edit the corresponding .md file and run:
 #   gh aw compile
-# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
+# For more information: https://github.com/githubnext/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 # Smoke test workflow that validates OpenCode custom engine functionality daily
 #
@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/opencode.md
 #
-# frontmatter-hash: 7c8847fce4f7b2b9928acdae7d75e216801347d8dab67c03dc26b8f540f00873
+# frontmatter-hash: 8048975ef16e92f9381b252166bb75b0c5bba9faf07e18bf69d7c2404edc0168
 
 name: "Smoke OpenCode"
 "on":
@@ -37,7 +37,7 @@ name: "Smoke OpenCode"
     types:
     - labeled
   schedule:
-  - cron: "10 11 * * *"
+  - cron: "3 3 * * *"
   workflow_dispatch: null
 
 permissions: {}
@@ -182,7 +182,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.2 ghcr.io/github/gh-aw-mcpg:v0.0.90 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.90 ghcr.io/github/github-mcp-server:v0.30.2 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
