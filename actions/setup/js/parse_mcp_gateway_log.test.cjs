@@ -492,7 +492,7 @@ Some content here.`;
       }
     });
 
-    test("truncates files larger than 10KB", () => {
+    test("truncates files larger than 64KB", () => {
       const fs = require("fs");
       const path = require("path");
       const os = require("os");
@@ -504,8 +504,8 @@ Some content here.`;
       try {
         fs.mkdirSync(logsDir, { recursive: true });
 
-        // Create a large file (15KB)
-        const largeContent = "A".repeat(15 * 1024);
+        // Create a large file (70KB)
+        const largeContent = "A".repeat(70 * 1024);
         fs.writeFileSync(path.join(logsDir, "large.log"), largeContent);
 
         // Mock core
@@ -554,8 +554,8 @@ Some content here.`;
         // Check that file was truncated
         expect(allOutput).toContain("...");
         expect(allOutput).toContain("truncated");
-        expect(allOutput).toContain("10240 bytes");
-        expect(allOutput).toContain("15360 total");
+        expect(allOutput).toContain("65536 bytes");
+        expect(allOutput).toContain("71680 total");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;
