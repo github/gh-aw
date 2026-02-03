@@ -61,21 +61,48 @@ Your task is to:
 
 1. **Analyze the Pull Request**: Review the pull request title and description above to understand what has been modified.
 
-2. **Use the repository name as the package identifier** (gh-aw)
+2. **Determine if a Changeset is Needed**:
+   
+   **If the PR does NOT require a changeset** (see criteria below), call the `noop` tool with a reason message and **stop immediately**:
+   
+   ```javascript
+   noop({
+     message: "No changeset needed: <reason>"
+   })
+   ```
+   
+   **PRs that do NOT require a changeset**:
+   - Documentation-only changes (README, docs/, comments)
+   - Test-only changes (test files, fixtures)
+   - CI/CD configuration changes (.github/workflows/, .github/actions/)
+   - Development tooling changes (Makefile, scripts/, build configs)
+   - Changes to repository metadata (.gitignore, LICENSE, etc.)
+   - Internal refactoring with no user-facing impact
+   
+   **PRs that DO require a changeset**:
+   - Bug fixes affecting users
+   - New features or capabilities
+   - Breaking changes in APIs or CLI
+   - Performance improvements
+   - Dependency updates that affect functionality
+   
+   If a changeset is needed, proceed with the steps below.
 
-3. **Determine the Change Type**:
+3. **Use the repository name as the package identifier** (gh-aw)
+
+4. **Determine the Change Type**:
    - **major**: Major breaking changes (X.0.0) - Very unlikely, probably should be **minor**
    - **minor**: Breaking changes in the CLI (0.X.0) - indicated by "BREAKING CHANGE" or major API changes
    - **patch**: Bug fixes, docs, refactoring, internal changes, tooling, new shared workflows (0.0.X)
    
    **Important**: Internal changes, tooling, and documentation are always "patch" level.
 
-4. **Generate the Changeset File**:
+5. **Generate the Changeset File**:
    - Create the `.changeset/` directory if it doesn't exist: `mkdir -p .changeset`
    - Use format from the changeset format reference above
    - Filename: `<type>-<short-description>.md` (e.g., `patch-fix-bug.md`)
 
-5. **Commit and Push Changes**:
+6. **Commit and Push Changes**:
    - Add and commit the changeset file using git commands:
      ```bash
      git add .changeset/<filename> && git commit -m "Add changeset"
@@ -90,7 +117,7 @@ Your task is to:
    - This tool call is REQUIRED for your changes to be pushed to the pull request
    - **WARNING**: If you don't call this tool, your changeset file will NOT be pushed and the job will be skipped
 
-6. **Append Changeset to PR Description**:
+7. **Append Changeset to PR Description**:
    - After pushing the changeset file, append a summary to the pull request description
    - Use the `update_pull_request` tool:
      ```javascript
