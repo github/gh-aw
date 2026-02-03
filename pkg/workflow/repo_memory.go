@@ -49,7 +49,6 @@ type RepoMemoryEntry struct {
 	MaxFileCount int      `yaml:"max-file-count,omitempty"` // maximum file count per commit (default: 100)
 	Description  string   `yaml:"description,omitempty"`    // optional description for this memory
 	CreateOrphan bool     `yaml:"create-orphan,omitempty"`  // create orphaned branch if missing (default: true)
-	CampaignID   string   `yaml:"campaign-id,omitempty"`    // campaign ID for campaign-specific repo-memory (optional)
 }
 
 // RepoMemoryToolConfig represents the configuration for repo-memory in tools
@@ -261,13 +260,6 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 					}
 				}
 
-				// Parse campaign-id
-				if campaignID, exists := memoryMap["campaign-id"]; exists {
-					if idStr, ok := campaignID.(string); ok {
-						entry.CampaignID = idStr
-					}
-				}
-
 				config.Memories = append(config.Memories, entry)
 			}
 		}
@@ -374,13 +366,6 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 		if createOrphan, exists := configMap["create-orphan"]; exists {
 			if orphanBool, ok := createOrphan.(bool); ok {
 				entry.CreateOrphan = orphanBool
-			}
-		}
-
-		// Parse campaign-id
-		if campaignID, exists := configMap["campaign-id"]; exists {
-			if idStr, ok := campaignID.(string); ok {
-				entry.CampaignID = idStr
 			}
 		}
 
@@ -630,9 +615,6 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		if fileGlobFilter != "" {
 			// Quote the value to prevent YAML alias interpretation of patterns like *.md
 			fmt.Fprintf(&step, "          FILE_GLOB_FILTER: \"%s\"\n", fileGlobFilter)
-		}
-		if memory.CampaignID != "" {
-			fmt.Fprintf(&step, "          GH_AW_CAMPAIGN_ID: %s\n", memory.CampaignID)
 		}
 		step.WriteString("        with:\n")
 		step.WriteString("          script: |\n")

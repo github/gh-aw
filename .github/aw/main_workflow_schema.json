@@ -3161,7 +3161,7 @@
           "oneOf": [
             {
               "type": "object",
-              "description": "Configuration for managing GitHub Projects v2 boards. Smart tool that can add issue/PR items and update custom fields on existing items. By default it is update-only: if the project does not exist, the job fails with instructions to create it manually. To allow workflows to create missing projects, explicitly opt in via the agent output field create_if_missing=true (and/or provide a github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT) or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output items produced by the agent use type=update_project and may include: project (board name), content_type (issue|pull_request), content_number, fields, campaign_id, and create_if_missing.",
+              "description": "Configuration for managing GitHub Projects v2 boards. Smart tool that can add issue/PR items and update custom fields on existing items. By default it is update-only: if the project does not exist, the job fails with instructions to create it manually. To allow workflows to create missing projects, explicitly opt in via the agent output field create_if_missing=true (and/or provide a github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT) or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output items produced by the agent use type=update_project and may include: project (board name), content_type (issue|pull_request), content_number, fields, and create_if_missing.",
               "properties": {
                 "max": {
                   "type": "integer",

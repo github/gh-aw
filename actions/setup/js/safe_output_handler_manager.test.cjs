@@ -19,7 +19,6 @@ describe("Safe Output Handler Manager", () => {
   afterEach(() => {
     // Clean up environment variables
     delete process.env.GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG;
-    delete process.env.GH_AW_CAMPAIGN_ID;
     delete process.env.GH_AW_TRACKER_LABEL;
   });
 
@@ -114,33 +113,6 @@ describe("Safe Output Handler Manager", () => {
   });
 
   describe("processMessages", () => {
-    it("should inject campaign labels into create_issue and create_pull_request messages", async () => {
-      process.env.GH_AW_CAMPAIGN_ID = "Security Alert Burndown";
-
-      const messages = [
-        { type: "create_issue", title: "Issue", labels: ["Bug"] },
-        { type: "create_pull_request", title: "PR", labels: ["Bug", "agentic-campaign"] },
-      ];
-
-      const handler = vi.fn().mockImplementation(async message => {
-        expect(Array.isArray(message.labels)).toBe(true);
-        expect(message.labels).toContain("agentic-campaign");
-        expect(message.labels).toContain("z_campaign_security-alert-burndown");
-        return { success: true };
-      });
-
-      const handlers = new Map([
-        ["create_issue", handler],
-        ["create_pull_request", handler],
-      ]);
-
-      const result = await processMessages(handlers, messages);
-
-      expect(result.success).toBe(true);
-      expect(result.results).toHaveLength(2);
-      expect(handler).toHaveBeenCalledTimes(2);
-    });
-
     it("should process messages in order of appearance", async () => {
       const messages = [
         { type: "add_comment", body: "Comment" },

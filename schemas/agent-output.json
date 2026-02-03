@@ -498,10 +498,6 @@
           "description": "Project title, number, or GitHub project URL",
           "minLength": 1
         },
-        "campaign_id": {
-          "type": "string",
-          "description": "Optional campaign ID for tracking (auto-generated if not provided). Format: slug-timestamp"
-        },
         "content_type": {
           "type": "string",
           "enum": ["issue", "pull_request", "draft_issue"],

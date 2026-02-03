@@ -21,71 +21,8 @@ const { generateMissingInfoSections } = require("./missing_info_formatter.cjs");
 const { setCollectedMissings } = require("./missing_messages_helper.cjs");
 const { writeSafeOutputSummaries } = require("./safe_output_summary.cjs");
 const { getIssuesToAssignCopilot } = require("./create_issue.cjs");
-const { getCampaignLabelsFromEnv } = require("./campaign_labels.cjs");
 const { sortSafeOutputMessages } = require("./safe_output_topological_sort.cjs");
 const { loadCustomSafeOutputJobTypes } = require("./safe_output_helpers.cjs");
-
-/**
- * Merge labels with trimming + case-insensitive de-duplication.
- * @param {string[]|undefined} existing
- * @param {string[]} extra
- * @returns {string[]}
- */
-function mergeLabels(existing, extra) {
-  const out = [];
-  const seen = new Set();
-
-  for (const raw of [...(existing || []), ...(extra || [])]) {
-    const label = String(raw || "").trim();
-    if (!label) {
-      continue;
-    }
-
-    const key = label.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    out.push(label);
-  }
-
-  return out;
-}
-
-/**
- * Apply campaign labels to supported output messages.
- * This keeps worker output labeling centralized and avoids coupling campaign logic
- * into individual safe output handlers.
- *
- * @param {any} message
- * @param {{enabled: boolean, labels: string[]}} campaignLabels
- * @returns {any}
- */
-function applyCampaignLabelsToMessage(message, campaignLabels) {
-  if (!campaignLabels.enabled) {
-    return message;
-  }
-
-  if (!message || typeof message !== "object") {
-    return message;
-  }
-
-  const type = message.type;
-  if (type !== "create_issue" && type !== "create_pull_request") {
-    return message;
-  }
-
-  const existing = Array.isArray(message.labels) ? message.labels : [];
-  const merged = mergeLabels(existing, campaignLabels.labels);
-
-  // Avoid cloning unless we actually need to mutate
-  if (merged.length === existing.length && merged.every((v, i) => v === existing[i])) {
-    return message;
-  }
-
-  return { ...message, labels: merged };
-}
 
 /**
  * Handler map configuration for regular handlers
@@ -386,9 +323,6 @@ function collectMissingMessages(messages) {
 async function processMessages(messageHandlers, messages, projectOctokit = null) {
   const results = [];
 
-  // Campaign context: when present, always label created issues/PRs for discovery.
-  const campaignLabels = getCampaignLabelsFromEnv();
-
   // Collect missing_tool and missing_data messages first
   const missings = collectMissingMessages(messages);
 
@@ -429,7 +363,7 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
 
   // Process messages in topologically sorted order
   for (let i = 0; i < sortedMessages.length; i++) {
-    const message = applyCampaignLabelsToMessage(sortedMessages[i], campaignLabels);
+    const message = sortedMessages[i];
     const messageType = message.type;
 
     if (!messageType) {

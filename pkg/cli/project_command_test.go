@@ -172,10 +172,10 @@ func TestProjectNewCommandFlags(t *testing.T) {
 	linkFlag := cmd.Flags().Lookup("link")
 	require.NotNil(t, linkFlag, "Should have --link flag")
 
-	// Check campaign setup flag
-	campaignFlag := cmd.Flags().Lookup("with-campaign-setup")
-	require.NotNil(t, campaignFlag, "Should have --with-campaign-setup flag")
-	assert.Equal(t, "bool", campaignFlag.Value.Type(), "Campaign setup flag should be boolean")
+	// Check project setup flag
+	projectSetupFlag := cmd.Flags().Lookup("with-project-setup")
+	require.NotNil(t, projectSetupFlag, "Should have --with-project-setup flag")
+	assert.Equal(t, "bool", projectSetupFlag.Value.Type(), "Project setup flag should be boolean")
 
 	// Verify removed flags don't exist
 	viewsFlag := cmd.Flags().Lookup("views")
@@ -384,31 +384,31 @@ func TestSingleSelectOptionsEqual(t *testing.T) {
 	}
 }
 
-func TestProjectConfigWithCampaignSetup(t *testing.T) {
+func TestProjectConfigWithProjectSetup(t *testing.T) {
 	tests := []struct {
 		name        string
 		config      ProjectConfig
 		description string
 	}{
 		{
-			name: "with campaign setup",
+			name: "with project setup",
 			config: ProjectConfig{
-				Title:             "Campaign Project",
-				Owner:             "myorg",
-				OwnerType:         "org",
-				WithCampaignSetup: true,
+				Title:            "Project With Setup",
+				Owner:            "myorg",
+				OwnerType:        "org",
+				WithProjectSetup: true,
 			},
-			description: "Should have campaign setup enabled",
+			description: "Should have project setup enabled",
 		},
 		{
-			name: "without campaign setup",
+			name: "without project setup",
 			config: ProjectConfig{
-				Title:             "Basic Project",
-				Owner:             "myorg",
-				OwnerType:         "org",
-				WithCampaignSetup: false,
+				Title:            "Basic Project",
+				Owner:            "myorg",
+				OwnerType:        "org",
+				WithProjectSetup: false,
 			},
-			description: "Should have campaign setup disabled",
+			description: "Should have project setup disabled",
 		},
 	}
 
@@ -418,10 +418,10 @@ func TestProjectConfigWithCampaignSetup(t *testing.T) {
 			assert.NotEmpty(t, tt.config.Owner, "Project owner should not be empty")
 
 			// Verify flag settings
-			if tt.config.WithCampaignSetup {
-				assert.True(t, tt.config.WithCampaignSetup, "Campaign setup should be enabled")
+			if tt.config.WithProjectSetup {
+				assert.True(t, tt.config.WithProjectSetup, "Project setup should be enabled")
 			} else {
-				assert.False(t, tt.config.WithCampaignSetup, "Campaign setup should be disabled")
+				assert.False(t, tt.config.WithProjectSetup, "Project setup should be disabled")
 			}
 		})
 	}

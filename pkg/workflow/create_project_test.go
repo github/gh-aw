@@ -36,7 +36,7 @@ func TestParseCreateProjectsConfig(t *testing.T) {
 					"max":          1,
 					"github-token": "${{ secrets.PROJECTS_PAT }}",
 					"target-owner": "myorg",
-					"title-prefix": "Campaign",
+					"title-prefix": "Project",
 				},
 			},
 			expectedConfig: &CreateProjectsConfig{
@@ -45,7 +45,7 @@ func TestParseCreateProjectsConfig(t *testing.T) {
 				},
 				GitHubToken: "${{ secrets.PROJECTS_PAT }}",
 				TargetOwner: "myorg",
-				TitlePrefix: "Campaign",
+				TitlePrefix: "Project",
 			},
 		},
 		{
@@ -55,7 +55,7 @@ func TestParseCreateProjectsConfig(t *testing.T) {
 					"max": 1,
 					"views": []any{
 						map[string]any{
-							"name":   "Campaign Roadmap",
+							"name":   "Roadmap",
 							"layout": "roadmap",
 							"filter": "is:issue is:pr",
 						},
@@ -73,7 +73,7 @@ func TestParseCreateProjectsConfig(t *testing.T) {
 				},
 				Views: []ProjectView{
 					{
-						Name:   "Campaign Roadmap",
+						Name:   "Roadmap",
 						Layout: "roadmap",
 						Filter: "is:issue is:pr",
 					},
@@ -272,7 +272,7 @@ func TestCreateProjectsConfig_FieldDefinitionsParsing(t *testing.T) {
 			"max": 1,
 			"field-definitions": []any{
 				map[string]any{
-					"name":      "Campaign Id",
+					"name":      "Tracking Id",
 					"data-type": "TEXT",
 				},
 				map[string]any{
@@ -293,7 +293,7 @@ func TestCreateProjectsConfig_FieldDefinitionsParsing(t *testing.T) {
 	require.Len(t, config.FieldDefinitions, 3, "Should parse 3 field definitions")
 
 	// Check first field
-	assert.Equal(t, "Campaign Id", config.FieldDefinitions[0].Name)
+	assert.Equal(t, "Tracking Id", config.FieldDefinitions[0].Name)
 	assert.Equal(t, "TEXT", config.FieldDefinitions[0].DataType)
 	assert.Empty(t, config.FieldDefinitions[0].Options)
 
@@ -341,13 +341,13 @@ func TestCreateProjectsConfig_ViewsAndFieldDefinitions(t *testing.T) {
 			"target-owner": "myorg",
 			"views": []any{
 				map[string]any{
-					"name":   "Campaign Board",
+					"name":   "Task Board",
 					"layout": "board",
 				},
 			},
 			"field-definitions": []any{
 				map[string]any{
-					"name":      "Campaign Id",
+					"name":      "Tracking Id",
 					"data-type": "TEXT",
 				},
 				map[string]any{
@@ -364,12 +364,12 @@ func TestCreateProjectsConfig_ViewsAndFieldDefinitions(t *testing.T) {
 
 	// Check views
 	require.Len(t, config.Views, 1, "Should have 1 view")
-	assert.Equal(t, "Campaign Board", config.Views[0].Name)
+	assert.Equal(t, "Task Board", config.Views[0].Name)
 	assert.Equal(t, "board", config.Views[0].Layout)
 
 	// Check field definitions
 	require.Len(t, config.FieldDefinitions, 2, "Should have 2 field definitions")
-	assert.Equal(t, "Campaign Id", config.FieldDefinitions[0].Name)
+	assert.Equal(t, "Tracking Id", config.FieldDefinitions[0].Name)
 	assert.Equal(t, "TEXT", config.FieldDefinitions[0].DataType)
 	assert.Equal(t, "Size", config.FieldDefinitions[1].Name)
 	assert.Equal(t, "SINGLE_SELECT", config.FieldDefinitions[1].DataType)

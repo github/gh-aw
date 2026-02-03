@@ -15,21 +15,23 @@ import (
 func TestUpdateProjectHandlerConfigIncludesFieldDefinitions(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "handler-config-test")
 
-	testContent := `---
-name: Test Update Project Handler Config
-on: workflow_dispatch
-engine: copilot
-safe-outputs:
-  update-project:
-    max: 1
-    project: "https://github.com/orgs/test-org/projects/1"
-    field-definitions:
-      - name: "campaign_id"
-        data-type: "TEXT"
----
-
-Test workflow
-`
+	testContent := strings.Join([]string{
+		"---",
+		"name: Test Update Project Handler Config",
+		"on: workflow_dispatch",
+		"engine: copilot",
+		"safe-outputs:",
+		"  update-project:",
+		"    max: 1",
+		"    project: \"https://github.com/orgs/test-org/projects/1\"",
+		"    field-definitions:",
+		"      - name: \"tracker_id\"",
+		"        data-type: \"TEXT\"",
+		"---",
+		"",
+		"Test workflow",
+		"",
+	}, "\n")
 
 	mdFile := filepath.Join(tmpDir, "test-workflow.md")
 	err := os.WriteFile(mdFile, []byte(testContent), 0600)

@@ -45,8 +45,8 @@ Downloaded artifacts include:
 - workflow-logs/: GitHub Actions workflow run logs (job logs organized in subdirectory)
 - summary.json: Complete metrics and run data for all downloaded runs
 
-Campaign Orchestrator Usage:
-  In a campaign orchestrator workflow, use this command in a pre-step to download logs,
+Orchestrator Usage:
+	In an orchestrator workflow, use this command in a pre-step to download logs,
   then access the data in subsequent steps without needing GitHub CLI access:
 
     steps:
@@ -67,11 +67,11 @@ Campaign Orchestrator Usage:
     **DO NOT call 'gh aw logs' or any GitHub CLI commands** - they will not work in your environment.
     All data you need is in the summary.json file.
 
-  Live Tracking with Project Boards:
-    Use the summary.json data to update your campaign project board, treating issues/PRs (workers)
-    on the board as the real-time view of progress, ownership, and status. The orchestrator workflow
-    can use the 'update-project' safe output to sync status fields without modifying worker workflow
-    files. Workers remain unchanged while the campaign board reflects current execution state.
+	Live Tracking with Project Boards:
+		Use the summary.json data to update your project board, treating issues/PRs (workers)
+		on the board as the real-time view of progress, ownership, and status. The orchestrator workflow
+		can use the 'update-project' safe output to sync status fields without modifying worker workflow
+		files. Workers remain unchanged while the board reflects current execution state.
     
     For incremental updates, pull data for each worker based on the last pull time using --start-date
     (e.g., --start-date -1d for daily updates) and align with existing board items. Compare run data
@@ -167,7 +167,6 @@ Examples:
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 			timeout, _ := cmd.Flags().GetInt("timeout")
 			repoOverride, _ := cmd.Flags().GetString("repo")
-			campaignOnly, _ := cmd.Flags().GetBool("campaign")
 			summaryFile, _ := cmd.Flags().GetString("summary-file")
 			safeOutputType, _ := cmd.Flags().GetString("safe-output")
 
@@ -204,7 +203,7 @@ Examples:
 
 			logsCommandLog.Printf("Executing logs download: workflow=%s, count=%d, engine=%s", workflowName, count, engine)
 
-			return DownloadWorkflowLogs(cmd.Context(), workflowName, count, startDate, endDate, outputDir, engine, ref, beforeRunID, afterRunID, repoOverride, verbose, toolGraph, noStaged, firewallOnly, noFirewall, parse, jsonOutput, timeout, campaignOnly, summaryFile, safeOutputType)
+			return DownloadWorkflowLogs(cmd.Context(), workflowName, count, startDate, endDate, outputDir, engine, ref, beforeRunID, afterRunID, repoOverride, verbose, toolGraph, noStaged, firewallOnly, noFirewall, parse, jsonOutput, timeout, summaryFile, safeOutputType)
 		},
 	}
 
@@ -222,7 +221,6 @@ Examples:
 	logsCmd.Flags().Bool("no-staged", false, "Filter out staged workflow runs (exclude runs with staged: true in aw_info.json)")
 	logsCmd.Flags().Bool("firewall", false, "Filter to only runs with firewall enabled")
 	logsCmd.Flags().Bool("no-firewall", false, "Filter to only runs without firewall enabled")
-	logsCmd.Flags().Bool("campaign", false, "Filter to only campaign orchestrator workflows")
 	logsCmd.Flags().String("safe-output", "", "Filter to runs containing a specific safe output type (e.g., create-issue, missing-tool, missing-data)")
 	logsCmd.Flags().Bool("parse", false, "Run JavaScript parsers on agent logs and firewall logs, writing Markdown to log.md and firewall.md")
 	addJSONFlag(logsCmd)
