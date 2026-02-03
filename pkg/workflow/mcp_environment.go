@@ -46,7 +46,7 @@
 package workflow
 
 import (
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpEnvironmentLog = logger.New("workflow:mcp_environment")

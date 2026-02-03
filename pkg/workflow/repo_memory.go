@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var repoMemoryLog = logger.New("workflow:repo_memory")

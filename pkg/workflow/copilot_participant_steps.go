@@ -3,7 +3,7 @@ package workflow
 import (
 	"fmt"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var copilotParticipantLog = logger.New("workflow:copilot_participant_steps")

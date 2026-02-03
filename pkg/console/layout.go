@@ -13,8 +13,8 @@
 //	import (
 //		"fmt"
 //		"os"
-//		"github.com/githubnext/gh-aw/pkg/console"
-//		"github.com/githubnext/gh-aw/pkg/styles"
+//		"github.com/github/gh-aw/pkg/console"
+//		"github.com/github/gh-aw/pkg/styles"
 //	)
 //
 //	// Create layout elements
@@ -55,8 +55,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/githubnext/gh-aw/pkg/styles"
-	"github.com/githubnext/gh-aw/pkg/tty"
+	"github.com/github/gh-aw/pkg/styles"
+	"github.com/github/gh-aw/pkg/tty"
 )
 
 // LayoutTitleBox renders a title with a double border box as a single string.

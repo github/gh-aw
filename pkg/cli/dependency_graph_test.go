@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 func TestDependencyGraph_IsTopLevelWorkflow(t *testing.T) {

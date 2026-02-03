@@ -35,7 +35,7 @@ package workflow
 import (
 	"fmt"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var filterValidationLog = logger.New("workflow:filter_validation")

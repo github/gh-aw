@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestImportFileNotFoundError(t *testing.T) {

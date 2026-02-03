@@ -3,7 +3,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var sandboxAgentCodemodLog = logger.New("cli:codemod_sandbox_agent")

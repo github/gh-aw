@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 var logsModelsLog = logger.New("cli:logs_models")

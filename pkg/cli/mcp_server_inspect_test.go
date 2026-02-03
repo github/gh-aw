@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

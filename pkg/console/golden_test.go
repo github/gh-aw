@@ -8,7 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/golden"
-	"github.com/githubnext/gh-aw/pkg/styles"
+	"github.com/github/gh-aw/pkg/styles"
 )
 
 // TestGolden_TableRendering tests table rendering with different configurations

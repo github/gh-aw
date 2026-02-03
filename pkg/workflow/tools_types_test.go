@@ -5,7 +5,7 @@ package workflow
 import (
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/types"
+	"github.com/github/gh-aw/pkg/types"
 )
 
 func TestNewTools(t *testing.T) {

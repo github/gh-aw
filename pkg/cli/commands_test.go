@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // Test the CLI functions that are exported from this package

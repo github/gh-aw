@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var safeOutputsDomainsValidationLog = logger.New("workflow:safe_outputs_domains_validation")

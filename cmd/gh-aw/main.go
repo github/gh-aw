@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/cli"
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/cli"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
 

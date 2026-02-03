@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // TestSpawnSafeInputsInspector_NoSafeInputs tests the error case when workflow has no safe-inputs

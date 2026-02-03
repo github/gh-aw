@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/cli/fileutil"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/cli/fileutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestDownloadWorkflowLogs(t *testing.T) {

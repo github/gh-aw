@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/githubnext/gh-aw/pkg/cli/fileutil"
+	"github.com/github/gh-aw/pkg/cli/fileutil"
 )
 
 // Global binary path shared across all integration tests

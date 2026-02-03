@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var copilotExecLog = logger.New("workflow:copilot_engine_execution")

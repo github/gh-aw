@@ -3,8 +3,8 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // PlaywrightDockerArgs represents the common Docker arguments for Playwright container

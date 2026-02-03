@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/require"

@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var actionModeLog = logger.New("workflow:action_mode")

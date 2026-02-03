@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var dockerImagesLog = logger.New("cli:docker_images")

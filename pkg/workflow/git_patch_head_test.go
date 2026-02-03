@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestGitPatchFromHEADCommits tests that the patch generation script can detect

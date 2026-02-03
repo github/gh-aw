@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/githubnext/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // filterIgnoredFields removes ignored fields from frontmatter without warnings

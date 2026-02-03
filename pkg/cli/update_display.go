@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/githubnext/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/console"
 )
 
 // showUpdateSummary displays a summary of workflow updates using console helpers

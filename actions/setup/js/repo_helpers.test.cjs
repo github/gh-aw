@@ -135,7 +135,7 @@ describe("repo_helpers", () => {
     it("should qualify bare repo name with default repo's org", async () => {
       const { validateRepo } = await import("./repo_helpers.cjs");
       const allowedRepos = new Set(["github/gh-aw"]);
-      const result = validateRepo("gh-aw", "githubnext/other-repo", allowedRepos);
+      const result = validateRepo("gh-aw", "github/other-repo", allowedRepos);
       expect(result.valid).toBe(true);
       expect(result.error).toBe(null);
     });
@@ -149,8 +149,8 @@ describe("repo_helpers", () => {
 
     it("should reject bare repo name not in allowed list", async () => {
       const { validateRepo } = await import("./repo_helpers.cjs");
-      const allowedRepos = new Set(["githubnext/other-repo"]);
-      const result = validateRepo("gh-aw", "githubnext/default-repo", allowedRepos);
+      const allowedRepos = new Set(["github/other-repo"]);
+      const result = validateRepo("gh-aw", "github/default-repo", allowedRepos);
       expect(result.valid).toBe(false);
       expect(result.error).toContain("not in the allowed-repos list");
     });
@@ -158,7 +158,7 @@ describe("repo_helpers", () => {
     it("should not qualify repo name that already has org", async () => {
       const { validateRepo } = await import("./repo_helpers.cjs");
       const allowedRepos = new Set(["github/gh-aw"]);
-      const result = validateRepo("other-org/gh-aw", "githubnext/default-repo", allowedRepos);
+      const result = validateRepo("other-org/gh-aw", "github/default-repo", allowedRepos);
       expect(result.valid).toBe(false);
       expect(result.error).toContain("not in the allowed-repos list");
     });
@@ -264,14 +264,14 @@ describe("repo_helpers", () => {
     it("should qualify bare repo name and return qualified version", async () => {
       const { resolveAndValidateRepo } = await import("./repo_helpers.cjs");
       const item = { repo: "gh-aw" };
-      const defaultRepo = "githubnext/other-repo";
+      const defaultRepo = "github/other-repo";
       const allowedRepos = new Set(["github/gh-aw"]);
 
       const result = resolveAndValidateRepo(item, defaultRepo, allowedRepos, "test");
 
       expect(result.success).toBe(true);
       expect(result.repo).toBe("github/gh-aw");
-      expect(result.repoParts).toEqual({ owner: "githubnext", repo: "gh-aw" });
+      expect(result.repoParts).toEqual({ owner: "github", repo: "gh-aw" });
     });
 
     it("should qualify bare repo name matching default repo", async () => {
@@ -284,7 +284,7 @@ describe("repo_helpers", () => {
 
       expect(result.success).toBe(true);
       expect(result.repo).toBe("github/gh-aw");
-      expect(result.repoParts).toEqual({ owner: "githubnext", repo: "gh-aw" });
+      expect(result.repoParts).toEqual({ owner: "github", repo: "gh-aw" });
     });
   });
 

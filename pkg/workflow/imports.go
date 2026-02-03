@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 var importsLog = logger.New("workflow:imports")

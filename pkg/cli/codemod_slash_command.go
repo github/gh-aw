@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var slashCommandCodemodLog = logger.New("cli:codemod_slash_command")

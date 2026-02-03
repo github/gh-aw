@@ -43,8 +43,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/githubnext/gh-aw/pkg/styles"
-	"github.com/githubnext/gh-aw/pkg/tty"
+	"github.com/github/gh-aw/pkg/styles"
+	"github.com/github/gh-aw/pkg/tty"
 )
 
 // updateMessageMsg is a custom message for updating the spinner message

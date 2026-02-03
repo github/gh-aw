@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/sliceutil"
+	"github.com/github/gh-aw/pkg/sliceutil"
 )
 
 // TestMCPToolOutputSchemas verifies that output schemas are correctly generated for MCP tools

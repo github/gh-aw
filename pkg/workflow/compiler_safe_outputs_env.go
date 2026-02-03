@@ -1,7 +1,7 @@
 package workflow
 
 import (
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var compilerSafeOutputsEnvLog = logger.New("workflow:compiler_safe_outputs_env")

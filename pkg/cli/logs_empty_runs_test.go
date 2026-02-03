@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestBuildLogsDataEmptyRuns tests that buildLogsData works correctly with zero runs

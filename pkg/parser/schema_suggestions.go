@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var schemaSuggestionsLog = logger.New("parser:schema_suggestions")

@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 func TestGetIntFromEnv(t *testing.T) {

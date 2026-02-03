@@ -62,7 +62,7 @@ package workflow
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpPlaywrightLog = logger.New("workflow:mcp_config_playwright_renderer")

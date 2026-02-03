@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var scheduleFuzzyScatterLog = logger.New("parser:schedule_fuzzy_scatter")

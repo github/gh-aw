@@ -37,7 +37,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var engineValidationLog = logger.New("workflow:engine_validation")

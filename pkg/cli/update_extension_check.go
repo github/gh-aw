@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/workflow"
 )
 
 // checkExtensionUpdate checks if a newer version of gh-aw is available

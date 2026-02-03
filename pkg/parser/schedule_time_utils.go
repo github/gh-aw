@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var scheduleTimeUtilsLog = logger.New("parser:schedule_time_utils")

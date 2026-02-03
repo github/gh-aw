@@ -3,7 +3,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpModeToTypeCodemodLog = logger.New("cli:codemod_mcp_mode_to_type")

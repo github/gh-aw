@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 // TestSafeInputsExperimentalWarning tests that the safe-inputs feature

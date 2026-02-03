@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/parser"
-	"github.com/githubnext/gh-aw/pkg/types"
+	"github.com/github/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/types"
 )
 
 func TestGetMCPConfig(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var healthMetricsLog = logger.New("cli:health_metrics")

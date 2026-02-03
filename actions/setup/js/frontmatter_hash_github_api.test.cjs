@@ -52,7 +52,7 @@ describe("frontmatter_hash with GitHub API", () => {
 
   describe("createGitHubFileReader", () => {
     it("should create a file reader that fetches from GitHub API", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -68,7 +68,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should handle file not found errors", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -80,7 +80,7 @@ describe("frontmatter_hash with GitHub API", () => {
 
   describe("computeFrontmatterHash with real workflow", () => {
     it("should compute hash for audit-workflows.md using GitHub API", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -106,7 +106,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should handle workflows with imports using GitHub API", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -133,7 +133,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should compute hash for a workflow without imports", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -178,7 +178,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should produce deterministic hashes across multiple calls", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -203,7 +203,7 @@ describe("frontmatter_hash with GitHub API", () => {
 
   describe("GitHub API edge cases", () => {
     it("should handle workflows in subdirectories", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -224,7 +224,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should handle workflows with template expressions", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -249,7 +249,7 @@ describe("frontmatter_hash with GitHub API", () => {
     it("should use repository-relative paths for imports (not absolute filesystem paths)", async () => {
       // This test validates the fix for issue where path.resolve() created absolute paths
       // that broke GitHub API calls
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -312,7 +312,7 @@ describe("frontmatter_hash with GitHub API", () => {
     });
 
     it("should compute same hash with GitHub API reader as with filesystem reader", async () => {
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 
@@ -346,7 +346,7 @@ describe("frontmatter_hash with GitHub API", () => {
 
       // Use real GitHub API client
       const octokit = getOctokit(token);
-      const owner = "githubnext";
+      const owner = "github";
       const repo = "gh-aw";
       const ref = "main";
 

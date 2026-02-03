@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var dependencyTrackerLog = logger.New("workflow:dependency_tracker")

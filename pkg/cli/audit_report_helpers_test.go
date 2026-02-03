@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/cli/fileutil"
-	"github.com/githubnext/gh-aw/pkg/stringutil"
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/cli/fileutil"
+	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestCalculateDirectorySize(t *testing.T) {

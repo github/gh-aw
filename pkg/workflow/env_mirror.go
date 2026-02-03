@@ -17,7 +17,7 @@ package workflow
 import (
 	"sort"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var envMirrorLog = logger.New("workflow:env_mirror")

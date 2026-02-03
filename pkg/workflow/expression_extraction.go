@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var expressionExtractionLog = logger.New("workflow:expression_extraction")

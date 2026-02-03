@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/cli/fileutil"
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/repoutil"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/cli/fileutil"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/repoutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
 

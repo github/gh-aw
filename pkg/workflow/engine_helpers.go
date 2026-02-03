@@ -36,7 +36,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var engineHelpersLog = logger.New("workflow:engine_helpers")

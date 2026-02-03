@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/githubnext/gh-aw/pkg/styles"
+	"github.com/github/gh-aw/pkg/styles"
 )
 
 //go:embed assets/logo.txt

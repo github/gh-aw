@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/charmbracelet/huh"
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/constants"
-	"github.com/githubnext/gh-aw/pkg/parser"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 // selectAIEngineAndKey prompts the user to select an AI engine and provide API key

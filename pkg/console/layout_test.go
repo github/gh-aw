@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/githubnext/gh-aw/pkg/styles"
+	"github.com/github/gh-aw/pkg/styles"
 )
 
 func TestLayoutTitleBox(t *testing.T) {

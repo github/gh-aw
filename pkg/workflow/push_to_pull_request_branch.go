@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var pushToPullRequestBranchLog = logger.New("workflow:push_to_pull_request_branch")

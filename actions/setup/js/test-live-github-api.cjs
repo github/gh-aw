@@ -32,7 +32,7 @@ async function testLiveGitHubAPI() {
   console.log("🔍 Testing frontmatter hash with live GitHub API\n");
 
   // Configuration
-  const owner = "githubnext";
+  const owner = "github";
   const repo = "gh-aw";
   const ref = "main";
   const workflowPath = ".github/workflows/audit-workflows.md";

@@ -44,7 +44,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var bundlerScriptLog = logger.New("workflow:bundler_script_validation")

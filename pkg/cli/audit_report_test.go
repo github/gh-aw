@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
-	"github.com/githubnext/gh-aw/pkg/workflow"
+	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/githubnext/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/logger"
 )
 
 var mcpLogsGuardrailLog = logger.New("cli:mcp_logs_guardrail")

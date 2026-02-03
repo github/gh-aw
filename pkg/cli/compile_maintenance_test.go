@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/githubnext/gh-aw/pkg/testutil"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 func TestCompileSpecificFiles_GeneratesMaintenanceWorkflow(t *testing.T) {

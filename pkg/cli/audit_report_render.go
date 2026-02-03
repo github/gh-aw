@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/stringutil"
 )
 
 // renderJSON outputs the audit data as JSON

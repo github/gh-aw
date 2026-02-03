@@ -7,9 +7,9 @@ import (
 	"os/exec"
 
 	"github.com/cli/go-gh/v2"
-	"github.com/githubnext/gh-aw/pkg/console"
-	"github.com/githubnext/gh-aw/pkg/logger"
-	"github.com/githubnext/gh-aw/pkg/tty"
+	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/tty"
 )
 
 var githubCLILog = logger.New("workflow:github_cli")
