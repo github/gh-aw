@@ -18,9 +18,9 @@ engine:
   id: claude
   max-turns: 100
 imports:
-  - shared/mcp/gh-aw.md
   - shared/jqschema.md
 tools:
+  agentic-workflows:
   serena: ["go"]
   edit:
   playwright:

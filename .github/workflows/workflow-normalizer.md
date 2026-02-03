@@ -16,6 +16,7 @@ network:
     - python
     - node
 tools:
+  agentic-workflows:
   github:
     toolsets: [default]
 safe-outputs:
@@ -27,7 +28,6 @@ safe-outputs:
     group: true
 imports:
   - shared/reporting.md
-  - shared/mcp/gh-aw.md
 ---
 
 # Workflow Normalizer

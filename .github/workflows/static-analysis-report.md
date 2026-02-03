@@ -10,6 +10,7 @@ permissions:
   pull-requests: read
 engine: claude
 tools:
+  agentic-workflows:
   github:
    toolsets:
       - default
@@ -24,7 +25,6 @@ safe-outputs:
 timeout-minutes: 45
 strict: true
 imports:
-  - shared/mcp/gh-aw.md
   - shared/reporting.md
 steps:
   - name: Pull static analysis Docker images

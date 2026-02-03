@@ -29,7 +29,6 @@ safe-outputs:
 imports:
   - shared/jqschema.md
   - shared/reporting.md
-  - shared/mcp/gh-aw.md
   - shared/copilot-pr-data-fetch.md
   - shared/trending-charts-simple.md
 
@@ -40,6 +39,7 @@ cache:
       prompt-clustering-cache-
 
 tools:
+  agentic-workflows:
   cache-memory: true
   github:
     toolsets: [repos, pull_requests]

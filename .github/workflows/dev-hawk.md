@@ -21,8 +21,6 @@ tools:
     toolsets: [pull_requests, actions, repos]
   bash:
     - "gh agent-task create *"
-imports:
-  - shared/mcp/gh-aw.md
 safe-outputs:
   add-comment:
     max: 1

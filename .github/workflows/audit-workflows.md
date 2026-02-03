@@ -11,6 +11,7 @@ permissions:
 tracker-id: audit-workflows-daily
 engine: claude
 tools:
+  agentic-workflows:
   repo-memory:
     branch-name: memory/audit-workflows
     description: "Historical audit data and patterns"
@@ -30,7 +31,6 @@ safe-outputs:
     close-older-discussions: true
 timeout-minutes: 30
 imports:
-  - shared/mcp/gh-aw.md
   - shared/jqschema.md
   - shared/reporting.md
   - shared/trending-charts-simple.md

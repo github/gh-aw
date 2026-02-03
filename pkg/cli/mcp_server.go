@@ -491,20 +491,52 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 		// Always use --json mode in MCP server
 		cmdArgs = append(cmdArgs, "--json")
 
+		// Log the command being executed for debugging
+		mcpLog.Printf("Executing logs tool: workflow=%s, count=%d, firewall=%v, no_firewall=%v, timeout=%d, command_args=%v",
+			args.WorkflowName, args.Count, args.Firewall, args.NoFirewall, timeoutValue, cmdArgs)
+
 		// Execute the CLI command
+		// Use separate stdout/stderr capture instead of CombinedOutput because:
+		// - Stdout contains JSON output (--json flag)
+		// - Stderr contains console messages and error details
 		cmd := execCmd(ctx, cmdArgs...)
-		output, err := cmd.CombinedOutput()
+		stdout, err := cmd.Output()
+
+		// The logs command outputs JSON to stdout when --json flag is used.
+		// If the command fails, we need to provide detailed error information.
+		outputStr := string(stdout)
 
 		if err != nil {
+			// Try to get stderr and exit code for detailed error reporting
+			var stderr string
+			var exitCode int
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				stderr = string(exitErr.Stderr)
+				exitCode = exitErr.ExitCode()
+			}
+
+			mcpLog.Printf("Logs command exited with error: %v (stdout length: %d, stderr length: %d, exit_code: %d)",
+				err, len(outputStr), len(stderr), exitCode)
+
+			// Build detailed error data
+			errorData := map[string]any{
+				"error":     err.Error(),
+				"command":   strings.Join(cmdArgs, " "),
+				"exit_code": exitCode,
+				"stdout":    outputStr,
+				"stderr":    stderr,
+				"timeout":   timeoutValue,
+				"workflow":  args.WorkflowName,
+			}
+
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,
-				Message: "failed to download workflow logs",
-				Data:    mcpErrorData(map[string]any{"error": err.Error(), "output": string(output)}),
+				Message: fmt.Sprintf("failed to download workflow logs: %s", err.Error()),
+				Data:    mcpErrorData(errorData),
 			}
 		}
 
 		// Apply jq filter if provided
-		outputStr := string(output)
 		if args.JqFilter != "" {
 			filteredOutput, err := ApplyJqFilter(outputStr, args.JqFilter)
 			if err != nil {

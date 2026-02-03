@@ -34,7 +34,6 @@ tools:
     - "*"
   edit:
 imports:
-  - shared/mcp/gh-aw.md
   - shared/reporting.md
   - shared/trending-charts-simple.md
 ---

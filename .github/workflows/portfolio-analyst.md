@@ -13,6 +13,7 @@ engine: copilot
 network:
   allowed: [python]
 tools:
+  agentic-workflows:
   github:
     toolsets: [default]
   bash: ["*"]
@@ -31,7 +32,6 @@ safe-outputs:
   upload-asset:
 timeout-minutes: 20
 imports:
-  - shared/mcp/gh-aw.md
   - shared/reporting.md
   - shared/jqschema.md
   - shared/trending-charts-simple.md

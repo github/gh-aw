@@ -13,9 +13,8 @@ permissions:
   discussions: read
 roles: [admin, maintainer, write]
 engine: copilot
-imports:
-  - shared/mcp/gh-aw.md
 tools:
+  agentic-workflows:
   serena: ["go"]
   github:
     toolsets:

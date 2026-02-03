@@ -35,7 +35,6 @@ imports:
   - shared/mcp/datadog.md
   - shared/mcp/deepwiki.md
   - shared/mcp/fabric-rti.md
-  - shared/mcp/gh-aw.md
   - shared/mcp/markitdown.md
   - shared/mcp/microsoft-docs.md
   - shared/mcp/notion.md
@@ -45,6 +44,7 @@ imports:
   - shared/mcp/tavily.md
   - shared/reporting.md
 tools:
+  agentic-workflows:
   serena: ["go"]
   edit:
   bash:
