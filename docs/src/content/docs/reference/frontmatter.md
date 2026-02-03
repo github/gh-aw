@@ -138,6 +138,30 @@ roles: all                         # Allow any user (⚠️ use with caution)
 
 Available roles: `admin`, `maintainer`, `write`, `read`, `all`. Workflows with unsafe triggers (`push`, `issues`, `pull_request`) automatically enforce permission checks. Failed checks cancel the workflow with a warning.
 
+### Bot Filtering (`bots:`)
+
+Configure which GitHub bot accounts can trigger workflows. Useful for allowing specific automation bots while maintaining security controls.
+
+```yaml wrap
+bots: 
+  - "dependabot[bot]"
+  - "renovate[bot]"
+  - "agentic-workflows-dev[bot]"
+```
+
+**Behavior**:
+- When specified, only the listed bot accounts can trigger the workflow
+- The bot must be active (installed) on the repository to trigger the workflow
+- Combine with `roles:` for comprehensive access control
+- Applies to all workflow triggers (`pull_request`, `issues`, etc.)
+- When `roles: all` is set, bot filtering is not enforced
+
+**Common bot names**:
+- `dependabot[bot]` - GitHub Dependabot for dependency updates
+- `renovate[bot]` - Renovate bot for automated dependency management
+- `github-actions[bot]` - GitHub Actions bot
+- `agentic-workflows-dev[bot]` - Development bot for testing workflows
+
 ### Strict Mode (`strict:`)
 
 Enables enhanced security validation for production workflows. **Enabled by default**.
