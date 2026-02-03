@@ -119,6 +119,8 @@ jobs:
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '8.0'
+      - name: Capture DOTNET_ROOT for AWF chroot mode
+        run: echo "DOTNET_ROOT=$(echo $DOTNET_ROOT)" >> $GITHUB_ENV
       - name: Setup Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
@@ -130,6 +132,8 @@ jobs:
         with:
           java-version: '21'
           distribution: temurin
+      - name: Capture JAVA_HOME for AWF chroot mode
+        run: echo "JAVA_HOME=$(echo $JAVA_HOME)" >> $GITHUB_ENV
       - name: Setup Node.js
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:

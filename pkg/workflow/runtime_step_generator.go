@@ -18,13 +18,25 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement) []GitHubAction
 	for _, req := range requirements {
 		steps = append(steps, generateSetupStep(&req))
 
-		// Add GOROOT capture step after Go setup
-		// GitHub Actions uses "trimmed" Go binaries that require GOROOT to be explicitly set.
-		// actions/setup-go does NOT export GOROOT to the environment, so we must capture it.
-		// This is required for AWF chroot mode which passes GOROOT as AWF_GOROOT to the container.
-		if req.Runtime.ID == "go" {
+		// Add environment variable capture steps after setup actions for AWF chroot mode.
+		// These setup actions install tools but don't always export the required env vars.
+		// AWF chroot mode needs these env vars to properly configure the container.
+		switch req.Runtime.ID {
+		case "go":
+			// GitHub Actions uses "trimmed" Go binaries that require GOROOT to be explicitly set.
+			// actions/setup-go does NOT export GOROOT to the environment, so we must capture it.
 			runtimeStepGeneratorLog.Print("Adding GOROOT capture step for chroot mode compatibility")
-			steps = append(steps, generateGOROOTCaptureStep())
+			steps = append(steps, generateEnvCaptureStep("GOROOT", "go env GOROOT"))
+		case "java":
+			// actions/setup-java sets JAVA_HOME but sudo may not preserve it.
+			// AWF chroot mode needs JAVA_HOME to add $JAVA_HOME/bin to PATH.
+			runtimeStepGeneratorLog.Print("Adding JAVA_HOME capture step for chroot mode compatibility")
+			steps = append(steps, generateEnvCaptureStep("JAVA_HOME", "echo $JAVA_HOME"))
+		case "dotnet":
+			// actions/setup-dotnet sets DOTNET_ROOT but it may not be preserved.
+			// AWF chroot mode needs DOTNET_ROOT to find the .NET runtime.
+			runtimeStepGeneratorLog.Print("Adding DOTNET_ROOT capture step for chroot mode compatibility")
+			steps = append(steps, generateEnvCaptureStep("DOTNET_ROOT", "echo $DOTNET_ROOT"))
 		}
 	}
 
@@ -32,13 +44,13 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement) []GitHubAction
 	return steps
 }
 
-// generateGOROOTCaptureStep creates a step to capture GOROOT and export it to the environment.
-// This is required because actions/setup-go does not export GOROOT, but AWF chroot mode
-// needs it to be set in the environment to pass it to the container.
-func generateGOROOTCaptureStep() GitHubActionStep {
+// generateEnvCaptureStep creates a step to capture an environment variable and export it.
+// This is required because some setup actions don't export env vars, but AWF chroot mode
+// needs them to be set in the environment to pass them to the container.
+func generateEnvCaptureStep(envVar string, captureCmd string) GitHubActionStep {
 	return GitHubActionStep{
-		"      - name: Capture GOROOT for AWF chroot mode",
-		"        run: echo \"GOROOT=$(go env GOROOT)\" >> $GITHUB_ENV",
+		fmt.Sprintf("      - name: Capture %s for AWF chroot mode", envVar),
+		fmt.Sprintf("        run: echo \"%s=$(%s)\" >> $GITHUB_ENV", envVar, captureCmd),
 	}
 }
 
