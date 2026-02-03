@@ -20,19 +20,6 @@ tools:
   bash:
     - "*"
 steps:
-  - name: Setup Go
-    uses: actions/setup-go@v6
-    with:
-      go-version-file: go.mod
-      cache: true
-
-  - name: Build gh-aw
-    run: |
-      echo "Building gh-aw binary..."
-      make build
-      echo "✅ gh-aw binary built successfully"
-      ./gh-aw --version
-
   - name: Pre-download workflow logs
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,6 +44,7 @@ safe-outputs:
     close-older-discussions: true
 timeout-minutes: 20
 imports:
+  - copilot-setup-steps.yml    # Import setup steps from copilot-setup-steps.yml
   - shared/reporting.md
   - shared/python-dataviz.md
 ---

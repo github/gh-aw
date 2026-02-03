@@ -23,10 +23,11 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - copilot-setup-steps.yml
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 93c17bc36dc67277c59151f5e8b19e45ba439bf4bba02bd319e85bd0eabd1ebf
+# frontmatter-hash: 80c0f8732124f20258ad23e0c7d3abcaa105de5012234a39336f17b9474a3484
 
 name: "Daily Copilot Token Consumption Report"
 "on":
@@ -108,12 +109,46 @@ jobs:
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
-      - name: Checkout repository
+      - name: Checkout .github folder
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
+          sparse-checkout: |
+            .github
+          depth: 1
           persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
+      - name: Install gh-aw extension
+        run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Setup Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: '1.25'
+      - name: Setup Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'actions/setup/js/package-lock.json'
+          package-manager-cache: false
+      - name: Install JavaScript dependencies
+        run: cd actions/setup/js && npm ci
+      - name: Install development dependencies
+        run: make deps-dev
+      - name: Build code
+        run: make build
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        name: Recompile workflows
+        run: make recompile
+      - name: Install UV (Python package manager)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install Go language server (gopls)
+        run: go install golang.org/x/tools/gopls@latest
+      - name: Install TypeScript language server
+        run: npm install -g typescript-language-server typescript
       - name: Setup Python environment
         run: "# Create working directory for Python scripts\nmkdir -p /tmp/gh-aw/python\nmkdir -p /tmp/gh-aw/python/data\nmkdir -p /tmp/gh-aw/python/charts\nmkdir -p /tmp/gh-aw/python/artifacts\n\necho \"Python environment setup complete\"\necho \"Working directory: /tmp/gh-aw/python\"\necho \"Data directory: /tmp/gh-aw/python/data\"\necho \"Charts directory: /tmp/gh-aw/python/charts\"\necho \"Artifacts directory: /tmp/gh-aw/python/artifacts\"\n"
       - name: Install Python scientific libraries
@@ -136,17 +171,6 @@ jobs:
             /tmp/gh-aw/python/*.py
             /tmp/gh-aw/python/data/*
           retention-days: 30
-      - name: Setup Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
-        with:
-          cache: true
-          go-version-file: go.mod
-      - name: Build gh-aw
-        run: |
-          echo "Building gh-aw binary..."
-          make build
-          echo "✅ gh-aw binary built successfully"
-          ./gh-aw --version
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Pre-download workflow logs
