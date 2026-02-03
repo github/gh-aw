@@ -37,7 +37,7 @@ name: "Smoke OpenCode"
     types:
     - labeled
   schedule:
-  - cron: "3 3 * * *"
+  - cron: "10 11 * * *"
   workflow_dispatch: null
 
 permissions: {}
