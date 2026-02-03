@@ -21,7 +21,7 @@
 #
 # Automatically fixes code scanning alerts by creating pull requests with remediation
 #
-# frontmatter-hash: 881c737fb47033df8bfd4a3833103ac7940624506696e41086caf40c29c4003f
+# frontmatter-hash: db23396c88368a8a4ae67a081c2670a29099890ce486d349da5fa1e69d5c244c
 
 name: "Code Scanning Fixer"
 "on":
@@ -1175,7 +1175,6 @@ jobs:
           MAX_FILE_SIZE: 10240
           MAX_FILE_COUNT: 100
           FILE_GLOB_FILTER: "security-alert-burndown/**"
-          GH_AW_CAMPAIGN_ID: security-alert-burndown
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
