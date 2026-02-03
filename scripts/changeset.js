@@ -571,7 +571,7 @@ async function main() {
         }
 
         if (!versionTag) {
-          throw new Error("Version tag is required. Usage: node scripts/changeset.js release <version> [--yes]");
+          throw new Error("Version tag is required");
         }
 
         await runRelease(versionTag, skipConfirmation);
