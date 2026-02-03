@@ -502,7 +502,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		} else {
 			yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + apiKey + "\"\n")
 		}
-		yaml.WriteString("          export DEBUG=*\n")
+		yaml.WriteString("          export DEBUG=\"*\"\n")
 		yaml.WriteString("          \n")
 		yaml.WriteString("          # Register API key as secret to mask it from logs\n")
 		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")

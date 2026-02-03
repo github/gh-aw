@@ -430,7 +430,7 @@ jobs:
           MCP_GATEWAY_API_KEY=""
           MCP_GATEWAY_API_KEY=$(openssl rand -base64 45 | tr -d '/+=')
           export MCP_GATEWAY_API_KEY
-          export DEBUG=*
+          export DEBUG="*"
           
           # Register API key as secret to mask it from logs
           echo "::add-mask::${MCP_GATEWAY_API_KEY}"
