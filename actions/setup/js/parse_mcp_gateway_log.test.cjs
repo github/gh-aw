@@ -407,7 +407,7 @@ Some content here.`;
         // Check file contents are printed for .log files
         expect(allOutput).toContain("Gateway log content");
         expect(allOutput).toContain("Error message");
-        
+
         // Check .md file is listed but content is not displayed
         expect(allOutput).toContain("gateway.md");
         expect(allOutput).toContain("content not displayed for .md files");
