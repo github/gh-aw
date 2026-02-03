@@ -119,18 +119,18 @@ steps:
 
 	t.Logf("Found %d steps: %v", len(stepNames), stepNames)
 
-	if len(stepNames) < 6 {
-		t.Fatalf("Expected at least 6 steps, got %d: %v", len(stepNames), stepNames)
+	if len(stepNames) < 5 {
+		t.Fatalf("Expected at least 5 steps, got %d: %v", len(stepNames), stepNames)
 	}
 
 	// Verify the order in dev mode (when local actions are used):
 	// 1. First step should be "Checkout actions folder" (checkout local actions)
 	// 2. Second step should be "Setup Scripts" (use the checked out action)
-	// 3. Third step should be "Checkout .github folder" (checkout .github for agent job)
-	// 4. Fourth step should be "Create gh-aw temp directory" (before custom steps)
-	// 5. Fifth step should be "Checkout code" (from custom steps)
-	// 6. Sixth step should be "Setup Node.js" (runtime setup, inserted after checkout)
-	// 7. Seventh step should be "Use Node" (from custom steps)
+	// 3. Third step should be "Create gh-aw temp directory" (before custom steps)
+	// 4. Fourth step should be "Checkout code" (from custom steps - full checkout, no separate .github checkout needed)
+	// 5. Fifth step should be "Setup Node.js" (runtime setup, inserted after checkout)
+	// 6. Sixth step should be "Use Node" (from custom steps)
+	// NOTE: The .github sparse checkout is skipped because custom steps contain a full checkout
 
 	if stepNames[0] != "Checkout actions folder" {
 		t.Errorf("First step should be 'Checkout actions folder', got '%s'", stepNames[0])
@@ -140,24 +140,27 @@ steps:
 		t.Errorf("Second step should be 'Setup Scripts', got '%s'", stepNames[1])
 	}
 
-	if stepNames[2] != "Checkout .github folder" {
-		t.Errorf("Third step should be 'Checkout .github folder', got '%s'", stepNames[2])
+	if stepNames[2] != "Create gh-aw temp directory" {
+		t.Errorf("Third step should be 'Create gh-aw temp directory', got '%s'", stepNames[2])
 	}
 
-	if stepNames[3] != "Create gh-aw temp directory" {
-		t.Errorf("Fourth step should be 'Create gh-aw temp directory', got '%s'", stepNames[3])
+	if stepNames[3] != "Checkout code" {
+		t.Errorf("Fourth step should be 'Checkout code', got '%s'", stepNames[3])
 	}
 
-	if stepNames[4] != "Checkout code" {
-		t.Errorf("Fifth step should be 'Checkout code', got '%s'", stepNames[4])
+	if stepNames[4] != "Setup Node.js" {
+		t.Errorf("Fifth step should be 'Setup Node.js' (runtime setup after checkout), got '%s'", stepNames[4])
 	}
 
-	if stepNames[5] != "Setup Node.js" {
-		t.Errorf("Sixth step should be 'Setup Node.js' (runtime setup after checkout), got '%s'", stepNames[5])
+	if stepNames[5] != "Use Node" {
+		t.Errorf("Sixth step should be 'Use Node', got '%s'", stepNames[5])
 	}
 
-	if stepNames[6] != "Use Node" {
-		t.Errorf("Seventh step should be 'Use Node', got '%s'", stepNames[6])
+	// Verify that .github checkout is NOT present (redundant with full checkout in custom steps)
+	for _, name := range stepNames {
+		if name == "Checkout .github folder" {
+			t.Error("Checkout .github folder should not be present when custom steps contain full repository checkout")
+		}
 	}
 
 	// Additional check: verify temp directory creation is first
