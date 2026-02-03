@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@marp-team/marp-cli": "^4.2.3",
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.58.1",
     "@types/primer__octicons": "^19.11.1",
     "http-server": "^14.1.1",
     "starlight-github-alerts": "^0.1.1"
