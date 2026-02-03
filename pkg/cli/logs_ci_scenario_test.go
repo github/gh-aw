@@ -48,7 +48,6 @@ func TestLogsJSONOutputWithNoRuns(t *testing.T) {
 		false,                        // parse
 		true,                         // jsonOutput - THIS IS KEY
 		10,                           // timeout
-		false,                        // campaignOnly
 		"summary.json",               // summaryFile
 		"",                           // safeOutputType
 	)

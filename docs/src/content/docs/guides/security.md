@@ -18,58 +18,8 @@ We aim for strong, declarative guardrails -- clear policies the workflow author 
 
 This material documents some notes on the security of using partially-automated agentic workflows.
 
-## Security Architecture Overview
-
-The following diagram illustrates the multi-layered security architecture of GitHub Agentic Workflows, showing how agent processes, MCP servers, and skills are isolated within sandboxes and communicate through proxy/firewall layers:
-
-```mermaid
-flowchart TB
-    subgraph ActionJobVM["Action Job VM"]
-        subgraph Sandbox1["Sandbox"]
-            Agent["Agent Process"]
-        end
-
-        Proxy1["Proxy / Firewall"]
-        Gateway["Gateway<br/>(mcpg)"]
-
-        Agent --> Proxy1
-        Proxy1 --> Gateway
-
-        subgraph Sandbox2["Sandbox"]
-            MCP["MCP Server"]
-        end
-
-        subgraph Sandbox3["Sandbox"]
-            Skill["Skill"]
-        end
-
-        Gateway --> MCP
-        Gateway --> Skill
-
-        Proxy2["Proxy / Firewall"]
-        Proxy3["Proxy / Firewall"]
-
-        MCP --> Proxy2
-        Skill --> Proxy3
-    end
-
-    Service1{{"Service"}}
-    Service2{{"Service"}}
-
-    Proxy2 --> Service1
-    Proxy3 --> Service2
-```
-
-**Key Security Layers:**
-
-1. **Agent Sandbox**: The agent process runs in an isolated sandbox environment with restricted permissions
-2. **Primary Proxy/Firewall**: Filters outbound traffic from the agent to the MCP Gateway
-3. **MCP Gateway (mcpg)**: Central routing component that manages communication between agents and backend services
-4. **MCP Server & Skill Sandboxes**: Each MCP server and skill runs in its own isolated sandbox
-5. **Secondary Proxy/Firewalls**: Additional proxy layers control egress traffic from MCP servers and skills to external services
-6. **Service Layer**: External services accessed through multiple layers of security controls
-
-This defense-in-depth architecture ensures that even if one layer is compromised, multiple additional security controls remain in place to protect sensitive resources.
+> [!NOTE]
+> For a comprehensive overview of the security architecture, threat model, and defense-in-depth mechanisms, see the [Security Architecture](/gh-aw/introduction/architecture/) page.
 
 ## Before You Begin
 
@@ -78,33 +28,6 @@ Review workflow contents before installation, treating prompt templates and rule
 GitHub Actions' built-in protections apply to agentic workflows: read-only defaults for fork PRs, restricted secret access, and explicit permissions (unspecified permissions default to `none`). See [GitHub Actions security](https://docs.github.com/en/actions/reference/security/secure-use).
 
 By default, workflows restrict execution to users with `admin`, `maintainer`, or `write` permissions. Use `roles: all` carefully in public repositories.
-
-## Threat Model
-
-Understanding the security risks in agentic workflows helps inform protective measures:
-
-### Primary Threats
-
-- **Command execution**: Workflows run in GitHub Actions' partially-sandboxed environment. Arbitrary shell commands are disallowed by default; specific commands require manual allowlisting. Misconfiguration enables malicious code execution and data exfiltration.
-
-- **Malicious inputs**: Workflows pull data from Issues, PRs, comments, and code that may contain hidden AI payloads. Risk is minimized by restricting expressions in markdown and requiring GitHub MCP access, though returned data can still manipulate AI behavior.
-
-- **Tool exposure**: Default access is GitHub MCP in read-only mode. Unconstrained 3rd-party MCP tools enable data exfiltration or privilege escalation.
-
-- **Supply chain**: Unpinned Actions, npm packages, and container images are vulnerable to tampering.
-
-### Core Security Principles
-
-Agentic Workflows inherit GitHub Actions' security model: isolated repository copies, read-only defaults for forked PRs, restricted secret access, and explicit permissions (default `none`). See [GitHub Actions security](https://docs.github.com/en/actions/reference/security/secure-use).
-
-Compilation-time security measures include:
-- Expression restrictions in frontmatter
-- Command allowlisting (explicit only)
-- Tool allowlisting
-- Engine network restrictions via domain allowlists
-- Workflow longevity and iteration limits
-
-Apply defense-in-depth consistently: least privilege by default, default-deny approach, separation of concerns (plan/apply with approval gates), and supply chain integrity (pin to immutable SHAs).
 
 ## Implementation Guidelines
 
@@ -452,6 +375,7 @@ network: {}
 
 ## See also
 
+- [Security Architecture](/gh-aw/introduction/architecture/) - Comprehensive security architecture, threat model, and defense-in-depth mechanisms
 - [Threat Detection Guide](/gh-aw/guides/threat-detection/) - Comprehensive threat detection configuration and examples
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/)
 - [Network Configuration](/gh-aw/reference/network/)

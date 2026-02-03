@@ -71,7 +71,7 @@ func TestDownloadWorkflowLogsWithCancellation(t *testing.T) {
 	cancel()
 
 	// Try to download logs with a cancelled context
-	err := DownloadWorkflowLogs(ctx, "", 10, "", "", "/tmp/test-logs", "", "", 0, 0, "", false, false, false, false, false, false, false, 0, false, "", "")
+	err := DownloadWorkflowLogs(ctx, "", 10, "", "", "/tmp/test-logs", "", "", 0, 0, "", false, false, false, false, false, false, false, 0, "", "")
 
 	// Should return context.Canceled error
 	assert.ErrorIs(t, err, context.Canceled, "Should return context.Canceled error when context is cancelled")
@@ -111,7 +111,7 @@ func TestDownloadWorkflowLogsTimeoutRespected(t *testing.T) {
 
 	start := time.Now()
 	// Use a workflow name that doesn't exist to avoid actual network calls
-	_ = DownloadWorkflowLogs(ctx, "nonexistent-workflow-12345", 100, "", "", "/tmp/test-logs", "", "", 0, 0, "", false, false, false, false, false, false, false, 1, false, "", "")
+	_ = DownloadWorkflowLogs(ctx, "nonexistent-workflow-12345", 100, "", "", "/tmp/test-logs", "", "", 0, 0, "", false, false, false, false, false, false, false, 1, "", "")
 	elapsed := time.Since(start)
 
 	// Should complete within reasonable time (give 5 seconds buffer for test overhead)

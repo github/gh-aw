@@ -19,7 +19,7 @@ Use `--name`, `--pr`, `--force`, `--number`, `--engine`, or `--verbose` flags to
 
 ## Updating Workflows
 
-Keep workflows synchronized with their source repositories:
+When you add a workflow, a tracking `source:` entry remembers where it came from. You can keep workflows synchronized with their source repositories:
 
 ```bash wrap
 gh aw update                           # update all workflows

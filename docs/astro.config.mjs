@@ -190,23 +190,6 @@ export default defineConfig({
 					],
 				},
 				{
-						label: 'Campaigns',
-					items: [
-						{ label: 'About Campaigns', link: '/guides/campaigns/' },
-						{ label: 'Getting Started', link: '/guides/campaigns/getting-started/' },
-					],
-				},
-					{
-						label: 'Examples',
-						items: [
-							{ label: 'Research & Planning', link: '/examples/scheduled/research-planning/' },
-							{ label: 'Triage & Analysis', link: '/examples/issue-pr-events/triage-analysis/' },
-							{ label: 'Coding & Development', link: '/examples/issue-pr-events/coding-development/' },
-							{ label: 'Quality & Testing', link: '/examples/issue-pr-events/quality-testing/' },
-							{ label: "Peli's Agent Factory", link: '/blog/2026-01-12-welcome-to-pelis-agent-factory/' },
-						],
-					},
-				{
 					label: 'Reference',
 					items: [
 						{ label: 'Glossary', link: '/reference/glossary/' },

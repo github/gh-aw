@@ -600,7 +600,7 @@
   },
   {
     "name": "update_project",
-    "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number. Use campaign_id to group related items.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title.\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
+    "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title.\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
     "inputSchema": {
       "type": "object",
       "required": ["project"],
@@ -613,7 +613,7 @@
         "operation": {
           "type": "string",
           "enum": ["create_fields", "create_view"],
-          "description": "Optional operation mode. Use create_fields to create required campaign fields up-front, or create_view to add a project view. When omitted, the tool adds/updates project items."
+          "description": "Optional operation mode. Use create_fields to create required fields up-front, or create_view to add a project view. When omitted, the tool adds/updates project items."
         },
         "content_type": {
           "type": "string",
@@ -688,10 +688,6 @@
           },
           "additionalProperties": false
         },
-        "campaign_id": {
-          "type": "string",
-          "description": "Campaign identifier to group related project items. Used to track items created by the same campaign or workflow run."
-        },
         "create_if_missing": {
           "type": "boolean",
           "description": "Whether to create the project if it doesn't exist. Defaults to false. Requires projects:write permission when true."
@@ -736,7 +732,7 @@
       "properties": {
         "title": {
           "type": "string",
-          "description": "Title for the new project. Should be descriptive and unique within the owner's projects. If not provided, will be auto-generated using the title-prefix configuration (default: 'Campaign') as '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the issue context."
+          "description": "Title for the new project. Should be descriptive and unique within the owner's projects. If not provided, will be auto-generated using the title-prefix configuration (default: 'Project') as '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the issue context."
         },
         "owner": {
           "type": "string",

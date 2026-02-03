@@ -19,13 +19,13 @@ var projectLog = logger.New("cli:project")
 
 // ProjectConfig holds configuration for creating a GitHub Project
 type ProjectConfig struct {
-	Title             string // Project title
-	Owner             string // Owner login (user or org)
-	OwnerType         string // "user" or "org"
-	Description       string // Project description (note: not currently supported by GitHub Projects V2 API during creation)
-	Repo              string // Repository to link project to (optional, format: owner/repo)
-	Verbose           bool   // Verbose output
-	WithCampaignSetup bool   // Whether to create standard campaign views and fields
+	Title            string // Project title
+	Owner            string // Owner login (user or org)
+	OwnerType        string // "user" or "org"
+	Description      string // Project description (note: not currently supported by GitHub Projects V2 API during creation)
+	Repo             string // Repository to link project to (optional, format: owner/repo)
+	Verbose          bool   // Verbose output
+	WithProjectSetup bool   // Whether to create standard project views and fields
 }
 
 // NewProjectCommand creates the project command
@@ -70,34 +70,34 @@ Token Requirements:
   Set GH_AW_PROJECT_GITHUB_TOKEN environment variable or configure your gh CLI
   with a token that has the required permissions.
 
-Campaign Setup:
-  Use --with-campaign-setup to automatically create:
-  - Standard views (Progress Board, Task Tracker, Campaign Roadmap)
-  - Custom fields (Campaign Id, Worker Workflow, Target Repo, Priority, Size, dates)
+Project Setup:
+	Use --with-project-setup to automatically create:
+	- Standard views (Progress Board, Task Tracker, Roadmap)
+	- Custom fields (Tracker Id, Worker Workflow, Target Repo, Priority, Size, dates)
   - Enhanced Status field with "Review Required" option
 
 Examples:
   gh aw project new "My Project" --owner @me                           # Create user project
   gh aw project new "Team Board" --owner myorg                         # Create org project  
   gh aw project new "Bugs" --owner myorg --link myorg/myrepo           # Create and link to repo
-  gh aw project new "Campaign Q1" --owner myorg --with-campaign-setup  # With campaign setup`,
+	gh aw project new "Project Q1" --owner myorg --with-project-setup     # With project setup`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			owner, _ := cmd.Flags().GetString("owner")
 			link, _ := cmd.Flags().GetString("link")
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			withCampaignSetup, _ := cmd.Flags().GetBool("with-campaign-setup")
+			withProjectSetup, _ := cmd.Flags().GetBool("with-project-setup")
 
 			if owner == "" {
 				return fmt.Errorf("--owner flag is required. Use '@me' for current user or specify org name")
 			}
 
 			config := ProjectConfig{
-				Title:             args[0],
-				Owner:             owner,
-				Repo:              link,
-				Verbose:           verbose,
-				WithCampaignSetup: withCampaignSetup,
+				Title:            args[0],
+				Owner:            owner,
+				Repo:             link,
+				Verbose:          verbose,
+				WithProjectSetup: withProjectSetup,
 			}
 
 			return RunProjectNew(cmd.Context(), config)
@@ -106,7 +106,7 @@ Examples:
 
 	cmd.Flags().StringP("owner", "o", "", "Project owner: '@me' for current user or organization name (required)")
 	cmd.Flags().StringP("link", "l", "", "Repository to link project to (format: owner/repo)")
-	cmd.Flags().Bool("with-campaign-setup", false, "Create standard campaign views and custom fields")
+	cmd.Flags().Bool("with-project-setup", false, "Create standard project views and custom fields")
 	_ = cmd.MarkFlagRequired("owner")
 
 	return cmd
@@ -174,7 +174,7 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 	}
 	projectNumber := int(projectNumberFloat)
 
-	if config.WithCampaignSetup {
+	if config.WithProjectSetup {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Creating standard project views..."))
 		if err := createStandardViews(ctx, projectURL, config.Verbose); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to create views: %v", err)))
@@ -190,7 +190,7 @@ func RunProjectNew(ctx context.Context, config ProjectConfig) error {
 		}
 	}
 
-	if config.WithCampaignSetup {
+	if config.WithProjectSetup {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Enhancing Status field..."))
 		if err := ensureStatusOption(ctx, projectURL, "Review Required", config.Verbose); err != nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Status field: %v", err)))
@@ -432,7 +432,7 @@ func parseProjectURL(projectURL string) (projectURLInfo, error) {
 	}, nil
 }
 
-// createStandardViews creates the standard campaign views
+// createStandardViews creates the standard project views
 func createStandardViews(ctx context.Context, projectURL string, verbose bool) error {
 	projectLog.Print("Creating standard views")
 	console.LogVerbose(verbose, "Creating standard project views...")
@@ -448,7 +448,7 @@ func createStandardViews(ctx context.Context, projectURL string, verbose bool) e
 	}{
 		{name: "Progress Board", layout: "board"},
 		{name: "Task Tracker", layout: "table"},
-		{name: "Campaign Roadmap", layout: "roadmap"},
+		{name: "Roadmap", layout: "roadmap"},
 	}
 
 	for _, view := range views {
@@ -489,7 +489,7 @@ func createView(ctx context.Context, info projectURLInfo, name, layout string, v
 	return nil
 }
 
-// createStandardFields creates the standard campaign fields
+// createStandardFields creates the standard project fields
 func createStandardFields(ctx context.Context, projectURL string, projectNumber int, owner string, verbose bool) error {
 	projectLog.Print("Creating standard fields")
 	console.LogVerbose(verbose, "Creating custom fields...")
@@ -502,7 +502,7 @@ func createStandardFields(ctx context.Context, projectURL string, projectNumber 
 		dataType string
 		options  []string // For SINGLE_SELECT fields
 	}{
-		{"Campaign Id", "TEXT", nil},
+		{"Tracker Id", "TEXT", nil},
 		{"Worker Workflow", "TEXT", nil},
 		{"Target Repo", "TEXT", nil},
 		{"Priority", "SINGLE_SELECT", []string{"High", "Medium", "Low"}},

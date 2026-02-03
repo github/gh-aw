@@ -181,29 +181,28 @@ func TestBuildActivationJobWithReaction(t *testing.T) {
 	}
 }
 
-// TestBuildActivationJobCampaignOrchestratorFilename tests that campaign orchestrator
-// workflows (.campaign.g.md) generate correct GH_AW_WORKFLOW_FILE (.campaign.lock.yml)
-func TestBuildActivationJobCampaignOrchestratorFilename(t *testing.T) {
+// TestBuildActivationJobLockFilename tests that lock filenames are passed through
+// unchanged to the activation job environment.
+func TestBuildActivationJobLockFilename(t *testing.T) {
 	compiler := NewCompiler()
 
 	workflowData := &WorkflowData{
-		Name:        "Test Campaign",
+		Name:        "Test Workflow",
 		SafeOutputs: &SafeOutputsConfig{},
 	}
 
-	// Test with campaign orchestrator filename (with .g.)
-	job, err := compiler.buildActivationJob(workflowData, false, "", "example.campaign.lock.yml")
+	job, err := compiler.buildActivationJob(workflowData, false, "", "example.workflow.lock.yml")
 	if err != nil {
 		t.Fatalf("buildActivationJob() returned error: %v", err)
 	}
 
-	// Check that GH_AW_WORKFLOW_FILE uses .campaign.lock.yml (without .g.)
+	// Check that GH_AW_WORKFLOW_FILE uses the lock filename exactly
 	stepsContent := strings.Join(job.Steps, "")
-	if !strings.Contains(stepsContent, `GH_AW_WORKFLOW_FILE: "example.campaign.lock.yml"`) {
-		t.Errorf("Expected GH_AW_WORKFLOW_FILE to be 'example.campaign.lock.yml', got steps content:\n%s", stepsContent)
+	if !strings.Contains(stepsContent, `GH_AW_WORKFLOW_FILE: "example.workflow.lock.yml"`) {
+		t.Errorf("Expected GH_AW_WORKFLOW_FILE to be 'example.workflow.lock.yml', got steps content:\n%s", stepsContent)
 	}
 	// Verify it does NOT contain the incorrect .g. version
-	if strings.Contains(stepsContent, "example.campaign.g.lock.yml") {
+	if strings.Contains(stepsContent, "example.workflow.g.lock.yml") {
 		t.Error("GH_AW_WORKFLOW_FILE should not contain '.g.' in the filename")
 	}
 }

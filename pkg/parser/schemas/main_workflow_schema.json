@@ -3286,10 +3286,6 @@
                 "create-orphan": {
                   "type": "boolean",
                   "description": "Create orphaned branch if it doesn't exist (default: true)"
-                },
-                "campaign-id": {
-                  "type": "string",
-                  "description": "Campaign ID for campaign-specific repo-memory (optional, used to correlate memory with campaign workflows)"
                 }
               },
               "additionalProperties": false,
@@ -3364,10 +3360,6 @@
                   "create-orphan": {
                     "type": "boolean",
                     "description": "Create orphaned branch if it doesn't exist (default: true)"
-                  },
-                  "campaign-id": {
-                    "type": "string",
-                    "description": "Campaign ID for campaign-specific repo-memory (optional, used to correlate memory with campaign workflows)"
                   }
                 },
                 "additionalProperties": false
@@ -3896,7 +3888,7 @@
           "oneOf": [
             {
               "type": "object",
-              "description": "Configuration for managing GitHub Projects v2 boards. Smart tool that can add issue/PR items and update custom fields on existing items. By default it is update-only: if the project does not exist, the job fails with instructions to create it manually. To allow workflows to create missing projects, explicitly opt in via the agent output field create_if_missing=true (and/or provide a github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT) or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output items produced by the agent use type=update_project Configuration also supports an optional views array for declaring project views to create. Safe output items produced by the agent use type=update_project and may include: project (board name), content_type (issue|pull_request), content_number, fields, campaign_id, and create_if_missing.",
+              "description": "Configuration for managing GitHub Projects v2 boards. Smart tool that can add issue/PR items and update custom fields on existing items. By default it is update-only: if the project does not exist, the job fails with instructions to create it manually. To allow workflows to create missing projects, explicitly opt in via the agent output field create_if_missing=true (and/or provide a github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT) or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be used for Projects v2. Safe output items produced by the agent use type=update_project. Configuration also supports an optional views array for declaring project views to create. Safe output items produced by the agent use type=update_project and may include: project (board name), content_type (issue|pull_request), content_number, fields, and create_if_missing.",
               "required": ["project"],
               "properties": {
                 "max": {
@@ -3925,7 +3917,7 @@
                     "properties": {
                       "name": {
                         "type": "string",
-                        "description": "The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')"
+                        "description": "The name of the view (e.g., 'Sprint Board', 'Roadmap')"
                       },
                       "layout": {
                         "type": "string",
@@ -3953,14 +3945,14 @@
                 },
                 "field-definitions": {
                   "type": "array",
-                  "description": "Optional array of project custom fields to create up-front. Useful for campaign projects that require a fixed set of fields.",
+                  "description": "Optional array of project custom fields to create up-front.",
                   "items": {
                     "type": "object",
                     "required": ["name", "data-type"],
                     "properties": {
                       "name": {
                         "type": "string",
-                        "description": "The field name to create (e.g., 'status', 'campaign_id')"
+                        "description": "The field name to create (e.g., 'status', 'priority')"
                       },
                       "data-type": {
                         "type": "string",
@@ -4019,7 +4011,7 @@
                 },
                 "title-prefix": {
                   "type": "string",
-                  "description": "Optional prefix for auto-generated project titles (default: 'Campaign'). When the agent doesn't provide a title, the project title is auto-generated as '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the issue context."
+                  "description": "Optional prefix for auto-generated project titles (default: 'Project'). When the agent doesn't provide a title, the project title is auto-generated as '<title-prefix>: <issue-title>' or '<title-prefix> #<issue-number>' based on the issue context."
                 },
                 "views": {
                   "type": "array",
@@ -4031,7 +4023,7 @@
                     "properties": {
                       "name": {
                         "type": "string",
-                        "description": "The name of the view (e.g., 'Sprint Board', 'Campaign Roadmap')"
+                        "description": "The name of the view (e.g., 'Sprint Board', 'Roadmap')"
                       },
                       "layout": {
                         "type": "string",
@@ -4059,14 +4051,14 @@
                 },
                 "field-definitions": {
                   "type": "array",
-                  "description": "Optional array of project custom fields to create automatically after project creation. Useful for campaign projects that require a fixed set of fields.",
+                  "description": "Optional array of project custom fields to create automatically after project creation.",
                   "items": {
                     "type": "object",
                     "required": ["name", "data-type"],
                     "properties": {
                       "name": {
                         "type": "string",
-                        "description": "The field name to create (e.g., 'Campaign Id', 'Priority')"
+                        "description": "The field name to create (e.g., 'Priority', 'Classification')"
                       },
                       "data-type": {
                         "type": "string",
@@ -4105,7 +4097,7 @@
           "oneOf": [
             {
               "type": "object",
-              "description": "Configuration for creating GitHub Project status updates. Status updates provide stakeholder communication and historical record of project progress. Requires a Personal Access Token (PAT) or GitHub App token with Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects v2. Status updates are created on the specified project board and appear in the Updates tab. Typically used by campaign orchestrators to post run summaries with progress, findings, and next steps.",
+              "description": "Configuration for creating GitHub Project status updates. Status updates provide stakeholder communication and historical record of project progress. Requires a Personal Access Token (PAT) or GitHub App token with Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects v2. Status updates are created on the specified project board and appear in the Updates tab. Typically used by orchestrators to post run summaries with progress, findings, and next steps.",
               "required": ["project"],
               "properties": {
                 "max": {

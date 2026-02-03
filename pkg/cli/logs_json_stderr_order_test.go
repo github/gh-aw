@@ -56,7 +56,6 @@ func TestLogsJSONOutputBeforeStderr(t *testing.T) {
 		false,                             // parse
 		true,                              // jsonOutput - THIS IS KEY
 		10,                                // timeout
-		false,                             // campaignOnly
 		"summary.json",                    // summaryFile
 		"",                                // safeOutputType
 	)
@@ -177,7 +176,6 @@ func TestLogsJSONAndStderrRedirected(t *testing.T) {
 		false,
 		true, // jsonOutput
 		10,
-		false,
 		"summary.json",
 		"", // safeOutputType
 	)

@@ -97,19 +97,19 @@ describe("push_repo_memory.cjs - globPatternToRegex helper", () => {
       expect(flexibleRegex.test("metrics/daily/file.json")).toBe(true);
     });
 
-    it("should match campaign-specific patterns", () => {
-      const cursorRegex = globPatternToRegex("security-q1/cursor.json");
-      const metricsRegex = globPatternToRegex("security-q1/metrics/**");
+    it("should match subdirectory-specific patterns", () => {
+      const cursorRegex = globPatternToRegex("project-1/cursor.json");
+      const metricsRegex = globPatternToRegex("project-1/metrics/**");
 
-      expect(cursorRegex.test("security-q1/cursor.json")).toBe(true);
-      expect(cursorRegex.test("security-q1/metrics/file.json")).toBe(false);
+      expect(cursorRegex.test("project-1/cursor.json")).toBe(true);
+      expect(cursorRegex.test("project-1/metrics/file.json")).toBe(false);
 
-      expect(metricsRegex.test("security-q1/metrics/2024-12-29.json")).toBe(true);
-      expect(metricsRegex.test("security-q1/metrics/daily/snapshot.json")).toBe(true);
-      expect(metricsRegex.test("security-q1/cursor.json")).toBe(false);
+      expect(metricsRegex.test("project-1/metrics/2024-12-29.json")).toBe(true);
+      expect(metricsRegex.test("project-1/metrics/daily/snapshot.json")).toBe(true);
+      expect(metricsRegex.test("project-1/cursor.json")).toBe(false);
     });
 
-    it("should match flexible campaign pattern for both dated and non-dated structures", () => {
+    it("should match flexible prefix pattern for both dated and non-dated structures", () => {
       // Pattern: go-file-size-reduction-project64*/**
       // This should match BOTH:
       // - go-file-size-reduction-project64-2025-12-31/ (with date suffix)
@@ -124,9 +124,9 @@ describe("push_repo_memory.cjs - globPatternToRegex helper", () => {
       expect(flexibleRegex.test("go-file-size-reduction-project64/cursor.json")).toBe(true);
       expect(flexibleRegex.test("go-file-size-reduction-project64/metrics/2025-12-31.json")).toBe(true);
 
-      // Should not match other campaigns
-      expect(flexibleRegex.test("other-campaign/file.json")).toBe(false);
-      expect(flexibleRegex.test("security-q1/cursor.json")).toBe(false);
+      // Should not match other prefixes
+      expect(flexibleRegex.test("other-prefix/file.json")).toBe(false);
+      expect(flexibleRegex.test("project-1/cursor.json")).toBe(false);
     });
 
     it("should match multiple file extensions", () => {
@@ -664,13 +664,13 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
   describe("multi-pattern filter support", () => {
     it("should support multiple space-separated patterns", () => {
-      // Test multiple patterns like "campaign-id/cursor.json campaign-id/metrics/**"
-      const patterns = "security-q1/cursor.json security-q1/metrics/**".split(/\s+/).filter(Boolean);
+      // Test multiple patterns like "project-1/cursor.json project-1/metrics/**"
+      const patterns = "project-1/cursor.json project-1/metrics/**".split(/\s+/).filter(Boolean);
 
       // Each pattern should be validated independently
       expect(patterns).toHaveLength(2);
-      expect(patterns[0]).toBe("security-q1/cursor.json");
-      expect(patterns[1]).toBe("security-q1/metrics/**");
+      expect(patterns[0]).toBe("project-1/cursor.json");
+      expect(patterns[1]).toBe("project-1/metrics/**");
     });
 
     it("should validate each pattern in multi-pattern filter", () => {
@@ -698,9 +698,8 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
       expect(regexPatterns[1].test("data/file.json")).toBe(false);
     });
 
-    it("should handle campaign-specific multi-pattern filters", () => {
-      // Real-world campaign use case: multiple specific patterns
-      const patterns = "security-q1/cursor.json security-q1/metrics/**".split(/\s+/).filter(Boolean);
+    it("should handle multi-pattern filters with nested directories", () => {
+      const patterns = "project-1/cursor.json project-1/metrics/**".split(/\s+/).filter(Boolean);
 
       const regexPatterns = patterns.map(pattern => {
         const regexPattern = pattern
@@ -713,81 +712,14 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
       });
 
       // First pattern: exact cursor file
-      expect(regexPatterns[0].test("security-q1/cursor.json")).toBe(true);
-      expect(regexPatterns[0].test("security-q1/cursor.txt")).toBe(false);
-      expect(regexPatterns[0].test("security-q1/metrics/2024-12-29.json")).toBe(false);
+      expect(regexPatterns[0].test("project-1/cursor.json")).toBe(true);
+      expect(regexPatterns[0].test("project-1/cursor.txt")).toBe(false);
+      expect(regexPatterns[0].test("project-1/metrics/2024-12-29.json")).toBe(false);
 
       // Second pattern: any metrics files
-      expect(regexPatterns[1].test("security-q1/metrics/2024-12-29.json")).toBe(true);
-      expect(regexPatterns[1].test("security-q1/metrics/daily/snapshot.json")).toBe(true);
-      expect(regexPatterns[1].test("security-q1/cursor.json")).toBe(false);
-    });
-  });
-
-  describe("campaign ID validation", () => {
-    it("should extract campaign ID from first pattern", () => {
-      // Test extracting campaign ID from pattern like "security-q1/**"
-      const pattern = "security-q1/**";
-      const match = /^([^*?/]+)\/\*\*/.exec(pattern);
-
-      expect(match).not.toBeNull();
-      expect(match[1]).toBe("security-q1");
-    });
-
-    it("should validate all patterns start with campaign ID", () => {
-      // Test that all patterns must be under campaign-id/ subdirectory
-      const campaignId = "security-q1";
-      const validPatterns = ["security-q1/cursor.json", "security-q1/metrics/**", "security-q1/data/*.txt"];
-
-      for (const pattern of validPatterns) {
-        expect(pattern.startsWith(`${campaignId}/`)).toBe(true);
-      }
-
-      const invalidPatterns = ["other-campaign/cursor.json", "cursor.json", "metrics/**"];
-
-      for (const pattern of invalidPatterns) {
-        expect(pattern.startsWith(`${campaignId}/`)).toBe(false);
-      }
-    });
-
-    it("should handle campaign ID with hyphens and underscores", () => {
-      // Test various campaign ID formats
-      const patterns = ["security-q1-2025/**", "incident_response/**", "rollout-v2_phase1/**"];
-
-      for (const pattern of patterns) {
-        const match = /^([^*?/]+)\/\*\*/.exec(pattern);
-        expect(match).not.toBeNull();
-
-        // Extracted campaign ID should match the prefix
-        const campaignId = match[1];
-        expect(pattern.startsWith(`${campaignId}/`)).toBe(true);
-      }
-    });
-
-    it("should reject patterns not under campaign ID subdirectory", () => {
-      // Test enforcement that patterns must be under campaign-id/
-      const campaignId = "security-q1";
-
-      // Valid: under campaign-id/
-      expect("security-q1/metrics/**".startsWith(`${campaignId}/`)).toBe(true);
-      expect("security-q1/cursor.json".startsWith(`${campaignId}/`)).toBe(true);
-
-      // Invalid: not under campaign-id/
-      expect("metrics/**".startsWith(`${campaignId}/`)).toBe(false);
-      expect("other-campaign/data.json".startsWith(`${campaignId}/`)).toBe(false);
-      expect("cursor.json".startsWith(`${campaignId}/`)).toBe(false);
-    });
-
-    it("should support explicit GH_AW_CAMPAIGN_ID override", () => {
-      // Test that environment variable can override campaign ID detection
-      // This would be simulated in the actual code by process.env.GH_AW_CAMPAIGN_ID
-      const explicitCampaignId = "rollout-v2";
-      const patterns = ["rollout-v2/cursor.json", "rollout-v2/metrics/**"];
-
-      // All patterns should validate against explicit campaign ID
-      for (const pattern of patterns) {
-        expect(pattern.startsWith(`${explicitCampaignId}/`)).toBe(true);
-      }
+      expect(regexPatterns[1].test("project-1/metrics/2024-12-29.json")).toBe(true);
+      expect(regexPatterns[1].test("project-1/metrics/daily/snapshot.json")).toBe(true);
+      expect(regexPatterns[1].test("project-1/cursor.json")).toBe(false);
     });
   });
 
@@ -928,16 +860,16 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
     it("should match patterns against relative paths, not branch-prefixed paths", () => {
       // This test validates the fix for: https://github.com/github/gh-aw/actions/runs/20613564835
-      // Campaign workflows specify patterns relative to the memory directory,
+      // Workflows specify patterns relative to the memory directory,
       // not including the branch name prefix.
       //
       // Example scenario:
-      // - Branch name: memory/campaigns
+      // - Branch name: memory/tracking
       // - File in artifact: go-file-size-reduction-project64/cursor.json
       // - Pattern: go-file-size-reduction-project64/**
       //
       // The pattern should match the file's relative path within the memory directory,
-      // NOT the full branch path (memory/campaigns/go-file-size-reduction-project64/cursor.json).
+      // NOT the full branch path (memory/tracking/go-file-size-reduction-project64/cursor.json).
 
       const fileGlobFilter = "go-file-size-reduction-project64/**";
       const relativeFilePath = "go-file-size-reduction-project64/cursor.json";
@@ -962,17 +894,17 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
       expect(matchesRelativePath).toBe(true);
 
       // Verify it would NOT match if we incorrectly prepended branch name
-      const branchName = "memory/campaigns";
+      const branchName = "memory/tracking";
       const branchRelativePath = `${branchName}/${relativeFilePath}`;
       const matchesBranchPath = patterns.some(p => p.test(branchRelativePath));
       expect(matchesBranchPath).toBe(false); // This is the bug we're fixing!
 
-      // Additional test cases for the campaign pattern
+      // Additional test cases for the pattern
       const testFiles = [
         { path: "go-file-size-reduction-project64/cursor.json", shouldMatch: true },
         { path: "go-file-size-reduction-project64/metrics/2024-12-31.json", shouldMatch: true },
         { path: "go-file-size-reduction-project64/data/config.yaml", shouldMatch: true },
-        { path: "other-campaign/cursor.json", shouldMatch: false },
+        { path: "other-prefix/cursor.json", shouldMatch: false },
         { path: "cursor.json", shouldMatch: false },
       ];
 
@@ -983,7 +915,7 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
     });
 
     it("should allow filtering out legacy files from previous runs", () => {
-      // Real-world scenario: The memory/campaigns branch had old files with incorrect
+      // Real-world scenario: A repo-memory branch had old files with incorrect
       // nesting (memory/default/...) from before a bug fix. When cloning this branch,
       // these old files are present alongside new correctly-structured files.
       // The glob filter should match only the new files, allowing old files to be skipped.
@@ -995,7 +927,7 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
       // Legacy files with incorrect nesting (should not match)
       expect(currentPattern.test("memory/default/go-file-size-reduction-20610415309/metrics/2025-12-31.json")).toBe(false);
-      expect(currentPattern.test("memory/campaigns/go-file-size-reduction-project64/cursor.json")).toBe(false);
+      expect(currentPattern.test("memory/tracking/go-file-size-reduction-project64/cursor.json")).toBe(false);
 
       // This behavior allows push_repo_memory.cjs to skip legacy files instead of failing,
       // enabling gradual migration from old to new structure without manual branch cleanup.
@@ -1060,260 +992,6 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
       // Key insight: The branch name is stored in BRANCH_NAME env var, not in file paths.
       // Patterns should match against the relative path within the artifact, not the branch path.
-    });
-  });
-
-  describe("metrics validation error messages", () => {
-    // Helper function to simulate the validation logic from push_repo_memory.cjs
-    function validateCampaignMetricsSnapshot(obj, campaignId, relPath) {
-      function isPlainObject(value) {
-        return typeof value === "object" && value !== null && !Array.isArray(value);
-      }
-
-      if (!isPlainObject(obj)) {
-        throw new Error(`Metrics snapshot must be a JSON object: ${relPath}`);
-      }
-      if (typeof obj.campaign_id !== "string" || obj.campaign_id.trim() === "") {
-        throw new Error(`Metrics snapshot must include non-empty 'campaign_id': ${relPath}`);
-      }
-      if (obj.campaign_id !== campaignId) {
-        throw new Error(`Metrics snapshot 'campaign_id' must match '${campaignId}': ${relPath}`);
-      }
-      if (typeof obj.date !== "string" || obj.date.trim() === "") {
-        throw new Error(`Metrics snapshot must include non-empty 'date' (YYYY-MM-DD): ${relPath}`);
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(obj.date)) {
-        throw new Error(`Metrics snapshot 'date' must be YYYY-MM-DD: ${relPath}`);
-      }
-
-      // Require these to be present and non-negative integers (aligns with CampaignMetricsSnapshot).
-      const requiredIntFields = ["tasks_total", "tasks_completed"];
-      for (const field of requiredIntFields) {
-        const value = obj[field];
-        if (value === null || value === undefined) {
-          throw new Error(`Metrics snapshot '${field}' is required but was ${value === null ? "null" : "undefined"}: ${relPath}`);
-        }
-        if (typeof value !== "number") {
-          throw new Error(`Metrics snapshot '${field}' must be a number, got ${typeof value} (value: ${JSON.stringify(value)}): ${relPath}`);
-        }
-        if (!Number.isInteger(value)) {
-          throw new Error(`Metrics snapshot '${field}' must be an integer, got ${value}: ${relPath}`);
-        }
-        if (value < 0) {
-          throw new Error(`Metrics snapshot '${field}' must be non-negative, got ${value}: ${relPath}`);
-        }
-      }
-
-      // Optional numeric fields, if present.
-      const optionalIntFields = ["tasks_in_progress", "tasks_blocked"];
-      for (const field of optionalIntFields) {
-        const value = obj[field];
-        if (value !== undefined && value !== null) {
-          if (typeof value !== "number") {
-            throw new Error(`Metrics snapshot '${field}' must be a number when present, got ${typeof value} (value: ${JSON.stringify(value)}): ${relPath}`);
-          }
-          if (!Number.isInteger(value)) {
-            throw new Error(`Metrics snapshot '${field}' must be an integer when present, got ${value}: ${relPath}`);
-          }
-          if (value < 0) {
-            throw new Error(`Metrics snapshot '${field}' must be non-negative when present, got ${value}: ${relPath}`);
-          }
-        }
-      }
-      if (obj.velocity_per_day !== undefined && obj.velocity_per_day !== null) {
-        const value = obj.velocity_per_day;
-        if (typeof value !== "number") {
-          throw new Error(`Metrics snapshot 'velocity_per_day' must be a number when present, got ${typeof value} (value: ${JSON.stringify(value)}): ${relPath}`);
-        }
-        if (value < 0) {
-          throw new Error(`Metrics snapshot 'velocity_per_day' must be non-negative when present, got ${value}: ${relPath}`);
-        }
-      }
-      if (obj.estimated_completion !== undefined && obj.estimated_completion !== null) {
-        const value = obj.estimated_completion;
-        if (typeof value !== "string") {
-          throw new Error(`Metrics snapshot 'estimated_completion' must be a string when present, got ${typeof value} (value: ${JSON.stringify(value)}): ${relPath}`);
-        }
-      }
-    }
-
-    it("should provide clear error message when tasks_total is null", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: null,
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_total' is required but was null: test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should provide clear error message when tasks_total is undefined", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_total' is required but was undefined: test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should provide clear error message when tasks_total is a string", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: "10",
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_total' must be a number, got string (value: \"10\"): test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should provide clear error message when tasks_total is a float", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10.5,
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_total' must be an integer, got 10.5: test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should provide clear error message when tasks_total is negative", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: -5,
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_total' must be non-negative, got -5: test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should accept valid integer values for required fields", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).not.toThrow();
-    });
-
-    it("should accept zero for required integer fields", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 0,
-        tasks_completed: 0,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).not.toThrow();
-    });
-
-    it("should allow optional fields to be undefined", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-        // tasks_in_progress, tasks_blocked, velocity_per_day, estimated_completion are undefined
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).not.toThrow();
-    });
-
-    it("should allow optional fields to be null", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-        tasks_in_progress: null,
-        tasks_blocked: null,
-        velocity_per_day: null,
-        estimated_completion: null,
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).not.toThrow();
-    });
-
-    it("should validate optional integer fields when present", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-        tasks_in_progress: "3", // Invalid: string instead of number
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_in_progress' must be a number when present, got string (value: \"3\"): test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should validate optional float fields when present", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-        velocity_per_day: "2.5", // Invalid: string instead of number
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'velocity_per_day' must be a number when present, got string (value: \"2.5\"): test-campaign/metrics/2025-12-31.json");
-    });
-
-    it("should accept valid optional fields", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: 5,
-        tasks_in_progress: 3,
-        tasks_blocked: 1,
-        velocity_per_day: 2.5,
-        estimated_completion: "2026-01-15",
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).not.toThrow();
-    });
-
-    it("should validate tasks_completed field with same rigor as tasks_total", () => {
-      const metricsSnapshot = {
-        date: "2025-12-31",
-        campaign_id: "test-campaign",
-        tasks_total: 10,
-        tasks_completed: "5", // Invalid: string
-      };
-
-      expect(() => {
-        validateCampaignMetricsSnapshot(metricsSnapshot, "test-campaign", "test-campaign/metrics/2025-12-31.json");
-      }).toThrow("Metrics snapshot 'tasks_completed' must be a number, got string (value: \"5\"): test-campaign/metrics/2025-12-31.json");
     });
   });
 });

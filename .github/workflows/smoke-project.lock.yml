@@ -217,14 +217,10 @@ jobs:
               "name": "noop"
             },
             {
-              "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number. Use campaign_id to group related items.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title.\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
+              "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title.\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
-                  "campaign_id": {
-                    "description": "Campaign identifier to group related project items. Used to track items created by the same campaign or workflow run.",
-                    "type": "string"
-                  },
                   "content_number": {
                     "description": "Issue or pull request number to add to the project. This is the numeric ID from the GitHub URL (e.g., 123 in github.com/owner/repo/issues/123 for issue #123, or 456 in github.com/owner/repo/pull/456 for PR #456). Required when content_type is 'issue' or 'pull_request'.",
                     "type": "number"
@@ -291,7 +287,7 @@ jobs:
                     "type": "object"
                   },
                   "operation": {
-                    "description": "Optional operation mode. Use create_fields to create required campaign fields up-front, or create_view to add a project view. When omitted, the tool adds/updates project items.",
+                    "description": "Optional operation mode. Use create_fields to create required fields up-front, or create_view to add a project view. When omitted, the tool adds/updates project items.",
                     "enum": [
                       "create_fields",
                       "create_view"
@@ -492,11 +488,6 @@ jobs:
             "update_project": {
               "defaultMax": 10,
               "fields": {
-                "campaign_id": {
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                },
                 "content_number": {
                   "optionalPositiveInteger": true
                 },

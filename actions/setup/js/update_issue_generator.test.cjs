@@ -18,7 +18,7 @@ const mockCore = {
 // Set up global mocks expected by the scripts we import
 global.core = mockCore;
 
-describe("update_issue.cjs - campaign generator payload", () => {
+describe("update_issue.cjs - generator payload", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -29,8 +29,8 @@ describe("update_issue.cjs - campaign generator payload", () => {
 
     const { success, data } = updateIssueModule.buildIssueUpdateData(
       {
-        // This is representative of how the campaign generator should update the triggering issue.
-        body: "## Campaign setup status\n\n**Status:** Ready for PR review\n\nDocs: https://github.github.com/gh-aw/guides/campaigns/getting-started/\n",
+        // Representative of a generator updating the triggering issue.
+        body: "## Run status\n\n**Status:** Ready for review\n",
       },
       {}
     );
@@ -39,7 +39,7 @@ describe("update_issue.cjs - campaign generator payload", () => {
 
     // The handler should keep the raw body + operation so it can append + add footer.
     expect(data._operation).toBe("append");
-    expect(data._rawBody).toContain("## Campaign setup status");
+    expect(data._rawBody).toContain("## Run status");
 
     // The actual API body is computed later (after fetching current issue body).
     expect(data.body).toBeUndefined();

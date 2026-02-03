@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 
 let updateProject;
 let parseProjectInput;
-let generateCampaignId;
 let updateProjectHandlerFactory;
 
 const mockCore = {
@@ -53,7 +52,6 @@ beforeAll(async () => {
   const exports = mod.default || mod;
   updateProject = exports.updateProject;
   parseProjectInput = exports.parseProjectInput;
-  generateCampaignId = exports.generateCampaignId;
   updateProjectHandlerFactory = exports.main;
   // Call main to execute the module
   if (exports.main) {
@@ -102,7 +100,7 @@ describe("update_project handler config: field_definitions", () => {
 
     const handler = await updateProjectHandlerFactory({
       max: 10,
-      field_definitions: [{ name: "campaign_id", data_type: "TEXT" }],
+      field_definitions: [{ name: "classification", data_type: "TEXT" }],
     });
 
     await handler(
@@ -298,15 +296,6 @@ describe("parseProjectInput", () => {
   });
 });
 
-describe("generateCampaignId", () => {
-  it("builds a slug with a timestamp suffix", () => {
-    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1734470400000);
-    const id = generateCampaignId("https://github.com/orgs/acme/projects/42", "42");
-    expect(id).toBe("acme-project-42-m4syw5xc");
-    nowSpy.mockRestore();
-  });
-});
-
 describe("updateProject", () => {
   it("creates a view for an org-owned project", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
@@ -415,25 +404,6 @@ describe("updateProject", () => {
     await expect(updateProject(output)).rejects.toThrow(/not found or not accessible/);
   });
 
-  it("respects a custom campaign id", async () => {
-    const projectUrl = "https://github.com/orgs/testowner/projects/60";
-    const output = {
-      type: "update_project",
-      project: projectUrl,
-      campaign_id: "custom-id-2025",
-      content_type: "issue",
-      content_number: 42,
-    };
-
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project456"), issueResponse("issue-id-42"), emptyItemsResponse(), { addProjectV2ItemById: { item: { id: "item-custom" } } }]);
-
-    await updateProject(output);
-
-    const labelCall = mockGithub.rest.issues.addLabels.mock.calls[0][0];
-    expect(labelCall.labels).toEqual(["z_campaign_custom-id-2025"]);
-    expect(getOutput("item-id")).toBe("item-custom");
-  });
-
   it("adds an issue to a project board", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const output = { type: "update_project", project: projectUrl, content_type: "issue", content_number: 42 };
@@ -442,28 +412,8 @@ describe("updateProject", () => {
 
     await updateProject(output);
 
-    // No campaign label should be added when campaign_id is not provided
+    // update_project no longer adds labels as a side effect
     expect(mockGithub.rest.issues.addLabels).not.toHaveBeenCalled();
-    expect(getOutput("item-id")).toBe("item123");
-  });
-
-  it("adds an issue to a project board with campaign label when campaign_id provided", async () => {
-    const projectUrl = "https://github.com/orgs/testowner/projects/60";
-    const output = { type: "update_project", project: projectUrl, content_type: "issue", content_number: 42, campaign_id: "my-campaign" };
-
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project123"), issueResponse("issue-id-42"), emptyItemsResponse(), { addProjectV2ItemById: { item: { id: "item123" } } }]);
-
-    await updateProject(output);
-
-    const labelCall = mockGithub.rest.issues.addLabels.mock.calls[0][0];
-    expect(labelCall).toEqual(
-      expect.objectContaining({
-        owner: "testowner",
-        repo: "testrepo",
-        issue_number: 42,
-      })
-    );
-    expect(labelCall.labels).toEqual(["z_campaign_my-campaign"]);
     expect(getOutput("item-id")).toBe("item123");
   });
 
@@ -521,7 +471,7 @@ describe("updateProject", () => {
 
     await updateProject(output);
 
-    // No campaign label should be added when campaign_id is not provided
+    // update_project no longer adds labels as a side effect
     expect(mockGithub.rest.issues.addLabels).not.toHaveBeenCalled();
   });
 
@@ -535,7 +485,7 @@ describe("updateProject", () => {
 
     expect(mockCore.warning).toHaveBeenCalledWith('Field "issue" deprecated; use "content_number" instead.');
 
-    // No campaign label should be added when campaign_id is not provided
+    // update_project no longer adds labels as a side effect
     expect(mockGithub.rest.issues.addLabels).not.toHaveBeenCalled();
     expect(getOutput("item-id")).toBe("legacy-item");
   });
@@ -743,37 +693,9 @@ describe("updateProject", () => {
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining('Failed to create field "NonExistentField"'));
   });
 
-  it("warns when adding the campaign label fails", async () => {
-    const projectUrl = "https://github.com/orgs/testowner/projects/60";
-    const output = { type: "update_project", project: projectUrl, content_type: "issue", content_number: 50, campaign_id: "test-campaign" };
-
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-label"), issueResponse("issue-id-50"), emptyItemsResponse(), { addProjectV2ItemById: { item: { id: "item-label" } } }]);
-
-    mockGithub.rest.issues.addLabels.mockRejectedValueOnce(new Error("Labels disabled"));
-
-    await updateProject(output);
-
-    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to add campaign label"));
-  });
-
   it("rejects non-URL project identifier", async () => {
-    const output = { type: "update_project", project: "My Campaign", campaign_id: "my-campaign-123" };
+    const output = { type: "update_project", project: "Engineering Roadmap" };
     await expect(updateProject(output)).rejects.toThrow(/full GitHub project URL/);
-  });
-
-  it("accepts URL project identifier when campaign_id is present", async () => {
-    const projectUrl = "https://github.com/orgs/testowner/projects/60";
-    const output = {
-      type: "update_project",
-      project: projectUrl,
-      campaign_id: "my-campaign-123",
-    };
-
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project123")]);
-
-    await updateProject(output);
-
-    expect(mockCore.error).not.toHaveBeenCalled();
   });
 
   it("correctly identifies DATE fields and uses date format (not singleSelectOptionId)", async () => {
@@ -1211,7 +1133,7 @@ describe("updateProject", () => {
     expect(updateFieldCall).toBeUndefined();
   });
 
-  it("creates campaign_id field as TEXT type (not SINGLE_SELECT)", async () => {
+  it("creates classification field as TEXT type (not SINGLE_SELECT)", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const output = {
       type: "update_project",
@@ -1219,24 +1141,24 @@ describe("updateProject", () => {
       content_type: "issue",
       content_number: 100,
       fields: {
-        campaign_id: "my-campaign-123",
+        classification: "high",
       },
     };
 
     queueResponses([
       repoResponse(),
       viewerResponse(),
-      orgProjectV2Response(projectUrl, 60, "project-campaign-id"),
+      orgProjectV2Response(projectUrl, 60, "project-id-60"),
       issueResponse("issue-id-100"),
-      existingItemResponse("issue-id-100", "item-campaign-id"),
-      // No existing fields - will need to create campaign_id as TEXT
+      existingItemResponse("issue-id-100", "item-id-100"),
+      // No existing fields - will need to create Classification as TEXT
       fieldsResponse([]),
-      // Response for creating campaign_id field as TEXT type (not SINGLE_SELECT)
+      // Response for creating Classification field as TEXT type
       {
         createProjectV2Field: {
           projectV2Field: {
-            id: "field-campaign-id",
-            name: "Campaign Id",
+            id: "field-id-classification",
+            name: "Classification",
           },
         },
       },
@@ -1245,20 +1167,20 @@ describe("updateProject", () => {
 
     await updateProject(output);
 
-    // Verify that campaign_id field was created with TEXT type (not SINGLE_SELECT)
+    // Verify that field was created with TEXT type (not SINGLE_SELECT)
     const createCalls = mockGithub.graphql.mock.calls.filter(([query]) => query.includes("createProjectV2Field"));
     expect(createCalls.length).toBe(1);
 
     // Check that the field was created with TEXT dataType
     expect(createCalls[0][1].dataType).toBe("TEXT");
-    expect(createCalls[0][1].name).toBe("Campaign Id");
+    expect(createCalls[0][1].name).toBe("Classification");
     // Verify that singleSelectOptions was NOT provided (which would indicate SINGLE_SELECT)
     expect(createCalls[0][1].singleSelectOptions).toBeUndefined();
 
     // Verify the field value was set using text format
     const updateCalls = mockGithub.graphql.mock.calls.filter(([query]) => query.includes("updateProjectV2ItemFieldValue"));
     expect(updateCalls.length).toBe(1);
-    expect(updateCalls[0][1].value).toEqual({ text: "my-campaign-123" });
+    expect(updateCalls[0][1].value).toEqual({ text: "high" });
   });
 
   it("should reject update_project message with missing project field", async () => {

@@ -6,7 +6,7 @@
 //   - Coordinating the main download workflow (DownloadWorkflowLogs)
 //   - Managing pagination and iteration through workflow runs
 //   - Concurrent downloading of artifacts from multiple runs
-//   - Applying filters (engine, firewall, staged, campaign, etc.)
+//   - Applying filters (engine, firewall, staged, etc.)
 //   - Building and rendering output (console, JSON, tool graphs)
 
 package cli
@@ -40,8 +40,8 @@ func getMaxConcurrentDownloads() int {
 }
 
 // DownloadWorkflowLogs downloads and analyzes workflow logs with metrics
-func DownloadWorkflowLogs(ctx context.Context, workflowName string, count int, startDate, endDate, outputDir, engine, ref string, beforeRunID, afterRunID int64, repoOverride string, verbose bool, toolGraph bool, noStaged bool, firewallOnly bool, noFirewall bool, parse bool, jsonOutput bool, timeout int, campaignOnly bool, summaryFile string, safeOutputType string) error {
-	logsOrchestratorLog.Printf("Starting workflow log download: workflow=%s, count=%d, startDate=%s, endDate=%s, outputDir=%s, campaignOnly=%v, summaryFile=%s, safeOutputType=%s", workflowName, count, startDate, endDate, outputDir, campaignOnly, summaryFile, safeOutputType)
+func DownloadWorkflowLogs(ctx context.Context, workflowName string, count int, startDate, endDate, outputDir, engine, ref string, beforeRunID, afterRunID int64, repoOverride string, verbose bool, toolGraph bool, noStaged bool, firewallOnly bool, noFirewall bool, parse bool, jsonOutput bool, timeout int, summaryFile string, safeOutputType string) error {
+	logsOrchestratorLog.Printf("Starting workflow log download: workflow=%s, count=%d, startDate=%s, endDate=%s, outputDir=%s, summaryFile=%s, safeOutputType=%s", workflowName, count, startDate, endDate, outputDir, summaryFile, safeOutputType)
 
 	// Check context cancellation at the start
 	select {
@@ -208,22 +208,8 @@ func DownloadWorkflowLogs(ctx context.Context, workflowName string, count int, s
 				awInfoPath := filepath.Join(result.LogsPath, "aw_info.json")
 
 				// Only parse if we need it for any filter
-				if engine != "" || noStaged || firewallOnly || noFirewall || campaignOnly {
+				if engine != "" || noStaged || firewallOnly || noFirewall {
 					awInfo, awInfoErr = parseAwInfo(awInfoPath, verbose)
-				}
-
-				// Apply campaign filtering if --campaign flag is specified
-				if campaignOnly {
-					// Campaign orchestrator workflows end with .campaign.lock.yml
-					isCampaign := strings.HasSuffix(result.Run.WorkflowName, " Campaign Orchestrator") ||
-						strings.Contains(result.Run.WorkflowPath, ".campaign.lock.yml")
-
-					if !isCampaign {
-						if verbose {
-							fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Skipping run %d: not a campaign orchestrator workflow", result.Run.DatabaseID)))
-						}
-						continue
-					}
 				}
 
 				// Apply engine filtering if specified

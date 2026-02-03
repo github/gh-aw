@@ -98,7 +98,7 @@ describe("glob_pattern_helpers.cjs", () => {
         expect(flexibleRegex.test("metrics/daily/file.json")).toBe(true);
       });
 
-      it("should match campaign-specific patterns", () => {
+      it("should match prefix-scoped patterns", () => {
         const cursorRegex = globPatternToRegex("security-q1/cursor.json");
         const metricsRegex = globPatternToRegex("security-q1/metrics/**");
 
@@ -277,7 +277,7 @@ describe("glob_pattern_helpers.cjs", () => {
       expect(matchesGlobPattern("script.js", filter)).toBe(false);
     });
 
-    it("should work with campaign patterns", () => {
+    it("should work with prefix-scoped patterns", () => {
       const filter = "security-q1/cursor.json security-q1/metrics/**";
 
       expect(matchesGlobPattern("security-q1/cursor.json", filter)).toBe(true);

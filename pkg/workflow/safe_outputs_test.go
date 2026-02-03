@@ -954,21 +954,18 @@ func TestBuildStandardSafeOutputEnvVars(t *testing.T) {
 			},
 		},
 		{
-			name: "with repo-memory campaign-id",
+			name: "with repo-memory",
 			workflowData: &WorkflowData{
 				Name:        "Test Workflow",
 				SafeOutputs: &SafeOutputsConfig{},
 				RepoMemoryConfig: &RepoMemoryConfig{
 					Memories: []RepoMemoryEntry{{
-						ID:         "campaigns",
-						CampaignID: "security-alert-burndown",
+						ID: "notes",
 					}},
 				},
 			},
 			targetRepoSlug: "",
-			expectedInVars: []string{
-				"GH_AW_CAMPAIGN_ID: \"security-alert-burndown\"",
-			},
+			expectedInVars: []string{},
 		},
 	}
 

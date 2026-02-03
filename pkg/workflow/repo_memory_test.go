@@ -666,52 +666,6 @@ func TestRepoMemoryMaxFileCountValidationArray(t *testing.T) {
 	}
 }
 
-// TestRepoMemoryConfigWithCampaignID tests repo-memory configuration with campaign-id field
-func TestRepoMemoryConfigWithCampaignID(t *testing.T) {
-	toolsMap := map[string]any{
-		"repo-memory": []any{
-			map[string]any{
-				"id":          "campaigns",
-				"branch-name": "memory/campaigns",
-				"file-glob":   []any{"go-file-size-reduction-project64/**"},
-				"campaign-id": "go-file-size-reduction-project64",
-			},
-		},
-	}
-
-	toolsConfig, err := ParseToolsConfig(toolsMap)
-	if err != nil {
-		t.Fatalf("Failed to parse tools config: %v", err)
-	}
-
-	compiler := NewCompiler()
-	config, err := compiler.extractRepoMemoryConfig(toolsConfig)
-	if err != nil {
-		t.Fatalf("Failed to extract repo-memory config: %v", err)
-	}
-
-	if config == nil {
-		t.Fatal("Expected non-nil config")
-	}
-
-	if len(config.Memories) != 1 {
-		t.Fatalf("Expected 1 memory, got %d", len(config.Memories))
-	}
-
-	memory := config.Memories[0]
-	if memory.ID != "campaigns" {
-		t.Errorf("Expected ID 'campaigns', got '%s'", memory.ID)
-	}
-
-	if memory.CampaignID != "go-file-size-reduction-project64" {
-		t.Errorf("Expected campaign ID 'go-file-size-reduction-project64', got '%s'", memory.CampaignID)
-	}
-
-	if len(memory.FileGlob) != 1 || memory.FileGlob[0] != "go-file-size-reduction-project64/**" {
-		t.Errorf("Expected file glob 'go-file-size-reduction-project64/**', got %v", memory.FileGlob)
-	}
-}
-
 // TestBranchPrefixValidation tests the validateBranchPrefix function
 func TestBranchPrefixValidation(t *testing.T) {
 	tests := []struct {
@@ -727,7 +681,7 @@ func TestBranchPrefixValidation(t *testing.T) {
 		},
 		{
 			name:    "valid prefix - alphanumeric",
-			prefix:  "campaigns",
+			prefix:  "memories",
 			wantErr: false,
 		},
 		{

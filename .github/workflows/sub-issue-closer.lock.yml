@@ -209,7 +209,7 @@ jobs:
                     ]
                   },
                   "labels": {
-                    "description": "Replace the issue labels with this list (e.g., ['bug', 'campaign:foo']). Labels must exist in the repository.",
+                    "description": "Replace the issue labels with this list (e.g., ['bug', 'tracking:foo']). Labels must exist in the repository.",
                     "items": {
                       "type": "string"
                     },

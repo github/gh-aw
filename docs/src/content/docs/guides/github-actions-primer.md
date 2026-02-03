@@ -15,11 +15,11 @@ This guide introduces GitHub Actions—GitHub's native automation platform—and
 
 Understanding these fundamental concepts is essential for working with both traditional GitHub Actions and agentic workflows.
 
-### Workflows
+### YAML Workflows
 
-A **workflow** is an automated process defined in a YAML file stored in your repository's `.github/workflows/` directory. Each workflow consists of one or more jobs that execute when triggered by specific events.
+A traditional **YAML workflow** is an automated process defined in a YAML file stored in your repository's `.github/workflows/` directory. Each workflow consists of one or more jobs that execute when triggered by specific events.
 
-**Example workflow file** (`.github/workflows/ci.yml`):
+**Example YAML workflow file** (`.github/workflows/ci.yml`):
 
 ```yaml
 name: CI
@@ -39,10 +39,13 @@ jobs:
 ```
 
 **Key characteristics:**
+
 - Must be stored in `.github/workflows/` directory on the **main** or **default branch** to be active
 - Define triggers (events), jobs, and execution environments
 - Can be manually triggered, scheduled, or event-driven
 - Are versioned alongside your code
+
+Agentic workflows compile from markdown files into secure GitHub Actions YAML workflows, inheriting these core concepts while adding AI-driven decision-making and enhanced security.
 
 ### Jobs
 

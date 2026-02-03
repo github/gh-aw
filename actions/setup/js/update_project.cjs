@@ -6,26 +6,6 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { loadTemporaryIdMap, resolveIssueNumber } = require("./temporary_id.cjs");
 
 /**
- * Campaign label prefix constant.
- * Campaign-specific labels follow the format "z_campaign_<id>" where <id> is the campaign identifier.
- * The "z_" prefix ensures these labels sort last in label lists.
- */
-const CAMPAIGN_LABEL_PREFIX = "z_campaign_";
-
-/**
- * Format a campaign ID into a standardized campaign label.
- * Mirrors the logic in pkg/stringutil/identifiers.go:FormatCampaignLabel and
- * actions/setup/js/safe_output_handler_manager.cjs:formatCampaignLabel.
- * @param {string} campaignId - Campaign ID to format
- * @returns {string} Formatted campaign label (e.g., "z_campaign_security-q1-2025")
- */
-function formatCampaignLabel(campaignId) {
-  return `${CAMPAIGN_LABEL_PREFIX}${String(campaignId)
-    .toLowerCase()
-    .replace(/[_\s]+/g, "-")}`;
-}
-
-/**
  * Log detailed GraphQL error information
  * @param {Error & { errors?: Array<{ type?: string, message: string, path?: unknown, locations?: unknown }>, request?: unknown, data?: unknown }} error - GraphQL error
  * @param {string} operation - Operation description
@@ -267,23 +247,6 @@ async function resolveProjectV2(projectInfo, projectNumberInt, github) {
   throw new Error(`Project #${projectNumberInt} not found or not accessible for ${who}.${total} Accessible Projects v2: ${summary}`);
 }
 /**
- * Generate a campaign ID for the project
- * @param {string} projectUrl - Project URL
- * @param {string} projectNumber - Project number
- * @returns {string} Campaign ID
- */
-function generateCampaignId(projectUrl, projectNumber) {
-  const urlMatch = projectUrl.match(/github\.com\/(users|orgs)\/([^/]+)\/projects/);
-  const base = `${urlMatch ? urlMatch[2] : "project"}-project-${projectNumber}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .substring(0, 30);
-  const timestamp = Date.now().toString(36).substring(0, 8);
-  return `${base}-${timestamp}`;
-}
-
-/**
  * Check if a field name conflicts with unsupported GitHub built-in field types
  * @param {string} fieldName - Original field name
  * @param {string} normalizedFieldName - Normalized field name
@@ -362,7 +325,6 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
   const { owner, repo } = context.repo;
   const projectInfo = parseProjectUrl(output.project);
   const projectNumberFromUrl = projectInfo.projectNumber;
-  const campaignId = output.campaign_id;
 
   const wantsCreateView =
     output?.operation === "create_view" ||
@@ -695,7 +657,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
           // Detect expected field type based on field name and value heuristics
           const datePattern = /^\d{4}-\d{2}-\d{2}$/;
           const isDateField = fieldName.toLowerCase().includes("_date") || fieldName.toLowerCase().includes("date");
-          const isTextField = "classification" === fieldName.toLowerCase() || "campaign_id" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|"));
+          const isTextField = "classification" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|"));
           let expectedDataType;
           if (isDateField && typeof fieldValue === "string" && datePattern.test(fieldValue)) {
             expectedDataType = "DATE";
@@ -730,7 +692,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
                 core.warning(`Field "${fieldName}" looks like a date field but value "${fieldValue}" is not in YYYY-MM-DD format. Skipping field creation.`);
                 continue;
               }
-            } else if ("classification" === fieldName.toLowerCase() || "campaign_id" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|")))
+            } else if ("classification" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|")))
               try {
                 field = (
                   await github.graphql(
@@ -859,13 +821,6 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
             { projectId, contentId }
           )
         ).addProjectV2ItemById.item.id;
-        if (campaignId) {
-          try {
-            await github.rest.issues.addLabels({ owner, repo, issue_number: contentNumber, labels: [formatCampaignLabel(campaignId)] });
-          } catch (labelError) {
-            core.warning(`Failed to add campaign label: ${getErrorMessage(labelError)}`);
-          }
-        }
       }
       const fieldsToUpdate = output.fields ? { ...output.fields } : {};
       if (Object.keys(fieldsToUpdate).length > 0) {
@@ -891,7 +846,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
           // Detect expected field type based on field name and value heuristics
           const datePattern = /^\d{4}-\d{2}-\d{2}$/;
           const isDateField = fieldName.toLowerCase().includes("_date") || fieldName.toLowerCase().includes("date");
-          const isTextField = "classification" === fieldName.toLowerCase() || "campaign_id" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|"));
+          const isTextField = "classification" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|"));
           let expectedDataType;
           if (isDateField && typeof fieldValue === "string" && datePattern.test(fieldValue)) {
             expectedDataType = "DATE";
@@ -926,7 +881,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
                 core.warning(`Field "${fieldName}" looks like a date field but value "${fieldValue}" is not in YYYY-MM-DD format. Skipping field creation.`);
                 continue;
               }
-            } else if ("classification" === fieldName.toLowerCase() || "campaign_id" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|")))
+            } else if ("classification" === fieldName.toLowerCase() || ("string" == typeof fieldValue && fieldValue.includes("|")))
               try {
                 field = (
                   await github.graphql(
@@ -1133,7 +1088,7 @@ async function main(config = {}, githubClient = null) {
       }
 
       // Create configured fields once before processing the first message
-      // This ensures campaign-required fields exist even if the agent doesn't explicitly emit operation=create_fields.
+      // This ensures configured fields exist even if the agent doesn't explicitly emit operation=create_fields.
       if (!fieldsCreated && configuredFieldDefinitions.length > 0 && firstProjectUrl) {
         const operation = typeof resolvedMessage?.operation === "string" ? resolvedMessage.operation : "";
         if (operation !== "create_fields") {
@@ -1217,4 +1172,4 @@ async function main(config = {}, githubClient = null) {
   };
 }
 
-module.exports = { updateProject, parseProjectInput, generateCampaignId, main };
+module.exports = { updateProject, parseProjectInput, main };

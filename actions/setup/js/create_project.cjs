@@ -291,7 +291,7 @@ async function main(config = {}, githubClient = null) {
   // Extract configuration
   const defaultTargetOwner = config.target_owner || "";
   const maxCount = config.max || 1;
-  const titlePrefix = config.title_prefix || "Campaign";
+  const titlePrefix = config.title_prefix || "Project";
   const configuredViews = Array.isArray(config.views) ? config.views : [];
 
   // Use the provided github client, or fall back to the global github object
@@ -341,18 +341,18 @@ async function main(config = {}, githubClient = null) {
 
       // Generate a title if not provided by the agent
       if (!title) {
-        // Try to generate a campaign title from the issue context
+        // Try to generate a project title from the issue context
         const issueTitle = context.payload?.issue?.title;
         const issueNumber = context.payload?.issue?.number;
 
         if (issueTitle) {
           // Use the issue title with the configured prefix
           title = `${titlePrefix}: ${issueTitle}`;
-          core.info(`Generated campaign title from issue: "${title}"`);
+          core.info(`Generated title from issue: "${title}"`);
         } else if (issueNumber) {
           // Fallback to issue number if no title is available
           title = `${titlePrefix} #${issueNumber}`;
-          core.info(`Generated campaign title from issue number: "${title}"`);
+          core.info(`Generated title from issue number: "${title}"`);
         } else {
           throw new Error("Missing required field 'title' in create_project call and unable to generate from context");
         }
