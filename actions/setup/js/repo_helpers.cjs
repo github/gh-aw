@@ -51,7 +51,7 @@ function getDefaultTargetRepo(config) {
  * Validate that a repo is allowed for operations
  * If repo is a bare name (no slash), it is automatically qualified with the
  * default repo's organization (e.g., "gh-aw" becomes "github/gh-aw" if
- * the default repo is "githubnext/something").
+ * the default repo is "github/something").
  * @param {string} repo - Repository slug to validate (can be "owner/repo" or just "repo")
  * @param {string} defaultRepo - Default target repository
  * @param {Set<string>} allowedRepos - Set of explicitly allowed repos
