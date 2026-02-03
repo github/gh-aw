@@ -900,21 +900,15 @@ network:
     # example.com itself) and ecosystem names like 'python', 'node'.
 
 # Sandbox configuration for AI engines. Controls agent sandbox (AWF or Sandbox
-# Runtime) and MCP gateway.
+# Runtime) and MCP gateway. The agent sandbox is mandatory and cannot be disabled.
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: Set to false to completely disable sandbox features (firewall and
-# gateway). Warning: This removes important security protections and should only
-# be used in controlled environments. Not allowed in strict mode.
-sandbox: true
+# Option 1: Legacy string format for sandbox type: 'awf' for Agent Workflow 
+# Firewall (default), 'srt' for Anthropic Sandbox Runtime
+sandbox: "awf"
 
-# Option 2: Legacy string format for sandbox type: 'default' for no sandbox,
-# 'sandbox-runtime' or 'srt' for Anthropic Sandbox Runtime, 'awf' for Agent
-# Workflow Firewall
-sandbox: "default"
-
-# Option 3: Object format for full sandbox configuration with agent and mcp
+# Option 2: Object format for full sandbox configuration with agent and mcp
 # options
 sandbox:
   # Legacy sandbox type field (use agent instead)
