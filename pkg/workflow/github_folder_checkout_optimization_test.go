@@ -18,11 +18,11 @@ import (
 // redundant checkout operations.
 func TestGitHubFolderCheckoutOptimization(t *testing.T) {
 	tests := []struct {
-		name                    string
-		workflowContent         string
-		expectGitHubCheckout    bool
-		expectFullCheckout      bool
-		description             string
+		name                 string
+		workflowContent      string
+		expectGitHubCheckout bool
+		expectFullCheckout   bool
+		description          string
 	}{
 		{
 			name: "full_checkout_no_github_sparse",
