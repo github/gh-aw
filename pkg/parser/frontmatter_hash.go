@@ -127,6 +127,7 @@ func buildCanonicalFrontmatter(frontmatter map[string]any, result *ImportsResult
 	addSlice("merged-safe-outputs", result.MergedSafeOutputs)
 	addSlice("merged-safe-inputs", result.MergedSafeInputs)
 	addString("merged-steps", result.MergedSteps)
+	addString("copilot-setup-steps", result.CopilotSetupSteps)
 	addString("merged-runtimes", result.MergedRuntimes)
 	addString("merged-services", result.MergedServices)
 	addString("merged-network", result.MergedNetwork)

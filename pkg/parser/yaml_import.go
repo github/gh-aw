@@ -55,8 +55,18 @@ func isActionDefinitionFile(filePath string, content []byte) (bool, error) {
 	return false, nil
 }
 
+// isCopilotSetupStepsFile checks if a file is the special copilot-setup-steps file
+// This file receives special handling - only steps are extracted from the setup job
+// Supports both .yml and .yaml extensions for consistency with GitHub Actions
+func isCopilotSetupStepsFile(filePath string) bool {
+	base := filepath.Base(filePath)
+	lower := strings.ToLower(base)
+	return lower == "copilot-setup-steps.yml" || lower == "copilot-setup-steps.yaml"
+}
+
 // processYAMLWorkflowImport processes an imported YAML workflow file
 // Returns the extracted jobs in JSON format for merging
+// Special case: For copilot-setup-steps.yml, returns steps in YAML format instead of jobs
 func processYAMLWorkflowImport(filePath string) (jobs string, services string, err error) {
 	yamlImportLog.Printf("Processing YAML workflow import: %s", filePath)
 
@@ -86,6 +96,18 @@ func processYAMLWorkflowImport(filePath string) (jobs string, services string, e
 	_, hasJobs := workflow["jobs"]
 	if !hasOn && !hasJobs {
 		return "", "", fmt.Errorf("not a valid GitHub Actions workflow: missing 'on' or 'jobs' field")
+	}
+
+	// Special handling for copilot-setup-steps.yml: extract only steps from the setup job
+	if isCopilotSetupStepsFile(filePath) {
+		yamlImportLog.Printf("Detected copilot-setup-steps.yml - extracting steps from setup job")
+		stepsYAML, err := extractStepsFromCopilotSetup(workflow)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to extract steps from copilot-setup-steps.yml: %w", err)
+		}
+		// Return steps as "jobs" string for compatibility with the import processor.
+		// The import processor will route this to ImportsResult.CopilotSetupSteps.
+		return stepsYAML, "", nil
 	}
 
 	// Extract jobs section
@@ -137,4 +159,51 @@ func processYAMLWorkflowImport(filePath string) (jobs string, services string, e
 	}
 
 	return jobsJSON, servicesJSON, nil
+}
+
+// extractStepsFromCopilotSetup extracts steps from the copilot-setup-steps job
+// Returns the steps in YAML array format for merging into the agent job
+func extractStepsFromCopilotSetup(workflow map[string]any) (string, error) {
+	jobsValue, ok := workflow["jobs"]
+	if !ok {
+		return "", fmt.Errorf("no jobs found in copilot-setup-steps.yml")
+	}
+
+	jobsMap, ok := jobsValue.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("jobs field is not a map in copilot-setup-steps.yml")
+	}
+
+	// Look for the copilot-setup-steps job
+	setupJob, ok := jobsMap["copilot-setup-steps"]
+	if !ok {
+		return "", fmt.Errorf("copilot-setup-steps job not found in copilot-setup-steps.yml")
+	}
+
+	setupJobMap, ok := setupJob.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("copilot-setup-steps job is not a map")
+	}
+
+	// Extract steps from the job
+	stepsValue, ok := setupJobMap["steps"]
+	if !ok {
+		return "", fmt.Errorf("no steps found in copilot-setup-steps job")
+	}
+
+	// Verify steps is actually a list
+	stepsSlice, ok := stepsValue.([]any)
+	if !ok {
+		return "", fmt.Errorf("steps field is not a list in copilot-setup-steps job")
+	}
+
+	// Marshal steps array directly to YAML format (without "steps:" wrapper)
+	// This matches the format expected by the compiler which unmarshals into []any
+	stepsYAML, err := yaml.Marshal(stepsSlice)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal steps to YAML: %w", err)
+	}
+
+	yamlImportLog.Printf("Extracted steps from copilot-setup-steps job (YAML array format)")
+	return string(stepsYAML), nil
 }
