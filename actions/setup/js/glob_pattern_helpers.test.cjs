@@ -286,7 +286,6 @@ describe("glob_pattern_helpers.cjs", () => {
     });
   });
 
-
   describe("security and correctness", () => {
     it("should prevent ReDoS with reasonable patterns", () => {
       // Test that the regex doesn't hang on pathological inputs

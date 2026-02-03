@@ -17,7 +17,6 @@ tools:
     - id: campaigns
       branch-name: memory/campaigns
       file-glob: [security-alert-burndown/**]
-      campaign-id: security-alert-burndown
   cache-memory:
   edit:
   bash:

@@ -21,7 +21,7 @@
 #
 # Bundles Dependabot security alert updates per package.json into a single PR
 #
-# frontmatter-hash: f1c32c1663b19f69def5ac20f545124b5a9ebaf463e98d55a5d8f9e628963f29
+# frontmatter-hash: 7210b79f508961cee24ddebdf483da9e0d91676a09cb2735ba5cfce598c2252d
 
 name: "Dependabot Bundler"
 "on":
@@ -1175,7 +1175,6 @@ jobs:
           MAX_FILE_SIZE: 10240
           MAX_FILE_COUNT: 100
           FILE_GLOB_FILTER: "security-alert-burndown/**"
-          GH_AW_CAMPAIGN_ID: security-alert-burndown
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

@@ -21,7 +21,7 @@
 #
 # Identifies and automatically fixes code security issues by creating autofixes via GitHub Code Scanning
 #
-# frontmatter-hash: 9507342e8275a292c3181cedb701ea27e9f017e1a4b81800606f27c92da09b0c
+# frontmatter-hash: 2c0874c7d5caae7ad004f661800b012b5e12571c5c4ba5f776cd3e7eb8c0d484
 
 name: "Security Fix PR"
 "on":
@@ -1129,7 +1129,6 @@ jobs:
           MAX_FILE_SIZE: 10240
           MAX_FILE_COUNT: 100
           FILE_GLOB_FILTER: "security-alert-burndown/**"
-          GH_AW_CAMPAIGN_ID: security-alert-burndown
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
