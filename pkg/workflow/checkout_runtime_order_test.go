@@ -287,15 +287,15 @@ Run node --version to check the Node.js version.
 		}
 	}
 
-	if len(stepNames) < 4 {
-		t.Fatalf("Expected at least 4 steps, got %d: %v", len(stepNames), stepNames)
+	if len(stepNames) < 3 {
+		t.Fatalf("Expected at least 3 steps, got %d: %v", len(stepNames), stepNames)
 	}
 
 	// Verify the order in dev mode:
 	// 1. First step should be "Checkout actions folder" (checkout local actions)
 	// 2. Second step should be "Setup Scripts" (use the checked out action)
-	// 3. Third step should be "Checkout .github folder" (checkout .github for agent job)
-	// 4. Fourth step should be "Checkout repository" (automatic)
+	// 3. Third step should be "Checkout repository" (automatic full checkout - no separate .github checkout needed)
+	// NOTE: The .github sparse checkout is skipped when full repository checkout is performed
 
 	if stepNames[0] != "Checkout actions folder" {
 		t.Errorf("First step should be 'Checkout actions folder', got '%s'", stepNames[0])
@@ -305,17 +305,19 @@ Run node --version to check the Node.js version.
 		t.Errorf("Second step should be 'Setup Scripts', got '%s'", stepNames[1])
 	}
 
-	if stepNames[2] != "Checkout .github folder" {
-		t.Errorf("Third step should be 'Checkout .github folder', got '%s'", stepNames[2])
+	if stepNames[2] != "Checkout repository" {
+		t.Errorf("Third step should be 'Checkout repository', got '%s'", stepNames[2])
 	}
 
-	if stepNames[3] != "Checkout repository" {
-		t.Errorf("Fourth step should be 'Checkout repository', got '%s'", stepNames[3])
+	// Verify that .github checkout is NOT present (redundant with full checkout)
+	for _, name := range stepNames {
+		if name == "Checkout .github folder" {
+			t.Error("Checkout .github folder should not be present when full repository checkout is performed")
+		}
 	}
 
 	t.Logf("Step order is correct:")
 	t.Logf("  1. %s", stepNames[0])
 	t.Logf("  2. %s", stepNames[1])
 	t.Logf("  3. %s", stepNames[2])
-	t.Logf("  4. %s", stepNames[3])
 }

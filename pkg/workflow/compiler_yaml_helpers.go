@@ -155,6 +155,8 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 // Returns a slice of strings that can be appended to a steps array, where each
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - action-tag feature is specified (uses remote actions instead)
+// - full repository checkout will be performed (redundant to checkout .github separately)
+// - no contents permission (checkout not possible)
 func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
 	// Check if action-tag is specified - if so, skip checkout
 	if data != nil && data.Features != nil {
@@ -164,6 +166,20 @@ func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
 				return nil
 			}
 		}
+	}
+
+	// Check if we have contents permission - without it, checkout is not possible
+	permParser := NewPermissionsParser(data.Permissions)
+	if !permParser.HasContentsReadAccess() {
+		compilerYamlLog.Print("Skipping .github checkout: no contents read access")
+		return nil
+	}
+
+	// Skip .github checkout if full repository checkout will be performed
+	// The full checkout already includes the .github folder, making sparse checkout redundant
+	if c.shouldAddCheckoutStep(data) {
+		compilerYamlLog.Print("Skipping .github sparse checkout: full repository checkout will be performed")
+		return nil
 	}
 
 	// For all modes (dev, script, release), checkout .github folder
