@@ -15,7 +15,7 @@ func TestSplitRepoSlug(t *testing.T) {
 		{
 			name:          "valid slug",
 			slug:          "github/gh-aw",
-			expectedOwner: "githubnext",
+			expectedOwner: "github",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
 		},
@@ -81,7 +81,7 @@ func TestParseGitHubURL(t *testing.T) {
 		{
 			name:          "SSH format with .git",
 			url:           "git@github.com:github/gh-aw.git",
-			expectedOwner: "githubnext",
+			expectedOwner: "github",
 			expectedRepo:  "gh-aw",
 			expectError:   false,
 		},
@@ -154,7 +154,7 @@ func TestSanitizeForFilename(t *testing.T) {
 		{
 			name:     "normal slug",
 			slug:     "github/gh-aw",
-			expected: "githubnext-gh-aw",
+			expected: "github-gh-aw",
 		},
 		{
 			name:     "empty slug",
