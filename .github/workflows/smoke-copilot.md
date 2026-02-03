@@ -106,7 +106,7 @@ strict: true
 1. **GitHub MCP Testing**: Review the last 2 merged pull requests in ${{ github.repository }}
 2. **Safe Inputs GH CLI Testing**: Use the `safeinputs-gh` tool to query 2 pull requests from ${{ github.repository }} (use args: "pr list --repo ${{ github.repository }} --limit 2 --json number,title,author")
 3. **Serena MCP Testing**: Use the Serena MCP server tool `activate_project` to initialize the workspace at `${{ github.workspace }}` and verify it succeeds (do NOT use bash to run go commands - use Serena's MCP tools)
-4. **Playwright Testing**: Use playwright to navigate to <https://github.com> and verify the page title contains "GitHub"
+4. **Playwright Testing**: Use the playwright tools to navigate to <https://github.com> and verify the page title contains "GitHub" (do NOT try to install playwright - use the provided MCP tools)
 5. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-copilot-${{ github.run_id }}.txt` with content "Smoke test passed for Copilot at $(date)" (create the directory if it doesn't exist)
 6. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 7. **Discussion Interaction Testing**: 
