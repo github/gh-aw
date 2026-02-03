@@ -1175,7 +1175,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
       // Verify failure issue includes create_discussion errors
       const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
       expect(createCall.body).toContain("Create Discussion Failed");
-      expect(createCall.body).toContain("Discussion \"Test Discussion\" in github/gh-aw");
+      expect(createCall.body).toContain('Discussion "Test Discussion" in github/gh-aw');
       expect(createCall.body).toContain("Discussions not enabled");
     });
   });
