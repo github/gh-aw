@@ -225,6 +225,15 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		return nil, err
 	}
 
+	// Validate that imported custom engine steps don't use agentic engine secrets
+	orchestratorEngineLog.Printf("Validating imported steps for agentic secrets (strict=%v)", c.strictMode)
+	if err := c.validateImportedStepsNoAgenticSecrets(engineConfig, engineSetting); err != nil {
+		orchestratorEngineLog.Printf("Imported steps validation failed: %v", err)
+		// Restore strict mode before returning error
+		c.strictMode = initialStrictModeForFirewall
+		return nil, err
+	}
+
 	// Restore the strict mode state after network check
 	c.strictMode = initialStrictModeForFirewall
 
