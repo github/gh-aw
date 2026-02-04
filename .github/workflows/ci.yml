@@ -230,8 +230,9 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-modules-${{ matrix.test-group.name }}-${{ hashFiles('**/go.sum') }}
           restore-keys: |
+            ${{ runner.os }}-go-modules-${{ matrix.test-group.name }}-
             ${{ runner.os }}-go-modules-
 
       - name: Report Go cache status
