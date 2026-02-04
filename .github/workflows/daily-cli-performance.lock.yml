@@ -31,7 +31,7 @@
 name: "Daily CLI Performance Agent"
 "on":
   schedule:
-  - cron: "2 22 * * *"
+  - cron: "21 11 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
