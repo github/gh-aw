@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 
 /**
  * Shared utility functions for log parsers
@@ -309,7 +310,9 @@ function generateConversationMarkdown(logEntries, options) {
 
         if (content.type === "text" && content.text) {
           // Add reasoning text directly
-          const text = content.text.trim();
+          let text = content.text.trim();
+          // Apply unfencing to remove accidental outer markdown fences
+          text = unfenceMarkdown(text);
           if (text && text.length > 0) {
             if (!addContent(text + "\n\n")) {
               break;
@@ -1010,7 +1013,9 @@ function generatePlainTextSummary(logEntries, options = {}) {
 
         if (content.type === "text" && content.text) {
           // Display agent response text
-          const text = content.text.trim();
+          let text = content.text.trim();
+          // Apply unfencing to remove accidental outer markdown fences
+          text = unfenceMarkdown(text);
           if (text && text.length > 0) {
             // Truncate long responses to keep output manageable
             const maxTextLength = 500;
@@ -1223,7 +1228,9 @@ function generateCopilotCliStyleSummary(logEntries, options = {}) {
 
         if (content.type === "text" && content.text) {
           // Display agent response text
-          const text = content.text.trim();
+          let text = content.text.trim();
+          // Apply unfencing to remove accidental outer markdown fences
+          text = unfenceMarkdown(text);
           if (text && text.length > 0) {
             // Truncate long responses to keep output manageable
             const maxTextLength = 500;
