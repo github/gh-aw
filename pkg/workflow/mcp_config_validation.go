@@ -156,7 +156,7 @@ func getRawMCPConfig(toolConfig map[string]any) (map[string]any, error) {
 		}
 	}
 
-		// Check for unknown fields that might be typos or deprecated (like "network")
+	// Check for unknown fields that might be typos or deprecated (like "network")
 	for field := range toolConfig {
 		if !knownToolFields[field] {
 			// Build list of valid fields for the error message
