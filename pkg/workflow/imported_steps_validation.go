@@ -76,7 +76,7 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 	// Check each custom step for secret usage
 	for stepIdx, step := range engineConfig.Steps {
 		importedStepsValidationLog.Printf("Checking step %d", stepIdx)
-		
+
 		// Convert step to YAML string for pattern matching
 		stepYAML, err := convertStepToYAML(step)
 		if err != nil {
@@ -90,7 +90,7 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 			if len(match) < 2 {
 				continue
 			}
-			
+
 			secretName := match[1]
 			if engineName, isAgenticSecret := agenticEngineSecrets[secretName]; isAgenticSecret {
 				importedStepsValidationLog.Printf("Found agentic secret in step %d: %s (engine: %s)", stepIdx, secretName, engineName)
@@ -137,27 +137,27 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 // convertStepToYAML converts a step map to YAML string for pattern matching
 func convertStepToYAML(step map[string]any) (string, error) {
 	var builder strings.Builder
-	
+
 	// Helper function to write key-value pairs
 	var writeValue func(key string, value any, indent string)
 	writeValue = func(key string, value any, indent string) {
 		switch v := value.(type) {
 		case string:
-			builder.WriteString(fmt.Sprintf("%s%s: %s\n", indent, key, v))
+			fmt.Fprintf(&builder, "%s%s: %s\n", indent, key, v)
 		case map[string]any:
-			builder.WriteString(fmt.Sprintf("%s%s:\n", indent, key))
+			fmt.Fprintf(&builder, "%s%s:\n", indent, key)
 			for k, val := range v {
 				writeValue(k, val, indent+"  ")
 			}
 		case []any:
-			builder.WriteString(fmt.Sprintf("%s%s:\n", indent, key))
+			fmt.Fprintf(&builder, "%s%s:\n", indent, key)
 			for _, item := range v {
 				if str, ok := item.(string); ok {
-					builder.WriteString(fmt.Sprintf("%s  - %s\n", indent, str))
+					fmt.Fprintf(&builder, "%s  - %s\n", indent, str)
 				}
 			}
 		default:
-			builder.WriteString(fmt.Sprintf("%s%s: %v\n", indent, key, v))
+			fmt.Fprintf(&builder, "%s%s: %v\n", indent, key, v)
 		}
 	}
 

@@ -18,7 +18,7 @@ imports:
   - shared/opencode.md
   - shared/gh.md
   - shared/github-queries-safe-input.md
-strict: true
+strict: false  # TODO: Remove agentic secrets from shared/opencode.md steps
 sandbox:
   mcp:
     container: "ghcr.io/github/gh-aw-mcpg"

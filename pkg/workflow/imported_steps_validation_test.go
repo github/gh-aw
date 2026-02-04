@@ -57,8 +57,8 @@ This workflow imports a custom engine with agentic secrets.
 		compiler := NewCompiler()
 		compiler.SetStrictMode(true)
 		err := compiler.CompileWorkflow(mainFile)
-		
-		assert.Error(t, err, "Expected error in strict mode")
+
+		require.Error(t, err, "Expected error in strict mode")
 		if err != nil {
 			assert.Contains(t, err.Error(), "strict mode", "Error should mention strict mode")
 			assert.Contains(t, err.Error(), "COPILOT_GITHUB_TOKEN", "Error should mention the secret name")
@@ -83,12 +83,12 @@ This workflow imports a custom engine with agentic secrets.
 `
 		mainFileNonStrict := filepath.Join(workflowsDir, "test-copilot-secret-nonstrict.md")
 		require.NoError(t, os.WriteFile(mainFileNonStrict, []byte(mainContentNonStrict), 0644))
-		
+
 		compiler := NewCompiler()
 		err := compiler.CompileWorkflow(mainFileNonStrict)
-		
-		assert.NoError(t, err, "Should not error in non-strict mode")
-		assert.Greater(t, compiler.GetWarningCount(), 0, "Should have warnings")
+
+		require.NoError(t, err, "Should not error in non-strict mode")
+		assert.Positive(t, compiler.GetWarningCount(), "Should have warnings")
 	})
 }
 
@@ -131,8 +131,8 @@ imports:
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
 	err := compiler.CompileWorkflow(mainFile)
-	
-	assert.Error(t, err, "Expected error in strict mode")
+
+	require.Error(t, err, "Expected error in strict mode")
 	if err != nil {
 		assert.Contains(t, err.Error(), "ANTHROPIC_API_KEY")
 		assert.Contains(t, err.Error(), "Claude engine")
@@ -180,8 +180,8 @@ imports:
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
 	err := compiler.CompileWorkflow(mainFile)
-	
-	assert.Error(t, err, "Expected error in strict mode")
+
+	require.Error(t, err, "Expected error in strict mode")
 	if err != nil {
 		// Should detect both secrets
 		errMsg := err.Error()
@@ -240,7 +240,7 @@ imports:
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
 	err := compiler.CompileWorkflow(mainFile)
-	
+
 	assert.NoError(t, err, "Should not error when using safe secrets")
 	// Note: We may have warning for experimental feature (custom engine), but not for our secret validation
 }
@@ -272,7 +272,7 @@ This uses the standard copilot engine, not custom.
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
 	err := compiler.CompileWorkflow(mainFile)
-	
+
 	assert.NoError(t, err, "Should not error for non-custom engines")
 }
 
@@ -322,8 +322,8 @@ imports:
 	compiler := NewCompiler()
 	compiler.SetStrictMode(true)
 	err := compiler.CompileWorkflow(mainFile)
-	
-	assert.Error(t, err, "Expected error in strict mode")
+
+	require.Error(t, err, "Expected error in strict mode")
 	if err != nil {
 		errMsg := err.Error()
 		// Should mention both secrets
