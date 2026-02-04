@@ -76,7 +76,7 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 		},
 	}
 
-	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
+	_ = RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
 }
 
 // renderCopilotMCPConfigWithContext generates custom MCP server configuration for Copilot CLI

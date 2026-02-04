@@ -1175,7 +1175,7 @@ jobs:
                   "--output-dir",
                   "/tmp/gh-aw/mcp-logs/playwright",
                   "--allowed-hosts",
-                  "localhost;localhost:*;127.0.0.1;127.0.0.1:*;github.com",
+                  "localhost,localhost:*,127.0.0.1,127.0.0.1:*,github.com",
                   "--allowed-origins",
                   "localhost;localhost:*;127.0.0.1;127.0.0.1:*;github.com"
                 ],

@@ -19,6 +19,20 @@ curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | 
 
 After installation, the binary is installed to `~/.local/share/gh/extensions/gh-aw/gh-aw` and can be used with `gh aw` commands just like the extension installation.
 
+> [!NOTE]
+> The install script works in restricted network environments (like GitHub Copilot agent runtime or corporate networks with MITM proxies) by using GitHub's "latest" release redirect, which doesn't require API access. Simply run the script without specifying a version to install the latest release.
+
+### Install Specific Version
+
+To install a specific version, pass the version tag as an argument:
+
+```bash wrap
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | \
+  bash -s -- v0.40.0
+```
+
+Find available versions at the [releases page](https://github.com/github/gh-aw/releases).
+
 ### Extension Not Found After Installation
 
 If you installed the extension but `gh aw` command is not found:

@@ -262,7 +262,7 @@ func (e *CustomEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]a
 	}
 
 	// Use shared JSON MCP config renderer with unified renderer methods
-	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, JSONMCPConfigOptions{
+	_ = RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, JSONMCPConfigOptions{
 		ConfigPath:    "/tmp/gh-aw/mcp-config/mcp-servers.json",
 		GatewayConfig: buildMCPGatewayConfig(workflowData),
 		Renderers: MCPToolRenderers{

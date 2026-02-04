@@ -112,7 +112,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		})
 	}
 
-	RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, JSONMCPConfigOptions{
+	_ = RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, JSONMCPConfigOptions{
 		ConfigPath:    "/tmp/gh-aw/mcp-config/mcp-servers.json",
 		GatewayConfig: gatewayConfig,
 		Renderers: MCPToolRenderers{

@@ -21,7 +21,7 @@
 #
 # Build, test, and release gh-aw extension, then generate and prepend release highlights
 #
-# frontmatter-hash: 62a5857122b3a2ff00cac78bc5db9fd961177658cbee4eba8187769c0fd15b7b
+# frontmatter-hash: a196c2dde64e55df900998075dbc57211973d35293e684bac5283763b5a6848d
 
 name: "Release"
 "on":
@@ -752,55 +752,6 @@ jobs:
             /tmp/gh-aw/sandbox/firewall/logs/
             /tmp/gh-aw/agent-stdio.log
           if-no-files-found: ignore
-
-  changesets:
-    needs:
-      - activation
-      - agent
-      - config
-      - release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-      - name: Setup Node.js
-        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
-        with:
-          node-version: "20"
-      - name: Update CHANGELOG with changesets
-        run: |
-          set -e
-          echo "Updating CHANGELOG.md for release: $RELEASE_TAG"
-
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Run changeset script to update CHANGELOG.md and delete changeset files
-          # Pass the release tag as an argument
-          node scripts/changeset.js release "$RELEASE_TAG" --yes
-
-          # Check if there are any changes to commit
-          if git diff --quiet CHANGELOG.md && [ -z "$(git ls-files --others --exclude-standard .changeset/)" ]; then
-            echo "No changeset updates to commit"
-          else
-            # Add and commit changes
-            git add CHANGELOG.md .changeset/
-            git commit -m "Update CHANGELOG.md for $RELEASE_TAG"
-
-            # Push changes to main branch
-            git push origin main
-
-            echo "✓ CHANGELOG.md updated and committed to main"
-          fi
-        env:
-          RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
 
   conclusion:
     needs:

@@ -2,10 +2,18 @@
 
 # Script to download and install gh-aw binary for the current OS and architecture
 # Supports: Linux, macOS (Darwin), FreeBSD, Windows (Git Bash/MSYS/Cygwin)
-# Usage: ./install-gh-aw.sh [version]
-# If no version is specified, it will fetch and use the latest release
+# Usage: ./install-gh-aw.sh [version] [options]
+# If no version is specified, it will use "latest" (GitHub automatically resolves to the latest release)
 # Note: Checksum validation is currently skipped by default (will be enabled in future releases)
-# Example: ./install-gh-aw.sh v1.0.0
+# 
+# Examples:
+#   ./install-gh-aw.sh                           # Install latest version
+#   ./install-gh-aw.sh v1.0.0                    # Install specific version
+#   ./install-gh-aw.sh --skip-checksum           # Skip checksum validation
+#
+# Options:
+#   --skip-checksum                   Skip checksum verification
+#   --gh-install                      Try gh extension install first
 
 set -e  # Exit on any error
 
@@ -25,11 +33,9 @@ for arg in "$@"; do
     case $arg in
         --skip-checksum)
             SKIP_CHECKSUM=true
-            shift
             ;;
         --gh-install)
             TRY_GH_INSTALL=true
-            shift
             ;;
         *)
             if [ -z "$VERSION" ]; then
@@ -214,47 +220,16 @@ fetch_release_data() {
     return 1
 }
 
-# Get version (use provided version or fetch latest)
+# Get version (use provided version or default to "latest")
 # VERSION is already set from argument parsing
 REPO="github/gh-aw"
 
 if [ -z "$VERSION" ]; then
-    print_info "No version specified, fetching latest release information from GitHub..."
-    
-    if ! LATEST_RELEASE=$(fetch_release_data "https://api.github.com/repos/$REPO/releases/latest"); then
-        print_error "Failed to fetch latest release information from GitHub API"
-        print_info "You can specify a version directly: ./install-gh-aw.sh v1.0.0"
-        exit 1
-    fi
-    
-    if [ "$HAS_JQ" = true ]; then
-        # Use jq for JSON parsing
-        VERSION=$(echo "$LATEST_RELEASE" | jq -r '.tag_name')
-        RELEASE_NAME=$(echo "$LATEST_RELEASE" | jq -r '.name')
-    else
-        # Fallback to grep/sed
-        VERSION=$(echo "$LATEST_RELEASE" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-        RELEASE_NAME=$(echo "$LATEST_RELEASE" | grep '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/')
-    fi
-    
-    if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
-        print_error "Failed to parse latest release information"
-        exit 1
-    fi
-    
-    print_info "Latest release: $RELEASE_NAME ($VERSION)"
+    print_info "No version specified, using 'latest'..."
+    VERSION="latest"
 else
     print_info "Using specified version: $VERSION"
 fi
-
-# Validate that the release exists
-print_info "Validating release $VERSION exists..."
-if ! RELEASE_CHECK=$(fetch_release_data "https://api.github.com/repos/$REPO/releases/tags/$VERSION"); then
-    print_error "Release $VERSION does not exist in $REPO"
-    print_info "Please check the releases at: https://github.com/$REPO/releases"
-    exit 1
-fi
-print_success "Release $VERSION validated"
 
 # Try gh extension install if requested (and gh is available)
 if [ "$TRY_GH_INSTALL" = true ] && command -v gh &> /dev/null; then
@@ -289,8 +264,13 @@ elif [ "$TRY_GH_INSTALL" = true ]; then
 fi
 
 # Construct download URL and paths
-DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$PLATFORM"
-CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
+if [ "$VERSION" = "latest" ]; then
+    DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$PLATFORM"
+    CHECKSUMS_URL="https://github.com/$REPO/releases/latest/download/checksums.txt"
+else
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/$PLATFORM"
+    CHECKSUMS_URL="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
+fi
 if [ "$OS_NAME" = "windows" ]; then
     DOWNLOAD_URL="${DOWNLOAD_URL}.exe"
 fi

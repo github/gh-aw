@@ -3,7 +3,11 @@ package workflow
 import (
 	"reflect"
 	"sort"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var safeOutputReflectionLog = logger.New("workflow:safe_outputs_config_helpers_reflection")
 
 // safeOutputFieldMapping maps struct field names to their tool names
 var safeOutputFieldMapping = map[string]string{
@@ -46,8 +50,11 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool {
 		return false
 	}
 
+	safeOutputReflectionLog.Print("Checking if any safe outputs are enabled using reflection")
+
 	// Check Jobs separately as it's a map
 	if len(safeOutputs.Jobs) > 0 {
+		safeOutputReflectionLog.Printf("Found %d custom jobs enabled", len(safeOutputs.Jobs))
 		return true
 	}
 
@@ -56,10 +63,12 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool {
 	for fieldName := range safeOutputFieldMapping {
 		field := val.FieldByName(fieldName)
 		if field.IsValid() && !field.IsNil() {
+			safeOutputReflectionLog.Printf("Found enabled safe output field: %s", fieldName)
 			return true
 		}
 	}
 
+	safeOutputReflectionLog.Print("No safe outputs enabled")
 	return false
 }
 
@@ -69,6 +78,7 @@ func getEnabledSafeOutputToolNamesReflection(safeOutputs *SafeOutputsConfig) []s
 		return nil
 	}
 
+	safeOutputReflectionLog.Print("Getting enabled safe output tool names using reflection")
 	var tools []string
 
 	// Use reflection to check all pointer fields
@@ -83,10 +93,12 @@ func getEnabledSafeOutputToolNamesReflection(safeOutputs *SafeOutputsConfig) []s
 	// Add custom job tools
 	for jobName := range safeOutputs.Jobs {
 		tools = append(tools, jobName)
+		safeOutputReflectionLog.Printf("Added custom job tool: %s", jobName)
 	}
 
 	// Sort tools to ensure deterministic compilation
 	sort.Strings(tools)
 
+	safeOutputReflectionLog.Printf("Found %d enabled safe output tools", len(tools))
 	return tools
 }
