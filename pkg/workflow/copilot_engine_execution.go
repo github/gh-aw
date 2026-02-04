@@ -332,12 +332,14 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// AWF v0.2.0 uses -- to separate AWF args from the actual command
 		// The command arguments should be passed as individual shell arguments, not as a single string
 
-		// In chroot mode, PATH is already set by AWF's entrypoint.sh from AWF_HOST_PATH
-		// which contains the complete host PATH with all setup-* action additions.
-		// No need for additional PATH reconstruction.
-		escapedCommand := shellEscapeArg(copilotCommand)
+		// Add PATH setup inside the AWF command to ensure hostedtoolcache paths come before system paths.
+		// While AWF_HOST_PATH includes setup-* action additions, system paths (like /usr/bin/go) may
+		// still appear before them. GetHostedToolcachePathSetup() PREPENDS hostedtoolcache paths,
+		// ensuring tools like Go from actions/setup-go are found before system versions.
+		pathSetup := GetHostedToolcachePathSetup()
+		copilotCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, copilotCommand)
+		escapedCommand := shellEscapeArg(copilotCommandWithPath)
 
-		// With chroot mode, the host environment is inherited, so no setup commands are needed
 		command = fmt.Sprintf(`set -o pipefail
 %s %s \
   -- %s \
