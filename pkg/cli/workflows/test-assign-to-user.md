@@ -27,6 +27,8 @@ safe-outputs:
   assign-to-user:
     max: 5
 strict: false
+features:
+  dangerous-permissions-write: true
 ---
 
 # Assign to User Test Workflow

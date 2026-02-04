@@ -4,6 +4,9 @@ on:
 permissions:
   pull-requests: write
   contents: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: copilot
 ---
 

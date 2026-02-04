@@ -8,6 +8,9 @@ permissions:
   actions: read
   issues: write
   pull-requests: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: copilot
 safe-outputs:
   noop:

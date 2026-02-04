@@ -7,6 +7,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+strict: false
 engine: copilot
 timeout-minutes: 5
 imports:

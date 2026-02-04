@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   issues: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: claude
 ---
 

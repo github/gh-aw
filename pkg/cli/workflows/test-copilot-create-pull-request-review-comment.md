@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   pull-requests: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: copilot
 ---
 

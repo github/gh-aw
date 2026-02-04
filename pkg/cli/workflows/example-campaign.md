@@ -10,6 +10,9 @@ safe-outputs:
   create-issue:
     title-prefix: "[Example] "
     labels: [example, automated]
+strict: false
+features:
+  dangerous-permissions-write: true
 ---
 
 # Example Fingerprint Workflow

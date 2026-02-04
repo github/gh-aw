@@ -4,6 +4,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: claude
 ---
 

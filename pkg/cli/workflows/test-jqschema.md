@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+strict: false
 engine: copilot
 timeout-minutes: 5
 imports:

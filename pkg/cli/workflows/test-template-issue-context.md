@@ -5,6 +5,9 @@ on:
 permissions:
   contents: read
   issues: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine:
   id: copilot
 tools:

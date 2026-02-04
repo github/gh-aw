@@ -3,6 +3,9 @@ on: issues
 permissions:
   contents: read
   issues: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: copilot
 ---
 

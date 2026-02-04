@@ -4,6 +4,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine: copilot
 safe-outputs:
   max-patch-size: 512  # Limit patches to 512 KB for testing

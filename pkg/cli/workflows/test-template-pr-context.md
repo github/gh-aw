@@ -5,6 +5,9 @@ on:
 permissions:
   contents: read
   pull-requests: write
+strict: false
+features:
+  dangerous-permissions-write: true
 engine:
   id: claude
 tools:
