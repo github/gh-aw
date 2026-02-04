@@ -53,14 +53,14 @@ gh extension install github/gh-aw@v0.2.0
 
 ### Alternative: Standalone Installer
 
-Use the standalone installer if extension installation fails (common in Codespaces or with auth issues):
+Use the standalone installer if extension installation fails (common in Codespaces, restricted networks, or with auth issues):
 
 ```bash wrap
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash                # Latest
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s v0.1.0      # Pinned
 ```
 
-Installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and works with all `gh aw` commands. Supports Linux, macOS, FreeBSD, and Windows.
+Installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and works with all `gh aw` commands. Supports Linux, macOS, FreeBSD, and Windows. Works in environments where GitHub API access is blocked by MITM proxies or corporate firewalls by using direct release download URLs.
 
 ### GitHub Actions Setup Action
 

@@ -821,7 +821,31 @@ safe-outputs:
     expires: 3                # auto-close after 3 days (or false to disable)
     max: 3                    # max discussions (default: 1)
     target-repo: "owner/repo" # cross-repository
+    fallback-to-issue: true   # fallback to issue creation on permission errors (default: true)
 ```
+
+#### Fallback to Issue Creation
+
+The `fallback-to-issue` field (default: `true`) automatically falls back to creating an issue when discussion creation fails due to permissions errors. This is useful in repositories where discussions are not enabled or where the workflow lacks the necessary permissions to create discussions.
+
+When fallback is triggered:
+- An issue is created instead of a discussion
+- A note is added to the issue body indicating it was intended to be a discussion
+- The issue includes all the same content as the intended discussion
+
+To disable fallback behavior and fail if discussions cannot be created:
+
+```yaml wrap
+safe-outputs:
+  create-discussion:
+    fallback-to-issue: false
+```
+
+Common scenarios where fallback is useful:
+- Repositories with discussions disabled
+- Insufficient permissions (requires `discussions: write`)
+- Organization policies restricting discussions
+- Testing workflows across different repository configurations
 
 ### Close Discussion (`close-discussion:`)
 
