@@ -54,6 +54,9 @@ All metrics use standardized names from scratchpad/metrics-glossary.md:
 **Tests**: Test files/LOC (`test_lines_of_code`), test-to-source ratio (`test_to_source_ratio`)
 
 **Churn (7d)**: Files modified, commits, lines added/deleted, most active files (requires `git fetch --unshallow`)
+  - **IMPORTANT**: Exclude generated `*.lock.yml` files from churn calculations to avoid noise
+  - Calculate separate churn metrics: source code churn vs workflow lock file churn
+  - Use source code churn (excluding `*.lock.yml`) for quality score calculation
 
 **Workflows**: Total `.md` files (`total_workflows`), `.lock.yml` files, avg workflow size in `.github/workflows`
 
@@ -63,8 +66,35 @@ All metrics use standardized names from scratchpad/metrics-glossary.md:
 
 Store as JSON Lines in `/tmp/gh-aw/repo-memory/default/history.jsonl`:
 ```json
-{"date": "2024-01-15", "timestamp": 1705334400, "metrics": {"size": {...}, "quality": {...}, "tests": {...}, "churn": {...}, "workflows": {...}, "docs": {...}}}
+{
+  "date": "2024-01-15", 
+  "timestamp": 1705334400, 
+  "metrics": {
+    "size": {...}, 
+    "quality": {...}, 
+    "tests": {...}, 
+    "churn": {
+      "source": {
+        "files_modified": 123,
+        "commits": 45,
+        "lines_added": 1234,
+        "lines_deleted": 567,
+        "net_change": 667
+      },
+      "lock_files": {
+        "files_modified": 89,
+        "lines_added": 5678,
+        "lines_deleted": 4321,
+        "net_change": 1357
+      }
+    }, 
+    "workflows": {...}, 
+    "docs": {...}
+  }
+}
 ```
+
+**Note**: Churn metrics are split into `source` (excludes `*.lock.yml`) and `lock_files` (only `*.lock.yml`) for separate tracking.
 
 ## Data Visualization with Python
 
@@ -113,7 +143,8 @@ Generate **6 high-quality charts** to visualize code metrics and trends using Py
 
 #### 5. Code Churn (`code_churn.png`)
 **Type**: Diverging bar chart
-**Content**: Top 10 most changed files in last 7 days
+**Content**: Top 10 most changed source files in last 7 days
+- **EXCLUDE** `*.lock.yml` files (generated workflow files)
 - Show lines added (positive) and deleted (negative)
 - Net change highlighting
 - Color-code by file type
@@ -283,7 +314,7 @@ Brief 2-3 paragraph executive summary highlighting key findings, quality score, 
 #### Code Churn (Last 7 Days)
 ![Code Churn](URL_FROM_UPLOAD_ASSET)
 
-[Most changed files and activity patterns]
+[Most changed source files and activity patterns - excludes generated *.lock.yml files]
 
 #### Historical Trends (30 Days)
 ![Historical Trends](URL_FROM_UPLOAD_ASSET)
@@ -328,16 +359,27 @@ Brief 2-3 paragraph executive summary highlighting key findings, quality score, 
 
 ### Code Churn (Last 7 Days)
 
+#### Source Code Churn (Excludes *.lock.yml)
+
 - **Files Modified**: XXX files
 - **Commits**: XXX commits
 - **Lines Added**: +X,XXX lines
 - **Lines Deleted**: -X,XXX lines
 - **Net Change**: +/-X,XXX lines
 
-#### Most Active Files
+#### Most Active Source Files
 1. path/to/file.go: +XXX/-XXX lines
 2. path/to/file.js: +XXX/-XXX lines
 ...
+
+#### Workflow Lock File Churn (*.lock.yml only)
+
+- **Lock Files Modified**: XXX files
+- **Lines Added**: +X,XXX lines
+- **Lines Deleted**: -X,XXX lines
+- **Net Change**: +/-X,XXX lines
+
+**Note**: Lock file churn is reported separately and excluded from quality score calculations to avoid noise from generated files.
 
 ### Workflow Metrics
 
@@ -390,6 +432,18 @@ Brief 2-3 paragraph executive summary highlighting key findings, quality score, 
 ## Quality Score
 
 Weighted average: Test coverage (30%), Code organization (25%), Documentation (20%), Churn stability (15%), Comment density (10%)
+
+### Churn Stability Component (15% of Quality Score)
+
+**CRITICAL**: Use **source code churn only** (exclude `*.lock.yml` files) when calculating churn stability for the quality score.
+
+**Calculation**:
+1. Calculate source code churn: `git log --since="7 days ago" --numstat --pretty=format: -- . ':!*.lock.yml'`
+2. Compute churn score based on files modified and net change (lower churn = higher stability)
+3. Normalize to 0-15 points scale
+4. Track workflow lock file churn separately for informational purposes only
+
+This ensures the quality score reflects actionable source code volatility, not noise from generated files.
 
 ## Guidelines
 
