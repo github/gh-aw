@@ -249,22 +249,19 @@ Some content here.`;
   });
 
   describe("main function behavior", () => {
-    // These tests verify that when gateway.md exists, gateway.log is printed to core.info
-    // and gateway.md is printed to step summary
+    // These tests verify that when gateway.md exists, it is written to step summary
     const fs = require("fs");
     const path = require("path");
     const os = require("os");
 
-    test("when gateway.md and gateway.log both exist, prints gateway.log to core.info", async () => {
+    test("when gateway.md exists, writes it to step summary without gateway.log", async () => {
       // Create a temporary directory for test files
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-test-"));
       const gatewayMdPath = path.join(tmpDir, "gateway.md");
-      const gatewayLogPath = path.join(tmpDir, "gateway.log");
 
       try {
-        // Write test files
+        // Write test file
         fs.writeFileSync(gatewayMdPath, "# Gateway Summary\n\nSome markdown content");
-        fs.writeFileSync(gatewayLogPath, "Gateway log line 1\nGateway log line 2");
 
         // Mock core and fs for the test
         const mockCore = {
@@ -287,16 +284,12 @@ Some content here.`;
 
         fs.existsSync = vi.fn(filepath => {
           if (filepath === "/tmp/gh-aw/mcp-logs/gateway.md") return true;
-          if (filepath === "/tmp/gh-aw/mcp-logs/gateway.log") return true;
           return originalExistsSync(filepath);
         });
 
         fs.readFileSync = vi.fn((filepath, encoding) => {
           if (filepath === "/tmp/gh-aw/mcp-logs/gateway.md") {
             return fs.readFileSync(gatewayMdPath, encoding);
-          }
-          if (filepath === "/tmp/gh-aw/mcp-logs/gateway.log") {
-            return fs.readFileSync(gatewayLogPath, encoding);
           }
           return originalReadFileSync(filepath, encoding);
         });
@@ -308,15 +301,13 @@ Some content here.`;
         const { main } = require("./parse_mcp_gateway_log.cjs");
         await main();
 
-        // Verify gateway.log was printed to core.info
-        const infoCall = mockCore.info.mock.calls.find(call => call[0].includes("Gateway log line 1"));
-        expect(infoCall).toBeDefined();
-        expect(infoCall[0]).toContain("Gateway log line 1");
-        expect(infoCall[0]).toContain("Gateway log line 2");
-
         // Verify gateway.md was written to step summary
         expect(mockCore.summary.addRaw).toHaveBeenCalledWith(expect.stringContaining("Gateway Summary"));
         expect(mockCore.summary.write).toHaveBeenCalled();
+
+        // Verify gateway.log content was NOT printed to core.info
+        const infoMessages = mockCore.info.mock.calls.map(call => call[0]).join("\n");
+        expect(infoMessages).not.toContain("Gateway log line");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;
@@ -408,10 +399,9 @@ Some content here.`;
         expect(allOutput).toContain("Gateway log content");
         expect(allOutput).toContain("Error message");
 
-        // Check .md file is listed but content is not displayed
+        // Check .md file is listed and content IS displayed (now supported)
         expect(allOutput).toContain("gateway.md");
-        expect(allOutput).toContain("content not displayed for .md files");
-        expect(allOutput).not.toContain("# Gateway Summary");
+        expect(allOutput).toContain("# Gateway Summary");
 
         // Restore original functions
         fs.existsSync = originalExistsSync;

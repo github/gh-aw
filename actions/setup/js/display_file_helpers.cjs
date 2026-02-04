@@ -41,7 +41,7 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
     }
 
     // Only show content for specific file types
-    const displayExtensions = [".json", ".jsonl", ".log", ".txt"];
+    const displayExtensions = [".json", ".jsonl", ".log", ".txt", ".md", ".yml", ".yaml", ".toml"];
     const fileExtension = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
     const shouldDisplayContent = displayExtensions.includes(fileExtension);
 

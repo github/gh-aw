@@ -39,21 +39,6 @@ async function main() {
       if (gatewayMdContent && gatewayMdContent.trim().length > 0) {
         core.info(`Found gateway.md (${gatewayMdContent.length} bytes)`);
 
-        // Read gateway.log for core.info output instead of gateway.md
-        if (fs.existsSync(gatewayLogPath)) {
-          const gatewayLogContent = fs.readFileSync(gatewayLogPath, "utf8");
-          if (gatewayLogContent && gatewayLogContent.trim().length > 0) {
-            core.info(`Found gateway.log (${gatewayLogContent.length} bytes)`);
-            // Generate plain text summary for core.info from gateway.log
-            const plainTextSummary = generatePlainTextLegacySummary(gatewayLogContent, "");
-            core.info(plainTextSummary);
-          } else {
-            core.info("gateway.log is empty");
-          }
-        } else {
-          core.info(`No gateway.log found at: ${gatewayLogPath}`);
-        }
-
         // Write the markdown directly to the step summary
         core.summary.addRaw(gatewayMdContent).write();
         return;

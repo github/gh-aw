@@ -162,27 +162,27 @@ describe("display_file_helpers", () => {
 
     test("skips content display for unsupported file extensions", () => {
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
-      const filePath = path.join(tmpDir, "test.md");
-      fs.writeFileSync(filePath, "# Markdown content");
+      const filePath = path.join(tmpDir, "test.pdf");
+      fs.writeFileSync(filePath, "PDF binary content");
 
       const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
       global.core = mockCore;
 
       try {
-        displayFileContent(filePath, "test.md");
+        displayFileContent(filePath, "test.pdf");
 
         // Check file info was displayed
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.md"));
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.pdf"));
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check message about not displaying content
-        expect(mockCore.info).toHaveBeenCalledWith("    (content not displayed for .md files)");
+        expect(mockCore.info).toHaveBeenCalledWith("    (content not displayed for .pdf files)");
 
         // Should not start group for unsupported file type
         expect(mockCore.startGroup).not.toHaveBeenCalled();
 
         // Content should not be displayed
-        expect(mockCore.info).not.toHaveBeenCalledWith("# Markdown content");
+        expect(mockCore.info).not.toHaveBeenCalledWith("PDF binary content");
       } finally {
         delete global.core;
         fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -228,6 +228,98 @@ describe("display_file_helpers", () => {
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("Log entry 1");
         expect(mockCore.info).toHaveBeenCalledWith("Log entry 2");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .md files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "test.md");
+      fs.writeFileSync(filePath, "# Markdown Title\nSome content");
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "test.md");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("test.md");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("# Markdown Title");
+        expect(mockCore.info).toHaveBeenCalledWith("Some content");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .yml files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "config.yml");
+      fs.writeFileSync(filePath, "key: value\nanother: item");
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "config.yml");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("config.yml");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("key: value");
+        expect(mockCore.info).toHaveBeenCalledWith("another: item");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .yaml files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "config.yaml");
+      fs.writeFileSync(filePath, "name: test\nversion: 1.0");
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "config.yaml");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("config.yaml");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("name: test");
+        expect(mockCore.info).toHaveBeenCalledWith("version: 1.0");
+      } finally {
+        delete global.core;
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test("displays content for .toml files", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "display-test-"));
+      const filePath = path.join(tmpDir, "config.toml");
+      fs.writeFileSync(filePath, '[package]\nname = "test"');
+
+      const mockCore = { info: vi.fn(), startGroup: vi.fn(), endGroup: vi.fn(), warning: vi.fn() };
+      global.core = mockCore;
+
+      try {
+        displayFileContent(filePath, "config.toml");
+
+        // Check group was started
+        expect(mockCore.startGroup).toHaveBeenCalledWith("config.toml");
+
+        // Check content was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("[package]");
+        expect(mockCore.info).toHaveBeenCalledWith('name = "test"');
       } finally {
         delete global.core;
         fs.rmSync(tmpDir, { recursive: true, force: true });
