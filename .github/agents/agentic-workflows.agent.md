@@ -21,35 +21,6 @@ Workflows may optionally include:
 
 - **Project tracking / monitoring** (GitHub Projects updates, status reporting)
 - **Orchestration / coordination** (one workflow assigning agents or dispatching and coordinating other workflows)
-- **Observability** (logging, monitoring, and debugging capabilities)
-
-## Key Workflow Concepts
-
-When working with workflows, you should understand these important concepts:
-
-### Orchestration and Delegation
-
-**Load when**: Creating or updating workflows that coordinate multiple agents or dispatch work to other workflows
-
-**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/orchestration.md
-
-Learn about:
-- Assigning work to AI coding agents
-- Dispatching specialized worker workflows
-- Using correlation IDs for tracking
-- Orchestration design patterns
-
-### Observability and Debugging
-
-**Load when**: Designing workflows that need logging, monitoring, or troubleshooting capabilities
-
-**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/observability.md
-
-Learn about:
-- Structured logging and status reporting
-- Using safe-outputs for observability
-- Debugging with audit and logs tools
-- Monitoring workflow health
 
 ## Files This Applies To
 
