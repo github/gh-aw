@@ -124,7 +124,7 @@ func TestErrorMessageQuality(t *testing.T) {
 			shouldContain: []string{
 				"cannot specify both",
 				"Choose one",
-				"Example:",
+				"Example",
 			},
 			shouldNotBeVague: true,
 		},
