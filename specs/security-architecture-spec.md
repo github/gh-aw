@@ -651,26 +651,19 @@ The sandbox isolation layer provides process-level and container-level isolation
 
 **SI-04**: The AWF sandbox MUST provide:
 - Container-based process isolation
-- Network egress control via iptables
-- Domain-based allowlisting
-- Mounted volumes for workspace access
-- Mounted system utilities (read-only)
+- Network egress control via iptables and domain-based allowlisting
+- Chroot-based filesystem transparency (all host binaries accessible, no explicit mounts)
+- Hidden Docker socket for security
+- Automatic environment variable inheritance via `--env-all`
+- Capability drop post-setup (CAP_NET_ADMIN, CAP_SYS_CHROOT)
 
-**SI-05**: AWF MUST mount the following volumes by default:
+**SI-05**: AWF chroot mode MUST enforce this filesystem access model:
 
-| Host Path | Container Path | Mode | Purpose |
-|-----------|----------------|------|---------|
-| `/tmp` | `/tmp` | `rw` | Temporary files |
-| `${HOME}/.cache` | `${HOME}/.cache` | `rw` | Build caches |
-| `${GITHUB_WORKSPACE}` | `${GITHUB_WORKSPACE}` | `rw` | Repository workspace |
-| `/opt/hostedtoolcache` | `/opt/hostedtoolcache` | `ro` | Runtimes (Node, Python, Go) |
-| `/opt/gh-aw` | `/opt/gh-aw` | `ro` | Scripts and configs |
-
-**SI-06**: AWF MUST mount common system utilities as read-only binaries:
-- Essential: `cat`, `curl`, `date`, `find`, `gh`, `grep`, `jq`, `yq`
-- Common: `cp`, `cut`, `diff`, `head`, `ls`, `mkdir`, `rm`, `sed`, `sort`, `tail`, `wc`
-
-**SI-07**: AWF MUST NOT mount Docker socket (`/var/run/docker.sock`) for security reasons.
+| Path Type | Mode | Examples |
+|-----------|------|----------|
+| User paths | Read-write | `$HOME`, `$GITHUB_WORKSPACE`, `/tmp` |
+| System paths | Read-only | `/usr`, `/opt`, `/bin`, `/lib` |
+| Docker socket | Hidden | `/var/run/docker.sock` |
 
 ### 8.4 MCP Server Sandbox
 
@@ -688,23 +681,21 @@ The sandbox isolation layer provides process-level and container-level isolation
 - Be scanned for vulnerabilities
 - Have SBOMs tracked
 
-### 8.5 Environment Variable Mirroring
+### 8.5 Environment Variable Inheritance
 
-**SI-11**: The implementation SHOULD mirror essential environment variables from the host to the agent container:
-- Language toolchain paths (JAVA_HOME, GOROOT, etc.)
-- Package manager paths (PIPX_HOME, GEM_HOME, etc.)
-- Browser driver paths (CHROMEWEBDRIVER, etc.)
-
-**SI-12**: Undefined environment variables MUST be silently ignored (no errors).
+**SI-06**: AWF MUST pass all environment variables via `--env-all` and implement PATH inheritance:
+- Host `PATH` captured as `AWF_HOST_PATH` and restored inside container
+- `GOROOT` explicitly captured after `actions/setup-go` (Go's trimmed binaries require it)
+- Undefined variables silently ignored
 
 ### 8.6 Sandbox Guarantees
 
-**SI-13**: The sandbox isolation layer MUST guarantee:
-- Agent processes cannot access host filesystem outside mounted volumes
-- Agent processes cannot spawn Docker containers
-- Agent processes have network access only to allowed domains
-- MCP servers execute in separate, isolated containers
-- MCP servers have independent network allowlists
+**SI-07**: The sandbox isolation layer MUST guarantee:
+- Read-only system paths, read-write user paths only (`$HOME`, `$GITHUB_WORKSPACE`, `/tmp`)
+- No Docker socket access
+- Network access only to allowed domains (iptables enforcement independent of chroot)
+- MCP servers in isolated containers with independent network allowlists
+- Defense in depth: filesystem visibility (chroot) and network isolation (iptables) remain separate layers
 
 ---
 
@@ -1046,12 +1037,12 @@ A conforming implementation MUST provide a compliance test suite covering all MU
 #### 12.2.5 Sandbox Isolation Tests
 
 - **T-SI-001**: Verify agent sandbox type support (AWF, SRT)
-- **T-SI-002**: Verify AWF default volume mounts
-- **T-SI-003**: Verify AWF system utility mounts
-- **T-SI-004**: Verify Docker socket denial
-- **T-SI-005**: Verify MCP server container isolation
-- **T-SI-006**: Verify MCP server security profile (non-root, dropped caps)
-- **T-SI-007**: Verify environment variable mirroring
+- **T-SI-002**: Verify AWF chroot filesystem visibility and access model
+- **T-SI-003**: Verify Docker socket hidden from chroot
+- **T-SI-004**: Verify `--env-all` and `AWF_HOST_PATH` mechanism
+- **T-SI-005**: Verify GOROOT capture for Go runtime
+- **T-SI-006**: Verify MCP server container isolation
+- **T-SI-007**: Verify network isolation independent of chroot
 
 #### 12.2.6 Threat Detection Tests
 

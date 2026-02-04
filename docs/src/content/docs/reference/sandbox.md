@@ -78,121 +78,50 @@ network:
     - "api.example.com"
 ```
 
-#### Default Mounted Volumes
+#### Chroot Mode
 
-AWF automatically mounts several paths from the host into the container to enable agent functionality:
+AWF v0.13.1+ uses **chroot mode** (`--enable-chroot`) to provide transparent host filesystem access while maintaining network isolation via iptables. This eliminates explicit volume mounts and environment variable configuration.
 
-| Host Path | Container Path | Mode | Purpose |
-|-----------|----------------|------|---------|
-| `/tmp` | `/tmp` | `rw` | Temporary files and cache |
-| `${HOME}/.cache` | `${HOME}/.cache` | `rw` | Build caches (Go, npm, etc.) |
-| `${GITHUB_WORKSPACE}` | `${GITHUB_WORKSPACE}` | `rw` | Repository workspace directory |
-| `/opt/hostedtoolcache` | `/opt/hostedtoolcache` | `ro` | Runtimes (Node.js, Python, Go, Ruby, Java) |
-| `/opt/gh-aw` | `/opt/gh-aw` | `ro` | Script and configuration files |
-| `/usr/local/bin/copilot` | `/usr/local/bin/copilot` | `ro` | Copilot CLI binary |
-| `/home/runner/.copilot` | `/home/runner/.copilot` | `rw` | Copilot configuration and state |
-
-These default mounts ensure the agent has access to essential tools and the repository files. Custom mounts specified via `sandbox.agent.mounts` are added alongside these defaults.
-
-#### Mounted System Utilities
-
-AWF mounts common system utilities from the host into the container as read-only binaries. These utilities are frequently used in workflow scripts and are organized by priority:
-
-**Essential Utilities** (most commonly used):
-
-| Utility | Purpose |
-|---------|---------|
-| `cat` | Display file contents |
-| `curl` | HTTP client for API calls |
-| `date` | Date/time operations |
-| `find` | Locate files by pattern |
-| `gh` | GitHub CLI operations |
-| `grep` | Pattern matching |
-| `jq` | JSON processing |
-| `yq` | YAML processing |
-
-**Common Utilities** (frequently used for file operations):
-
-| Utility | Purpose |
-|---------|---------|
-| `cp` | Copy files |
-| `cut` | Extract text columns |
-| `diff` | Compare files |
-| `head` | Display file start |
-| `ls` | List directory contents |
-| `mkdir` | Create directories |
-| `rm` | Remove files |
-| `sed` | Stream text editing |
-| `sort` | Sort text lines |
-| `tail` | Display file end |
-| `wc` | Count lines/words |
-| `which` | Locate commands |
-
-All utilities are mounted read-only (`:ro`) from `/usr/bin/` on the host. They execute on the read-write workspace directory inside the container.
-
-> [!TIP]
-> Available Utilities
-> Run `which jq` or `jq --version` in your workflow to verify utility availability. The agent has access to all mounted utilities without additional setup.
-
-> [!WARNING]
-> Docker socket access is not supported for security
-> reasons. The agent firewall does not mount
-> `/var/run/docker.sock`, and custom mounts cannot add
-> it, preventing agents from spawning Docker
-> containers.
-
-#### Mirrored Environment Variables
-
-AWF automatically mirrors essential environment variables from the GitHub Actions runner into the agent container. This ensures compatibility with workflows that depend on runner-provided tool paths.
-
-The following environment variables are mirrored (if they exist on the host):
-
-| Category | Environment Variables |
-|----------|----------------------|
-| **Java** | `JAVA_HOME`, `JAVA_HOME_8_X64`, `JAVA_HOME_11_X64`, `JAVA_HOME_17_X64`, `JAVA_HOME_21_X64`, `JAVA_HOME_25_X64` |
-| **Android** | `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `ANDROID_NDK`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT`, `ANDROID_NDK_LATEST_HOME` |
-| **Browsers** | `CHROMEWEBDRIVER`, `EDGEWEBDRIVER`, `GECKOWEBDRIVER`, `SELENIUM_JAR_PATH` |
-| **Package Managers** | `CONDA`, `VCPKG_INSTALLATION_ROOT`, `PIPX_HOME`, `PIPX_BIN_DIR`, `GEM_HOME`, `GEM_PATH` |
-| **Go** | `GOPATH`, `GOROOT` |
-| **.NET** | `DOTNET_ROOT` |
-| **Rust** | `CARGO_HOME`, `RUSTUP_HOME` |
-| **Node.js** | `NVM_DIR` |
-| **Homebrew** | `HOMEBREW_PREFIX`, `HOMEBREW_CELLAR`, `HOMEBREW_REPOSITORY` |
-| **Swift** | `SWIFT_PATH` |
-| **Azure** | `AZURE_EXTENSION_DIR` |
-
-> [!NOTE]
-> Environment Variable Handling
-> Variables are only passed to the container if they exist on the host runner. Missing variables are silently ignored, ensuring workflows work across different runner configurations.
-
-#### Runtime Tools (hostedtoolcache)
-
-AWF mounts the `/opt/hostedtoolcache` directory from the GitHub Actions runner, providing access to all runtimes installed via `actions/setup-*` steps. This directory contains pre-installed and dynamically-installed versions of popular development tools.
-
-**Available Runtimes:**
-
-| Runtime | Setup Action | Example Versions |
-|---------|-------------|------------------|
-| **Node.js** | `actions/setup-node` | 18.x, 20.x, 22.x |
-| **Python** | `actions/setup-python` | 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 |
-| **Go** | `actions/setup-go` | 1.22.x, 1.23.x, 1.24.x, 1.25.x |
-| **Ruby** | `ruby/setup-ruby` | 3.2, 3.3, 3.4 |
-| **Java** | `actions/setup-java` | 8, 11, 17, 21, 25 |
-
-**PATH Integration:**
-
-All runtime binaries are automatically added to PATH inside the agent container. The PATH is configured using a dynamic `find` command that discovers all `bin` directories within `/opt/hostedtoolcache`:
-
-```bash
-# PATH includes all hostedtoolcache binaries
-export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"
+```text
+┌─────────────────────────────────────────────┐
+│  AWF Container (chroot)                     │
+│  • Full filesystem visibility               │
+│  • All host binaries available              │
+│  • Network: RESTRICTED via iptables/Squid   │
+└─────────────────────┬───────────────────────┘
+                      ▼
+              Allowed domains only
 ```
 
-**Version Priority:**
+#### Filesystem Access
 
-When multiple versions of a runtime are installed, versions configured by `actions/setup-*` take precedence. The agent detects which specific version is active by reading environment variables like `GOROOT`, `JAVA_HOME`, and ensures that version's binaries appear first in PATH.
+AWF chroot mode makes the host filesystem visible inside the container with appropriate permissions:
 
-**Using Runtimes in Workflows:**
+| Path Type | Mode | Examples |
+|-----------|------|----------|
+| User paths | Read-write | `$HOME`, `$GITHUB_WORKSPACE`, `/tmp` |
+| System paths | Read-only | `/usr`, `/opt`, `/bin`, `/lib` |
+| Docker socket | Hidden | `/var/run/docker.sock` (security) |
+
+Custom mounts can still be added via `sandbox.agent.mounts` for paths that need different permissions.
+
+#### Host Binaries
+
+All host binaries are available without explicit mounts: system utilities, `gh`, language runtimes, build tools, and anything installed via `apt-get` or setup actions. Verify with `which <tool>`.
+
+> [!WARNING]
+> Docker socket is hidden for security. Agents cannot spawn containers.
+
+#### Environment Variables
+
+AWF passes all environment variables via `--env-all`. The host `PATH` is captured as `AWF_HOST_PATH` and restored inside the container, preserving setup action tool paths.
+
+> [!NOTE]
+> Go's "trimmed" binaries require `GOROOT`—AWF automatically captures it after `actions/setup-go`.
+
+#### Runtime Tools
+
+Setup actions work transparently. Runtimes update `PATH`, which AWF captures and restores inside the container.
 
 ```yaml wrap
 ---
@@ -207,12 +136,8 @@ jobs:
           python-version: '3.12'
 ---
 
-Use `go build` or `python3` in your workflow - both are available!
+Use `go build` or `python3` - both are available.
 ```
-
-> [!TIP]
-> Verify Runtime Availability
-> Use `node --version`, `python3 --version`, `go version`, or `ruby --version` in your workflow to confirm runtime availability. The agent automatically inherits all runtimes configured by setup actions.
 
 #### Custom AWF Configuration
 
