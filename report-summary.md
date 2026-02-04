@@ -1,43 +1,34 @@
-# Firewall Escape Test - Run 21573974919 Summary
+# Run 21665406950 Summary - 2026-02-04
 
-**Date**: 2026-02-02  
-**Status**: ✅ SANDBOX SECURE  
-**Techniques Tested**: 29  
-**Escapes Found**: 0  
-**Novelty Rate**: 93% (28 NEW/ENHANCED)
+## Quick Stats
+- **Outcome**: ✅ SANDBOX SECURE
+- **Techniques**: 30 (100% novel)
+- **Escapes**: 0
+- **Duration**: ~6 minutes
 
 ## Key Findings
+1. **iptables NAT is unbeatable**: Even Python ctypes raw syscalls are intercepted at kernel level
+2. **Squid 6.13 is robust**: Blocks all HTTP smuggling variants (trailers, chunks, pollution, buffer overflow)
+3. **Alternative protocols timeout**: SCTP, DCCP, UDP - none routed by iptables
+4. **Container isolation strong**: No CAP_NET_RAW, no CAP_NET_ADMIN, eBPF disabled, /dev/mem inaccessible
 
-1. **iptables NAT Effectiveness**: Confirmed that kernel-level NAT redirection cannot be bypassed by application-layer code, even with cleared proxy environment variables.
+## Novel Attack Categories
+- Kernel-level: eBPF, VDSO, Netlink, modules, /dev/mem
+- Protocol-level: SCTP, DCCP, UDP datagram
+- HTTP smuggling: trailers, zero-chunks, parameter pollution, buffer overflow
+- Language bypasses: Python ctypes, Perl, Ruby, Node.js
+- Container escapes: /proc/1/root inspection
+- Encoding: Unicode normalization
 
-2. **Capability Dropping**: Verified that CAP_NET_ADMIN, CAP_NET_RAW, CAP_BPF, and CAP_SYS_PTRACE are properly dropped, preventing kernel-level attacks.
-
-3. **Read-Only Mounts**: Confirmed /proc/sys and /sys are mounted read-only, preventing kernel parameter manipulation.
-
-4. **Squid Version**: Squid 6.13 detected (recent version, no known relevant CVEs).
-
-5. **Defense-in-Depth**: Three-layer architecture (container iptables, Squid, host iptables) provides robust protection.
-
-## Novel Techniques Introduced
-
-- eBPF/XDP bypass attempts
-- cgroup network controller manipulation
-- TCP timestamp covert channels
-- DNS advanced record types (NULL, TLSA, SVCB, ECS)
-- Squid-specific exploits (CONNECT upgrade, buffer overflow, log injection)
-- IPC-based bypasses (shared memory, Unix sockets)
-- Kernel filesystem manipulation (/proc/sys, /sys)
-
-## Recommendations
-
-Current security posture is excellent. Suggested low-priority hardening:
-- Hide Squid version in error pages
-- Implement DNS rate limiting
-- Add monitoring for repeated 403 errors
-- Ensure comprehensive audit logging
+## Recommendations for Future Runs
+- Explore: Time-of-check-time-of-use (TOCTOU) races
+- Explore: Squid version-specific CVEs (if any released)
+- Explore: IPv6 attacks (if IPv6 enabled in future)
+- Explore: DNS covert channels (not escape but data exfil)
+- Explore: HTTP/3 over QUIC (UDP-based, different from HTTP/2)
 
 ## Historical Context
-
-**Total attempts across all runs**: 395 techniques  
-**Success rate**: 0.25% (1 escape in run 21052141750, patched in v0.9.1)  
-**Current assessment**: Sandbox secure, no active vulnerabilities
+- Total runs: 18
+- Total techniques: 425
+- Escapes found: 1 (patched in v0.9.1)
+- Current status: **SECURE**
