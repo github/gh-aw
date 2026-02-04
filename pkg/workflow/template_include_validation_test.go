@@ -398,3 +398,72 @@ No indent
 		})
 	}
 }
+
+// TestValidateNoIncludesInTemplateRegions_MultipleErrors tests that multiple errors are aggregated
+func TestValidateNoIncludesInTemplateRegions_MultipleErrors(t *testing.T) {
+	// Input with multiple includes inside different template regions
+	input := `# Test Workflow
+
+{{#if github.event.issue.number}}
+@include shared/issue-tools.md
+Some content here.
+{{/if}}
+
+{{#if github.actor}}
+@import shared/actor-config.md
+More content here.
+{{/if}}
+
+{{#if github.repository}}
+@include? shared/optional.md
+Even more content.
+{{/if}}`
+
+	err := validateNoIncludesInTemplateRegions(input)
+
+	// Should return aggregated error with all three violations
+	if err == nil {
+		t.Fatal("validateNoIncludesInTemplateRegions() expected error, got nil")
+	}
+
+	errStr := err.Error()
+
+	// Check that all three errors are present
+	if !strings.Contains(errStr, "issue-tools.md") {
+		t.Errorf("Error should contain first violation: issue-tools.md")
+	}
+	if !strings.Contains(errStr, "actor-config.md") {
+		t.Errorf("Error should contain second violation: actor-config.md")
+	}
+	if !strings.Contains(errStr, "optional.md") {
+		t.Errorf("Error should contain third violation: optional.md")
+	}
+
+	// Check for newline-separated errors (errors.Join behavior)
+	errorLines := strings.Split(errStr, "\n")
+	if len(errorLines) < 3 {
+		t.Errorf("Expected at least 3 error lines, got %d", len(errorLines))
+	}
+}
+
+// TestValidateNoIncludesInTemplateRegions_SingleError tests single error behavior
+func TestValidateNoIncludesInTemplateRegions_SingleError(t *testing.T) {
+	// Input with single include inside template region
+	input := `# Test Workflow
+
+{{#if github.event.issue.number}}
+@include shared/tools.md
+{{/if}}`
+
+	err := validateNoIncludesInTemplateRegions(input)
+
+	// Should return single error (not aggregated)
+	if err == nil {
+		t.Fatal("validateNoIncludesInTemplateRegions() expected error, got nil")
+	}
+
+	errStr := err.Error()
+	if !strings.Contains(errStr, "tools.md") {
+		t.Errorf("Error should contain violation: tools.md")
+	}
+}

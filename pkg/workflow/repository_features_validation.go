@@ -175,6 +175,7 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 
 	// Return aggregated errors with formatted output
 	return collector.FormattedError("repository features")
+}
 
 // getCurrentRepository gets the current repository from git context (with caching)
 func getCurrentRepository() (string, error) {

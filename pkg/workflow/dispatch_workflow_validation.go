@@ -163,6 +163,7 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 
 	// Return aggregated errors with formatted output
 	return collector.FormattedError("dispatch-workflow")
+}
 
 // extractWorkflowDispatchInputs parses a workflow file and extracts the workflow_dispatch inputs schema
 // Returns a map of input definitions that can be used to generate MCP tool schemas
