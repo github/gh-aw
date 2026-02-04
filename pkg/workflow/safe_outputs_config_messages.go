@@ -3,7 +3,11 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var safeOutputMessagesLog = logger.New("workflow:safe_outputs_config_messages")
 
 // ========================================
 // Safe Output Messages Configuration
@@ -11,11 +15,13 @@ import (
 
 // parseMessagesConfig parses the messages configuration from safe-outputs frontmatter
 func parseMessagesConfig(messagesMap map[string]any) *SafeOutputMessagesConfig {
+	safeOutputMessagesLog.Printf("Parsing messages configuration with %d fields", len(messagesMap))
 	config := &SafeOutputMessagesConfig{}
 
 	if appendOnly, exists := messagesMap["append-only-comments"]; exists {
 		if appendOnlyBool, ok := appendOnly.(bool); ok {
 			config.AppendOnlyComments = appendOnlyBool
+			safeOutputMessagesLog.Printf("Set append-only-comments: %t", appendOnlyBool)
 		}
 	}
 
@@ -82,11 +88,13 @@ func parseMessagesConfig(messagesMap map[string]any) *SafeOutputMessagesConfig {
 // - true: always allows mentions (error in strict mode)
 // - object: detailed configuration with allow-team-members, allow-context, allowed, max
 func parseMentionsConfig(mentions any) *MentionsConfig {
+	safeOutputMessagesLog.Printf("Parsing mentions configuration: type=%T", mentions)
 	config := &MentionsConfig{}
 
 	// Handle boolean value
 	if boolVal, ok := mentions.(bool); ok {
 		config.Enabled = &boolVal
+		safeOutputMessagesLog.Printf("Mentions configured as boolean: %t", boolVal)
 		return config
 	}
 
@@ -157,9 +165,12 @@ func serializeMessagesConfig(messages *SafeOutputMessagesConfig) (string, error)
 	if messages == nil {
 		return "", nil
 	}
+	safeOutputMessagesLog.Print("Serializing messages configuration to JSON")
 	jsonBytes, err := json.Marshal(messages)
 	if err != nil {
+		safeOutputMessagesLog.Printf("Failed to serialize messages config: %v", err)
 		return "", fmt.Errorf("failed to serialize messages config: %w", err)
 	}
+	safeOutputMessagesLog.Printf("Serialized messages config: %d bytes", len(jsonBytes))
 	return string(jsonBytes), nil
 }

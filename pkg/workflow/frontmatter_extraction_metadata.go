@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var frontmatterMetadataLog = logger.New("workflow:frontmatter_extraction_metadata")
 
 // extractFeatures extracts the features field from frontmatter
 // Returns a map of feature flags and configuration options (supports boolean flags and string values)
@@ -67,9 +71,12 @@ func (c *Compiler) extractTrackerID(frontmatter map[string]any) (string, error) 
 		return "", nil
 	}
 
+	frontmatterMetadataLog.Print("Extracting and validating tracker-id")
+
 	// Convert the value to string
 	strValue, ok := value.(string)
 	if !ok {
+		frontmatterMetadataLog.Printf("Invalid tracker-id type: %T", value)
 		return "", fmt.Errorf("tracker-id must be a string, got %T. Example: tracker-id: \"my-tracker-123\"", value)
 	}
 
@@ -77,6 +84,7 @@ func (c *Compiler) extractTrackerID(frontmatter map[string]any) (string, error) 
 
 	// Validate minimum length
 	if len(trackerID) < 8 {
+		frontmatterMetadataLog.Printf("tracker-id too short: %d characters", len(trackerID))
 		return "", fmt.Errorf("tracker-id must be at least 8 characters long (got %d)", len(trackerID))
 	}
 
@@ -84,10 +92,12 @@ func (c *Compiler) extractTrackerID(frontmatter map[string]any) (string, error) 
 	for i, char := range trackerID {
 		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') &&
 			(char < '0' || char > '9') && char != '-' && char != '_' {
+			frontmatterMetadataLog.Printf("Invalid character in tracker-id at position %d", i+1)
 			return "", fmt.Errorf("tracker-id contains invalid character at position %d: '%c' (only alphanumeric, hyphens, and underscores allowed)", i+1, char)
 		}
 	}
 
+	frontmatterMetadataLog.Printf("Successfully validated tracker-id: %s", trackerID)
 	return trackerID, nil
 }
 
@@ -152,6 +162,7 @@ func (c *Compiler) extractToolsTimeout(tools map[string]any) (int, error) {
 
 	// Check if timeout is explicitly set in tools
 	if timeoutValue, exists := tools["timeout"]; exists {
+		frontmatterMetadataLog.Printf("Extracting tools.timeout value: type=%T", timeoutValue)
 		var timeout int
 		// Handle different numeric types with safe conversions to prevent overflow
 		switch v := timeoutValue.(type) {
@@ -166,14 +177,17 @@ func (c *Compiler) extractToolsTimeout(tools map[string]any) (int, error) {
 		case float64:
 			timeout = int(v)
 		default:
+			frontmatterMetadataLog.Printf("Invalid tools.timeout type: %T", timeoutValue)
 			return 0, fmt.Errorf("tools.timeout must be an integer, got %T", timeoutValue)
 		}
 
 		// Validate minimum value per schema constraint
 		if timeout < 1 {
+			frontmatterMetadataLog.Printf("Invalid tools.timeout value: %d (must be >= 1)", timeout)
 			return 0, fmt.Errorf("tools.timeout must be at least 1 second, got %d. Example:\ntools:\n  timeout: 60", timeout)
 		}
 
+		frontmatterMetadataLog.Printf("Extracted tools.timeout: %d seconds", timeout)
 		return timeout, nil
 	}
 
