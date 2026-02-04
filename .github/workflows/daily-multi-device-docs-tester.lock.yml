@@ -158,7 +158,7 @@ jobs:
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.1
       - name: Install Claude Code CLI
-        run: npm install -g --silent @anthropic-ai/claude-code@2.1.29
+        run: npm install -g --silent @anthropic-ai/claude-code@2.1.31
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:
@@ -170,7 +170,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.98 ghcr.io/github/github-mcp-server:v0.30.2 mcr.microsoft.com/playwright/mcp node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.0.98 ghcr.io/github/github-mcp-server:v0.30.3 mcr.microsoft.com/playwright/mcp node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -458,7 +458,7 @@ jobs:
           {
             "mcpServers": {
               "github": {
-                "container": "ghcr.io/github/github-mcp-server:v0.30.2",
+                "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
                   "GITHUB_LOCKDOWN_MODE": "$GITHUB_MCP_LOCKDOWN",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN",
@@ -510,7 +510,7 @@ jobs:
               engine_name: "Claude Code",
               model: process.env.GH_AW_MODEL_AGENT_CLAUDE || "",
               version: "",
-              agent_version: "2.1.29",
+              agent_version: "2.1.31",
               workflow_name: "Multi-Device Docs Tester",
               experimental: false,
               supports_tools_allowlist: true,
@@ -527,7 +527,7 @@ jobs:
               allowed_domains: ["node"],
               firewall_enabled: true,
               awf_version: "v0.13.1",
-              awmg_version: "v0.0.94",
+              awmg_version: "v0.0.98",
               steps: {
                 firewall: "squid"
               },
@@ -1230,7 +1230,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Claude Code CLI
-        run: npm install -g --silent @anthropic-ai/claude-code@2.1.29
+        run: npm install -g --silent @anthropic-ai/claude-code@2.1.31
       - name: Execute Claude Code CLI
         id: agentic_execution
         # Allowed tools (sorted):
