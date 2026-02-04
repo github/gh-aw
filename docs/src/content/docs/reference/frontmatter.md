@@ -298,6 +298,37 @@ env:
 
 Environment variables can be defined at multiple scopes (workflow, job, step, engine, safe-outputs, etc.) with clear precedence rules. See [Environment Variables](/gh-aw/reference/environment-variables/) for complete documentation on all 13 env scopes and precedence order.
 
+## Secrets (`secrets:`)
+
+Defines secret values passed to workflow execution. Secrets are typically used to provide sensitive configuration to MCP servers, custom engines, or workflow components. Values must be GitHub Actions expressions that reference secrets (e.g., `${{ secrets.API_KEY }}`).
+
+```yaml wrap
+secrets:
+  API_TOKEN: ${{ secrets.API_TOKEN }}
+  DATABASE_URL: ${{ secrets.DB_URL }}
+```
+
+Secrets can also include descriptions for documentation:
+
+```yaml wrap
+secrets:
+  API_TOKEN:
+    value: ${{ secrets.API_TOKEN }}
+    description: "API token for external service"
+  DATABASE_URL:
+    value: ${{ secrets.DB_URL }}
+    description: "Production database connection string"
+```
+
+**Security best practices:**
+
+- Always use GitHub Actions secret expressions (`${{ secrets.NAME }}`)
+- Never commit plaintext secrets to workflow files
+- Use environment-specific secrets when possible (via `environment:` field)
+- Limit secret access to only the components that need them
+
+**Note:** For passing secrets to reusable workflows, use the `jobs.<job_id>.secrets` field instead. The top-level `secrets:` field is for workflow-level secret configuration.
+
 ## Environment Protection (`environment:`)
 
 Specifies the environment for deployment protection rules and environment-specific secrets. Standard GitHub Actions syntax.
