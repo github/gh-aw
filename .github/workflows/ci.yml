@@ -98,6 +98,7 @@ jobs:
           retention-days: 7
 
       - name: Upload unit test results
+        if: always()  # Upload even if tests fail so canary_go can track coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-result-unit
@@ -287,6 +288,7 @@ jobs:
           fi
 
       - name: Upload integration test results
+        if: always()  # Upload even if tests fail so canary_go can track coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-result-integration-${{ matrix.test-group.name }}
