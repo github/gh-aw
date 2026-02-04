@@ -28,7 +28,6 @@ Interactive Mode (default):
 
 This command:
 - Configures .gitattributes to mark .lock.yml files as generated
-- Creates .github/aw/logs/.gitignore to ignore downloaded workflow logs
 - Creates GitHub Copilot custom instructions at .github/aw/github-agentic-workflows.md
 - Creates the dispatcher agent at .github/agents/agentic-workflows.agent.md
 - Creates workflow creation prompt at .github/aw/create-agentic-workflow.md (for new workflows)
