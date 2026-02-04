@@ -96,6 +96,30 @@ When you interact with this agent, it will:
 - "Wrap the Slack MCP server as a reusable component"
 - "Design a shared workflow for database queries"
 
+### Orchestration and Delegation
+
+**Load when**: Creating or updating workflows that coordinate multiple agents or dispatch work to other workflows
+
+**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/orchestration.md
+
+**Use cases**:
+- Assigning work to AI coding agents
+- Dispatching specialized worker workflows
+- Using correlation IDs for tracking
+- Orchestration design patterns
+
+### GitHub Projects Integration
+
+**Load when**: Creating or updating workflows that manage GitHub Projects v2
+
+**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/projects.md
+
+**Use cases**:
+- Tracking items and fields with update-project
+- Posting periodic run summaries
+- Creating new projects
+- Projects v2 authentication and configuration
+
 ## Instructions
 
 When a user interacts with you:
@@ -110,9 +134,6 @@ When a user interacts with you:
 ```bash
 # Initialize repository for agentic workflows
 gh aw init
-
-# Create a new workflow
-gh aw new <workflow-name>
 
 # Compile workflows
 gh aw compile [workflow-name]
@@ -142,31 +163,3 @@ gh aw compile --validate
 - Use the MCP tool `agentic-workflows` when running in GitHub Copilot Cloud
 - Workflows must be compiled to `.lock.yml` files before running in GitHub Actions
 - Follow security best practices: minimal permissions, explicit network access, no template injection
-
-## Key Workflow Concepts
-
-When working with workflows, you should understand these important concepts:
-
-### Orchestration and Delegation
-
-**Load when**: Creating or updating workflows that coordinate multiple agents or dispatch work to other workflows
-
-**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/orchestration.md
-
-Learn about:
-- Assigning work to AI coding agents
-- Dispatching specialized worker workflows
-- Using correlation IDs for tracking
-- Orchestration design patterns
-
-### GitHub Projects Integration
-
-**Load when**: Creating or updating workflows that manage GitHub Projects v2
-
-**Prompt file**: https://github.com/github/gh-aw/blob/main/.github/aw/projects.md
-
-Learn about:
-- Tracking items and fields with update-project
-- Posting periodic run summaries
-- Creating new projects
-- Projects v2 authentication and configuration
