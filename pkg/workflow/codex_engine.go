@@ -244,6 +244,10 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		awfArgs = append(awfArgs, "--image-tag", awfImageTag)
 		codexEngineLog.Printf("Pinned AWF image tag to %s", awfImageTag)
 
+		// Skip pulling images since they are pre-downloaded in the Download container images step
+		awfArgs = append(awfArgs, "--skip-pull")
+		codexEngineLog.Print("Using --skip-pull since images are pre-downloaded")
+
 		// Use ACT agent container for GitHub Actions parity
 		awfArgs = append(awfArgs, "--agent-image", "act")
 		codexEngineLog.Print("Using ACT agent container for GitHub Actions parity")
