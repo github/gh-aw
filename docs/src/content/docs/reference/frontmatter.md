@@ -66,7 +66,7 @@ Labels help organize workflows by purpose, team, or functionality. They appear i
 
 ### Metadata (`metadata:`)
 
-Optional key-value pairs for storing custom metadata compatible with the [GitHub Copilot custom agent spec](https://docs.github.com/en/copilot/reference/custom-agents-configuration).
+Optional key-value pairs for storing custom metadata compatible with the [GitHub Copilot custom agent spec](https://docs.github.com/en/copilot/reference/copilot-custom-agents-configuration).
 
 ```yaml wrap
 metadata:

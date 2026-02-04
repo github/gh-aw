@@ -310,4 +310,4 @@ When sharing agents across teams:
 - Test agent updates in non-production workflows first
 - Maintain backwards compatibility within major versions
 
-**Related:** [CLI Commands](/gh-aw/setup/cli/) | [Workflow Structure](/gh-aw/reference/workflow-structure/) | [Frontmatter](/gh-aw/reference/frontmatter/) | [Imports](/gh-aw/reference/imports/) | [Custom Agents](/gh-aw/reference/custom-agents/)
+**Related:** [CLI Commands](/gh-aw/setup/cli/) | [Workflow Structure](/gh-aw/reference/workflow-structure/) | [Frontmatter](/gh-aw/reference/frontmatter/) | [Imports](/gh-aw/reference/imports/) | [Custom Agents](/gh-aw/reference/copilot-custom-agents/)

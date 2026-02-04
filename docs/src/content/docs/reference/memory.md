@@ -110,10 +110,10 @@ Creates branch `memory/default` at `/tmp/gh-aw/repo-memory-default/`. Files are 
 ---
 tools:
   repo-memory:
-    branch-name: memory/custom-agent
+    branch-name: memory/custom-agent-for-aw
     branch-prefix: tracking  # Custom prefix instead of "memory"
     description: "Long-term insights"
-    file-glob: ["memory/custom-agent/*.md", "memory/custom-agent/*.json"]
+    file-glob: ["memory/custom-agent-for-aw/*.md", "memory/custom-agent-for-aw/*.json"]
     max-file-size: 1048576  # 1MB (default 10KB)
     max-file-count: 50      # default 100
     target-repo: "owner/repository"
@@ -123,7 +123,7 @@ tools:
 
 **Branch Prefix**: Use `branch-prefix` to customize the branch name prefix (default is `memory`). The prefix must be 4-32 characters, alphanumeric with hyphens/underscores, and cannot be `copilot`. When set, branches are created as `{branch-prefix}/{id}` instead of `memory/{id}`.
 
-**Note**: File glob patterns must include the full branch path structure. For branch `memory/custom-agent`, use patterns like `memory/custom-agent/*.json` to match files stored at that path within the branch.
+**Note**: File glob patterns must include the full branch path structure. For branch `memory/custom-agent-for-aw`, use patterns like `memory/custom-agent-for-aw/*.json` to match files stored at that path within the branch.
 
 ## Multiple Repo Memory Configurations
 

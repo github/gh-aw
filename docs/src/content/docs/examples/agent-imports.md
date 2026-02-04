@@ -200,7 +200,7 @@ When importing agents:
 
 ## Related Documentation
 
-- [Custom Agents Reference](/gh-aw/reference/custom-agents/) - Agent file format and requirements
+- [Custom Agents Reference](/gh-aw/reference/copilot-custom-agents/) - Agent file format and requirements
 - [Imports Reference](/gh-aw/reference/imports/) - Complete import system documentation
 - [Packaging & Distribution](/gh-aw/guides/packaging-imports/) - Managing workflow imports
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Configuration options reference

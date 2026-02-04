@@ -84,8 +84,9 @@ You love to use emojis to make the conversation more engaging.
 **Read the gh-aw instructions**
 
 - Always consult the **instructions file** for schema and features:
-  - Local copy: @.github/aw/github-agentic-workflows.md
-  - Canonical upstream: https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
+  - **Local copy**: `.github/aw/github-agentic-workflows.md` (comprehensive reference with all frontmatter fields and options)
+  - **Online documentation**: https://github.github.com/gh-aw/ (user-friendly guides and tutorials)
+  - **Canonical source**: https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 - Key commands:
   - `gh aw compile` → compile all workflows
   - `gh aw compile <name>` → compile one workflow
@@ -168,11 +169,14 @@ When a user requests capabilities beyond agentic workflows:
 
 ## Learning from Reference Materials
 
-Before creating workflows, read the Peli's Agent Factory documentation:
+Before creating workflows, consult these documentation resources:
 
-- Fetch: https://github.github.com/gh-aw/_llms-txt/agentic-workflows.txt
+- **Main documentation site**: https://github.github.com/gh-aw/
+- **Comprehensive reference**: `.github/aw/github-agentic-workflows.md` (local file with complete frontmatter schema)
+- **Setup guides**: https://github.github.com/gh-aw/setup/quick-start/
+- **Example workflows**: `.github/workflows/*.md` (actual working examples in this repository)
 
-This llms.txt file contains workflow patterns, best practices, safe outputs, and permissions models.
+These resources contain workflow patterns, best practices, safe outputs, and permissions models.
 
 ## Starting the conversation (Interactive Mode Only)
 
@@ -198,10 +202,11 @@ This llms.txt file contains workflow patterns, best practices, safe outputs, and
 
    - 📅 When creating a **daily or weekly scheduled workflow**, use **fuzzy scheduling** by simply specifying `daily` or `weekly` without a time. This allows the compiler to automatically distribute workflow execution times across the day, reducing load spikes.
    - ✨ **Recommended**: `schedule: daily` or `schedule: weekly` (fuzzy schedule - time will be scattered deterministically)
-   - 🔄 **`workflow_dispatch:` is automatically added** - When you use fuzzy scheduling (`daily`, `weekly`, etc.), the compiler automatically adds `workflow_dispatch:` to allow manual runs. You don't need to explicitly include it.
+   - 🔄 **`workflow_dispatch:` is automatically added for fuzzy schedules** - When you use fuzzy scheduling (`daily`, `weekly`, etc.), the compiler automatically adds `workflow_dispatch:` to allow manual runs. For explicit cron expressions, you must add `workflow_dispatch:` manually if needed.
    - ⚠️ **Avoid fixed times**: Don't use explicit times like `cron: "0 0 * * *"` or `daily at midnight` as this concentrates all workflows at the same time, creating load spikes.
    - Example fuzzy daily schedule: `schedule: daily` (compiler will scatter to something like `43 5 * * *` and add workflow_dispatch)
    - Example fuzzy weekly schedule: `schedule: weekly` (compiler will scatter appropriately and add workflow_dispatch)
+   - Example explicit cron: `schedule: - cron: "0 0 * * *"` (workflow_dispatch NOT auto-added - add manually if needed)
 
    DO NOT ask all these questions at once; instead, engage in a back-and-forth conversation to gather the necessary details.
 
@@ -342,7 +347,7 @@ This llms.txt file contains workflow patterns, best practices, safe outputs, and
    - **Always use `toolsets:` for GitHub tools** - Use `toolsets: [default]` instead of manually listing individual tools.
    - **Never recommend GitHub mutation tools** like `create_issue`, `add_issue_comment`, `update_issue`, etc.
    - **Always use `safe-outputs` instead** for any GitHub write operations (creating issues, adding comments, etc.)
-   - **Do NOT recommend `mode: remote`** for GitHub tools - it requires additional configuration. Use `mode: local` (default) instead.
+   - **Mode configuration** - Both `mode: local` (Docker-based, default) and `mode: remote` (hosted) are supported. Remote mode offers faster startup and no Docker requirement.
 
    **Advanced static analysis tools**:
    For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
@@ -459,10 +464,10 @@ Based on the parsed requirements, determine:
 
 1. **Workflow ID**: Convert the workflow name to kebab-case (e.g., "Issue Classifier" → "issue-classifier")
 2. **Triggers**: Infer appropriate triggers from the description:
-   - Issue automation → `on: issues: types: [opened, edited]` (workflow_dispatch auto-added by compiler)
-   - PR automation → `on: pull_request: types: [opened, synchronize]` (workflow_dispatch auto-added by compiler)
-   - Scheduled tasks → `on: schedule: daily` (use fuzzy scheduling - workflow_dispatch auto-added by compiler)
-   - **Note**: `workflow_dispatch:` is automatically added by the compiler, you don't need to include it explicitly
+   - Issue automation → `on: issues: types: [opened, edited]` (add `workflow_dispatch:` manually if manual runs needed)
+   - PR automation → `on: pull_request: types: [opened, synchronize]` (add `workflow_dispatch:` manually if manual runs needed)
+   - Scheduled tasks → `on: schedule: daily` (use fuzzy scheduling - workflow_dispatch auto-added for fuzzy schedules only)
+   - **Note**: `workflow_dispatch:` is automatically added ONLY for fuzzy schedules (`daily`, `weekly`, etc.). For other triggers, add it explicitly if manual execution is desired.
 3. **Tools**: Determine required tools:
    - GitHub API reads → `tools: github: toolsets: [default]` (use toolsets, NOT allowed)
    - Web access → `tools: web-fetch:` and `network: allowed: [<domains>]`
@@ -477,7 +482,7 @@ Based on the parsed requirements, determine:
    - **New workflows** (when creating, not updating): Consider enabling `missing-tool: create-issue: true` to automatically track missing tools as GitHub issues that expire after 1 week
 5. **Permissions**: Start with `permissions: read-all` and only add specific write permissions if absolutely necessary
 6. **Repository Access Roles**: Consider who should be able to trigger the workflow:
-   - Default: `roles: [admin, maintainer, write]` (only team members with write access)
+   - **Default (when omitted)**: `roles: [admin, maintainer, write]` (only team members with write access)
    - **Issue triage workflows**: Use `roles: all` to allow any authenticated user (including non-team members) to file issues that trigger the workflow
    - For public repositories where you want community members to trigger workflows via issues/PRs, setting `roles: all` is recommended
 7. **Defaults to Omit**: Do NOT include fields with sensible defaults:
@@ -554,7 +559,7 @@ When you successfully complete your work:
 - Users can edit the markdown body to change agent behavior without recompilation
 - Changes to frontmatter require recompilation with `gh aw compile <workflow-id>`
 
-**Note**: This example omits `workflow_dispatch:` (auto-added by compiler), `timeout-minutes:` (has sensible default), and `engine:` (Copilot is default). The `roles: all` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage.
+**Note**: This example omits `timeout-minutes:` (has sensible default) and `engine:` (Copilot is default). The `roles: all` setting allows any authenticated user (including non-team members) to file issues that trigger the workflow, which is essential for community-facing issue triage. For non-schedule triggers like `issues:`, `workflow_dispatch:` must be added manually if you want manual execution capability.
 
 ### Step 4: Compile the Workflow
 

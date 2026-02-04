@@ -1,20 +1,20 @@
 ---
-title: Custom Agent Files
-description: Create specialized AI agents with custom instructions and behavior for GitHub Agentic Workflows
+title: Reusing Copilot Custom Agents
+description: Create and reuse specialized AI agents with custom instructions and behavior for GitHub Agentic Workflows
 sidebar:
   order: 650
 ---
 
-Custom agent files provide specialized instructions and behavior for AI engines. Agent files are markdown documents stored in the `.github/agents/` directory and imported via the `imports` field. Copilot supports agents natively, while other engines (Claude, Codex) inject the markdown body as a prompt.
+"Custom Agents" is a term used in GitHub Copilot for specialized prompts for behaviors for specific tasks. They are markdown documents stored in the `.github/agents/` directory and imported via the `imports` field. Copilot supports agents natively, while other engines (Claude, Codex) inject the markdown body as a prompt.
 
-## Creating a Custom Agent
+## Creating a Copilot Custom Agent
 
 Create a markdown file in `.github/agents/` with agent-specific instructions:
 
 ```markdown title=".github/agents/my-agent.md"
 ---
-name: My Custom Agent
-description: Specialized agent for code review tasks
+name: My Copilot Custom Agent
+description: Specialized prompt for code review tasks
 ---
 
 # Agent Instructions
@@ -25,7 +25,7 @@ You are a specialized code review agent. Focus on:
 - Performance optimization
 ```
 
-## Using Custom Agents
+## Using Copilot Custom Agents from Agentic Workflows
 
 Import agent files in your workflow using the `imports` field. Agents can be imported from local `.github/agents/` directories or from external repositories.
 
@@ -60,6 +60,7 @@ Perform comprehensive code review using shared agent instructions.
 ```
 
 Remote agent imports support versioning:
+
 - **Semantic tags**: `@v1.0.0` (recommended for production)
 - **Branch names**: `@main`, `@develop` (for development)
 - **Commit SHAs**: `@abc123def` (for immutable references)
@@ -74,8 +75,6 @@ The agent instructions are merged with the workflow prompt, customizing the AI e
 - **One per workflow**: Only one agent file can be imported per workflow
 - **Caching**: Remote agents are cached by commit SHA in `.github/aw/imports/`
 
-## Built-in Agents
+## The Copilot Custom Agent for Agentic Workflows
 
-The `gh aw init` command sets up a unified `agentic-workflows` dispatcher agent that intelligently routes your workflow requests to specialized prompts based on your intent (create/debug/update/upgrade). This agent is stored in `.github/agents/` and provides conversational workflow authoring, debugging, and upgrade capabilities using CLI tools (`gh aw logs`, `gh aw audit`, `gh aw run`, `gh aw compile`).
-
-When you invoke `/agent agentic-workflows` in Copilot Chat, simply state your intent (e.g., "create a workflow that...", "debug why my workflow...", "update my workflow to...") and the agent will route to the appropriate specialized prompt.
+The [Copilot Custom Agent for Agentic Workflows](/gh-aw/reference/custom-agent-for-aw/) (`agentic-workflows.agent.md`) is a specialized custom agent designed to assist with creating, updating, importing, and debugging agentic workflows. It provides tailored instructions and behaviors to streamline workflow management tasks.

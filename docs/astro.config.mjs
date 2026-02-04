@@ -211,7 +211,7 @@ export default defineConfig({
 						{ label: 'Cache & Memory', link: '/reference/memory/' },
 						{ label: 'Concurrency', link: '/reference/concurrency/' },
 						{ label: 'Markdown', link: '/reference/markdown/' },
-						{ label: 'Custom Agents', link: '/reference/custom-agents/' },
+						{ label: 'Custom Agents', link: '/reference/copilot-custom-agents/' },
 						{ label: 'GH-AW as MCP Server', link: '/setup/mcp-server/' },
 						{ label: 'MCP Gateway', link: '/reference/mcp-gateway/' },
 						{ label: 'FAQ', link: '/reference/faq/' },

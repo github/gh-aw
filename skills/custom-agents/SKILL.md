@@ -562,7 +562,7 @@ tools: [read, edit, pr]
 
 ## References
 
-- [GitHub Copilot Custom Agents Configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) - Official reference for custom agent configuration including tool aliases
+- [GitHub Copilot Custom Agents Configuration](https://docs.github.com/en/copilot/reference/copilot-custom-agents-configuration) - Official reference for custom agent configuration including tool aliases
 - [GitHub Copilot Custom Instructions Documentation](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)
 - [About Custom Agents](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-custom-agents)
 - [GitHub Blog: Custom Instructions Support](https://github.blog/changelog/2025-07-23-github-copilot-coding-agent-now-supports-instructions-md-custom-instructions/)

@@ -11,8 +11,6 @@ In this guide you will add the automated [**Daily Repo Status Report**](https://
 
 The aim here is **automated AI**: to install something that will run **automatically** every day, in the context of your repository. The workflow will regularly create or update a fresh status report issue in your repository, without any further manual intervention. If you're familiar with GitHub Actions, you will be aware of the power of automation in repositories; this is simply taking that to the next level with AI.
 
-Alternatively you can [create your own workflow using AI to help](./creating-workflows/). If so, check out that guide instead.
-
 ## Prerequisites
 
 Before installing, ensure you have:

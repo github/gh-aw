@@ -110,7 +110,7 @@ The GitHub MCP server is built into agentic workflows and provides comprehensive
 | `code_security` | Security alerts | `list_code_scanning_alerts` |
 | `users` | User profiles | `get_me`, `get_user`, `list_users` |
 
-The `default` toolset includes: `context`, `repos`, `issues`, `pull_requests`. When used in workflows, `[default]` expands to action-friendly toolsets that work with GitHub Actions tokens. Note: The `users` toolset is not included by default.
+The `default` toolset includes: `context`, `repos`, `issues`, `pull_requests`. When used in workflows, `[default]` expands to action-friendly toolsets that work with GitHub Actions tokens. Note: The `users` toolset is not included by default as GitHub Actions tokens do not support user operations.
 
 ### Operating Modes
 

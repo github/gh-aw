@@ -82,9 +82,9 @@ engine:
   agent: agent-id                       # custom agent file identifier
 ```
 
-### Custom Agent Configuration
+### Copilot Custom Configuration
 
-For the Copilot engine, you can specify a custom agent using the `agent` field. This references a custom agent file located in the `.github/agents/` directory:
+For the Copilot engine, you can specify a specialized prompt to be used whenever the coding agent is invoked. This is called a "custom agent" in Copilot vocabulary. You specify this using the `agent` field. This references a file located in the `.github/agents/` directory:
 
 ```yaml wrap
 engine:
@@ -94,7 +94,7 @@ engine:
 
 The `agent` field value should match the agent file name without the `.agent.md` extension. For example, `agent: technical-doc-writer` references `.github/agents/technical-doc-writer.agent.md`.
 
-Custom agent files define specialized behaviors, tool access, and instructions tailored to specific tasks. See [Custom Agents](/gh-aw/reference/custom-agents/) for details on creating and configuring custom agents.
+See [Copilot Custom Agents](/gh-aw/reference/copilot-custom-agents/) for details on creating and configuring custom agents.
 
 ### Engine Environment Variables
 
