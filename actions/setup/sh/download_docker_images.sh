@@ -21,9 +21,18 @@ docker_pull_with_retry() {
   
   while [ $attempt -le $max_attempts ]; do
     echo "Attempt $attempt of $max_attempts: Pulling $image..."
-    if docker pull --quiet "$image" 2>&1; then
+    timeout 5m docker pull --quiet "$image" 2>&1
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
       echo "Successfully pulled $image"
       return 0
+    fi
+    
+    # Check if the command timed out (exit code 124 from timeout command)
+    if [ $exit_code -eq 124 ]; then
+      echo "docker pull timed out for $image"
+      return 1
     fi
     
     if [ $attempt -lt $max_attempts ]; then
