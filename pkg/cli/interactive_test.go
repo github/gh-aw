@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -420,7 +421,7 @@ func TestCreateWorkflowInteractively_InAutomatedEnvironment(t *testing.T) {
 	})
 
 	// Test should fail in automated environment
-	err := CreateWorkflowInteractively("test-workflow", false, false)
+	err := CreateWorkflowInteractively(context.Background(), "test-workflow", false, false)
 	if err == nil {
 		t.Error("Expected error in automated environment, got nil")
 	}
@@ -455,8 +456,8 @@ func TestCreateWorkflowInteractively_WithForceFlag(t *testing.T) {
 	})
 
 	// Both with and without force should fail in CI
-	err1 := CreateWorkflowInteractively("test-workflow", false, false)
-	err2 := CreateWorkflowInteractively("test-workflow", false, true)
+	err1 := CreateWorkflowInteractively(context.Background(), "test-workflow", false, false)
+	err2 := CreateWorkflowInteractively(context.Background(), "test-workflow", false, true)
 
 	if err1 == nil || err2 == nil {
 		t.Error("Expected errors in CI environment")
@@ -479,7 +480,7 @@ func TestInteractiveWorkflowBuilder_compileWorkflow_SpinnerIntegration(t *testin
 
 	// Test with invalid workflow (should handle error correctly)
 	// This will fail compilation but should not panic
-	err := builder.compileWorkflow(false)
+	err := builder.compileWorkflow(context.Background(), false)
 
 	// We expect an error since the workflow doesn't exist
 	if err == nil {
