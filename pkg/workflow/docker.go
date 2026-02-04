@@ -59,6 +59,30 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []str
 		}
 	}
 
+	// Collect AWF (firewall) container images when firewall is enabled
+	// AWF uses two containers: squid (proxy) and agent
+	if isFirewallEnabled(workflowData) {
+		// Get the firewall version for image tags
+		firewallConfig := getFirewallConfig(workflowData)
+		awfImageTag := getAWFImageTag(firewallConfig)
+
+		// Add squid (proxy) container
+		squidImage := constants.DefaultFirewallRegistry + "/squid:" + awfImageTag
+		if !imageSet[squidImage] {
+			images = append(images, squidImage)
+			imageSet[squidImage] = true
+			dockerLog.Printf("Added AWF squid (proxy) container: %s", squidImage)
+		}
+
+		// Add agent container (using act preset which is the GitHub Actions parity image)
+		agentImage := constants.DefaultFirewallRegistry + "/agent-act:" + awfImageTag
+		if !imageSet[agentImage] {
+			images = append(images, agentImage)
+			imageSet[agentImage] = true
+			dockerLog.Printf("Added AWF agent container: %s", agentImage)
+		}
+	}
+
 	// Collect sandbox.mcp container (MCP gateway)
 	// Skip if sandbox is disabled (sandbox: false)
 	if workflowData != nil && workflowData.SandboxConfig != nil {
