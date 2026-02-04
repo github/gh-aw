@@ -1,13 +1,15 @@
 package cli
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -28,9 +30,6 @@ func init() {
 	workflow.SetDefaultVersion(version)
 }
 
-//go:embed templates/agentic-workflows.agent.md
-var agenticWorkflowsDispatcherTemplate string
-
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
 	version = v
@@ -40,6 +39,58 @@ func SetVersionInfo(v string) {
 // GetVersion returns the current version
 func GetVersion() string {
 	return version
+}
+
+// downloadAgentFileFromGitHub downloads the agentic-workflows.agent.md file from GitHub
+func downloadAgentFileFromGitHub(verbose bool) (string, error) {
+	commandsLog.Print("Downloading agentic-workflows.agent.md from GitHub")
+	
+	// Determine the ref to use (tag for releases, main for dev builds)
+	ref := "main"
+	currentVersion := GetVersion()
+	
+	// If version looks like a release tag (starts with v and contains dots), use it
+	if strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".") {
+		ref = currentVersion
+		commandsLog.Printf("Using release tag: %s", ref)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using release version: %s", ref)))
+		}
+	} else {
+		commandsLog.Print("Using main branch for dev build")
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using main branch (dev build)"))
+		}
+	}
+	
+	// Construct the raw GitHub URL
+	url := fmt.Sprintf("https://raw.githubusercontent.com/github/gh-aw/%s/.github/agents/agentic-workflows.agent.md", ref)
+	commandsLog.Printf("Downloading from URL: %s", url)
+	
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	
+	// Download the file
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to download agent file: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download agent file: HTTP %d", resp.StatusCode)
+	}
+	
+	// Read the content
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read agent file content: %w", err)
+	}
+	
+	commandsLog.Printf("Successfully downloaded agent file (%d bytes)", len(content))
+	return string(content), nil
 }
 
 func isGHCLIAvailable() bool {

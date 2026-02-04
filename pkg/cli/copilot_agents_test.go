@@ -163,27 +163,24 @@ func TestDeleteOldTemplateFiles(t *testing.T) {
 		name             string
 		filesToCreate    []string // Files to create in pkg/cli/templates/
 		expectedDeleted  []string // Files that should be deleted
-		expectedKept     []string // Files that should NOT be deleted
 		expectDirRemoved bool     // Whether the templates directory should be removed
 	}{
 		{
-			name: "deletes old template files but keeps agent file",
+			name: "deletes all old template files including agent file and removes directory",
 			filesToCreate: []string{
 				"agentic-workflows.agent.md",
 				"create-agentic-workflow.md",
 				"github-agentic-workflows.md",
 			},
 			expectedDeleted: []string{
+				"agentic-workflows.agent.md",
 				"create-agentic-workflow.md",
 				"github-agentic-workflows.md",
 			},
-			expectedKept: []string{
-				"agentic-workflows.agent.md",
-			},
-			expectDirRemoved: false,
+			expectDirRemoved: true,
 		},
 		{
-			name: "deletes all old template files except agent file",
+			name: "deletes all template files",
 			filesToCreate: []string{
 				"agentic-workflows.agent.md",
 				"create-agentic-workflow.md",
@@ -195,6 +192,7 @@ func TestDeleteOldTemplateFiles(t *testing.T) {
 				"upgrade-agentic-workflows.md",
 			},
 			expectedDeleted: []string{
+				"agentic-workflows.agent.md",
 				"create-agentic-workflow.md",
 				"create-shared-agentic-workflow.md",
 				"debug-agentic-workflow.md",
@@ -203,16 +201,12 @@ func TestDeleteOldTemplateFiles(t *testing.T) {
 				"update-agentic-workflow.md",
 				"upgrade-agentic-workflows.md",
 			},
-			expectedKept: []string{
-				"agentic-workflows.agent.md",
-			},
-			expectDirRemoved: false,
+			expectDirRemoved: true,
 		},
 		{
 			name:             "handles no files to delete",
 			filesToCreate:    []string{},
 			expectedDeleted:  []string{},
-			expectedKept:     []string{},
 			expectDirRemoved: false,
 		},
 	}
@@ -263,14 +257,6 @@ func TestDeleteOldTemplateFiles(t *testing.T) {
 				path := filepath.Join(templatesDir, file)
 				if _, err := os.Stat(path); !os.IsNotExist(err) {
 					t.Errorf("Expected file %s to be deleted, but it still exists", file)
-				}
-			}
-
-			// Check that files marked as "kept" were NOT deleted
-			for _, file := range tt.expectedKept {
-				path := filepath.Join(templatesDir, file)
-				if _, err := os.Stat(path); os.IsNotExist(err) {
-					t.Errorf("Expected file %s to be kept, but it was deleted", file)
 				}
 			}
 
