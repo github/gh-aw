@@ -51,7 +51,7 @@ func TestSetupCLIAction(t *testing.T) {
 			t.Fatalf("Failed to read install.sh: %v", err)
 		}
 		// Verify script has fallback to fetch latest
-		if !strings.Contains(string(content), "No version specified") || !strings.Contains(string(content), "fetching latest") {
+		if !strings.Contains(string(content), "No version specified") || !strings.Contains(string(content), "using 'latest'") {
 			t.Errorf("Script should support fetching latest release when no version is provided")
 		}
 	})
@@ -84,7 +84,8 @@ func TestSetupCLIAction(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to read install.sh: %v", err)
 		}
-		if !strings.Contains(string(content), "Validating release") {
+		// Verify script has binary verification logic
+		if !strings.Contains(string(content), "Verifying binary") {
 			t.Errorf("Script does not include release validation")
 		}
 	})
