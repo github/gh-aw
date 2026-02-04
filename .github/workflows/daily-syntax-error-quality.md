@@ -52,7 +52,6 @@ Test the quality of compiler error messages by:
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
-- **Test Date**: Current date
 - **Workspace**: ${{ github.workspace }}
 - **Compiler**: ./gh-aw
 
@@ -346,14 +345,14 @@ Create a detailed evaluation for each test case:
 - Any individual test case scores < 55, OR
 - Critical pattern issues are identified
 
-**Note**: The example issue template below demonstrates the **complete structure and formatting** that would be used when an issue is created. The specific scores shown (74.7 average) represent a "Good" quality scenario that would NOT trigger issue creation. This is intentional to show the full report format. In practice, the workflow would only create an issue if the criteria above are met (e.g., if the average was 65 or a test scored 50).
-
 ### Issue Structure
+
+**Note**: The template below demonstrates the complete structure and formatting for the issue report.
 
 ```markdown
 ### 📊 Error Message Quality Analysis
 
-**Analysis Date**: YYYY-MM-DD  
+**Analysis Date**: Use current date in YYYY-MM-DD format  
 **Test Cases**: 3  
 **Average Score**: XX/100  
 **Status**: [✅ Good | ⚠️ Needs Improvement | ❌ Critical Issues]
