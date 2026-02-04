@@ -52,34 +52,48 @@ func buildAgenticEngineSecretsMap() map[string]string {
 	// (we don't need MCP servers or other config for base secret names)
 	workflowData := &WorkflowData{}
 
-	// Get secrets from Copilot engine
-	copilotEngine := NewCopilotEngine()
-	for _, secret := range copilotEngine.GetRequiredSecretNames(workflowData) {
-		// Skip non-agentic secrets (like MCP_GATEWAY_API_KEY, GITHUB_MCP_SERVER_TOKEN)
-		if secret == "COPILOT_GITHUB_TOKEN" {
-			secretsMap[secret] = "Copilot engine"
-		}
-	}
+	// Get the global engine registry
+	registry := GetGlobalEngineRegistry()
 
-	// Get secrets from Claude engine
-	claudeEngine := NewClaudeEngine()
-	for _, secret := range claudeEngine.GetRequiredSecretNames(workflowData) {
-		// Skip non-agentic secrets
-		if secret == "ANTHROPIC_API_KEY" || secret == "CLAUDE_CODE_OAUTH_TOKEN" {
-			secretsMap[secret] = "Claude engine"
-		}
-	}
+	// Iterate through all registered engines
+	for _, engine := range registry.GetAllEngines() {
+		engineID := engine.GetID()
+		engineName := engine.GetDisplayName()
 
-	// Get secrets from Codex engine
-	codexEngine := NewCodexEngine()
-	for _, secret := range codexEngine.GetRequiredSecretNames(workflowData) {
-		// Skip non-agentic secrets
-		if secret == "CODEX_API_KEY" || secret == "OPENAI_API_KEY" {
-			secretsMap[secret] = "Codex engine"
+		// Skip custom engine as it doesn't have predefined secrets
+		if engineID == "custom" {
+			continue
+		}
+
+		// Get required secrets from this engine
+		requiredSecrets := engine.GetRequiredSecretNames(workflowData)
+
+		for _, secret := range requiredSecrets {
+			// Filter out non-agentic secrets (infrastructure/gateway secrets)
+			// Only include secrets that are specific to the AI engine itself
+			if isAgenticEngineSecret(secret) {
+				secretsMap[secret] = engineName
+				importedStepsValidationLog.Printf("Registered agentic secret: %s (engine: %s)", secret, engineName)
+			}
 		}
 	}
 
 	return secretsMap
+}
+
+// isAgenticEngineSecret returns true if the secret is an agentic engine-specific secret
+// (not an infrastructure secret like MCP_GATEWAY_API_KEY or GITHUB_MCP_SERVER_TOKEN)
+func isAgenticEngineSecret(secretName string) bool {
+	// Infrastructure/gateway secrets that are NOT agentic engine secrets
+	nonAgenticSecrets := map[string]bool{
+		"MCP_GATEWAY_API_KEY":           true,
+		"GITHUB_MCP_SERVER_TOKEN":       true,
+		"GH_AW_GITHUB_MCP_SERVER_TOKEN": true,
+		"GH_AW_GITHUB_TOKEN":            true,
+		"GITHUB_TOKEN":                  true,
+	}
+
+	return !nonAgenticSecrets[secretName]
 }
 
 // getAgenticEngineSecrets returns the map of agentic engine secrets

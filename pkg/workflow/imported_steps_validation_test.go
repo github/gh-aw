@@ -62,7 +62,7 @@ This workflow imports a custom engine with agentic secrets.
 		if err != nil {
 			assert.Contains(t, err.Error(), "strict mode", "Error should mention strict mode")
 			assert.Contains(t, err.Error(), "COPILOT_GITHUB_TOKEN", "Error should mention the secret name")
-			assert.Contains(t, err.Error(), "Copilot engine", "Error should mention the engine")
+			assert.Contains(t, err.Error(), "GitHub Copilot CLI", "Error should mention the engine")
 			assert.Contains(t, err.Error(), "custom engine steps", "Error should mention custom engine steps")
 		}
 	})
@@ -135,7 +135,7 @@ imports:
 	require.Error(t, err, "Expected error in strict mode")
 	if err != nil {
 		assert.Contains(t, err.Error(), "ANTHROPIC_API_KEY")
-		assert.Contains(t, err.Error(), "Claude engine")
+		assert.Contains(t, err.Error(), "Claude Code")
 	}
 }
 
@@ -183,12 +183,12 @@ imports:
 
 	require.Error(t, err, "Expected error in strict mode")
 	if err != nil {
-		// Should detect both secrets
 		errMsg := err.Error()
+		// Should detect both secrets
 		hasCodex := strings.Contains(errMsg, "CODEX_API_KEY")
 		hasOpenAI := strings.Contains(errMsg, "OPENAI_API_KEY")
 		assert.True(t, hasCodex || hasOpenAI, "Should mention at least one of the Codex secrets")
-		assert.Contains(t, errMsg, "Codex engine")
+		assert.Contains(t, errMsg, "Codex")
 	}
 }
 
@@ -329,9 +329,9 @@ imports:
 		// Should mention both secrets
 		assert.Contains(t, errMsg, "COPILOT_GITHUB_TOKEN")
 		assert.Contains(t, errMsg, "ANTHROPIC_API_KEY")
-		// Should mention both engines
-		hasCopilot := strings.Contains(errMsg, "Copilot engine")
-		hasClaude := strings.Contains(errMsg, "Claude engine")
+		// Should mention the engines (GitHub Copilot CLI and/or Claude Code)
+		hasCopilot := strings.Contains(errMsg, "GitHub Copilot CLI")
+		hasClaude := strings.Contains(errMsg, "Claude Code")
 		assert.True(t, hasCopilot || hasClaude, "Should mention the engines")
 	}
 }
