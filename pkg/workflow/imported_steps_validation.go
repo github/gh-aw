@@ -94,7 +94,7 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 			secretName := match[1]
 			if engineName, isAgenticSecret := agenticEngineSecrets[secretName]; isAgenticSecret {
 				importedStepsValidationLog.Printf("Found agentic secret in step %d: %s (engine: %s)", stepIdx, secretName, engineName)
-				if !contains(foundSecrets, secretName) {
+				if !containsSecretName(foundSecrets, secretName) {
 					foundSecrets = append(foundSecrets, secretName)
 					secretEngines = append(secretEngines, engineName)
 				}
@@ -139,7 +139,8 @@ func convertStepToYAML(step map[string]any) (string, error) {
 	var builder strings.Builder
 	
 	// Helper function to write key-value pairs
-	writeValue := func(key string, value any, indent string) {
+	var writeValue func(key string, value any, indent string)
+	writeValue = func(key string, value any, indent string) {
 		switch v := value.(type) {
 		case string:
 			builder.WriteString(fmt.Sprintf("%s%s: %s\n", indent, key, v))
@@ -167,8 +168,8 @@ func convertStepToYAML(step map[string]any) (string, error) {
 	return builder.String(), nil
 }
 
-// contains checks if a string slice contains a string
-func contains(slice []string, item string) bool {
+// containsSecretName checks if a string slice contains a string (helper for secret detection)
+func containsSecretName(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
 			return true
