@@ -26,7 +26,7 @@
 name: "Issue Monster"
 "on":
   schedule:
-  - cron: "49 */1 * * *"
+  - cron: "58 */1 * * *"
     # Friendly format: every 1h (scattered)
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
     # max: 9

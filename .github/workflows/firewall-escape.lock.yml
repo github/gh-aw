@@ -31,7 +31,7 @@ name: "The Great Escapi"
     types:
     - labeled
   schedule:
-  - cron: "49 0 * * *"
+  - cron: "58 8 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 

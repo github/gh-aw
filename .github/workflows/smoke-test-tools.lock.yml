@@ -31,7 +31,7 @@ name: "Agent Container Smoke Test"
     types:
     - labeled
   schedule:
-  - cron: "23 */12 * * *"
+  - cron: "54 */12 * * *"
     # Friendly format: every 12h (scattered)
   workflow_dispatch:
 
