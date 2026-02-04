@@ -285,7 +285,7 @@ func TestPermissions_MetadataExcluded(t *testing.T) {
 			},
 		},
 		{
-			name: "all: read should expand without metadata",
+			name:  "all: read should expand without metadata",
 			perms: NewPermissionsAllRead(),
 			contains: []string{
 				"permissions:",
