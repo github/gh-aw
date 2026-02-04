@@ -467,7 +467,9 @@ async function main() {
           workflow_source_url: workflowSourceURL,
           secret_verification_failed: String(secretVerificationResult === "failed"),
           secret_verification_context:
-            secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
+            secretVerificationResult === "failed"
+              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.io/gh-aw/reference/engines/\n"
+              : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
           missing_data_context: missingDataContext,
@@ -550,7 +552,9 @@ async function main() {
           pull_request_info: pullRequest ? `  \n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})` : "",
           secret_verification_failed: String(secretVerificationResult === "failed"),
           secret_verification_context:
-            secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
+            secretVerificationResult === "failed"
+              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.io/gh-aw/reference/engines/\n"
+              : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
           missing_data_context: missingDataContext,
