@@ -805,6 +805,15 @@ env: "example-value"
 features:
   {}
 
+# Secret values passed to workflow execution. Secrets can be defined as simple
+# strings (GitHub Actions expressions) or objects with 'value' and 'description'
+# properties. Typically used to provide secrets to MCP servers or custom engines.
+# Note: For passing secrets to reusable workflows, use the jobs.<job_id>.secrets
+# field instead.
+# (optional)
+secrets:
+  {}
+
 # Environment that the job references (for protected environments and deployments)
 # (optional)
 # This field supports multiple formats (oneOf):
