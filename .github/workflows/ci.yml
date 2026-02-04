@@ -360,6 +360,9 @@ jobs:
             echo "- Number of cached modules: $(find $(go env GOMODCACHE) -name "go.mod" 2>/dev/null | wc -l || echo 'unknown')"
           fi
 
+      - name: Build gh-aw binary for integration tests
+        run: make build
+        
       - name: Run integration tests - ${{ matrix.test-group.name }}
         run: |
           set -o pipefail
