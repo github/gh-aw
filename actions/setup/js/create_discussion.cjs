@@ -172,6 +172,7 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const expiresHours = config.expires ? parseInt(String(config.expires), 10) : 0;
   const fallbackToIssue = config.fallback_to_issue !== false; // Default to true
+  const closeOlderDiscussions = config.close_older_discussions === true || config.close_older_discussions === "true";
 
   // Parse labels from config
   const labelsConfig = config.labels || [];
@@ -190,6 +191,9 @@ async function main(config = {}) {
   if (fallbackToIssue) {
     core.info("Fallback to issue enabled: will create an issue if discussion creation fails due to permissions");
   }
+  if (closeOlderDiscussions) {
+    core.info("Close older discussions enabled: will close older discussions/issues with same workflow-id marker");
+  }
 
   // Track state
   let processedCount = 0;
@@ -205,6 +209,8 @@ async function main(config = {}) {
       title_prefix: titlePrefix,
       max: maxCount,
       expires: expiresHours,
+      // Map close_older_discussions to close_older_issues for fallback issues
+      close_older_issues: closeOlderDiscussions,
     });
   }
 
