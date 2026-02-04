@@ -19,7 +19,7 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: sync-templates sync-action-pins sync-action-scripts
+build: sync-action-pins sync-action-scripts
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
 
 # Build for all platforms
@@ -579,26 +579,6 @@ clean-docs:
 	@echo "✓ Documentation artifacts cleaned"
 
 # Sync templates from .github to pkg/cli/templates
-.PHONY: sync-templates
-sync-templates:
-	@echo "Syncing templates from .github to pkg/cli/templates..."
-	@mkdir -p pkg/cli/templates
-
-	# Workflow management templates
-	@cp .github/aw/github-agentic-workflows.md pkg/cli/templates/
-	@cp .github/aw/create-agentic-workflow.md pkg/cli/templates/
-	@cp .github/aw/create-shared-agentic-workflow.md pkg/cli/templates/
-	@cp .github/aw/debug-agentic-workflow.md pkg/cli/templates/
-	@cp .github/aw/update-agentic-workflow.md pkg/cli/templates/
-	@cp .github/aw/upgrade-agentic-workflows.md pkg/cli/templates/
-
-	# Agent templates
-	@cp .github/agents/agentic-workflows.agent.md pkg/cli/templates/
-
-	@echo "✓ Templates synced successfully"
-
-
-
 # Sync action pins from .github/aw to pkg/workflow/data
 .PHONY: sync-action-pins
 sync-action-pins:
@@ -620,7 +600,7 @@ sync-action-scripts:
 
 # Recompile all workflow files
 .PHONY: recompile
-recompile: sync-templates build
+recompile: build
 	./$(BINARY_NAME) init --codespaces
 	./$(BINARY_NAME) compile --validate --verbose --purge --stats
 #	./$(BINARY_NAME) compile --dir pkg/cli/workflows --validate --verbose --purge
@@ -736,7 +716,6 @@ help:
 	@echo "  actionlint       - Validate workflows with actionlint (depends on build)"
 	@echo "  validate-workflows - Validate compiled workflow lock files (depends on build)"
 	@echo "  install          - Install binary locally"
-	@echo "  sync-templates   - Sync templates from .github to pkg/cli/templates (runs automatically during build)"
 	@echo "  sync-action-pins - Sync actions-lock.json from .github/aw to pkg/workflow/data (runs automatically during build)"
 	@echo "  sync-action-scripts - Sync install-gh-aw.sh to actions/setup-cli/install.sh (runs automatically during build)"
 	@echo "  update           - Update GitHub Actions and workflows, sync action pins, and rebuild binary"

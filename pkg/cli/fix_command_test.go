@@ -661,7 +661,7 @@ This is a test workflow.
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	// Run fix command (which should update prompt and agent files)
+	// Run fix command (which checks prompt and agent files exist)
 	config := FixConfig{
 		WorkflowIDs: []string{"test-workflow"},
 		Write:       false,
@@ -674,36 +674,10 @@ This is a test workflow.
 		t.Fatalf("RunFix failed: %v", err)
 	}
 
-	// Verify that prompt and agent files were created/updated
-	copilotInstructionsPath := filepath.Join(".github", "aw", "github-agentic-workflows.md")
-	if _, err := os.Stat(copilotInstructionsPath); os.IsNotExist(err) {
-		t.Error("Expected copilot instructions file to be created/updated")
-	}
-
-	dispatcherAgentPath := filepath.Join(".github", "agents", "agentic-workflows.agent.md")
-	if _, err := os.Stat(dispatcherAgentPath); os.IsNotExist(err) {
-		t.Error("Expected dispatcher agent file to be created/updated")
-	}
-
-	createPromptPath := filepath.Join(".github", "aw", "create-agentic-workflow.md")
-	if _, err := os.Stat(createPromptPath); os.IsNotExist(err) {
-		t.Error("Expected create workflow prompt file to be created/updated")
-	}
-
-	updatePromptPath := filepath.Join(".github", "aw", "update-agentic-workflow.md")
-	if _, err := os.Stat(updatePromptPath); os.IsNotExist(err) {
-		t.Error("Expected update workflow prompt file to be created/updated")
-	}
-
-	debugPromptPath := filepath.Join(".github", "aw", "debug-agentic-workflow.md")
-	if _, err := os.Stat(debugPromptPath); os.IsNotExist(err) {
-		t.Error("Expected debug workflow prompt file to be created/updated")
-	}
-
-	upgradePromptPath := filepath.Join(".github", "aw", "upgrade-agentic-workflows.md")
-	if _, err := os.Stat(upgradePromptPath); os.IsNotExist(err) {
-		t.Error("Expected upgrade workflow prompt file to be created/updated")
-	}
+	// Note: The ensure functions no longer create files from templates.
+	// They just check if files exist. Since we're in a temp directory,
+	// the files won't exist, but that's expected behavior.
+	// This test now just verifies that RunFix completes without error.
 }
 
 func TestFixCommand_GrepToolRemoval(t *testing.T) {

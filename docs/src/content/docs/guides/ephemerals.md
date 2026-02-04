@@ -43,7 +43,7 @@ The minimum granularity is hours - minute-only units (e.g., `+30m`) are not allo
 **Use cases**:
 - Trial workflows that should run for a limited period
 - Experimental features with automatic sunset dates
-- Campaign workflows with defined end dates
+- Orchestrated initiatives with defined end dates
 - Cost-controlled scheduled workflows
 
 See [Triggers Reference](/gh-aw/reference/triggers/#stop-after-configuration-stop-after) for complete documentation.
@@ -271,5 +271,5 @@ This configuration ensures:
 - [Triggers Reference](/gh-aw/reference/triggers/) - Complete trigger configuration including `stop-after`
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - All safe output types and expiration options
 - [SideRepoOps Guide](/gh-aw/guides/siderepoops/) - Complete setup for side repository operations
-- [Security Best Practices](/gh-aw/introduction/architecture/) - Authentication and security considerations
-- [Campaign Workflows](/gh-aw/guides/campaigns/) - Orchestrating multi-workflow initiatives
+- [Security Best Practices](/gh-aw/reference/tokens/) - Authentication and security considerations
+- [Orchestration](/gh-aw/guides/orchestration/) - Orchestrating multi-workflow initiatives

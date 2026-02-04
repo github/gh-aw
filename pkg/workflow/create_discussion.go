@@ -22,6 +22,7 @@ type CreateDiscussionsConfig struct {
 	CloseOlderDiscussions bool     `yaml:"close-older-discussions,omitempty"` // When true, close older discussions with same title prefix or labels as outdated
 	RequiredCategory      string   `yaml:"required-category,omitempty"`       // Required category for matching when close-older-discussions is enabled
 	Expires               int      `yaml:"expires,omitempty"`                 // Hours until the discussion expires and should be automatically closed
+	FallbackToIssue       *bool    `yaml:"fallback-to-issue,omitempty"`       // When true (default), fallback to create-issue if discussion creation fails due to permissions
 }
 
 // parseDiscussionsConfig handles create-discussion configuration
@@ -79,6 +80,13 @@ func (c *Compiler) parseDiscussionsConfig(outputMap map[string]any) *CreateDiscu
 		discussionLog.Print("Expiration explicitly disabled")
 	}
 
+	// Set default fallback-to-issue to true if not specified
+	if config.FallbackToIssue == nil {
+		trueValue := true
+		config.FallbackToIssue = &trueValue
+		discussionLog.Print("Using default fallback-to-issue: true")
+	}
+
 	// Validate target-repo (wildcard "*" is not allowed)
 	if validateTargetRepoSlug(config.TargetRepoSlug, discussionLog) {
 		return nil // Invalid configuration, return nil to cause validation error
@@ -117,6 +125,9 @@ func (c *Compiler) parseDiscussionsConfig(outputMap map[string]any) *CreateDiscu
 	if config.Expires > 0 {
 		discussionLog.Printf("Discussion expiration configured: %d hours", config.Expires)
 	}
+	if config.FallbackToIssue != nil {
+		discussionLog.Printf("Fallback to issue configured: %t", *config.FallbackToIssue)
+	}
 
 	return &config
 }
@@ -145,6 +156,11 @@ func (c *Compiler) buildCreateOutputDiscussionJob(data *WorkflowData, mainJobNam
 	// Add expires value if set
 	if data.SafeOutputs.CreateDiscussions.Expires > 0 {
 		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_DISCUSSION_EXPIRES: \"%d\"\n", data.SafeOutputs.CreateDiscussions.Expires))
+	}
+
+	// Add fallback-to-issue flag
+	if data.SafeOutputs.CreateDiscussions.FallbackToIssue != nil && *data.SafeOutputs.CreateDiscussions.FallbackToIssue {
+		customEnvVars = append(customEnvVars, "          GH_AW_DISCUSSION_FALLBACK_TO_ISSUE: \"true\"\n")
 	}
 
 	// Add environment variable for temporary ID map from create_issue job

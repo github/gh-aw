@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -16,22 +15,17 @@ func TestEnsureCreateWorkflowPrompt(t *testing.T) {
 	tests := []struct {
 		name            string
 		existingContent string
-		expectedContent string
+		expectExists    bool
 	}{
 		{
-			name:            "creates new workflow creation prompt file",
+			name:            "reports missing file without error",
 			existingContent: "",
-			expectedContent: strings.TrimSpace(createWorkflowPromptTemplate),
+			expectExists:    false,
 		},
 		{
-			name:            "does not modify existing correct file",
-			existingContent: createWorkflowPromptTemplate,
-			expectedContent: strings.TrimSpace(createWorkflowPromptTemplate),
-		},
-		{
-			name:            "updates modified file",
-			existingContent: "# Modified Workflow Creation Prompt\n\nThis is a modified version.",
-			expectedContent: strings.TrimSpace(createWorkflowPromptTemplate),
+			name:            "reports existing file",
+			existingContent: "# Test content",
+			expectExists:    true,
 		},
 	}
 
@@ -74,24 +68,16 @@ func TestEnsureCreateWorkflowPrompt(t *testing.T) {
 				t.Fatalf("ensureCreateWorkflowPrompt() returned error: %v", err)
 			}
 
-			// Check that file exists
-			if _, err := os.Stat(promptPath); os.IsNotExist(err) {
-				t.Fatalf("Expected prompt file to exist")
-			}
+			// Check that file exists or not based on test expectation
+			_, statErr := os.Stat(promptPath)
+			fileExists := statErr == nil
 
-			// Check content
-			content, err := os.ReadFile(promptPath)
-			if err != nil {
-				t.Fatalf("Failed to read prompt: %v", err)
-			}
-
-			contentStr := strings.TrimSpace(string(content))
-			expectedStr := strings.TrimSpace(tt.expectedContent)
-
-			if contentStr != expectedStr {
-				t.Errorf("Expected content does not match.\nExpected first 100 chars: %q\nActual first 100 chars: %q",
-					expectedStr[:min(100, len(expectedStr))],
-					contentStr[:min(100, len(contentStr))])
+			if fileExists != tt.expectExists {
+				if tt.expectExists {
+					t.Errorf("Expected prompt file to exist, but it doesn't")
+				} else {
+					t.Errorf("Expected prompt file to not exist, but it does")
+				}
 			}
 		})
 	}
@@ -130,7 +116,7 @@ func TestEnsureCreateWorkflowPrompt_WithSkipInstructionsTrue(t *testing.T) {
 	}
 }
 
-func TestEnsureCreateWorkflowPrompt_CreatesNewFile(t *testing.T) {
+func TestEnsureCreateWorkflowPrompt_ReportsNonExistent(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := testutil.TempDir(t, "test-*")
 
@@ -149,16 +135,16 @@ func TestEnsureCreateWorkflowPrompt_CreatesNewFile(t *testing.T) {
 		t.Fatalf("Failed to init git repo: %v", err)
 	}
 
-	// Call the function to create prompt
+	// Call the function - it should not error even if file doesn't exist
 	err = ensureCreateWorkflowPrompt(false, false)
 	if err != nil {
 		t.Fatalf("ensureCreateWorkflowPrompt() returned error: %v", err)
 	}
 
-	// Check that new prompt file was created in .github/aw/
+	// Check that new prompt file was NOT created (files are source of truth in .github/aw/)
 	awDir := filepath.Join(tempDir, ".github", "aw")
 	newPromptPath := filepath.Join(awDir, "create-agentic-workflow.md")
-	if _, err := os.Stat(newPromptPath); os.IsNotExist(err) {
-		t.Fatalf("Expected new prompt file to be created in .github/aw/")
+	if _, err := os.Stat(newPromptPath); !os.IsNotExist(err) {
+		t.Fatalf("Expected new prompt file to NOT be created (files are source of truth)")
 	}
 }

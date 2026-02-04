@@ -1,13 +1,15 @@
 package cli
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -28,30 +30,6 @@ func init() {
 	workflow.SetDefaultVersion(version)
 }
 
-//go:embed templates/github-agentic-workflows.md
-var copilotInstructionsTemplate string
-
-//go:embed templates/agentic-workflows.agent.md
-var agenticWorkflowsDispatcherTemplate string
-
-//go:embed templates/create-agentic-workflow.md
-var createWorkflowPromptTemplate string
-
-//go:embed templates/update-agentic-workflow.md
-var updateWorkflowPromptTemplate string
-
-//go:embed templates/create-shared-agentic-workflow.md
-var createSharedAgenticWorkflowPromptTemplate string
-
-//go:embed templates/debug-agentic-workflow.md
-var debugWorkflowPromptTemplate string
-
-//go:embed templates/upgrade-agentic-workflows.md
-var upgradeAgenticWorkflowsPromptTemplate string
-
-//go:embed templates/serena-tool.md
-var serenaToolTemplate string
-
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
 	version = v
@@ -61,6 +39,82 @@ func SetVersionInfo(v string) {
 // GetVersion returns the current version
 func GetVersion() string {
 	return version
+}
+
+// downloadAgentFileFromGitHub downloads the agentic-workflows.agent.md file from GitHub
+func downloadAgentFileFromGitHub(verbose bool) (string, error) {
+	commandsLog.Print("Downloading agentic-workflows.agent.md from GitHub")
+
+	// Determine the ref to use (tag for releases, main for dev builds)
+	ref := "main"
+	currentVersion := GetVersion()
+
+	// If version looks like a release tag (starts with v and contains dots), use it
+	isRelease := strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".")
+	if isRelease {
+		ref = currentVersion
+		commandsLog.Printf("Using release tag: %s", ref)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Using release version: %s", ref)))
+		}
+	} else {
+		commandsLog.Print("Using main branch for dev build")
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Using main branch (dev build)"))
+		}
+	}
+
+	// Construct the raw GitHub URL
+	url := fmt.Sprintf("https://raw.githubusercontent.com/github/gh-aw/%s/.github/agents/agentic-workflows.agent.md", ref)
+	commandsLog.Printf("Downloading from URL: %s", url)
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Download the file
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to download agent file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download agent file: HTTP %d", resp.StatusCode)
+	}
+
+	// Read the content
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read agent file content: %w", err)
+	}
+
+	contentStr := string(content)
+
+	// Patch URLs to match the current version/ref
+	patchedContent := patchAgentFileURLs(contentStr, ref)
+	if patchedContent != contentStr && verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Patched URLs to use ref: %s", ref)))
+	}
+
+	commandsLog.Printf("Successfully downloaded agent file (%d bytes)", len(patchedContent))
+	return patchedContent, nil
+}
+
+// patchAgentFileURLs patches URLs in the agent file to use the correct ref
+func patchAgentFileURLs(content, ref string) string {
+	// Pattern 1: Convert local paths to GitHub URLs
+	// `.github/aw/file.md` -> `https://github.com/github/gh-aw/blob/{ref}/.github/aw/file.md`
+	content = strings.ReplaceAll(content, "`.github/aw/", fmt.Sprintf("`https://github.com/github/gh-aw/blob/%s/.github/aw/", ref))
+
+	// Pattern 2: Update existing GitHub URLs to use the correct ref
+	// https://github.com/github/gh-aw/blob/main/ -> https://github.com/github/gh-aw/blob/{ref}/
+	if ref != "main" {
+		content = strings.ReplaceAll(content, "/blob/main/", fmt.Sprintf("/blob/%s/", ref))
+	}
+
+	return content
 }
 
 func isGHCLIAvailable() bool {

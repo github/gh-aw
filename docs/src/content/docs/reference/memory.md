@@ -111,7 +111,7 @@ Creates branch `memory/default` at `/tmp/gh-aw/repo-memory-default/`. Files are 
 tools:
   repo-memory:
     branch-name: memory/custom-agent
-    branch-prefix: campaigns  # Custom prefix instead of "memory"
+    branch-prefix: tracking  # Custom prefix instead of "memory"
     description: "Long-term insights"
     file-glob: ["memory/custom-agent/*.md", "memory/custom-agent/*.json"]
     max-file-size: 1048576  # 1MB (default 10KB)

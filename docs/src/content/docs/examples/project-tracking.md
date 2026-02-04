@@ -223,23 +223,16 @@ safe-outputs:
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ```
 
-Use for campaign progress reports, milestone summaries, or workflow health indicators.
+Use for progress reports, milestone summaries, or workflow health indicators.
 
-## Relationship with Campaigns
+## How this fits
 
-Project tracking in safe-outputs brings project management capabilities from [campaign coordinators](/gh-aw/guides/campaigns/) to regular agentic workflows:
+- **Projects & Monitoring:** Use `update-project` to track work items and `create-project-status-update` to publish run summaries.
+- **Orchestration:** An orchestrator can dispatch workers and use the same project safe-outputs to keep a shared board updated.
 
-**Campaign coordinators** (campaign.md files):
-- Use `project-url` in campaign spec
-- Automatically coordinate multiple workflows
-- Track campaign-wide progress
-
-**Agentic workflows** (regular .md files):
-- Configure `update-project` and `create-project-status-update` in `safe-outputs`
-- Focus on single workflow operations
-- Track workflow-specific items
-
-Both use the same underlying safe-output operations (`update-project`, `create-project-status-update`).
+See:
+- [Projects & Monitoring](/gh-aw/guides/monitoring/)
+- [Orchestration](/gh-aw/guides/orchestration/)
 
 ## Common Patterns
 
@@ -331,4 +324,5 @@ Update the project item with the team field.
 - [update-project](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) - Detailed update-project configuration
 - [create-project-status-update](/gh-aw/reference/safe-outputs/#project-status-updates-create-project-status-update) - Status update configuration
 - [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) - Token setup guide
-- [Campaigns](/gh-aw/guides/campaigns/) - Campaign coordination documentation
+- [Projects & Monitoring](/gh-aw/guides/monitoring/) - Design pattern guide
+- [Orchestration](/gh-aw/guides/orchestration/) - Design pattern guide

@@ -167,10 +167,10 @@ Uses metrics to:
 - Calculate week-over-week and month-over-month changes
 - Avoid redundant API queries (metrics already collected)
 
-### Campaign Manager
+### Orchestration Manager
 
 Uses metrics to:
-- Assess campaign health via workflow success rates
+- Assess orchestration health via workflow success rates
 - Calculate velocity trends from safe output volume
 - Detect performance degradation early
 - Predict completion dates based on velocity

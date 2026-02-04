@@ -184,6 +184,8 @@ export default defineConfig({
 						{ label: 'SideRepoOps', link: '/guides/siderepoops/' },
 						{ label: 'SpecOps', link: '/guides/specops/' },
 						{ label: 'TrialOps', link: '/guides/trialops/' },
+						{ label: 'Monitoring', link: '/guides/monitoring/' },
+						{ label: 'Orchestration', link: '/guides/orchestration/' },
 					],
 				},
 				{

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -16,22 +15,17 @@ func TestEnsureCopilotInstructions(t *testing.T) {
 	tests := []struct {
 		name            string
 		existingContent string
-		expectedContent string
+		expectExists    bool
 	}{
 		{
-			name:            "creates new copilot instructions file",
+			name:            "reports missing file without error",
 			existingContent: "",
-			expectedContent: strings.TrimSpace(copilotInstructionsTemplate),
+			expectExists:    false,
 		},
 		{
-			name:            "does not modify existing correct file",
-			existingContent: copilotInstructionsTemplate,
-			expectedContent: strings.TrimSpace(copilotInstructionsTemplate),
-		},
-		{
-			name:            "updates modified file",
-			existingContent: "# Modified GitHub Agentic Workflows - Copilot Instructions\n\nThis is a modified version.",
-			expectedContent: strings.TrimSpace(copilotInstructionsTemplate),
+			name:            "reports existing file",
+			existingContent: "# Test content",
+			expectExists:    true,
 		},
 	}
 
@@ -74,24 +68,16 @@ func TestEnsureCopilotInstructions(t *testing.T) {
 				t.Fatalf("ensureCopilotInstructions() returned error: %v", err)
 			}
 
-			// Check that file exists
-			if _, err := os.Stat(copilotInstructionsPath); os.IsNotExist(err) {
-				t.Fatalf("Expected copilot instructions file to exist")
-			}
+			// Check that file exists or not based on test expectation
+			_, statErr := os.Stat(copilotInstructionsPath)
+			fileExists := statErr == nil
 
-			// Check content
-			content, err := os.ReadFile(copilotInstructionsPath)
-			if err != nil {
-				t.Fatalf("Failed to read copilot instructions: %v", err)
-			}
-
-			contentStr := strings.TrimSpace(string(content))
-			expectedStr := strings.TrimSpace(tt.expectedContent)
-
-			if contentStr != expectedStr {
-				t.Errorf("Expected content does not match.\nExpected first 100 chars: %q\nActual first 100 chars: %q",
-					expectedStr[:min(100, len(expectedStr))],
-					contentStr[:min(100, len(contentStr))])
+			if fileExists != tt.expectExists {
+				if tt.expectExists {
+					t.Errorf("Expected copilot instructions file to exist, but it doesn't")
+				} else {
+					t.Errorf("Expected copilot instructions file to not exist, but it does")
+				}
 			}
 		})
 	}
@@ -125,7 +111,7 @@ func TestEnsureCopilotInstructions_WithSkipInstructionsTrue(t *testing.T) {
 		t.Fatalf("ensureCopilotInstructions() returned error: %v", err)
 	}
 
-	// Check that file does not exist
+	// Check that file does not exist (no file created when skipInstructions=true)
 	if _, err := os.Stat(copilotInstructionsPath); !os.IsNotExist(err) {
 		t.Fatalf("Expected copilot instructions file to not exist when skipInstructions=true")
 	}
@@ -176,29 +162,10 @@ func TestEnsureCopilotInstructions_CleansUpOldFile(t *testing.T) {
 		t.Errorf("Old file should be removed after ensureCopilotInstructions")
 	}
 
-	// Verify new file was created
+	// New file should not be created by ensureCopilotInstructions anymore
+	// (files in .github/aw are source of truth, not created by init)
 	newPath := filepath.Join(tempDir, ".github", "aw", "github-agentic-workflows.md")
-	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-		t.Errorf("New file should exist after ensureCopilotInstructions")
+	if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+		t.Errorf("New file should not be created by ensureCopilotInstructions (files are source of truth)")
 	}
-
-	// Verify new file has correct content
-	content, err := os.ReadFile(newPath)
-	if err != nil {
-		t.Fatalf("Failed to read new file: %v", err)
-	}
-
-	contentStr := strings.TrimSpace(string(content))
-	expectedStr := strings.TrimSpace(copilotInstructionsTemplate)
-
-	if contentStr != expectedStr {
-		t.Errorf("New file content does not match template")
-	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

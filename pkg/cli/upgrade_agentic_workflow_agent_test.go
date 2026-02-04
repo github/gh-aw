@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -16,22 +15,17 @@ func TestEnsureUpgradeAgenticWorkflowsPrompt(t *testing.T) {
 	tests := []struct {
 		name            string
 		existingContent string
-		expectedContent string
+		expectExists    bool
 	}{
 		{
-			name:            "creates new upgrade workflows prompt file",
+			name:            "reports missing file without error",
 			existingContent: "",
-			expectedContent: strings.TrimSpace(upgradeAgenticWorkflowsPromptTemplate),
+			expectExists:    false,
 		},
 		{
-			name:            "does not modify existing correct file",
-			existingContent: upgradeAgenticWorkflowsPromptTemplate,
-			expectedContent: strings.TrimSpace(upgradeAgenticWorkflowsPromptTemplate),
-		},
-		{
-			name:            "updates modified file",
-			existingContent: "# Modified Upgrade Prompt\n\nThis is a modified version.",
-			expectedContent: strings.TrimSpace(upgradeAgenticWorkflowsPromptTemplate),
+			name:            "reports existing file",
+			existingContent: "# Test content",
+			expectExists:    true,
 		},
 	}
 
@@ -74,24 +68,16 @@ func TestEnsureUpgradeAgenticWorkflowsPrompt(t *testing.T) {
 				t.Fatalf("ensureUpgradeAgenticWorkflowsPrompt() returned error: %v", err)
 			}
 
-			// Check that file exists
-			if _, err := os.Stat(promptPath); os.IsNotExist(err) {
-				t.Fatalf("Expected prompt file to exist")
-			}
+			// Check that file exists or not based on test expectation
+			_, statErr := os.Stat(promptPath)
+			fileExists := statErr == nil
 
-			// Check content
-			content, err := os.ReadFile(promptPath)
-			if err != nil {
-				t.Fatalf("Failed to read prompt: %v", err)
-			}
-
-			contentStr := strings.TrimSpace(string(content))
-			expectedStr := strings.TrimSpace(tt.expectedContent)
-
-			if contentStr != expectedStr {
-				t.Errorf("Expected content does not match.\nExpected first 100 chars: %q\nActual first 100 chars: %q",
-					expectedStr[:min(100, len(expectedStr))],
-					contentStr[:min(100, len(contentStr))])
+			if fileExists != tt.expectExists {
+				if tt.expectExists {
+					t.Errorf("Expected prompt file to exist, but it doesn't")
+				} else {
+					t.Errorf("Expected prompt file to not exist, but it does")
+				}
 			}
 		})
 	}

@@ -101,7 +101,7 @@ a[href*="#overview"]:focus:first-child {
   outline-offset: 2px !important;
 }
 
-/* Campaign specs Mermaid diagram colors
+/* Mermaid diagram colors
    We style Mermaid nodes by their class (tracked, notTracked, workflow, external)
    so we can use lighter colors in light mode and darker colors in dark mode. */
 

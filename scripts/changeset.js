@@ -9,6 +9,10 @@
  *
  * Example:
  *   node changeset.js release v1.2.3 --yes
+ *
+ * Note: This script does NOT create or push git tags. Tags should be created by the caller
+ * (e.g., the GitHub Actions workflow) before running this script. This script only updates
+ * CHANGELOG.md, deletes changeset files, commits the changes, and pushes to the main branch.
  */
 
 const fs = require("fs");
@@ -492,21 +496,13 @@ async function runRelease(versionTag, skipConfirmation = false) {
     console.log(formatInfoMessage("Committing changes..."));
     execSync(`git commit -m "Release ${versionString}"`, { encoding: "utf8" });
 
-    // Create tag
-    console.log(formatInfoMessage("Creating tag..."));
-    execSync(`git tag -a ${versionString} -m "Release ${versionString}"`, { encoding: "utf8" });
-
     // Push commit to remote
     console.log(formatInfoMessage("Pushing commit..."));
     execSync("git push", { encoding: "utf8" });
 
-    // Push tag
-    console.log(formatInfoMessage("Pushing tag..."));
-    execSync(`git push origin ${versionString}`, { encoding: "utf8" });
-
     console.log("");
     console.log(formatSuccessMessage(`Successfully released ${versionString}`));
-    console.log(formatSuccessMessage("Commit and tag pushed to remote"));
+    console.log(formatSuccessMessage("Commit pushed to remote"));
   } catch (error) {
     console.log("");
     console.error(formatErrorMessage("Git operation failed: " + error.message));
@@ -518,9 +514,7 @@ async function runRelease(versionTag, skipConfirmation = false) {
       console.log(`  git add CHANGELOG.md`);
     }
     console.log(`  git commit -m "Release ${versionString}"`);
-    console.log(`  git tag -a ${versionString} -m "Release ${versionString}"`);
     console.log(`  git push`);
-    console.log(`  git push origin ${versionString}`);
     process.exit(1);
   }
 }

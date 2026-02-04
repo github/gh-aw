@@ -410,7 +410,7 @@ safe-outputs:
     max: 1                              # max operations (default: 1)
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     target-owner: "myorg"               # default target owner (optional)
-    title-prefix: "Campaign"            # default title prefix (optional)
+    title-prefix: "Project"             # default title prefix (optional)
     views:                              # optional: auto-create views
       - name: "Sprint Board"
         layout: board
@@ -426,7 +426,7 @@ The `target-owner` field is an optional default. When configured, the agent can 
 **Without default** (agent must provide owner):
 ```javascript
 create_project({
-  title: "Campaign: Security Q1 2025",
+  title: "Project: Security Q1 2025",
   owner: "myorg",
   owner_type: "org",  // "org" or "user" (default: "org")
   item_url: "https://github.com/myorg/repo/issues/123"  // Optional issue to add
@@ -436,7 +436,7 @@ create_project({
 **With default configured** (agent only needs title):
 ```javascript
 create_project({
-  title: "Campaign: Security Q1 2025"
+  title: "Project: Security Q1 2025"
   // owner uses configured default
   // owner_type defaults to "org"
   // Can still override: owner: "...", owner_type: "user"
@@ -451,7 +451,7 @@ Optionally include `item_url` (GitHub issue URL) to add the issue as the first p
 > - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
 
 > [!NOTE]
-> You can configure views directly during project creation using the `views` field (see above), or later using `update-project` to add custom fields and additional views. For end-to-end campaign usage, see [Campaign Guides](/gh-aw/guides/campaigns/).
+> You can configure views directly during project creation using the `views` field (see above), or later using `update-project` to add custom fields and additional views. For pattern guidance, see [Projects & Monitoring](/gh-aw/guides/monitoring/).
 
 ### Project Board Updates (`update-project:`)
 
@@ -469,7 +469,7 @@ safe-outputs:
         filter: "is:issue is:open"
       - name: "Task Tracker"
         layout: table
-      - name: "Campaign Roadmap"
+      - name: "Roadmap"
         layout: roadmap
 ```
 
@@ -478,8 +478,7 @@ safe-outputs:
 - `max`: Maximum number of operations per run (default: 10).
 - `github-token`: Custom token with Projects permissions (required for Projects v2 access).
 - `views`: Optional array of project views to create automatically.
-- Optional `campaign_id` in agent output applies `z_campaign_<id>` labels for [Campaign Workflows](/gh-aw/guides/campaigns/).
-- Exposes outputs: `project-id`, `project-number`, `project-url`, `campaign-id`, `item-id`.
+- Exposes outputs: `project-id`, `project-number`, `project-url`, `item-id`.
 
 #### Supported Field Types
 
@@ -520,7 +519,7 @@ safe-outputs:
       - name: "Task Tracker"
         layout: table
         filter: "is:issue is:pr"
-      - name: "Campaign Timeline"
+      - name: "Roadmap"
         layout: roadmap
 ```
 
@@ -545,13 +544,13 @@ safe-outputs:
 - `label:bug` — Items with bug label
 - `assignee:@me` — Items assigned to viewer
 
-Views are created automatically during workflow execution. The workflow must include at least one `update_project` operation to provide the target project URL. For campaign workflows, see [Campaign Guides](/gh-aw/guides/campaigns/).
+Views are created automatically during workflow execution. The workflow must include at least one `update_project` operation to provide the target project URL.
 
 
 
 ### Project Status Updates (`create-project-status-update:`)
 
-Creates status updates on GitHub Projects boards to communicate campaign progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access.
+Creates status updates on GitHub Projects boards to communicate progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access.
 
 ```yaml wrap
 safe-outputs:
@@ -565,14 +564,14 @@ safe-outputs:
 - `project` (required in configuration): Default project URL shown in examples. Note: Agent output messages **must** explicitly include the `project` field - the configured value is for documentation purposes only.
 - `max`: Maximum number of status updates per run (default: 1).
 - `github-token`: Custom token with Projects permissions (required for Projects v2 access).
-- Typically used by [Campaign Workflows](/gh-aw/guides/campaigns/) to automatically post run summaries.
+- Often used by scheduled workflows and orchestrator workflows to post run summaries.
 
 #### Required Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `project` | URL | Full GitHub project URL (e.g., `https://github.com/orgs/myorg/projects/73`). **Required** in every agent output message. |
-| `body` | Markdown | Status update content with campaign summary, findings, and next steps |
+| `body` | Markdown | Status update content with summary, findings, and next steps |
 
 #### Optional Fields
 
@@ -591,7 +590,7 @@ create-project-status-update:
   start_date: "2026-01-06"
   target_date: "2026-01-31"
   body: |
-    ## Campaign Run Summary
+  ## Run Summary
 
     **Discovered:** 25 items (15 issues, 10 PRs)
     **Processed:** 10 items added to project, 5 updated
@@ -615,11 +614,11 @@ create-project-status-update:
 
 #### Status Indicators
 
-- **`ON_TRACK`**: Campaign progressing as planned, meeting velocity targets
+- **`ON_TRACK`**: Progressing as planned, meeting expected targets
 - **`AT_RISK`**: Potential issues identified (blocked items, slower velocity, dependencies)
-- **`OFF_TRACK`**: Campaign behind schedule, requires intervention or re-planning
-- **`COMPLETE`**: All campaign objectives met, no further work needed
-- **`INACTIVE`**: Campaign paused or not actively running
+- **`OFF_TRACK`**: Behind schedule, requires intervention or re-planning
+- **`COMPLETE`**: Objectives met, no further work needed
+- **`INACTIVE`**: Paused or not actively running
 
 Exposes outputs: `status-update-id`, `project-id`, `status`.
 
@@ -867,7 +866,7 @@ When using `target: "*"`, the agent must provide `discussion_number` in the outp
 
 ### Workflow Dispatch (`dispatch-workflow:`)
 
-Triggers other workflows in the same repository using GitHub's `workflow_dispatch` event. This enables agent orchestration patterns, such as campaign workflows that coordinate multiple worker workflows.
+Triggers other workflows in the same repository using GitHub's `workflow_dispatch` event. This enables orchestration patterns, such as orchestrator workflows that coordinate multiple worker workflows.
 
 **Shorthand Syntax:**
 ```yaml wrap
@@ -904,8 +903,8 @@ At compile time, the compiler validates:
      push:
      workflow_dispatch:
        inputs:
-         campaign_id:
-           description: "Campaign identifier"
+         tracker_id:
+           description: "Tracker identifier"
            required: true
    ```
 
@@ -1116,8 +1115,8 @@ The agent dispatches the workflow but doesn't include necessary inputs.
 on:
   workflow_dispatch:
     inputs:
-      campaign_id:
-        description: "Unique identifier for this campaign run (e.g., 'campaign-2024-01-15-001')"
+      tracker_id:
+        description: "Unique identifier for this orchestration run (e.g., 'run-2024-01-15-001')"
         required: true
         type: string
       target_repos:
@@ -1140,7 +1139,7 @@ on:
 
 #### Use Cases
 
-**Campaign Orchestration:**
+**Orchestration:**
 ```yaml wrap
 safe-outputs:
   dispatch-workflow:
@@ -1148,7 +1147,7 @@ safe-outputs:
     max: 2
 ```
 
-An orchestrator workflow can dispatch seeder and worker workflows to discover and process campaign work items.
+An orchestrator workflow can dispatch seeder and worker workflows to discover and process work items.
 
 **Multi-Stage Pipelines:**
 ```yaml wrap
@@ -1319,9 +1318,16 @@ Specify custom runner for safe output jobs (default: `ubuntu-slim`): `runs-on: u
 
 Auto-enabled. Analyzes output for prompt injection, secret leaks, malicious patches. See [Threat Detection Guide](/gh-aw/reference/threat-detection/).
 
-## Agentic Campaign Workflows
+## Projects, Monitoring, and Orchestration Patterns
 
-Combine `create-issue` + `update-project` for coordinated initiatives. Returns campaign ID, applies `z_campaign_<id>` labels, syncs boards. See [Campaign Workflows](/gh-aw/guides/campaigns/).
+Common combinations:
+
+- **Projects & Monitoring:** `create-issue` + `update-project` + `create-project-status-update`
+- **Orchestration:** `dispatch-workflow` (orchestrator/worker pattern), optionally paired with Projects updates
+
+See:
+- [Projects & Monitoring](/gh-aw/guides/monitoring/)
+- [Orchestration](/gh-aw/guides/orchestration/)
 
 ## Custom Messages (`messages:`)
 
