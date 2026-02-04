@@ -332,9 +332,14 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// AWF v0.2.0 uses -- to separate AWF args from the actual command
 		// The command arguments should be passed as individual shell arguments, not as a single string
 
+		// Compute GH_AW_TOOL_BINS on the host side before AWF starts.
+		// This extracts paths from GOROOT, JAVA_HOME, etc. and exports GH_AW_TOOL_BINS
+		// which will be passed to the container via --env-all.
+		toolBinsSetup := GetToolBinsSetup()
+
 		// Add PATH setup inside the AWF command to ensure hostedtoolcache paths come before system paths.
 		// While AWF_HOST_PATH includes setup-* action additions, system paths (like /usr/bin/go) may
-		// still appear before them. GetHostedToolcachePathSetup() PREPENDS hostedtoolcache paths,
+		// still appear before them. GetHostedToolcachePathSetup() PREPENDS GH_AW_TOOL_BINS paths,
 		// ensuring tools like Go from actions/setup-go are found before system versions.
 		pathSetup := GetHostedToolcachePathSetup()
 		copilotCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, copilotCommand)
@@ -344,9 +349,10 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCopilotCommand)
 
 		command = fmt.Sprintf(`set -o pipefail
+%s
 %s %s \
   -- %s \
-  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 	} else {
 		// Run copilot command without AWF wrapper
 		command = fmt.Sprintf(`set -o pipefail

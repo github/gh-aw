@@ -354,6 +354,11 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 			claudeLog.Print("Using standard AWF command")
 		}
 
+		// Compute GH_AW_TOOL_BINS on the host side before AWF starts.
+		// This extracts paths from GOROOT, JAVA_HOME, etc. and exports GH_AW_TOOL_BINS
+		// which will be passed to the container via --env-all.
+		toolBinsSetup := GetToolBinsSetup()
+
 		// Build the command with AWF wrapper
 		// AWF requires the command to be wrapped in a shell invocation because the claude command
 		// contains && chains that need shell interpretation. We use bash -c with properly escaped command.
@@ -370,12 +375,14 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s
+%s
 %s %s \
-  -- %s 2>&1 | tee -a %s`, promptSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, promptSetup, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
+%s
 %s %s \
-  -- %s 2>&1 | tee -a %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		}
 	} else {
 		// Run Claude command without AWF wrapper
