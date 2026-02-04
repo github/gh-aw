@@ -70,7 +70,7 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 			},
 		},
 		{
-			name: "injects extension install into existing workflow",
+			name: "renders instructions for existing workflow without install step",
 			existingWorkflow: &Workflow{
 				Name: "Copilot Setup Steps",
 				On:   "workflow_dispatch",
@@ -93,7 +93,7 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 			verbose: false,
 			wantErr: false,
 			validateContent: func(t *testing.T, content []byte) {
-				// Unmarshal YAML content into Workflow struct for structured validation
+				// File should NOT be modified - should remain with only 2 steps
 				var wf Workflow
 				if err := yaml.Unmarshal(content, &wf); err != nil {
 					t.Fatalf("Failed to unmarshal workflow YAML: %v", err)
@@ -103,13 +103,14 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 					t.Fatalf("Expected job 'copilot-setup-steps' not found")
 				}
 
-				// Extension install and verify steps should be injected at the beginning
-				if len(job.Steps) < 3 {
-					t.Fatalf("Expected at least 3 steps after injection (1 injected + 2 existing), got %d", len(job.Steps))
+				// File should remain unchanged with only 2 existing steps
+				if len(job.Steps) != 2 {
+					t.Errorf("Expected 2 steps (file should not be modified), got %d", len(job.Steps))
 				}
 
-				if job.Steps[0].Name != "Install gh-aw extension" {
-					t.Errorf("Expected first step to be 'Install gh-aw extension', got %q", job.Steps[0].Name)
+				// Verify the install step was NOT injected
+				if job.Steps[0].Name == "Install gh-aw extension" {
+					t.Errorf("Expected 'Install gh-aw extension' step to NOT be injected (instructions should be rendered)")
 				}
 			},
 		},
@@ -729,34 +730,32 @@ jobs:
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
-	// Update with release mode
+	// Call with release mode - should render instructions instead of modifying
 	testVersion := "v3.0.0"
 	err = ensureCopilotSetupSteps(false, workflow.ActionModeRelease, testVersion)
 	if err != nil {
 		t.Fatalf("ensureCopilotSetupSteps() failed: %v", err)
 	}
 
-	// Read updated file
+	// Read file - should remain unchanged
 	content, err := os.ReadFile(setupStepsPath)
 	if err != nil {
-		t.Fatalf("Failed to read updated file: %v", err)
+		t.Fatalf("Failed to read file: %v", err)
 	}
 
 	contentStr := string(content)
 
-	// Verify release mode injection
-	if !strings.Contains(contentStr, "actions/setup-cli@v3.0.0") {
-		t.Errorf("Expected injected action with @v3.0.0 tag, got:\n%s", contentStr)
+	// Verify file was NOT modified - should remain identical to existingContent
+	if contentStr != existingContent {
+		t.Errorf("Expected file to remain unchanged (instructions should be rendered instead), got:\n%s", contentStr)
 	}
-	if !strings.Contains(contentStr, "version: v3.0.0") {
-		t.Errorf("Expected version: v3.0.0 parameter, got:\n%s", contentStr)
+
+	// Verify the install step was NOT injected
+	if strings.Contains(contentStr, "actions/setup-cli") {
+		t.Errorf("Expected 'actions/setup-cli' to NOT be injected (instructions should be rendered)")
 	}
-	if !strings.Contains(contentStr, "actions/checkout@v4") {
-		t.Errorf("Expected checkout step to be injected")
-	}
-	// Verify original step is preserved
-	if !strings.Contains(contentStr, "Some other step") {
-		t.Errorf("Expected original step to be preserved")
+	if strings.Contains(contentStr, "Install gh-aw extension") {
+		t.Errorf("Expected 'Install gh-aw extension' step to NOT be injected (instructions should be rendered)")
 	}
 }
 
@@ -796,26 +795,31 @@ jobs:
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
-	// Update with dev mode
+	// Call with dev mode - should render instructions instead of modifying
 	err = ensureCopilotSetupSteps(false, workflow.ActionModeDev, "dev")
 	if err != nil {
 		t.Fatalf("ensureCopilotSetupSteps() failed: %v", err)
 	}
 
-	// Read updated file
+	// Read file - should remain unchanged
 	content, err := os.ReadFile(setupStepsPath)
 	if err != nil {
-		t.Fatalf("Failed to read updated file: %v", err)
+		t.Fatalf("Failed to read file: %v", err)
 	}
 
 	contentStr := string(content)
 
-	// Verify dev mode injection
-	if !strings.Contains(contentStr, "curl -fsSL") {
-		t.Errorf("Expected curl command in dev mode")
+	// Verify file was NOT modified - should remain identical to existingContent
+	if contentStr != existingContent {
+		t.Errorf("Expected file to remain unchanged (instructions should be rendered instead), got:\n%s", contentStr)
 	}
-	if !strings.Contains(contentStr, "install-gh-aw.sh") {
-		t.Errorf("Expected install-gh-aw.sh in dev mode")
+
+	// Verify the install step was NOT injected
+	if strings.Contains(contentStr, "curl -fsSL") {
+		t.Errorf("Expected 'curl' command to NOT be injected (instructions should be rendered)")
+	}
+	if strings.Contains(contentStr, "install-gh-aw.sh") {
+		t.Errorf("Expected 'install-gh-aw.sh' to NOT be injected (instructions should be rendered)")
 	}
 	if strings.Contains(contentStr, "actions/setup-cli") {
 		t.Errorf("Did not expect actions/setup-cli in dev mode")

@@ -159,7 +159,7 @@ func TestInitRepository_MCP_Idempotent(t *testing.T) {
 	}
 }
 
-func TestEnsureMCPConfig_UpdatesExisting(t *testing.T) {
+func TestEnsureMCPConfig_RendersInstructions(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := testutil.TempDir(t, "test-*")
 
@@ -201,7 +201,7 @@ func TestEnsureMCPConfig_UpdatesExisting(t *testing.T) {
 		t.Fatalf("ensureMCPConfig() returned error: %v", err)
 	}
 
-	// Verify the config now contains both servers
+	// Verify the config was NOT modified (file should remain unchanged)
 	content, err := os.ReadFile(mcpConfigPath)
 	if err != nil {
 		t.Fatalf("Failed to read mcp.json: %v", err)
@@ -212,17 +212,18 @@ func TestEnsureMCPConfig_UpdatesExisting(t *testing.T) {
 		t.Fatalf("Failed to parse mcp.json: %v", err)
 	}
 
-	// Check both servers exist
+	// Check that other-server still exists
 	if _, exists := config.Servers["other-server"]; !exists {
 		t.Errorf("Expected existing 'other-server' to be preserved")
 	}
 
-	if _, exists := config.Servers["github-agentic-workflows"]; !exists {
-		t.Errorf("Expected 'github-agentic-workflows' server to be added")
+	// Check that github-agentic-workflows was NOT added (file should not be modified)
+	if _, exists := config.Servers["github-agentic-workflows"]; exists {
+		t.Errorf("Expected 'github-agentic-workflows' server to NOT be added (should render instructions instead)")
 	}
 }
 
-func TestEnsureCopilotSetupSteps_InjectsStep(t *testing.T) {
+func TestEnsureCopilotSetupSteps_RendersInstructions(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := testutil.TempDir(t, "test-*")
 
@@ -268,34 +269,22 @@ jobs:
 		t.Fatalf("ensureCopilotSetupSteps() returned error: %v", err)
 	}
 
-	// Verify the extension install step was injected
+	// Verify the file was NOT modified (should render instructions instead)
 	content, err := os.ReadFile(setupStepsPath)
 	if err != nil {
 		t.Fatalf("Failed to read setup steps file: %v", err)
 	}
 
 	contentStr := string(content)
-	if !strings.Contains(contentStr, "Install gh-aw extension") {
-		t.Errorf("Expected extension install step to be injected")
-	}
-	if !strings.Contains(contentStr, "install-gh-aw.sh") {
-		t.Errorf("Expected extension install command to be present with bash script")
-	}
-	if !strings.Contains(contentStr, "curl -fsSL") {
-		t.Errorf("Expected curl command to be present")
+
+	// File should remain unchanged
+	if contentStr != customContent {
+		t.Errorf("Expected file to remain unchanged (should render instructions instead of modifying)")
 	}
 
-	// Verify it was injected at the beginning (before other steps)
-	extensionIndex := strings.Index(contentStr, "Install gh-aw extension")
-	someStepIndex := strings.Index(contentStr, "Some step")
-	buildIndex := strings.Index(contentStr, "Build code")
-
-	if extensionIndex == -1 || someStepIndex == -1 || buildIndex == -1 {
-		t.Fatalf("Could not find expected steps in file")
-	}
-
-	if extensionIndex >= someStepIndex || someStepIndex >= buildIndex {
-		t.Errorf("Extension install step not in correct position (should be at beginning, before other steps)")
+	// Verify extension install step was NOT injected
+	if strings.Contains(contentStr, "Install gh-aw extension") {
+		t.Errorf("Expected extension install step to NOT be injected (should render instructions instead)")
 	}
 }
 

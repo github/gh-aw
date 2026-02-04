@@ -43,7 +43,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "adds to existing config without gh-aw server",
+			name: "renders instructions for existing config without gh-aw server",
 			existingConfig: &MCPConfig{
 				Servers: map[string]VSCodeMCPServer{
 					"other-server": {
@@ -55,14 +55,16 @@ func TestEnsureMCPConfig(t *testing.T) {
 			verbose: true,
 			wantErr: false,
 			validateContent: func(t *testing.T, config *MCPConfig) {
-				if len(config.Servers) != 2 {
-					t.Errorf("Expected 2 servers, got %d", len(config.Servers))
+				// File should NOT be modified - should remain with only 1 server
+				if len(config.Servers) != 1 {
+					t.Errorf("Expected 1 server (file should not be modified), got %d", len(config.Servers))
 				}
 				if _, exists := config.Servers["other-server"]; !exists {
 					t.Error("Expected existing other-server to be preserved")
 				}
-				if _, exists := config.Servers["github-agentic-workflows"]; !exists {
-					t.Error("Expected github-agentic-workflows server to be added")
+				// gh-aw server should NOT be added (instructions rendered instead)
+				if _, exists := config.Servers["github-agentic-workflows"]; exists {
+					t.Error("Expected github-agentic-workflows server to NOT be added (instructions should be rendered)")
 				}
 			},
 		},
@@ -86,7 +88,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "updates existing config with different settings",
+			name: "renders instructions for existing config with different settings",
 			existingConfig: &MCPConfig{
 				Servers: map[string]VSCodeMCPServer{
 					"github-agentic-workflows": {
@@ -98,12 +100,13 @@ func TestEnsureMCPConfig(t *testing.T) {
 			verbose: false,
 			wantErr: false,
 			validateContent: func(t *testing.T, config *MCPConfig) {
+				// File should NOT be modified - old settings should remain
 				server := config.Servers["github-agentic-workflows"]
-				if server.Command != "gh" {
-					t.Errorf("Expected command to be updated to 'gh', got %q", server.Command)
+				if server.Command != "old-command" {
+					t.Errorf("Expected command to remain 'old-command' (file should not be modified), got %q", server.Command)
 				}
-				if server.CWD != "${workspaceFolder}" {
-					t.Errorf("Expected CWD to be updated, got %q", server.CWD)
+				if len(server.Args) != 1 || server.Args[0] != "old-arg" {
+					t.Errorf("Expected args to remain ['old-arg'] (file should not be modified), got %v", server.Args)
 				}
 			},
 		},

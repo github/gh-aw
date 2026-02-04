@@ -247,6 +247,11 @@ func (p *Permissions) RenderToYAML() string {
 			continue
 		}
 
+		// Skip metadata - it's a built-in permission that is always available with read access
+		if scope == PermissionMetadata {
+			continue
+		}
+
 		// Add 2 spaces for proper indentation under permissions:
 		// When rendered in a job, the job renderer adds 4 spaces to the first line only,
 		// so we need to pre-indent continuation lines with 4 additional spaces
