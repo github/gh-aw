@@ -71,7 +71,7 @@ func TestEnsureCopilotInstructions(t *testing.T) {
 			// Check that file exists or not based on test expectation
 			_, statErr := os.Stat(copilotInstructionsPath)
 			fileExists := statErr == nil
-			
+
 			if fileExists != tt.expectExists {
 				if tt.expectExists {
 					t.Errorf("Expected copilot instructions file to exist, but it doesn't")

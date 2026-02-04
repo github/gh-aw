@@ -4,87 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
 var copilotAgentsLog = logger.New("cli:copilot_agents")
-
-// ensureFileMatchesTemplate ensures a file in a subdirectory matches the expected template content
-func ensureFileMatchesTemplate(subdir, fileName, templateContent, fileType string, verbose bool, skipInstructions bool) error {
-	copilotAgentsLog.Printf("Ensuring file matches template: subdir=%s, file=%s, type=%s", subdir, fileName, fileType)
-
-	if skipInstructions {
-		copilotAgentsLog.Print("Skipping template update: instructions disabled")
-		return nil
-	}
-
-	gitRoot, err := findGitRoot()
-	if err != nil {
-		return err // Not in a git repository, skip
-	}
-
-	targetDir := filepath.Join(gitRoot, subdir)
-	targetPath := filepath.Join(targetDir, fileName)
-
-	// Ensure the target directory exists
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create %s directory: %w", subdir, err)
-	}
-
-	// Check if the file already exists and matches the template
-	existingContent := ""
-	if content, err := os.ReadFile(targetPath); err == nil {
-		existingContent = string(content)
-	}
-
-	// Check if content matches our expected template
-	expectedContent := strings.TrimSpace(templateContent)
-	if strings.TrimSpace(existingContent) == expectedContent {
-		copilotAgentsLog.Printf("File is up-to-date: %s", targetPath)
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("%s is up-to-date: %s", fileType, targetPath)))
-		}
-		return nil
-	}
-
-	// Write the file with restrictive permissions (0600) to follow security best practices
-	// Agent files and instructions may contain sensitive configuration
-	if err := os.WriteFile(targetPath, []byte(templateContent), 0600); err != nil {
-		copilotAgentsLog.Printf("Failed to write file: %s, error: %v", targetPath, err)
-		return fmt.Errorf("failed to write %s: %w", fileType, err)
-	}
-
-	if existingContent == "" {
-		copilotAgentsLog.Printf("Created %s: %s", fileType, targetPath)
-	} else {
-		copilotAgentsLog.Printf("Updated %s: %s", fileType, targetPath)
-	}
-
-	if verbose {
-		if existingContent == "" {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Created %s: %s", fileType, targetPath)))
-		} else {
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s: %s", fileType, targetPath)))
-		}
-	}
-
-	return nil
-}
-
-// ensureAgentFromTemplate ensures that an agent file exists and matches the embedded template
-func ensureAgentFromTemplate(agentFileName, templateContent string, verbose bool, skipInstructions bool) error {
-	return ensureFileMatchesTemplate(
-		filepath.Join(".github", "agents"),
-		agentFileName,
-		templateContent,
-		"agent",
-		verbose,
-		skipInstructions,
-	)
-}
 
 // cleanupOldPromptFile removes an old prompt file from .github/prompts/ if it exists
 func cleanupOldPromptFile(promptFileName string, verbose bool) error {
@@ -111,7 +36,7 @@ func cleanupOldPromptFile(promptFileName string, verbose bool) error {
 // ensureCopilotInstructions ensures that .github/aw/github-agentic-workflows.md exists
 func ensureCopilotInstructions(verbose bool, skipInstructions bool) error {
 	copilotAgentsLog.Print("Checking Copilot instructions file")
-	
+
 	if skipInstructions {
 		copilotAgentsLog.Print("Skipping instructions check: instructions disabled")
 		return nil
@@ -128,7 +53,7 @@ func ensureCopilotInstructions(verbose bool, skipInstructions bool) error {
 	}
 
 	targetPath := filepath.Join(gitRoot, ".github", "aw", "github-agentic-workflows.md")
-	
+
 	// Check if the file exists
 	if _, err := os.Stat(targetPath); err == nil {
 		copilotAgentsLog.Printf("Copilot instructions file exists: %s", targetPath)
@@ -171,7 +96,7 @@ func cleanupOldCopilotInstructions(verbose bool) error {
 // ensureAgenticWorkflowsDispatcher ensures that .github/agents/agentic-workflows.agent.md exists
 func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool) error {
 	copilotAgentsLog.Print("Checking agentic workflows dispatcher agent")
-	
+
 	if skipInstructions {
 		copilotAgentsLog.Print("Skipping agent check: instructions disabled")
 		return nil
@@ -183,7 +108,7 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool) error
 	}
 
 	targetPath := filepath.Join(gitRoot, ".github", "agents", "agentic-workflows.agent.md")
-	
+
 	// Check if the file exists
 	if _, err := os.Stat(targetPath); err == nil {
 		copilotAgentsLog.Printf("Dispatcher agent file exists: %s", targetPath)
@@ -234,7 +159,7 @@ func ensureSerenaTool(verbose bool, skipInstructions bool) error {
 // ensurePromptFileExists checks if a prompt file exists
 func ensurePromptFileExists(relativePath, fileType string, verbose bool, skipInstructions bool) error {
 	copilotAgentsLog.Printf("Checking %s file: %s", fileType, relativePath)
-	
+
 	if skipInstructions {
 		copilotAgentsLog.Print("Skipping file check: instructions disabled")
 		return nil
@@ -246,7 +171,7 @@ func ensurePromptFileExists(relativePath, fileType string, verbose bool, skipIns
 	}
 
 	targetPath := filepath.Join(gitRoot, relativePath)
-	
+
 	// Check if the file exists
 	if _, err := os.Stat(targetPath); err == nil {
 		copilotAgentsLog.Printf("%s file exists: %s", fileType, targetPath)
