@@ -4,10 +4,7 @@ on:
     types: [opened, synchronize]
 permissions:
   contents: read
-  pull-requests: write
-strict: false
-features:
-  dangerous-permissions-write: true
+  pull-requests: read
 engine:
   id: claude
 tools:

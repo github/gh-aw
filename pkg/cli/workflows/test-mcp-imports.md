@@ -2,10 +2,7 @@
 on: issues
 permissions:
   contents: read
-  issues: write
-strict: false
-features:
-  dangerous-permissions-write: true
+  issues: read
 engine: copilot
 
 imports:

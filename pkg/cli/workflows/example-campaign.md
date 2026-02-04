@@ -4,13 +4,12 @@ on:
 permissions:
   contents: read
   actions: read
-  issues: write
+  issues: read
 tracker-id: example-fingerprint-2024
 safe-outputs:
   create-issue:
     title-prefix: "[Example] "
     labels: [example, automated]
-strict: false
 features:
   dangerous-permissions-write: true
 ---

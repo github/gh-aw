@@ -2,11 +2,8 @@
 on:
   workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
-strict: false
-features:
-  dangerous-permissions-write: true
+  contents: read
+  pull-requests: read
 engine: copilot
 ---
 

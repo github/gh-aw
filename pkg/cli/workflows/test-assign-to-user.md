@@ -17,8 +17,8 @@ on:
 
 permissions:
   actions: write
-  contents: write
-  issues: write
+  contents: read
+  issues: read
 
 engine: copilot
 timeout-minutes: 5
@@ -26,7 +26,6 @@ timeout-minutes: 5
 safe-outputs:
   assign-to-user:
     max: 5
-strict: false
 features:
   dangerous-permissions-write: true
 ---

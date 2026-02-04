@@ -2,10 +2,7 @@
 on:
   workflow_dispatch:
 permissions:
-  issues: write
-strict: false
-features:
-  dangerous-permissions-write: true
+  issues: read
 engine: copilot
 ---
 

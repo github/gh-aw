@@ -6,11 +6,8 @@ on:
 permissions:
   contents: read
   actions: read
-  issues: write
-  pull-requests: write
-strict: false
-features:
-  dangerous-permissions-write: true
+  issues: read
+  pull-requests: read
 engine: copilot
 safe-outputs:
   noop:
