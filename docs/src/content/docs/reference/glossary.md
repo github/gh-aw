@@ -275,26 +275,6 @@ The process of checking workflow files for errors, security issues, and best pra
 
 Persistent storage for workflows that preserves data between runs. Configured using `cache-memory:` in the tools section, it enables workflows to remember information and build on previous interactions.
 
-### ProjectOps
-
-AI-powered GitHub Projects board management that automates issue triage, routing, and field updates. ProjectOps workflows analyze issue/PR content and make intelligent decisions about project assignment, status, priority, and custom field values. Uses the `update-project` safe output for secure board updates without elevated permissions.
-
-**Key capabilities:**
-
-- Content-based routing to appropriate project boards
-- AI-driven priority and effort estimation
-- Automated status transitions and field updates
-- Multi-issue coordination with tracking labels
-- Works with both user-owned and organization-owned Projects v2
-
-**Common patterns:**
-
-1. **Event-driven triage** - Automatically categorize new issues/PRs and route to appropriate project boards
-
-**When to use:** Event-driven workflows (issue opened, PR created) that need to categorize and track work on project boards.
-
-See the [ProjectOps Guide](/gh-aw/examples/issue-pr-events/projectops/) for implementation details.
-
 ### Command Triggers
 
 Special triggers that respond to slash commands in issue and PR comments (e.g., `/review`, `/deploy`). Configured using the `slash_command:` section with a command name.
@@ -366,6 +346,82 @@ on:
         type: string
         default: github
 ```
+
+## Operational Patterns
+
+Operational patterns (suffixed with "-Ops") are established workflow architectures for common automation scenarios. Each pattern addresses specific use cases with recommended triggers, tools, and safe outputs.
+
+### DispatchOps
+
+Manual workflow execution via the GitHub Actions UI or CLI using the `workflow_dispatch` trigger. Enables on-demand tasks, testing, and workflows requiring human judgment about timing. Workflows can accept custom input parameters for runtime customization.
+
+**Use for:** Research tasks, operational commands, development testing, debugging production issues, and ad-hoc analysis that doesn't fit scheduled or event-based triggers.
+
+See the [DispatchOps Guide](/gh-aw/guides/dispatchops/) for implementation details.
+
+### IssueOps
+
+Automated issue management that analyzes, categorizes, and responds to issues when they are created. Uses issue event triggers with safe outputs for secure, automated triage without requiring write permissions for the AI job.
+
+**Use for:** Auto-triage, smart routing to teams, initial responses, quality checks, and content analysis of newly created issues.
+
+See the [IssueOps Examples](/gh-aw/examples/issue-pr-events/issueops/) for implementation details.
+
+### LabelOps
+
+Workflows triggered by label changes on issues and pull requests. Uses labels as workflow triggers, metadata, and state markers with filtering to activate only for specific label additions or removals.
+
+**Use for:** Priority-based workflows, stage transitions, specialized processing based on label categories, and team coordination via label-based handoffs.
+
+See the [LabelOps Examples](/gh-aw/examples/issue-pr-events/labelops/) for implementation details.
+
+### MemoryOps
+
+Stateful workflows that persist data between runs using `cache-memory` and `repo-memory`. Enables workflows to track progress, resume after interruptions, share data between runs, and avoid API throttling through incremental processing.
+
+**Use for:** Incremental data processing, trend analysis, multi-step tasks requiring state, workflow coordination, and long-running operations that need checkpointing.
+
+See the [MemoryOps Guide](/gh-aw/guides/memoryops/) for implementation details.
+
+### MultiRepoOps
+
+Cross-repository coordination that extends automation patterns across multiple GitHub repositories. Uses secure authentication and cross-repository safe outputs to synchronize features, centralize tracking, and enforce organization-wide policies.
+
+**Use for:** Feature synchronization across repos, hub-and-spoke issue tracking, organization-wide policy enforcement, security patch rollouts, and coordinating services in separate repositories.
+
+See the [MultiRepoOps Guide](/gh-aw/guides/multirepoops/) for implementation details.
+
+### ProjectOps
+
+AI-powered GitHub Projects board management that automates issue triage, routing, and field updates. Analyzes issue/PR content and makes intelligent decisions about project assignment, status, priority, and custom field values using the `update-project` safe output for secure board updates without elevated permissions.
+
+**Use for:** Event-driven workflows (issue opened, PR created) that need to categorize and track work on project boards, content-based routing, AI-driven priority estimation, and automated status transitions.
+
+See the [ProjectOps Guide](/gh-aw/examples/issue-pr-events/projectops/) for implementation details.
+
+### SideRepoOps
+
+Development pattern where workflows run from a separate "side" repository that targets your main codebase. Keeps AI-generated issues, comments, and workflow runs isolated from the main repository for cleaner separation between automation infrastructure and production code.
+
+**Use for:** Getting started with agentic workflows, experimentation without affecting main repository, keeping automation artifacts separate, and reporting workflows that generate high volumes of content.
+
+See the [SideRepoOps Guide](/gh-aw/guides/siderepoops/) for implementation details.
+
+### SpecOps
+
+Maintaining and propagating W3C-style specifications using the `w3c-specification-writer` agent. Creates formal specifications with RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) and automatically synchronizes changes to consuming implementations.
+
+**Use for:** Maintaining formal technical specifications, keeping specifications synchronized across repositories, and ensuring implementations stay compliant with specification updates.
+
+See the [SpecOps Guide](/gh-aw/guides/specops/) for implementation details.
+
+### TrialOps
+
+Testing and validation pattern that executes workflows in isolated trial repositories before production deployment. Creates temporary private repositories where workflows run safely, capturing safe outputs without modifying your actual codebase.
+
+**Use for:** Testing workflows before production, comparing implementation approaches, validating prompt changes, debugging in isolation, and demonstrating capabilities with real results.
+
+See the [TrialOps Guide](/gh-aw/guides/trialops/) for implementation details.
 
 ## Related Resources
 
