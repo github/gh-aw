@@ -176,3 +176,102 @@ func TestUnfenceMarkdownPreservesNonWrappedContent(t *testing.T) {
 		})
 	}
 }
+
+func TestUnfenceMarkdownFenceLengthMatching(t *testing.T) {
+	// Test that fence lengths must match (closing must be >= opening)
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "4 backticks opening, 4 backticks closing",
+			input:    "````markdown\nContent\n````",
+			expected: "Content",
+		},
+		{
+			name:     "4 backticks opening, 5 backticks closing",
+			input:    "````markdown\nContent\n`````",
+			expected: "Content",
+		},
+		{
+			name:     "5 backticks opening, 5 backticks closing",
+			input:    "`````markdown\nContent\n`````",
+			expected: "Content",
+		},
+		{
+			name:     "3 backticks opening, 4 backticks closing",
+			input:    "```markdown\nContent\n````",
+			expected: "Content",
+		},
+		{
+			name:     "4 backticks opening, 3 backticks closing - should not unfence",
+			input:    "````markdown\nContent\n```",
+			expected: "````markdown\nContent\n```",
+		},
+		{
+			name:     "10 backticks opening, 10 backticks closing",
+			input:    "``````````markdown\nContent\n``````````",
+			expected: "Content",
+		},
+		{
+			name:     "4 tildes opening, 4 tildes closing",
+			input:    "~~~~markdown\nContent\n~~~~",
+			expected: "Content",
+		},
+		{
+			name:     "5 tildes opening, 6 tildes closing",
+			input:    "~~~~~markdown\nContent\n~~~~~~",
+			expected: "Content",
+		},
+		{
+			name:     "4 tildes opening, 3 tildes closing - should not unfence",
+			input:    "~~~~markdown\nContent\n~~~",
+			expected: "~~~~markdown\nContent\n~~~",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := UnfenceMarkdown(tt.input)
+			assert.Equal(t, tt.expected, result, "Fence length matching should work correctly")
+		})
+	}
+}
+
+func TestUnfenceMarkdownRealWorldExamples(t *testing.T) {
+	// Test real-world examples that might come from agents
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "agent response with issue update",
+			input:    "```markdown\n# Issue Analysis\n\nI've reviewed the code and found the following:\n\n- Bug in line 42\n- Missing validation\n```",
+			expected: "# Issue Analysis\n\nI've reviewed the code and found the following:\n\n- Bug in line 42\n- Missing validation",
+		},
+		{
+			name:     "agent response with code examples",
+			input:    "```markdown\nHere's the fix:\n\n```go\nfunc Fix() {\n    // Fixed code\n}\n```\n\nThis should resolve the issue.\n```",
+			expected: "Here's the fix:\n\n```go\nfunc Fix() {\n    // Fixed code\n}\n```\n\nThis should resolve the issue.",
+		},
+		{
+			name:     "agent response with multiple sections",
+			input:    "```md\n## Summary\n\nCompleted the task.\n\n## Changes\n\n- Updated file A\n- Fixed bug in B\n\n## Testing\n\nAll tests pass.\n```",
+			expected: "## Summary\n\nCompleted the task.\n\n## Changes\n\n- Updated file A\n- Fixed bug in B\n\n## Testing\n\nAll tests pass.",
+		},
+		{
+			name:     "plain markdown without fence - no change",
+			input:    "## Summary\n\nTask completed successfully.",
+			expected: "## Summary\n\nTask completed successfully.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := UnfenceMarkdown(tt.input)
+			assert.Equal(t, tt.expected, result, "Real-world examples should unfence correctly")
+		})
+	}
+}

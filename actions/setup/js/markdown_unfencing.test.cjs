@@ -176,4 +176,71 @@ describe("markdown_unfencing.cjs", () => {
     expect(unfenceMarkdown(123)).toBe(123);
     expect(unfenceMarkdown({})).toStrictEqual({});
   });
+
+  // Fence length matching tests
+  describe("fence length matching", () => {
+    it("should unfence when 4 backticks opening and 4 closing", () => {
+      expect(unfenceMarkdown("````markdown\nContent\n````")).toBe("Content");
+    });
+
+    it("should unfence when 4 backticks opening and 5 closing", () => {
+      expect(unfenceMarkdown("````markdown\nContent\n`````")).toBe("Content");
+    });
+
+    it("should unfence when 5 backticks opening and 5 closing", () => {
+      expect(unfenceMarkdown("`````markdown\nContent\n`````")).toBe("Content");
+    });
+
+    it("should unfence when 3 backticks opening and 4 closing", () => {
+      expect(unfenceMarkdown("```markdown\nContent\n````")).toBe("Content");
+    });
+
+    it("should NOT unfence when 4 backticks opening and 3 closing", () => {
+      const input = "````markdown\nContent\n```";
+      expect(unfenceMarkdown(input)).toBe(input);
+    });
+
+    it("should unfence when 10 backticks opening and 10 closing", () => {
+      expect(unfenceMarkdown("``````````markdown\nContent\n``````````")).toBe("Content");
+    });
+
+    it("should unfence when 4 tildes opening and 4 closing", () => {
+      expect(unfenceMarkdown("~~~~markdown\nContent\n~~~~")).toBe("Content");
+    });
+
+    it("should unfence when 5 tildes opening and 6 closing", () => {
+      expect(unfenceMarkdown("~~~~~markdown\nContent\n~~~~~~")).toBe("Content");
+    });
+
+    it("should NOT unfence when 4 tildes opening and 3 closing", () => {
+      const input = "~~~~markdown\nContent\n~~~";
+      expect(unfenceMarkdown(input)).toBe(input);
+    });
+  });
+
+  // Real-world examples
+  describe("real-world examples", () => {
+    it("should unfence agent response with issue update", () => {
+      const input = "```markdown\n# Issue Analysis\n\nI've reviewed the code and found the following:\n\n- Bug in line 42\n- Missing validation\n```";
+      const expected = "# Issue Analysis\n\nI've reviewed the code and found the following:\n\n- Bug in line 42\n- Missing validation";
+      expect(unfenceMarkdown(input)).toBe(expected);
+    });
+
+    it("should unfence agent response with code examples", () => {
+      const input = "```markdown\nHere's the fix:\n\n```go\nfunc Fix() {\n    // Fixed code\n}\n```\n\nThis should resolve the issue.\n```";
+      const expected = "Here's the fix:\n\n```go\nfunc Fix() {\n    // Fixed code\n}\n```\n\nThis should resolve the issue.";
+      expect(unfenceMarkdown(input)).toBe(expected);
+    });
+
+    it("should unfence agent response with multiple sections", () => {
+      const input = "```md\n## Summary\n\nCompleted the task.\n\n## Changes\n\n- Updated file A\n- Fixed bug in B\n\n## Testing\n\nAll tests pass.\n```";
+      const expected = "## Summary\n\nCompleted the task.\n\n## Changes\n\n- Updated file A\n- Fixed bug in B\n\n## Testing\n\nAll tests pass.";
+      expect(unfenceMarkdown(input)).toBe(expected);
+    });
+
+    it("should not modify plain markdown without fence", () => {
+      const input = "## Summary\n\nTask completed successfully.";
+      expect(unfenceMarkdown(input)).toBe(input);
+    });
+  });
 });
