@@ -248,7 +248,7 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, enable bo
 
 		// Collect the workflow .md file, .lock.yml file, and transitive imports
 		workflowMarkdownPath := stringutil.LockFileToMarkdown(lockFilePath)
-		files, err := collectWorkflowFiles(workflowMarkdownPath, verbose)
+		files, err := collectWorkflowFiles(ctx, workflowMarkdownPath, verbose)
 		if err != nil {
 			return fmt.Errorf("failed to collect workflow files: %w", err)
 		}

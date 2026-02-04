@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -156,7 +157,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 				Verbose:        verbose,
 			}
 
-			if err := RunWorkflowTrials(workflowSpecs, opts); err != nil {
+			if err := RunWorkflowTrials(cmd.Context(), workflowSpecs, opts); err != nil {
 				return err
 			}
 			return nil
@@ -193,7 +194,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 }
 
 // RunWorkflowTrials executes the main logic for trialing one or more workflows
-func RunWorkflowTrials(workflowSpecs []string, opts TrialOptions) error {
+func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOptions) error {
 	trialLog.Printf("Starting trial execution: specs=%v, logicalRepo=%s, cloneRepo=%s, hostRepo=%s, repeat=%d", workflowSpecs, opts.Repos.LogicalRepo, opts.Repos.CloneRepo, opts.Repos.HostRepo, opts.RepeatCount)
 
 	// Parse all workflow specifications
@@ -424,7 +425,7 @@ func RunWorkflowTrials(workflowSpecs []string, opts TrialOptions) error {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
 
 			// Install workflow with trial mode compilation
-			if err := installWorkflowInTrialMode(tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, secretTracker, opts.EngineOverride, opts.AppendText, opts.PushSecrets, directTrialMode, opts.Verbose); err != nil {
+			if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, secretTracker, opts.EngineOverride, opts.AppendText, opts.PushSecrets, directTrialMode, opts.Verbose); err != nil {
 				return fmt.Errorf("failed to install workflow '%s' in trial mode: %w", parsedSpec.WorkflowName, err)
 			}
 

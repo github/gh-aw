@@ -22,7 +22,7 @@ var runPushLog = logger.New("cli:run_push")
 // and the transitive closure of all imported files.
 // Note: This function always recompiles the workflow to ensure the lock file is up-to-date,
 // regardless of the frontmatter hash status.
-func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
+func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool) ([]string, error) {
 	runPushLog.Printf("Collecting files for workflow: %s", workflowPath)
 
 	files := make(map[string]bool) // Use map to avoid duplicates
@@ -78,7 +78,7 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 
 	// Always recompile (hash check is for observability only)
 	runPushLog.Printf("Always recompiling workflow: %s", absWorkflowPath)
-	if err := recompileWorkflow(absWorkflowPath, verbose); err != nil {
+	if err := recompileWorkflow(ctx, absWorkflowPath, verbose); err != nil {
 		runPushLog.Printf("Failed to recompile workflow: %v", err)
 		return nil, fmt.Errorf("failed to recompile workflow: %w", err)
 	}
@@ -119,7 +119,7 @@ func collectWorkflowFiles(workflowPath string, verbose bool) ([]string, error) {
 }
 
 // recompileWorkflow compiles a workflow using CompileWorkflows
-func recompileWorkflow(workflowPath string, verbose bool) error {
+func recompileWorkflow(ctx context.Context, workflowPath string, verbose bool) error {
 	runPushLog.Printf("Recompiling workflow: %s", workflowPath)
 
 	config := CompileConfig{
@@ -139,8 +139,6 @@ func recompileWorkflow(workflowPath string, verbose bool) error {
 
 	runPushLog.Printf("Compilation config: Validate=%v, NoEmit=%v", config.Validate, config.NoEmit)
 
-	// Use background context for compilation
-	ctx := context.Background()
 	runPushLog.Printf("Starting compilation with CompileWorkflows")
 	if _, err := CompileWorkflows(ctx, config); err != nil {
 		runPushLog.Printf("Compilation failed: %v", err)

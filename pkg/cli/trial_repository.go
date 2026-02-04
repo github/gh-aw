@@ -163,7 +163,7 @@ func cloneTrialHostRepository(repoSlug string, verbose bool) (string, error) {
 }
 
 // installWorkflowInTrialMode installs a workflow in trial mode using a parsed spec
-func installWorkflowInTrialMode(tempDir string, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, secretTracker *TrialSecretTracker, engineOverride string, appendText string, pushSecrets bool, directTrialMode bool, verbose bool) error {
+func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, secretTracker *TrialSecretTracker, engineOverride string, appendText string, pushSecrets bool, directTrialMode bool, verbose bool) error {
 	trialRepoLog.Printf("Installing workflow in trial mode: workflow=%s, hostRepo=%s, directMode=%v", parsedSpec.WorkflowName, hostRepoSlug, directTrialMode)
 
 	// Change to temp directory
@@ -226,7 +226,7 @@ func installWorkflowInTrialMode(tempDir string, parsedSpec *WorkflowSpec, logica
 		TrialMode:            !directTrialMode && (cloneRepoSlug == ""), // Enable trial mode in compiler unless in direct mode or clone-repo mode
 		TrialLogicalRepoSlug: logicalRepoSlug,
 	}
-	workflowDataList, err := CompileWorkflows(context.Background(), config)
+	workflowDataList, err := CompileWorkflows(ctx, config)
 	if err != nil {
 		return fmt.Errorf("failed to compile workflow: %w", err)
 	}

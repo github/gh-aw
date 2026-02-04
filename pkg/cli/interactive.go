@@ -43,7 +43,7 @@ type InteractiveWorkflowBuilder struct {
 }
 
 // CreateWorkflowInteractively prompts the user to build a workflow interactively
-func CreateWorkflowInteractively(workflowName string, verbose bool, force bool) error {
+func CreateWorkflowInteractively(ctx context.Context, workflowName string, verbose bool, force bool) error {
 	interactiveLog.Printf("Starting interactive workflow creation: workflowName=%s, force=%v", workflowName, force)
 
 	// Assert this function is not running in automated unit tests
@@ -77,7 +77,7 @@ func CreateWorkflowInteractively(workflowName string, verbose bool, force bool) 
 	}
 
 	// Compile the workflow
-	if err := builder.compileWorkflow(verbose); err != nil {
+	if err := builder.compileWorkflow(ctx, verbose); err != nil {
 		return fmt.Errorf("failed to compile workflow: %w", err)
 	}
 
@@ -472,7 +472,7 @@ func (b *InteractiveWorkflowBuilder) describeTrigger() string {
 }
 
 // compileWorkflow automatically compiles the generated workflow
-func (b *InteractiveWorkflowBuilder) compileWorkflow(verbose bool) error {
+func (b *InteractiveWorkflowBuilder) compileWorkflow(ctx context.Context, verbose bool) error {
 	interactiveLog.Printf("Starting workflow compilation: name=%s, verbose=%v", b.WorkflowName, verbose)
 
 	// Create spinner for compilation progress
@@ -494,7 +494,7 @@ func (b *InteractiveWorkflowBuilder) compileWorkflow(verbose bool) error {
 		TrialLogicalRepoSlug: "",
 	}
 
-	_, err := CompileWorkflows(context.Background(), config)
+	_, err := CompileWorkflows(ctx, config)
 
 	if err != nil {
 		spinner.Stop()

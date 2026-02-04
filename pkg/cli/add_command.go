@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,8 +112,7 @@ Note: To create a new workflow from scratch, use the 'new' command instead.`,
 
 			if useInteractive {
 				addLog.Print("Using interactive mode")
-				ctx := context.Background()
-				return RunAddInteractive(ctx, workflows, verbose, engineOverride, noGitattributes, workflowDir, noStopAfter, stopAfter)
+				return RunAddInteractive(cmd.Context(), workflows, verbose, engineOverride, noGitattributes, workflowDir, noStopAfter, stopAfter)
 			}
 
 			// Handle normal (non-interactive) mode
