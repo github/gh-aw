@@ -4183,8 +4183,13 @@
                 },
                 "close-older-discussions": {
                   "type": "boolean",
-                  "description": "When true, automatically close older discussions matching the same title prefix or labels as 'outdated' with a comment linking to the new discussion. Requires title-prefix or labels to be set. Maximum 10 discussions will be closed. Only runs if discussion creation succeeds.",
+                  "description": "When true, automatically close older discussions matching the same title prefix or labels as 'outdated' with a comment linking to the new discussion. Requires title-prefix or labels to be set. Maximum 10 discussions will be closed. Only runs if discussion creation succeeds. When fallback-to-issue is enabled and discussion creation fails, older issues will be closed instead.",
                   "default": false
+                },
+                "fallback-to-issue": {
+                  "type": "boolean",
+                  "description": "When true (default), fallback to creating an issue if discussion creation fails due to permissions. The fallback issue will include a note indicating it was intended to be a discussion. If close-older-discussions is enabled, the close-older-issues logic will be applied to the fallback issue.",
+                  "default": true
                 },
                 "expires": {
                   "oneOf": [
