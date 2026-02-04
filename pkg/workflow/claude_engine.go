@@ -354,19 +354,18 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 			claudeLog.Print("Using standard AWF command")
 		}
 
-		// Compute GH_AW_TOOL_BINS on the host side before AWF starts.
-		// This extracts paths from GOROOT, JAVA_HOME, etc. and exports GH_AW_TOOL_BINS
-		// which will be passed to the container via --env-all.
-		toolBinsSetup := GetToolBinsSetup()
-
 		// Build the command with AWF wrapper
+		//
+		// AWF with --enable-chroot and --env-all handles PATH natively:
+		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
+		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
+		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars
+		// 4. Container inherits complete, correctly-ordered environment
+		//
 		// AWF requires the command to be wrapped in a shell invocation because the claude command
 		// contains && chains that need shell interpretation. We use bash -c with properly escaped command.
-		// Add PATH setup inside the AWF command to find npm-installed binaries and runtimes
-		pathSetup := GetHostedToolcachePathSetup()
-		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 		// Escape single quotes in the command by replacing ' with '\''
-		escapedClaudeCommand := strings.ReplaceAll(claudeCommandWithPath, "'", "'\\''")
+		escapedClaudeCommand := strings.ReplaceAll(claudeCommand, "'", "'\\''")
 		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedClaudeCommand)
 
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
@@ -375,32 +374,28 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s
-%s
 %s %s \
-  -- %s 2>&1 | tee -a %s`, promptSetup, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, promptSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
-%s
 %s %s \
-  -- %s 2>&1 | tee -a %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		}
 	} else {
 		// Run Claude command without AWF wrapper
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
 		// Use tee to capture stdout (stream-json output) to the log file while also displaying on console
 		// The combined output (debug logs + JSON) will be in the log file for parsing
-		// Prepend PATH setup to find claude binary and all runtimes
-		pathSetup := GetHostedToolcachePathSetup()
-		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
+		// PATH is already set correctly by actions/setup-* steps which prepend to PATH
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s
           # Execute Claude Code CLI with prompt from file
-          %s 2>&1 | tee -a %s`, promptSetup, claudeCommandWithPath, logFile)
+          %s 2>&1 | tee -a %s`, promptSetup, claudeCommand, logFile)
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
           # Execute Claude Code CLI with prompt from file
-          %s 2>&1 | tee -a %s`, claudeCommandWithPath, logFile)
+          %s 2>&1 | tee -a %s`, claudeCommand, logFile)
 		}
 	}
 

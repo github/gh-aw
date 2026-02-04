@@ -331,28 +331,23 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// Build the full AWF command with proper argument separation
 		// AWF v0.2.0 uses -- to separate AWF args from the actual command
 		// The command arguments should be passed as individual shell arguments, not as a single string
+		//
+		// AWF with --enable-chroot and --env-all handles PATH natively:
+		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
+		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
+		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars
+		// 4. Container inherits complete, correctly-ordered environment
+		//
+		// Version precedence works because actions/setup-* PREPEND to PATH, so
+		// /opt/hostedtoolcache/go/1.25.6/x64/bin comes before /usr/bin in AWF_HOST_PATH.
 
-		// Compute GH_AW_TOOL_BINS on the host side before AWF starts.
-		// This extracts paths from GOROOT, JAVA_HOME, etc. and exports GH_AW_TOOL_BINS
-		// which will be passed to the container via --env-all.
-		toolBinsSetup := GetToolBinsSetup()
-
-		// Add PATH setup inside the AWF command to ensure hostedtoolcache paths come before system paths.
-		// While AWF_HOST_PATH includes setup-* action additions, system paths (like /usr/bin/go) may
-		// still appear before them. GetHostedToolcachePathSetup() PREPENDS GH_AW_TOOL_BINS paths,
-		// ensuring tools like Go from actions/setup-go are found before system versions.
-		pathSetup := GetHostedToolcachePathSetup()
-		copilotCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, copilotCommand)
-		// Escape single quotes for embedding in single-quoted shell command
-		escapedCopilotCommand := strings.ReplaceAll(copilotCommandWithPath, "'", "'\\''")
-		// Wrap in /bin/bash -c to ensure PATH setup (source sanitize_path.sh) is executed properly
-		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCopilotCommand)
+		// Escape the command for shell - copilotCommand may contain shell expansions
+		escapedCommand := shellEscapeArg(copilotCommand)
 
 		command = fmt.Sprintf(`set -o pipefail
-%s
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), escapedCommand, shellEscapeArg(logFile))
 	} else {
 		// Run copilot command without AWF wrapper
 		command = fmt.Sprintf(`set -o pipefail

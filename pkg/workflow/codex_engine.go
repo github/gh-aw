@@ -275,41 +275,39 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			codexEngineLog.Print("Using standard AWF command")
 		}
 
-		// Compute GH_AW_TOOL_BINS on the host side before AWF starts.
-		// This extracts paths from GOROOT, JAVA_HOME, etc. and exports GH_AW_TOOL_BINS
-		// which will be passed to the container via --env-all.
-		toolBinsSetup := GetToolBinsSetup()
-
 		// Build the command with agent file handling if specified
-		// Add PATH setup and INSTRUCTION reading inside the AWF command
-		// This avoids Docker Compose interpolation issues with $ characters in the prompt
-		pathSetup := GetHostedToolcachePathSetup()
+		// INSTRUCTION reading is done inside the AWF command to avoid Docker Compose interpolation
+		// issues with $ characters in the prompt.
+		//
+		// AWF with --enable-chroot and --env-all handles PATH natively:
+		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
+		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
+		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars
+		// 4. Container inherits complete, correctly-ordered environment
 
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
 			// Read agent file and prompt inside AWF container
-			codexCommandWithSetup := fmt.Sprintf(`AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s && %s`, agentPath, pathSetup, codexCommand)
+			codexCommandWithSetup := fmt.Sprintf(`AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s`, agentPath, codexCommand)
 			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
 			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
 
 			command = fmt.Sprintf(`set -o pipefail
 mkdir -p "$CODEX_HOME/logs"
-%s
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
 			// Read prompt inside AWF container to avoid Docker Compose interpolation issues
-			codexCommandWithSetup := fmt.Sprintf(`INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s && %s`, pathSetup, codexCommand)
+			codexCommandWithSetup := fmt.Sprintf(`INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s`, codexCommand)
 			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
 			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
 
 			command = fmt.Sprintf(`set -o pipefail
 mkdir -p "$CODEX_HOME/logs"
-%s
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		}
 	} else {
 		// Build the command without AWF wrapping
