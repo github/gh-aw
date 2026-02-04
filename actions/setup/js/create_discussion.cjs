@@ -94,6 +94,71 @@ function resolveCategoryId(categoryConfig, itemCategory, categories) {
 }
 
 /**
+ * Checks if an error is a permissions-related error
+ * @param {string} errorMessage - The error message to check
+ * @returns {boolean} True if the error is permissions-related
+ */
+function isPermissionsError(errorMessage) {
+  return (
+    errorMessage.includes("Resource not accessible") ||
+    errorMessage.includes("Insufficient permissions") ||
+    errorMessage.includes("Bad credentials") ||
+    errorMessage.includes("Not Authenticated") ||
+    errorMessage.includes("requires authentication") ||
+    errorMessage.includes("Discussions not enabled") ||
+    errorMessage.includes("Failed to fetch repository information")
+  );
+}
+
+/**
+ * Handles fallback to create-issue when discussion creation fails
+ * @param {Function} createIssueHandler - The create_issue handler function
+ * @param {Object} item - The original discussion message item
+ * @param {string} qualifiedItemRepo - The qualified repository name (owner/repo)
+ * @param {Object} resolvedTemporaryIds - Map of temporary IDs to {repo, number}
+ * @param {string} contextMessage - Context-specific error message prefix
+ * @returns {Promise<Object>} Result with success/error status
+ */
+async function handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, contextMessage) {
+  try {
+    // Prepare issue message with a note about the fallback
+    const fallbackNote = `\n\n---\n\n> **Note:** This was intended to be a discussion, but discussions could not be created due to permissions issues. This issue was created as a fallback.\n`;
+    const issueMessage = {
+      ...item,
+      body: (item.body || "") + fallbackNote,
+      repo: qualifiedItemRepo,
+    };
+
+    // Call the create_issue handler
+    const issueResult = await createIssueHandler(issueMessage, resolvedTemporaryIds);
+
+    if (issueResult.success) {
+      core.info(`✓ Successfully created issue ${issueResult.repo}#${issueResult.number} as fallback`);
+      return {
+        success: true,
+        repo: issueResult.repo,
+        number: issueResult.number,
+        url: issueResult.url,
+        fallback: "issue", // Indicate this was a fallback
+      };
+    } else {
+      core.error(`Fallback to create-issue also failed: ${issueResult.error}`);
+      return {
+        success: false,
+        error: `${contextMessage} and fallback to issue also failed: ${issueResult.error}`,
+      };
+    }
+  } catch (fallbackError) {
+    const fallbackErrorMessage = getErrorMessage(fallbackError);
+    core.error(`Fallback to create-issue failed: ${fallbackErrorMessage}`);
+    return {
+      success: false,
+      error: `${contextMessage} and fallback to issue threw an error: ${fallbackErrorMessage}`,
+    };
+  }
+}
+
+/**
  * Main handler factory for create_discussion
  * Returns a message handler function that processes individual create_discussion messages
  * @type {HandlerFactoryFunction}
@@ -106,6 +171,7 @@ async function main(config = {}) {
   const configCategory = config.category || "";
   const maxCount = config.max || 10;
   const expiresHours = config.expires ? parseInt(String(config.expires), 10) : 0;
+  const fallbackToIssue = config.fallback_to_issue !== false; // Default to true
 
   // Parse labels from config
   const labelsConfig = config.labels || [];
@@ -121,11 +187,26 @@ async function main(config = {}) {
   if (allowedRepos.size > 0) {
     core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
   }
+  if (fallbackToIssue) {
+    core.info("Fallback to issue enabled: will create an issue if discussion creation fails due to permissions");
+  }
 
   // Track state
   let processedCount = 0;
   const repoInfoCache = new Map();
   const temporaryIdMap = new Map();
+
+  // Initialize create_issue handler for fallback if enabled
+  let createIssueHandler = null;
+  if (fallbackToIssue) {
+    const { main: createIssueMain } = require("./create_issue.cjs");
+    createIssueHandler = await createIssueMain({
+      ...config, // Pass through most config
+      title_prefix: titlePrefix,
+      max: maxCount,
+      expires: expiresHours,
+    });
+  }
 
   /**
    * Message handler function that processes a single create_discussion message
@@ -206,6 +287,16 @@ async function main(config = {}) {
         core.info(`Fetched discussion categories for ${qualifiedItemRepo}`);
       } catch (error) {
         const errorMessage = getErrorMessage(error);
+
+        // Check if this is a permissions error and fallback is enabled
+        if (fallbackToIssue && createIssueHandler && isPermissionsError(errorMessage)) {
+          core.warning(`Failed to fetch discussion info due to permissions: ${errorMessage}`);
+          core.info(`Falling back to create-issue for ${qualifiedItemRepo}`);
+
+          return await handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, "Failed to fetch discussion info");
+        }
+
+        // No fallback or not a permissions error - return original error
         // Provide enhanced error message with troubleshooting hints
         const enhancedError =
           `Failed to fetch repository information for '${qualifiedItemRepo}': ${errorMessage}. ` +
@@ -326,6 +417,16 @@ async function main(config = {}) {
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+
+      // Check if this is a permissions error and fallback is enabled
+      if (fallbackToIssue && createIssueHandler && isPermissionsError(errorMessage)) {
+        core.warning(`Discussion creation failed due to permissions: ${errorMessage}`);
+        core.info(`Falling back to create-issue for ${qualifiedItemRepo}`);
+
+        return await handleFallbackToIssue(createIssueHandler, item, qualifiedItemRepo, resolvedTemporaryIds, "Discussion creation failed");
+      }
+
+      // No fallback or not a permissions error - return original error
       // Provide enhanced error message with troubleshooting hints
       const enhancedError =
         `Failed to create discussion in '${qualifiedItemRepo}': ${errorMessage}. ` +

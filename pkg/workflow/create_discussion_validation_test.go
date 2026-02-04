@@ -145,3 +145,52 @@ func TestParseDiscussionsConfigValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDiscussionsConfigFallbackToIssue(t *testing.T) {
+	tests := []struct {
+		name             string
+		config           map[string]any
+		expectedFallback *bool
+	}{
+		{
+			name: "default fallback-to-issue is true",
+			config: map[string]any{
+				"category": "general",
+			},
+			expectedFallback: boolPtr(true),
+		},
+		{
+			name: "explicit fallback-to-issue true",
+			config: map[string]any{
+				"category":          "general",
+				"fallback-to-issue": true,
+			},
+			expectedFallback: boolPtr(true),
+		},
+		{
+			name: "explicit fallback-to-issue false",
+			config: map[string]any{
+				"category":          "general",
+				"fallback-to-issue": false,
+			},
+			expectedFallback: boolPtr(false),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler(WithFailFast(true))
+			outputMap := map[string]any{
+				"create-discussion": tt.config,
+			}
+
+			result := compiler.parseDiscussionsConfig(outputMap)
+
+			assert.NotNil(t, result, "Expected non-nil result")
+			if tt.expectedFallback != nil {
+				assert.NotNil(t, result.FallbackToIssue, "Expected FallbackToIssue to be set")
+				assert.Equal(t, *tt.expectedFallback, *result.FallbackToIssue, "FallbackToIssue value mismatch")
+			}
+		})
+	}
+}

@@ -38,7 +38,7 @@ tools:
 			// With Docker MCP always enabled, default is docker (not services)
 			expectedType:        "docker",
 			expectedCommand:     "docker",
-			expectedDockerImage: "ghcr.io/github/github-mcp-server:v0.30.2",
+			expectedDockerImage: "ghcr.io/github/github-mcp-server:v0.30.3",
 		},
 	}
 
@@ -173,7 +173,7 @@ func TestGenerateGitHubMCPConfig(t *testing.T) {
 
 			switch tt.expectedType {
 			case "docker":
-				if !strings.Contains(result, `"container": "ghcr.io/github/github-mcp-server:v0.30.2"`) {
+				if !strings.Contains(result, `"container": "ghcr.io/github/github-mcp-server:v0.30.3"`) {
 					t.Errorf("Expected container field with GitHub MCP image but got:\n%s", result)
 				}
 				if strings.Contains(result, `"type": "http"`) {
