@@ -426,9 +426,10 @@ async function main() {
   core.setOutput("assignment_errors", assignmentErrors);
   core.setOutput("assignment_error_count", failureCount.toString());
 
-  // Fail if any assignments failed (but not if they were skipped)
+  // Log assignment failures but don't fail the job
+  // The conclusion job will report these failures in the agent failure issue/comment
   if (failureCount > 0) {
-    core.setFailed(`Failed to assign ${failureCount} agent(s)`);
+    core.warning(`Failed to assign ${failureCount} agent(s) - errors will be reported in conclusion job`);
   }
 }
 
