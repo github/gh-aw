@@ -27,7 +27,7 @@ safe-outputs:
     labels: [code-quality, automation, task-mining, cookie]
     max: 5
     group: true
-    expires: 14d
+    expires: 1d
   add-comment:
     max: 3
   messages:
@@ -267,7 +267,7 @@ All tasks focus on code quality improvements and are ready for assignment to age
 
 ### Issue Creation
 - Create **3-5 issues maximum** per run (respects rate limits)
-- Each issue expires after 14 days if not addressed
+- Each issue expires after 1 day if not addressed
 - All issues tagged with `code-quality`, `automation`, `task-mining`
 - Issues include clear acceptance criteria and file paths
 
