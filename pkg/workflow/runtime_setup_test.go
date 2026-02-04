@@ -328,7 +328,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("dotnet"), Version: "8.0"},
 			},
-			expectSteps: 1,
+			expectSteps: 1, // setup only - PATH inherited via AWF_HOST_PATH in chroot mode
 			checkContent: []string{
 				"Setup .NET",
 				"actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9",
@@ -340,7 +340,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("java"), Version: "21"},
 			},
-			expectSteps: 1,
+			expectSteps: 1, // setup only - PATH inherited via AWF_HOST_PATH in chroot mode
 			checkContent: []string{
 				"Setup Java",
 				"actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9",
@@ -399,11 +399,12 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("go"), Version: "1.22"},
 			},
-			expectSteps: 1,
+			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
 				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
 				"go-version: '1.22'",
+				"Capture GOROOT for AWF chroot mode",
 			},
 		},
 		{
@@ -411,11 +412,12 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("go"), Version: ""},
 			},
-			expectSteps: 1,
+			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
 				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
 				"go-version: '1.25'",
+				"Capture GOROOT for AWF chroot mode",
 			},
 		},
 		{
@@ -423,12 +425,13 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			requirements: []RuntimeRequirement{
 				{Runtime: findRuntimeByID("go"), Version: "", GoModFile: "custom/go.mod"},
 			},
-			expectSteps: 1,
+			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
 				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
 				"go-version-file: custom/go.mod",
 				"cache: true",
+				"Capture GOROOT for AWF chroot mode",
 			},
 		},
 	}

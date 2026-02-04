@@ -137,8 +137,9 @@ func upgradeCopilotSetupSteps(verbose bool, actionMode workflow.ActionMode, vers
 	return ensureCopilotSetupStepsWithUpgrade(verbose, actionMode, version, true)
 }
 
-// ensureCopilotSetupStepsWithUpgrade creates or updates .github/workflows/copilot-setup-steps.yml
-// When upgradeVersion is true, it will update existing actions/setup-cli versions
+// ensureCopilotSetupStepsWithUpgrade creates .github/workflows/copilot-setup-steps.yml
+// If the file already exists, it renders console instructions instead of editing
+// When upgradeVersion is true and called from upgrade command, this is a special case
 func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.ActionMode, version string, upgradeVersion bool) error {
 	copilotSetupLog.Printf("Creating copilot-setup-steps.yml with action mode: %s, version: %s, upgradeVersion: %v", actionMode, version, upgradeVersion)
 
@@ -168,9 +169,10 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 			(strings.Contains(contentStr, "Install gh-aw extension") && strings.Contains(contentStr, "curl -fsSL"))
 		hasActionInstall := strings.Contains(contentStr, "actions/setup-cli")
 
-		// If we have an install step and upgradeVersion is true, attempt to upgrade the version
+		// If we have an install step and upgradeVersion is true, this is from upgrade command
+		// In this case, we still update the file for backward compatibility
 		if (hasLegacyInstall || hasActionInstall) && upgradeVersion {
-			copilotSetupLog.Print("Extension install step exists, attempting version upgrade")
+			copilotSetupLog.Print("Extension install step exists, attempting version upgrade (upgrade command)")
 
 			// Parse existing workflow
 			var workflow Workflow
@@ -209,49 +211,60 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 			return nil
 		}
 
+		// File exists - render instructions instead of editing
 		if hasLegacyInstall || hasActionInstall {
-			copilotSetupLog.Print("Extension install step already exists, skipping update")
+			copilotSetupLog.Print("Extension install step already exists, file is up to date")
 			if verbose {
 				fmt.Fprintf(os.Stderr, "Skipping %s (already has gh-aw extension install step)\n", setupStepsPath)
 			}
 			return nil
 		}
 
-		// Parse existing workflow
-		var workflow Workflow
-		if err := yaml.Unmarshal(content, &workflow); err != nil {
-			return fmt.Errorf("failed to parse existing copilot-setup-steps.yml: %w", err)
-		}
-
-		// Inject the extension install step
-		copilotSetupLog.Print("Injecting extension install step into existing file")
-		if err := injectExtensionInstallStep(&workflow, actionMode, version); err != nil {
-			return fmt.Errorf("failed to inject extension install step: %w", err)
-		}
-
-		// Marshal back to YAML
-		updatedContent, err := yaml.Marshal(&workflow)
-		if err != nil {
-			return fmt.Errorf("failed to marshal updated workflow: %w", err)
-		}
-
-		if err := os.WriteFile(setupStepsPath, updatedContent, 0600); err != nil {
-			return fmt.Errorf("failed to update copilot-setup-steps.yml: %w", err)
-		}
-		copilotSetupLog.Printf("Updated file with extension install step: %s", setupStepsPath)
-
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Updated %s with gh-aw extension install step\n", setupStepsPath)
-		}
+		// File exists but needs update - render instructions
+		copilotSetupLog.Print("File exists without install step, rendering update instructions instead of editing")
+		renderCopilotSetupUpdateInstructions(setupStepsPath, actionMode, version)
 		return nil
 	}
 
+	// File doesn't exist - create it
 	if err := os.WriteFile(setupStepsPath, []byte(generateCopilotSetupStepsYAML(actionMode, version)), 0600); err != nil {
 		return fmt.Errorf("failed to write copilot-setup-steps.yml: %w", err)
 	}
 	copilotSetupLog.Printf("Created file: %s", setupStepsPath)
 
 	return nil
+}
+
+// renderCopilotSetupUpdateInstructions renders console instructions for updating copilot-setup-steps.yml
+func renderCopilotSetupUpdateInstructions(filePath string, actionMode workflow.ActionMode, version string) {
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s %s\n",
+		"ℹ",
+		fmt.Sprintf("Existing file detected: %s", filePath))
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "To enable GitHub Copilot Agent integration, please add the following steps")
+	fmt.Fprintln(os.Stderr, "to the 'copilot-setup-steps' job in your .github/workflows/copilot-setup-steps.yml file:")
+	fmt.Fprintln(os.Stderr)
+
+	// Determine the action reference
+	actionRef := "@main"
+	if actionMode.IsRelease() && version != "" && version != "dev" {
+		actionRef = "@" + version
+	}
+
+	if actionMode.IsRelease() {
+		fmt.Fprintln(os.Stderr, "      - name: Checkout repository")
+		fmt.Fprintln(os.Stderr, "        uses: actions/checkout@v4")
+		fmt.Fprintf(os.Stderr, "      - name: Install gh-aw extension\n")
+		fmt.Fprintf(os.Stderr, "        uses: github/gh-aw/actions/setup-cli%s\n", actionRef)
+		fmt.Fprintln(os.Stderr, "        with:")
+		fmt.Fprintf(os.Stderr, "          version: %s\n", version)
+	} else {
+		fmt.Fprintln(os.Stderr, "      - name: Install gh-aw extension")
+		fmt.Fprintln(os.Stderr, "        run: |")
+		fmt.Fprintln(os.Stderr, "          curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash")
+	}
+	fmt.Fprintln(os.Stderr)
 }
 
 // upgradeSetupCliVersion upgrades the version in existing actions/setup-cli steps

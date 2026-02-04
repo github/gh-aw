@@ -33,9 +33,9 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that the command contains standard awf flags
-		if !strings.Contains(stepContent, "awf --env-all") {
-			t.Error("Expected command to contain 'awf --env-all'")
+		// Check that the command contains --enable-chroot for AWF v0.13.1+ chroot mode
+		if !strings.Contains(stepContent, "awf --enable-chroot") {
+			t.Error("Expected command to contain 'awf --enable-chroot'")
 		}
 
 		if !strings.Contains(stepContent, "--allow-domains") {
@@ -128,7 +128,7 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 		}
 	})
 
-	t.Run("gh CLI binary is mounted to AWF container", func(t *testing.T) {
+	t.Run("AWF uses chroot mode instead of individual binary mounts", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -150,9 +150,15 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that gh CLI binary mount is included in AWF command
-		if !strings.Contains(stepContent, "--mount /usr/bin/gh:/usr/bin/gh:ro") {
-			t.Error("Expected AWF command to contain gh CLI binary mount '--mount /usr/bin/gh:/usr/bin/gh:ro'")
+		// Check that --enable-chroot is used for transparent host access (AWF v0.13.1+)
+		// This replaces the need for explicit binary mounts like --mount /usr/bin/gh:/usr/bin/gh:ro
+		if !strings.Contains(stepContent, "--enable-chroot") {
+			t.Error("Expected AWF command to contain '--enable-chroot' for transparent host access")
+		}
+
+		// Verify that individual binary mounts are no longer used (replaced by chroot)
+		if strings.Contains(stepContent, "--mount /usr/bin/gh:/usr/bin/gh:ro") {
+			t.Error("Individual binary mounts should be replaced by --enable-chroot mode")
 		}
 	})
 

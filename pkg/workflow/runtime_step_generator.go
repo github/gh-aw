@@ -17,10 +17,35 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement) []GitHubAction
 
 	for _, req := range requirements {
 		steps = append(steps, generateSetupStep(&req))
+
+		// Add environment variable capture steps after setup actions for AWF chroot mode.
+		// Most env vars are inherited via AWF_HOST_PATH, but Go is special.
+		switch req.Runtime.ID {
+		case "go":
+			// GitHub Actions uses "trimmed" Go binaries that require GOROOT to be explicitly set.
+			// Unlike other runtimes where PATH is sufficient, Go's trimmed binaries need GOROOT
+			// for /proc/self/exe resolution. actions/setup-go does NOT export GOROOT to the
+			// environment, so we must capture it explicitly.
+			runtimeStepGeneratorLog.Print("Adding GOROOT capture step for chroot mode compatibility")
+			steps = append(steps, generateEnvCaptureStep("GOROOT", "go env GOROOT"))
+		}
+		// Note: Java and .NET don't need capture steps anymore because:
+		// - AWF_HOST_PATH captures the complete host PATH including $JAVA_HOME/bin and $DOTNET_ROOT
+		// - AWF's entrypoint.sh exports PATH="${AWF_HOST_PATH}" which preserves all setup-* additions
 	}
 
 	runtimeStepGeneratorLog.Printf("Generated %d runtime setup steps", len(steps))
 	return steps
+}
+
+// generateEnvCaptureStep creates a step to capture an environment variable and export it.
+// This is required because some setup actions don't export env vars, but AWF chroot mode
+// needs them to be set in the environment to pass them to the container.
+func generateEnvCaptureStep(envVar string, captureCmd string) GitHubActionStep {
+	return GitHubActionStep{
+		fmt.Sprintf("      - name: Capture %s for AWF chroot mode", envVar),
+		fmt.Sprintf("        run: echo \"%s=$(%s)\" >> $GITHUB_ENV", envVar, captureCmd),
+	}
 }
 
 // GenerateSerenaLanguageServiceSteps creates installation steps for Serena language services

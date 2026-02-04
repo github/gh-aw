@@ -279,9 +279,9 @@ func TestCopilotEngineWithCustomMounts(t *testing.T) {
 			t.Error("Expected command to contain custom mount '--mount /usr/local/bin/custom-tool:/usr/local/bin/custom-tool:ro'")
 		}
 
-		// Verify standard mounts are still present
-		if !strings.Contains(stepContent, "--mount /tmp:/tmp:rw") {
-			t.Error("Expected command to still contain standard mount '--mount /tmp:/tmp:rw'")
+		// Verify --enable-chroot is present (replaces standard mounts)
+		if !strings.Contains(stepContent, "--enable-chroot") {
+			t.Error("Expected command to contain '--enable-chroot' for transparent host access")
 		}
 	})
 
@@ -307,9 +307,9 @@ func TestCopilotEngineWithCustomMounts(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify standard mounts are present
-		if !strings.Contains(stepContent, "--mount /tmp:/tmp:rw") {
-			t.Error("Expected command to contain standard mount '--mount /tmp:/tmp:rw'")
+		// Verify --enable-chroot is present (provides transparent host access)
+		if !strings.Contains(stepContent, "--enable-chroot") {
+			t.Error("Expected command to contain '--enable-chroot' for transparent host access")
 		}
 
 		// Custom mount should not be present

@@ -173,8 +173,7 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		commandName = workflowData.EngineConfig.Command
 		codexEngineLog.Printf("Using custom command: %s", commandName)
 	} else {
-		// Use regular codex command regardless of firewall status
-		// PATH will be set to find codex in hostedtoolcache when firewall is enabled
+		// Use regular codex command - PATH is inherited via --env-all in AWF mode
 		commandName = "codex"
 	}
 
@@ -195,44 +194,19 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// Get allowed domains (Codex defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetCodexAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: mount points + standard flags + custom args from config
+		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
+		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
+		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
 		var awfArgs []string
+		awfArgs = append(awfArgs, "--enable-chroot")
+		codexEngineLog.Print("Enabled chroot mode for transparent host access")
+
+		// Pass all environment variables to the container
 		awfArgs = append(awfArgs, "--env-all")
-
-		// Add mirrored environment variables from the runner
-		// These runner-level env vars (JAVA_HOME_*, ANDROID_HOME, etc.) need explicit --env flags
-		// to be passed through to the container. AWF only passes them if they exist on the host.
-		mirroredEnvArgs := GetMirroredEnvArgs()
-		awfArgs = append(awfArgs, mirroredEnvArgs...)
-		codexEngineLog.Printf("Added %d mirrored environment variable arguments", len(mirroredEnvArgs)/2)
-
-		// Add GH_AW_TOOL_BINS env arg for PATH priority (computed by GetToolBinsSetup on runner)
-		// This ensures actions/setup-* installed tools take precedence over pre-installed versions
-		awfArgs = append(awfArgs, GetToolBinsEnvArg()...)
 
 		// Set container working directory to match GITHUB_WORKSPACE
 		awfArgs = append(awfArgs, "--container-workdir", "\"${GITHUB_WORKSPACE}\"")
 		codexEngineLog.Print("Set container working directory to GITHUB_WORKSPACE")
-
-		// Add mount arguments for required paths
-		// Always mount /tmp for temporary files, cache, and CODEX_HOME
-		awfArgs = append(awfArgs, "--mount", "/tmp:/tmp:rw")
-
-		// Mount the user's cache directory for Go build cache, npm cache, etc.
-		awfArgs = append(awfArgs, "--mount", "\"${HOME}/.cache:${HOME}/.cache:rw\"")
-
-		// Always mount the workspace directory so Codex can access it
-		awfArgs = append(awfArgs, "--mount", "\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"")
-		codexEngineLog.Print("Added workspace mount to AWF")
-
-		// Mount the hostedtoolcache directory (where actions/setup-* installs tools like Go, Node, Python, etc.)
-		// The PATH is already passed via --env-all, so tools installed by setup actions are accessible
-		awfArgs = append(awfArgs, "--mount", "/opt/hostedtoolcache:/opt/hostedtoolcache:ro")
-		codexEngineLog.Print("Added hostedtoolcache mount to AWF container")
-
-		// Mount /opt/gh-aw as readonly for script and configuration files
-		awfArgs = append(awfArgs, "--mount", "/opt/gh-aw:/opt/gh-aw:ro")
-		codexEngineLog.Print("Added /opt/gh-aw mount as readonly to AWF container")
 
 		// Add custom mounts from agent config if specified
 		if agentConfig != nil && len(agentConfig.Mounts) > 0 {
@@ -270,6 +244,10 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		awfArgs = append(awfArgs, "--image-tag", awfImageTag)
 		codexEngineLog.Printf("Pinned AWF image tag to %s", awfImageTag)
 
+		// Skip pulling images since they are pre-downloaded in the Download container images step
+		awfArgs = append(awfArgs, "--skip-pull")
+		codexEngineLog.Print("Using --skip-pull since images are pre-downloaded")
+
 		// Use ACT agent container for GitHub Actions parity
 		awfArgs = append(awfArgs, "--agent-image", "act")
 		codexEngineLog.Print("Using ACT agent container for GitHub Actions parity")
@@ -301,36 +279,38 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 			codexEngineLog.Print("Using standard AWF command")
 		}
 
-		// Prepend PATH setup to find all runtimes in hostedtoolcache
-		// This ensures codex, python, go, ruby, node and all dependencies (including MCP servers) are accessible
-		// The PATH setup finds all bin directories in /opt/hostedtoolcache/<tool>/<version>/<arch>/bin
-		pathSetup := GetHostedToolcachePathSetup()
-		codexCommandWithPath := fmt.Sprintf("%s && %s", pathSetup, codexCommand)
-
-		// Compute GH_AW_TOOL_BINS on the runner side (safer than shell expansion inside container)
-		toolBinsSetup := GetToolBinsSetup()
-
 		// Build the command with agent file handling if specified
+		// INSTRUCTION reading is done inside the AWF command to avoid Docker Compose interpolation
+		// issues with $ characters in the prompt.
+		//
+		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
+		// - GOROOT, JAVA_HOME, etc. are handled via AWF_HOST_PATH and entrypoint.sh
+		// However, npm-installed CLIs (like codex) need hostedtoolcache bin directories in PATH.
+		npmPathSetup := GetNpmBinPathSetup()
+
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
+			// Read agent file and prompt inside AWF container, with PATH setup for npm binaries
+			codexCommandWithSetup := fmt.Sprintf(`%s && AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s`, npmPathSetup, agentPath, codexCommand)
+			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
+			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
+
 			command = fmt.Sprintf(`set -o pipefail
-%s
-mkdir -p "$HOME/.cache"
-AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)"
-INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat "$GH_AW_PROMPT")")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, agentPath, awfCommand, shellJoinArgs(awfArgs), codexCommandWithPath, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
+			// Read prompt inside AWF container to avoid Docker Compose interpolation issues, with PATH setup
+			codexCommandWithSetup := fmt.Sprintf(`%s && INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s`, npmPathSetup, codexCommand)
+			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
+			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
+
 			command = fmt.Sprintf(`set -o pipefail
-%s
-mkdir -p "$HOME/.cache"
-INSTRUCTION="$(cat "$GH_AW_PROMPT")"
 mkdir -p "$CODEX_HOME/logs"
 %s %s \
   -- %s \
-  2>&1 | tee %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), codexCommandWithPath, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		}
 	} else {
 		// Build the command without AWF wrapping

@@ -56,6 +56,7 @@ func validateDangerousPermissions(workflowData *WorkflowData) error {
 
 // findWritePermissions returns a list of permission scopes that have write access
 // Excludes id-token since it's safe (used for OIDC authentication) and doesn't modify repository content
+// Excludes metadata since it's a built-in read-only permission
 func findWritePermissions(permissions *Permissions) []PermissionScope {
 	if permissions == nil {
 		return nil
@@ -67,6 +68,11 @@ func findWritePermissions(permissions *Permissions) []PermissionScope {
 	for _, scope := range GetAllPermissionScopes() {
 		// Skip id-token as it's safe and used for OIDC authentication
 		if scope == PermissionIdToken {
+			continue
+		}
+
+		// Skip metadata as it's a built-in read-only permission
+		if scope == PermissionMetadata {
 			continue
 		}
 

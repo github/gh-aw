@@ -275,13 +275,16 @@ const DefaultCodexVersion Version = "0.94.0"
 const DefaultGitHubMCPServerVersion Version = "v0.30.3"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
-const DefaultFirewallVersion Version = "v0.13.1"
+const DefaultFirewallVersion Version = "v0.13.4"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
 const DefaultMCPGatewayVersion Version = "v0.0.98"
 
 // DefaultMCPGatewayContainer is the default container image for the MCP Gateway
 const DefaultMCPGatewayContainer = "ghcr.io/github/gh-aw-mcpg"
+
+// DefaultFirewallRegistry is the container image registry for AWF (gh-aw-firewall) Docker images
+const DefaultFirewallRegistry = "ghcr.io/github/gh-aw-firewall"
 
 // DefaultSerenaMCPServerContainer is the default container image for the Serena MCP server
 const DefaultSerenaMCPServerContainer = "ghcr.io/github/serena-mcp-server"

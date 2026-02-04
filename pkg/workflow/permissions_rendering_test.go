@@ -260,3 +260,79 @@ func TestPermissions_AllReadRenderToYAML(t *testing.T) {
 		})
 	}
 }
+
+func TestPermissions_MetadataExcluded(t *testing.T) {
+	tests := []struct {
+		name        string
+		perms       *Permissions
+		contains    []string
+		notContains []string
+	}{
+		{
+			name: "metadata permission should be excluded from YAML output",
+			perms: NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+				PermissionContents: PermissionRead,
+				PermissionMetadata: PermissionRead,
+				PermissionIssues:   PermissionWrite,
+			}),
+			contains: []string{
+				"permissions:",
+				"      contents: read",
+				"      issues: write",
+			},
+			notContains: []string{
+				"metadata",
+			},
+		},
+		{
+			name:  "all: read should expand without metadata",
+			perms: NewPermissionsAllRead(),
+			contains: []string{
+				"permissions:",
+				"      contents: read",
+				"      issues: read",
+			},
+			notContains: []string{
+				"metadata",
+			},
+		},
+		{
+			name: "metadata: write should also be excluded",
+			perms: NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+				PermissionContents: PermissionRead,
+				PermissionMetadata: PermissionWrite,
+			}),
+			contains: []string{
+				"permissions:",
+				"      contents: read",
+			},
+			notContains: []string{
+				"metadata",
+			},
+		},
+		{
+			name: "only metadata permission should render empty permissions",
+			perms: NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+				PermissionMetadata: PermissionRead,
+			}),
+			contains:    []string{},
+			notContains: []string{"metadata"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.perms.RenderToYAML()
+			for _, expected := range tt.contains {
+				if !strings.Contains(result, expected) {
+					t.Errorf("RenderToYAML() should contain %q, but got:\n%s", expected, result)
+				}
+			}
+			for _, notExpected := range tt.notContains {
+				if strings.Contains(result, notExpected) {
+					t.Errorf("RenderToYAML() should NOT contain %q, but got:\n%s", notExpected, result)
+				}
+			}
+		})
+	}
+}

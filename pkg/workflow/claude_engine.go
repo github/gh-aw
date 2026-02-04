@@ -231,7 +231,7 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		commandName = workflowData.EngineConfig.Command
 		claudeLog.Printf("Using custom command: %s", commandName)
 	} else {
-		// Use claude command directly (available in PATH from hostedtoolcache mount)
+		// Use regular claude command - PATH is inherited via --env-all in AWF mode
 		commandName = "claude"
 	}
 
@@ -242,12 +242,6 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 	// Join command parts with proper escaping using shellJoinArgs helper
 	// This handles already-quoted arguments correctly and prevents double-escaping
 	claudeCommand := shellJoinArgs(commandParts)
-
-	// Prepend PATH setup to find all runtimes in hostedtoolcache
-	// This ensures claude, python, go, ruby, node and all dependencies (including MCP servers) are accessible
-	// The PATH setup finds all bin directories in /opt/hostedtoolcache/<tool>/<version>/<arch>/bin
-	pathSetup := GetHostedToolcachePathSetup()
-	claudeCommand = fmt.Sprintf(`%s && %s`, pathSetup, claudeCommand)
 
 	// Add conditional model flag if not explicitly configured
 	// Check if this is a detection job (has no SafeOutputs config)
@@ -276,49 +270,23 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Get allowed domains (Claude defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetClaudeAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: mount points + standard flags + custom args from config
+		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
+		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
+		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
 		var awfArgs []string
-		awfArgs = append(awfArgs, "--env-all")
-
-		// Add mirrored environment variables from the runner
-		// These runner-level env vars (JAVA_HOME_*, ANDROID_HOME, etc.) need explicit --env flags
-		// to be passed through to the container. AWF only passes them if they exist on the host.
-		mirroredEnvArgs := GetMirroredEnvArgs()
-		awfArgs = append(awfArgs, mirroredEnvArgs...)
-		claudeLog.Printf("Added %d mirrored environment variable arguments", len(mirroredEnvArgs)/2)
-
-		// Add GH_AW_TOOL_BINS env arg for PATH priority (computed by GetToolBinsSetup on runner)
-		// This ensures actions/setup-* installed tools take precedence over pre-installed versions
-		awfArgs = append(awfArgs, GetToolBinsEnvArg()...)
+		awfArgs = append(awfArgs, "--enable-chroot")
+		claudeLog.Print("Enabled chroot mode for transparent host access")
 
 		// TTY is required for Claude Code CLI
 		awfArgs = append(awfArgs, "--tty")
+
+		// Pass all environment variables to the container
+		awfArgs = append(awfArgs, "--env-all")
 
 		// Set container working directory to match GITHUB_WORKSPACE
 		// This ensures pwd inside the container matches what the prompt tells the AI
 		awfArgs = append(awfArgs, "--container-workdir", "\"${GITHUB_WORKSPACE}\"")
 		claudeLog.Print("Set container working directory to GITHUB_WORKSPACE")
-
-		// Add mount arguments for required paths
-		// Always mount /tmp for temporary files and cache
-		awfArgs = append(awfArgs, "--mount", "/tmp:/tmp:rw")
-
-		// Mount the user's cache directory for Go build cache, npm cache, etc.
-		awfArgs = append(awfArgs, "--mount", "\"${HOME}/.cache:${HOME}/.cache:rw\"")
-
-		// Always mount the workspace directory so Claude CLI can access it
-		// Use double quotes to allow shell variable expansion
-		awfArgs = append(awfArgs, "--mount", "\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"")
-		claudeLog.Print("Added workspace mount to AWF")
-
-		// Mount the hostedtoolcache directory (where actions/setup-* installs tools like Go, Node, Python, etc.)
-		// The PATH is already passed via --env-all, so tools installed by setup actions are accessible
-		awfArgs = append(awfArgs, "--mount", "/opt/hostedtoolcache:/opt/hostedtoolcache:ro")
-		claudeLog.Print("Added hostedtoolcache mount to AWF container")
-
-		// Mount /opt/gh-aw as readonly for script and configuration files
-		awfArgs = append(awfArgs, "--mount", "/opt/gh-aw:/opt/gh-aw:ro")
-		claudeLog.Print("Added /opt/gh-aw mount as readonly to AWF container")
 
 		// Add custom mounts from agent config if specified
 		if agentConfig != nil && len(agentConfig.Mounts) > 0 {
@@ -357,6 +325,10 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		awfArgs = append(awfArgs, "--image-tag", awfImageTag)
 		claudeLog.Printf("Pinned AWF image tag to %s", awfImageTag)
 
+		// Skip pulling images since they are pre-downloaded in the Download container images step
+		awfArgs = append(awfArgs, "--skip-pull")
+		claudeLog.Print("Using --skip-pull since images are pre-downloaded")
+
 		// Use ACT agent container for GitHub Actions parity
 		awfArgs = append(awfArgs, "--agent-image", "act")
 		claudeLog.Print("Using ACT agent container for GitHub Actions parity")
@@ -387,14 +359,19 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		}
 
 		// Build the command with AWF wrapper
+		//
+		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
+		// - GOROOT, JAVA_HOME, etc. are handled via AWF_HOST_PATH and entrypoint.sh
+		// However, npm-installed CLIs (like claude) need hostedtoolcache bin directories in PATH.
+		//
 		// AWF requires the command to be wrapped in a shell invocation because the claude command
 		// contains && chains that need shell interpretation. We use bash -c with properly escaped command.
+		// Add PATH setup to find npm-installed binaries in hostedtoolcache
+		npmPathSetup := GetNpmBinPathSetup()
+		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
 		// Escape single quotes in the command by replacing ' with '\''
-		escapedClaudeCommand := strings.ReplaceAll(claudeCommand, "'", "'\\''")
+		escapedClaudeCommand := strings.ReplaceAll(claudeCommandWithPath, "'", "'\\''")
 		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedClaudeCommand)
-
-		// Compute GH_AW_TOOL_BINS on the runner side (safer than shell expansion inside container)
-		toolBinsSetup := GetToolBinsSetup()
 
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
 		// Use tee to capture stdout (stream-json output) to the log file while also displaying on console
@@ -402,22 +379,19 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s
-%s
-mkdir -p "$HOME/.cache"
 %s %s \
-  -- %s 2>&1 | tee -a %s`, promptSetup, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, promptSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		} else {
 			command = fmt.Sprintf(`set -o pipefail
-%s
-mkdir -p "$HOME/.cache"
 %s %s \
-  -- %s 2>&1 | tee -a %s`, toolBinsSetup, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
+  -- %s 2>&1 | tee -a %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, logFile)
 		}
 	} else {
 		// Run Claude command without AWF wrapper
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout
 		// Use tee to capture stdout (stream-json output) to the log file while also displaying on console
 		// The combined output (debug logs + JSON) will be in the log file for parsing
+		// PATH is already set correctly by actions/setup-* steps which prepend to PATH
 		if promptSetup != "" {
 			command = fmt.Sprintf(`set -o pipefail
           %s

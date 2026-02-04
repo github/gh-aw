@@ -27,6 +27,8 @@ func convertStringToPermissionScope(key string) PermissionScope {
 		return PermissionIdToken
 	case "issues":
 		return PermissionIssues
+	case "metadata":
+		return PermissionMetadata
 	case "models":
 		return PermissionModels
 	case "packages":
@@ -93,6 +95,7 @@ const (
 	PermissionDiscussions      PermissionScope = "discussions"
 	PermissionIdToken          PermissionScope = "id-token"
 	PermissionIssues           PermissionScope = "issues"
+	PermissionMetadata         PermissionScope = "metadata"
 	PermissionModels           PermissionScope = "models"
 	PermissionPackages         PermissionScope = "packages"
 	PermissionPages            PermissionScope = "pages"
@@ -114,6 +117,7 @@ func GetAllPermissionScopes() []PermissionScope {
 		PermissionDiscussions,
 		PermissionIdToken,
 		PermissionIssues,
+		PermissionMetadata,
 		PermissionModels,
 		PermissionPackages,
 		PermissionPages,

@@ -34,6 +34,7 @@ var CopilotDefaultDomains = []string{
 
 // CodexDefaultDomains are the minimal default domains required for Codex CLI operation
 var CodexDefaultDomains = []string{
+	"172.30.0.1", // AWF gateway IP - Codex resolves host.docker.internal to this IP for Rust DNS compatibility
 	"api.openai.com",
 	"host.docker.internal",
 	"openai.com",

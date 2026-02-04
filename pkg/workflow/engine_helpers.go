@@ -363,6 +363,23 @@ func GetHostedToolcachePathSetup() string {
 	return GetSanitizedPATHExport(rawPath)
 }
 
+// GetNpmBinPathSetup returns a simple shell command that adds hostedtoolcache bin directories
+// to PATH. This is specifically for npm-installed CLIs (like Claude and Codex) that need
+// to find their binaries installed via `npm install -g`.
+//
+// Unlike GetHostedToolcachePathSetup(), this does NOT use GH_AW_TOOL_BINS because AWF's
+// native chroot mode already handles tool-specific paths (GOROOT, JAVA_HOME, etc.) via
+// AWF_HOST_PATH and the entrypoint.sh script. This function only adds the generic
+// hostedtoolcache bin directories for npm packages.
+//
+// Returns:
+//   - string: A shell command that exports PATH with hostedtoolcache bin directories prepended
+func GetNpmBinPathSetup() string {
+	// Find all bin directories in hostedtoolcache (Node.js, Python, etc.)
+	// This finds paths like /opt/hostedtoolcache/node/22.13.0/x64/bin
+	return `export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"`
+}
+
 // GetSanitizedPATHExport returns a shell command that sets PATH to the given value
 // with sanitization to remove security risks from malformed PATH entries.
 //
