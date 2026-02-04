@@ -53,6 +53,7 @@ type TrialOptions struct {
 	DeleteHostRepo bool
 	ForceDelete    bool
 	Quiet          bool
+	DryRun         bool
 	TimeoutMinutes int
 	TriggerContext string
 	RepeatCount    int
@@ -94,6 +95,7 @@ Repeat and cleanup examples:
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --repeat 3                # Run 3 times total
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --delete-host-repo-after  # Delete repo after completion
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --quiet --host-repo my-trial # Custom host repo
+  ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --dry-run                 # Show what would be done without changes
 
 Auto-merge examples:
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --auto-merge-prs          # Auto-merge any PRs created during trial
@@ -121,6 +123,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 			deleteHostRepo, _ := cmd.Flags().GetBool("delete-host-repo-after")
 			forceDeleteHostRepo, _ := cmd.Flags().GetBool("force-delete-host-repo-before")
 			yes, _ := cmd.Flags().GetBool("yes")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			timeout, _ := cmd.Flags().GetInt("timeout")
 			triggerContext, _ := cmd.Flags().GetString("trigger-context")
 			repeatCount, _ := cmd.Flags().GetInt("repeat")
@@ -147,6 +150,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 				DeleteHostRepo: deleteHostRepo,
 				ForceDelete:    forceDeleteHostRepo,
 				Quiet:          yes,
+				DryRun:         dryRun,
 				TimeoutMinutes: timeout,
 				TriggerContext: triggerContext,
 				RepeatCount:    repeatCount,
@@ -180,6 +184,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 	cmd.Flags().Bool("delete-host-repo-after", false, "Delete the host repository after completion (default: keep)")
 	cmd.Flags().Bool("force-delete-host-repo-before", false, "Force delete the host repository before creation, if it exists before creating it")
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompts")
+	cmd.Flags().Bool("dry-run", false, "Show what would be done without making any changes")
 	cmd.Flags().Int("timeout", 30, "Execution timeout in minutes (default: 30)")
 	cmd.Flags().String("trigger-context", "", "Trigger context URL (e.g., GitHub issue URL) for issue-triggered workflows")
 	cmd.Flags().Int("repeat", 0, "Number of times to repeat running workflows (0 = run once)")
@@ -205,6 +210,10 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 			return fmt.Errorf("invalid workflow specification '%s': %w", spec, err)
 		}
 		parsedSpecs = append(parsedSpecs, parsedSpec)
+	}
+
+	if opts.DryRun {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Showing what would be done without making changes"))
 	}
 
 	if len(parsedSpecs) == 1 {
@@ -303,8 +312,14 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 
 	// Step 2: Create or reuse host repository
 	trialLog.Printf("Ensuring trial repository exists: %s", hostRepoSlug)
-	if err := ensureTrialRepository(hostRepoSlug, cloneRepoSlug, opts.ForceDelete, opts.Verbose); err != nil {
+	if err := ensureTrialRepository(hostRepoSlug, cloneRepoSlug, opts.ForceDelete, opts.DryRun, opts.Verbose); err != nil {
 		return fmt.Errorf("failed to ensure host repository: %w", err)
+	}
+
+	// In dry-run mode, stop here after showing what would be done
+	if opts.DryRun {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Stopping here. No actual changes were made."))
+		return nil
 	}
 
 	// Step 2.5: Create secret tracker
