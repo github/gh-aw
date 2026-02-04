@@ -356,16 +356,17 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 
 		// Build the command with AWF wrapper
 		//
-		// AWF with --enable-chroot and --env-all handles PATH natively:
-		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
-		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
-		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars
-		// 4. Container inherits complete, correctly-ordered environment
+		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
+		// - GOROOT, JAVA_HOME, etc. are handled via AWF_HOST_PATH and entrypoint.sh
+		// However, npm-installed CLIs (like claude) need hostedtoolcache bin directories in PATH.
 		//
 		// AWF requires the command to be wrapped in a shell invocation because the claude command
 		// contains && chains that need shell interpretation. We use bash -c with properly escaped command.
+		// Add PATH setup to find npm-installed binaries in hostedtoolcache
+		npmPathSetup := GetNpmBinPathSetup()
+		claudeCommandWithPath := fmt.Sprintf(`%s && %s`, npmPathSetup, claudeCommand)
 		// Escape single quotes in the command by replacing ' with '\''
-		escapedClaudeCommand := strings.ReplaceAll(claudeCommand, "'", "'\\''")
+		escapedClaudeCommand := strings.ReplaceAll(claudeCommandWithPath, "'", "'\\''")
 		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedClaudeCommand)
 
 		// Note: Claude Code CLI writes debug logs to --debug-file and JSON output to stdout

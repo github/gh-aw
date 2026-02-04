@@ -279,16 +279,15 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// INSTRUCTION reading is done inside the AWF command to avoid Docker Compose interpolation
 		// issues with $ characters in the prompt.
 		//
-		// AWF with --enable-chroot and --env-all handles PATH natively:
-		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
-		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
-		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars
-		// 4. Container inherits complete, correctly-ordered environment
+		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
+		// - GOROOT, JAVA_HOME, etc. are handled via AWF_HOST_PATH and entrypoint.sh
+		// However, npm-installed CLIs (like codex) need hostedtoolcache bin directories in PATH.
+		npmPathSetup := GetNpmBinPathSetup()
 
 		if workflowData.AgentFile != "" {
 			agentPath := ResolveAgentFilePath(workflowData.AgentFile)
-			// Read agent file and prompt inside AWF container
-			codexCommandWithSetup := fmt.Sprintf(`AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s`, agentPath, codexCommand)
+			// Read agent file and prompt inside AWF container, with PATH setup for npm binaries
+			codexCommandWithSetup := fmt.Sprintf(`%s && AGENT_CONTENT="$(awk 'BEGIN{skip=1} /^---$/{if(skip){skip=0;next}else{skip=1;next}} !skip' %s)" && INSTRUCTION="$(printf "%%s\n\n%%s" "$AGENT_CONTENT" "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)")" && %s`, npmPathSetup, agentPath, codexCommand)
 			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
 			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
 
@@ -298,8 +297,8 @@ mkdir -p "$CODEX_HOME/logs"
   -- %s \
   2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 		} else {
-			// Read prompt inside AWF container to avoid Docker Compose interpolation issues
-			codexCommandWithSetup := fmt.Sprintf(`INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s`, codexCommand)
+			// Read prompt inside AWF container to avoid Docker Compose interpolation issues, with PATH setup
+			codexCommandWithSetup := fmt.Sprintf(`%s && INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)" && %s`, npmPathSetup, codexCommand)
 			escapedCodexCommand := strings.ReplaceAll(codexCommandWithSetup, "'", "'\\''")
 			shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCodexCommand)
 
