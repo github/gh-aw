@@ -160,7 +160,11 @@ The SafeOutputs subsystem provides security by design: the agent never requires 
 
 ## Agent Workflow Firewall (AWF)
 
-The Agent Workflow Firewall (AWF) provides network egress control at the substrate level. AWF mediates all outbound network requests from the agent, enforcing a domain allowlist that constrains which external endpoints the agent may contact. This mechanism prevents unauthorized data exfiltration and limits the blast radius of a compromised agent to only those domains explicitly permitted by configuration.
+The Agent Workflow Firewall (AWF) enforces network egress control via a domain allowlist, preventing data exfiltration and containing compromised agents to permitted domains.
+
+AWF separates two concerns:
+- **Filesystem**: All host binaries and runtimes accessible; setup actions work transparently
+- **Network**: All traffic routed through proxy enforcing the domain allowlist
 
 ```mermaid
 flowchart TB
