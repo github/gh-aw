@@ -159,113 +159,127 @@ func TestDeleteOldAgentFiles(t *testing.T) {
 
 // TestDeleteOldTemplateFiles tests deletion of old template files
 func TestDeleteOldTemplateFiles(t *testing.T) {
-tests := []struct {
-name             string
-filesToCreate    []string // Files to create in pkg/cli/templates/
-expectedDeleted  []string // Files that should be deleted
-expectDirRemoved bool     // Whether the templates directory should be removed
-}{
-{
-name: "deletes old template files and removes empty directory",
-filesToCreate: []string{
-"agentic-workflows.agent.md",
-"create-agentic-workflow.md",
-"github-agentic-workflows.md",
-},
-expectedDeleted: []string{
-"agentic-workflows.agent.md",
-"create-agentic-workflow.md",
-"github-agentic-workflows.md",
-},
-expectDirRemoved: true,
-},
-{
-name: "deletes all template files",
-filesToCreate: []string{
-"agentic-workflows.agent.md",
-"create-agentic-workflow.md",
-"create-shared-agentic-workflow.md",
-"debug-agentic-workflow.md",
-"github-agentic-workflows.md",
-"serena-tool.md",
-"update-agentic-workflow.md",
-"upgrade-agentic-workflows.md",
-},
-expectedDeleted: []string{
-"agentic-workflows.agent.md",
-"create-agentic-workflow.md",
-"create-shared-agentic-workflow.md",
-"debug-agentic-workflow.md",
-"github-agentic-workflows.md",
-"serena-tool.md",
-"update-agentic-workflow.md",
-"upgrade-agentic-workflows.md",
-},
-expectDirRemoved: true,
-},
-{
-name:             "handles no files to delete",
-filesToCreate:    []string{},
-expectedDeleted:  []string{},
-expectDirRemoved: false,
-},
-}
+	tests := []struct {
+		name             string
+		filesToCreate    []string // Files to create in pkg/cli/templates/
+		expectedDeleted  []string // Files that should be deleted
+		expectedKept     []string // Files that should NOT be deleted
+		expectDirRemoved bool     // Whether the templates directory should be removed
+	}{
+		{
+			name: "deletes old template files but keeps agent file",
+			filesToCreate: []string{
+				"agentic-workflows.agent.md",
+				"create-agentic-workflow.md",
+				"github-agentic-workflows.md",
+			},
+			expectedDeleted: []string{
+				"create-agentic-workflow.md",
+				"github-agentic-workflows.md",
+			},
+			expectedKept: []string{
+				"agentic-workflows.agent.md",
+			},
+			expectDirRemoved: false,
+		},
+		{
+			name: "deletes all old template files except agent file",
+			filesToCreate: []string{
+				"agentic-workflows.agent.md",
+				"create-agentic-workflow.md",
+				"create-shared-agentic-workflow.md",
+				"debug-agentic-workflow.md",
+				"github-agentic-workflows.md",
+				"serena-tool.md",
+				"update-agentic-workflow.md",
+				"upgrade-agentic-workflows.md",
+			},
+			expectedDeleted: []string{
+				"create-agentic-workflow.md",
+				"create-shared-agentic-workflow.md",
+				"debug-agentic-workflow.md",
+				"github-agentic-workflows.md",
+				"serena-tool.md",
+				"update-agentic-workflow.md",
+				"upgrade-agentic-workflows.md",
+			},
+			expectedKept: []string{
+				"agentic-workflows.agent.md",
+			},
+			expectDirRemoved: false,
+		},
+		{
+			name:             "handles no files to delete",
+			filesToCreate:    []string{},
+			expectedDeleted:  []string{},
+			expectedKept:     []string{},
+			expectDirRemoved: false,
+		},
+	}
 
-for _, tt := range tests {
-t.Run(tt.name, func(t *testing.T) {
-// Create a temporary directory for testing
-tempDir := testutil.TempDir(t, "test-*")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary directory for testing
+			tempDir := testutil.TempDir(t, "test-*")
 
-// Change to temp directory and initialize git repo
-oldWd, _ := os.Getwd()
-defer func() {
-_ = os.Chdir(oldWd)
-}()
-err := os.Chdir(tempDir)
-if err != nil {
-t.Fatalf("Failed to change directory: %v", err)
-}
+			// Change to temp directory and initialize git repo
+			oldWd, _ := os.Getwd()
+			defer func() {
+				_ = os.Chdir(oldWd)
+			}()
+			err := os.Chdir(tempDir)
+			if err != nil {
+				t.Fatalf("Failed to change directory: %v", err)
+			}
 
-// Initialize git repo
-if err := exec.Command("git", "init").Run(); err != nil {
-t.Fatalf("Failed to init git repo: %v", err)
-}
+			// Initialize git repo
+			if err := exec.Command("git", "init").Run(); err != nil {
+				t.Fatalf("Failed to init git repo: %v", err)
+			}
 
-// Create templates directory and files
-templatesDir := filepath.Join(tempDir, "pkg", "cli", "templates")
-if len(tt.filesToCreate) > 0 {
-if err := os.MkdirAll(templatesDir, 0755); err != nil {
-t.Fatalf("Failed to create templates directory: %v", err)
-}
+			// Create templates directory and files
+			templatesDir := filepath.Join(tempDir, "pkg", "cli", "templates")
+			if len(tt.filesToCreate) > 0 {
+				if err := os.MkdirAll(templatesDir, 0755); err != nil {
+					t.Fatalf("Failed to create templates directory: %v", err)
+				}
 
-for _, file := range tt.filesToCreate {
-path := filepath.Join(templatesDir, file)
-if err := os.WriteFile(path, []byte("# Test template content"), 0644); err != nil {
-t.Fatalf("Failed to create file %s: %v", file, err)
-}
-}
-}
+				for _, file := range tt.filesToCreate {
+					path := filepath.Join(templatesDir, file)
+					if err := os.WriteFile(path, []byte("# Test template content"), 0644); err != nil {
+						t.Fatalf("Failed to create file %s: %v", file, err)
+					}
+				}
+			}
 
-// Call deleteOldTemplateFiles
-err = deleteOldTemplateFiles(false)
-if err != nil {
-t.Fatalf("deleteOldTemplateFiles() returned error: %v", err)
-}
+			// Call deleteOldTemplateFiles
+			err = deleteOldTemplateFiles(false)
+			if err != nil {
+				t.Fatalf("deleteOldTemplateFiles() returned error: %v", err)
+			}
 
-// Check that expected files were deleted
-for _, file := range tt.expectedDeleted {
-path := filepath.Join(templatesDir, file)
-if _, err := os.Stat(path); !os.IsNotExist(err) {
-t.Errorf("Expected file %s to be deleted, but it still exists", file)
-}
-}
+			// Check that expected files were deleted
+			for _, file := range tt.expectedDeleted {
+				path := filepath.Join(templatesDir, file)
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Errorf("Expected file %s to be deleted, but it still exists", file)
+				}
+			}
 
-// Check if directory was removed
-if tt.expectDirRemoved {
-if _, err := os.Stat(templatesDir); !os.IsNotExist(err) {
-t.Errorf("Expected templates directory to be removed, but it still exists")
-}
-}
-})
-}
+			// Check that files marked as "kept" were NOT deleted
+			for _, file := range tt.expectedKept {
+				path := filepath.Join(templatesDir, file)
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Errorf("Expected file %s to be kept, but it was deleted", file)
+				}
+			}
+
+			// Check if directory was removed
+			if tt.expectDirRemoved {
+				if _, err := os.Stat(templatesDir); !os.IsNotExist(err) {
+					t.Errorf("Expected templates directory to be removed, but it still exists")
+				}
+			}
+		})
+	}
 }

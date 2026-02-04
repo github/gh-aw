@@ -19,7 +19,7 @@ all: build
 
 # Build the binary, run make deps before this
 .PHONY: build
-build: sync-action-pins sync-action-scripts
+build: sync-agent-template sync-action-pins sync-action-scripts
 	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/gh-aw
 
 # Build for all platforms
@@ -579,6 +579,14 @@ clean-docs:
 	@echo "✓ Documentation artifacts cleaned"
 
 # Sync templates from .github to pkg/cli/templates
+# Sync agent template from .github/agents to pkg/cli/templates
+.PHONY: sync-agent-template
+sync-agent-template:
+	@echo "Syncing agentic-workflows.agent.md from .github/agents to pkg/cli/templates..."
+	@mkdir -p pkg/cli/templates
+	@cp .github/agents/agentic-workflows.agent.md pkg/cli/templates/
+	@echo "✓ Agent template synced successfully"
+
 # Sync action pins from .github/aw to pkg/workflow/data
 .PHONY: sync-action-pins
 sync-action-pins:
@@ -716,6 +724,7 @@ help:
 	@echo "  actionlint       - Validate workflows with actionlint (depends on build)"
 	@echo "  validate-workflows - Validate compiled workflow lock files (depends on build)"
 	@echo "  install          - Install binary locally"
+	@echo "  sync-agent-template - Sync agentic-workflows.agent.md from .github/agents to pkg/cli/templates (runs automatically during build)"
 	@echo "  sync-action-pins - Sync actions-lock.json from .github/aw to pkg/workflow/data (runs automatically during build)"
 	@echo "  sync-action-scripts - Sync install-gh-aw.sh to actions/setup-cli/install.sh (runs automatically during build)"
 	@echo "  update           - Update GitHub Actions and workflows, sync action pins, and rebuild binary"

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
@@ -93,12 +94,12 @@ func cleanupOldCopilotInstructions(verbose bool) error {
 	return nil
 }
 
-// ensureAgenticWorkflowsDispatcher ensures that .github/agents/agentic-workflows.agent.md exists
+// ensureAgenticWorkflowsDispatcher ensures that .github/agents/agentic-workflows.agent.md contains the dispatcher agent
 func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool) error {
-	copilotAgentsLog.Print("Checking agentic workflows dispatcher agent")
+	copilotAgentsLog.Print("Ensuring agentic workflows dispatcher agent")
 
 	if skipInstructions {
-		copilotAgentsLog.Print("Skipping agent check: instructions disabled")
+		copilotAgentsLog.Print("Skipping agent creation: instructions disabled")
 		return nil
 	}
 
@@ -107,22 +108,49 @@ func ensureAgenticWorkflowsDispatcher(verbose bool, skipInstructions bool) error
 		return err // Not in a git repository, skip
 	}
 
-	targetPath := filepath.Join(gitRoot, ".github", "agents", "agentic-workflows.agent.md")
+	targetDir := filepath.Join(gitRoot, ".github", "agents")
+	targetPath := filepath.Join(targetDir, "agentic-workflows.agent.md")
 
-	// Check if the file exists
-	if _, err := os.Stat(targetPath); err == nil {
-		copilotAgentsLog.Printf("Dispatcher agent file exists: %s", targetPath)
+	// Ensure the target directory exists
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .github/agents directory: %w", err)
+	}
+
+	// Check if the file already exists and matches the template
+	existingContent := ""
+	if content, err := os.ReadFile(targetPath); err == nil {
+		existingContent = string(content)
+	}
+
+	// Check if content matches our expected template
+	expectedContent := strings.TrimSpace(agenticWorkflowsDispatcherTemplate)
+	if strings.TrimSpace(existingContent) == expectedContent {
+		copilotAgentsLog.Printf("Dispatcher agent is up-to-date: %s", targetPath)
 		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Dispatcher agent file exists: %s", targetPath)))
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Dispatcher agent is up-to-date: %s", targetPath)))
 		}
 		return nil
 	}
 
-	// File doesn't exist - this is expected in external repositories
-	copilotAgentsLog.Printf("Dispatcher agent file not found: %s (expected in gh-aw repository)", targetPath)
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Dispatcher agent file not found: %s", targetPath)))
+	// Write the file with restrictive permissions (0600) to follow security best practices
+	// Agent files may contain sensitive configuration
+	if err := os.WriteFile(targetPath, []byte(agenticWorkflowsDispatcherTemplate), 0600); err != nil {
+		copilotAgentsLog.Printf("Failed to write dispatcher agent: %s, error: %v", targetPath, err)
+		return fmt.Errorf("failed to write dispatcher agent: %w", err)
 	}
+
+	if existingContent == "" {
+		copilotAgentsLog.Printf("Created dispatcher agent: %s", targetPath)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Created dispatcher agent: %s", targetPath)))
+		}
+	} else {
+		copilotAgentsLog.Printf("Updated dispatcher agent: %s", targetPath)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated dispatcher agent: %s", targetPath)))
+		}
+	}
+
 	return nil
 }
 
@@ -220,8 +248,8 @@ func deleteOldTemplateFiles(verbose bool) error {
 	}
 
 	// Template files that were removed from pkg/cli/templates/
+	// Note: agentic-workflows.agent.md is still bundled and should NOT be deleted
 	templateFiles := []string{
-		"agentic-workflows.agent.md",
 		"create-agentic-workflow.md",
 		"create-shared-agentic-workflow.md",
 		"debug-agentic-workflow.md",
@@ -232,7 +260,7 @@ func deleteOldTemplateFiles(verbose bool) error {
 	}
 
 	templatesDir := filepath.Join(gitRoot, "pkg", "cli", "templates")
-	
+
 	// Check if templates directory exists
 	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
 		// Directory doesn't exist, nothing to clean up
@@ -253,15 +281,24 @@ func deleteOldTemplateFiles(verbose bool) error {
 		}
 	}
 
-	// If directory is now empty, remove it
+	// Check if directory should be removed (only if it's empty after cleanup)
+	// We keep agentic-workflows.agent.md, so only remove directory if it has no files or only has that file
 	if removedCount > 0 {
 		entries, err := os.ReadDir(templatesDir)
-		if err == nil && len(entries) == 0 {
-			if err := os.Remove(templatesDir); err != nil {
-				return fmt.Errorf("failed to remove empty templates directory: %w", err)
-			}
-			if verbose {
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed empty templates directory: %s", templatesDir)))
+		if err == nil {
+			// Check if directory is empty or only contains agentic-workflows.agent.md
+			isEmpty := len(entries) == 0
+			hasOnlyAgentFile := len(entries) == 1 && entries[0].Name() == "agentic-workflows.agent.md"
+
+			if isEmpty {
+				if err := os.Remove(templatesDir); err != nil {
+					return fmt.Errorf("failed to remove empty templates directory: %w", err)
+				}
+				if verbose {
+					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed empty templates directory: %s", templatesDir)))
+				}
+			} else if hasOnlyAgentFile && verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Keeping templates directory (contains agentic-workflows.agent.md)")))
 			}
 		}
 	}

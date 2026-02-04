@@ -1,6 +1,7 @@
 package cli
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -26,6 +27,9 @@ func init() {
 	// This allows workflow.NewCompiler() to auto-detect the version
 	workflow.SetDefaultVersion(version)
 }
+
+//go:embed templates/agentic-workflows.agent.md
+var agenticWorkflowsDispatcherTemplate string
 
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
