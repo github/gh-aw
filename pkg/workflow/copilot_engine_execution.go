@@ -338,12 +338,15 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// ensuring tools like Go from actions/setup-go are found before system versions.
 		pathSetup := GetHostedToolcachePathSetup()
 		copilotCommandWithPath := fmt.Sprintf(`%s && %s`, pathSetup, copilotCommand)
-		escapedCommand := shellEscapeArg(copilotCommandWithPath)
+		// Escape single quotes for embedding in single-quoted shell command
+		escapedCopilotCommand := strings.ReplaceAll(copilotCommandWithPath, "'", "'\\''")
+		// Wrap in /bin/bash -c to ensure PATH setup (source sanitize_path.sh) is executed properly
+		shellWrappedCommand := fmt.Sprintf("/bin/bash -c '%s'", escapedCopilotCommand)
 
 		command = fmt.Sprintf(`set -o pipefail
 %s %s \
   -- %s \
-  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), escapedCommand, shellEscapeArg(logFile))
+  2>&1 | tee %s`, awfCommand, shellJoinArgs(awfArgs), shellWrappedCommand, shellEscapeArg(logFile))
 	} else {
 		// Run copilot command without AWF wrapper
 		command = fmt.Sprintf(`set -o pipefail
