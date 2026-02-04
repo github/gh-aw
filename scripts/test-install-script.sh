@@ -352,5 +352,41 @@ else
     exit 1
 fi
 
+# Test 11: Verify "latest" version functionality
+echo ""
+echo "Test 11: Verify 'latest' version functionality"
+
+# Check for "latest" as default version
+if grep -q "using 'latest'" "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✓ PASS: Script uses 'latest' as default version"
+else
+    echo "  ✗ FAIL: Script does not use 'latest' as default version"
+    exit 1
+fi
+
+# Check for latest URL construction
+if grep -q 'releases/latest/download' "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✓ PASS: Latest release URL pattern is correct"
+else
+    echo "  ✗ FAIL: Latest release URL pattern not found"
+    exit 1
+fi
+
+# Check that API validation is removed
+if grep -q "fetch_release_data.*releases/latest" "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✗ FAIL: API validation for latest release still exists"
+    exit 1
+else
+    echo "  ✓ PASS: API validation for latest release removed"
+fi
+
+# Check that validation logic is removed
+if grep -q "Validating release.*exists" "$PROJECT_ROOT/install-gh-aw.sh"; then
+    echo "  ✗ FAIL: Version validation logic still exists"
+    exit 1
+else
+    echo "  ✓ PASS: Version validation logic removed"
+fi
+
 echo ""
 echo "=== All tests passed ==="

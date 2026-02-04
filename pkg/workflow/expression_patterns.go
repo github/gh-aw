@@ -56,7 +56,17 @@
 
 package workflow
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/github/gh-aw/pkg/logger"
+)
+
+var expressionPatternsLog = logger.New("workflow:expression_patterns")
+
+func init() {
+	expressionPatternsLog.Print("Initializing expression pattern regex compilation")
+}
 
 // Core Expression Patterns
 var (
