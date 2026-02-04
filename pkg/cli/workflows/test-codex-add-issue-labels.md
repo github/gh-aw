@@ -2,7 +2,7 @@
 on:
   workflow_dispatch:
 permissions:
-  issues: write
+  issues: read
 engine: codex
 ---
 

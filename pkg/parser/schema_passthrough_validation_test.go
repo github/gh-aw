@@ -8,7 +8,7 @@ import (
 )
 
 // TestPassThroughFieldValidation tests that pass-through YAML fields
-// (concurrency, container, environment, env, runs-on, services) are
+// (concurrency, container, environment, env, secrets, runs-on, services) are
 // properly validated by the schema during frontmatter parsing.
 //
 // These fields are "pass-through" in that they are extracted from
@@ -239,6 +239,93 @@ func TestPassThroughFieldValidation(t *testing.T) {
 			frontmatter: map[string]any{
 				"on":  "push",
 				"env": []string{"invalid"},
+			},
+			wantErr:     true,
+			errContains: "oneOf",
+		},
+
+		// Secrets field tests
+		{
+			name: "valid secrets - simple string values",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN":    "${{ secrets.API_TOKEN }}",
+					"DATABASE_URL": "${{ secrets.DB_URL }}",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid secrets - object with value and description",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN": map[string]any{
+						"value":       "${{ secrets.API_TOKEN }}",
+						"description": "API token for external service",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid secrets - mixed simple and object values",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN": "${{ secrets.API_TOKEN }}",
+					"DB_URL": map[string]any{
+						"value":       "${{ secrets.DB_URL }}",
+						"description": "Database connection string",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid secrets - object missing required value field",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN": map[string]any{
+						"description": "Missing value field",
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "missing property 'value'",
+		},
+		{
+			name: "invalid secrets - object with additional properties",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN": map[string]any{
+						"value":   "${{ secrets.API_TOKEN }}",
+						"invalid": "field",
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "additional properties 'invalid' not allowed",
+		},
+		{
+			name: "invalid secrets - array",
+			frontmatter: map[string]any{
+				"on":      "push",
+				"secrets": []string{"invalid"},
+			},
+			wantErr:     true,
+			errContains: "got array, want object",
+		},
+		{
+			name: "invalid secrets - non-string, non-object value",
+			frontmatter: map[string]any{
+				"on": "push",
+				"secrets": map[string]any{
+					"API_TOKEN": 123,
+				},
 			},
 			wantErr:     true,
 			errContains: "oneOf",

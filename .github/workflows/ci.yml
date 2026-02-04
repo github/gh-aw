@@ -48,6 +48,13 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Display Go environment
+        run: |
+          echo "Go environment:"
+          go env | grep -E "GOPROXY|GOSUMDB|GOMODCACHE|GOPRIVATE"
+          echo ""
+          echo "Module cache location: $(go env GOMODCACHE)"
+          
       - name: Download dependencies with retry
         run: |
           set -e
@@ -56,14 +63,25 @@ jobs:
           
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i of $MAX_RETRIES: Downloading Go modules..."
-            if go mod download; then
+            # Use -x for verbose output to see what's being downloaded
+            if go mod download -x; then
               echo "✅ Successfully downloaded Go modules"
               break
             else
+              EXIT_CODE=$?
               if [ $i -eq $MAX_RETRIES ]; then
-                echo "❌ Failed to download Go modules after $MAX_RETRIES attempts"
-                echo "This may indicate that proxy.golang.org is unreachable"
-                echo "Please check network connectivity or consider vendoring dependencies"
+                echo "❌ Failed to download Go modules after $MAX_RETRIES attempts (exit code: $EXIT_CODE)"
+                echo "This indicates that proxy.golang.org is unreachable or returning errors"
+                echo ""
+                echo "Diagnostic information:"
+                echo "- GOPROXY: $(go env GOPROXY)"
+                echo "- GOSUMDB: $(go env GOSUMDB)"
+                echo "- Network connectivity: checking proxy.golang.org..."
+                if curl -s -I --connect-timeout 5 https://proxy.golang.org/golang.org/@v/list >/dev/null 2>&1; then
+                  echo "  ✓ proxy.golang.org is reachable"
+                else
+                  echo "  ✗ proxy.golang.org is NOT reachable"
+                fi
                 exit 1
               fi
               echo "⚠️ Download failed, retrying in ${RETRY_DELAY}s..."
@@ -73,6 +91,33 @@ jobs:
 
       - name: Verify dependencies
         run: go mod verify
+        
+      - name: Pre-flight check - Validate test dependencies
+        run: |
+          echo "Validating that test dependencies are available..."
+          echo "This ensures go test can compile test packages without network access."
+          echo ""
+          
+          # List all test dependencies to ensure they're in the cache
+          # This will fail fast if any dependencies are missing
+          echo "Checking test dependencies for all packages..."
+          if go list -test -deps ./... >/dev/null 2>&1; then
+            echo "✅ All test dependencies are available"
+          else
+            echo "❌ Failed to resolve test dependencies"
+            echo ""
+            echo "Attempting to show which dependencies are missing:"
+            go list -test -deps ./... 2>&1 || true
+            exit 1
+          fi
+          
+          echo ""
+          echo "Module cache statistics:"
+          echo "- Cache directory: $(go env GOMODCACHE)"
+          if [ -d "$(go env GOMODCACHE)" ]; then
+            echo "- Cache size: $(du -sh $(go env GOMODCACHE) 2>/dev/null | cut -f1 || echo 'unknown')"
+            echo "- Number of cached modules: $(find $(go env GOMODCACHE) -name "go.mod" 2>/dev/null | wc -l || echo 'unknown')"
+          fi
 
       - name: Run unit tests with coverage
         run: |
@@ -244,6 +289,13 @@ jobs:
             echo "⚠️ Go cache miss" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: Display Go environment
+        run: |
+          echo "Go environment:"
+          go env | grep -E "GOPROXY|GOSUMDB|GOMODCACHE|GOPRIVATE"
+          echo ""
+          echo "Module cache location: $(go env GOMODCACHE)"
+          
       - name: Download dependencies with retry
         run: |
           set -e
@@ -252,14 +304,25 @@ jobs:
           
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i of $MAX_RETRIES: Downloading Go modules..."
-            if go mod download; then
+            # Use -x for verbose output to see what's being downloaded
+            if go mod download -x; then
               echo "✅ Successfully downloaded Go modules"
               break
             else
+              EXIT_CODE=$?
               if [ $i -eq $MAX_RETRIES ]; then
-                echo "❌ Failed to download Go modules after $MAX_RETRIES attempts"
-                echo "This may indicate that proxy.golang.org is unreachable"
-                echo "Please check network connectivity or consider vendoring dependencies"
+                echo "❌ Failed to download Go modules after $MAX_RETRIES attempts (exit code: $EXIT_CODE)"
+                echo "This indicates that proxy.golang.org is unreachable or returning errors"
+                echo ""
+                echo "Diagnostic information:"
+                echo "- GOPROXY: $(go env GOPROXY)"
+                echo "- GOSUMDB: $(go env GOSUMDB)"
+                echo "- Network connectivity: checking proxy.golang.org..."
+                if curl -s -I --connect-timeout 5 https://proxy.golang.org/golang.org/@v/list >/dev/null 2>&1; then
+                  echo "  ✓ proxy.golang.org is reachable"
+                else
+                  echo "  ✗ proxy.golang.org is NOT reachable"
+                fi
                 exit 1
               fi
               echo "⚠️ Download failed, retrying in ${RETRY_DELAY}s..."
@@ -269,6 +332,33 @@ jobs:
 
       - name: Verify dependencies
         run: go mod verify
+        
+      - name: Pre-flight check - Validate test dependencies
+        run: |
+          echo "Validating that test dependencies are available..."
+          echo "This ensures go test can compile test packages without network access."
+          echo ""
+          
+          # List all test dependencies to ensure they're in the cache
+          # This will fail fast if any dependencies are missing
+          echo "Checking test dependencies for ${{ matrix.test-group.packages }}..."
+          if go list -test -deps ${{ matrix.test-group.packages }} >/dev/null 2>&1; then
+            echo "✅ All test dependencies are available"
+          else
+            echo "❌ Failed to resolve test dependencies"
+            echo ""
+            echo "Attempting to show which dependencies are missing:"
+            go list -test -deps ${{ matrix.test-group.packages }} 2>&1 || true
+            exit 1
+          fi
+          
+          echo ""
+          echo "Module cache statistics:"
+          echo "- Cache directory: $(go env GOMODCACHE)"
+          if [ -d "$(go env GOMODCACHE)" ]; then
+            echo "- Cache size: $(du -sh $(go env GOMODCACHE) 2>/dev/null | cut -f1 || echo 'unknown')"
+            echo "- Number of cached modules: $(find $(go env GOMODCACHE) -name "go.mod" 2>/dev/null | wc -l || echo 'unknown')"
+          fi
 
       - name: Run integration tests - ${{ matrix.test-group.name }}
         run: |

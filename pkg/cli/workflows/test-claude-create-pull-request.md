@@ -2,8 +2,8 @@
 on:
   workflow_dispatch:
 permissions:
-  pull-requests: write
-  contents: write
+  pull-requests: read
+  contents: read
 engine: claude
 ---
 

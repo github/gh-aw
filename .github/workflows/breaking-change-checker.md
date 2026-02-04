@@ -33,6 +33,8 @@ safe-outputs:
     run-success: "✅ Analysis complete! [{workflow_name}]({run_url}) has reviewed all changes. Compatibility verdict delivered! 📋"
     run-failure: "🔬 Analysis interrupted! [{workflow_name}]({run_url}) {status}. Compatibility status unknown..."
 timeout-minutes: 10
+imports:
+  - shared/reporting.md
 ---
 
 # Breaking Change Checker
@@ -128,6 +130,19 @@ Is it removing schema fields or making optional fields required?
 
 ## Step 5: Report Findings
 
+### Report Formatting Guidelines
+
+**CRITICAL**: Follow the formatting guidelines from `shared/reporting.md` to create well-structured, readable reports.
+
+**Key Requirements**:
+1. **Header Levels**: Use h3 (###) or lower for all headers in your issue report to maintain proper document hierarchy. The issue title serves as h1, so all content headers should start at h3.
+2. **Progressive Disclosure**: Wrap detailed analysis in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.
+3. **Report Structure**:
+   - **Summary** (always visible): Count of breaking changes, severity assessment
+   - **Critical Breaking Changes** (always visible): List of changes requiring immediate attention
+   - **Detailed Analysis** (in `<details>` tags): Full diff analysis, code examples
+   - **Recommendations** (always visible): Migration steps, version bump guidance
+
 ### If NO Breaking Changes Found
 
 **YOU MUST CALL** the `noop` tool to log completion:
@@ -153,19 +168,40 @@ Create an issue with the following structure:
 **Body**:
 
 ```markdown
-## ⚠️ Breaking Changes Detected
+### Summary
 
-The following breaking changes were detected in commits from the last 24 hours.
+- **Total Breaking Changes**: [NUMBER]
+- **Severity**: [CRITICAL/HIGH/MEDIUM]
+- **Commits Analyzed**: [NUMBER]
+- **Status**: ⚠️ Requires Immediate Review
 
-### Breaking Changes Summary
+### Critical Breaking Changes
+
+[List the most important breaking changes here - always visible]
 
 | Commit | File | Category | Change | Impact |
 |--------|------|----------|--------|--------|
 | [sha] | [file path] | [category] | [description] | [user impact] |
 
-### Commits Analyzed
+<details>
+<summary><b>Full Code Diff Analysis</b></summary>
 
-List the commits that were analyzed with their details.
+#### Detailed Commit Analysis
+
+[Detailed analysis of each commit with code diffs and context]
+
+#### Breaking Change Patterns Detected
+
+[Detailed breakdown of specific breaking patterns found in the code]
+
+</details>
+
+<details>
+<summary><b>All Commits Analyzed</b></summary>
+
+[Complete list of commits that were analyzed with their details]
+
+</details>
 
 ### Action Checklist
 
@@ -176,6 +212,10 @@ Complete the following items to address these breaking changes:
 - [ ] **Add migration guidance to changeset** - Include clear migration instructions in the changeset file showing users how to update their workflows
 - [ ] **Document breaking changes in CHANGELOG.md** - Add entries under "Breaking Changes" section with user-facing descriptions
 - [ ] **Verify backward compatibility was considered** - Confirm that alternatives to breaking were evaluated
+
+### Recommendations
+
+[Migration steps, version bump guidance, and action items - always visible]
 
 ### Reference
 

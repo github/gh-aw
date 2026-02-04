@@ -2,7 +2,7 @@
 on: issues
 permissions:
   contents: read
-  issues: write
+  issues: read
 engine: copilot
 
 imports:

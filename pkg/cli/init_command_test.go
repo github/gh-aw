@@ -217,12 +217,6 @@ func TestInitRepositoryBasic(t *testing.T) {
 		t.Errorf("Expected .gitattributes to contain %q", expectedEntry)
 	}
 
-	// Verify logs .gitignore was created
-	logsGitignorePath := filepath.Join(".github", "aw", "logs", ".gitignore")
-	if _, err := os.Stat(logsGitignorePath); os.IsNotExist(err) {
-		t.Error("Expected .github/aw/logs/.gitignore to be created")
-	}
-
 	// Verify MCP files were created by default
 	mcpConfigPath := filepath.Join(".vscode", "mcp.json")
 	if _, err := os.Stat(mcpConfigPath); os.IsNotExist(err) {

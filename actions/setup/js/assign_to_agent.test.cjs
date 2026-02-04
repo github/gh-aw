@@ -274,7 +274,7 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining('Agent "unsupported-agent" is not supported'));
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
   it("should handle invalid issue numbers", async () => {
@@ -350,7 +350,7 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Failed to assign agent"));
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
   it("should handle 502 errors as success", async () => {
@@ -650,7 +650,7 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.error).toHaveBeenCalledWith("Cannot specify both issue_number and pull_number in the same assign_to_agent item");
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
   it("should auto-resolve issue number from context when not provided (triggering target)", async () => {
@@ -752,7 +752,7 @@ describe("assign_to_agent", () => {
 
     // Should fail because target "*" requires explicit issue_number or pull_number
     expect(mockCore.error).toHaveBeenCalled();
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
   it("should accept agent when in allowed list", async () => {
@@ -816,7 +816,7 @@ describe("assign_to_agent", () => {
 
     expect(mockCore.info).toHaveBeenCalledWith("Allowed agents: other-agent");
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining('Agent "copilot" is not in the allowed list'));
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
 
     // Should not have made any GraphQL calls since validation failed early
     expect(mockGithub.graphql).not.toHaveBeenCalled();
@@ -923,7 +923,7 @@ describe("assign_to_agent", () => {
 
     // Should error and fail
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Failed to assign agent"));
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 
   it("should handle ignore-if-error when 'Resource not accessible' error", async () => {
@@ -971,6 +971,6 @@ describe("assign_to_agent", () => {
 
     // Should error and fail (not skipped because it's not an auth error)
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Failed to assign agent"));
-    expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
 });

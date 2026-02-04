@@ -2,7 +2,7 @@
 on: issues
 permissions:
   contents: read
-  issues: write
+  issues: read
 engine: claude
 mcp-servers:
   # New direct field format - stdio with command

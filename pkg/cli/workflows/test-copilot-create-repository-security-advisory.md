@@ -4,6 +4,8 @@ on:
 permissions:
   security-events: write
 engine: copilot
+features:
+  dangerous-permissions-write: true
 ---
 
 # Test Copilot Create Repository Security Advisory

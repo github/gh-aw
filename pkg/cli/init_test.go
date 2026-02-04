@@ -76,30 +76,8 @@ func TestInitRepository(t *testing.T) {
 				t.Errorf("Expected .gitattributes file to exist")
 			}
 
-			// Note: The following files are NOT created by init - they are source of truth in .github/aw/
-			// and should already exist in the gh-aw repository itself
-
-			// Verify logs .gitignore was created
-			logsGitignorePath := filepath.Join(tempDir, ".github", "aw", "logs", ".gitignore")
-			if _, err := os.Stat(logsGitignorePath); os.IsNotExist(err) {
-				t.Errorf("Expected .github/aw/logs/.gitignore file to exist")
-			}
-
-			// Verify logs .gitignore content
-			if content, err := os.ReadFile(logsGitignorePath); err == nil {
-				contentStr := string(content)
-				if !strings.Contains(contentStr, "# Ignore all downloaded workflow logs") {
-					t.Errorf("Expected .gitignore to contain comment about ignoring logs")
-				}
-				if !strings.Contains(contentStr, "*") {
-					t.Errorf("Expected .gitignore to contain wildcard pattern")
-				}
-				if !strings.Contains(contentStr, "!.gitignore") {
-					t.Errorf("Expected .gitignore to keep itself")
-				}
-			} else {
-				t.Errorf("Failed to read .github/aw/logs/.gitignore: %v", err)
-			}
+			// Note: The .github/aw/logs/.gitignore file is no longer created by init.
+			// It is now created by the logs download command on every invocation.
 
 			// Verify .gitattributes contains the correct entry
 			content, err := os.ReadFile(gitAttributesPath)
@@ -153,15 +131,8 @@ func TestInitRepository_Idempotent(t *testing.T) {
 		t.Errorf("Expected .gitattributes file to exist after second call")
 	}
 
-	// Note: The following files are NOT created by init - they are source of truth in .github/aw/
-	// and should already exist in the gh-aw repository itself. These tests are not relevant
-	// for external repositories.
-
-	// Verify logs .gitignore still exists after second call
-	logsGitignorePath := filepath.Join(tempDir, ".github", "aw", "logs", ".gitignore")
-	if _, err := os.Stat(logsGitignorePath); os.IsNotExist(err) {
-		t.Errorf("Expected .github/aw/logs/.gitignore file to exist after second call")
-	}
+	// Note: The .github/aw/logs/.gitignore file is no longer created by init.
+	// It is now created by the logs download command on every invocation.
 }
 
 func TestInitRepository_Verbose(t *testing.T) {

@@ -4,6 +4,8 @@ on:
 permissions:
   security-events: write
 engine: claude
+features:
+  dangerous-permissions-write: true
 ---
 
 # Test Claude Create Repository Security Advisory

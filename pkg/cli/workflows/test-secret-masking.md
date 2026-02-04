@@ -5,6 +5,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+strict: false
 engine: copilot
 imports:
   - shared/secret-redaction-test.md

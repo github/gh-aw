@@ -805,6 +805,15 @@ env: "example-value"
 features:
   {}
 
+# Secret values passed to workflow execution. Secrets can be defined as simple
+# strings (GitHub Actions expressions) or objects with 'value' and 'description'
+# properties. Typically used to provide secrets to MCP servers or custom engines.
+# Note: For passing secrets to reusable workflows, use the jobs.<job_id>.secrets
+# field instead.
+# (optional)
+secrets:
+  {}
+
 # Environment that the job references (for protected environments and deployments)
 # (optional)
 # This field supports multiple formats (oneOf):
@@ -2164,9 +2173,17 @@ safe-outputs:
     # When true, automatically close older discussions matching the same title prefix
     # or labels as 'outdated' with a comment linking to the new discussion. Requires
     # title-prefix or labels to be set. Maximum 10 discussions will be closed. Only
-    # runs if discussion creation succeeds.
+    # runs if discussion creation succeeds. When fallback-to-issue is enabled and
+    # discussion creation fails, older issues will be closed instead.
     # (optional)
     close-older-discussions: true
+
+    # When true (default), fallback to creating an issue if discussion creation fails
+    # due to permissions. The fallback issue will include a note indicating it was
+    # intended to be a discussion. If close-older-discussions is enabled, the
+    # close-older-issues logic will be applied to the fallback issue.
+    # (optional)
+    fallback-to-issue: true
 
     # Time until the discussion expires and should be automatically closed. Supports
     # integer (days), relative time format like '2h' (2 hours), '7d' (7 days), '2w' (2

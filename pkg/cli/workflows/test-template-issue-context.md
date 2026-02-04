@@ -4,7 +4,7 @@ on:
     types: [opened]
 permissions:
   contents: read
-  issues: write
+  issues: read
 engine:
   id: copilot
 tools:

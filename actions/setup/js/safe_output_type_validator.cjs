@@ -12,6 +12,7 @@
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { isTemporaryId } = require("./temporary_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { unfenceMarkdown } = require("./markdown_unfencing.cjs");
 
 /**
  * Default max body length for GitHub content
@@ -344,7 +345,9 @@ function validateField(value, fieldName, validation, itemType, lineNum, options)
 
     // Handle sanitization
     if (validation.sanitize) {
-      const sanitized = sanitizeContent(value, {
+      // Apply unfencing to remove accidental outer markdown fences before sanitization
+      let processedValue = unfenceMarkdown(value);
+      const sanitized = sanitizeContent(processedValue, {
         maxLength: validation.maxLength || MAX_BODY_LENGTH,
         allowedAliases: options?.allowedAliases || [],
       });

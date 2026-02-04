@@ -2,8 +2,8 @@
 on:
   workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 engine: claude
 safe-outputs:
   max-patch-size: 1  # Very small limit (1 KB) to test failure case

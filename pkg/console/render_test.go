@@ -4,8 +4,9 @@ package console
 
 import (
 	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Test types for struct rendering
@@ -41,20 +42,12 @@ func TestRenderStruct_SimpleStruct(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Check that basic fields are present (using header names from tags)
-	if !strings.Contains(output, "Run ID") {
-		t.Errorf("Output should contain Run ID field, got:\n%s", output)
-	}
-	if !strings.Contains(output, "12345") {
-		t.Error("Output should contain RunID value")
-	}
-	if !strings.Contains(output, "test-workflow") {
-		t.Error("Output should contain Workflow value")
-	}
+	assert.Contains(t, output, "Run ID", "output should contain Run ID header from tag")
+	assert.Contains(t, output, "12345", "output should contain RunID value")
+	assert.Contains(t, output, "test-workflow", "output should contain Workflow value")
 
 	// Check that skip field is not present
-	if strings.Contains(output, "should not appear") {
-		t.Error("Output should not contain skipped field")
-	}
+	assert.NotContains(t, output, "should not appear", "output should not contain skipped field")
 }
 
 func TestRenderStruct_OmitEmpty(t *testing.T) {
@@ -67,12 +60,8 @@ func TestRenderStruct_OmitEmpty(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Check that non-empty fields are present
-	if !strings.Contains(output, "1000") {
-		t.Error("Output should contain TokenUsage value")
-	}
-	if !strings.Contains(output, "1.23") {
-		t.Error("Output should contain Cost value")
-	}
+	assert.Contains(t, output, "1000", "output should contain TokenUsage value")
+	assert.Contains(t, output, "1.23", "output should contain Cost value")
 
 	// Turns should be omitted because it's 0 and has omitempty
 	// Note: This is tricky because "0" might appear in other contexts
@@ -83,9 +72,7 @@ func TestRenderStruct_OmitEmpty(t *testing.T) {
 		Turns:      5,
 	}
 	outputWithTurns := RenderStruct(dataWithTurns)
-	if !strings.Contains(outputWithTurns, "5") {
-		t.Error("Output should contain Turns value when non-zero")
-	}
+	assert.Contains(t, outputWithTurns, "5", "output should contain Turns value when non-zero")
 }
 
 func TestRenderSlice_AsTable(t *testing.T) {
@@ -97,21 +84,11 @@ func TestRenderSlice_AsTable(t *testing.T) {
 	output := RenderStruct(jobs)
 
 	// Check for table structure (headers and values)
-	if !strings.Contains(output, "Name") {
-		t.Error("Output should contain Name header")
-	}
-	if !strings.Contains(output, "Status") {
-		t.Error("Output should contain Status header")
-	}
-	if !strings.Contains(output, "job-1") {
-		t.Error("Output should contain job-1 name")
-	}
-	if !strings.Contains(output, "completed") {
-		t.Error("Output should contain completed status")
-	}
-	if !strings.Contains(output, "job-2") {
-		t.Error("Output should contain job-2 name")
-	}
+	assert.Contains(t, output, "Name", "output should contain Name header")
+	assert.Contains(t, output, "Status", "output should contain Status header")
+	assert.Contains(t, output, "job-1", "output should contain job-1 name")
+	assert.Contains(t, output, "completed", "output should contain completed status")
+	assert.Contains(t, output, "job-2", "output should contain job-2 name")
 }
 
 func TestRenderMap(t *testing.T) {
@@ -123,18 +100,10 @@ func TestRenderMap(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Maps should render as key-value pairs
-	if !strings.Contains(output, "key1") {
-		t.Error("Output should contain key1")
-	}
-	if !strings.Contains(output, "value1") {
-		t.Error("Output should contain value1")
-	}
-	if !strings.Contains(output, "key2") {
-		t.Error("Output should contain key2")
-	}
-	if !strings.Contains(output, "value2") {
-		t.Error("Output should contain value2")
-	}
+	assert.Contains(t, output, "key1", "map output should contain key1")
+	assert.Contains(t, output, "value1", "map output should contain value1")
+	assert.Contains(t, output, "key2", "map output should contain key2")
+	assert.Contains(t, output, "value2", "map output should contain value2")
 }
 
 func TestParseConsoleTag(t *testing.T) {
@@ -193,18 +162,10 @@ func TestParseConsoleTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := parseConsoleTag(tt.tag)
-			if result.skip != tt.expected.skip {
-				t.Errorf("skip: got %v, want %v", result.skip, tt.expected.skip)
-			}
-			if result.omitempty != tt.expected.omitempty {
-				t.Errorf("omitempty: got %v, want %v", result.omitempty, tt.expected.omitempty)
-			}
-			if result.header != tt.expected.header {
-				t.Errorf("header: got %v, want %v", result.header, tt.expected.header)
-			}
-			if result.title != tt.expected.title {
-				t.Errorf("title: got %v, want %v", result.title, tt.expected.title)
-			}
+			assert.Equal(t, tt.expected.skip, result.skip, "skip flag should match")
+			assert.Equal(t, tt.expected.omitempty, result.omitempty, "omitempty flag should match")
+			assert.Equal(t, tt.expected.header, result.header, "header value should match")
+			assert.Equal(t, tt.expected.title, result.title, "title value should match")
 		})
 	}
 }
@@ -230,9 +191,7 @@ func TestIsZeroValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			val := reflect.ValueOf(tt.value)
 			result := isZeroValue(val)
-			if result != tt.expected {
-				t.Errorf("got %v, want %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "zero value detection should match expectation")
 		})
 	}
 }
@@ -254,9 +213,7 @@ func TestFormatFieldValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			val := reflect.ValueOf(tt.value)
 			result := formatFieldValue(val)
-			if result != tt.expected {
-				t.Errorf("got %v, want %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "formatted field value should match expectation")
 		})
 	}
 }
@@ -288,20 +245,12 @@ func TestRenderStruct_ComplexExample(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Check that basic fields are present
-	if !strings.Contains(output, "John Doe") {
-		t.Error("Output should contain Name value")
-	}
-	if !strings.Contains(output, "30") {
-		t.Error("Output should contain Age value")
-	}
-	if !strings.Contains(output, "123 Main St") {
-		t.Error("Output should contain nested Street value")
-	}
+	assert.Contains(t, output, "John Doe", "output should contain Name value")
+	assert.Contains(t, output, "30", "output should contain Age value")
+	assert.Contains(t, output, "123 Main St", "output should contain nested Street value")
 
 	// Check that nested struct has a title
-	if !strings.Contains(output, "Address") {
-		t.Error("Output should contain Address section title")
-	}
+	assert.Contains(t, output, "Address", "output should contain Address section title")
 }
 
 func TestBuildTableConfig(t *testing.T) {
@@ -313,18 +262,11 @@ func TestBuildTableConfig(t *testing.T) {
 	val := reflect.ValueOf(jobs)
 	config := buildTableConfig(val, "Test Jobs")
 
-	if len(config.Headers) != 3 {
-		t.Errorf("Expected 3 headers (excluding omitempty empty fields), got %d", len(config.Headers))
-	}
-
-	if len(config.Rows) != 2 {
-		t.Errorf("Expected 2 rows, got %d", len(config.Rows))
-	}
+	assert.Len(t, config.Headers, 3, "expected 3 headers (excluding omitempty empty fields)")
+	assert.Len(t, config.Rows, 2, "expected 2 rows in table output")
 
 	// Check first row
-	if config.Rows[0][0] != "job-1" {
-		t.Errorf("Expected first row name to be 'job-1', got %s", config.Rows[0][0])
-	}
+	assert.Equal(t, "job-1", config.Rows[0][0], "first row name should be job-1")
 }
 
 func TestFormatTag_Number(t *testing.T) {
@@ -341,14 +283,10 @@ func TestFormatTag_Number(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Should format token usage as "250k"
-	if !strings.Contains(output, "250k") {
-		t.Errorf("Output should contain formatted number '250k', got:\n%s", output)
-	}
+	assert.Contains(t, output, "250k", "output should contain formatted number '250k'")
 
 	// Errors should not be formatted
-	if !strings.Contains(output, "5") {
-		t.Errorf("Output should contain unformatted number '5', got:\n%s", output)
-	}
+	assert.Contains(t, output, "5", "output should contain unformatted number '5'")
 }
 
 func TestFormatTag_Cost(t *testing.T) {
@@ -363,9 +301,7 @@ func TestFormatTag_Cost(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Should format cost with $ prefix
-	if !strings.Contains(output, "$1.234") {
-		t.Errorf("Output should contain formatted cost '$1.234', got:\n%s", output)
-	}
+	assert.Contains(t, output, "$1.234", "output should contain formatted cost '$1.234'")
 }
 
 func TestFormatTag_InTable(t *testing.T) {
@@ -383,14 +319,10 @@ func TestFormatTag_InTable(t *testing.T) {
 	output := RenderStruct(tools)
 
 	// Should format large output size
-	if !strings.Contains(output, "5.00M") {
-		t.Errorf("Output should contain formatted number '5.00M', got:\n%s", output)
-	}
+	assert.Contains(t, output, "5.00M", "output should contain formatted number '5.00M'")
 
 	// Should format small output size
-	if !strings.Contains(output, "1.50k") {
-		t.Errorf("Output should contain formatted number '1.50k', got:\n%s", output)
-	}
+	assert.Contains(t, output, "1.50k", "output should contain formatted number '1.50k'")
 }
 
 func TestFormatNumber(t *testing.T) {
@@ -442,9 +374,7 @@ func TestFormatNumber(t *testing.T) {
 
 	for _, test := range tests {
 		result := FormatNumber(test.input)
-		if result != test.expected {
-			t.Errorf("FormatNumber(%d) = %s, expected %s", test.input, result, test.expected)
-		}
+		assert.Equal(t, test.expected, result, "FormatNumber(%d) mismatch", test.input)
 	}
 }
 
@@ -471,22 +401,13 @@ func TestRenderStruct_PointerToStruct(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Check that inner struct is rendered properly, not as raw data
-	if !strings.Contains(output, "Inner Section") {
-		t.Errorf("Output should contain nested struct title 'Inner Section', got:\n%s", output)
-	}
-	if !strings.Contains(output, "Name") {
-		t.Errorf("Output should contain inner field 'Name', got:\n%s", output)
-	}
-	if !strings.Contains(output, "test-name") {
-		t.Errorf("Output should contain inner value 'test-name', got:\n%s", output)
-	}
-	if !strings.Contains(output, "42") {
-		t.Errorf("Output should contain inner value '42', got:\n%s", output)
-	}
+	assert.Contains(t, output, "Inner Section", "output should contain nested struct title 'Inner Section'")
+	assert.Contains(t, output, "Name", "output should contain inner field 'Name'")
+	assert.Contains(t, output, "test-name", "output should contain inner value 'test-name'")
+	assert.Contains(t, output, "42", "output should contain inner value '42'")
 	// Ensure it's NOT rendered as raw data structure
-	if strings.Contains(output, "{test-name") || strings.Contains(output, "&{") {
-		t.Errorf("Output should NOT contain raw struct representation, got:\n%s", output)
-	}
+	assert.NotContains(t, output, "{test-name", "output should not contain raw struct representation")
+	assert.NotContains(t, output, "&{", "output should not contain raw struct pointer representation")
 }
 
 // TestRenderStruct_NilPointerToStruct tests that nil pointer-to-struct fields are handled gracefully
@@ -508,11 +429,7 @@ func TestRenderStruct_NilPointerToStruct(t *testing.T) {
 	output := RenderStruct(data)
 
 	// Should contain title but not the nil inner
-	if !strings.Contains(output, "Title") {
-		t.Errorf("Output should contain 'Title', got:\n%s", output)
-	}
+	assert.Contains(t, output, "Title", "output should contain 'Title'")
 	// Should not crash and should not contain inner section when nil and omitempty
-	if strings.Contains(output, "Inner Section") {
-		t.Errorf("Output should NOT contain 'Inner Section' when nil and omitempty, got:\n%s", output)
-	}
+	assert.NotContains(t, output, "Inner Section", "output should not contain 'Inner Section' when nil and omitempty")
 }

@@ -1876,6 +1876,50 @@
         }
       ]
     },
+    "secrets": {
+      "description": "Secret values passed to workflow execution. Secrets can be defined as simple strings (GitHub Actions expressions) or objects with 'value' and 'description' properties. Typically used to provide secrets to MCP servers or custom engines. Note: For passing secrets to reusable workflows, use the jobs.<job_id>.secrets field instead.",
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Secret value as a GitHub Actions expression (e.g., ${{ secrets.API_KEY }})"
+          },
+          {
+            "type": "object",
+            "description": "Secret with metadata",
+            "required": ["value"],
+            "properties": {
+              "value": {
+                "type": "string",
+                "description": "Secret value as a GitHub Actions expression"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what this secret is used for"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "examples": [
+        {
+          "API_TOKEN": "${{ secrets.API_TOKEN }}",
+          "DATABASE_URL": "${{ secrets.DB_URL }}"
+        },
+        {
+          "API_TOKEN": {
+            "value": "${{ secrets.API_TOKEN }}",
+            "description": "API token for external service"
+          },
+          "DATABASE_URL": {
+            "value": "${{ secrets.DB_URL }}",
+            "description": "Production database connection string"
+          }
+        }
+      ]
+    },
     "environment": {
       "description": "Environment that the job references (for protected environments and deployments)",
       "oneOf": [
@@ -4183,8 +4227,13 @@
                 },
                 "close-older-discussions": {
                   "type": "boolean",
-                  "description": "When true, automatically close older discussions matching the same title prefix or labels as 'outdated' with a comment linking to the new discussion. Requires title-prefix or labels to be set. Maximum 10 discussions will be closed. Only runs if discussion creation succeeds.",
+                  "description": "When true, automatically close older discussions matching the same title prefix or labels as 'outdated' with a comment linking to the new discussion. Requires title-prefix or labels to be set. Maximum 10 discussions will be closed. Only runs if discussion creation succeeds. When fallback-to-issue is enabled and discussion creation fails, older issues will be closed instead.",
                   "default": false
+                },
+                "fallback-to-issue": {
+                  "type": "boolean",
+                  "description": "When true (default), fallback to creating an issue if discussion creation fails due to permissions. The fallback issue will include a note indicating it was intended to be a discussion. If close-older-discussions is enabled, the close-older-issues logic will be applied to the fallback issue.",
+                  "default": true
                 },
                 "expires": {
                   "oneOf": [
@@ -5264,38 +5313,46 @@
         "dispatch-workflow": {
           "oneOf": [
             {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string"
-              },
-              "description": "Shorthand format: array of workflow names to dispatch (without .md extension). Workflows must exist in same directory and support workflow_dispatch trigger. Self-reference not allowed. Max defaults to 1."
-            },
-            {
               "type": "object",
-              "description": "Configuration for dispatching other workflows from this workflow. Allows workflows to trigger other workflows via workflow_dispatch events. Includes self-reference prevention and path traversal protection.",
+              "description": "Configuration for dispatching workflow_dispatch events to other workflows. Orchestrators use this to delegate work to worker workflows.",
               "properties": {
                 "workflows": {
                   "type": "array",
-                  "minItems": 1,
+                  "description": "List of workflow names (without .md extension) to allow dispatching. Each workflow must exist in .github/workflows/.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
-                  "description": "List of workflow names to dispatch (without .md extension). Workflows must exist in same directory and support workflow_dispatch trigger. Self-reference not allowed."
+                  "minItems": 1,
+                  "maxItems": 50
                 },
                 "max": {
                   "type": "integer",
+                  "description": "Maximum number of workflow dispatch operations per run (default: 1, max: 50)",
                   "minimum": 1,
                   "maximum": 50,
-                  "description": "Maximum number of concurrent workflow dispatches (default: 1, maximum: 50)"
+                  "default": 1
+                },
+                "github-token": {
+                  "$ref": "#/$defs/github_token",
+                  "description": "GitHub token to use for dispatching workflows. Overrides global github-token if specified."
                 }
               },
               "required": ["workflows"],
               "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "description": "Shorthand array format: list of workflow names (without .md extension) to allow dispatching",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 50
             }
           ],
-          "$comment": "Self-reference prevention: workflow cannot dispatch itself (prevents infinite loops). Path traversal protection: all paths validated with isPathWithinDir(). Validation: pkg/workflow/dispatch_workflow_validation.go",
-          "description": "Enable dispatching other workflows from this workflow. Allows workflows to trigger other workflows via workflow_dispatch events with security constraints."
+          "description": "Dispatch workflow_dispatch events to other workflows. Used by orchestrators to delegate work to worker workflows with controlled maximum dispatch count."
         },
         "missing-tool": {
           "oneOf": [
@@ -5840,50 +5897,6 @@
         "runs-on": {
           "type": "string",
           "description": "Runner specification for all safe-outputs jobs (activation, create-issue, add-comment, etc.). Single runner label (e.g., 'ubuntu-slim', 'ubuntu-latest', 'windows-latest', 'self-hosted'). Defaults to 'ubuntu-slim'. See https://github.blog/changelog/2025-10-28-1-vcpu-linux-runner-now-available-in-github-actions-in-public-preview/"
-        },
-        "dispatch-workflow": {
-          "oneOf": [
-            {
-              "type": "object",
-              "description": "Configuration for dispatching workflow_dispatch events to other workflows. Orchestrators use this to delegate work to worker workflows.",
-              "properties": {
-                "workflows": {
-                  "type": "array",
-                  "description": "List of workflow names (without .md extension) to allow dispatching. Each workflow must exist in .github/workflows/.",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "minItems": 1,
-                  "maxItems": 50
-                },
-                "max": {
-                  "type": "integer",
-                  "description": "Maximum number of workflow dispatch operations per run (default: 1, max: 50)",
-                  "minimum": 1,
-                  "maximum": 50,
-                  "default": 1
-                },
-                "github-token": {
-                  "$ref": "#/$defs/github_token",
-                  "description": "GitHub token to use for dispatching workflows. Overrides global github-token if specified."
-                }
-              },
-              "required": ["workflows"],
-              "additionalProperties": false
-            },
-            {
-              "type": "array",
-              "description": "Shorthand array format: list of workflow names (without .md extension) to allow dispatching",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "minItems": 1,
-              "maxItems": 50
-            }
-          ],
-          "description": "Dispatch workflow_dispatch events to other workflows. Used by orchestrators to delegate work to worker workflows with controlled maximum dispatch count."
         }
       },
       "additionalProperties": false
