@@ -335,3 +335,62 @@ imports:
 		assert.True(t, hasCopilot || hasClaude, "Should mention the engines")
 	}
 }
+
+func TestValidateImportedStepsNoAgenticSecrets_OpenCodeExemption(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "test-*")
+	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
+	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+
+	// Create an import file with OpenCode custom engine using agentic secrets
+	importContent := `---
+engine:
+  id: custom
+  env:
+    GH_AW_AGENT_VERSION: "0.15.13"
+  steps:
+    - name: Install OpenCode
+      run: |
+        npm install -g "opencode-ai@${GH_AW_AGENT_VERSION}"
+      env:
+        GH_AW_AGENT_VERSION: ${{ env.GH_AW_AGENT_VERSION }}
+    - name: Run OpenCode
+      run: |
+        opencode run "test prompt"
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+---
+
+# OpenCode Engine
+This is a custom agentic engine wrapper.
+`
+	importFile := filepath.Join(workflowsDir, "shared", "opencode.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+
+	// Create main workflow with strict mode
+	mainContent := `---
+name: Test OpenCode Workflow
+on: push
+strict: true
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+imports:
+  - shared/opencode.md
+---
+
+# Test
+This workflow uses OpenCode which is a custom agentic engine.
+`
+	mainFile := filepath.Join(workflowsDir, "test-opencode.md")
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+
+	// Test in strict mode - should succeed because OpenCode is exempt
+	compiler := NewCompiler()
+	compiler.SetStrictMode(true)
+	err := compiler.CompileWorkflow(mainFile)
+
+	assert.NoError(t, err, "Should not error for OpenCode custom engine even in strict mode")
+}

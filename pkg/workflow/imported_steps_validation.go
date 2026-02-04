@@ -51,8 +51,42 @@ var agenticEngineSecrets = map[string]string{
 	"OPENAI_API_KEY":          "Codex engine",
 }
 
+// isCustomAgenticEngine checks if the custom engine is actually another agentic framework
+// (like OpenCode) that legitimately needs agentic engine secrets
+func isCustomAgenticEngine(engineConfig *EngineConfig) bool {
+	if engineConfig == nil || len(engineConfig.Steps) == 0 {
+		return false
+	}
+
+	// List of known agentic framework packages/commands that should be exempt
+	agenticFrameworks := []string{
+		"opencode-ai",
+		"opencode",
+		// Add other agentic frameworks here as needed
+	}
+
+	// Check if any step installs or runs a known agentic framework
+	for _, step := range engineConfig.Steps {
+		stepYAML, err := convertStepToYAML(step)
+		if err != nil {
+			continue
+		}
+
+		stepYAMLLower := strings.ToLower(stepYAML)
+		for _, framework := range agenticFrameworks {
+			if strings.Contains(stepYAMLLower, framework) {
+				importedStepsValidationLog.Printf("Detected custom agentic framework: %s", framework)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // validateImportedStepsNoAgenticSecrets validates that custom engine steps don't use agentic engine secrets
 // In strict mode, this returns an error. In non-strict mode, this prints a warning to stderr.
+// This validation is skipped for custom engines that are actually agentic frameworks (like OpenCode).
 func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineConfig, engineID string) error {
 	if engineConfig == nil || engineID != "custom" {
 		importedStepsValidationLog.Print("Skipping validation: not a custom engine")
@@ -61,6 +95,12 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 
 	if len(engineConfig.Steps) == 0 {
 		importedStepsValidationLog.Print("No custom steps to validate")
+		return nil
+	}
+
+	// Skip validation for custom agentic engines like OpenCode
+	if isCustomAgenticEngine(engineConfig) {
+		importedStepsValidationLog.Print("Skipping validation: custom engine is an agentic framework")
 		return nil
 	}
 
