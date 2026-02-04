@@ -26,7 +26,7 @@ describe("handle_agent_failure.cjs", () => {
 **Branch:** {branch}  
 **Run URL:** {run_url}{pull_request_info}
 
-{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_safe_outputs_context}
+{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_data_context}{missing_safe_outputs_context}
 
 ### Action Required
 
@@ -40,7 +40,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
       } else if (filePath.includes("agent_failure_comment.md")) {
         return `Agent job [{run_id}]({run_url}) failed.
 
-{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_safe_outputs_context}`;
+{secret_verification_context}{assignment_errors_context}{create_discussion_errors_context}{missing_data_context}{missing_safe_outputs_context}`;
       }
       return originalReadFileSync.call(fs, filePath, encoding);
     });
@@ -1177,6 +1177,105 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(createCall.body).toContain("Create Discussion Failed");
       expect(createCall.body).toContain('Discussion "Test Discussion" in github/gh-aw');
       expect(createCall.body).toContain("Discussions not enabled");
+    });
+
+    it("should include missing_data in failure issue", async () => {
+      // Create a temporary agent output file with missing_data messages
+      const tempDir = `/tmp/test-agent-output-${Date.now()}`;
+      const agentOutputPath = `${tempDir}/agent_output.json`;
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      // Write agent output with missing_data messages
+      const agentOutput = {
+        items: [
+          {
+            type: "missing_data",
+            data_type: "GitHub API token",
+            reason: "Required for accessing private repositories",
+            context: "Workflow needs to read issues from private repo",
+            alternatives: "Use a personal access token or GitHub App",
+          },
+          {
+            type: "missing_data",
+            data_type: "Repository configuration",
+            reason: "Missing repository settings file",
+            context: null,
+            alternatives: null,
+          },
+        ],
+      };
+      fs.writeFileSync(agentOutputPath, JSON.stringify(agentOutput));
+      process.env.GH_AW_AGENT_OUTPUT = agentOutputPath;
+
+      // Mock searches
+      mockGithub.rest.search.issuesAndPullRequests
+        .mockResolvedValueOnce({
+          // First search: PR search (no PR found)
+          data: { total_count: 0, items: [] },
+        })
+        .mockResolvedValueOnce({
+          // Second search: parent issue exists
+          data: {
+            total_count: 1,
+            items: [
+              {
+                number: 5,
+                html_url: "https://github.com/test-owner/test-repo/issues/5",
+                node_id: "I_parent_5",
+              },
+            ],
+          },
+        })
+        .mockResolvedValueOnce({
+          // Third search: no failure issue
+          data: { total_count: 0, items: [] },
+        });
+
+      // Mock GraphQL for sub-issue count
+      mockGithub.graphql = vi
+        .fn()
+        .mockResolvedValueOnce({
+          // First call: check sub-issue count
+          repository: {
+            issue: {
+              subIssues: {
+                totalCount: 5,
+              },
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          // Second call: link sub-issue
+          addSubIssue: {
+            issue: { id: "I_parent_5", number: 5 },
+            subIssue: { id: "I_sub_42", number: 42 },
+          },
+        });
+
+      // Mock failure issue creation
+      mockGithub.rest.issues.create.mockResolvedValueOnce({
+        data: {
+          number: 42,
+          html_url: "https://github.com/test-owner/test-repo/issues/42",
+          node_id: "I_sub_42",
+        },
+      });
+
+      await main();
+
+      // Verify failure issue includes missing_data
+      const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
+      expect(createCall.body).toContain("Missing Data Reported");
+      expect(createCall.body).toContain("GitHub API token");
+      expect(createCall.body).toContain("Required for accessing private repositories");
+      expect(createCall.body).toContain("Workflow needs to read issues from private repo");
+      expect(createCall.body).toContain("Use a personal access token or GitHub App");
+      expect(createCall.body).toContain("Repository configuration");
+      expect(createCall.body).toContain("Missing repository settings file");
+
+      // Clean up temp file
+      fs.unlinkSync(agentOutputPath);
+      fs.rmdirSync(tempDir);
     });
   });
 

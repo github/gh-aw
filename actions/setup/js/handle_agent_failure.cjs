@@ -8,6 +8,7 @@ const { renderTemplate } = require("./messages_core.cjs");
 const { getCurrentBranch } = require("./get_current_branch.cjs");
 const { createExpirationLine, generateFooterWithExpiration } = require("./ephemerals.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount } = require("./sub_issue_helpers.cjs");
+const { formatMissingData } = require("./missing_info_formatter.cjs");
 const fs = require("fs");
 
 /**
@@ -263,6 +264,65 @@ function buildCreateDiscussionErrorsContext(createDiscussionErrors) {
 }
 
 /**
+ * Load missing_data messages from agent output
+ * @returns {Array<{data_type: string, reason: string, context?: string, alternatives?: string}>} Array of missing data messages
+ */
+function loadMissingDataMessages() {
+  try {
+    const { loadAgentOutput } = require("./load_agent_output.cjs");
+    const agentOutputResult = loadAgentOutput();
+
+    if (!agentOutputResult.success || !agentOutputResult.items) {
+      return [];
+    }
+
+    // Extract missing_data messages from agent output
+    const missingDataMessages = [];
+    for (const item of agentOutputResult.items) {
+      if (item.type === "missing_data") {
+        // Extract the fields we need
+        if (item.data_type && item.reason) {
+          missingDataMessages.push({
+            data_type: item.data_type,
+            reason: item.reason,
+            context: item.context || null,
+            alternatives: item.alternatives || null,
+          });
+        }
+      }
+    }
+
+    return missingDataMessages;
+  } catch (error) {
+    core.warning(`Failed to load missing_data messages: ${getErrorMessage(error)}`);
+    return [];
+  }
+}
+
+/**
+ * Build missing_data context string for display in failure issues/comments
+ * @returns {string} Formatted missing data context
+ */
+function buildMissingDataContext() {
+  const missingDataMessages = loadMissingDataMessages();
+
+  if (missingDataMessages.length === 0) {
+    return "";
+  }
+
+  core.info(`Found ${missingDataMessages.length} missing_data message(s)`);
+
+  // Format the missing data using the existing formatter
+  const formattedList = formatMissingData(missingDataMessages);
+
+  let context = "\n**⚠️ Missing Data Reported**: The agent reported missing data during execution.\n\n**Missing Data:**\n";
+  context += formattedList;
+  context += "\n\n";
+
+  return context;
+}
+
+/**
  * Handle agent job failure by creating or updating a failure tracking issue
  * This script is called from the conclusion job when the agent job has failed
  * or when the agent succeeded but produced no safe outputs
@@ -386,6 +446,9 @@ async function main() {
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
 
+        // Build missing_data context
+        const missingDataContext = buildMissingDataContext();
+
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
         if (hasMissingSafeOutputs) {
@@ -407,6 +470,7 @@ async function main() {
             secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
+          missing_data_context: missingDataContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };
 
@@ -465,6 +529,9 @@ async function main() {
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
 
+        // Build missing_data context
+        const missingDataContext = buildMissingDataContext();
+
         // Build missing safe outputs context
         let missingSafeOutputsContext = "";
         if (hasMissingSafeOutputs) {
@@ -486,6 +553,7 @@ async function main() {
             secretVerificationResult === "failed" ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n" : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
+          missing_data_context: missingDataContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };
 
