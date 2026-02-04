@@ -23,7 +23,7 @@ network:
 
 safe-outputs:
   create-pull-request:
-    expires: 7d
+    expires: 1d
     title-prefix: "[docs] "
     labels: [documentation, automation]
     reviewers: [copilot]

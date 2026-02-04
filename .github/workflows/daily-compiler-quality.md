@@ -25,7 +25,7 @@ tools:
     - "git show HEAD:pkg/workflow/compiler*.go"
 safe-outputs:
   create-discussion:
-    expires: 7d
+    expires: 1d
     category: "audits"
     max: 1
     close-older-discussions: true

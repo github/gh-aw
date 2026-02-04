@@ -33,7 +33,7 @@ tools:
 safe-outputs:
   create-issue:
     max: 1
-    expires: 7d
+    expires: 1d
     labels: [documentation, projectops, testing, trialops]
 ---
 

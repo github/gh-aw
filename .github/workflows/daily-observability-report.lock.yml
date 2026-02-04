@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 2616b8865b00bc64a48a303a5f03479131b818509a4e757a863365b609229574
+# frontmatter-hash: 322a9a815e9b10370dd2b073d16c4d2e115c8f050d2288406e1b00dc1e0a51d9
 
 name: "Daily Observability Report for AWF Firewall and MCP Gateway"
 "on":
@@ -199,7 +199,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"close_discussion":{"max":10},"create_discussion":{"expires":168,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"close_discussion":{"max":10},"create_discussion":{"expires":24,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1213,7 +1213,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":10},\"create_discussion\":{\"category\":\"general\",\"close_older_discussions\":true,\"expires\":168,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[observability] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":10},\"create_discussion\":{\"category\":\"general\",\"close_older_discussions\":true,\"expires\":24,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[observability] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

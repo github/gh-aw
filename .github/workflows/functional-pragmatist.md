@@ -27,7 +27,7 @@ safe-outputs:
     title-prefix: "[fp-enhancer] "
     labels: [refactoring, functional, immutability, code-quality]
     reviewers: [copilot]
-    expires: 7d
+    expires: 1d
 
 tools:
   github:

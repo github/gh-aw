@@ -23,7 +23,7 @@ network:
 
 safe-outputs:
   create-pull-request:
-    expires: 7d
+    expires: 1d
     title-prefix: "[actions] "
     labels: [dependencies, automation]
     draft: false

@@ -21,7 +21,7 @@ tools:
     toolsets: [default]
 safe-outputs:
   create-issue:
-    expires: 7d
+    expires: 1d
     title-prefix: "[workflow-style] "
     labels: [cookie]
     max: 5

@@ -21,7 +21,7 @@
 #
 # Automatically reviews and updates documentation to ensure accuracy and completeness
 #
-# frontmatter-hash: b462b06d1271b5c5498d709adf96359f8d1024072c218e4e86cfa96850b72bc1
+# frontmatter-hash: 35460e38111980eca84125eab989981dbfaded007936d021f9e6dda4d294f5f1
 
 name: "Daily Documentation Updater"
 "on":
@@ -178,7 +178,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_pull_request":{"auto_merge":true,"expires":168},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_pull_request":{"auto_merge":true,"expires":24},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1168,7 +1168,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"auto_merge\":true,\"base_branch\":\"${{ github.ref_name }}\",\"draft\":false,\"expires\":168,\"labels\":[\"documentation\",\"automation\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[docs] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"auto_merge\":true,\"base_branch\":\"${{ github.ref_name }}\",\"draft\":false,\"expires\":24,\"labels\":[\"documentation\",\"automation\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[docs] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

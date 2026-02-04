@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 53c43f889e6fc2e80d7e49c08c814602b865b4ac56633aa8e1290c46fd829af4
+# frontmatter-hash: c9f371e2c9f855df56da69aa6fa020ab7f3762c68248c087fdbb48e2615c6bc2
 
 name: "Functional Pragmatist"
 "on":
@@ -164,7 +164,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_pull_request":{"expires":168},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_pull_request":{"expires":24},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1130,7 +1130,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"base_branch\":\"${{ github.ref_name }}\",\"expires\":168,\"labels\":[\"refactoring\",\"functional\",\"immutability\",\"code-quality\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[fp-enhancer] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"base_branch\":\"${{ github.ref_name }}\",\"expires\":24,\"labels\":[\"refactoring\",\"functional\",\"immutability\",\"code-quality\"],\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[fp-enhancer] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

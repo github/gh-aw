@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 777fac080a683d82913ac01bab41d389298299b6fda17ca001cb0de07a5d5a2c
+# frontmatter-hash: 886192dc443ff5333372d34597d5a7ecbf5e79d15f608370ce0bbffd119f3b4e
 
 name: "Workflow Normalizer"
 "on":
@@ -190,7 +190,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"create_issue":{"expires":168,"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":24,"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -1134,7 +1134,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":168,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"title_prefix\":\"[workflow-style] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":24,\"group\":true,\"labels\":[\"cookie\"],\"max\":5,\"title_prefix\":\"[workflow-style] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

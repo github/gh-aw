@@ -20,7 +20,7 @@ safe-outputs:
     title-prefix: "[code-simplifier] "
     labels: [refactoring, code-quality, automation]
     reviewers: [copilot]
-    expires: 7d
+    expires: 1d
 
 tools:
   github:

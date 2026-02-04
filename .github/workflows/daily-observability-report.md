@@ -18,7 +18,7 @@ tools:
   agentic-workflows: true
 safe-outputs:
   create-discussion:
-    expires: 7d
+    expires: 1d
     category: "general"
     title-prefix: "[observability] "
     max: 1
