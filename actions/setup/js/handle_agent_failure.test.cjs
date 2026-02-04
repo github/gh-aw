@@ -1273,9 +1273,13 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(createCall.body).toContain("Repository configuration");
       expect(createCall.body).toContain("Missing repository settings file");
 
-      // Clean up temp file
-      fs.unlinkSync(agentOutputPath);
-      fs.rmdirSync(tempDir);
+      // Clean up temp file (use try-catch to ensure cleanup doesn't fail test)
+      try {
+        fs.unlinkSync(agentOutputPath);
+        fs.rmdirSync(tempDir);
+      } catch (cleanupError) {
+        // Ignore cleanup errors
+      }
     });
   });
 
