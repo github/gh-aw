@@ -302,52 +302,6 @@ jobs:
           sbom: true
           provenance: mode=max
 
-  changesets:
-    needs: ["activation", "config", "release", "agent"]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-          
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          
-      - name: Update CHANGELOG with changesets
-        env:
-          RELEASE_TAG: ${{ needs.config.outputs.release_tag }}
-        run: |
-          set -e
-          echo "Updating CHANGELOG.md for release: $RELEASE_TAG"
-          
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Run changeset script to update CHANGELOG.md and delete changeset files
-          # Pass the release tag as an argument
-          node scripts/changeset.js release "$RELEASE_TAG" --yes
-          
-          # Check if there are any changes to commit
-          if git diff --quiet CHANGELOG.md && [ -z "$(git ls-files --others --exclude-standard .changeset/)" ]; then
-            echo "No changeset updates to commit"
-          else
-            # Add and commit changes
-            git add CHANGELOG.md .changeset/
-            git commit -m "Update CHANGELOG.md for $RELEASE_TAG"
-            
-            # Push changes to main branch
-            git push origin main
-            
-            echo "✓ CHANGELOG.md updated and committed to main"
-          fi
-
 steps:
   - name: Setup environment and fetch release data
     env:
