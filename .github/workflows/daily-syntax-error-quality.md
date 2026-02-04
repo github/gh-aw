@@ -454,7 +454,7 @@ Create a detailed evaluation for each test case:
 | Acceptable (55-69) | 1 |
 | Poor (<55) | 0 |
 
-**Quality Assessment**: ⚠️ **Needs Improvement** (Average score below threshold of 70)
+**Quality Assessment**: ✅ **Good** (Average score above threshold of 70, but one test case needs attention)
 
 ---
 
