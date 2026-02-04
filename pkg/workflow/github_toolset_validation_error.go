@@ -66,6 +66,8 @@ func (e *GitHubToolsetValidationError) Error() string {
 	for _, toolset := range allToolsets {
 		lines = append(lines, fmt.Sprintf("      - %s", toolset))
 	}
+	lines = append(lines, "")
+	lines = append(lines, "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools")
 
 	return strings.Join(lines, "\n")
 }

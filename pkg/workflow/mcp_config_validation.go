@@ -156,7 +156,7 @@ func getRawMCPConfig(toolConfig map[string]any) (map[string]any, error) {
 		}
 	}
 
-	// Check for unknown fields that might be typos or deprecated (like "network")
+		// Check for unknown fields that might be typos or deprecated (like "network")
 	for field := range toolConfig {
 		if !knownToolFields[field] {
 			// Build list of valid fields for the error message
@@ -169,7 +169,7 @@ func getRawMCPConfig(toolConfig map[string]any) (map[string]any, error) {
 			if len(validFields) < maxFields {
 				maxFields = len(validFields)
 			}
-			return nil, fmt.Errorf("unknown property '%s' in tool configuration. Valid properties include: %s. Example:\nmcp-servers:\n  my-tool:\n    command: \"node server.js\"\n    args: [\"--verbose\"]", field, strings.Join(validFields[:maxFields], ", ")) // Show up to 10 to keep message reasonable
+			return nil, fmt.Errorf("unknown property '%s' in tool configuration. Valid properties include: %s.\n\nExample:\ntools:\n  my-tool:\n    command: \"node server.js\"\n    args: [\"--verbose\"]\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", field, strings.Join(validFields[:maxFields], ", "))
 		}
 	}
 
@@ -204,10 +204,10 @@ func getTypeString(value any) string {
 // validateStringProperty validates that a property is a string and returns appropriate error message
 func validateStringProperty(toolName, propertyName string, value any, exists bool) error {
 	if !exists {
-		return fmt.Errorf("tool '%s' mcp configuration missing required property '%s'. Example:\nmcp-servers:\n  %s:\n    %s: \"value\"", toolName, propertyName, toolName, propertyName)
+		return fmt.Errorf("tool '%s' mcp configuration missing required property '%s'.\n\nExample:\ntools:\n  %s:\n    %s: \"value\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, propertyName, toolName, propertyName)
 	}
 	if _, ok := value.(string); !ok {
-		return fmt.Errorf("tool '%s' mcp configuration property '%s' must be a string, got %T. Example:\nmcp-servers:\n  %s:\n    %s: \"my-value\"", toolName, propertyName, value, toolName, propertyName)
+		return fmt.Errorf("tool '%s' mcp configuration property '%s' must be a string, got %T.\n\nExample:\ntools:\n  %s:\n    %s: \"my-value\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, propertyName, value, toolName, propertyName)
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 	if hasType {
 		// Explicit type provided - validate it's a string
 		if _, ok := mcpType.(string); !ok {
-			return fmt.Errorf("tool '%s' mcp configuration 'type' must be a string, got %T. Valid types per MCP Gateway Specification: stdio, http. Note: 'local' is accepted for backward compatibility and treated as 'stdio'. Example:\nmcp-servers:\n  %s:\n    type: \"stdio\"\n    command: \"node server.js\"", toolName, mcpType, toolName)
+			return fmt.Errorf("tool '%s' mcp configuration 'type' must be a string, got %T. Valid types per MCP Gateway Specification: stdio, http. Note: 'local' is accepted for backward compatibility and treated as 'stdio'.\n\nExample:\ntools:\n  %s:\n    type: \"stdio\"\n    command: \"node server.js\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, mcpType, toolName)
 		}
 		typeStr = mcpType.(string)
 	} else {
@@ -233,7 +233,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 		} else if _, hasContainer := mcpConfig["container"]; hasContainer {
 			typeStr = "stdio"
 		} else {
-			return fmt.Errorf("tool '%s' unable to determine MCP type: missing type, url, command, or container. Example:\nmcp-servers:\n  %s:\n    command: \"node server.js\"\n    args: [\"--port\", \"3000\"]", toolName, toolName)
+			return fmt.Errorf("tool '%s' unable to determine MCP type: missing type, url, command, or container.\n\nExample:\ntools:\n  %s:\n    command: \"node server.js\"\n    args: [\"--port\", \"3000\"]\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, toolName)
 		}
 	}
 
@@ -244,7 +244,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 
 	// Validate type is one of the supported types
 	if !parser.IsMCPType(typeStr) {
-		return fmt.Errorf("tool '%s' mcp configuration 'type' must be one of: stdio, http (per MCP Gateway Specification). Note: 'local' is accepted for backward compatibility and treated as 'stdio'. Got: %s. Example:\nmcp-servers:\n  %s:\n    type: \"stdio\"\n    command: \"node server.js\"", toolName, typeStr, toolName)
+		return fmt.Errorf("tool '%s' mcp configuration 'type' must be one of: stdio, http (per MCP Gateway Specification). Note: 'local' is accepted for backward compatibility and treated as 'stdio'. Got: %s.\n\nExample:\ntools:\n  %s:\n    type: \"stdio\"\n    command: \"node server.js\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, typeStr, toolName)
 	}
 
 	// Validate type-specific requirements
@@ -255,7 +255,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 
 		// HTTP type cannot use container field
 		if _, hasContainer := mcpConfig["container"]; hasContainer {
-			return fmt.Errorf("tool '%s' mcp configuration with type 'http' cannot use 'container' field. HTTP MCP uses URL endpoints, not containers. Example:\nmcp-servers:\n  %s:\n    type: http\n    url: \"https://api.example.com/mcp\"\n    headers:\n      Authorization: \"Bearer ${{ secrets.API_KEY }}\"", toolName, toolName)
+			return fmt.Errorf("tool '%s' mcp configuration with type 'http' cannot use 'container' field. HTTP MCP uses URL endpoints, not containers.\n\nExample:\ntools:\n  %s:\n    type: http\n    url: \"https://api.example.com/mcp\"\n    headers:\n      Authorization: \"Bearer ${{ secrets.API_KEY }}\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, toolName)
 		}
 
 		return validateStringProperty(toolName, "url", url, hasURL)
@@ -266,7 +266,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 		container, hasContainer := mcpConfig["container"]
 
 		if hasCommand && hasContainer {
-			return fmt.Errorf("tool '%s' mcp configuration cannot specify both 'container' and 'command'. Choose one. Example:\nmcp-servers:\n  %s:\n    command: \"node server.js\"\nOr use container:\nmcp-servers:\n  %s:\n    container: \"my-registry/my-tool\"\n    version: \"latest\"", toolName, toolName, toolName)
+			return fmt.Errorf("tool '%s' mcp configuration cannot specify both 'container' and 'command'. Choose one.\n\nExample (command):\ntools:\n  %s:\n    command: \"node server.js\"\n\nExample (container):\ntools:\n  %s:\n    container: \"my-registry/my-tool\"\n    version: \"latest\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, toolName, toolName)
 		}
 
 		if hasCommand {
@@ -278,7 +278,7 @@ func validateMCPRequirements(toolName string, mcpConfig map[string]any, toolConf
 				return err
 			}
 		} else {
-			return fmt.Errorf("tool '%s' mcp configuration must specify either 'command' or 'container'. Example:\nmcp-servers:\n  %s:\n    command: \"node server.js\"\n    args: [\"--port\", \"3000\"]\nOr use container:\nmcp-servers:\n  %s:\n    container: \"my-registry/my-tool\"\n    version: \"latest\"", toolName, toolName, toolName)
+			return fmt.Errorf("tool '%s' mcp configuration must specify either 'command' or 'container'.\n\nExample (command):\ntools:\n  %s:\n    command: \"node server.js\"\n    args: [\"--port\", \"3000\"]\n\nExample (container):\ntools:\n  %s:\n    container: \"my-registry/my-tool\"\n    version: \"latest\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", toolName, toolName, toolName)
 		}
 	}
 

@@ -115,7 +115,7 @@ func validateDockerImage(image string, verbose bool) error {
 			strings.Contains(outputStr, "manifest unknown") {
 			// These errors won't be resolved by retrying
 			dockerValidationLog.Printf("Image %s does not exist (non-retryable error)", image)
-			return fmt.Errorf("container image '%s' not found and could not be pulled: %s. Please verify the image name and tag. Example: container: \"node:20\" or container: \"ghcr.io/owner/image:latest\"", image, outputStr)
+			return fmt.Errorf("container image '%s' not found and could not be pulled: %s. Please verify the image name and tag.\n\nExample:\ntools:\n  my-tool:\n    container: \"node:20\"\n\nOr:\ntools:\n  my-tool:\n    container: \"ghcr.io/owner/image:latest\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", image, outputStr)
 		}
 
 		// If not the last attempt, wait and retry (likely network error)
@@ -127,5 +127,5 @@ func validateDockerImage(image string, verbose bool) error {
 	}
 
 	// All attempts failed with retryable errors
-	return fmt.Errorf("container image '%s' not found and could not be pulled after %d attempts: %s. Please verify the image name and tag. Example: container: \"node:20\" or container: \"ghcr.io/owner/image:latest\"", image, maxAttempts, lastOutput)
+	return fmt.Errorf("container image '%s' not found and could not be pulled after %d attempts: %s. Please verify the image name and tag.\n\nExample:\ntools:\n  my-tool:\n    container: \"node:20\"\n\nOr:\ntools:\n  my-tool:\n    container: \"ghcr.io/owner/image:latest\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md", image, maxAttempts, lastOutput)
 }

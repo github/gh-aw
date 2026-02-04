@@ -66,7 +66,7 @@ func (c *Compiler) validateEngine(engineID string) error {
 
 	engineValidationLog.Printf("Engine ID %s not found: %v", engineID, err)
 	// Provide helpful error with valid options
-	return fmt.Errorf("invalid engine: %s. Valid engines are: copilot, claude, codex, custom. Example: engine: copilot", engineID)
+	return fmt.Errorf("invalid engine: %s. Valid engines are: copilot, claude, codex, custom.\n\nExample:\nengine: copilot\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md", engineID)
 }
 
 // validateSingleEngineSpecification validates that only one engine field exists across all files
@@ -91,7 +91,7 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 	}
 
 	if len(allEngines) > 1 {
-		return "", fmt.Errorf("multiple engine fields found (%d engine specifications detected). Only one engine field is allowed across the main workflow and all included files. Remove duplicate engine specifications to keep only one. Example: engine: copilot", len(allEngines))
+		return "", fmt.Errorf("multiple engine fields found (%d engine specifications detected). Only one engine field is allowed across the main workflow and all included files. Remove duplicate engine specifications to keep only one.\n\nExample:\nengine: copilot\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md", len(allEngines))
 	}
 
 	// Exactly one engine found - parse and return it
@@ -102,7 +102,7 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 	// Must be from included file
 	var firstEngine any
 	if err := json.Unmarshal([]byte(includedEnginesJSON[0]), &firstEngine); err != nil {
-		return "", fmt.Errorf("failed to parse included engine configuration: %w. Expected string or object format. Example (string): engine: copilot or (object): engine:\\n  id: copilot\\n  model: gpt-4", err)
+		return "", fmt.Errorf("failed to parse included engine configuration: %w. Expected string or object format.\n\nExample (string):\nengine: copilot\n\nExample (object):\nengine:\n  id: copilot\n  model: gpt-4\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md", err)
 	}
 
 	// Handle string format
@@ -117,5 +117,5 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 		}
 	}
 
-	return "", fmt.Errorf("invalid engine configuration in included file, missing or invalid 'id' field. Expected string or object with 'id' field. Example (string): engine: copilot or (object): engine:\\n  id: copilot\\n  model: gpt-4")
+	return "", fmt.Errorf("invalid engine configuration in included file, missing or invalid 'id' field. Expected string or object with 'id' field.\n\nExample (string):\nengine: copilot\n\nExample (object):\nengine:\n  id: copilot\n  model: gpt-4\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md")
 }

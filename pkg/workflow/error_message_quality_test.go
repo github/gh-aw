@@ -292,7 +292,7 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 				"must specify either",
 				"command",
 				"container",
-				"Example:",
+				"Example",
 			},
 		},
 		{
@@ -341,7 +341,7 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 				"stdio",
 				"http",
 				"Example:",
-				"mcp-servers:",
+				"tools:",
 			},
 		},
 		{
@@ -358,8 +358,8 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 				"command",
 				"container",
 				"Choose one",
-				"Example:",
-				"mcp-servers:",
+				"Example",
+				"tools:",
 			},
 		},
 		{
@@ -378,7 +378,7 @@ func TestMCPValidationErrorQuality(t *testing.T) {
 				"local",
 				"websocket",
 				"Example:",
-				"mcp-servers:",
+				"tools:",
 			},
 		},
 	}

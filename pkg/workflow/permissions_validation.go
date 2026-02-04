@@ -321,6 +321,8 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 		level := result.MissingPermissions[scope]
 		lines = append(lines, fmt.Sprintf("  %s: %s", scope, level))
 	}
+	lines = append(lines, "")
+	lines = append(lines, "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/permissions.md")
 
 	// Add suggestion to reduce toolsets if we have toolset details
 	if len(result.MissingToolsetDetails) > 0 {
