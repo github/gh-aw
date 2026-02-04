@@ -212,6 +212,63 @@ func deleteSetupAgenticWorkflowsAgent(verbose bool) error {
 	return cleanupOldPromptFile("setup-agentic-workflows.prompt.md", verbose)
 }
 
+// deleteOldTemplateFiles deletes old template files that are no longer bundled in the binary
+func deleteOldTemplateFiles(verbose bool) error {
+	gitRoot, err := findGitRoot()
+	if err != nil {
+		return nil // Not in a git repository, skip
+	}
+
+	// Template files that were removed from pkg/cli/templates/
+	templateFiles := []string{
+		"agentic-workflows.agent.md",
+		"create-agentic-workflow.md",
+		"create-shared-agentic-workflow.md",
+		"debug-agentic-workflow.md",
+		"github-agentic-workflows.md",
+		"serena-tool.md",
+		"update-agentic-workflow.md",
+		"upgrade-agentic-workflows.md",
+	}
+
+	templatesDir := filepath.Join(gitRoot, "pkg", "cli", "templates")
+	
+	// Check if templates directory exists
+	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
+		// Directory doesn't exist, nothing to clean up
+		return nil
+	}
+
+	removedCount := 0
+	for _, file := range templateFiles {
+		path := filepath.Join(templatesDir, file)
+		if _, err := os.Stat(path); err == nil {
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to remove old template file %s: %w", file, err)
+			}
+			removedCount++
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed old template file: %s", path)))
+			}
+		}
+	}
+
+	// If directory is now empty, remove it
+	if removedCount > 0 {
+		entries, err := os.ReadDir(templatesDir)
+		if err == nil && len(entries) == 0 {
+			if err := os.Remove(templatesDir); err != nil {
+				return fmt.Errorf("failed to remove empty templates directory: %w", err)
+			}
+			if verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Removed empty templates directory: %s", templatesDir)))
+			}
+		}
+	}
+
+	return nil
+}
+
 // deleteOldAgentFiles deletes old .agent.md files that have been moved to .github/aw/
 func deleteOldAgentFiles(verbose bool) error {
 	gitRoot, err := findGitRoot()

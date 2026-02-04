@@ -46,6 +46,7 @@ Available codemods:
   • schedule-at-to-around-migration: Converts 'daily at TIME' to 'daily around TIME'
   • delete-schema-file: Deletes deprecated .github/aw/schemas/agentic-workflow.json
   • delete-old-agents: Deletes old .agent.md files moved to .github/aw/
+  • delete-old-templates: Removes old template files from pkg/cli/templates/
 
 If no workflows are specified, all Markdown files in .github/workflows will be processed.
 
@@ -56,7 +57,8 @@ The command will:
   4. Write updated files back to disk (with --write flag)
   5. Update prompt and agent files to latest templates (similar to 'init' command)
   6. Delete deprecated .github/aw/schemas/agentic-workflow.json file if it exists
-  7. Delete old .agent.md files that have been moved to .github/aw/ (with --write flag)
+  7. Delete old template files from pkg/cli/templates/ (with --write flag)
+  8. Delete old .agent.md files that have been moved to .github/aw/ (with --write flag)
 
 ` + WorkflowIDExplanation + `
 
@@ -231,6 +233,15 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	if err := ensureSerenaTool(verbose, false); err != nil {
 		fixLog.Printf("Failed to update Serena tool documentation: %v", err)
 		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update Serena tool documentation: %v", err)))
+	}
+
+	// Delete old template files from pkg/cli/templates/ (only with --write)
+	if write {
+		fixLog.Print("Cleaning up old template files")
+		if err := deleteOldTemplateFiles(verbose); err != nil {
+			fixLog.Printf("Failed to delete old template files: %v", err)
+			fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to delete old template files: %v", err)))
+		}
 	}
 
 	// Delete old agent files if write flag is set
