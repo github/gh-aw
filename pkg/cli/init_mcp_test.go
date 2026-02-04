@@ -276,7 +276,7 @@ jobs:
 	}
 
 	contentStr := string(content)
-	
+
 	// File should remain unchanged
 	if contentStr != customContent {
 		t.Errorf("Expected file to remain unchanged (should render instructions instead of modifying)")

@@ -238,20 +238,20 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 // renderCopilotSetupUpdateInstructions renders console instructions for updating copilot-setup-steps.yml
 func renderCopilotSetupUpdateInstructions(filePath string, actionMode workflow.ActionMode, version string) {
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintf(os.Stderr, "%s %s\n", 
-		"ℹ", 
+	fmt.Fprintf(os.Stderr, "%s %s\n",
+		"ℹ",
 		fmt.Sprintf("Existing file detected: %s", filePath))
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "To enable GitHub Copilot Agent integration, please add the following steps")
 	fmt.Fprintln(os.Stderr, "to the 'copilot-setup-steps' job in your .github/workflows/copilot-setup-steps.yml file:")
 	fmt.Fprintln(os.Stderr)
-	
+
 	// Determine the action reference
 	actionRef := "@main"
 	if actionMode.IsRelease() && version != "" && version != "dev" {
 		actionRef = "@" + version
 	}
-	
+
 	if actionMode.IsRelease() {
 		fmt.Fprintln(os.Stderr, "      - name: Checkout repository")
 		fmt.Fprintln(os.Stderr, "        uses: actions/checkout@v4")

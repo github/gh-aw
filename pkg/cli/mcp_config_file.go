@@ -48,7 +48,7 @@ func ensureMCPConfig(verbose bool) error {
 	// Check if file already exists
 	if data, err := os.ReadFile(mcpConfigPath); err == nil {
 		mcpConfigLog.Printf("File already exists: %s", mcpConfigPath)
-		
+
 		// Parse existing config
 		var config MCPConfig
 		if err := json.Unmarshal(data, &config); err != nil {
@@ -98,19 +98,19 @@ func ensureMCPConfig(verbose bool) error {
 // renderMCPConfigUpdateInstructions renders console instructions for updating .vscode/mcp.json
 func renderMCPConfigUpdateInstructions(filePath, serverName string, serverConfig VSCodeMCPServer) {
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintf(os.Stderr, "%s %s\n", 
-		"ℹ", 
+	fmt.Fprintf(os.Stderr, "%s %s\n",
+		"ℹ",
 		fmt.Sprintf("Existing file detected: %s", filePath))
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "To enable GitHub Copilot Agent MCP server integration, please add the following")
 	fmt.Fprintln(os.Stderr, "to the \"servers\" section of your .vscode/mcp.json file:")
 	fmt.Fprintln(os.Stderr)
-	
+
 	// Generate the JSON to add
 	serverJSON, _ := json.MarshalIndent(map[string]VSCodeMCPServer{
 		serverName: serverConfig,
 	}, "", "  ")
-	
+
 	fmt.Fprintln(os.Stderr, string(serverJSON))
 	fmt.Fprintln(os.Stderr)
 }

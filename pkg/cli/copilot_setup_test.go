@@ -749,7 +749,7 @@ jobs:
 	if contentStr != existingContent {
 		t.Errorf("Expected file to remain unchanged (instructions should be rendered instead), got:\n%s", contentStr)
 	}
-	
+
 	// Verify the install step was NOT injected
 	if strings.Contains(contentStr, "actions/setup-cli") {
 		t.Errorf("Expected 'actions/setup-cli' to NOT be injected (instructions should be rendered)")
@@ -813,7 +813,7 @@ jobs:
 	if contentStr != existingContent {
 		t.Errorf("Expected file to remain unchanged (instructions should be rendered instead), got:\n%s", contentStr)
 	}
-	
+
 	// Verify the install step was NOT injected
 	if strings.Contains(contentStr, "curl -fsSL") {
 		t.Errorf("Expected 'curl' command to NOT be injected (instructions should be rendered)")
