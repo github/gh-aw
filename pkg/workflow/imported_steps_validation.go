@@ -35,6 +35,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
@@ -42,13 +43,58 @@ import (
 
 var importedStepsValidationLog = logger.New("workflow:imported_steps_validation")
 
-// agenticEngineSecrets maps secret names to their display names for validation
-var agenticEngineSecrets = map[string]string{
-	"COPILOT_GITHUB_TOKEN":    "Copilot engine",
-	"ANTHROPIC_API_KEY":       "Claude engine",
-	"CLAUDE_CODE_OAUTH_TOKEN": "Claude engine",
-	"CODEX_API_KEY":           "Codex engine",
-	"OPENAI_API_KEY":          "Codex engine",
+// buildAgenticEngineSecretsMap dynamically builds a map of agentic engine secret names
+// by querying each registered engine for its required secrets
+func buildAgenticEngineSecretsMap() map[string]string {
+	secretsMap := make(map[string]string)
+
+	// Create a minimal WorkflowData for querying engine secrets
+	// (we don't need MCP servers or other config for base secret names)
+	workflowData := &WorkflowData{}
+
+	// Get secrets from Copilot engine
+	copilotEngine := NewCopilotEngine()
+	for _, secret := range copilotEngine.GetRequiredSecretNames(workflowData) {
+		// Skip non-agentic secrets (like MCP_GATEWAY_API_KEY, GITHUB_MCP_SERVER_TOKEN)
+		if secret == "COPILOT_GITHUB_TOKEN" {
+			secretsMap[secret] = "Copilot engine"
+		}
+	}
+
+	// Get secrets from Claude engine
+	claudeEngine := NewClaudeEngine()
+	for _, secret := range claudeEngine.GetRequiredSecretNames(workflowData) {
+		// Skip non-agentic secrets
+		if secret == "ANTHROPIC_API_KEY" || secret == "CLAUDE_CODE_OAUTH_TOKEN" {
+			secretsMap[secret] = "Claude engine"
+		}
+	}
+
+	// Get secrets from Codex engine
+	codexEngine := NewCodexEngine()
+	for _, secret := range codexEngine.GetRequiredSecretNames(workflowData) {
+		// Skip non-agentic secrets
+		if secret == "CODEX_API_KEY" || secret == "OPENAI_API_KEY" {
+			secretsMap[secret] = "Codex engine"
+		}
+	}
+
+	return secretsMap
+}
+
+// getAgenticEngineSecrets returns the map of agentic engine secrets
+// Lazily builds the map on first call
+var (
+	agenticEngineSecretsMap     map[string]string
+	agenticEngineSecretsMapOnce sync.Once
+)
+
+func getAgenticEngineSecrets() map[string]string {
+	agenticEngineSecretsMapOnce.Do(func() {
+		agenticEngineSecretsMap = buildAgenticEngineSecretsMap()
+		importedStepsValidationLog.Printf("Built agentic engine secrets map with %d entries", len(agenticEngineSecretsMap))
+	})
+	return agenticEngineSecretsMap
 }
 
 // isCustomAgenticEngine checks if the custom engine is actually another agentic framework
@@ -106,6 +152,9 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 
 	importedStepsValidationLog.Printf("Validating %d custom engine steps for agentic secrets", len(engineConfig.Steps))
 
+	// Get the map of agentic engine secrets (dynamically built from engine instances)
+	agenticSecrets := getAgenticEngineSecrets()
+
 	// Build regex pattern to detect secrets references
 	// Matches: ${{ secrets.SECRET_NAME }} or ${{secrets.SECRET_NAME}}
 	secretsPattern := regexp.MustCompile(`\$\{\{\s*secrets\.([A-Z_][A-Z0-9_]*)\s*(?:\|\||&&)?[^}]*\}\}`)
@@ -132,7 +181,7 @@ func (c *Compiler) validateImportedStepsNoAgenticSecrets(engineConfig *EngineCon
 			}
 
 			secretName := match[1]
-			if engineName, isAgenticSecret := agenticEngineSecrets[secretName]; isAgenticSecret {
+			if engineName, isAgenticSecret := agenticSecrets[secretName]; isAgenticSecret {
 				importedStepsValidationLog.Printf("Found agentic secret in step %d: %s (engine: %s)", stepIdx, secretName, engineName)
 				if !containsSecretName(foundSecrets, secretName) {
 					foundSecrets = append(foundSecrets, secretName)
