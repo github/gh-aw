@@ -31,18 +31,29 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 	currentWorkflowName := getCurrentWorkflowName(workflowPath)
 	dispatchWorkflowValidationLog.Printf("Current workflow name: %s", currentWorkflowName)
 
+	// Collect all validation errors using ErrorCollector
+	collector := NewErrorCollector(c.failFast)
+
 	for _, workflowName := range config.Workflows {
 		dispatchWorkflowValidationLog.Printf("Validating workflow: %s", workflowName)
 
 		// Check for self-reference
 		if workflowName == currentWorkflowName {
-			return fmt.Errorf("dispatch-workflow: self-reference not allowed (workflow '%s' cannot dispatch itself)", workflowName)
+			selfRefErr := fmt.Errorf("dispatch-workflow: self-reference not allowed (workflow '%s' cannot dispatch itself)", workflowName)
+			if returnErr := collector.Add(selfRefErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Find the workflow file in multiple locations
 		fileResult, err := findWorkflowFile(workflowName, workflowPath)
 		if err != nil {
-			return fmt.Errorf("dispatch-workflow: error finding workflow '%s': %w", workflowName, err)
+			findErr := fmt.Errorf("dispatch-workflow: error finding workflow '%s': %w", workflowName, err)
+			if returnErr := collector.Add(findErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Check if any workflow file exists
@@ -53,8 +64,12 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 			repoRoot := filepath.Dir(githubDir)
 			workflowsDir := filepath.Join(repoRoot, ".github", "workflows")
 
-			return fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s (tried .md, .lock.yml, and .yml extensions)",
+			notFoundErr := fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s (tried .md, .lock.yml, and .yml extensions)",
 				workflowName, workflowsDir)
+			if returnErr := collector.Add(notFoundErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Validate that the workflow supports workflow_dispatch
@@ -67,29 +82,49 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 			workflowFile = fileResult.lockPath
 			workflowContent, readErr = os.ReadFile(fileResult.lockPath) // #nosec G304 -- Path is validated via isPathWithinDir in findWorkflowFile
 			if readErr != nil {
-				return fmt.Errorf("dispatch-workflow: failed to read workflow file %s: %w", fileResult.lockPath, readErr)
+				fileReadErr := fmt.Errorf("dispatch-workflow: failed to read workflow file %s: %w", fileResult.lockPath, readErr)
+				if returnErr := collector.Add(fileReadErr); returnErr != nil {
+					return returnErr // Fail-fast mode
+				}
+				continue // Skip further validation for this workflow
 			}
 		} else if fileResult.ymlExists {
 			workflowFile = fileResult.ymlPath
 			workflowContent, readErr = os.ReadFile(fileResult.ymlPath) // #nosec G304 -- Path is validated via isPathWithinDir in findWorkflowFile
 			if readErr != nil {
-				return fmt.Errorf("dispatch-workflow: failed to read workflow file %s: %w", fileResult.ymlPath, readErr)
+				fileReadErr := fmt.Errorf("dispatch-workflow: failed to read workflow file %s: %w", fileResult.ymlPath, readErr)
+				if returnErr := collector.Add(fileReadErr); returnErr != nil {
+					return returnErr // Fail-fast mode
+				}
+				continue // Skip further validation for this workflow
 			}
 		} else {
 			// Only .md exists - needs to be compiled first
-			return fmt.Errorf("dispatch-workflow: workflow '%s' must be compiled first (run 'gh aw compile %s')", workflowName, fileResult.mdPath)
+			compileErr := fmt.Errorf("dispatch-workflow: workflow '%s' must be compiled first (run 'gh aw compile %s')", workflowName, fileResult.mdPath)
+			if returnErr := collector.Add(compileErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Parse the workflow YAML to check for workflow_dispatch trigger
 		var workflow map[string]any
 		if err := yaml.Unmarshal(workflowContent, &workflow); err != nil {
-			return fmt.Errorf("dispatch-workflow: failed to parse workflow file %s: %w", workflowFile, err)
+			parseErr := fmt.Errorf("dispatch-workflow: failed to parse workflow file %s: %w", workflowFile, err)
+			if returnErr := collector.Add(parseErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Check if the workflow has an "on" section
 		onSection, hasOn := workflow["on"]
 		if !hasOn {
-			return fmt.Errorf("dispatch-workflow: workflow '%s' does not have an 'on' trigger section", workflowName)
+			onSectionErr := fmt.Errorf("dispatch-workflow: workflow '%s' does not have an 'on' trigger section", workflowName)
+			if returnErr := collector.Add(onSectionErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		// Check if workflow_dispatch is in the "on" section
@@ -114,14 +149,20 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 		}
 
 		if !hasWorkflowDispatch {
-			return fmt.Errorf("dispatch-workflow: workflow '%s' does not support workflow_dispatch trigger (must include 'workflow_dispatch' in the 'on' section)", workflowName)
+			dispatchErr := fmt.Errorf("dispatch-workflow: workflow '%s' does not support workflow_dispatch trigger (must include 'workflow_dispatch' in the 'on' section)", workflowName)
+			if returnErr := collector.Add(dispatchErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
+			continue // Skip further validation for this workflow
 		}
 
 		dispatchWorkflowValidationLog.Printf("Workflow '%s' is valid for dispatch (found in %s)", workflowName, workflowFile)
 	}
 
-	dispatchWorkflowValidationLog.Printf("All %d workflows validated successfully", len(config.Workflows))
-	return nil
+	dispatchWorkflowValidationLog.Printf("Dispatch workflow validation completed: error_count=%d, total_workflows=%d", collector.Count(), len(config.Workflows))
+
+	// Return aggregated errors with formatted output
+	return collector.FormattedError("dispatch-workflow")
 }
 
 // extractWorkflowDispatchInputs parses a workflow file and extracts the workflow_dispatch inputs schema

@@ -54,6 +54,8 @@ var bundlerRuntimeLog = logger.New("workflow:bundler_runtime_validation")
 // validateNoRuntimeMixing checks that all files being bundled are compatible with the target runtime mode
 // This prevents mixing nodejs-only scripts (that use child_process) with github-script scripts
 // Returns an error if incompatible runtime modes are detected
+// Note: This function uses fail-fast error handling because runtime mode conflicts in dependencies
+// need to be resolved one at a time, and showing multiple conflicting dependency chains would be confusing
 func validateNoRuntimeMixing(mainScript string, sources map[string]string, targetMode RuntimeMode) error {
 	bundlerRuntimeLog.Printf("Validating runtime mode compatibility: target_mode=%s", targetMode)
 
@@ -61,6 +63,7 @@ func validateNoRuntimeMixing(mainScript string, sources map[string]string, targe
 	checked := make(map[string]bool)
 
 	// Recursively validate the main script and its dependencies
+	// This uses fail-fast error handling because runtime conflicts need sequential resolution
 	return validateRuntimeModeRecursive(mainScript, "", sources, targetMode, checked)
 }
 

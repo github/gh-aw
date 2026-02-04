@@ -269,7 +269,7 @@ func TestDryRunNoActualAPICallsForCreate(t *testing.T) {
 	output := buf.String()
 
 	// Should not error
-	assert.NoError(t, err, "Dry-run should not error")
+	require.NoError(t, err, "Dry-run should not error")
 
 	// Should indicate that it would create the repository
 	if strings.Contains(output, "exists") {
@@ -333,7 +333,7 @@ func TestDryRunForceDeleteBehavior(t *testing.T) {
 			buf.ReadFrom(r)
 			output := buf.String()
 
-			assert.NoError(t, err, "Should not error in dry-run mode")
+			require.NoError(t, err, "Should not error in dry-run mode")
 			assert.Contains(t, output, "[DRY RUN]", "Should show dry-run prefix")
 		})
 	}
