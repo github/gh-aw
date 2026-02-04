@@ -1,7 +1,6 @@
 package cli
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -27,30 +26,6 @@ func init() {
 	// This allows workflow.NewCompiler() to auto-detect the version
 	workflow.SetDefaultVersion(version)
 }
-
-//go:embed templates/github-agentic-workflows.md
-var copilotInstructionsTemplate string
-
-//go:embed templates/agentic-workflows.agent.md
-var agenticWorkflowsDispatcherTemplate string
-
-//go:embed templates/create-agentic-workflow.md
-var createWorkflowPromptTemplate string
-
-//go:embed templates/update-agentic-workflow.md
-var updateWorkflowPromptTemplate string
-
-//go:embed templates/create-shared-agentic-workflow.md
-var createSharedAgenticWorkflowPromptTemplate string
-
-//go:embed templates/debug-agentic-workflow.md
-var debugWorkflowPromptTemplate string
-
-//go:embed templates/upgrade-agentic-workflows.md
-var upgradeAgenticWorkflowsPromptTemplate string
-
-//go:embed templates/serena-tool.md
-var serenaToolTemplate string
 
 // SetVersionInfo sets the version information for the CLI and workflow package
 func SetVersionInfo(v string) {
