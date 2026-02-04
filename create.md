@@ -42,8 +42,8 @@ Follow the instructions in the appropriate prompt based on the user's request.
 
 Here ROOT is the location where you found this file. For example,
 
-* if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the ROOT is `https://github.com/github/gh-aw/blob/main/`
-* if this file is at `https://github.com/github/gh-aw/blob/v0.35.1/create.md` then the ROOT is `https://github.com/github/gh-aw/v0.35.1/main/`
+- if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the ROOT is `https://github.com/github/gh-aw/blob/main/`
+- if this file is at `https://github.com/github/gh-aw/blob/v0.35.1/create.md` then the ROOT is `https://github.com/github/gh-aw/v0.35.1/main/`
 
 ### Create New Workflow
 
@@ -57,11 +57,27 @@ Here ROOT is the location where you found this file. For example,
 - "I need a workflow to label pull requests"
 - "Design a weekly research automation"
 
-### Update Existing Workflow  
+**Common shared components**:
+
+When the workflow produces reports, manages GitHub Projects, or acts as an orchestrator, prefer importing existing shared guidance instead of duplicating instructions.
+
+Pin to a semantic tag like `@v1.2.3` for stability (use `@main` for latest, or a commit SHA for immutability).
+
+```yaml
+imports:
+
+  - github/gh-aw/.github/workflows/shared/reporting.md@vX.Y.Z
+  - github/gh-aw/.github/workflows/shared/projects.md@vX.Y.Z
+  - github/gh-aw/.github/workflows/shared/orchestration.md@vX.Y.Z
+```
+
+Note: When developing *inside* the gh-aw repository itself, these same files also exist under `.github/workflows/shared/` and can be imported locally as `shared/<name>.md`.
+
+### Update Existing Workflow
 
 **Load when**: User wants to modify, improve, or refactor an existing workflow
 
-**Prompt file**: `ROOT/.github/aw/update-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md)
+**Prompt file**: `ROOT/.github/aw/update-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the prompt file is at `https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md`)
 
 **Use cases**:
 
@@ -69,11 +85,11 @@ Here ROOT is the location where you found this file. For example,
 - "Update the PR reviewer to use discussions instead of issues"
 - "Improve the prompt for the weekly-research workflow"
 
-### Debug Workflow  
+### Debug Workflow
 
 **Load when**: User needs to investigate, audit, debug, or understand a workflow, troubleshoot issues, analyze logs, or fix errors
 
-**Prompt file**: `ROOT/.github/aw/debug-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md)
+**Prompt file**: `ROOT/.github/aw/debug-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the prompt file is at `https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md`)
 
 **Use cases**:
 
@@ -85,7 +101,7 @@ Here ROOT is the location where you found this file. For example,
 
 **Load when**: User wants to upgrade workflows to a new gh-aw version or fix deprecations
 
-**Prompt file**: `ROOT/.github/aw/upgrade-agentic-workflows.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md)
+**Prompt file**: `ROOT/.github/aw/upgrade-agentic-workflows.md` (relative to the location where you found this file. For example, if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the prompt file is at `https://github.com/github/gh-aw/blob/main/.github/aw/debug-agentic-workflow.md`)
 
 **Use cases**:
 
@@ -97,7 +113,7 @@ Here ROOT is the location where you found this file. For example,
 
 **Load when**: User wants to create a reusable workflow component or wrap an MCP server
 
-**Prompt file**: `ROOT/.github/aw/create-shared-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at https://github.com/github/gh-aw/blob/main/create.md then the prompt file is at https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md)
+**Prompt file**: `ROOT/.github/aw/create-shared-agentic-workflow.md` (relative to the location where you found this file. For example, if this file is at `https://github.com/github/gh-aw/blob/main/create.md` then the prompt file is at `https://github.com/github/gh-aw/blob/main/.github/aw/update-agentic-workflow.md`)
 
 **Use cases**:
 
@@ -161,7 +177,7 @@ See the separate guides on troubleshooting common issues.
 When a user interacts with you:
 
 1. **Identify the task type** from the user's request
-2. **Fetch and read the appropriate prompt** 
+2. **Fetch and read the appropriate prompt**
 3. **Follow the loaded prompt's instructions** exactly
 4. **If uncertain**, ask clarifying questions to determine the right prompt
 
