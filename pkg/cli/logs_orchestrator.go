@@ -43,6 +43,15 @@ func getMaxConcurrentDownloads() int {
 func DownloadWorkflowLogs(ctx context.Context, workflowName string, count int, startDate, endDate, outputDir, engine, ref string, beforeRunID, afterRunID int64, repoOverride string, verbose bool, toolGraph bool, noStaged bool, firewallOnly bool, noFirewall bool, parse bool, jsonOutput bool, timeout int, summaryFile string, safeOutputType string) error {
 	logsOrchestratorLog.Printf("Starting workflow log download: workflow=%s, count=%d, startDate=%s, endDate=%s, outputDir=%s, summaryFile=%s, safeOutputType=%s", workflowName, count, startDate, endDate, outputDir, summaryFile, safeOutputType)
 
+	// Ensure .github/aw/logs/.gitignore exists on every invocation
+	if err := ensureLogsGitignore(); err != nil {
+		// Log but don't fail - this is not critical for downloading logs
+		logsOrchestratorLog.Printf("Failed to ensure logs .gitignore: %v", err)
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to ensure .github/aw/logs/.gitignore: %v", err)))
+		}
+	}
+
 	// Check context cancellation at the start
 	select {
 	case <-ctx.Done():
