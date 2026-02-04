@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,7 +34,7 @@ This is a test workflow without a lock file.
 	require.NoError(t, err)
 
 	// Test collecting files - should now compile the workflow and create lock file
-	files, err := collectWorkflowFiles(workflowPath, false)
+	files, err := collectWorkflowFiles(context.Background(), workflowPath, false)
 	require.NoError(t, err)
 	assert.Len(t, files, 2, "Should collect workflow .md file and auto-generate lock file")
 
