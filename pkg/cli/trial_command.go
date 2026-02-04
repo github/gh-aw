@@ -95,6 +95,7 @@ Repeat and cleanup examples:
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --repeat 3                # Run 3 times total
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --delete-host-repo-after  # Delete repo after completion
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --quiet --host-repo my-trial # Custom host repo
+  ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --dry-run                 # Show what would be done without changes
 
 Auto-merge examples:
   ` + string(constants.CLIExtensionPrefix) + ` trial githubnext/agentics/my-workflow --auto-merge-prs          # Auto-merge any PRs created during trial
