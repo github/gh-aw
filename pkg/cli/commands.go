@@ -50,7 +50,8 @@ func downloadAgentFileFromGitHub(verbose bool) (string, error) {
 	currentVersion := GetVersion()
 	
 	// If version looks like a release tag (starts with v and contains dots), use it
-	if strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".") {
+	isRelease := strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".")
+	if isRelease {
 		ref = currentVersion
 		commandsLog.Printf("Using release tag: %s", ref)
 		if verbose {
@@ -89,8 +90,31 @@ func downloadAgentFileFromGitHub(verbose bool) (string, error) {
 		return "", fmt.Errorf("failed to read agent file content: %w", err)
 	}
 	
-	commandsLog.Printf("Successfully downloaded agent file (%d bytes)", len(content))
-	return string(content), nil
+	contentStr := string(content)
+	
+	// Patch URLs to match the current version/ref
+	patchedContent := patchAgentFileURLs(contentStr, ref)
+	if patchedContent != contentStr && verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Patched URLs to use ref: %s", ref)))
+	}
+	
+	commandsLog.Printf("Successfully downloaded agent file (%d bytes)", len(patchedContent))
+	return patchedContent, nil
+}
+
+// patchAgentFileURLs patches URLs in the agent file to use the correct ref
+func patchAgentFileURLs(content, ref string) string {
+	// Pattern 1: Convert local paths to GitHub URLs
+	// `.github/aw/file.md` -> `https://github.com/github/gh-aw/blob/{ref}/.github/aw/file.md`
+	content = strings.ReplaceAll(content, "`.github/aw/", fmt.Sprintf("`https://github.com/github/gh-aw/blob/%s/.github/aw/", ref))
+	
+	// Pattern 2: Update existing GitHub URLs to use the correct ref
+	// https://github.com/github/gh-aw/blob/main/ -> https://github.com/github/gh-aw/blob/{ref}/
+	if ref != "main" {
+		content = strings.ReplaceAll(content, "/blob/main/", fmt.Sprintf("/blob/%s/", ref))
+	}
+	
+	return content
 }
 
 func isGHCLIAvailable() bool {
