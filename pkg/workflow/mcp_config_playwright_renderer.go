@@ -131,9 +131,13 @@ func renderPlaywrightMCPConfigWithOptions(yaml *strings.Builder, playwrightConfi
 	// Build entrypoint args for Playwright MCP server (goes after container image)
 	entrypointArgs := []string{"--output-dir", "/tmp/gh-aw/mcp-logs/playwright"}
 	if len(allowedDomains) > 0 {
-		domainsStr := strings.Join(allowedDomains, ";")
-		entrypointArgs = append(entrypointArgs, "--allowed-hosts", domainsStr)
-		entrypointArgs = append(entrypointArgs, "--allowed-origins", domainsStr)
+		// Per Playwright MCP documentation:
+		// --allowed-hosts expects comma-separated list
+		// --allowed-origins expects semicolon-separated list
+		allowedHostsStr := strings.Join(allowedDomains, ",")
+		allowedOriginsStr := strings.Join(allowedDomains, ";")
+		entrypointArgs = append(entrypointArgs, "--allowed-hosts", allowedHostsStr)
+		entrypointArgs = append(entrypointArgs, "--allowed-origins", allowedOriginsStr)
 	}
 	// Append custom args if present
 	if len(customArgs) > 0 {

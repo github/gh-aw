@@ -1138,7 +1138,7 @@ jobs:
                 "type": "stdio",
                 "container": "mcr.microsoft.com/playwright/mcp",
                 "args": ["--init", "--network", "host"],
-                "entrypointArgs": ["--output-dir", "/tmp/gh-aw/mcp-logs/playwright", "--allowed-hosts", "localhost;localhost:*;127.0.0.1;127.0.0.1:*;github.com", "--allowed-origins", "localhost;localhost:*;127.0.0.1;127.0.0.1:*;github.com"],
+                "entrypointArgs": ["--output-dir", "/tmp/gh-aw/mcp-logs/playwright", "--allowed-hosts", "localhost,localhost:*,127.0.0.1,127.0.0.1:*,github.com", "--allowed-origins", "localhost;localhost:*;127.0.0.1;127.0.0.1:*;github.com"],
                 "mounts": ["/tmp/gh-aw/mcp-logs:/tmp/gh-aw/mcp-logs:rw"]
               },
               "safeinputs": {
