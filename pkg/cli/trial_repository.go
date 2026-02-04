@@ -21,8 +21,9 @@ var trialRepoLog = logger.New("cli:trial_repository")
 // ensureTrialRepository creates a host repository if it doesn't exist, or reuses existing one
 // For clone-repo mode, reusing an existing host repository is not allowed
 // If forceDeleteHostRepo is true, deletes the repository if it exists before creating it
-func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHostRepo bool, verbose bool) error {
-	trialRepoLog.Printf("Ensuring trial repository: %s (cloneRepo=%s, forceDelete=%v)", repoSlug, cloneRepoSlug, forceDeleteHostRepo)
+// If dryRun is true, only shows what would be done without making changes
+func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHostRepo bool, dryRun bool, verbose bool) error {
+	trialRepoLog.Printf("Ensuring trial repository: %s (cloneRepo=%s, forceDelete=%v, dryRun=%v)", repoSlug, cloneRepoSlug, forceDeleteHostRepo, dryRun)
 
 	parts := strings.Split(repoSlug, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
@@ -31,7 +32,18 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 
 	// Check if repository already exists
 	cmd := workflow.ExecGH("repo", "view", repoSlug)
-	if err := cmd.Run(); err == nil {
+	output, err := cmd.CombinedOutput()
+	repoExists := err == nil
+
+	if dryRun && verbose {
+		if repoExists {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("[DRY RUN] Repository %s exists", repoSlug)))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("[DRY RUN] Repository %s does not exist (output: %s)", repoSlug, string(output))))
+		}
+	}
+
+	if repoExists {
 		trialRepoLog.Printf("Repository %s already exists", repoSlug)
 		// Repository exists - determine what to do
 		if forceDeleteHostRepo {
@@ -40,11 +52,15 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Force deleting existing host repository: %s", repoSlug)))
 			}
 
-			if deleteOutput, deleteErr := workflow.RunGHCombined("Deleting repository...", "repo", "delete", repoSlug, "--yes"); deleteErr != nil {
-				return fmt.Errorf("failed to force delete existing host repository %s: %w (output: %s)", repoSlug, deleteErr, string(deleteOutput))
-			}
+			if dryRun {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("[DRY RUN] Would delete repository: %s", repoSlug)))
+			} else {
+				if deleteOutput, deleteErr := workflow.RunGHCombined("Deleting repository...", "repo", "delete", repoSlug, "--yes"); deleteErr != nil {
+					return fmt.Errorf("failed to force delete existing host repository %s: %w (output: %s)", repoSlug, deleteErr, string(deleteOutput))
+				}
 
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Force deleted existing host repository: %s", repoSlug)))
+				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Force deleted existing host repository: %s", repoSlug)))
+			}
 
 			// Continue to create the repository below
 		} else {
@@ -57,18 +73,34 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Reusing existing host repository: %s", repoSlug)))
 				}
 			}
-			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Using existing host repository: https://github.com/%s", repoSlug)))
+			prefix := ""
+			if dryRun {
+				prefix = "[DRY RUN] "
+			}
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("%sUsing existing host repository: https://github.com/%s", prefix, repoSlug)))
 			return nil
 		}
 	}
 
 	// Repository doesn't exist, create it
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Creating private host repository: %s", repoSlug)))
+	if verbose || dryRun {
+		prefix := ""
+		if dryRun {
+			prefix = "[DRY RUN] "
+		}
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("%sCreating private host repository: %s", prefix, repoSlug)))
+	}
+
+	if dryRun {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Would create repository with description: 'GitHub Agentic Workflows host repository'"))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("[DRY RUN] Would enable GitHub Actions permissions at: https://github.com/%s/settings/actions", repoSlug)))
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("[DRY RUN] Would enable discussions"))
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("[DRY RUN] Would create host repository: https://github.com/%s", repoSlug)))
+		return nil
 	}
 
 	// Use gh CLI to create private repo with initial README using full OWNER/REPO format
-	output, err := workflow.RunGHCombined("Creating repository...", "repo", "create", repoSlug, "--private", "--add-readme", "--description", "GitHub Agentic Workflows host repository")
+	output, err = workflow.RunGHCombined("Creating repository...", "repo", "create", repoSlug, "--private", "--add-readme", "--description", "GitHub Agentic Workflows host repository")
 
 	if err != nil {
 		// Check if the error is because the repository already exists

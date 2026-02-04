@@ -55,7 +55,7 @@ func TestRepoSlugErrorMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test ensureTrialRepository function
-			err := ensureTrialRepository(tt.repoSlug, "", false, false)
+			err := ensureTrialRepository(tt.repoSlug, "", false, false, false)
 
 			if err == nil {
 				t.Errorf("expected error for repo slug '%s', got nil", tt.repoSlug)

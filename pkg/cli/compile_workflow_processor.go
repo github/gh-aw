@@ -113,10 +113,8 @@ func compileWorkflowFile(
 			return result
 		}
 
-		errMsg := fmt.Sprintf("failed to parse workflow file %s: %v", resolvedFile, err)
-		if !jsonOutput {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
-		}
+		// Don't print error here - it will be displayed in the compilation summary
+		// The error is stored in ValidationResult for JSON output and summary display
 		result.validationResult.Valid = false
 		result.validationResult.Errors = append(result.validationResult.Errors, CompileValidationError{
 			Type:    "parse_error",
@@ -131,10 +129,8 @@ func compileWorkflowFile(
 	// Compile the workflow
 	// Disable per-file actionlint run (false instead of actionlint && !noEmit) - we'll batch them
 	if err := CompileWorkflowDataWithValidation(compiler, workflowData, resolvedFile, verbose && !jsonOutput, zizmor && !noEmit, poutine && !noEmit, false, strict, validate && !noEmit); err != nil {
-		// Always put error on a new line and don't wrap with "failed to compile workflow"
-		if !jsonOutput {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
-		}
+		// Don't print error here - it will be displayed in the compilation summary
+		// The error is stored in ValidationResult for JSON output and summary display
 		result.validationResult.Valid = false
 		result.validationResult.Errors = append(result.validationResult.Errors, CompileValidationError{
 			Type:    "compilation_error",

@@ -75,9 +75,8 @@ func compileSpecificFiles(
 		compileOrchestrationLog.Printf("Resolving workflow file: %s", markdownFile)
 		resolvedFile, err := resolveWorkflowFile(markdownFile, config.Verbose)
 		if err != nil {
-			if !config.JSONOutput {
-				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
-			}
+			// Don't print error here - it will be displayed in the compilation summary
+			// The error is stored in ValidationResult for JSON output and returned for main to display
 			errorMessages = append(errorMessages, err.Error())
 			errorCount++
 			stats.Errors++
