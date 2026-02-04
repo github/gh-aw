@@ -60,15 +60,12 @@ This is a test workflow.
 	err = RunUpgrade(config)
 	require.NoError(t, err, "Upgrade command should succeed")
 
-	// Verify that agent files were created
-	instructionsFile := filepath.Join(tmpDir, ".github", "aw", "github-agentic-workflows.md")
-	assert.FileExists(t, instructionsFile, "Copilot instructions file should be created")
-
+	// Verify that dispatcher agent file was created
+	// Note: After PR #13612, only the dispatcher agent file is downloaded/created.
+	// Other files (github-agentic-workflows.md, upgrade-agentic-workflows.md, etc.)
+	// are expected to exist only in the gh-aw repository itself.
 	dispatcherFile := filepath.Join(tmpDir, ".github", "agents", "agentic-workflows.agent.md")
 	assert.FileExists(t, dispatcherFile, "Dispatcher agent file should be created")
-
-	upgradePromptFile := filepath.Join(tmpDir, ".github", "aw", "upgrade-agentic-workflows.md")
-	assert.FileExists(t, upgradePromptFile, "Upgrade prompt file should be created")
 }
 
 func TestUpgradeCommand_AppliesCodemods(t *testing.T) {
