@@ -83,14 +83,20 @@ func buildAgenticEngineSecretsMap() map[string]string {
 
 // isAgenticEngineSecret returns true if the secret is an agentic engine-specific secret
 // (not an infrastructure secret like MCP_GATEWAY_API_KEY or GITHUB_MCP_SERVER_TOKEN)
+//
+// Infrastructure secrets are used for internal plumbing (MCP gateway, GitHub API access)
+// and are not agentic engine authentication credentials. These secrets are safe to use
+// in custom engine steps as they don't bypass the firewall or expose AI engine credentials.
 func isAgenticEngineSecret(secretName string) bool {
 	// Infrastructure/gateway secrets that are NOT agentic engine secrets
+	// These secrets are ignored in the validation because they are safe to use
+	// in custom engine steps (they don't expose AI engine credentials)
 	nonAgenticSecrets := map[string]bool{
-		"MCP_GATEWAY_API_KEY":           true,
-		"GITHUB_MCP_SERVER_TOKEN":       true,
-		"GH_AW_GITHUB_MCP_SERVER_TOKEN": true,
-		"GH_AW_GITHUB_TOKEN":            true,
-		"GITHUB_TOKEN":                  true,
+		"MCP_GATEWAY_API_KEY":           true, // MCP gateway infrastructure
+		"GITHUB_MCP_SERVER_TOKEN":       true, // GitHub MCP server access
+		"GH_AW_GITHUB_MCP_SERVER_TOKEN": true, // GitHub MCP server access (alternative)
+		"GH_AW_GITHUB_TOKEN":            true, // GitHub API access
+		"GITHUB_TOKEN":                  true, // GitHub Actions default token
 	}
 
 	return !nonAgenticSecrets[secretName]
