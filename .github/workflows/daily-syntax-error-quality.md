@@ -454,7 +454,14 @@ Create a detailed evaluation for each test case:
 | Acceptable (55-69) | 1 |
 | Poor (<55) | 0 |
 
-**Quality Assessment**: ✅ **Good** (Average score above threshold of 70, but one test case needs attention)
+**Quality Assessment**: ✅ **Good** (Average score: 74.7/100, above threshold of 70. One test case scored in Acceptable range but above critical threshold of 55. No issue creation required.)
+
+**Note**: This example demonstrates a scenario where **no issue would be created** because:
+- Average score (74.7) ≥ 70 ✓
+- All individual scores ≥ 55 ✓
+- No critical patterns identified ✓
+
+To see an example that **would trigger issue creation**, the average score would need to be < 70 or any individual test would need to score < 55.
 
 ---
 
