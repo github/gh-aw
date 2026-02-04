@@ -27,7 +27,7 @@
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 8fe9ac7b6dec460b437721f9400a51fe6597bb52d1ae955c82e2e8b33efc5845
+# frontmatter-hash: 4fe173ff899c6116bad234c3b2dd4ace4e85f88b65bb683225ece8952be7749a
 
 name: "Daily Project Performance Summary Generator (Using Safe Inputs)"
 "on":
@@ -746,7 +746,6 @@ jobs:
           }
           EOF
           fi
-          
           
           EOFSH_github-discussion-query
           chmod +x /opt/gh-aw/safe-inputs/github-discussion-query.sh
