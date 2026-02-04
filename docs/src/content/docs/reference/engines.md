@@ -79,7 +79,22 @@ engine:
   version: latest                       # defaults to latest
   model: gpt-5                          # defaults to claude-sonnet-4
   args: ["--add-dir", "/workspace"]     # custom CLI arguments
+  agent: agent-id                       # custom agent file identifier
 ```
+
+### Custom Agent Configuration
+
+For the Copilot engine, you can specify a custom agent using the `agent` field. This references a custom agent file located in the `.github/agents/` directory:
+
+```yaml wrap
+engine:
+  id: copilot
+  agent: technical-doc-writer
+```
+
+The `agent` field value should match the agent file name without the `.agent.md` extension. For example, `agent: technical-doc-writer` references `.github/agents/technical-doc-writer.agent.md`.
+
+Custom agent files define specialized behaviors, tool access, and instructions tailored to specific tasks. See [Custom Agents](/gh-aw/reference/custom-agents/) for details on creating and configuring custom agents.
 
 ### Engine Environment Variables
 
