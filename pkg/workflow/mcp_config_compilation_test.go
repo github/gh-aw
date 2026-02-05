@@ -186,3 +186,104 @@ func TestHasMCPConfigDetection(t *testing.T) {
 		})
 	}
 }
+
+// TestDevModeAgenticWorkflowsContainer verifies that the agentic-workflows MCP server
+// uses the locally built Docker image in dev mode instead of alpine:latest
+func TestDevModeAgenticWorkflowsContainer(t *testing.T) {
+	tests := []struct {
+		name              string
+		actionMode        ActionMode
+		expectedContainer string
+	}{
+		{
+			name:              "dev mode uses local image",
+			actionMode:        ActionModeDev,
+			expectedContainer: "localhost/gh-aw:dev",
+		},
+		{
+			name:              "release mode uses alpine",
+			actionMode:        ActionModeRelease,
+			expectedContainer: "alpine:latest",
+		},
+		{
+			name:              "script mode uses alpine",
+			actionMode:        ActionModeScript,
+			expectedContainer: "alpine:latest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a workflow with agentic-workflows tool
+			workflowContent := `---
+on:
+  workflow_dispatch:
+strict: false
+permissions:
+  contents: read
+  actions: read
+engine: copilot
+tools:
+  agentic-workflows:
+---
+
+# Test Agentic Workflows Dev Mode
+
+This workflow tests that agentic-workflows uses the correct container in dev mode.
+`
+
+			// Create temporary file
+			tmpFile, err := os.CreateTemp("", "test-dev-mode-*.md")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tmpFile.Name())
+
+			// Write content to file
+			if _, err := tmpFile.WriteString(workflowContent); err != nil {
+				t.Fatalf("Failed to write to temp file: %v", err)
+			}
+			tmpFile.Close()
+
+			// Compile the workflow with the specified action mode
+			compiler := NewCompiler()
+			compiler.SetActionMode(tt.actionMode)
+
+			if err := compiler.CompileWorkflow(tmpFile.Name()); err != nil {
+				t.Fatalf("Failed to compile workflow: %v", err)
+			}
+
+			// Read the compiled lock file
+			lockFile := strings.TrimSuffix(tmpFile.Name(), ".md") + ".lock.yml"
+			defer os.Remove(lockFile)
+
+			lockContent, err := os.ReadFile(lockFile)
+			if err != nil {
+				t.Fatalf("Failed to read lock file: %v", err)
+			}
+
+			// Check that the container image is correct
+			if !strings.Contains(string(lockContent), `"container": "`+tt.expectedContainer+`"`) {
+				t.Errorf("Expected container %q in lock file, but not found. Lock file content:\n%s",
+					tt.expectedContainer, string(lockContent))
+			}
+
+			// In dev mode, also check for the build steps
+			if tt.actionMode == ActionModeDev {
+				requiredSteps := []string{
+					"Setup Go",
+					"Build gh-aw CLI",
+					"Setup Docker Buildx",
+					"Build gh-aw Docker image",
+					"tags: localhost/gh-aw:dev",
+				}
+
+				for _, step := range requiredSteps {
+					if !strings.Contains(string(lockContent), step) {
+						t.Errorf("Expected build step %q in dev mode lock file, but not found", step)
+					}
+				}
+			}
+		})
+	}
+}

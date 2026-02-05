@@ -241,7 +241,7 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
-	
+
 	// In dev mode, use the locally built gh-aw image which includes all dependencies
 	containerImage := constants.DefaultAlpineImage
 	if actionMode.IsDev() {
