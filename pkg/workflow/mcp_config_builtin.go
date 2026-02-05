@@ -165,6 +165,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
 	// The gh-aw binary is mounted from /opt/gh-aw and executed directly inside a minimal Alpine container
+	// In dev mode, use locally built Docker image instead of alpine:latest
 	yaml.WriteString("              \"agentic_workflows\": {\n")
 
 	// Add type field for Copilot (per MCP Gateway Specification v1.0.0, use "stdio" for containerized servers)
@@ -173,7 +174,12 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 
 	// MCP Gateway spec fields for containerized stdio servers
-	yaml.WriteString("                \"container\": \"" + constants.DefaultAlpineImage + "\",\n")
+	// In dev mode, use the locally built gh-aw image which includes all dependencies
+	containerImage := constants.DefaultAlpineImage
+	if actionMode.IsDev() {
+		containerImage = constants.DevModeGhAwImage
+	}
+	yaml.WriteString("                \"container\": \"" + containerImage + "\",\n")
 	yaml.WriteString("                \"entrypoint\": \"/opt/gh-aw/gh-aw\",\n")
 
 	// In dev mode, add --cmd argument to specify the binary path
@@ -235,7 +241,13 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
-	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
+	
+	// In dev mode, use the locally built gh-aw image which includes all dependencies
+	containerImage := constants.DefaultAlpineImage
+	if actionMode.IsDev() {
+		containerImage = constants.DevModeGhAwImage
+	}
+	yaml.WriteString("          container = \"" + containerImage + "\"\n")
 	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
 
 	// In dev mode, add --cmd argument to specify the binary path

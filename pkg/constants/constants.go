@@ -383,6 +383,10 @@ const DefaultPythonAlpineLTSImage = "python:alpine"
 // Used for MCP servers that run statically-linked Go binaries like gh-aw mcp-server
 const DefaultAlpineImage = "alpine:latest"
 
+// DevModeGhAwImage is the Docker image tag for locally built gh-aw container in dev mode
+// This image is built during workflow execution and includes the gh-aw binary and dependencies
+const DevModeGhAwImage = "localhost/gh-aw:dev"
+
 // DefaultGhAwMount is the mount path for the gh-aw directory in containerized MCP servers
 // The gh-aw binary and supporting files are mounted read-only from /opt/gh-aw
 const DefaultGhAwMount = "/opt/gh-aw:/opt/gh-aw:ro"
