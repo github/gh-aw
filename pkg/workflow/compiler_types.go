@@ -427,6 +427,7 @@ type WorkflowData struct {
 	SecretMasking        *SecretMaskingConfig // secret masking configuration
 	ParsedFrontmatter    *FrontmatterConfig   // cached parsed frontmatter configuration (for performance optimization)
 	ActionPinWarnings    map[string]bool      // cache of already-warned action pin failures (key: "repo@version")
+	ActionMode           ActionMode           // action mode for workflow compilation (dev, release, script)
 }
 
 // BaseSafeOutputConfig holds common configuration fields for all safe output types

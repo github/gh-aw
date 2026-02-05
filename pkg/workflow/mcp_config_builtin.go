@@ -158,7 +158,7 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 // renderAgenticWorkflowsMCPConfigWithOptions generates the Agentic Workflows MCP server configuration with engine-specific options
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
-func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool) {
+func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode) {
 	envVars := []string{
 		"GITHUB_TOKEN",
 	}
@@ -175,7 +175,15 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	// MCP Gateway spec fields for containerized stdio servers
 	yaml.WriteString("                \"container\": \"" + constants.DefaultAlpineImage + "\",\n")
 	yaml.WriteString("                \"entrypoint\": \"/opt/gh-aw/gh-aw\",\n")
-	yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\"],\n")
+
+	// In dev mode, add --cmd argument to specify the binary path
+	// This is required for the MCP server to execute commands like 'compile', 'status', etc.
+	if actionMode.IsDev() {
+		yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"],\n")
+	} else {
+		yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\"],\n")
+	}
+
 	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
 	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
 
@@ -224,12 +232,19 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 // renderAgenticWorkflowsMCPConfigTOML generates the Agentic Workflows MCP server configuration in TOML format for Codex
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
-func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder) {
+func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
 	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
 	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
-	yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+
+	// In dev mode, add --cmd argument to specify the binary path
+	if actionMode.IsDev() {
+		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
+	} else {
+		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+	}
+
 	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
 	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
 	// Use env_vars array to reference environment variables instead of embedding secrets

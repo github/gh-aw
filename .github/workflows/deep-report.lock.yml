@@ -569,7 +569,7 @@ jobs:
           [mcp_servers.agentic_workflows]
           container = "alpine:latest"
           entrypoint = "/opt/gh-aw/gh-aw"
-          entrypointArgs = ["mcp-server"]
+          entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]
           mounts = ["/opt/gh-aw:/opt/gh-aw:ro"]
           env_vars = ["GITHUB_TOKEN"]
           
@@ -596,7 +596,7 @@ jobs:
               "agentic_workflows": {
                 "container": "alpine:latest",
                 "entrypoint": "/opt/gh-aw/gh-aw",
-                "entrypointArgs": ["mcp-server"],
+                "entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"],
                 "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "/usr/bin/gh:/usr/bin/gh:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
