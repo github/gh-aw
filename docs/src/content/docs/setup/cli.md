@@ -264,9 +264,10 @@ gh aw trial githubnext/agentics/ci-doctor          # Test remote workflow
 gh aw trial ./workflow.md --use-local-secrets      # Test with local API keys
 gh aw trial ./workflow.md --logical-repo owner/repo # Act as different repo
 gh aw trial ./workflow.md --repo owner/repo        # Run directly in repository
+gh aw trial ./workflow.md --dry-run                # Preview actions without executing
 ```
 
-**Options:** `-e`, `--engine`, `--auto-merge-prs`, `--repeat`, `--delete-host-repo-after`, `--use-local-secrets`, `--logical-repo`, `--clone-repo`, `--trigger-context`, `--repo`
+**Options:** `-e`, `--engine`, `--auto-merge-prs`, `--repeat`, `--delete-host-repo-after`, `--use-local-secrets`, `--logical-repo`, `--clone-repo`, `--trigger-context`, `--repo`, `--dry-run`
 
 #### `run`
 

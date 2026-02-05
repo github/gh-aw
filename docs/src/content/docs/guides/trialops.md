@@ -65,6 +65,16 @@ gh aw trial githubnext/agentics/code-review --clone-repo myorg/real-repo
 
 ## Basic Usage
 
+### Dry-Run Mode
+
+Preview trial operations without executing workflows or creating repositories:
+
+```bash
+gh aw trial ./my-workflow.md --dry-run
+```
+
+Dry-run mode shows what actions would be taken, including repository creation, workflow installation, and execution plans. Use this to verify trial configuration before committing to the full process.
+
 ### Single Workflow
 
 ```bash
@@ -205,11 +215,12 @@ cat trials/combined-results.*.json | jq '.results[] | {workflow: .workflow_name,
 ### Development Workflow
 
 1. Write workflows locally in your editor
-2. Test with `gh aw trial ./my-workflow.md`
-3. Adjust based on trial results
-4. Compare variants side-by-side
-5. Validate with `--repeat`
-6. Deploy to production
+2. Preview with `gh aw trial ./my-workflow.md --dry-run`
+3. Test with `gh aw trial ./my-workflow.md`
+4. Adjust based on trial results
+5. Compare variants side-by-side
+6. Validate with `--repeat`
+7. Deploy to production
 
 ### Testing Strategy
 
