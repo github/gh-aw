@@ -106,15 +106,16 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"agentic_workflows": {`,
 				`"type": "stdio"`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"entrypoint": "gh-aw"`,                                // Binary is in PATH in dev image
-				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed, entrypoint is gh-aw
+				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
 			unexpectedContent: []string{
 				`--cmd`,
+				`"entrypoint"`,               // Not needed in dev mode - uses container's ENTRYPOINT
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				`${{ secrets.`,
@@ -136,6 +137,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
@@ -153,11 +155,11 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"entrypoint": "gh-aw"`,                                // Binary is in PATH in dev image
 				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
 				// Security fix: Now uses shell variable instead of GitHub secret expression
+				`"GH_TOKEN": "$GH_TOKEN"`,
 				`"GITHUB_TOKEN": "$GITHUB_TOKEN"`,
 				`              }`,
 			},
@@ -165,6 +167,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"type"`,
 				`\\${`,
 				`--cmd`,
+				`"entrypoint"`,               // Not needed in dev mode - uses container's ENTRYPOINT
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				// Verify GitHub expressions are NOT in the output (security fix)
@@ -242,34 +245,36 @@ func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 	tests := []struct {
-		name               string
-		actionMode         ActionMode
-		expectedContainer  string
-		expectedEntrypoint string
-		expectedMounts     []string
-		unexpectedContent  []string
+		name                 string
+		actionMode           ActionMode
+		expectedContainer    string
+		shouldHaveEntrypoint bool
+		expectedMounts       []string
+		unexpectedContent    []string
 	}{
 		{
-			name:               "dev mode without mounts",
-			actionMode:         ActionModeDev,
-			expectedContainer:  `container = "localhost/gh-aw:dev"`,
-			expectedEntrypoint: `entrypoint = "gh-aw"`,
+			name:                 "dev mode without entrypoint",
+			actionMode:           ActionModeDev,
+			expectedContainer:    `container = "localhost/gh-aw:dev"`,
+			shouldHaveEntrypoint: false, // Dev mode uses container's default ENTRYPOINT
 			expectedMounts: []string{
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount
 			},
 			unexpectedContent: []string{
 				`--cmd`,
+				`entrypoint =`,               // Not needed in dev mode - uses container's ENTRYPOINT
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode
 			},
 		},
 		{
-			name:               "release mode with mounts",
-			actionMode:         ActionModeRelease,
-			expectedContainer:  `container = "alpine:latest"`,
-			expectedEntrypoint: `entrypoint = "/opt/gh-aw/gh-aw"`,
+			name:                 "release mode with entrypoint and mounts",
+			actionMode:           ActionModeRelease,
+			expectedContainer:    `container = "alpine:latest"`,
+			shouldHaveEntrypoint: true,
 			expectedMounts: []string{
+				`entrypoint = "/opt/gh-aw/gh-aw"`,                      // Entrypoint needed in release mode
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount
@@ -292,9 +297,8 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContent := []string{
 				`[mcp_servers.agentic_workflows]`,
 				tt.expectedContainer,
-				tt.expectedEntrypoint,
 				`entrypointArgs = ["mcp-server"]`,
-				`env_vars = ["GITHUB_TOKEN"]`,
+				`env_vars = ["GH_TOKEN", "GITHUB_TOKEN"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)
 

@@ -189,9 +189,9 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"container": "localhost/gh-aw:dev"`) {
 		t.Error("Expected dev mode container image for containerized server")
 	}
-	// In dev mode, entrypoint is gh-aw (binary is in PATH)
-	if !strings.Contains(output, `"entrypoint": "gh-aw"`) {
-		t.Error("Expected gh-aw entrypoint (binary in PATH in dev image)")
+	// In dev mode, should NOT have entrypoint (uses container's default ENTRYPOINT)
+	if strings.Contains(output, `"entrypoint"`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
 	// In dev mode, should NOT have binary mounts
 	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
@@ -199,6 +199,13 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	}
 	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
 		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+	}
+	// Should have both GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env vars")
+	}
+	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
 }
 
@@ -248,9 +255,9 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	if !strings.Contains(output, `container = "localhost/gh-aw:dev"`) {
 		t.Error("Expected dev mode container image for containerized server")
 	}
-	// In dev mode, entrypoint is gh-aw (binary is in PATH)
-	if !strings.Contains(output, `entrypoint = "gh-aw"`) {
-		t.Error("Expected gh-aw entrypoint (binary in PATH in dev image)")
+	// In dev mode, should NOT have entrypoint (uses container's default ENTRYPOINT)
+	if strings.Contains(output, `entrypoint =`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
 	// In dev mode, no --cmd needed
 	if !strings.Contains(output, `entrypointArgs = ["mcp-server"]`) {
@@ -262,6 +269,13 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	}
 	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
 		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+	}
+	// Should have both GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env_vars")
+	}
+	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env_vars")
 	}
 }
 

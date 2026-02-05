@@ -160,6 +160,7 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
 func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode) {
 	envVars := []string{
+		"GH_TOKEN",
 		"GITHUB_TOKEN",
 	}
 
@@ -178,9 +179,9 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 
 	if actionMode.IsDev() {
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
-		// The Dockerfile installs the binary at /usr/local/bin/gh-aw and sets it as ENTRYPOINT
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"], so we don't need to specify entrypoint
 		containerImage = constants.DevModeGhAwImage
-		entrypoint = "gh-aw"
+		entrypoint = "" // Use container's default entrypoint
 		// Only mount workspace and temp directory - binary and gh CLI are in the image
 		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
@@ -192,7 +193,13 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 
 	yaml.WriteString("                \"container\": \"" + containerImage + "\",\n")
-	yaml.WriteString("                \"entrypoint\": \"" + entrypoint + "\",\n")
+
+	// Only write entrypoint if it's specified (release mode)
+	// In dev mode, use the container's default ENTRYPOINT
+	if entrypoint != "" {
+		yaml.WriteString("                \"entrypoint\": \"" + entrypoint + "\",\n")
+	}
+
 	yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\"],\n")
 
 	// Write mounts
@@ -260,9 +267,9 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 
 	if actionMode.IsDev() {
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
-		// The Dockerfile installs the binary at /usr/local/bin/gh-aw and sets it as ENTRYPOINT
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"], so we don't need to specify entrypoint
 		containerImage = constants.DevModeGhAwImage
-		entrypoint = "gh-aw"
+		entrypoint = "" // Use container's default entrypoint
 		// Only mount workspace and temp directory - binary and gh CLI are in the image
 		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
@@ -273,7 +280,13 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	}
 
 	yaml.WriteString("          container = \"" + containerImage + "\"\n")
-	yaml.WriteString("          entrypoint = \"" + entrypoint + "\"\n")
+
+	// Only write entrypoint if it's specified (release mode)
+	// In dev mode, use the container's default ENTRYPOINT
+	if entrypoint != "" {
+		yaml.WriteString("          entrypoint = \"" + entrypoint + "\"\n")
+	}
+
 	yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 
 	// Write mounts
@@ -287,5 +300,5 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	yaml.WriteString("]\n")
 
 	// Use env_vars array to reference environment variables instead of embedding secrets
-	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
+	yaml.WriteString("          env_vars = [\"GH_TOKEN\", \"GITHUB_TOKEN\"]\n")
 }

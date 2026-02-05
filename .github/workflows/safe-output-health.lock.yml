@@ -475,10 +475,10 @@ jobs:
             "mcpServers": {
               "agentic_workflows": {
                 "container": "localhost/gh-aw:dev",
-                "entrypoint": "gh-aw",
                 "entrypointArgs": ["mcp-server"],
                 "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
+                  "GH_TOKEN": "$GH_TOKEN",
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
                 }
               },

@@ -285,14 +285,14 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					}
 				}
 
-				// Verify entrypoint is gh-aw (not /opt/gh-aw/gh-aw)
-				if !strings.Contains(string(lockContent), `"entrypoint": "gh-aw"`) {
-					t.Error("Expected entrypoint to be 'gh-aw' in dev mode (binary in PATH)")
+				// Verify NO entrypoint field (uses container's default ENTRYPOINT)
+				if strings.Contains(string(lockContent), `"entrypoint"`) {
+					t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 				}
 
-				// Verify no --cmd argument (not needed when binary is entrypoint)
+				// Verify no --cmd argument (not needed)
 				if strings.Contains(string(lockContent), `"--cmd"`) {
-					t.Error("Did not expect --cmd argument in dev mode (binary is entrypoint)")
+					t.Error("Did not expect --cmd argument in dev mode")
 				}
 
 				// Verify binary mounts are NOT present in dev mode
@@ -301,6 +301,14 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 				}
 				if strings.Contains(string(lockContent), `/usr/bin/gh:/usr/bin/gh:ro`) {
 					t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+				}
+
+				// Verify both GH_TOKEN and GITHUB_TOKEN are present
+				if !strings.Contains(string(lockContent), `"GH_TOKEN"`) {
+					t.Error("Expected GH_TOKEN in dev mode env vars")
+				}
+				if !strings.Contains(string(lockContent), `"GITHUB_TOKEN"`) {
+					t.Error("Expected GITHUB_TOKEN in dev mode env vars")
 				}
 			}
 		})

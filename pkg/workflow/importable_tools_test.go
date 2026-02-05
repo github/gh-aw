@@ -229,13 +229,13 @@ Uses imported agentic-workflows tool.
 	workflowData := string(lockFileContent)
 
 	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
-	// In dev mode, entrypoint is gh-aw (binary in PATH) and no --cmd argument needed
+	// In dev mode, no entrypoint field (uses container's default ENTRYPOINT)
 	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server"]`) {
 		t.Error("Expected compiled workflow to contain simple 'mcp-server' entrypointArgs in dev mode")
 	}
 
 	if strings.Contains(workflowData, `"--cmd"`) {
-		t.Error("Did not expect --cmd argument in dev mode (binary is entrypoint)")
+		t.Error("Did not expect --cmd argument in dev mode")
 	}
 
 	// Verify container format is used (not command format)
@@ -244,14 +244,22 @@ Uses imported agentic-workflows tool.
 		t.Error("Expected compiled workflow to contain localhost/gh-aw:dev container for agentic-workflows in dev mode")
 	}
 
-	// Verify entrypoint is gh-aw (not /opt/gh-aw/gh-aw)
-	if !strings.Contains(workflowData, `"entrypoint": "gh-aw"`) {
-		t.Error("Expected entrypoint to be 'gh-aw' in dev mode (binary in PATH)")
+	// Verify NO entrypoint field (uses container's default ENTRYPOINT)
+	if strings.Contains(workflowData, `"entrypoint"`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
 
 	// Verify binary mounts are NOT present in dev mode
 	if strings.Contains(workflowData, `/opt/gh-aw:/opt/gh-aw:ro`) {
 		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+
+	// Verify both GH_TOKEN and GITHUB_TOKEN are present
+	if !strings.Contains(workflowData, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env vars")
+	}
+	if !strings.Contains(workflowData, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
 }
 

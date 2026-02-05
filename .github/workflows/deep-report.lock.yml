@@ -595,10 +595,9 @@ jobs:
           
           [mcp_servers.agentic_workflows]
           container = "localhost/gh-aw:dev"
-          entrypoint = "gh-aw"
           entrypointArgs = ["mcp-server"]
           mounts = ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]
-          env_vars = ["GITHUB_TOKEN"]
+          env_vars = ["GH_TOKEN", "GITHUB_TOKEN"]
           
           [mcp_servers.github]
           user_agent = "deepreport-intelligence-gathering-agent"
@@ -622,10 +621,10 @@ jobs:
             "mcpServers": {
               "agentic_workflows": {
                 "container": "localhost/gh-aw:dev",
-                "entrypoint": "gh-aw",
                 "entrypointArgs": ["mcp-server"],
                 "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
+                  "GH_TOKEN": "$GH_TOKEN",
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
                 }
               },
