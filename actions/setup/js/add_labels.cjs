@@ -48,15 +48,12 @@ async function main(config = {}) {
     processedCount++;
 
     // Determine target issue/PR number
-    const itemNumber = message.item_number !== undefined ? parseInt(String(message.item_number), 10) : context.payload?.issue?.number || context.payload?.pull_request?.number;
+    const itemNumber = message.item_number !== undefined ? parseInt(String(message.item_number), 10) : (context.payload?.issue?.number ?? context.payload?.pull_request?.number);
 
     if (!itemNumber || isNaN(itemNumber)) {
-      const errorMsg = message.item_number !== undefined ? `Invalid item number: ${message.item_number}` : "No item_number provided and not in issue/PR context";
-      core.warning(errorMsg);
-      return {
-        success: false,
-        error: message.item_number !== undefined ? `Invalid item number: ${message.item_number}` : "No issue/PR number available",
-      };
+      const error = message.item_number !== undefined ? `Invalid item number: ${message.item_number}` : "No issue/PR number available";
+      core.warning(error);
+      return { success: false, error };
     }
 
     const contextType = context.payload?.pull_request ? "pull request" : "issue";
@@ -64,18 +61,11 @@ async function main(config = {}) {
     core.info(`Requested labels: ${JSON.stringify(requestedLabels)}`);
 
     // If no labels provided, return a helpful message with allowed labels if configured
-    if (!requestedLabels || requestedLabels.length === 0) {
-      let errorMessage = "No labels provided. Please provide at least one label from";
-      if (allowedLabels.length > 0) {
-        errorMessage += ` the allowed list: ${JSON.stringify(allowedLabels)}`;
-      } else {
-        errorMessage += " the repository's available labels";
-      }
-      core.info(errorMessage);
-      return {
-        success: false,
-        error: errorMessage,
-      };
+    if (requestedLabels.length === 0) {
+      const labelSource = allowedLabels.length > 0 ? `the allowed list: ${JSON.stringify(allowedLabels)}` : "the repository's available labels";
+      const error = `No labels provided. Please provide at least one label from ${labelSource}`;
+      core.info(error);
+      return { success: false, error };
     }
 
     // Use validation helper to sanitize and validate labels
@@ -101,6 +91,7 @@ async function main(config = {}) {
 
     const uniqueLabels = labelsResult.value ?? [];
 
+    // Early return if no labels after validation
     if (uniqueLabels.length === 0) {
       core.info("No labels to add");
       return {
@@ -121,7 +112,6 @@ async function main(config = {}) {
       });
 
       core.info(`Successfully added ${uniqueLabels.length} labels to ${contextType} #${itemNumber}`);
-
       return {
         success: true,
         number: itemNumber,
@@ -131,10 +121,7 @@ async function main(config = {}) {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to add labels: ${errorMessage}`);
-      return {
-        success: false,
-        error: errorMessage,
-      };
+      return { success: false, error: errorMessage };
     }
   };
 }
