@@ -45,6 +45,8 @@ The workflow follows a "one file per feature" principle: files should be named a
 
 In our own use of Semantic Function Refactoring **36 out of 53 proposed PRs were merged** (67% acceptance rate). It's been impressive to see how many organizational improvements the workflow can identify that we missed, and how practical its suggestions are for improving code structure and maintainability.
 
+An example PR from our own use of this workflow is [Move misplaced extraction functions to frontmatter_extraction.go](https://github.com/github/gh-aw/pull/7043).
+
 ### Large File Simplifier: The Size Monitor
 
 Large files are a common code smell - they often indicate unclear boundaries, mixed responsibilities, or accumulated complexity. The **Large File Simplifier** workflow monitors file sizes daily and creates actionable issues when files grow too large.
