@@ -122,7 +122,6 @@ test_platform_detection "FreeBSD" "i386" "freebsd" "386" "freebsd-386"
 echo ""
 echo "Test 5: Windows platform detection"
 test_platform_detection "MINGW64_NT-10.0" "x86_64" "windows" "amd64" "windows-amd64"
-test_platform_detection "MINGW32_NT-10.0" "i686" "windows" "386" "windows-386"
 test_platform_detection "MSYS_NT-10.0" "x86_64" "windows" "amd64" "windows-amd64"
 test_platform_detection "CYGWIN_NT-10.0" "x86_64" "windows" "amd64" "windows-amd64"
 

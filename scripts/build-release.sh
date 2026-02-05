@@ -20,7 +20,6 @@ platforms=(
   linux-amd64
   linux-arm
   linux-arm64
-  windows-386
   windows-amd64
   windows-arm64
 )
