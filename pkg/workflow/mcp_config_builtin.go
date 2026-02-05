@@ -175,7 +175,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	// MCP Gateway spec fields for containerized stdio servers
 	yaml.WriteString("                \"container\": \"" + constants.DefaultAlpineImage + "\",\n")
 	yaml.WriteString("                \"entrypoint\": \"/opt/gh-aw/gh-aw\",\n")
-	
+
 	// In dev mode, add --cmd argument to specify the binary path
 	// This is required for the MCP server to execute commands like 'compile', 'status', etc.
 	if actionMode.IsDev() {
@@ -183,7 +183,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	} else {
 		yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\"],\n")
 	}
-	
+
 	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
 	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
 
@@ -237,14 +237,14 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
 	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
 	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
-	
+
 	// In dev mode, add --cmd argument to specify the binary path
 	if actionMode.IsDev() {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
 	} else {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 	}
-	
+
 	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
 	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
 	// Use env_vars array to reference environment variables instead of embedding secrets

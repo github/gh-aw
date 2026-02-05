@@ -415,14 +415,14 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
 	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
 	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
-	
+
 	// In dev mode, add --cmd argument to specify the binary path
 	if r.options.ActionMode.IsDev() {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
 	} else {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 	}
-	
+
 	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\"]\n")
 	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
 }
