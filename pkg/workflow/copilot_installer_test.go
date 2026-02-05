@@ -104,8 +104,6 @@ func TestGenerateCopilotInstallerSteps(t *testing.T) {
 	}
 }
 
-
-
 func TestCopilotInstallerCustomVersion(t *testing.T) {
 	// Test that custom version from engine config is used
 	engine := NewCopilotEngine()
