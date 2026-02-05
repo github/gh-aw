@@ -82,7 +82,7 @@ Examples:
 
 // checkAndLogGHVersion checks if gh CLI is available and logs its version
 func checkAndLogGHVersion() {
-	cmd := exec.Command("gh", "version")
+	cmd := workflow.ExecGH("version")
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
