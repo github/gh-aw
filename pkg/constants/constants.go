@@ -279,7 +279,7 @@ const DefaultMCPRegistryURL URL = "https://api.mcp.github.com/v0.1"
 const GitHubCopilotMCPDomain = "api.githubcopilot.com"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.31"
+const DefaultClaudeCodeVersion Version = "2.1.29"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //

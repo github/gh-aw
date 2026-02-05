@@ -1677,7 +1677,6 @@ main,
     background: var(--sl-color-gray-6);
     border-left: 3px solid var(--sl-color-purple);
     border-radius: 0 6px 6px 0;
-    font-style: italic;
 }
 
 [data-theme='light'] .gh-aw-video-container {
