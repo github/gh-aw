@@ -114,7 +114,7 @@ describe("close_older_discussions.cjs", () => {
       expect(result[0].number).toBe(5);
     });
 
-    it("should search for discussions with workflow-id marker", async () => {
+    it("should search for discussions with workflow ID marker", async () => {
       const { searchOlderDiscussions } = await import("./close_older_discussions.cjs");
 
       mockGithub.graphql.mockResolvedValueOnce({
@@ -138,7 +138,7 @@ describe("close_older_discussions.cjs", () => {
       expect(result[0].number).toBe(5);
     });
 
-    it("should return empty array if no workflow-id provided", async () => {
+    it("should return empty array if no workflow ID provided", async () => {
       const { searchOlderDiscussions } = await import("./close_older_discussions.cjs");
 
       const result = await searchOlderDiscussions(mockGithub, "testowner", "testrepo", "", "DIC_test123", 10);

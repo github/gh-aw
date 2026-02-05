@@ -51,7 +51,7 @@ async function searchOlderDiscussions(github, owner, repo, workflowId, categoryI
   const escapedMarker = workflowIdMarker.replace(/"/g, '\\"');
   let searchQuery = `repo:${owner}/${repo} is:open "${escapedMarker}" in:body`;
 
-  core.info(`  Added workflow-id marker filter to query: "${escapedMarker}" in:body`);
+  core.info(`  Added workflow ID marker filter to query: "${escapedMarker}" in:body`);
   core.info(`Executing GitHub search with query: ${searchQuery}`);
 
   const result = await github.graphql(
@@ -202,7 +202,7 @@ async function closeOlderDiscussions(github, owner, repo, workflowId, categoryId
   core.info("Starting closeOlderDiscussions operation");
   core.info("=".repeat(70));
 
-  core.info(`Search criteria: workflow-id marker: "${getWorkflowIdMarkerContent(workflowId)}"`);
+  core.info(`Search criteria: workflow ID marker: "${getWorkflowIdMarkerContent(workflowId)}"`);
   core.info(`New discussion reference: #${newDiscussion.number} (${newDiscussion.url})`);
   core.info(`Workflow: ${workflowName}`);
   core.info(`Run URL: ${runUrl}`);
