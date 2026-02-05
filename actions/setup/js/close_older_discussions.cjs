@@ -3,6 +3,7 @@
 
 const { getCloseOlderDiscussionMessage } = require("./messages_close_discussion.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { getWorkflowIdMarkerContent } = require("./generate_footer.cjs");
 
 /**
  * Maximum number of older discussions to close
@@ -24,37 +25,34 @@ function delay(ms) {
 }
 
 /**
- * Search for open discussions with a matching title prefix and/or labels
+ * Search for open discussions with a matching workflow-id marker
  * @param {any} github - GitHub GraphQL instance
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
- * @param {string} titlePrefix - Title prefix to match (empty string to skip prefix matching)
- * @param {string[]} labels - Labels to match (empty array to skip label matching)
+ * @param {string} workflowId - Workflow ID to match in the marker
  * @param {string|undefined} categoryId - Optional category ID to filter by
  * @param {number} excludeNumber - Discussion number to exclude (the newly created one)
  * @returns {Promise<Array<{id: string, number: number, title: string, url: string}>>} Matching discussions
  */
-async function searchOlderDiscussions(github, owner, repo, titlePrefix, labels, categoryId, excludeNumber) {
+async function searchOlderDiscussions(github, owner, repo, workflowId, categoryId, excludeNumber) {
+  core.info(`Starting search for older discussions in ${owner}/${repo}`);
+  core.info(`  Workflow ID: ${workflowId || "(none)"}`);
+  core.info(`  Exclude discussion number: ${excludeNumber}`);
+
+  if (!workflowId) {
+    core.info("No workflow ID provided - cannot search for older discussions");
+    return [];
+  }
+
   // Build GraphQL search query
-  // Search for open discussions, optionally with title prefix or labels
-  let searchQuery = `repo:${owner}/${repo} is:open`;
+  // Search for open discussions with the workflow-id marker in the body
+  const workflowIdMarker = getWorkflowIdMarkerContent(workflowId);
+  // Escape quotes in workflow ID to prevent query injection
+  const escapedMarker = workflowIdMarker.replace(/"/g, '\\"');
+  let searchQuery = `repo:${owner}/${repo} is:open "${escapedMarker}" in:body`;
 
-  if (titlePrefix) {
-    // Escape quotes in title prefix to prevent query injection
-    const escapedPrefix = titlePrefix.replace(/"/g, '\\"');
-    searchQuery += ` in:title "${escapedPrefix}"`;
-  }
-
-  // Add label filters to the search query
-  // Note: GitHub search uses AND logic for multiple labels, so discussions must have ALL labels.
-  // We add each label as a separate filter and also validate client-side for extra safety.
-  if (labels && labels.length > 0) {
-    for (const label of labels) {
-      // Escape quotes in label names to prevent query injection
-      const escapedLabel = label.replace(/"/g, '\\"');
-      searchQuery += ` label:"${escapedLabel}"`;
-    }
-  }
+  core.info(`  Added workflow-id marker filter to query: "${escapedMarker}" in:body`);
+  core.info(`Executing GitHub search with query: ${searchQuery}`);
 
   const result = await github.graphql(
     `
@@ -69,11 +67,6 @@ async function searchOlderDiscussions(github, owner, repo, titlePrefix, labels, 
             category {
               id
             }
-            labels(first: 100) {
-              nodes {
-                name
-              }
-            }
             closed
           }
         }
@@ -82,36 +75,40 @@ async function searchOlderDiscussions(github, owner, repo, titlePrefix, labels, 
     { searchTerms: searchQuery, first: 50 }
   );
 
+  core.info(`Search API returned ${result?.search?.nodes?.length || 0} total results`);
+
   if (!result || !result.search || !result.search.nodes) {
+    core.info("No results returned from search API");
     return [];
   }
 
   // Filter results:
   // 1. Must not be the excluded discussion (newly created one)
   // 2. Must not be already closed
-  // 3. If titlePrefix is specified, must have title starting with the prefix
-  // 4. If labels are specified, must have ALL specified labels (AND logic, not OR)
-  // 5. If categoryId is specified, must match
-  return result.search.nodes
+  // 3. If categoryId is specified, must match
+  core.info("Filtering search results...");
+  let filteredCount = 0;
+  let excludedCount = 0;
+  let closedCount = 0;
+
+  const filtered = result.search.nodes
     .filter(
       /** @param {any} d */ d => {
-        if (!d || d.number === excludeNumber || d.closed) {
+        if (!d) {
           return false;
         }
 
-        // Check title prefix if specified
-        if (titlePrefix && d.title && !d.title.startsWith(titlePrefix)) {
+        // Exclude the newly created discussion
+        if (d.number === excludeNumber) {
+          excludedCount++;
+          core.info(`  Excluding discussion #${d.number} (the newly created discussion)`);
           return false;
         }
 
-        // Check labels if specified - requires ALL labels to match (AND logic)
-        // This is intentional: we only want to close discussions that have ALL the specified labels
-        if (labels && labels.length > 0) {
-          const discussionLabels = d.labels?.nodes?.map((/** @type {{name: string}} */ l) => l.name) || [];
-          const hasAllLabels = labels.every(label => discussionLabels.includes(label));
-          if (!hasAllLabels) {
-            return false;
-          }
+        // Exclude already closed discussions
+        if (d.closed) {
+          closedCount++;
+          return false;
         }
 
         // Check category if specified
@@ -119,6 +116,8 @@ async function searchOlderDiscussions(github, owner, repo, titlePrefix, labels, 
           return false;
         }
 
+        filteredCount++;
+        core.info(`  ✓ Discussion #${d.number} matches criteria: ${d.title}`);
         return true;
       }
     )
@@ -130,6 +129,13 @@ async function searchOlderDiscussions(github, owner, repo, titlePrefix, labels, 
         url: d.url,
       })
     );
+
+  core.info(`Filtering complete:`);
+  core.info(`  - Matched discussions: ${filteredCount}`);
+  core.info(`  - Excluded new discussion: ${excludedCount}`);
+  core.info(`  - Excluded closed discussions: ${closedCount}`);
+
+  return filtered;
 }
 
 /**
@@ -180,45 +186,65 @@ async function closeDiscussionAsOutdated(github, discussionId) {
 }
 
 /**
- * Close older discussions that match the title prefix and/or labels
+ * Close older discussions that match the workflow-id marker
  * @param {any} github - GitHub GraphQL instance
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
- * @param {string} titlePrefix - Title prefix to match (empty string to skip)
- * @param {string[]} labels - Labels to match (empty array to skip)
+ * @param {string} workflowId - Workflow ID to match in the marker
  * @param {string|undefined} categoryId - Optional category ID to filter by
  * @param {{number: number, url: string}} newDiscussion - The newly created discussion
  * @param {string} workflowName - Name of the workflow
  * @param {string} runUrl - URL of the workflow run
  * @returns {Promise<Array<{number: number, url: string}>>} List of closed discussions
  */
-async function closeOlderDiscussions(github, owner, repo, titlePrefix, labels, categoryId, newDiscussion, workflowName, runUrl) {
-  // Build search criteria description for logging
-  const searchCriteria = [];
-  if (titlePrefix) searchCriteria.push(`title prefix: "${titlePrefix}"`);
-  if (labels && labels.length > 0) searchCriteria.push(`labels: [${labels.join(", ")}]`);
-  core.info(`Searching for older discussions with ${searchCriteria.join(" and ")}`);
+async function closeOlderDiscussions(github, owner, repo, workflowId, categoryId, newDiscussion, workflowName, runUrl) {
+  core.info("=".repeat(70));
+  core.info("Starting closeOlderDiscussions operation");
+  core.info("=".repeat(70));
 
-  const olderDiscussions = await searchOlderDiscussions(github, owner, repo, titlePrefix, labels, categoryId, newDiscussion.number);
+  core.info(`Search criteria: workflow-id marker: "${getWorkflowIdMarkerContent(workflowId)}"`);
+  core.info(`New discussion reference: #${newDiscussion.number} (${newDiscussion.url})`);
+  core.info(`Workflow: ${workflowName}`);
+  core.info(`Run URL: ${runUrl}`);
+  core.info("");
+
+  const olderDiscussions = await searchOlderDiscussions(github, owner, repo, workflowId, categoryId, newDiscussion.number);
 
   if (olderDiscussions.length === 0) {
-    core.info("No older discussions found to close");
+    core.info("✓ No older discussions found to close - operation complete");
+    core.info("=".repeat(70));
     return [];
   }
 
-  core.info(`Found ${olderDiscussions.length} older discussion(s) to close`);
+  core.info("");
+  core.info(`Found ${olderDiscussions.length} older discussion(s) matching the criteria`);
+  for (const discussion of olderDiscussions) {
+    core.info(`  - Discussion #${discussion.number}: ${discussion.title}`);
+    core.info(`    URL: ${discussion.url}`);
+  }
 
   // Limit to MAX_CLOSE_COUNT discussions
   const discussionsToClose = olderDiscussions.slice(0, MAX_CLOSE_COUNT);
 
   if (olderDiscussions.length > MAX_CLOSE_COUNT) {
-    core.warning(`Found ${olderDiscussions.length} older discussions, but only closing the first ${MAX_CLOSE_COUNT}`);
+    core.warning("");
+    core.warning(`⚠️  Found ${olderDiscussions.length} older discussions, but only closing the first ${MAX_CLOSE_COUNT}`);
+    core.warning(`    The remaining ${olderDiscussions.length - MAX_CLOSE_COUNT} discussion(s) will be processed in subsequent runs`);
   }
+
+  core.info("");
+  core.info(`Preparing to close ${discussionsToClose.length} discussion(s)...`);
+  core.info("");
 
   const closedDiscussions = [];
 
   for (let i = 0; i < discussionsToClose.length; i++) {
     const discussion = discussionsToClose[i];
+    core.info("-".repeat(70));
+    core.info(`Processing discussion ${i + 1}/${discussionsToClose.length}: #${discussion.number}`);
+    core.info(`  Title: ${discussion.title}`);
+    core.info(`  URL: ${discussion.url}`);
+
     try {
       // Generate closing message using the messages module
       const closingMessage = getCloseOlderDiscussionMessage({
@@ -228,12 +254,13 @@ async function closeOlderDiscussions(github, owner, repo, titlePrefix, labels, c
         runUrl,
       });
 
+      core.info(`  Message length: ${closingMessage.length} characters`);
+      core.info("");
+
       // Add comment first
-      core.info(`Adding closing comment to discussion #${discussion.number}`);
       await addDiscussionComment(github, discussion.id, closingMessage);
 
       // Then close the discussion as outdated
-      core.info(`Closing discussion #${discussion.number} as outdated`);
       await closeDiscussionAsOutdated(github, discussion.id);
 
       closedDiscussions.push({
@@ -241,17 +268,33 @@ async function closeOlderDiscussions(github, owner, repo, titlePrefix, labels, c
         url: discussion.url,
       });
 
-      core.info(`✓ Closed discussion #${discussion.number}: ${discussion.url}`);
+      core.info("");
+      core.info(`✓ Successfully closed discussion #${discussion.number}`);
     } catch (error) {
-      core.error(`✗ Failed to close discussion #${discussion.number}: ${getErrorMessage(error)}`);
+      core.info("");
+      core.error(`✗ Failed to close discussion #${discussion.number}`);
+      core.error(`  Error: ${getErrorMessage(error)}`);
+      if (error instanceof Error && error.stack) {
+        core.error(`  Stack trace: ${error.stack}`);
+      }
       // Continue with other discussions even if one fails
     }
 
     // Add delay between GraphQL operations to avoid rate limiting (except for the last item)
     if (i < discussionsToClose.length - 1) {
+      core.info("");
+      core.info(`Waiting ${GRAPHQL_DELAY_MS}ms before processing next discussion to avoid rate limiting...`);
       await delay(GRAPHQL_DELAY_MS);
     }
   }
+
+  core.info("");
+  core.info("=".repeat(70));
+  core.info(`Closed ${closedDiscussions.length} of ${discussionsToClose.length} discussion(s) successfully`);
+  if (closedDiscussions.length < discussionsToClose.length) {
+    core.warning(`Failed to close ${discussionsToClose.length - closedDiscussions.length} discussion(s) - check logs above for details`);
+  }
+  core.info("=".repeat(70));
 
   return closedDiscussions;
 }
