@@ -390,7 +390,7 @@ jobs:
 
   canary_go:
     runs-on: ubuntu-latest
-    needs: [test, integration]
+    needs: [integration]  # test dependency removed - download-artifact fetches by name, not job dependency
     if: always()  # Run even if some tests fail to report coverage
     permissions:
       contents: read
