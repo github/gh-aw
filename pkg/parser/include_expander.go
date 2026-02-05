@@ -55,8 +55,12 @@ func ExpandIncludesWithManifest(content, baseDir string, extractTools bool) (str
 		// Try to make path relative to baseDir for cleaner output
 		relPath, err := filepath.Rel(baseDir, filePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
+			// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+			relPath = filepath.ToSlash(relPath)
 			includedFiles = append(includedFiles, relPath)
 		} else {
+			// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+			filePath = filepath.ToSlash(filePath)
 			includedFiles = append(includedFiles, filePath)
 		}
 	}

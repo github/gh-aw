@@ -115,9 +115,10 @@ This is a shared workflow.`
 
 			lockYAML := string(lockContent)
 
-			// Verify that all paths use forward slashes (Unix-compatible)
-			// Even on Windows, the lock file should NEVER contain backslashes
-			assert.NotContains(t, lockYAML, "\\", "Lock file should not contain backslashes (Windows paths)")
+			// Verify that file paths in the manifest use forward slashes (Unix-compatible)
+			// Note: The ASCII art header contains backslashes, so we only check the manifest section
+			manifestStart := strings.Index(lockYAML, "# Resolved workflow manifest:")
+			sourceStart := strings.Index(lockYAML, "# Source:")
 
 			// Verify expected import paths are present with forward slashes
 			for _, importPath := range tt.expectedImportPaths {
@@ -150,6 +151,26 @@ This is a shared workflow.`
 				backslashPath := strings.ReplaceAll(tt.expectedSourcePath, "/", "\\")
 				backslashLine := "# Source: " + backslashPath
 				assert.NotContains(t, lockYAML, backslashLine, "Lock file should not contain backslash version of source: %s", tt.expectedSourcePath)
+			}
+
+			// Verify that manifest section does not contain backslashes in file paths
+			if manifestStart >= 0 {
+				manifestEnd := strings.Index(lockYAML[manifestStart:], "\n\n")
+				if manifestEnd >= 0 {
+					manifest := lockYAML[manifestStart : manifestStart+manifestEnd]
+					assert.NotContains(t, manifest, "\\", "Lock file manifest should not contain backslashes in file paths")
+				}
+			}
+
+			// Verify that source section does not contain backslashes in file paths
+			if sourceStart >= 0 && tt.expectedSourcePath != "" {
+				sourceEnd := strings.Index(lockYAML[sourceStart:], "\n")
+				if sourceEnd >= 0 {
+					sourceLine := lockYAML[sourceStart : sourceStart+sourceEnd]
+					// Check that the source line doesn't contain a Windows path
+					backslashPath := strings.ReplaceAll(tt.expectedSourcePath, "/", "\\")
+					assert.NotContains(t, sourceLine, backslashPath, "Source line should not contain Windows-style path")
+				}
 			}
 		})
 	}
@@ -205,8 +226,16 @@ This workflow includes a deeply nested file.`
 	expectedInclude := "#     - shared/nested/deep/config.md"
 	assert.Contains(t, lockYAML, expectedInclude, "Lock file should contain nested include with forward slashes")
 
-	// Verify no backslashes exist in the lock file
-	assert.NotContains(t, lockYAML, "\\", "Lock file should not contain any backslashes")
+	// Verify no backslashes exist in file paths (ignore ASCII art in header)
+	// Extract the manifest section
+	manifestStart := strings.Index(lockYAML, "# Resolved workflow manifest:")
+	if manifestStart >= 0 {
+		manifestEnd := strings.Index(lockYAML[manifestStart:], "\n\n")
+		if manifestEnd >= 0 {
+			manifest := lockYAML[manifestStart : manifestStart+manifestEnd]
+			assert.NotContains(t, manifest, "\\", "Lock file manifest should not contain any backslashes")
+		}
+	}
 
 	// Specifically check for Windows-style path with backslashes (should NOT exist)
 	windowsPath := "shared\\nested\\deep\\config.md"

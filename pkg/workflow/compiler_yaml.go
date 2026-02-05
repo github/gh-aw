@@ -70,6 +70,8 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 	if data.Source != "" {
 		yaml.WriteString("#\n")
 		cleanSource := stringutil.StripANSIEscapeCodes(data.Source)
+		// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+		cleanSource = filepath.ToSlash(cleanSource)
 		fmt.Fprintf(yaml, "# Source: %s\n", cleanSource)
 	}
 
@@ -82,6 +84,8 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 			yaml.WriteString("#   Imports:\n")
 			for _, file := range data.ImportedFiles {
 				cleanFile := stringutil.StripANSIEscapeCodes(file)
+				// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+				cleanFile = filepath.ToSlash(cleanFile)
 				fmt.Fprintf(yaml, "#     - %s\n", cleanFile)
 			}
 		}
@@ -90,6 +94,8 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 			yaml.WriteString("#   Includes:\n")
 			for _, file := range data.IncludedFiles {
 				cleanFile := stringutil.StripANSIEscapeCodes(file)
+				// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+				cleanFile = filepath.ToSlash(cleanFile)
 				fmt.Fprintf(yaml, "#     - %s\n", cleanFile)
 			}
 		}
