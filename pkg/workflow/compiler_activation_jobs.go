@@ -788,28 +788,20 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	permissions := data.Permissions
 	if setupActionRef != "" && len(c.generateCheckoutActionsFolder(data)) > 0 {
 		// Need to merge contents: read with existing permissions
-		if permissions == "" || strings.TrimSpace(permissions) == "permissions: {}" {
-			// No permissions specified or explicit empty {} - add contents: read
+		if permissions == "" {
+			// No permissions specified, just add contents: read
 			perms := NewPermissionsContentsRead()
 			permissions = perms.RenderToYAML()
 		} else {
-			// Parse existing permissions
+			// Parse existing permissions and add contents: read
 			parser := NewPermissionsParser(permissions)
 			perms := parser.ToPermissions()
 
-			level, exists := perms.Get(PermissionContents)
-
-			// Only add contents: read if contents permission is already explicitly present
-			// (but set to none). If the user specified granular permissions without contents,
-			// we respect their choice and don't auto-add it.
-			// This allows users to explicitly opt out of repository access while still
-			// using the GitHub toolsets that don't require it.
-			if exists && level == PermissionNone {
+			// Only add contents: read if not already present
+			if level, exists := perms.Get(PermissionContents); !exists || level == PermissionNone {
 				perms.Set(PermissionContents, PermissionRead)
 				permissions = perms.RenderToYAML()
 			}
-			// Note: If contents permission is not present at all in explicit permissions,
-			// we don't add it to respect the user's intent to not have repository access.
 		}
 	}
 

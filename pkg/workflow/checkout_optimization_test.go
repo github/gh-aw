@@ -37,7 +37,7 @@ strict: false
 			description:         "When no permissions are specified, agent job adds contents:read in dev mode for local actions",
 		},
 		{
-			name: "permissions without contents should omit checkout",
+			name: "permissions without contents should include checkout for .github access",
 			frontmatter: `---
 on:
   issues:
@@ -53,8 +53,8 @@ features:
   dangerous-permissions-write: true
 strict: false
 ---`,
-			expectedHasCheckout: false,
-			description:         "When permissions don't include contents, checkout should be omitted",
+			expectedHasCheckout: true,
+			description:         "Even when permissions don't include contents, checkout is added for .github and .actions access",
 		},
 		{
 			name: "permissions with contents read should include checkout",
@@ -222,10 +222,10 @@ func TestShouldAddCheckoutStep(t *testing.T) {
 			expected:    true,
 		},
 		{
-			name:        "no contents permission specified, no custom steps",
+			name:        "no contents permission specified, no custom steps - checkout added for .github access",
 			permissions: "permissions:\n  issues: write",
 			customSteps: "",
-			expected:    false,
+			expected:    true,
 		},
 		{
 			name:        "contents read permission, custom steps with checkout",
