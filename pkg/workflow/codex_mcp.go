@@ -18,11 +18,16 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 	// Create unified renderer with Codex-specific options
 	// Codex uses TOML format without Copilot-specific fields and multi-line args
 	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
+		actionMode := ActionModeDev // Default to dev mode
+		if workflowData != nil {
+			actionMode = workflowData.ActionMode
+		}
 		return NewMCPConfigRenderer(MCPRendererOptions{
 			IncludeCopilotFields: false, // Codex doesn't use "type" and "tools" fields
 			InlineArgs:           false, // Codex uses multi-line args format
 			Format:               "toml",
 			IsLast:               isLast,
+			ActionMode:           actionMode,
 		})
 	}
 
@@ -104,11 +109,16 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 
 	// Use shared JSON renderer for gateway input
 	createJSONRenderer := func(isLast bool) *MCPConfigRendererUnified {
+		actionMode := ActionModeDev // Default to dev mode
+		if workflowData != nil {
+			actionMode = workflowData.ActionMode
+		}
 		return NewMCPConfigRenderer(MCPRendererOptions{
 			IncludeCopilotFields: false, // Gateway doesn't need Copilot fields
 			InlineArgs:           false, // Use standard multi-line format
 			Format:               "json",
 			IsLast:               isLast,
+			ActionMode:           actionMode,
 		})
 	}
 
