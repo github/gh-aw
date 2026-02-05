@@ -213,7 +213,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-firewall/agent-act:0.13.4 ghcr.io/github/gh-aw-firewall/squid:0.13.4 ghcr.io/github/gh-aw-mcpg:v0.0.99 ghcr.io/github/github-mcp-server:v0.30.3 mcr.microsoft.com/playwright/mcp node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh alpine:latest ghcr.io/github/gh-aw-firewall/agent-act:0.13.4 ghcr.io/github/gh-aw-firewall/squid:0.13.4 ghcr.io/github/gh-aw-mcpg:v0.0.99 ghcr.io/github/github-mcp-server:v0.30.3 ghcr.io/github/serena-mcp-server:latest mcr.microsoft.com/playwright/mcp node:lts-alpine
       - name: Install gh-aw extension
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
