@@ -237,6 +237,70 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    - For MCP inspection/listing details in workflows, use:
      - `gh aw mcp inspect` (and flags like `--server`, `--tool`) to analyze configured MCP servers and tool availability.
 
+   **Multi-Repository Operations (MultiRepoOps):**
+
+   ⚠️ **IMPORTANT**: When the task requires **cross-repository operations** (creating issues/PRs in other repos, commenting on issues in other repos):
+
+   **Key Concepts:**
+   - Use `target-repo` parameter on safe outputs to create resources in external repositories
+   - Configure authentication with `safe-outputs.github-token` (PAT) or `safe-outputs.app` (GitHub App)
+   - Use GitHub toolsets to **read** from external repos (repos, issues, pull_requests, actions)
+   - The default `GITHUB_TOKEN` only has access to the repository where the workflow runs
+
+   **Authentication Setup:**
+   ```yaml
+   safe-outputs:
+     github-token: ${{ secrets.CROSS_REPO_PAT }}  # PAT with access to target repos
+     create-issue:
+       max: 5
+     add-comment:
+       max: 10
+   ```
+
+   **Using target-repo:**
+   - When creating issues: Agent specifies `target-repo: "org/repo"` in the safe output call
+   - When commenting: Agent can comment on issues in any repo with `target-repo: "org/repo"`
+   - Without `target-repo`, safe outputs operate on the current repository
+
+   **Common MultiRepoOps Patterns:**
+   - **Hub-and-spoke tracking**: Component repos create tracking issues in a central repo
+   - **Feature synchronization**: Main repo propagates changes to sub-repos via PRs
+   - **Organization-wide coordination**: Single workflow creates issues across multiple repos
+
+   **Architectural Constraints:**
+   - ✅ **CAN**: Create issues/PRs/comments in external repos using `target-repo`
+   - ✅ **CAN**: Read from external repos using GitHub toolsets (repos, issues, actions)
+   - ❌ **CANNOT**: Automatically trigger workflows in other repos (requires separate workflow)
+   - ❌ **CANNOT**: Wait for external workflows to complete (single-job limitation)
+
+   **Teaching Agents Multi-Repo Access:**
+   - Enable GitHub toolsets: `github: toolsets: [repos, issues, pull_requests, actions]`
+   - In the prompt, instruct the agent to use full repo notation: `org/repo-name`
+   - Example: "Search for open issues in github/upstream-repo related to authentication"
+   - Example: "Create a tracking issue in github/central-tracker with target-repo"
+
+   **Security Best Practices:**
+   - Scope PATs minimally to required repositories (read source, write targets)
+   - Use GitHub Apps for automatic token revocation
+   - Store tokens as GitHub secrets (never in code)
+   - Document which repos need access in the workflow description
+
+   **When to recommend MultiRepoOps:**
+   - User mentions "create issue in another repo" or "comment on [external-repo] issues"
+   - Task involves coordinating multiple repositories
+   - Tracking issues across component repositories
+   - Synchronizing changes between related projects
+
+   **When NOT to use MultiRepoOps:**
+   - Single repository operations (use standard safe outputs)
+   - Need to wait for external workflows (architectural limitation - suggest separate workflows)
+   - Need to trigger workflows in other repos (use separate workflow in target repo)
+
+   **Documentation Reference:**
+   - Full guide: https://github.github.io/gh-aw/guides/multirepoops/
+   - Safe Outputs Reference: https://github.github.io/gh-aw/reference/safe-outputs/
+   - GitHub Tools: https://github.github.io/gh-aw/reference/tools/#github-tools-github
+
    **Custom Safe Output Jobs (for new safe outputs):**
 
    ⚠️ **IMPORTANT**: When the task requires a **new safe output** (e.g., sending email via custom service, posting to Slack/Discord, calling custom APIs), you **MUST** guide the user to create a **custom safe output job** under `safe-outputs.jobs:` instead of using `post-steps:`.
@@ -496,6 +560,63 @@ Based on the parsed requirements, determine:
    - Other fields with good defaults - Let compiler use defaults unless customization needed
 8. **Prompt Body**: Write clear, actionable instructions for the AI agent
    - **IMPORTANT**: Include guidance for agents to call the `noop` safe output when they successfully complete work but there's nothing to be done (e.g., no issues to triage, no PRs to create, no changes needed). This is essential for transparency—it proves the agent worked and consciously determined no action was necessary.
+
+### Multi-Repository Workflow Design
+
+If the workflow involves cross-repository operations, follow these additional guidelines:
+
+**Authentication Configuration:**
+- Add `safe-outputs.github-token: ${{ secrets.CROSS_REPO_PAT }}` for PAT authentication
+- Or use `safe-outputs.app` for GitHub App authentication
+- Document required PAT scopes in the workflow description
+
+**GitHub Toolsets:**
+- Enable appropriate toolsets for reading external repos:
+  - `repos` - Read files, search code, list commits, get releases
+  - `issues` - List and search issues across repositories
+  - `pull_requests` - List and search PRs across repositories
+  - `actions` - Access workflow runs and artifacts
+- Example: `tools: github: toolsets: [repos, issues, pull_requests]`
+
+**Cross-Repo Safe Outputs:**
+- Instruct the agent to use `target-repo: "org/repo-name"` when creating resources in external repos
+- Without `target-repo`, safe outputs operate on the current repository
+- Example prompt instruction: "Create a tracking issue in org/tracker-repo using the create-issue safe output with target-repo"
+
+**Architectural Limitations:**
+- Single-job execution means workflows CANNOT:
+  - Automatically trigger workflows in other repos (need separate workflow)
+  - Wait for external workflows to complete (need scheduled monitoring workflow)
+  - Pass state between workflow runs in different repos
+- Be explicit about these limitations in the prompt if relevant
+
+**Example Multi-Repo Workflow Structure:**
+```yaml
+tools:
+  github:
+    toolsets: [repos, issues, pull_requests]
+safe-outputs:
+  github-token: ${{ secrets.CROSS_REPO_PAT }}
+  create-issue:
+    max: 5
+  add-comment:
+    max: 10
+```
+
+**Example Agent Instructions:**
+```markdown
+When you identify issues requiring tracking:
+1. Search the upstream-repo using GitHub tools to gather context
+2. Create a tracking issue in org/tracker-repo with:
+   - Use create-issue safe output
+   - Specify target-repo: "org/tracker-repo"
+   - Include link back to this issue
+   - Apply labels: ["tracking", "automated"]
+3. Comment on this issue with a link to the tracking issue
+```
+
+**Reference Documentation:**
+- https://github.github.io/gh-aw/guides/multirepoops/
 
 ### Step 3: Create the Workflow File
 

@@ -27,6 +27,7 @@ safe-outputs:
     max: 1
 
 tools:
+  serena: ["go"]
   github:
     toolsets: [default, issues]
   edit:
