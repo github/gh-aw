@@ -1,0 +1,98 @@
+---
+title: Video Component Demo
+description: Example usage of the Video component for embedding videos in documentation
+---
+
+import Video from '../../../components/Video.astro';
+
+## Video Component Usage
+
+The Video component makes it easy to embed video files hosted in the `public` folder.
+
+### Basic Usage
+
+To embed a video with default settings:
+
+```mdx
+import Video from '../../../components/Video.astro';
+
+<Video src="/gh-aw/videos/demo.mp4" />
+```
+
+### With Title and Custom Dimensions
+
+```mdx
+<Video 
+  src="/gh-aw/videos/demo.mp4" 
+  title="Demo Video"
+  width="640"
+  height="360"
+/>
+```
+
+### Autoplay and Loop
+
+```mdx
+<Video 
+  src="/gh-aw/videos/demo.mp4" 
+  autoplay={true}
+  loop={true}
+  muted={true}
+/>
+```
+
+### With Poster Image
+
+```mdx
+<Video 
+  src="/gh-aw/videos/demo.mp4" 
+  poster="/gh-aw/images/video-thumbnail.png"
+  title="Demo with thumbnail"
+/>
+```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `src` | `string` | *required* | Path to the video file (relative to public folder) |
+| `title` | `string` | `undefined` | Video title (displayed as caption) |
+| `width` | `string \| number` | `"100%"` | Video width |
+| `height` | `string \| number` | `"auto"` | Video height |
+| `controls` | `boolean` | `true` | Show video controls |
+| `autoplay` | `boolean` | `false` | Auto-play video on load |
+| `loop` | `boolean` | `false` | Loop video playback |
+| `muted` | `boolean` | `false` | Mute video audio |
+| `poster` | `string` | `undefined` | Poster image displayed before playback |
+
+## Supported Formats
+
+The component automatically detects the MIME type from the file extension and supports:
+
+- **MP4** (`.mp4`) - Recommended for best browser compatibility
+- **WebM** (`.webm`) - Modern, open format
+- **OGG** (`.ogg`) - Open format, older browsers
+- **MOV** (`.mov`) - QuickTime format
+- **AVI** (`.avi`) - Legacy format
+- **MKV** (`.mkv`) - Matroska format
+
+## Implementation
+
+The Video component is based on the AudioPlayer component from the [Microsoft/genaiscript](https://github.com/microsoft/genaiscript) repository. It uses native HTML5 `<video>` elements with accessibility features and responsive styling.
+
+### Features
+
+- 🎬 **Multiple format support** - Automatically detects MIME type from file extension
+- 📱 **Responsive design** - Scales to fit container width
+- 🎨 **Theme-aware styling** - Matches light/dark themes
+- ♿ **Accessible** - Includes proper semantic HTML and ARIA labels
+- 🎛️ **Customizable** - Full control over video attributes
+- 🖼️ **Poster support** - Display thumbnail before playback
+
+## Tips
+
+- Place video files in `docs/public/videos/` directory
+- Use MP4 format for best browser compatibility
+- Keep file sizes reasonable for web delivery
+- Provide meaningful titles for accessibility
+- Use poster images to reduce initial load time

@@ -1,0 +1,98 @@
+---
+import * as path from "path"
+
+interface Props {
+    src: string
+    title?: string
+    width?: string | number
+    height?: string | number
+    autoplay?: boolean
+    loop?: boolean
+    muted?: boolean
+    controls?: boolean
+    poster?: string
+}
+
+const { 
+    src, 
+    title, 
+    width = "100%", 
+    height = "auto",
+    autoplay = false,
+    loop = false,
+    muted = false,
+    controls = true,
+    poster
+} = Astro.props
+
+// Determine MIME type from file extension
+const ext = path.extname(src).slice(1).toLowerCase()
+const mimeMap: Record<string, string> = {
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'ogg': 'video/ogg',
+    'mov': 'video/mp4', // MOV files typically use MP4 codec
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska'
+}
+const mime = mimeMap[ext] || `video/${ext}`
+---
+
+<figure class="video-component">
+    <video 
+        title={title}
+        width={width}
+        height={height}
+        controls={controls}
+        autoplay={autoplay}
+        loop={loop}
+        muted={muted}
+        preload="metadata"
+        poster={poster}
+        class="video-player"
+    >
+        <source src={src} type={mime} />
+        Your browser does not support the video element.
+    </video>
+    {title && (
+        <figcaption class="video-caption">
+            {title}
+        </figcaption>
+    )}
+</figure>
+
+<style>
+    .video-component {
+        margin: 1.5rem 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .video-player {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        background-color: #000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .video-caption {
+        font-size: 0.875rem;
+        color: #8d96a0;
+        text-align: center;
+        font-style: italic;
+        margin: 0;
+    }
+
+    :global([data-theme='light']) .video-caption {
+        color: #57606a;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .video-player {
+            /* Respect user preference for reduced motion */
+        }
+    }
+</style>
