@@ -308,6 +308,15 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 				}
 			}
 
+			// Verify entrypoint presence/absence based on shouldHaveEntrypoint flag
+			hasEntrypoint := strings.Contains(result, `entrypoint =`)
+			if tt.shouldHaveEntrypoint && !hasEntrypoint {
+				t.Errorf("Expected entrypoint field in %s mode, but not found", tt.actionMode)
+			}
+			if !tt.shouldHaveEntrypoint && hasEntrypoint {
+				t.Errorf("Did not expect entrypoint field in %s mode (uses container's ENTRYPOINT)", tt.actionMode)
+			}
+
 			for _, unexpected := range tt.unexpectedContent {
 				if strings.Contains(result, unexpected) {
 					t.Errorf("Unexpected content found: %q\nActual output:\n%s", unexpected, result)
