@@ -31,6 +31,7 @@ imports:
   - shared/reporting.md
   - shared/copilot-pr-data-fetch.md
   - shared/trending-charts-simple.md
+  - shared/gh-aw-cli.md
 
 cache:
   - key: prompt-clustering-cache-${{ github.run_id }}
@@ -50,58 +51,6 @@ steps:
     run: |
       pip3 install --user scikit-learn nltk
 
-  - name: Download full PR data with comments and reviews
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: |
-      # Create output directory for full PR data
-      mkdir -p /tmp/gh-aw/prompt-cache/pr-full-data
-      
-      # Download full data for each PR including comments, reviews, commits, and files
-      echo "Downloading full PR data for each PR..."
-      
-      PR_COUNT=$(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)
-      echo "Processing $PR_COUNT PRs..."
-      
-      # Extract PR numbers and download full data for each
-      jq -r '.[].number' /tmp/gh-aw/pr-data/copilot-prs.json | while read -r pr_number; do
-        echo "Downloading full data for PR #$pr_number..."
-        
-        # Download full PR data with essential fields only
-        gh pr view "$pr_number" \
-          --repo "${{ github.repository }}" \
-          --json number,title,body,state,createdAt,closedAt,mergedAt,url,comments,reviews,commits,changedFiles,additions,deletions,reviewDecision \
-          > "/tmp/gh-aw/prompt-cache/pr-full-data/pr-${pr_number}.json"
-        
-        echo "Downloaded PR #$pr_number"
-      done
-      
-      # Create an index file listing all downloaded PRs
-      find /tmp/gh-aw/prompt-cache/pr-full-data/ -maxdepth 1 -name 'pr-[0-9]*.json' -type f -printf '%f\n' | \
-        sed 's/pr-\([0-9]*\)\.json/\1/' | sort -n > /tmp/gh-aw/prompt-cache/pr-full-data/index.txt
-      
-      echo "Full PR data cached in /tmp/gh-aw/prompt-cache/pr-full-data/"
-      echo "Total PRs with full data: $(wc -l < /tmp/gh-aw/prompt-cache/pr-full-data/index.txt)"
-
-  - name: Download workflow logs for PR analysis
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    run: |
-      # Create logs directory
-      mkdir -p /tmp/gh-aw/workflow-logs
-      
-      echo "Downloading workflow logs to extract turn counts..."
-      
-      # Download logs for the last 30 days of copilot workflows
-      # This will give us the aw_info.json which contains turn counts
-      ./gh-aw logs --engine copilot --start-date -30d -o /tmp/gh-aw/workflow-logs
-      
-      # Verify logs were downloaded
-      echo "Downloaded workflow logs:"
-      find /tmp/gh-aw/workflow-logs -maxdepth 1 -ls
-
 timeout-minutes: 20
 
 ---
@@ -114,14 +63,70 @@ You are an AI analytics agent that performs advanced NLP analysis on prompts use
 
 Daily analysis of copilot agent task prompts using clustering techniques to identify common patterns, outliers, and opportunities for optimization.
 
+## Important Instructions
+
+**Step 1: Download Full PR Data**
+
+First, you must download full PR data for each copilot PR. Create the output directory and download full PR data:
+
+```bash
+# Create output directory for full PR data
+mkdir -p /tmp/gh-aw/prompt-cache/pr-full-data
+
+# Download full data for each PR including comments, reviews, commits, and files
+echo "Downloading full PR data for each PR..."
+
+PR_COUNT=$(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)
+echo "Processing $PR_COUNT PRs..."
+
+# Extract PR numbers and download full data for each
+jq -r '.[].number' /tmp/gh-aw/pr-data/copilot-prs.json | while read -r pr_number; do
+  echo "Downloading full data for PR #$pr_number..."
+  
+  # Download full PR data with essential fields only
+  gh pr view "$pr_number" \
+    --repo "${{ github.repository }}" \
+    --json number,title,body,state,createdAt,closedAt,mergedAt,url,comments,reviews,commits,changedFiles,additions,deletions,reviewDecision \
+    > "/tmp/gh-aw/prompt-cache/pr-full-data/pr-${pr_number}.json"
+  
+  echo "Downloaded PR #$pr_number"
+done
+
+# Create an index file listing all downloaded PRs
+find /tmp/gh-aw/prompt-cache/pr-full-data/ -maxdepth 1 -name 'pr-[0-9]*.json' -type f -printf '%f\n' | \
+  sed 's/pr-\([0-9]*\)\.json/\1/' | sort -n > /tmp/gh-aw/prompt-cache/pr-full-data/index.txt
+
+echo "Full PR data cached in /tmp/gh-aw/prompt-cache/pr-full-data/"
+echo "Total PRs with full data: $(wc -l < /tmp/gh-aw/prompt-cache/pr-full-data/index.txt)"
+```
+
+**Step 2: Download Workflow Logs**
+
+Use the gh-aw-logs safe-input tool to download workflow logs:
+
+```
+Use the gh-aw-logs tool with:
+- engine: "copilot"
+- start-date: "-30d"
+- output-dir: "/tmp/gh-aw/workflow-logs"
+```
+
+After the logs are downloaded, verify they are available:
+
+```bash
+echo "Downloaded workflow logs:"
+find /tmp/gh-aw/workflow-logs -maxdepth 1 -ls
+```
+
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
 - **Analysis Period**: Last 30 days
 - **Available Data**:
   - `/tmp/gh-aw/pr-data/copilot-prs.json` - Summary PR data for copilot-created PRs
-  - `/tmp/gh-aw/prompt-cache/pr-full-data/` - Full PR data with comments, reviews, commits, and files for each PR
-  - `/tmp/gh-aw/prompt-cache/pr-full-data/index.txt` - List of all PR numbers with full data
+  - `/tmp/gh-aw/prompt-cache/pr-full-data/` - Full PR data (you must download this using the bash command above)
+  - `/tmp/gh-aw/prompt-cache/pr-full-data/index.txt` - List of all PR numbers (created after download)
+  - `/tmp/gh-aw/workflow-logs/` - Workflow logs (you must download this using the gh-aw-logs tool)
   - `/tmp/gh-aw/prompt-cache/` - Cache directory for avoiding repeated work
 
 ## Task Overview
@@ -191,15 +196,9 @@ For PRs that have associated workflow runs, we need to extract:
 2. **Duration**: How long the task took
 3. **Success Metrics**: Token usage, cost, etc.
 
-Use the `gh-aw` MCP server to:
+**Important**: You must first use the gh-aw-logs safe-input tool to download the logs (as described in the "Important Instructions" section above).
 
-```bash
-# Download logs for recent copilot workflows
-# This creates directories with aw_info.json containing turn counts
-gh-aw logs --engine copilot --start-date -30d -o /tmp/gh-aw/workflow-logs
-```
-
-Then extract turn counts from `aw_info.json` files:
+After downloading with the gh-aw-logs tool, the logs will be available in `/tmp/gh-aw/workflow-logs/`:
 
 ```bash
 # Find all aw_info.json files and extract turn information
