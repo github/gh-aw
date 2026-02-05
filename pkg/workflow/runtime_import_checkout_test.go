@@ -11,6 +11,43 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
+// containsRuntimeImports checks if the content contains runtime-import macros
+// with local file paths (starting with . or ..) rather than URLs
+func containsRuntimeImports(content string) bool {
+	// Look for {{#runtime-import or {{#runtime-import? patterns
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		// Check for runtime-import or runtime-import? patterns
+		if strings.Contains(line, "{{#runtime-import") {
+			// Extract the part after runtime-import
+			idx := strings.Index(line, "{{#runtime-import")
+			if idx == -1 {
+				continue
+			}
+
+			// Find the path after the macro name
+			rest := line[idx+len("{{#runtime-import"):]
+
+			// Skip optional marker if present
+			rest = strings.TrimPrefix(rest, "?")
+
+			// Trim whitespace
+			rest = strings.TrimSpace(rest)
+
+			// Skip URLs (http:// or https://)
+			if strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://") {
+				continue
+			}
+
+			// Check if it starts with . or .. (local file path)
+			if strings.HasPrefix(rest, ".") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // TestContainsRuntimeImports tests the containsRuntimeImports function
 func TestContainsRuntimeImports(t *testing.T) {
 	tests := []struct {

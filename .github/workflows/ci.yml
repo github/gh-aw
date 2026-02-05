@@ -30,16 +30,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -270,17 +260,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ matrix.test-group.name }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-${{ matrix.test-group.name }}-
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -458,16 +437,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
 
       - name: Report Go cache status
         run: |
@@ -727,16 +696,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -928,16 +887,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -1032,16 +981,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -1101,16 +1040,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
 
       - name: Report Go cache status
         run: |
@@ -1226,16 +1155,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         run: |
           if [ "${{ steps.setup-go.outputs.cache-hit }}" == "true" ]; then
@@ -1304,16 +1223,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
 
       - name: Report Go cache status
         run: |
@@ -1648,16 +1557,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
-
       - name: Report Go cache status
         shell: bash
         run: |
@@ -1779,16 +1678,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Cache Go modules (explicit fallback)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-modules-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-modules-
 
       - name: Report Go cache status
         run: |
