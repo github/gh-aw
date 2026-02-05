@@ -7,9 +7,9 @@ This directory contains video files used in the documentation.
 Place video files here and reference them in documentation using the Video component:
 
 ```mdx
-import Video from '../../../components/Video.astro';
+import Video from '@components/Video.astro';
 
-<Video src="/gh-aw/videos/your-video.mp4" title="Video Title" />
+<Video src="/gh-aw/videos/your-video.mp4" caption="Video Title" />
 ```
 
 ## Supported Formats
@@ -37,11 +37,11 @@ To add a new video to the documentation:
 2. Reference it in your MDX file:
 
 ```mdx
-import Video from '../../../components/Video.astro';
+import Video from '@components/Video.astro';
 
 <Video 
   src="/gh-aw/videos/demo.mp4" 
-  title="Workflow Demo"
-  poster="/gh-aw/images/demo-thumbnail.png"
+  caption="Workflow Demo"
+  thumbnail="/gh-aw/images/demo-thumbnail.png"
 />
 ```
