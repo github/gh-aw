@@ -152,10 +152,6 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 // This checkout works in all modes (dev, script, release) and uses shallow clone
 // for minimal overhead. It should only be called in the main agent job.
 //
-// Note: The sparse-checkout includes .agents for the new skills location, but this folder
-// may not exist in all repositories. The actions/checkout action handles non-existent paths
-// gracefully - it simply won't check them out without failing.
-//
 // Returns a slice of strings that can be appended to a steps array, where each
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - action-tag feature is specified (uses remote actions instead)
