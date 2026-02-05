@@ -67,21 +67,19 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 	}
 
 	// Check for agentic-workflows tool
-	// In dev mode, uses locally built image; in release mode, uses alpine:latest
+	// In dev mode, the image is built locally in the workflow, so don't add to pull list
+	// In release/script mode, use alpine:latest which needs to be pulled
 	if _, hasAgenticWorkflows := tools["agentic-workflows"]; hasAgenticWorkflows {
-		var image string
-		if actionMode.IsDev() {
-			// Dev mode: Use locally built image (no need to pull)
-			image = constants.DevModeGhAwImage
-		} else {
-			// Release/script mode: Use alpine:latest
-			image = constants.DefaultAlpineImage
+		if !actionMode.IsDev() {
+			// Release/script mode: Use alpine:latest (needs to be pulled)
+			image := constants.DefaultAlpineImage
+			if !imageSet[image] {
+				images = append(images, image)
+				imageSet[image] = true
+				dockerLog.Printf("Added agentic-workflows MCP server container: %s", image)
+			}
 		}
-		if !imageSet[image] {
-			images = append(images, image)
-			imageSet[image] = true
-			dockerLog.Printf("Added agentic-workflows MCP server container: %s", image)
-		}
+		// Dev mode: localhost/gh-aw:dev is built locally, not pulled
 	}
 
 	// Collect AWF (firewall) container images when firewall is enabled
