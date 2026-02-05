@@ -480,22 +480,23 @@ func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 		return true // Custom agent file requires checkout to access the file
 	}
 
-	// Check condition 3: If permissions don't grant contents access, don't add checkout
-	// This must be checked before runtime-imports check because checkout requires permissions
+	// Check condition 3: Check if we have or will have contents: read permission
+	// In dev mode, contents: read is added automatically for local actions checkout
+	// So we need to account for that when deciding whether to add repository checkout
 	permParser := NewPermissionsParser(data.Permissions)
-	if !permParser.HasContentsReadAccess() {
+	hasContentsRead := permParser.HasContentsReadAccess()
+
+	// In dev mode, if we'll add contents: read for actions folder, we should also add repository checkout
+	// because all workflows use runtime-import for the main workflow file
+	willAddContentsRead := (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
+
+	if !hasContentsRead && !willAddContentsRead {
 		log.Print("Skipping checkout step: no contents read access in permissions")
 		return false // No contents read access, so checkout is not needed
 	}
 
-	// Check condition 4: If markdown contains runtime-import macros, checkout is required
-	// Runtime imports need to read files from the .github folder at runtime
-	// This check only matters if permissions allow contents access (checked above)
-	if containsRuntimeImports(data.MarkdownContent) {
-		log.Print("Adding checkout step: markdown contains runtime-import macros")
-		return true // Runtime imports require checkout to access repository files
-	}
-
-	// If we get here, permissions allow contents access and custom steps (if any) don't contain checkout
-	return true // Add checkout because it's needed and not already present
+	// If we have or will have contents: read, add checkout
+	// This is needed because all workflows use runtime-import for the main workflow file
+	log.Print("Adding checkout step: contents read access is available or will be added")
+	return true
 }

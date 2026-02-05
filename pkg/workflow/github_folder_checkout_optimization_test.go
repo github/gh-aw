@@ -71,8 +71,8 @@ engine: copilot
 Test workflow without contents permission.
 `,
 			expectGitHubCheckout: false,
-			expectFullCheckout:   false,
-			description:          "Without contents permission, no checkouts should be added",
+			expectFullCheckout:   true, // Changed: In dev mode, contents:read is added for local actions, triggering full checkout for runtime-import
+			description:          "Without explicit contents permission, full checkout is added in dev mode for runtime-import (contents:read added automatically for local actions)",
 		},
 		{
 			name: "runtime_imports_trigger_full_checkout",

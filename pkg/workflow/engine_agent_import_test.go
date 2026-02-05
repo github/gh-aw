@@ -380,6 +380,9 @@ func TestCheckoutWithAgentFromImports(t *testing.T) {
 
 	t.Run("no_checkout_without_agent_and_permissions", func(t *testing.T) {
 		compiler := NewCompiler()
+		// Set action mode to release to prevent automatic contents:read addition
+		compiler.SetActionMode(ActionModeRelease)
+		
 		workflowData := &WorkflowData{
 			EngineConfig: &EngineConfig{
 				ID: "copilot",
@@ -389,7 +392,7 @@ func TestCheckoutWithAgentFromImports(t *testing.T) {
 
 		shouldCheckout := compiler.shouldAddCheckoutStep(workflowData)
 		if shouldCheckout {
-			t.Error("Expected checkout NOT to be added without agent file and without contents permission")
+			t.Error("Expected checkout NOT to be added in release mode without agent file and without contents permission")
 		}
 	})
 
