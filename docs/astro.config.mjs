@@ -214,7 +214,7 @@ export default defineConfig({
 						{ label: 'Custom Agents', link: '/reference/copilot-custom-agents/' },
 						{ label: 'GH-AW as MCP Server', link: '/setup/mcp-server/' },
 						{ label: 'MCP Gateway', link: '/reference/mcp-gateway/' },
-						{ label: 'Video Component', link: '/examples/video-component-demo/' },
+						{ label: 'Video Component', link: '/reference/video-component/' },
 						{ label: 'FAQ', link: '/reference/faq/' },
 					],
 				},
