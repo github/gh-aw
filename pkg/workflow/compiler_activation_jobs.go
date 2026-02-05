@@ -788,8 +788,8 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	permissions := data.Permissions
 	if setupActionRef != "" && len(c.generateCheckoutActionsFolder(data)) > 0 {
 		// Need to merge contents: read with existing permissions
-		if permissions == "" {
-			// No permissions specified, just add contents: read
+		if permissions == "" || strings.TrimSpace(permissions) == "permissions: {}" {
+			// No permissions specified or explicit empty {} - add contents: read
 			perms := NewPermissionsContentsRead()
 			permissions = perms.RenderToYAML()
 		} else {

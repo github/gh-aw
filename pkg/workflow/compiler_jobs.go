@@ -454,11 +454,11 @@ func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 
 	// Determine if we would actually add contents: read for local actions
 	// This follows the same logic as buildMainJob:
-	// - If no permissions specified (empty), we add contents: read for local actions
+	// - If no permissions specified or explicit empty {}, we add contents: read for local actions
 	// - If permissions are specified without contents, we respect that and don't add it
 	willAddContentsRead := false
-	if data.Permissions == "" {
-		// No permissions specified - we'll add contents: read for local actions
+	if data.Permissions == "" || strings.TrimSpace(data.Permissions) == "permissions: {}" {
+		// No permissions specified or explicit empty {} - we'll add contents: read for local actions
 		willAddContentsRead = (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
 	} else {
 		// Permissions are specified - check if contents permission exists

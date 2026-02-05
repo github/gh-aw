@@ -116,11 +116,11 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	}
 
 	// Check if we have or will have contents permission
-	// If permissions are not specified (empty), we'll add contents: read for local actions
-	// If permissions are explicitly specified without contents, respect that choice and skip checkout
+	// If permissions are not specified or explicitly empty ({}), we'll add contents: read for local actions
+	// If permissions are explicitly specified with granular scopes, respect that choice
 	hasContentsPermission := false
-	if data.Permissions == "" {
-		// No permissions specified - we'll add contents: read for local actions
+	if data.Permissions == "" || strings.TrimSpace(data.Permissions) == "permissions: {}" {
+		// No permissions specified or explicit empty {} - we'll add contents: read for local actions
 		hasContentsPermission = true
 	} else {
 		// Permissions are specified - check if contents permission exists
