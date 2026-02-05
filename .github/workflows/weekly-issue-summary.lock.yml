@@ -51,12 +51,6 @@ jobs:
       comment_id: ""
       comment_repo: ""
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
@@ -76,8 +70,7 @@ jobs:
     needs: activation
     runs-on: ubuntu-latest
     permissions:
-          contents: read
-          issues: read
+      issues: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
     env:
@@ -97,20 +90,10 @@ jobs:
       output_types: ${{ steps.collect_output.outputs.output_types }}
       secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
           destination: /opt/gh-aw/actions
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       - name: Setup Python environment
@@ -1316,12 +1299,6 @@ jobs:
       tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}
       total_count: ${{ steps.missing_tool.outputs.total_count }}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
@@ -1428,12 +1405,6 @@ jobs:
     outputs:
       success: ${{ steps.parse_results.outputs.success }}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
@@ -1546,12 +1517,6 @@ jobs:
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
       process_safe_outputs_temporary_id_map: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
@@ -1587,15 +1552,8 @@ jobs:
       - detection
     if: always() && needs.detection.outputs.success == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    permissions: {}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:
@@ -1625,12 +1583,6 @@ jobs:
       branch_name: ${{ steps.upload_assets.outputs.branch_name }}
       published_count: ${{ steps.upload_assets.outputs.published_count }}
     steps:
-      - name: Checkout actions folder
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-        with:
-          sparse-checkout: |
-            actions
-          persist-credentials: false
       - name: Setup Scripts
         uses: ./actions/setup
         with:

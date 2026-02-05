@@ -798,7 +798,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 			perms := parser.ToPermissions()
 
 			level, exists := perms.Get(PermissionContents)
-			
+
 			// Only add contents: read if contents permission is already explicitly present
 			// (but set to none). If the user specified granular permissions without contents,
 			// we respect their choice and don't auto-add it.
