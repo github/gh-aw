@@ -229,8 +229,9 @@ Uses imported agentic-workflows tool.
 	workflowData := string(lockFileContent)
 
 	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
-	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server"]`) {
-		t.Error("Expected compiled workflow to contain 'mcp-server' entrypointArgs")
+	// In dev mode (default), should include --cmd argument
+	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`) {
+		t.Error("Expected compiled workflow to contain 'mcp-server' entrypointArgs with --cmd in dev mode")
 	}
 
 	// Verify container format is used (not command format)

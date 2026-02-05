@@ -565,5 +565,51 @@ describe("parse_claude_log.cjs", () => {
       const toolsSection = result.markdown.split("## 🤖 Reasoning")[0];
       expect(toolsSection).not.toMatch(/and \d+ more/);
     });
+
+    it("should handle ToolsSearch with array of objects (issue fix)", () => {
+      const logWithToolsSearch = JSON.stringify([
+        {
+          type: "system",
+          subtype: "init",
+          session_id: "test-tools-search",
+          tools: ["Bash", "mcp__serena__ToolsSearch"],
+          model: "claude-sonnet-4-20250514",
+        },
+        {
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                id: "tool_1",
+                name: "mcp__serena__ToolsSearch",
+                input: {
+                  query: "search term",
+                  tools: [
+                    { name: "tool1", type: "function" },
+                    { name: "tool2", type: "class" },
+                    { name: "tool3", type: "function" },
+                    { name: "tool4", type: "function" },
+                    { name: "tool5", type: "class" },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        { type: "result", total_cost_usd: 0.01, usage: { input_tokens: 100, output_tokens: 50 }, num_turns: 1 },
+      ]);
+      const result = parseClaudeLog(logWithToolsSearch);
+
+      // Should NOT contain [object Object] - the bug we're fixing
+      expect(result.markdown).not.toContain("[object Object]");
+
+      // Should contain properly formatted JSON array representation
+      expect(result.markdown).toContain("serena::ToolsSearch");
+      expect(result.markdown).toMatch(/tools:.*\[.*"name":"tool1"/);
+
+      // Should properly render the tool in initialization section
+      expect(result.markdown).toContain("serena::ToolsSearch");
+    });
   });
 });

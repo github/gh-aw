@@ -132,6 +132,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		StrictMode:           c.strictMode,
 		SecretMasking:        toolsResult.secretMasking,
 		ParsedFrontmatter:    toolsResult.parsedFrontmatter,
+		ActionMode:           c.actionMode,
 	}
 }
 
