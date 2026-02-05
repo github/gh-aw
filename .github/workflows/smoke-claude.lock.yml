@@ -1132,7 +1132,7 @@ jobs:
                 "container": "alpine:latest",
                 "entrypoint": "/opt/gh-aw/gh-aw",
                 "entrypointArgs": ["mcp-server"],
-                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "/usr/bin/gh:/usr/bin/gh:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
                 }

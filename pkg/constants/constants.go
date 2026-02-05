@@ -387,6 +387,10 @@ const DefaultAlpineImage = "alpine:latest"
 // The gh-aw binary and supporting files are mounted read-only from /opt/gh-aw
 const DefaultGhAwMount = "/opt/gh-aw:/opt/gh-aw:ro"
 
+// DefaultGhBinaryMount is the mount path for the gh CLI binary in containerized MCP servers
+// The gh CLI is required for agentic-workflows MCP server to run gh commands
+const DefaultGhBinaryMount = "/usr/bin/gh:/usr/bin/gh:ro"
+
 // DefaultTmpGhAwMount is the mount path for temporary gh-aw files in containerized MCP servers
 // Used for logs, cache, and other runtime data that needs read-write access
 const DefaultTmpGhAwMount = "/tmp/gh-aw:/tmp/gh-aw:rw"
