@@ -276,8 +276,6 @@ func TestModelNameConstants(t *testing.T) {
 	}
 }
 
-
-
 func TestNumericConstants(t *testing.T) {
 	tests := []struct {
 		name     string

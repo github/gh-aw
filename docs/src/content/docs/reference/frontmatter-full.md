@@ -2139,7 +2139,9 @@ safe-outputs:
     # (optional)
     category: null
 
-    # Optional list of labels to attach to created discussions.
+    # Optional list of labels to attach to created discussions. Also used for matching
+    # when close-older-discussions is enabled - discussions must have ALL specified
+    # labels (AND logic).
     # (optional)
     labels: []
       # Array of strings
@@ -2168,11 +2170,11 @@ safe-outputs:
     allowed-repos: []
       # Array of strings
 
-    # When true, automatically close older discussions with the same workflow-id marker
-    # as 'outdated' with a comment linking to the new discussion. Searches for discussions
-    # containing the workflow-id marker in their body. Maximum 10 discussions will be
-    # closed. Only runs if discussion creation succeeds. When fallback-to-issue is enabled
-    # and discussion creation fails, older issues will be closed instead.
+    # When true, automatically close older discussions matching the same title prefix
+    # or labels as 'outdated' with a comment linking to the new discussion. Requires
+    # title-prefix or labels to be set. Maximum 10 discussions will be closed. Only
+    # runs if discussion creation succeeds. When fallback-to-issue is enabled and
+    # discussion creation fails, older issues will be closed instead.
     # (optional)
     close-older-discussions: true
 
