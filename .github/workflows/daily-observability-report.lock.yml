@@ -519,10 +519,10 @@ jobs:
           include_only = ["CODEX_API_KEY", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_SAFE_OUTPUTS", "GITHUB_PERSONAL_ACCESS_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_TOKEN", "HOME", "OPENAI_API_KEY", "PATH"]
           
           [mcp_servers.agentic_workflows]
-          container = "alpine:latest"
-          entrypoint = "/opt/gh-aw/gh-aw"
-          entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]
-          mounts = ["/opt/gh-aw:/opt/gh-aw:ro"]
+          container = "localhost/gh-aw:dev"
+          entrypoint = "gh-aw"
+          entrypointArgs = ["mcp-server"]
+          mounts = ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]
           env_vars = ["GITHUB_TOKEN"]
           
           [mcp_servers.github]
@@ -547,9 +547,9 @@ jobs:
             "mcpServers": {
               "agentic_workflows": {
                 "container": "localhost/gh-aw:dev",
-                "entrypoint": "/opt/gh-aw/gh-aw",
-                "entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"],
-                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "/usr/bin/gh:/usr/bin/gh:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "entrypoint": "gh-aw",
+                "entrypointArgs": ["mcp-server"],
+                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
                 }

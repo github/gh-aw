@@ -189,8 +189,16 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"container": "localhost/gh-aw:dev"`) {
 		t.Error("Expected dev mode container image for containerized server")
 	}
-	if !strings.Contains(output, `"entrypoint": "/opt/gh-aw/gh-aw"`) {
-		t.Error("Expected entrypoint field for containerized server")
+	// In dev mode, entrypoint is gh-aw (binary is in PATH)
+	if !strings.Contains(output, `"entrypoint": "gh-aw"`) {
+		t.Error("Expected gh-aw entrypoint (binary in PATH in dev image)")
+	}
+	// In dev mode, should NOT have binary mounts
+	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
+		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 	}
 }
 
@@ -240,11 +248,20 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	if !strings.Contains(output, `container = "localhost/gh-aw:dev"`) {
 		t.Error("Expected dev mode container image for containerized server")
 	}
-	if !strings.Contains(output, `entrypoint = "/opt/gh-aw/gh-aw"`) {
-		t.Error("Expected TOML entrypoint field for containerized server")
+	// In dev mode, entrypoint is gh-aw (binary is in PATH)
+	if !strings.Contains(output, `entrypoint = "gh-aw"`) {
+		t.Error("Expected gh-aw entrypoint (binary in PATH in dev image)")
 	}
-	if !strings.Contains(output, `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`) {
-		t.Error("Expected TOML entrypointArgs field with --cmd in dev mode")
+	// In dev mode, no --cmd needed
+	if !strings.Contains(output, `entrypointArgs = ["mcp-server"]`) {
+		t.Error("Expected simple entrypointArgs without --cmd in dev mode")
+	}
+	// In dev mode, should NOT have binary mounts
+	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
+		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 	}
 }
 

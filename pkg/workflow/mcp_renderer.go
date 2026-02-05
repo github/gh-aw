@@ -413,17 +413,39 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Builder) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
-	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
-	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
 
-	// In dev mode, add --cmd argument to specify the binary path
+	containerImage := constants.DefaultAlpineImage
+	var entrypoint string
+	var mounts []string
+
 	if r.options.ActionMode.IsDev() {
-		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
+		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
+		// The Dockerfile installs the binary at /usr/local/bin/gh-aw and sets it as ENTRYPOINT
+		containerImage = constants.DevModeGhAwImage
+		entrypoint = "gh-aw"
+		// Only mount workspace and temp directory - binary and gh CLI are in the image
+		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
-		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+		// Release mode: Use minimal Alpine image with mounted binaries
+		entrypoint = "/opt/gh-aw/gh-aw"
+		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
+		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	}
 
-	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\"]\n")
+	yaml.WriteString("          container = \"" + containerImage + "\"\n")
+	yaml.WriteString("          entrypoint = \"" + entrypoint + "\"\n")
+	yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+
+	// Write mounts
+	yaml.WriteString("          mounts = [")
+	for i, mount := range mounts {
+		if i > 0 {
+			yaml.WriteString(", ")
+		}
+		yaml.WriteString("\"" + mount + "\"")
+	}
+	yaml.WriteString("]\n")
+
 	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
 }
 

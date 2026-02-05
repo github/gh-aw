@@ -105,17 +105,18 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"type": "stdio"`,
-				`"container": "localhost/gh-aw:dev"`, // Dev mode uses locally built image
-				`"entrypoint": "/opt/gh-aw/gh-aw"`,
-				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
+				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
+				`"entrypoint": "gh-aw"`,                                // Binary is in PATH in dev image
+				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed, entrypoint is gh-aw
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
 			unexpectedContent: []string{
+				`--cmd`,
+				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
+				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				`${{ secrets.`,
 				`"command":`, // Should NOT use command - must use container
 			},
@@ -151,11 +152,9 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
 				`"agentic_workflows": {`,
-				`"container": "localhost/gh-aw:dev"`, // Dev mode uses locally built image
-				`"entrypoint": "/opt/gh-aw/gh-aw"`,
-				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
+				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
+				`"entrypoint": "gh-aw"`,                                // Binary is in PATH in dev image
+				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
 				// Security fix: Now uses shell variable instead of GitHub secret expression
@@ -165,6 +164,9 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			unexpectedContent: []string{
 				`"type"`,
 				`\\${`,
+				`--cmd`,
+				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
+				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				// Verify GitHub expressions are NOT in the output (security fix)
 				`${{ secrets.`,
 				`"command":`, // Should NOT use command - must use container
@@ -240,26 +242,39 @@ func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 	tests := []struct {
-		name              string
-		actionMode        ActionMode
-		expectedContainer string
-		expectedArgs      string
-		unexpectedContent []string
+		name               string
+		actionMode         ActionMode
+		expectedContainer  string
+		expectedEntrypoint string
+		expectedMounts     []string
+		unexpectedContent  []string
 	}{
 		{
-			name:              "dev mode with --cmd",
-			actionMode:        ActionModeDev,
-			expectedContainer: `container = "localhost/gh-aw:dev"`,
-			expectedArgs:      `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
+			name:               "dev mode without mounts",
+			actionMode:         ActionModeDev,
+			expectedContainer:  `container = "localhost/gh-aw:dev"`,
+			expectedEntrypoint: `entrypoint = "gh-aw"`,
+			expectedMounts: []string{
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount
+			},
 			unexpectedContent: []string{
-				`entrypointArgs = ["mcp-server"]`,
+				`--cmd`,
+				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode
+				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode
 			},
 		},
 		{
-			name:              "release mode without --cmd",
-			actionMode:        ActionModeRelease,
-			expectedContainer: `container = "alpine:latest"`,
-			expectedArgs:      `entrypointArgs = ["mcp-server"]`,
+			name:               "release mode with mounts",
+			actionMode:         ActionModeRelease,
+			expectedContainer:  `container = "alpine:latest"`,
+			expectedEntrypoint: `entrypoint = "/opt/gh-aw/gh-aw"`,
+			expectedMounts: []string{
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount
+			},
 			unexpectedContent: []string{
 				`--cmd`,
 			},
@@ -277,14 +292,11 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContent := []string{
 				`[mcp_servers.agentic_workflows]`,
 				tt.expectedContainer,
-				`entrypoint = "/opt/gh-aw/gh-aw"`,
-				tt.expectedArgs,
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				tt.expectedEntrypoint,
+				`entrypointArgs = ["mcp-server"]`,
 				`env_vars = ["GITHUB_TOKEN"]`,
 			}
+			expectedContent = append(expectedContent, tt.expectedMounts...)
 
 			for _, expected := range expectedContent {
 				if !strings.Contains(result, expected) {

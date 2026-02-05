@@ -268,10 +268,11 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					tt.expectedContainer, string(lockContent))
 			}
 
-			// In dev mode, also check for the build steps
+			// In dev mode, verify dev-specific configuration
 			if tt.actionMode == ActionModeDev {
+				// Check for build steps
 				requiredSteps := []string{
-					"Setup Go",
+					"Setup Go for CLI build",
 					"Build gh-aw CLI",
 					"Setup Docker Buildx",
 					"Build gh-aw Docker image",
@@ -282,6 +283,24 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					if !strings.Contains(string(lockContent), step) {
 						t.Errorf("Expected build step %q in dev mode lock file, but not found", step)
 					}
+				}
+
+				// Verify entrypoint is gh-aw (not /opt/gh-aw/gh-aw)
+				if !strings.Contains(string(lockContent), `"entrypoint": "gh-aw"`) {
+					t.Error("Expected entrypoint to be 'gh-aw' in dev mode (binary in PATH)")
+				}
+
+				// Verify no --cmd argument (not needed when binary is entrypoint)
+				if strings.Contains(string(lockContent), `"--cmd"`) {
+					t.Error("Did not expect --cmd argument in dev mode (binary is entrypoint)")
+				}
+
+				// Verify binary mounts are NOT present in dev mode
+				if strings.Contains(string(lockContent), `/opt/gh-aw:/opt/gh-aw:ro`) {
+					t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+				}
+				if strings.Contains(string(lockContent), `/usr/bin/gh:/usr/bin/gh:ro`) {
+					t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 				}
 			}
 		})

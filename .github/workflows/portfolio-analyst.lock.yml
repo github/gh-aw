@@ -525,9 +525,9 @@ jobs:
               "agentic_workflows": {
                 "type": "stdio",
                 "container": "localhost/gh-aw:dev",
-                "entrypoint": "/opt/gh-aw/gh-aw",
-                "entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"],
-                "mounts": ["/opt/gh-aw:/opt/gh-aw:ro", "/usr/bin/gh:/usr/bin/gh:ro", "${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "entrypoint": "gh-aw",
+                "entrypointArgs": ["mcp-server"],
+                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "env": {
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}"
                 }

@@ -229,15 +229,29 @@ Uses imported agentic-workflows tool.
 	workflowData := string(lockFileContent)
 
 	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
-	// In dev mode (default), should include --cmd argument
-	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`) {
-		t.Error("Expected compiled workflow to contain 'mcp-server' entrypointArgs with --cmd in dev mode")
+	// In dev mode, entrypoint is gh-aw (binary in PATH) and no --cmd argument needed
+	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server"]`) {
+		t.Error("Expected compiled workflow to contain simple 'mcp-server' entrypointArgs in dev mode")
+	}
+
+	if strings.Contains(workflowData, `"--cmd"`) {
+		t.Error("Did not expect --cmd argument in dev mode (binary is entrypoint)")
 	}
 
 	// Verify container format is used (not command format)
-	// In dev mode, should use locally built image instead of alpine:latest
+	// In dev mode, should use locally built image
 	if !strings.Contains(workflowData, `"container": "localhost/gh-aw:dev"`) {
 		t.Error("Expected compiled workflow to contain localhost/gh-aw:dev container for agentic-workflows in dev mode")
+	}
+
+	// Verify entrypoint is gh-aw (not /opt/gh-aw/gh-aw)
+	if !strings.Contains(workflowData, `"entrypoint": "gh-aw"`) {
+		t.Error("Expected entrypoint to be 'gh-aw' in dev mode (binary in PATH)")
+	}
+
+	// Verify binary mounts are NOT present in dev mode
+	if strings.Contains(workflowData, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
 	}
 }
 
