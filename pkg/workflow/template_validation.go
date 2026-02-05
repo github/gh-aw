@@ -30,6 +30,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -56,6 +57,9 @@ func validateNoIncludesInTemplateRegions(markdown string) error {
 	matches := templateRegionPattern.FindAllStringSubmatch(markdown, -1)
 	templateValidationLog.Printf("Found %d template regions to validate", len(matches))
 
+	// Collect all validation errors
+	var errs []error
+
 	for _, match := range matches {
 		if len(match) < 2 {
 			continue
@@ -71,9 +75,16 @@ func validateNoIncludesInTemplateRegions(markdown string) error {
 			trimmedLine := strings.TrimSpace(line)
 			directive := parser.ParseImportDirective(trimmedLine)
 			if directive != nil {
-				return fmt.Errorf("import directives cannot be used inside template regions ({{#if...}}{{/if}}): found '%s' at line %d within template block", directive.Original, lineNum+1)
+				importErr := fmt.Errorf("import directives cannot be used inside template regions ({{#if...}}{{/if}}): found '%s' at line %d within template block", directive.Original, lineNum+1)
+				errs = append(errs, importErr)
 			}
 		}
+	}
+
+	// Return aggregated errors
+	if len(errs) > 0 {
+		templateValidationLog.Printf("Found %d template validation errors", len(errs))
+		return errors.Join(errs...)
 	}
 
 	return nil

@@ -156,10 +156,12 @@ gh aw compile --validate
 - **Strict Mode**: Security-first validation and sandboxing
 - **Shared Components**: Reusable workflow building blocks
 - **Repo Memory**: Persistent git-backed storage for agents
+- **Sandboxed Execution**: All workflows run in the Agent Workflow Firewall (AWF) sandbox, enabling full `bash` and `edit` tools by default
 
 ## Important Notes
 
 - Always reference the instructions file at https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md for complete documentation
 - Use the MCP tool `agentic-workflows` when running in GitHub Copilot Cloud
 - Workflows must be compiled to `.lock.yml` files before running in GitHub Actions
+- **Bash tools are enabled by default** - Don't restrict bash commands unnecessarily since workflows are sandboxed by the AWF
 - Follow security best practices: minimal permissions, explicit network access, no template injection

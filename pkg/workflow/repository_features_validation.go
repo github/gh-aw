@@ -111,6 +111,9 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 
 	repositoryFeaturesLog.Printf("Checking repository features for: %s", repo)
 
+	// Collect all validation errors using ErrorCollector
+	collector := NewErrorCollector(c.failFast)
+
 	// Check if discussions are enabled when create-discussion or add-comment with discussion: true is configured
 	needsDiscussions := workflowData.SafeOutputs.CreateDiscussions != nil ||
 		(workflowData.SafeOutputs.AddComments != nil &&
@@ -128,10 +131,8 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 					fmt.Sprintf("Could not verify if discussions are enabled: %v", err)))
 			}
-			return nil
-		}
-
-		if !hasDiscussions {
+			// Continue checking other features even if this check fails
+		} else if !hasDiscussions {
 			// Changed to warning instead of error per issue feedback
 			// Strategy: Always try to create the discussion at runtime and investigate if it fails
 			// The runtime create_discussion handler will provide better error messages if creation fails
@@ -146,7 +147,7 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 			if c.verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(warningMsg))
 			}
-			// Don't return error - allow compilation to proceed and let runtime handle the actual attempt
+			// Don't add to error collector - this is a warning, not an error
 		}
 	}
 
@@ -161,15 +162,19 @@ func (c *Compiler) validateRepositoryFeatures(workflowData *WorkflowData) error 
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(
 					fmt.Sprintf("Could not verify if issues are enabled: %v", err)))
 			}
-			return nil
-		}
-
-		if !hasIssues {
-			return fmt.Errorf("workflow uses safe-outputs.create-issue but repository %s does not have issues enabled. Enable issues in repository settings or remove create-issue from safe-outputs", repo)
+			// Continue to return aggregated errors even if this check fails
+		} else if !hasIssues {
+			issueErr := fmt.Errorf("workflow uses safe-outputs.create-issue but repository %s does not have issues enabled. Enable issues in repository settings or remove create-issue from safe-outputs", repo)
+			if returnErr := collector.Add(issueErr); returnErr != nil {
+				return returnErr // Fail-fast mode
+			}
 		}
 	}
 
-	return nil
+	repositoryFeaturesLog.Printf("Repository features validation completed: error_count=%d", collector.Count())
+
+	// Return aggregated errors with formatted output
+	return collector.FormattedError("repository features")
 }
 
 // getCurrentRepository gets the current repository from git context (with caching)

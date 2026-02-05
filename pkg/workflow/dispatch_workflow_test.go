@@ -457,3 +457,136 @@ No agentic-workflows tool is present.
 	assert.Contains(t, err.Error(), "nonexistent",
 		"Error should mention the workflow name")
 }
+
+// TestDispatchWorkflowMultipleErrors tests that multiple validation errors are aggregated
+func TestDispatchWorkflowMultipleErrors(t *testing.T) {
+	compiler := NewCompilerWithVersion("1.0.0")
+	compiler.failFast = false // Enable error aggregation
+
+	tmpDir := t.TempDir()
+	awDir := filepath.Join(tmpDir, ".github", "aw")
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+
+	err := os.MkdirAll(awDir, 0755)
+	require.NoError(t, err, "Failed to create aw directory")
+	err = os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	// Create a workflow WITHOUT workflow_dispatch
+	ciWorkflow := `name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Running tests"
+`
+	ciFile := filepath.Join(workflowsDir, "ci.lock.yml")
+	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0644)
+	require.NoError(t, err, "Failed to write ci workflow")
+
+	// Create dispatcher workflow that references multiple problematic workflows
+	dispatcherWorkflow := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  dispatch-workflow:
+    workflows:
+      - dispatcher  # Self-reference
+      - ci          # Missing workflow_dispatch
+      - nonexistent # Not found
+    max: 3
+---
+
+# Dispatcher Workflow
+
+This workflow has multiple validation errors.
+`
+	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	require.NoError(t, err, "Failed to write dispatcher workflow")
+
+	// Change to the aw directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(awDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	// Parse the dispatcher workflow
+	workflowData, err := compiler.ParseWorkflowFile("dispatcher.md")
+	require.NoError(t, err, "Failed to parse workflow")
+
+	// Validate the workflow - should return multiple errors
+	err = compiler.validateDispatchWorkflow(workflowData, dispatcherFile)
+	require.Error(t, err, "Validation should fail with multiple errors")
+
+	// Check that all three errors are present in the aggregated error
+	errStr := err.Error()
+	assert.Contains(t, errStr, "Found 3 dispatch-workflow errors:", "Should have error count header")
+	assert.Contains(t, errStr, "self-reference", "Should contain self-reference error")
+	assert.Contains(t, errStr, "dispatcher", "Should mention dispatcher workflow")
+	assert.Contains(t, errStr, "workflow_dispatch", "Should contain workflow_dispatch error")
+	assert.Contains(t, errStr, "ci", "Should mention ci workflow")
+	assert.Contains(t, errStr, "not found", "Should contain not found error")
+	assert.Contains(t, errStr, "nonexistent", "Should mention nonexistent workflow")
+}
+
+// TestDispatchWorkflowMultipleErrorsFailFast tests fail-fast mode stops at first error
+func TestDispatchWorkflowMultipleErrorsFailFast(t *testing.T) {
+	compiler := NewCompilerWithVersion("1.0.0")
+	compiler.failFast = true // Enable fail-fast mode
+
+	tmpDir := t.TempDir()
+	awDir := filepath.Join(tmpDir, ".github", "aw")
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+
+	err := os.MkdirAll(awDir, 0755)
+	require.NoError(t, err, "Failed to create aw directory")
+	err = os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
+
+	// Create dispatcher workflow with multiple errors
+	dispatcherWorkflow := `---
+on: issues
+engine: copilot
+permissions:
+  contents: read
+safe-outputs:
+  dispatch-workflow:
+    workflows:
+      - dispatcher  # Self-reference (first error)
+      - nonexistent # Not found (second error)
+    max: 2
+---
+
+# Dispatcher Workflow
+`
+	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	require.NoError(t, err, "Failed to write dispatcher workflow")
+
+	// Change to the aw directory
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(awDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
+
+	// Parse the dispatcher workflow
+	workflowData, err := compiler.ParseWorkflowFile("dispatcher.md")
+	require.NoError(t, err, "Failed to parse workflow")
+
+	// Validate the workflow - should fail fast with first error only
+	err = compiler.validateDispatchWorkflow(workflowData, dispatcherFile)
+	require.Error(t, err, "Validation should fail")
+
+	// In fail-fast mode, only the first error should be returned
+	errStr := err.Error()
+	assert.Contains(t, errStr, "self-reference", "Should contain first error")
+	assert.NotContains(t, errStr, "Found 2", "Should not have multiple error header in fail-fast mode")
+}

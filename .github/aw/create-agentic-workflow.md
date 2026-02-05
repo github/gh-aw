@@ -352,11 +352,13 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    **Advanced static analysis tools**:
    For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
 
-   ⚠️ **IMPORTANT - Default Tools**: 
-   - **`edit` and `bash` are enabled by default** when sandboxing is active (no need to add explicitly)
-   - `bash` defaults to `*` (all commands) when sandboxing is active
-   - Only specify `bash:` with specific patterns if you need to restrict commands beyond the secure defaults
-   - Sandboxing is active when `sandbox.agent` is configured or network restrictions are present
+   ⚠️ **IMPORTANT - Default Tools (Sandboxed by Default)**: 
+   - **Agentic workflows are sandboxed by the Agent Workflow Firewall (AWF)** - The agent runs in a secure, sandboxed environment with domain-based access control
+   - **`edit` and `bash` are enabled by default** - No need to add explicitly since the agent is sandboxed
+   - **`bash` defaults to `*` (all commands)** - All bash commands are available because the sandbox provides security isolation
+   - **DO NOT restrict bash tools unnecessarily** - The sandbox already provides security, so restricting bash commands adds friction without meaningful security benefit
+   - Only specify `bash:` with specific patterns if you need to restrict commands for **workflow-specific reasons** (not security)
+   - When creating workflows, assume bash is fully available and use it freely for tasks like file operations, git commands, CLI tools, etc.
 
    **MCP servers (top-level block)**:
 
@@ -469,6 +471,7 @@ Based on the parsed requirements, determine:
    - Scheduled tasks → `on: schedule: daily` (use fuzzy scheduling - workflow_dispatch auto-added for fuzzy schedules only)
    - **Note**: `workflow_dispatch:` is automatically added ONLY for fuzzy schedules (`daily`, `weekly`, etc.). For other triggers, add it explicitly if manual execution is desired.
 3. **Tools**: Determine required tools:
+   - **`bash` and `edit` are enabled by default** - No need to add (sandboxed by AWF)
    - GitHub API reads → `tools: github: toolsets: [default]` (use toolsets, NOT allowed)
    - Web access → `tools: web-fetch:` and `network: allowed: [<domains>]`
    - Browser automation → `tools: playwright:` and `network: allowed: [<domains>]`
@@ -487,6 +490,8 @@ Based on the parsed requirements, determine:
    - For public repositories where you want community members to trigger workflows via issues/PRs, setting `roles: all` is recommended
 7. **Defaults to Omit**: Do NOT include fields with sensible defaults:
    - `engine: copilot` - Copilot is the default, only specify if user wants Claude/Codex/Custom
+   - `tools: bash:` - Bash is enabled by default with all commands (`*`) since workflows are sandboxed
+   - `tools: edit:` - Edit is enabled by default since workflows are sandboxed
    - `timeout-minutes:` - Has sensible defaults, only specify if user needs custom timeout
    - Other fields with good defaults - Let compiler use defaults unless customization needed
 8. **Prompt Body**: Write clear, actionable instructions for the AI agent
