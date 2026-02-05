@@ -300,6 +300,9 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 		workflowFilePath = workflowBasename
 	}
 
+	// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+	workflowFilePath = filepath.ToSlash(workflowFilePath)
+
 	// Create a runtime-import macro for the main workflow markdown
 	// The runtime_import.cjs helper will extract and process the markdown body at runtime
 	runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
