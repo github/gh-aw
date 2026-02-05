@@ -37,9 +37,14 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 
 		// Add CLI build steps in dev mode (after automatic checkout, before other steps)
 		// This builds the gh-aw CLI and Docker image for use by the agentic-workflows MCP server
+		// Only generate build steps if agentic-workflows tool is enabled
 		if c.actionMode.IsDev() {
-			compilerYamlLog.Printf("Generating CLI build steps for dev mode")
-			c.generateDevModeCLIBuildSteps(yaml)
+			if _, hasAgenticWorkflows := data.Tools["agentic-workflows"]; hasAgenticWorkflows {
+				compilerYamlLog.Printf("Generating CLI build steps for dev mode (agentic-workflows tool enabled)")
+				c.generateDevModeCLIBuildSteps(yaml)
+			} else {
+				compilerYamlLog.Printf("Skipping CLI build steps in dev mode (agentic-workflows tool not enabled)")
+			}
 		}
 	}
 
