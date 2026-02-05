@@ -145,9 +145,9 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	return nil
 }
 
-// generateCheckoutGitHubFolder generates the checkout step for the .github folder
-// for the agent job. This ensures workflows have access to workflow configurations
-// and runtime imports even when they don't do a full repository checkout.
+// generateCheckoutGitHubFolder generates the checkout step for the .github and .agents folders
+// for the agent job. This ensures workflows have access to workflow configurations,
+// runtime imports, and skills even when they don't do a full repository checkout.
 //
 // This checkout works in all modes (dev, script, release) and uses shallow clone
 // for minimal overhead. It should only be called in the main agent job.
@@ -171,32 +171,33 @@ func (c *Compiler) generateCheckoutGitHubFolder(data *WorkflowData) []string {
 	// Check if we have contents permission - without it, checkout is not possible
 	permParser := NewPermissionsParser(data.Permissions)
 	if !permParser.HasContentsReadAccess() {
-		compilerYamlLog.Print("Skipping .github checkout: no contents read access")
+		compilerYamlLog.Print("Skipping .github and .agents checkout: no contents read access")
 		return nil
 	}
 
-	// Skip .github checkout if custom steps already contain a full repository checkout
-	// The full checkout already includes the .github folder, making sparse checkout redundant
+	// Skip .github and .agents checkout if custom steps already contain a full repository checkout
+	// The full checkout already includes these folders, making sparse checkout redundant
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
-		compilerYamlLog.Print("Skipping .github sparse checkout: custom steps contain full repository checkout")
+		compilerYamlLog.Print("Skipping .github and .agents sparse checkout: custom steps contain full repository checkout")
 		return nil
 	}
 
-	// Skip .github checkout if an automatic full repository checkout will be added
+	// Skip .github and .agents checkout if an automatic full repository checkout will be added
 	// The shouldAddCheckoutStep function returns true when a checkout step will be automatically added
 	if c.shouldAddCheckoutStep(data) {
-		compilerYamlLog.Print("Skipping .github sparse checkout: full repository checkout will be added automatically")
+		compilerYamlLog.Print("Skipping .github and .agents sparse checkout: full repository checkout will be added automatically")
 		return nil
 	}
 
-	// For all modes (dev, script, release), checkout .github folder
+	// For all modes (dev, script, release), checkout .github and .agents folders
 	// This works in release mode where actions aren't checked out
 	return []string{
-		"      - name: Checkout .github folder\n",
+		"      - name: Checkout .github and .agents folders\n",
 		fmt.Sprintf("        uses: %s\n", GetActionPin("actions/checkout")),
 		"        with:\n",
 		"          sparse-checkout: |\n",
 		"            .github\n",
+		"            .agents\n",
 		"          depth: 1\n",
 		"          persist-credentials: false\n",
 	}

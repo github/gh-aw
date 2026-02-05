@@ -145,10 +145,10 @@ This workflow uses runtime imports: {{runtime-import:shared/example.md}}
 				agentJobSection = lockStr[agentJobStart : agentJobStart+10+nextJobStart]
 			}
 
-			// Check for .github folder checkout
-			hasGitHubCheckout := strings.Contains(agentJobSection, "Checkout .github folder")
+			// Check for .github and .agents folders checkout
+			hasGitHubCheckout := strings.Contains(agentJobSection, "Checkout .github and .agents folders")
 			assert.Equal(t, tt.expectGitHubCheckout, hasGitHubCheckout,
-				"Test case: %s - Expected .github checkout: %t, got: %t\nDescription: %s",
+				"Test case: %s - Expected .github and .agents checkout: %t, got: %t\nDescription: %s",
 				tt.name, tt.expectGitHubCheckout, hasGitHubCheckout, tt.description)
 
 			// Check for full repository checkout
@@ -161,6 +161,14 @@ This workflow uses runtime imports: {{runtime-import:shared/example.md}}
 			if hasGitHubCheckout && hasFullCheckout {
 				t.Errorf("Test case: %s - Both .github sparse checkout and full checkout are present (redundant!)\nDescription: %s",
 					tt.name, tt.description)
+			}
+
+			// If .github checkout is expected, verify that .agents folder is also included
+			if tt.expectGitHubCheckout {
+				assert.Contains(t, agentJobSection, ".github",
+					"Test case: %s - Sparse checkout should include .github folder", tt.name)
+				assert.Contains(t, agentJobSection, ".agents",
+					"Test case: %s - Sparse checkout should include .agents folder", tt.name)
 			}
 
 			t.Logf("✓ Test case passed: %s", tt.description)
