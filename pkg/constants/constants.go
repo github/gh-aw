@@ -256,7 +256,7 @@ const (
 	DocsToolsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md"
 
 	// DocsGitHubToolsURL is the documentation URL for GitHub tools configuration
-	DocsGitHubToolsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools"
+	DocsGitHubToolsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools-github"
 
 	// DocsPermissionsURL is the documentation URL for GitHub permissions configuration
 	DocsPermissionsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/permissions.md"
