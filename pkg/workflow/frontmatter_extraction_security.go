@@ -144,13 +144,6 @@ func (c *Compiler) extractFirewallConfig(firewall any) *FirewallConfig {
 			}
 		}
 
-		// Extract cleanup-script if present (deprecated but still in struct)
-		if cleanupScript, hasCleanup := firewallObj["cleanup-script"]; hasCleanup {
-			if scriptStr, ok := cleanupScript.(string); ok {
-				config.CleanupScript = scriptStr
-			}
-		}
-
 		return config
 	}
 
