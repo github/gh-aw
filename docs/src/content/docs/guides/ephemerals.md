@@ -105,25 +105,23 @@ See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for complete docume
 
 ### Close Older Discussions
 
-Automatically close older discussions matching the same title prefix or labels when creating new ones. This keeps your discussions focused on the latest information.
+Automatically close older discussions with the same workflow-id marker when creating new ones. This keeps your discussions focused on the latest information.
 
 ```yaml wrap
 safe-outputs:
   create-discussion:
-    title-prefix: "[weekly-report]"
-    labels: [automation, weekly]
     close-older-discussions: true  # Close previous reports
 ```
 
 **How it works**:
 - When a new discussion is created successfully, the system searches for older discussions
-- Matches are identified by title prefix OR any of the specified labels
+- Matches are identified by the workflow-id marker embedded in the discussion body
 - Up to 10 older discussions are closed as "OUTDATED"
 - Each closed discussion receives a comment linking to the new discussion
 - Only runs if the new discussion creation succeeds
 
 **Requirements**:
-- Must set `title-prefix` or `labels` (or both) to identify matching discussions
+- GH_AW_WORKFLOW_ID environment variable must be set
 - Requires appropriate permissions on the target repository
 
 **Use cases**:
@@ -252,9 +250,7 @@ safe-outputs:
 ```yaml wrap
 safe-outputs:
   create-discussion:
-    title-prefix: "[weekly-status]"
     category: "Status Updates"
-    labels: [automation, weekly]
     expires: 14  # Close after 2 weeks
     close-older-discussions: true  # Replace previous reports
 ```
