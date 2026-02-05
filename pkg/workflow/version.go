@@ -1,5 +1,11 @@
 package workflow
 
+import (
+	"github.com/github/gh-aw/pkg/logger"
+)
+
+var versionLog = logger.New("workflow:version")
+
 // compilerVersion holds the version of the compiler, set at runtime.
 // This is used to include version information in generated workflow headers.
 var compilerVersion = "dev"
@@ -12,6 +18,7 @@ var isReleaseBuild = false
 // SetVersion sets the compiler version for inclusion in generated workflow headers.
 // Only non-dev versions are included in the generated headers.
 func SetVersion(v string) {
+	versionLog.Printf("Setting compiler version: %s", v)
 	compilerVersion = v
 }
 
@@ -22,6 +29,7 @@ func GetVersion() string {
 
 // SetIsRelease sets whether this binary was built as a release.
 func SetIsRelease(release bool) {
+	versionLog.Printf("Setting release build flag: %v", release)
 	isReleaseBuild = release
 }
 

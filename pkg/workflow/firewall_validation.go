@@ -9,23 +9,34 @@
 
 package workflow
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/github/gh-aw/pkg/logger"
+)
+
+var firewallValidationLog = logger.New("workflow:firewall_validation")
 
 // ValidateLogLevel validates that a firewall log-level value is one of the allowed enum values.
 // Valid values are: "debug", "info", "warn", "error".
 // Empty string is allowed as it defaults to "info" at runtime.
 // Returns an error if the log-level is invalid.
 func ValidateLogLevel(level string) error {
+	firewallValidationLog.Printf("Validating firewall log-level: %s", level)
+
 	// Empty string is allowed (defaults to "info")
 	if level == "" {
+		firewallValidationLog.Print("Empty log-level, using default")
 		return nil
 	}
 
 	valid := []string{"debug", "info", "warn", "error"}
 	for _, v := range valid {
 		if level == v {
+			firewallValidationLog.Printf("Valid log-level: %s", level)
 			return nil
 		}
 	}
+	firewallValidationLog.Printf("Invalid log-level: %s", level)
 	return fmt.Errorf("invalid log-level '%s', must be one of: %v", level, valid)
 }

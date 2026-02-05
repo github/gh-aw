@@ -2,7 +2,10 @@ package workflow
 
 import (
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var runtimeDefLog = logger.New("workflow:runtime_definitions")
 
 // Runtime represents configuration for a runtime environment
 type Runtime struct {
@@ -143,6 +146,8 @@ var commandToRuntime map[string]*Runtime
 var actionRepoToRuntime map[string]*Runtime
 
 func init() {
+	runtimeDefLog.Printf("Initializing runtime definitions: total_runtimes=%d", len(knownRuntimes))
+
 	// Build the command to runtime mapping
 	commandToRuntime = make(map[string]*Runtime)
 	for _, runtime := range knownRuntimes {
@@ -150,20 +155,25 @@ func init() {
 			commandToRuntime[cmd] = runtime
 		}
 	}
+	runtimeDefLog.Printf("Built command to runtime mapping: total_commands=%d", len(commandToRuntime))
 
 	// Build the action repo to runtime mapping
 	actionRepoToRuntime = make(map[string]*Runtime)
 	for _, runtime := range knownRuntimes {
 		actionRepoToRuntime[runtime.ActionRepo] = runtime
 	}
+	runtimeDefLog.Printf("Built action repo to runtime mapping: total_actions=%d", len(actionRepoToRuntime))
 }
 
 // findRuntimeByID finds a runtime configuration by its ID
 func findRuntimeByID(id string) *Runtime {
+	runtimeDefLog.Printf("Finding runtime by ID: %s", id)
 	for _, runtime := range knownRuntimes {
 		if runtime.ID == id {
+			runtimeDefLog.Printf("Found runtime: %s (%s)", runtime.ID, runtime.Name)
 			return runtime
 		}
 	}
+	runtimeDefLog.Printf("Runtime not found: %s", id)
 	return nil
 }
