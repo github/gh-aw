@@ -39,6 +39,21 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []str
 		}
 	}
 
+	// Check for Serena tool (uses Docker image when not in local mode)
+	if serenaTool, hasSerena := tools["serena"]; hasSerena {
+		// Only add if NOT using local mode (local mode uses uvx, not Docker)
+		if workflowData != nil && !isSerenaInLocalMode(workflowData.ParsedTools) {
+			// Select the appropriate container based on configured languages
+			containerImage := selectSerenaContainer(serenaTool)
+			image := containerImage + ":latest"
+			if !imageSet[image] {
+				images = append(images, image)
+				imageSet[image] = true
+				dockerLog.Printf("Added Serena MCP server container: %s", image)
+			}
+		}
+	}
+
 	// Check for safe-outputs MCP server (uses node:lts-alpine container)
 	if workflowData != nil && workflowData.SafeOutputs != nil && HasSafeOutputsEnabled(workflowData.SafeOutputs) {
 		image := constants.DefaultNodeAlpineLTSImage
