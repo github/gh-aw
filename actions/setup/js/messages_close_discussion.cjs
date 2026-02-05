@@ -29,12 +29,10 @@ function getCloseOlderDiscussionMessage(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default close-older-discussion template - pirate themed! 🏴‍☠️
-  const defaultMessage = `⚓ Avast! This discussion be marked as **outdated** by [{workflow_name}]({run_url}).
+  // Default close-older-discussion template
+  const defaultMessage = `This discussion has been marked as **outdated** by [{workflow_name}]({run_url}).
 
-🗺️ A newer treasure map awaits ye at **[Discussion #{new_discussion_number}]({new_discussion_url})**.
-
-Fair winds, matey! 🏴‍☠️`;
+A newer discussion is available at **[Discussion #{new_discussion_number}]({new_discussion_url})**.`;
 
   // Use custom message if configured
   return messages?.closeOlderDiscussion ? renderTemplate(messages.closeOlderDiscussion, templateContext) : renderTemplate(defaultMessage, templateContext);

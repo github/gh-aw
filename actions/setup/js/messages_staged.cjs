@@ -26,8 +26,8 @@ function getStagedTitle(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default staged title template - pirate themed! 🏴‍☠️
-  const defaultTitle = "## 🏴‍☠️ Ahoy Matey! Staged Waters: {operation} Preview";
+  // Default staged title template
+  const defaultTitle = "## 🔍 Preview: {operation}";
 
   // Use custom title if configured
   return messages?.stagedTitle ? renderTemplate(messages.stagedTitle, templateContext) : renderTemplate(defaultTitle, templateContext);
@@ -44,8 +44,8 @@ function getStagedDescription(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default staged description template - pirate themed! 🏴‍☠️
-  const defaultDescription = "🗺️ Shiver me timbers! The following booty would be plundered if we set sail (staged mode disabled):";
+  // Default staged description template
+  const defaultDescription = "📋 The following operations would be performed if staged mode was disabled:";
 
   // Use custom description if configured
   return messages?.stagedDescription ? renderTemplate(messages.stagedDescription, templateContext) : renderTemplate(defaultDescription, templateContext);

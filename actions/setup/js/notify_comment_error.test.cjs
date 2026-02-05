@@ -127,7 +127,7 @@ const mockCore = {
             await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
             expect(mockGithub.request).toHaveBeenCalledWith(
               "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
-              expect.objectContaining({ owner: "testowner", repo: "testrepo", comment_id: 123456, body: expect.stringContaining("found the treasure and completed successfully") })
+              expect.objectContaining({ owner: "testowner", repo: "testrepo", comment_id: 123456, body: expect.stringContaining("completed successfully!") })
             ),
             expect(mockCore.info).toHaveBeenCalledWith("Successfully updated comment"));
         }),
@@ -139,7 +139,7 @@ const mockCore = {
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
               expect(mockGithub.request).toHaveBeenCalledWith(
                 "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
-                expect.objectContaining({ owner: "testowner", repo: "testrepo", comment_id: 123456, body: expect.stringContaining("walked the plank") })
+                expect.objectContaining({ owner: "testowner", repo: "testrepo", comment_id: 123456, body: expect.stringContaining("failed. Please review the logs") })
               ),
               expect(mockCore.info).toHaveBeenCalledWith("Successfully updated comment"));
           }),
@@ -149,10 +149,7 @@ const mockCore = {
               (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
               (process.env.GH_AW_AGENT_CONCLUSION = "cancelled"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith(
-                "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
-                expect.objectContaining({ body: expect.stringContaining("was cancelled"), body: expect.stringContaining("walked the plank") })
-              ));
+              expect(mockGithub.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining("was cancelled. Please review the logs") })));
           }),
           it("should update with timeout message when agent times out", async () => {
             ((process.env.GH_AW_COMMENT_ID = "123456"),
@@ -160,10 +157,7 @@ const mockCore = {
               (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
               (process.env.GH_AW_AGENT_CONCLUSION = "timed_out"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith(
-                "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
-                expect.objectContaining({ body: expect.stringContaining("timed out"), body: expect.stringContaining("walked the plank") })
-              ));
+              expect(mockGithub.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining("timed out. Please review the logs") })));
           }),
           it("should update with skipped message when agent is skipped", async () => {
             ((process.env.GH_AW_COMMENT_ID = "123456"),
@@ -171,10 +165,7 @@ const mockCore = {
               (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
               (process.env.GH_AW_AGENT_CONCLUSION = "skipped"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith(
-                "PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}",
-                expect.objectContaining({ body: expect.stringContaining("was skipped"), body: expect.stringContaining("walked the plank") })
-              ));
+              expect(mockGithub.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining("was skipped. Please review the logs") })));
           }),
           it("should use custom comment repo when provided", async () => {
             ((process.env.GH_AW_COMMENT_ID = "123456"),
@@ -214,7 +205,7 @@ const mockCore = {
               (process.env.GH_AW_AGENT_CONCLUSION = "success"),
               (process.env.GH_AW_DETECTION_CONCLUSION = "success"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining("found the treasure and completed successfully") })));
+              expect(mockGithub.request).toHaveBeenCalledWith("PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}", expect.objectContaining({ body: expect.stringContaining("completed successfully!") })));
           }));
       }),
       describe("when updating a discussion comment", () => {
@@ -224,10 +215,7 @@ const mockCore = {
             (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
             (process.env.GH_AW_AGENT_CONCLUSION = "success"),
             await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-            expect(mockGithub.graphql).toHaveBeenCalledWith(
-              expect.stringContaining("updateDiscussionComment"),
-              expect.objectContaining({ commentId: "DC_kwDOABCDEF4ABCDEF", body: expect.stringContaining("found the treasure and completed successfully") })
-            ),
+            expect(mockGithub.graphql).toHaveBeenCalledWith(expect.stringContaining("updateDiscussionComment"), expect.objectContaining({ commentId: "DC_kwDOABCDEF4ABCDEF", body: expect.stringContaining("completed successfully!") })),
             expect(mockCore.info).toHaveBeenCalledWith("Successfully updated discussion comment"));
         }),
           it("should use GraphQL API for discussion comments on failure", async () => {
@@ -236,7 +224,10 @@ const mockCore = {
               (process.env.GH_AW_WORKFLOW_NAME = "test-workflow"),
               (process.env.GH_AW_AGENT_CONCLUSION = "failure"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`),
-              expect(mockGithub.graphql).toHaveBeenCalledWith(expect.stringContaining("updateDiscussionComment"), expect.objectContaining({ commentId: "DC_kwDOABCDEF4ABCDEF", body: expect.stringContaining("walked the plank") })));
+              expect(mockGithub.graphql).toHaveBeenCalledWith(
+                expect.stringContaining("updateDiscussionComment"),
+                expect.objectContaining({ commentId: "DC_kwDOABCDEF4ABCDEF", body: expect.stringContaining("failed. Please review the logs") })
+              ));
           }));
       }),
       describe("error handling", () => {
@@ -281,7 +272,7 @@ const mockCore = {
               (process.env.GH_AW_SAFE_OUTPUT_JOBS = JSON.stringify({ create_issue: "issue_url" })),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`));
             const callArgs = mockGithub.request.mock.calls[0][1];
-            expect(callArgs.body).toMatch(/completed successfully.*⚓💰$/);
+            expect(callArgs.body).toMatch(/completed successfully!$/);
           }),
           it("should handle empty safe output jobs gracefully", async () => {
             ((process.env.GH_AW_COMMENT_ID = "123456"),
@@ -290,7 +281,7 @@ const mockCore = {
               (process.env.GH_AW_AGENT_CONCLUSION = "success"),
               await eval(`(async () => { ${notifyCommentScript}; await main(); })()`));
             const callArgs = mockGithub.request.mock.calls[0][1];
-            expect(callArgs.body).toMatch(/completed successfully.*⚓💰$/);
+            expect(callArgs.body).toMatch(/completed successfully!$/);
           }));
       }));
   }));

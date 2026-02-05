@@ -28,8 +28,8 @@ function getRunStartedMessage(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default run-started template - pirate themed! 🏴‍☠️
-  const defaultMessage = "⚓ Avast! [{workflow_name}]({run_url}) be settin' sail on this {event_type}! 🏴‍☠️";
+  // Default run-started template
+  const defaultMessage = "🚀 [{workflow_name}]({run_url}) has started processing this {event_type}";
 
   // Use custom message if configured
   return messages?.runStarted ? renderTemplate(messages.runStarted, templateContext) : renderTemplate(defaultMessage, templateContext);
@@ -52,8 +52,8 @@ function getRunSuccessMessage(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default run-success template - pirate themed! 🏴‍☠️
-  const defaultMessage = "🎉 Yo ho ho! [{workflow_name}]({run_url}) found the treasure and completed successfully! ⚓💰";
+  // Default run-success template
+  const defaultMessage = "✅ [{workflow_name}]({run_url}) completed successfully!";
 
   // Use custom message if configured
   return messages?.runSuccess ? renderTemplate(messages.runSuccess, templateContext) : renderTemplate(defaultMessage, templateContext);
@@ -77,8 +77,8 @@ function getRunFailureMessage(ctx) {
   // Create context with both camelCase and snake_case keys
   const templateContext = toSnakeCase(ctx);
 
-  // Default run-failure template - pirate themed! 🏴‍☠️
-  const defaultMessage = "💀 Blimey! [{workflow_name}]({run_url}) {status} and walked the plank! No treasure today, matey! ☠️";
+  // Default run-failure template
+  const defaultMessage = "❌ [{workflow_name}]({run_url}) {status}. Please review the logs for details.";
 
   // Use custom message if configured
   return messages?.runFailure ? renderTemplate(messages.runFailure, templateContext) : renderTemplate(defaultMessage, templateContext);

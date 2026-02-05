@@ -73,7 +73,7 @@ const mockCore = {
             mockGithub.request.mockResolvedValueOnce({ data: { id: 789 } }).mockResolvedValueOnce({ data: { id: 999, html_url: "https://github.com/testowner/testrepo/pull/456#issuecomment-999" } }),
             await eval(`(async () => { ${reactionScript}; await main(); })()`),
             expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/456/reactions", expect.objectContaining({ content: "heart" })),
-            expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/456/comments", expect.objectContaining({ body: expect.stringContaining("be settin' sail on this pull request") })),
+            expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/456/comments", expect.objectContaining({ body: expect.stringContaining("has started processing this pull request") })),
             expect(mockCore.setOutput).toHaveBeenCalledWith("reaction-id", "789"),
             expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "999"),
             expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/pull/456#issuecomment-999"));
@@ -147,7 +147,7 @@ const mockCore = {
             mockGithub.request.mockResolvedValueOnce({ data: { id: 456 } }).mockResolvedValueOnce({ data: { id: 789, html_url: "https://github.com/testowner/testrepo/issues/123#issuecomment-789" } }),
             await eval(`(async () => { ${reactionScript}; await main(); })()`),
             expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/123/reactions", expect.objectContaining({ content: "eyes" })),
-            expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/123/comments", expect.objectContaining({ body: expect.stringContaining("be settin' sail on this issue") })),
+            expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/123/comments", expect.objectContaining({ body: expect.stringContaining("has started processing this issue") })),
             expect(mockCore.setOutput).toHaveBeenCalledWith("reaction-id", "456"),
             expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "789"),
             expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/issues/123#issuecomment-789"));
@@ -159,7 +159,7 @@ const mockCore = {
               (global.context.payload = { issue: { number: 123 }, comment: { id: 456 }, repository: { html_url: "https://github.com/testowner/testrepo" } }),
               mockGithub.request.mockResolvedValueOnce({ data: { id: 111 } }).mockResolvedValueOnce({ data: { id: 789, html_url: "https://github.com/testowner/testrepo/issues/123#issuecomment-789" } }),
               await eval(`(async () => { ${reactionScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/123/comments", expect.objectContaining({ body: expect.stringContaining("be settin' sail on this issue comment") })),
+              expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/123/comments", expect.objectContaining({ body: expect.stringContaining("has started processing this issue comment") })),
               expect(mockGithub.request).not.toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/comments/456", expect.anything()),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "789"),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/issues/123#issuecomment-789"),
@@ -172,7 +172,7 @@ const mockCore = {
               (global.context.payload = { pull_request: { number: 456 }, comment: { id: 789 }, repository: { html_url: "https://github.com/testowner/testrepo" } }),
               mockGithub.request.mockResolvedValueOnce({ data: { id: 222 } }).mockResolvedValueOnce({ data: { id: 999, html_url: "https://github.com/testowner/testrepo/pull/456#discussion_r999" } }),
               await eval(`(async () => { ${reactionScript}; await main(); })()`),
-              expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/456/comments", expect.objectContaining({ body: expect.stringContaining("be settin' sail on this pull request review comment") })),
+              expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/testowner/testrepo/issues/456/comments", expect.objectContaining({ body: expect.stringContaining("has started processing this pull request review comment") })),
               expect(mockGithub.request).not.toHaveBeenCalledWith("POST /repos/testowner/testrepo/pulls/comments/789", expect.anything()),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "999"),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/pull/456#discussion_r999"),
@@ -190,7 +190,7 @@ const mockCore = {
                 .mockResolvedValueOnce({ addDiscussionComment: { comment: { id: "DC_kwDOABcD1M4AaBbE", url: "https://github.com/testowner/testrepo/discussions/10#discussioncomment-999" } } }),
               await eval(`(async () => { ${reactionScript}; await main(); })()`),
               expect(mockGithub.graphql).toHaveBeenCalledTimes(4),
-              expect(mockGithub.graphql).toHaveBeenCalledWith(expect.stringContaining("addDiscussionComment"), expect.objectContaining({ dId: "D_kwDOABcD1M4AaBbC", body: expect.stringContaining("be settin' sail on this discussion") })),
+              expect(mockGithub.graphql).toHaveBeenCalledWith(expect.stringContaining("addDiscussionComment"), expect.objectContaining({ dId: "D_kwDOABcD1M4AaBbC", body: expect.stringContaining("has started processing this discussion") })),
               expect(mockCore.setOutput).toHaveBeenCalledWith("reaction-id", "MDg6UmVhY3Rpb24xMjM0NTY3ODk="),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "DC_kwDOABcD1M4AaBbE"),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/discussions/10#discussioncomment-999"));
@@ -207,7 +207,7 @@ const mockCore = {
               await eval(`(async () => { ${reactionScript}; await main(); })()`),
               expect(mockGithub.graphql).toHaveBeenCalledWith(
                 expect.stringContaining("addDiscussionComment"),
-                expect.objectContaining({ dId: "D_kwDOABcD1M4AaBbC", body: expect.stringContaining("be settin' sail on this discussion comment"), replyToId: "DC_kwDOABcD1M4AaBbC" })
+                expect.objectContaining({ dId: "D_kwDOABcD1M4AaBbC", body: expect.stringContaining("has started processing this discussion comment"), replyToId: "DC_kwDOABcD1M4AaBbC" })
               ),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-id", "DC_kwDOABcD1M4AaBbE"),
               expect(mockCore.setOutput).toHaveBeenCalledWith("comment-url", "https://github.com/testowner/testrepo/discussions/10#discussioncomment-789"),
