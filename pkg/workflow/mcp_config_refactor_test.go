@@ -105,7 +105,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"type": "stdio"`,
-				`"container": "alpine:latest"`,
+				`"container": "localhost/gh-aw:dev"`, // Dev mode uses locally built image
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
 				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
@@ -151,7 +151,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
 				`"agentic_workflows": {`,
-				`"container": "alpine:latest"`,
+				`"container": "localhost/gh-aw:dev"`, // Dev mode uses locally built image
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
 				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
@@ -242,21 +242,24 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 	tests := []struct {
 		name              string
 		actionMode        ActionMode
+		expectedContainer string
 		expectedArgs      string
 		unexpectedContent []string
 	}{
 		{
-			name:         "dev mode with --cmd",
-			actionMode:   ActionModeDev,
-			expectedArgs: `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
+			name:              "dev mode with --cmd",
+			actionMode:        ActionModeDev,
+			expectedContainer: `container = "localhost/gh-aw:dev"`,
+			expectedArgs:      `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
 			unexpectedContent: []string{
 				`entrypointArgs = ["mcp-server"]`,
 			},
 		},
 		{
-			name:         "release mode without --cmd",
-			actionMode:   ActionModeRelease,
-			expectedArgs: `entrypointArgs = ["mcp-server"]`,
+			name:              "release mode without --cmd",
+			actionMode:        ActionModeRelease,
+			expectedContainer: `container = "alpine:latest"`,
+			expectedArgs:      `entrypointArgs = ["mcp-server"]`,
 			unexpectedContent: []string{
 				`--cmd`,
 			},
@@ -273,7 +276,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 
 			expectedContent := []string{
 				`[mcp_servers.agentic_workflows]`,
-				`container = "alpine:latest"`,
+				tt.expectedContainer,
 				`entrypoint = "/opt/gh-aw/gh-aw"`,
 				tt.expectedArgs,
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)

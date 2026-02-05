@@ -34,13 +34,13 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 			effectiveToken := getEffectiveGitHubToken("", data.GitHubToken)
 			fmt.Fprintf(yaml, "          token: %s\n", effectiveToken)
 		}
-	}
 
-	// Add CLI build steps in dev mode (after checkout, before other steps)
-	// This builds the gh-aw CLI and Docker image for use by the agentic-workflows MCP server
-	if c.actionMode.IsDev() {
-		compilerYamlLog.Printf("Generating CLI build steps for dev mode")
-		c.generateDevModeCLIBuildSteps(yaml)
+		// Add CLI build steps in dev mode (after automatic checkout, before other steps)
+		// This builds the gh-aw CLI and Docker image for use by the agentic-workflows MCP server
+		if c.actionMode.IsDev() {
+			compilerYamlLog.Printf("Generating CLI build steps for dev mode")
+			c.generateDevModeCLIBuildSteps(yaml)
+		}
 	}
 
 	// Add checkout steps for repository imports
@@ -637,8 +637,8 @@ func sanitizeRefForPath(ref string) string {
 func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
 	compilerYamlLog.Print("Generating dev mode CLI build steps")
 
-	// Step 1: Setup Go
-	yaml.WriteString("      - name: Setup Go\n")
+	// Step 1: Setup Go for building the CLI
+	yaml.WriteString("      - name: Setup Go for CLI build\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/setup-go"))
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          go-version-file: go.mod\n")

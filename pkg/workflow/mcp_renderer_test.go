@@ -169,6 +169,7 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 		InlineArgs:           true,
 		Format:               "json",
 		IsLast:               true,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -184,8 +185,9 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 		t.Error("Expected agentic_workflows server ID")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
-	if !strings.Contains(output, `"container": "alpine:latest"`) {
-		t.Error("Expected container field for containerized server")
+	// In dev mode, should use locally built image
+	if !strings.Contains(output, `"container": "localhost/gh-aw:dev"`) {
+		t.Error("Expected dev mode container image for containerized server")
 	}
 	if !strings.Contains(output, `"entrypoint": "/opt/gh-aw/gh-aw"`) {
 		t.Error("Expected entrypoint field for containerized server")
@@ -198,6 +200,7 @@ func TestRenderAgenticWorkflowsMCP_JSON_Claude(t *testing.T) {
 		InlineArgs:           false,
 		Format:               "json",
 		IsLast:               false,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -220,6 +223,7 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 		InlineArgs:           false,
 		Format:               "toml",
 		IsLast:               false,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -232,14 +236,15 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 		t.Error("Expected TOML section header")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
-	if !strings.Contains(output, `container = "alpine:latest"`) {
-		t.Error("Expected TOML container field for containerized server")
+	// In dev mode, should use locally built image
+	if !strings.Contains(output, `container = "localhost/gh-aw:dev"`) {
+		t.Error("Expected dev mode container image for containerized server")
 	}
 	if !strings.Contains(output, `entrypoint = "/opt/gh-aw/gh-aw"`) {
 		t.Error("Expected TOML entrypoint field for containerized server")
 	}
-	if !strings.Contains(output, `entrypointArgs = ["mcp-server"]`) {
-		t.Error("Expected TOML entrypointArgs field")
+	if !strings.Contains(output, `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`) {
+		t.Error("Expected TOML entrypointArgs field with --cmd in dev mode")
 	}
 }
 

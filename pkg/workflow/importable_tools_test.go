@@ -235,8 +235,9 @@ Uses imported agentic-workflows tool.
 	}
 
 	// Verify container format is used (not command format)
-	if !strings.Contains(workflowData, `"container": "alpine:latest"`) {
-		t.Error("Expected compiled workflow to contain alpine container for agentic-workflows")
+	// In dev mode, should use locally built image instead of alpine:latest
+	if !strings.Contains(workflowData, `"container": "localhost/gh-aw:dev"`) {
+		t.Error("Expected compiled workflow to contain localhost/gh-aw:dev container for agentic-workflows in dev mode")
 	}
 }
 
@@ -397,11 +398,12 @@ Uses imported serena with language config.
 
 	// Verify that language runtime setup steps are NOT present
 	// since Serena now runs in a container with language services included
-	if strings.Contains(workflowData, "Setup Go") {
-		t.Error("Did not expect Go setup step (Serena runs in container)")
+	// Note: "Setup Go for CLI build" is for building the gh-aw CLI in dev mode, not for runtime
+	if strings.Contains(workflowData, "- name: Setup Go\n") {
+		t.Error("Did not expect Go runtime setup step (Serena runs in container)")
 	}
 
-	if strings.Contains(workflowData, "Setup Node.js") {
+	if strings.Contains(workflowData, "- name: Setup Node.js\n") {
 		t.Error("Did not expect Node.js setup step (Serena runs in container)")
 	}
 
