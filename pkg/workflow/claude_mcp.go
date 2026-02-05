@@ -15,16 +15,12 @@ func (e *ClaudeEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]a
 	// Create unified renderer with Claude-specific options
 	// Claude uses JSON format without Copilot-specific fields and multi-line args
 	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
-		actionMode := ActionModeDev // Default to dev mode
-		if workflowData != nil {
-			actionMode = workflowData.ActionMode
-		}
 		return NewMCPConfigRenderer(MCPRendererOptions{
 			IncludeCopilotFields: false, // Claude doesn't use "type" and "tools" fields
 			InlineArgs:           false, // Claude uses multi-line args format
 			Format:               "json",
 			IsLast:               isLast,
-			ActionMode:           actionMode,
+			ActionMode:           GetActionModeFromWorkflowData(workflowData),
 		})
 	}
 

@@ -102,3 +102,11 @@ func DetectActionMode(version string) ActionMode {
 	actionModeLog.Printf("Detected dev mode (default): isRelease=%v, ref=%s", IsRelease(), githubRef)
 	return ActionModeDev
 }
+
+// GetActionModeFromWorkflowData extracts the ActionMode from WorkflowData, defaulting to dev mode if nil
+func GetActionModeFromWorkflowData(workflowData *WorkflowData) ActionMode {
+	if workflowData != nil {
+		return workflowData.ActionMode
+	}
+	return ActionModeDev
+}
