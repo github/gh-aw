@@ -22,13 +22,14 @@ safe-outputs:
     # Omitting 'allowed' to permit dynamic label creation (pr-type:*, pr-risk:*, etc.)
   add-comment:
     max: 50
-  create-discussion:
+  create-issue:
     max: 1
-    category: "general"
     title-prefix: "[PR Triage Report] "
+    expires: 1d
+    close-older-issues: true
   messages:
     run-started: "🔍 Starting PR triage analysis... [{workflow_name}]({run_url}) is categorizing and prioritizing agent-created PRs"
-    run-success: "✅ PR triage complete! [{workflow_name}]({run_url}) has analyzed and categorized PRs. Check the discussion for detailed report."
+    run-success: "✅ PR triage complete! [{workflow_name}]({run_url}) has analyzed and categorized PRs. Check the issue for detailed report."
     run-failure: "❌ PR triage failed! [{workflow_name}]({run_url}) {status}. Some PRs may not be triaged."
 timeout-minutes: 30
 ---
@@ -270,7 +271,7 @@ For each triaged PR, add a comment with the triage results:
 
 ### Phase 8: Report Generation (3 minutes)
 
-Create a comprehensive triage report as a GitHub Discussion:
+Create a comprehensive triage report as a GitHub Issue:
 
 **Report Structure:**
 
