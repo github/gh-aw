@@ -1,141 +1,58 @@
 {
-  "run_date": "2026-02-05T00:41:40.490727+00:00",
-  "run_id": "21694060903",
-  "total_prs_triaged": 4,
+  "run_date": "2026-02-05T06:27:54.716Z",
+  "run_id": "21701307344",
+  "total_prs_triaged": 1,
   "results": [
     {
-      "number": 13820,
-      "title": "Add shared workflow for Microsoft Amplifier CLI",
-      "url": "https://github.com/github/gh-aw/pull/13820",
+      "number": 13859,
+      "title": "Fix Serena container selection for Go language support",
+      "url": "https://github.com/github/gh-aw/pull/13859",
       "author": "Copilot",
       "draft": true,
-      "category": "feature",
-      "risk": "high",
-      "priority_score": 40,
+      "category": "bug",
+      "risk": "medium",
+      "priority_score": 42,
       "impact_score": 30,
-      "urgency_score": 6,
-      "quality_score": 4,
+      "urgency_score": 5,
+      "quality_score": 7,
       "action": "batch_review",
-      "age_hours": 0.39,
+      "age_hours": 0.5,
       "age_days": 0.02,
-      "changed_files": 4,
-      "additions": 979,
-      "deletions": 0,
+      "changed_files": 23,
+      "additions": 127,
+      "deletions": 46,
       "comments": 0,
       "commits": 4,
       "ci_status": "pending",
       "mergeable_state": "unstable",
-      "fixes_issue": null
-    },
-    {
-      "number": 13822,
-      "title": "Update CLI tools: Copilot 0.0.403, Codex 0.96.0, MCP Gateway v0.0.99",
-      "url": "https://github.com/github/gh-aw/pull/13822",
-      "author": "Copilot",
-      "draft": true,
-      "category": "chore",
-      "risk": "high",
-      "priority_score": 34,
-      "impact_score": 25,
-      "urgency_score": 0,
-      "quality_score": 9,
-      "action": "batch_review",
-      "age_hours": 0.24,
-      "age_days": 0.01,
-      "changed_files": 148,
-      "additions": 760,
-      "deletions": 755,
-      "comments": 7,
-      "commits": 4,
-      "ci_status": "pending",
-      "mergeable_state": "blocked",
-      "fixes_issue": 13821
-    },
-    {
-      "number": 13809,
-      "title": "Add documentation links to validation error messages with centralized URL constants",
-      "url": "https://github.com/github/gh-aw/pull/13809",
-      "author": "Copilot",
-      "draft": false,
-      "category": "docs",
-      "risk": "medium",
-      "priority_score": 22,
-      "impact_score": 10,
-      "urgency_score": 0,
-      "quality_score": 12,
-      "action": "batch_review",
-      "age_hours": 1.4,
-      "age_days": 0.06,
-      "changed_files": 8,
-      "additions": 75,
-      "deletions": 26,
-      "comments": 3,
-      "commits": 7,
-      "ci_status": "pending",
-      "mergeable_state": "clean",
-      "fixes_issue": 13789
-    },
-    {
-      "number": 13813,
-      "title": "Move agentic-chat skill to .github/aw folder and update references",
-      "url": "https://github.com/github/gh-aw/pull/13813",
-      "author": "Copilot",
-      "draft": true,
-      "category": "docs",
-      "risk": "low",
-      "priority_score": 14,
-      "impact_score": 10,
-      "urgency_score": 0,
-      "quality_score": 4,
-      "action": "defer",
-      "age_hours": 1.06,
-      "age_days": 0.04,
-      "changed_files": 2,
-      "additions": 2,
-      "deletions": 2,
-      "comments": 4,
-      "commits": 3,
-      "ci_status": "pending",
-      "mergeable_state": "unstable",
-      "fixes_issue": null
+      "fixes_issue": 13857
     }
   ],
   "statistics": {
-    "total": 4,
+    "total": 1,
     "by_category": {
-      "feature": 1,
-      "chore": 1,
-      "docs": 2
+      "bug": 1
     },
     "by_risk": {
-      "high": 2,
-      "medium": 1,
-      "low": 1
+      "medium": 1
     },
     "by_priority": {
       "high": 0,
       "medium": 1,
-      "low": 3
+      "low": 0
     },
     "by_action": {
-      "batch_review": 3,
-      "defer": 1
+      "batch_review": 1
     },
     "by_draft_status": {
-      "draft": 3,
-      "ready": 1
+      "draft": 1,
+      "ready": 0
     }
   },
   "auto_merge_candidates": [],
   "fast_track_needed": [],
-  "batch_review": [
-    13820,
-    13822,
-    13809
-  ],
-  "defer": [
-    13813
-  ],
+  "batch_review": [13859],
+  "defer": [],
   "close_candidates": [],
   "batches": {}
 }
