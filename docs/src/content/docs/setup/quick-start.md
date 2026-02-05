@@ -27,9 +27,8 @@ Install the [GitHub CLI](https://cli.github.com/), then install the GitHub Agent
 
 ```bash wrap
 gh extension install github/gh-aw
-```
-
-> [!TIP]
+``
+`> [!TIP]
 > If you are encountering authentication issues, use this script,
 > ```
 > curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
@@ -56,6 +55,22 @@ Once your initial run is complete, a new issue will be created in your repositor
 - Progress tracking, goal reminders and highlights
 - Project status and recommendations
 - Actionable next steps for maintainers
+
+<div class="gh-aw-video-wrapper" style="max-width: 100%;">
+   <div class="gh-aw-video-container has-aspect-ratio" style="padding-bottom: 56.25%;">
+      <video
+         class="gh-aw-video-element"
+         controls
+         preload="metadata"
+         poster="/gh-aw/images/install-and-add-workflow-in-cli-thumbnail.png"
+         aria-label="Install gh-aw and add a workflow using the CLI"
+      >
+         <source src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4" type="video/mp4" />
+         <p>Your browser doesn't support HTML5 video. Download the video <a href="/gh-aw/videos/install-and-add-workflow-in-cli.mp4">here</a>.</p>
+      </video>
+   </div>
+   <div class="gh-aw-video-caption" role="note">Install the extension, add a workflow, and trigger a run from the CLI</div>
+</div>
 
 ### Going further — Customize your workflow
 
