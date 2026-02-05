@@ -94,11 +94,23 @@ The YAML frontmatter supports these fields:
 - **`if:`** - Conditional execution expression (string)
 - **`run-name:`** - Custom workflow run name (string)
 - **`name:`** - Workflow name (string)
-- **`steps:`** - Custom workflow steps (object)
-- **`post-steps:`** - Custom workflow steps to run after AI execution (object)
+- **`steps:`** - Custom workflow steps before AI execution (object). **Security Notice**: Custom steps run OUTSIDE the firewall sandbox with standard GitHub Actions security but NO network egress controls. Use only for deterministic data preparation, not agentic compute.
+- **`post-steps:`** - Custom workflow steps after AI execution (object). **Security Notice**: Post-execution steps run OUTSIDE the firewall sandbox. Use only for deterministic cleanup, artifact uploads, or notifications—not agentic compute or untrusted AI execution.
 - **`environment:`** - Environment that the job references for protection rules (string or object)
 - **`container:`** - Container to run job steps in (string or object)
 - **`services:`** - Service containers that run alongside the job (object)
+- **`secrets:`** - Secret values passed to workflow execution (object)
+  - Use GitHub Actions expressions: `${{ secrets.API_KEY }}`
+  - String format: `secrets: { API_TOKEN: "${{ secrets.API_TOKEN }}" }`
+  - Object format with descriptions:
+    ```yaml
+    secrets:
+      API_TOKEN:
+        value: ${{ secrets.API_TOKEN }}
+        description: "API token for external service"
+    ```
+  - Never commit plaintext secrets
+  - For reusable workflows, use `jobs.<job_id>.secrets` instead
 
 ### Agentic Workflow Specific Fields
 
@@ -186,6 +198,7 @@ The YAML frontmatter supports these fields:
   - Standard GitHub Actions jobs configuration
   - Each job can have: `name`, `runs-on`, `steps`, `needs`, `if`, `env`, `permissions`, `timeout-minutes`, etc.
   - For most agentic workflows, jobs are auto-generated; only specify this for advanced multi-job workflows
+  - **Security Notice**: Custom jobs run OUTSIDE the firewall sandbox. Execute with standard GitHub Actions security but NO network egress controls. Use only for deterministic preprocessing, data fetching, or static analysis—not agentic compute or untrusted AI execution.
   - Example:
     ```yaml
     jobs:
@@ -205,6 +218,7 @@ The YAML frontmatter supports these fields:
       id: copilot                       # Required: coding agent identifier (copilot, custom, or experimental: claude, codex)
       version: beta                     # Optional: version of the action (has sensible default)
       model: gpt-5                      # Optional: LLM model to use (has sensible default)
+      agent: technical-doc-writer       # Optional: custom agent file (Copilot only, references .github/agents/{agent}.agent.md)
       max-turns: 5                      # Optional: maximum chat iterations per run (has sensible default)
       max-concurrency: 3                # Optional: max concurrent workflows across all workflows (default: 3)
       env:                              # Optional: custom environment variables (object)
