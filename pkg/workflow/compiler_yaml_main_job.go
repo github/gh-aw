@@ -645,14 +645,15 @@ func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
 	yaml.WriteString("          cache: true\n")
 
 	// Step 2: Build CLI binary for linux/amd64
-	// Use CGO_ENABLED=0 for static linking (required for Alpine containers)
-	// Build only for linux/amd64 since that's what the container uses
+	// Use the standard build command from CI/Makefile (not release build)
+	// CGO_ENABLED=0 for static linking (required for Alpine containers)
 	yaml.WriteString("      - name: Build gh-aw CLI\n")
 	yaml.WriteString("        run: |\n")
 	yaml.WriteString("          echo \"Building gh-aw CLI for linux/amd64...\"\n")
 	yaml.WriteString("          mkdir -p dist\n")
+	yaml.WriteString("          VERSION=$(git describe --tags --always --dirty)\n")
 	yaml.WriteString("          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \\\n")
-	yaml.WriteString("            -ldflags \"-X 'github.com/github/gh-aw/pkg/workflow.isReleaseBuild=false'\" \\\n")
+	yaml.WriteString("            -ldflags \"-s -w -X main.version=${VERSION}\" \\\n")
 	yaml.WriteString("            -o dist/gh-aw-linux-amd64 \\\n")
 	yaml.WriteString("            ./cmd/gh-aw\n")
 	yaml.WriteString("          echo \"✓ Built gh-aw CLI successfully\"\n")

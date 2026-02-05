@@ -120,8 +120,9 @@ jobs:
         run: |
           echo "Building gh-aw CLI for linux/amd64..."
           mkdir -p dist
+          VERSION=$(git describe --tags --always --dirty)
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags "-X 'github.com/github/gh-aw/pkg/workflow.isReleaseBuild=false'" \
+            -ldflags "-s -w -X main.version=${VERSION}" \
             -o dist/gh-aw-linux-amd64 \
             ./cmd/gh-aw
           echo "✓ Built gh-aw CLI successfully"
