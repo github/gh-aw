@@ -282,15 +282,15 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	// This allows users to edit the main workflow file without recompilation
 	workflowBasename := filepath.Base(c.markdownPath)
 
-	// Determine the directory path relative to .github
-	// For a workflow at ".github/workflows/test.md", the runtime-import path should be "workflows/test.md"
+	// Determine the directory path relative to workspace root
+	// For a workflow at ".github/workflows/test.md", the runtime-import path should be ".github/workflows/test.md"
+	// This makes the path explicit and matches the actual file location in the repository
 	var workflowFilePath string
 	if strings.Contains(c.markdownPath, ".github") {
-		// Extract everything after ".github/"
+		// Extract everything from ".github/" onwards (inclusive)
 		githubIndex := strings.Index(c.markdownPath, ".github")
 		if githubIndex != -1 {
-			relPath := c.markdownPath[githubIndex+len(".github/"):]
-			workflowFilePath = relPath
+			workflowFilePath = c.markdownPath[githubIndex:]
 		} else {
 			// Fallback
 			workflowFilePath = workflowBasename
@@ -305,6 +305,7 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 
 	// Create a runtime-import macro for the main workflow markdown
 	// The runtime_import.cjs helper will extract and process the markdown body at runtime
+	// The path uses .github/ prefix for clarity (e.g., .github/workflows/test.md)
 	runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", workflowFilePath)
 	compilerYamlLog.Printf("Using runtime-import for main workflow markdown: %s", workflowFilePath)
 
