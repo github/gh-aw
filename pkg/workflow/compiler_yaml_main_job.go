@@ -343,6 +343,11 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	// Collect agent stdio logs path for unified upload
 	artifactPaths = append(artifactPaths, logFileFull)
 
+	// Collect agent-generated files path for unified upload
+	// This directory is used by workflows that instruct the agent to write files
+	// (e.g., smoke-claude status summaries)
+	artifactPaths = append(artifactPaths, "/tmp/gh-aw/agent/")
+
 	// Add post-execution cleanup step for Copilot engine
 	if copilotEngine, ok := engine.(*CopilotEngine); ok {
 		cleanupStep := copilotEngine.GetCleanupStep(data)
