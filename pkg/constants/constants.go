@@ -318,7 +318,7 @@ const DefaultGitHubMCPServerVersion Version = "v0.30.3"
 const DefaultFirewallVersion Version = "v0.13.4"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
-const DefaultMCPGatewayVersion Version = "v0.0.99"
+const DefaultMCPGatewayVersion Version = "v0.0.103"
 
 // DefaultMCPGatewayContainer is the default container image for the MCP Gateway
 const DefaultMCPGatewayContainer = "ghcr.io/github/gh-aw-mcpg"
