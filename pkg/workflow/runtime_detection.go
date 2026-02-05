@@ -285,21 +285,21 @@ func containsRuntimeImports(content string) bool {
 			if idx == -1 {
 				continue
 			}
-			
+
 			// Find the path after the macro name
 			rest := line[idx+len("{{#runtime-import"):]
-			
+
 			// Skip optional marker if present
 			rest = strings.TrimPrefix(rest, "?")
-			
+
 			// Trim whitespace
 			rest = strings.TrimSpace(rest)
-			
+
 			// Skip URLs (http:// or https://)
 			if strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://") {
 				continue
 			}
-			
+
 			// Check if it starts with . or .. (local file path)
 			if strings.HasPrefix(rest, ".") {
 				return true
