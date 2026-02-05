@@ -1263,6 +1263,7 @@ jobs:
     permissions:
       contents: read
       discussions: write
+      issues: write
     timeout-minutes: 15
     env:
       GH_AW_ENGINE_ID: "copilot"
