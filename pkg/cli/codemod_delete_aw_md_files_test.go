@@ -32,7 +32,7 @@ This is a test workflow.
 	}
 
 	result, changed, err := codemod.Apply(content, frontmatter)
-	assert.NoError(t, err, "Apply should not return an error")
+	require.NoError(t, err, "Apply should not return an error")
 	assert.False(t, changed, "Codemod should not mark content as changed")
 	assert.Equal(t, content, result, "Codemod should not modify workflow content")
 }
