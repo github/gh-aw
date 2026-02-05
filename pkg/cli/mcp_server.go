@@ -80,6 +80,26 @@ Examples:
 	return cmd
 }
 
+// checkAndLogGHVersion checks if gh CLI is available and logs its version
+func checkAndLogGHVersion() {
+	cmd := exec.Command("gh", "version")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		mcpLog.Print("WARNING: gh CLI not found in PATH")
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("gh CLI not found in PATH - some MCP server operations may fail"))
+		return
+	}
+
+	// Parse and log the version
+	versionOutput := strings.TrimSpace(string(output))
+	mcpLog.Printf("gh CLI version: %s", versionOutput)
+
+	// Extract just the first line for cleaner logging to stderr
+	firstLine := strings.Split(versionOutput, "\n")[0]
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("gh CLI: %s", firstLine)))
+}
+
 // runMCPServer starts the MCP server on stdio or HTTP transport
 func runMCPServer(port int, cmdPath string) error {
 	if port > 0 {
@@ -87,6 +107,9 @@ func runMCPServer(port int, cmdPath string) error {
 	} else {
 		mcpLog.Print("Starting MCP server with stdio transport")
 	}
+
+	// Check and log gh CLI version
+	checkAndLogGHVersion()
 
 	// Validate that the CLI and secrets are properly configured
 	// Note: Validation failures are logged as warnings but don't prevent server startup
