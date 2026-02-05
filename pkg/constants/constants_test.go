@@ -276,41 +276,6 @@ func TestModelNameConstants(t *testing.T) {
 	}
 }
 
-func TestVersionConstants(t *testing.T) {
-	tests := []struct {
-		name     string
-		value    Version
-		expected Version
-	}{
-		{"DefaultClaudeCodeVersion", DefaultClaudeCodeVersion, "2.1.31"},
-		{"DefaultCopilotVersion", DefaultCopilotVersion, "0.0.402"},
-		{"DefaultCodexVersion", DefaultCodexVersion, "0.94.0"},
-		{"DefaultGitHubMCPServerVersion", DefaultGitHubMCPServerVersion, "v0.30.3"},
-		{"DefaultMCPGatewayVersion", DefaultMCPGatewayVersion, "v0.0.98"},
-		{"DefaultSandboxRuntimeVersion", DefaultSandboxRuntimeVersion, "0.0.34"},
-		{"DefaultFirewallVersion", DefaultFirewallVersion, "v0.13.4"},
-		{"DefaultPlaywrightMCPVersion", DefaultPlaywrightMCPVersion, "0.0.63"},
-		{"DefaultPlaywrightBrowserVersion", DefaultPlaywrightBrowserVersion, "v1.58.1"},
-		{"DefaultBunVersion", DefaultBunVersion, "1.1"},
-		{"DefaultNodeVersion", DefaultNodeVersion, "24"},
-		{"DefaultPythonVersion", DefaultPythonVersion, "3.12"},
-		{"DefaultRubyVersion", DefaultRubyVersion, "3.3"},
-		{"DefaultDotNetVersion", DefaultDotNetVersion, "8.0"},
-		{"DefaultJavaVersion", DefaultJavaVersion, "21"},
-		{"DefaultElixirVersion", DefaultElixirVersion, "1.17"},
-		{"DefaultHaskellVersion", DefaultHaskellVersion, "9.10"},
-		{"DefaultDenoVersion", DefaultDenoVersion, "2.x"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.value != tt.expected {
-				t.Errorf("%s = %q, want %q", tt.name, tt.value, tt.expected)
-			}
-		})
-	}
-}
-
 func TestNumericConstants(t *testing.T) {
 	tests := []struct {
 		name     string

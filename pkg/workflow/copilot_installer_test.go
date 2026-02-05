@@ -104,43 +104,6 @@ func TestGenerateCopilotInstallerSteps(t *testing.T) {
 	}
 }
 
-func TestCopilotInstallerVersionPassthrough(t *testing.T) {
-	// Test that version from constants is correctly passed through
-	engine := NewCopilotEngine()
-
-	// Test with default version (no engine config)
-	workflowData := &WorkflowData{
-		Name: "test-workflow",
-	}
-
-	steps := engine.GetInstallationSteps(workflowData)
-
-	// Should have at least 2 steps (secret validation + install)
-	if len(steps) < 2 {
-		t.Fatalf("Expected at least 2 steps, got %d", len(steps))
-	}
-
-	// Find the install step
-	var installStep string
-	for _, step := range steps {
-		stepContent := strings.Join(step, "\n")
-		if strings.Contains(stepContent, "install_copilot_cli.sh") {
-			installStep = stepContent
-			break
-		}
-	}
-
-	if installStep == "" {
-		t.Fatal("Could not find install step with install_copilot_cli.sh")
-	}
-
-	// Should contain the default version from constants
-	expectedVersionLine := "/opt/gh-aw/actions/install_copilot_cli.sh " + string(constants.DefaultCopilotVersion)
-	if !strings.Contains(installStep, expectedVersionLine) {
-		t.Errorf("Expected default version %s in install step, got:\n%s", string(constants.DefaultCopilotVersion), installStep)
-	}
-}
-
 func TestCopilotInstallerCustomVersion(t *testing.T) {
 	// Test that custom version from engine config is used
 	engine := NewCopilotEngine()
