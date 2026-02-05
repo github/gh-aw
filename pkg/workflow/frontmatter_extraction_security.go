@@ -126,6 +126,31 @@ func (c *Compiler) extractFirewallConfig(firewall any) *FirewallConfig {
 			}
 		}
 
+		// Extract ssl-bump if present
+		if sslBump, hasSslBump := firewallObj["ssl-bump"]; hasSslBump {
+			if sslBumpBool, ok := sslBump.(bool); ok {
+				config.SSLBump = sslBumpBool
+			}
+		}
+
+		// Extract allow-urls if present
+		if allowUrls, hasAllowUrls := firewallObj["allow-urls"]; hasAllowUrls {
+			if urlsSlice, ok := allowUrls.([]any); ok {
+				for _, url := range urlsSlice {
+					if urlStr, ok := url.(string); ok {
+						config.AllowURLs = append(config.AllowURLs, urlStr)
+					}
+				}
+			}
+		}
+
+		// Extract cleanup-script if present (deprecated but still in struct)
+		if cleanupScript, hasCleanup := firewallObj["cleanup-script"]; hasCleanup {
+			if scriptStr, ok := cleanupScript.(string); ok {
+				config.CleanupScript = scriptStr
+			}
+		}
+
 		return config
 	}
 
