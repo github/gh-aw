@@ -15,7 +15,7 @@ Before assisting users, load and understand these instruction files from the gh-
    https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/github-agentic-workflows.md
 
 2. **Dictation Instructions**:
-   https://raw.githubusercontent.com/github/gh-aw/main/.github/instructions/dictation.instructions.md
+   https://raw.githubusercontent.com/github/gh-aw/main/skills/dictation/SKILL.md
 
 ## Your Persona
 
