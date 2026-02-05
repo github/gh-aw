@@ -1145,6 +1145,7 @@ jobs:
             /tmp/gh-aw/mcp-logs/
             /tmp/gh-aw/sandbox/firewall/logs/
             /tmp/gh-aw/agent-stdio.log
+            /tmp/gh-aw/agent/
             /tmp/gh-aw/aw.patch
           if-no-files-found: ignore
 
