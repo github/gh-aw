@@ -446,15 +446,29 @@ func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 		return true // Custom agent file requires checkout to access the file
 	}
 
-	// Check condition 3: Check if we have or will have contents: read permission
-	// In dev mode, contents: read is added automatically for local actions checkout
-	// So we need to account for that when deciding whether to add repository checkout
+	// Check condition 3: Check if we have contents: read permission
+	// Note: We no longer auto-add contents: read for local actions if the user
+	// explicitly specified permissions without contents
 	permParser := NewPermissionsParser(data.Permissions)
 	hasContentsRead := permParser.HasContentsReadAccess()
 
-	// In dev mode, if we'll add contents: read for actions folder, we should also add repository checkout
-	// because all workflows use runtime-import for the main workflow file
-	willAddContentsRead := (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
+	// Determine if we would actually add contents: read for local actions
+	// This follows the same logic as buildMainJob:
+	// - If no permissions specified (empty), we add contents: read for local actions
+	// - If permissions are specified without contents, we respect that and don't add it
+	willAddContentsRead := false
+	if data.Permissions == "" {
+		// No permissions specified - we'll add contents: read for local actions
+		willAddContentsRead = (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
+	} else {
+		// Permissions are specified - check if contents permission exists
+		perms := permParser.ToPermissions()
+		if level, exists := perms.Get(PermissionContents); exists && level == PermissionNone {
+			// contents: none is explicitly set, we'll upgrade it to read for local actions
+			willAddContentsRead = (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
+		}
+		// If contents is not in the permissions map at all, we don't add it (respect user intent)
+	}
 
 	if !hasContentsRead && !willAddContentsRead {
 		log.Print("Skipping checkout step: no contents read access in permissions")

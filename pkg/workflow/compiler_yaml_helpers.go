@@ -103,6 +103,7 @@ func generatePlaceholderSubstitutionStep(yaml *strings.Builder, expressionMappin
 // string represents a line of YAML for the checkout step. Returns nil if:
 // - Not in dev or script mode
 // - action-tag feature is specified (uses remote actions instead)
+// - No contents permission available (checkout not possible)
 func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 	// Check if action-tag is specified - if so, we're using remote actions
 	if data != nil && data.Features != nil {
@@ -112,6 +113,24 @@ func (c *Compiler) generateCheckoutActionsFolder(data *WorkflowData) []string {
 				return nil
 			}
 		}
+	}
+
+	// Check if we have or will have contents permission
+	// If permissions are not specified (empty), we'll add contents: read for local actions
+	// If permissions are explicitly specified without contents, respect that choice and skip checkout
+	hasContentsPermission := false
+	if data.Permissions == "" {
+		// No permissions specified - we'll add contents: read for local actions
+		hasContentsPermission = true
+	} else {
+		// Permissions are specified - check if contents permission exists
+		permParser := NewPermissionsParser(data.Permissions)
+		hasContentsPermission = permParser.HasContentsReadAccess()
+	}
+
+	if !hasContentsPermission {
+		compilerYamlLog.Print("Skipping actions folder checkout: no contents read access")
+		return nil
 	}
 
 	// Script mode: checkout .github folder from github/gh-aw to /tmp/gh-aw/actions-source/
