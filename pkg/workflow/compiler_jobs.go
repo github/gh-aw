@@ -446,23 +446,8 @@ func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 		return true // Custom agent file requires checkout to access the file
 	}
 
-	// Check condition 3: Check if we have or will have contents: read permission
-	// In dev mode, contents: read is added automatically for local actions checkout
-	// So we need to account for that when deciding whether to add repository checkout
-	permParser := NewPermissionsParser(data.Permissions)
-	hasContentsRead := permParser.HasContentsReadAccess()
-
-	// In dev mode, if we'll add contents: read for actions folder, we should also add repository checkout
-	// because all workflows use runtime-import for the main workflow file
-	willAddContentsRead := (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
-
-	if !hasContentsRead && !willAddContentsRead {
-		log.Print("Skipping checkout step: no contents read access in permissions")
-		return false // No contents read access, so checkout is not needed
-	}
-
-	// If we have or will have contents: read, add checkout
-	// This is needed because all workflows use runtime-import for the main workflow file
-	log.Print("Adding checkout step: contents read access is available or will be added")
+	// Agent job always gets contents: read permission for .github and .actions access
+	// Therefore, we always add checkout for runtime-import and workflow files
+	log.Print("Adding checkout step: agent job has contents read access for .github and .actions")
 	return true
 }
