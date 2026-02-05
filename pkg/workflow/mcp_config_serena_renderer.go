@@ -15,6 +15,20 @@ func selectSerenaContainer(serenaTool any) string {
 	// Extract languages from the serena tool configuration
 	var requestedLanguages []string
 
+	// Handle direct array format (from ToMap conversion of short syntax)
+	if langArray, ok := serenaTool.([]any); ok {
+		for _, lang := range langArray {
+			if langStr, ok := lang.(string); ok {
+				requestedLanguages = append(requestedLanguages, langStr)
+			}
+		}
+	}
+
+	// Handle []string format (another possible array representation)
+	if langStrArray, ok := serenaTool.([]string); ok {
+		requestedLanguages = append(requestedLanguages, langStrArray...)
+	}
+
 	if toolMap, ok := serenaTool.(map[string]any); ok {
 		// Check for short syntax (array of language names)
 		if langs, ok := toolMap["langs"].([]any); ok {

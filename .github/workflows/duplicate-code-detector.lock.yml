@@ -439,7 +439,7 @@ jobs:
           Authorization = "$GH_AW_SAFE_OUTPUTS_API_KEY"
           
           [mcp_servers.serena]
-          container = "ghcr.io/github/serena-mcp-server:latest"
+          container = "ghcr.io/oraios/serena:latest"
           args = [
             "--network",
             "host",
@@ -476,7 +476,7 @@ jobs:
                 }
               },
               "serena": {
-                "container": "ghcr.io/github/serena-mcp-server:latest",
+                "container": "ghcr.io/oraios/serena:latest",
                 "args": [
                   "--network",
                   "host"

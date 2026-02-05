@@ -333,9 +333,12 @@ const DefaultSerenaMCPServerContainer = "ghcr.io/github/serena-mcp-server"
 const OraiosSerenaContainer = "ghcr.io/oraios/serena"
 
 // SerenaLanguageSupport defines the supported languages for each Serena container image
+// NOTE: Go is not included in DefaultSerenaMCPServerContainer as the container image
+// does not have the Go runtime installed, which is required for gopls language server.
+// Use OraiosSerenaContainer for Go support.
 var SerenaLanguageSupport = map[string][]string{
 	DefaultSerenaMCPServerContainer: {
-		"go", "typescript", "javascript", "python", "java", "rust", "csharp",
+		"typescript", "javascript", "python", "java", "rust", "csharp",
 		"cpp", "c", "ruby", "php", "bash", "swift", "kotlin", "scala",
 		"haskell", "elixir", "erlang", "clojure", "lua", "perl", "r",
 		"dart", "julia", "fortran", "nix", "rego", "terraform", "yaml",
