@@ -37,6 +37,7 @@ safe-outputs:
   add-comment:
     max: 1
   create-discussion:
+    category: "audits"
     max: 1
   messages:
     footer: "> 📄 *Summary compiled by [{workflow_name}]({run_url})*"

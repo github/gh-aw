@@ -25,6 +25,7 @@ safe-outputs:
     group: true
     labels: [cookie]
   create-discussion:
+    category: "audits"
     max: 2
   add-comment:
     max: 10

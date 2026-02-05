@@ -32,6 +32,7 @@ tools:
 safe-outputs:
   upload-asset:
   create-discussion:
+    category: "audits"
     expires: 3d
     title-prefix: "📰 "
     close-older-discussions: true
