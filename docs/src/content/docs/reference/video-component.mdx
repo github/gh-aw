@@ -25,72 +25,72 @@ import Video from '../../../components/Video.astro';
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `src` | `string` | *required* | Path to the video file (relative to public folder) |
-| `title` | `string` | `undefined` | Video title (displayed as caption below video) |
-| `width` | `string \| number` | `"100%"` | Video width (CSS value or number in pixels) |
-| `height` | `string \| number` | `"auto"` | Video height (CSS value or number in pixels) |
-| `controls` | `boolean` | `true` | Show video playback controls |
-| `autoplay` | `boolean` | `false` | Auto-play video on page load |
-| `loop` | `boolean` | `false` | Loop video playback |
-| `muted` | `boolean` | `false` | Mute video audio by default |
-| `poster` | `string` | `undefined` | Poster image URL displayed before playback |
+| `src` | `string` | *required* | Path to the video file in the public folder |
+| `caption` | `string` | `undefined` | Descriptive caption displayed below the video |
+| `aspectRatio` | `'16:9' \| '4:3' \| '1:1' \| 'auto'` | `'auto'` | Maintain specific aspect ratio or auto-size |
+| `showControls` | `boolean` | `true` | Display native video playback controls |
+| `autoStart` | `boolean` | `false` | Begin playback automatically when loaded |
+| `repeat` | `boolean` | `false` | Loop the video continuously |
+| `silenced` | `boolean` | `false` | Start with audio muted |
+| `thumbnail` | `string` | `undefined` | Preview image shown before playback starts |
+| `maxWidth` | `string` | `'100%'` | Maximum width constraint (CSS value) |
 
 ## Examples
 
-### Video with Title
+### Video with Caption
 
 ```mdx
 <Video 
   src="/gh-aw/videos/demo.mp4" 
-  title="Workflow demonstration showing the compile command"
+  caption="Workflow demonstration showing the compile command"
 />
 ```
 
-### Custom Dimensions
+### Responsive with Aspect Ratio
 
 ```mdx
 <Video 
   src="/gh-aw/videos/demo.mp4" 
-  width="640"
-  height="360"
+  aspectRatio="16:9"
+  maxWidth="800px"
 />
 ```
 
-### Autoplay with Loop
+### Autoplay Configuration
 
 ```mdx
 <Video 
   src="/gh-aw/videos/demo.mp4" 
-  autoplay={true}
-  loop={true}
-  muted={true}
+  autoStart={true}
+  repeat={true}
+  silenced={true}
 />
 ```
 
-Note: Most browsers require `muted={true}` for autoplay to work due to autoplay policies.
+Note: Browsers require `silenced={true}` for autoplay due to media policies.
 
-### With Poster Image
+### With Preview Thumbnail
 
 ```mdx
 <Video 
   src="/gh-aw/videos/demo.mp4" 
-  poster="/gh-aw/images/demo-thumbnail.png"
-  title="Demo with custom thumbnail"
+  thumbnail="/gh-aw/images/demo-preview.png"
+  caption="Interactive demo with custom preview"
 />
 ```
 
 ## Supported Video Formats
 
-The component automatically detects the MIME type from the file extension and supports:
+The component recognizes file extensions and configures appropriate content types:
 
-- **MP4** (`.mp4`) - **Recommended** - Best browser compatibility with H.264 codec
-- **WebM** (`.webm`) - Modern, open format with VP8/VP9 codec
-- **OGG** (`.ogg`) - Open format, older browser support
-- **MOV** (`.mov`) - QuickTime format (uses MP4 MIME type)
-- **AVI** (`.avi`) - Legacy format (limited browser support)
-- **MKV** (`.mkv`) - Matroska format (limited browser support)
+- **MP4** (`.mp4`, `.m4v`) - H.264/H.265 codec - **Recommended for compatibility**
+- **WebM** (`.webm`) - VP8/VP9 codec - Excellent compression
+- **OGG** (`.ogg`, `.ogv`) - Theora codec - Open source alternative  
+- **QuickTime** (`.mov`) - Various codecs - Apple ecosystem
+- **AVI** (`.avi`) - Legacy container format
+- **Matroska** (`.mkv`) - Modern container with advanced features
 
-For best cross-browser compatibility, use MP4 format with H.264 video codec and AAC audio codec.
+For maximum browser compatibility, MP4 with H.264 video and AAC audio is recommended.
 
 ## Adding Video Files
 
@@ -114,22 +114,23 @@ docs/
 
 ## Best Practices
 
-- **File Size**: Keep videos under 50MB for reasonable load times
-- **Format**: Use MP4 with H.264 codec for widest browser support
-- **Compression**: Compress videos appropriately for web delivery
-- **Poster Images**: Provide poster images to improve perceived performance
-- **Accessibility**: Always include meaningful titles for screen readers
-- **Autoplay**: Avoid autoplay unless the video is muted and serves a decorative purpose
+- **File Size**: Optimize videos to under 50MB for reasonable loading performance
+- **Encoding**: H.264 codec in MP4 container provides excellent compatibility
+- **Compression**: Balance quality with file size based on content requirements
+- **Thumbnails**: Use the `thumbnail` prop to show preview images
+- **Captions**: Always provide descriptive `caption` text for accessibility
+- **Aspect Ratios**: Use built-in ratios (`16:9`, `4:3`) for consistent sizing
+- **Autoplay**: Avoid autoplay unless video is `silenced` and decorative
 
 ## Implementation Details
 
-This component is based on the AudioPlayer component from the [Microsoft/genaiscript](https://github.com/microsoft/genaiscript) repository. It uses:
+The Video component uses:
 
-- Native HTML5 `<video>` element
-- Semantic `<figure>` and `<figcaption>` markup
-- Theme-aware styling for light and dark modes
-- Responsive design that scales to container width
-- Accessibility features including proper ARIA labels
+- Semantic HTML5 `<video>` element with accessibility attributes
+- CSS aspect ratio containers for responsive sizing
+- Starlight theme integration for consistent light/dark mode styling
+- Progressive enhancement with fallback download links
+- Namespace-prefixed classes (`gh-aw-video-*`) to avoid conflicts
 
 ## Troubleshooting
 
@@ -142,16 +143,18 @@ This component is based on the AudioPlayer component from the [Microsoft/genaisc
 
 ### Autoplay not working
 
-- Add `muted={true}` - most browsers block unmuted autoplay
-- Some browsers block all autoplay - users may need to click play
+- Add `silenced={true}` - browsers block unmuted autoplay for user experience
+- Some browsers require user interaction before any video plays
+- Check browser console for autoplay policy messages
 
-### Video quality issues
+### Video aspect ratio incorrect
 
-- Check the source video resolution and bitrate
-- Consider providing multiple resolutions for responsive delivery
-- Use appropriate compression settings for web delivery
+- Specify explicit `aspectRatio` prop (`16:9`, `4:3`, `1:1`)
+- Use `aspectRatio="auto"` to let video determine its own size
+- Consider using `maxWidth` to constrain overly large videos
 
 ## Related Components
 
-- [AudioPlayer](https://microsoft.github.io/genaiscript/) - Similar component for audio files (in GenAIScript docs)
-- Image component - Astro's built-in `<Image>` component for optimized images
+- **Image Component** - Astro's built-in optimized image handling
+- **Code Blocks** - Syntax-highlighted code examples with copy functionality
+- **Tabs Component** - Starlight tabs for organizing multi-format content
