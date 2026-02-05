@@ -193,6 +193,10 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if strings.Contains(output, `"entrypoint"`) {
 		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
+	// In dev mode, should NOT have entrypointArgs (uses container's default CMD)
+	if strings.Contains(output, `"entrypointArgs"`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
+	}
 	// In dev mode, should NOT have binary mounts
 	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
 		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
@@ -200,7 +204,10 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
 		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 	}
-	// Should have both GH_TOKEN and GITHUB_TOKEN
+	// Should have DEBUG, GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"DEBUG": "*"`) {
+		t.Error("Expected DEBUG set to literal '*' in env vars")
+	}
 	if !strings.Contains(output, `"GH_TOKEN"`) {
 		t.Error("Expected GH_TOKEN in env vars")
 	}
@@ -259,9 +266,9 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	if strings.Contains(output, `entrypoint =`) {
 		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
-	// In dev mode, no --cmd needed
-	if !strings.Contains(output, `entrypointArgs = ["mcp-server"]`) {
-		t.Error("Expected simple entrypointArgs without --cmd in dev mode")
+	// In dev mode, should NOT have entrypointArgs (uses container's default CMD)
+	if strings.Contains(output, `entrypointArgs =`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
 	}
 	// In dev mode, should NOT have binary mounts
 	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
@@ -270,7 +277,10 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
 		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 	}
-	// Should have both GH_TOKEN and GITHUB_TOKEN
+	// Should have DEBUG, GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"DEBUG"`) {
+		t.Error("Expected DEBUG in env_vars")
+	}
 	if !strings.Contains(output, `"GH_TOKEN"`) {
 		t.Error("Expected GH_TOKEN in env_vars")
 	}

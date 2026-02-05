@@ -98,7 +98,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 		unexpectedContent    []string
 	}{
 		{
-			name:                 "Copilot dev mode with --cmd",
+			name:                 "Copilot dev mode without entrypoint/args",
 			isLast:               false,
 			includeCopilotFields: true,
 			actionMode:           ActionModeDev,
@@ -106,9 +106,9 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"agentic_workflows": {`,
 				`"type": "stdio"`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"DEBUG": "*"`,                                         // Literal value for debug logging
 				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
@@ -116,6 +116,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			unexpectedContent: []string{
 				`--cmd`,
 				`"entrypoint"`,               // Not needed in dev mode - uses container's ENTRYPOINT
+				`"entrypointArgs"`,           // Not needed in dev mode - uses container's CMD
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				`${{ secrets.`,
@@ -123,7 +124,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			},
 		},
 		{
-			name:                 "Copilot release mode without --cmd",
+			name:                 "Copilot release mode with entrypoint/args",
 			isLast:               false,
 			includeCopilotFields: true,
 			actionMode:           ActionModeRelease,
@@ -137,6 +138,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"DEBUG": "*"`,
 				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
@@ -148,17 +150,17 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			},
 		},
 		{
-			name:                 "Claude/Custom dev mode with --cmd",
+			name:                 "Claude/Custom dev mode without entrypoint/args",
 			isLast:               true,
 			includeCopilotFields: false,
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"entrypointArgs": ["mcp-server"]`,                     // No --cmd needed
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				// Security fix: Now uses shell variable instead of GitHub secret expression
+				// Environment variables
+				`"DEBUG": "*"`, // Literal value for debug logging
 				`"GH_TOKEN": "$GH_TOKEN"`,
 				`"GITHUB_TOKEN": "$GITHUB_TOKEN"`,
 				`              }`,
@@ -168,6 +170,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`\\${`,
 				`--cmd`,
 				`"entrypoint"`,               // Not needed in dev mode - uses container's ENTRYPOINT
+				`"entrypointArgs"`,           // Not needed in dev mode - uses container's CMD
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode - binary is in image
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode - gh CLI is in image
 				// Verify GitHub expressions are NOT in the output (security fix)
@@ -253,7 +256,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 		unexpectedContent    []string
 	}{
 		{
-			name:                 "dev mode without entrypoint",
+			name:                 "dev mode without entrypoint/args",
 			actionMode:           ActionModeDev,
 			expectedContainer:    `container = "localhost/gh-aw:dev"`,
 			shouldHaveEntrypoint: false, // Dev mode uses container's default ENTRYPOINT
@@ -264,6 +267,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			unexpectedContent: []string{
 				`--cmd`,
 				`entrypoint =`,               // Not needed in dev mode - uses container's ENTRYPOINT
+				`entrypointArgs =`,           // Not needed in dev mode - uses container's CMD
 				`/opt/gh-aw:/opt/gh-aw:ro`,   // Not needed in dev mode
 				`/usr/bin/gh:/usr/bin/gh:ro`, // Not needed in dev mode
 			},
@@ -275,6 +279,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			shouldHaveEntrypoint: true,
 			expectedMounts: []string{
 				`entrypoint = "/opt/gh-aw/gh-aw"`,                      // Entrypoint needed in release mode
+				`entrypointArgs = ["mcp-server"]`,                      // EntrypointArgs needed in release mode
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount
@@ -297,8 +302,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContent := []string{
 				`[mcp_servers.agentic_workflows]`,
 				tt.expectedContainer,
-				`entrypointArgs = ["mcp-server"]`,
-				`env_vars = ["GH_TOKEN", "GITHUB_TOKEN"]`,
+				`env_vars = ["DEBUG", "GH_TOKEN", "GITHUB_TOKEN"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)
 
@@ -315,6 +319,15 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			}
 			if !tt.shouldHaveEntrypoint && hasEntrypoint {
 				t.Errorf("Did not expect entrypoint field in %s mode (uses container's ENTRYPOINT)", tt.actionMode)
+			}
+
+			// Verify entrypointArgs presence/absence
+			hasEntrypointArgs := strings.Contains(result, `entrypointArgs =`)
+			if tt.shouldHaveEntrypoint && !hasEntrypointArgs {
+				t.Errorf("Expected entrypointArgs field in %s mode, but not found", tt.actionMode)
+			}
+			if !tt.shouldHaveEntrypoint && hasEntrypointArgs {
+				t.Errorf("Did not expect entrypointArgs field in %s mode (uses container's CMD)", tt.actionMode)
 			}
 
 			for _, unexpected := range tt.unexpectedContent {

@@ -229,9 +229,9 @@ Uses imported agentic-workflows tool.
 	workflowData := string(lockFileContent)
 
 	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
-	// In dev mode, no entrypoint field (uses container's default ENTRYPOINT)
-	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server"]`) {
-		t.Error("Expected compiled workflow to contain simple 'mcp-server' entrypointArgs in dev mode")
+	// In dev mode, no entrypoint or entrypointArgs (uses container's defaults)
+	if strings.Contains(workflowData, `"entrypointArgs"`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
 	}
 
 	if strings.Contains(workflowData, `"--cmd"`) {
@@ -254,7 +254,10 @@ Uses imported agentic-workflows tool.
 		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
 	}
 
-	// Verify both GH_TOKEN and GITHUB_TOKEN are present
+	// Verify DEBUG, GH_TOKEN and GITHUB_TOKEN are present
+	if !strings.Contains(workflowData, `"DEBUG": "*"`) {
+		t.Error("Expected DEBUG set to literal '*' in env vars")
+	}
 	if !strings.Contains(workflowData, `"GH_TOKEN"`) {
 		t.Error("Expected GH_TOKEN in env vars")
 	}

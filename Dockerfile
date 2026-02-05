@@ -31,8 +31,8 @@ WORKDIR /workspace
 # Set the entrypoint to gh-aw
 ENTRYPOINT ["gh-aw"]
 
-# Default command shows help
-CMD ["--help"]
+# Default command runs MCP server
+CMD ["mcp-server", "--cmd", "gh-aw"]
 
 # Metadata labels
 LABEL org.opencontainers.image.source="https://github.com/github/gh-aw"
