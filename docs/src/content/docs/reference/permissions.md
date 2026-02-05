@@ -30,14 +30,14 @@ This model prevents AI agents from accidentally or maliciously modifying reposit
 
 ### Why This Model?
 
-In enterprise environments, AI agents require careful security controls:
+AI agents require careful security controls:
 
 - **Audit Trail**: Separating read (agent) from write (safe outputs) provides clear accountability for all changes
 - **Blast Radius Containment**: If an agent misbehaves, it cannot modify code, merge PRs, or delete resources
 - **Compliance**: Many organizations require approval workflows for automated changes - safe outputs provide the approval gate
 - **Defense in Depth**: Even if prompt injection occurs, the agent cannot perform destructive actions
 
-This model trades convenience for enterprise-grade security. Safe outputs add one extra job but provide critical safety guarantees.
+This model trades convenience for security. Safe outputs add one extra job but provide critical safety guarantees.
 
 ### Permission Scopes
 
