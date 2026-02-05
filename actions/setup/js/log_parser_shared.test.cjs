@@ -539,6 +539,113 @@ describe("log_parser_shared.cjs", () => {
 
       expect(result).toBe("");
     });
+
+    it("should format array values correctly", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        items: ["item1", "item2", "item3"],
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toContain("items: [item1, item2, item3]");
+      expect(result).not.toContain("[object Object]");
+    });
+
+    it("should format small arrays (3 or fewer items)", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        tags: ["tag1", "tag2"],
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toBe("tags: [tag1, tag2]");
+    });
+
+    it("should format large arrays with ellipsis", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        items: ["item1", "item2", "item3", "item4", "item5"],
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toContain("items: [item1, item2, ...3 more]");
+    });
+
+    it("should format empty arrays", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        emptyList: [],
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toBe("emptyList: []");
+    });
+
+    it("should format object values as JSON", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        config: { enabled: true, timeout: 30 },
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toContain('config: {"enabled":true,"timeout":30}');
+      expect(result).not.toContain("[object Object]");
+    });
+
+    it("should format arrays containing objects", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        tools: [{ name: "tool1" }, { name: "tool2" }],
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toContain('tools: [{"name":"tool1"}, {"name":"tool2"}]');
+      expect(result).not.toContain("[object Object]");
+    });
+
+    it("should handle mixed parameter types", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        query: "search term",
+        filters: ["filter1", "filter2"],
+        options: { caseSensitive: false },
+        limit: 10,
+      };
+
+      const result = formatMcpParameters(input);
+
+      expect(result).toContain("query: search term");
+      expect(result).toContain("filters: [filter1, filter2]");
+      expect(result).toContain('options: {"caseSensitive":false}');
+      expect(result).toContain("limit: 10");
+    });
+
+    it("should truncate long array representations", async () => {
+      const { formatMcpParameters } = await import("./log_parser_shared.cjs");
+
+      const input = {
+        longArray: ["a".repeat(50), "b".repeat(50)],
+      };
+
+      const result = formatMcpParameters(input);
+
+      // Should be truncated to 40 chars
+      expect(result.length).toBeLessThan(60);
+      expect(result).toContain("...");
+    });
   });
 
   describe("formatInitializationSummary", () => {
