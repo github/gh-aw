@@ -3,11 +3,11 @@ set -e
 
 # Script to generate web-optimized poster images from videos in docs/public/videos
 # Posters are extracted at 1 second into the video and saved as PNG files
+# alongside the video files (same directory, with .png extension)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 VIDEOS_DIR="$REPO_ROOT/docs/public/videos"
-IMAGES_DIR="$REPO_ROOT/docs/public/images"
 
 # Check if ffmpeg is installed
 if ! command -v ffmpeg &> /dev/null; then
@@ -17,11 +17,8 @@ if ! command -v ffmpeg &> /dev/null; then
     exit 1
 fi
 
-# Create images directory if it doesn't exist
-mkdir -p "$IMAGES_DIR"
-
 echo "Generating poster images from videos in $VIDEOS_DIR"
-echo "Output directory: $IMAGES_DIR"
+echo "Posters will be saved alongside video files with .png extension"
 echo ""
 
 # Process each MP4 video file
@@ -34,8 +31,8 @@ for video in "$VIDEOS_DIR"/*.mp4; do
     # Get the base filename without extension
     basename=$(basename "$video" .mp4)
     
-    # Generate the output poster filename (PNG format)
-    poster="$IMAGES_DIR/${basename}-thumbnail.png"
+    # Generate the output poster filename (PNG in same directory as video)
+    poster="$VIDEOS_DIR/${basename}.png"
     
     echo "Processing: $basename.mp4"
     echo "  → Extracting frame at 1 second..."
@@ -61,4 +58,4 @@ done
 echo "✓ All poster images generated successfully!"
 echo ""
 echo "Generated files:"
-ls -lh "$IMAGES_DIR"/*-thumbnail.png 2>/dev/null || true
+ls -lh "$VIDEOS_DIR"/*.png 2>/dev/null || true
