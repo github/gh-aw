@@ -98,6 +98,8 @@ type MCPRendererOptions struct {
 	Format string
 	// IsLast indicates if this is the last server in the configuration (affects trailing comma)
 	IsLast bool
+	// ActionMode indicates the action mode for workflow compilation (dev, release, script)
+	ActionMode ActionMode
 }
 
 // MCPConfigRendererUnified provides unified rendering methods for MCP configurations
@@ -395,7 +397,7 @@ func (r *MCPConfigRendererUnified) renderSafeInputsTOML(yaml *strings.Builder, s
 
 // RenderAgenticWorkflowsMCP generates the Agentic Workflows MCP server configuration
 func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Builder) {
-	mcpRendererLog.Printf("Rendering Agentic Workflows MCP: format=%s", r.options.Format)
+	mcpRendererLog.Printf("Rendering Agentic Workflows MCP: format=%s, action_mode=%s", r.options.Format, r.options.ActionMode)
 
 	if r.options.Format == "toml" {
 		r.renderAgenticWorkflowsTOML(yaml)
@@ -403,7 +405,7 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 	}
 
 	// JSON format
-	renderAgenticWorkflowsMCPConfigWithOptions(yaml, r.options.IsLast, r.options.IncludeCopilotFields)
+	renderAgenticWorkflowsMCPConfigWithOptions(yaml, r.options.IsLast, r.options.IncludeCopilotFields, r.options.ActionMode)
 }
 
 // renderAgenticWorkflowsTOML generates Agentic Workflows MCP configuration in TOML format
@@ -413,7 +415,14 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
 	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
 	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
-	yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+	
+	// In dev mode, add --cmd argument to specify the binary path
+	if r.options.ActionMode.IsDev() {
+		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
+	} else {
+		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+	}
+	
 	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\"]\n")
 	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
 }

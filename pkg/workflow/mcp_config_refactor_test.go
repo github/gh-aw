@@ -93,13 +93,38 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 		name                 string
 		isLast               bool
 		includeCopilotFields bool
+		actionMode           ActionMode
 		expectedContent      []string
 		unexpectedContent    []string
 	}{
 		{
-			name:                 "Copilot with type and escaped env vars",
+			name:                 "Copilot dev mode with --cmd",
 			isLast:               false,
 			includeCopilotFields: true,
+			actionMode:           ActionModeDev,
+			expectedContent: []string{
+				`"agentic_workflows": {`,
+				`"type": "stdio"`,
+				`"container": "alpine:latest"`,
+				`"entrypoint": "/opt/gh-aw/gh-aw"`,
+				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
+				`              },`,
+			},
+			unexpectedContent: []string{
+				`${{ secrets.`,
+				`"command":`, // Should NOT use command - must use container
+			},
+		},
+		{
+			name:                 "Copilot release mode without --cmd",
+			isLast:               false,
+			includeCopilotFields: true,
+			actionMode:           ActionModeRelease,
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"type": "stdio"`,
@@ -114,19 +139,21 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`              },`,
 			},
 			unexpectedContent: []string{
+				`--cmd`,
 				`${{ secrets.`,
 				`"command":`, // Should NOT use command - must use container
 			},
 		},
 		{
-			name:                 "Claude/Custom without type, with shell env vars",
+			name:                 "Claude/Custom dev mode with --cmd",
 			isLast:               true,
 			includeCopilotFields: false,
+			actionMode:           ActionModeDev,
 			expectedContent: []string{
 				`"agentic_workflows": {`,
 				`"container": "alpine:latest"`,
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
-				`"entrypointArgs": ["mcp-server"]`,
+				`"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
@@ -149,7 +176,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var output strings.Builder
 
-			renderAgenticWorkflowsMCPConfigWithOptions(&output, tt.isLast, tt.includeCopilotFields)
+			renderAgenticWorkflowsMCPConfigWithOptions(&output, tt.isLast, tt.includeCopilotFields, tt.actionMode)
 
 			result := output.String()
 
@@ -212,40 +239,61 @@ func TestRenderSafeOutputsMCPConfigTOML(t *testing.T) {
 // TestRenderAgenticWorkflowsMCPConfigTOML verifies the Agentic Workflows TOML format helper
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
-	var output strings.Builder
-
-	renderAgenticWorkflowsMCPConfigTOML(&output)
-
-	result := output.String()
-
-	expectedContent := []string{
-		`[mcp_servers.agentic_workflows]`,
-		`container = "alpine:latest"`,
-		`entrypoint = "/opt/gh-aw/gh-aw"`,
-		`entrypointArgs = ["mcp-server"]`,
-		`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-		`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
-		`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-		`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-		`env_vars = ["GITHUB_TOKEN"]`,
+	tests := []struct {
+		name              string
+		actionMode        ActionMode
+		expectedArgs      string
+		unexpectedContent []string
+	}{
+		{
+			name:         "dev mode with --cmd",
+			actionMode:   ActionModeDev,
+			expectedArgs: `entrypointArgs = ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`,
+			unexpectedContent: []string{
+				`entrypointArgs = ["mcp-server"]`,
+			},
+		},
+		{
+			name:         "release mode without --cmd",
+			actionMode:   ActionModeRelease,
+			expectedArgs: `entrypointArgs = ["mcp-server"]`,
+			unexpectedContent: []string{
+				`--cmd`,
+			},
+		},
 	}
 
-	unexpectedContent := []string{
-		`env = {`,        // Should use env_vars instead
-		`command = "gh"`, // Should NOT use command - must use container
-		`"aw"`,           // Old arg format
-		`args = [`,       // Old args format
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output strings.Builder
 
-	for _, expected := range expectedContent {
-		if !strings.Contains(result, expected) {
-			t.Errorf("Expected content not found: %q\nActual output:\n%s", expected, result)
-		}
-	}
+			renderAgenticWorkflowsMCPConfigTOML(&output, tt.actionMode)
 
-	for _, unexpected := range unexpectedContent {
-		if strings.Contains(result, unexpected) {
-			t.Errorf("Unexpected content found: %q\nActual output:\n%s", unexpected, result)
-		}
+			result := output.String()
+
+			expectedContent := []string{
+				`[mcp_servers.agentic_workflows]`,
+				`container = "alpine:latest"`,
+				`entrypoint = "/opt/gh-aw/gh-aw"`,
+				tt.expectedArgs,
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`env_vars = ["GITHUB_TOKEN"]`,
+			}
+
+			for _, expected := range expectedContent {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Expected content not found: %q\nActual output:\n%s", expected, result)
+				}
+			}
+
+			for _, unexpected := range tt.unexpectedContent {
+				if strings.Contains(result, unexpected) {
+					t.Errorf("Unexpected content found: %q\nActual output:\n%s", unexpected, result)
+				}
+			}
+		})
 	}
 }
