@@ -346,7 +346,7 @@ This workflow tests that copilot assignment is wired in consolidated safe output
 	}
 
 	// Verify copilot assignment step is present and wired to handler manager output
-	if !strings.Contains(lockContent, "name: Assign copilot to created issues") {
+	if !strings.Contains(lockContent, "name: Assign Copilot to created issues") {
 		t.Error("Expected copilot assignment step in consolidated safe_outputs job")
 	}
 	if !strings.Contains(lockContent, "GH_AW_ISSUES_TO_ASSIGN_COPILOT") || !strings.Contains(lockContent, "steps.process_safe_outputs.outputs.issues_to_assign_copilot") {

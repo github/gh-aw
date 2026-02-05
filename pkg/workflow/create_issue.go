@@ -122,7 +122,7 @@ func buildCopilotAssignmentStep(configToken, safeOutputsToken, workflowToken str
 	// Get the effective agent token with full precedence chain
 	effectiveToken := getEffectiveAgentGitHubToken(configToken, getEffectiveAgentGitHubToken(safeOutputsToken, workflowToken))
 
-	steps = append(steps, "      - name: Assign copilot to created issues\n")
+	steps = append(steps, "      - name: Assign Copilot to created issues\n")
 	steps = append(steps, "        if: steps.create_issue.outputs.issues_to_assign_copilot != ''\n")
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", GetActionPin("actions/github-script")))
 	steps = append(steps, "        with:\n")
