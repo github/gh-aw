@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -17,12 +16,6 @@ import (
 )
 
 var compilerJobsLog = logger.New("workflow:compiler_jobs")
-
-// Pre-compiled regexes for performance (avoid recompilation in hot paths)
-var (
-	// runtimeImportMacroRe matches runtime-import macros: {{#runtime-import filepath}} or {{#runtime-import? filepath}}
-	runtimeImportMacroRe = regexp.MustCompile(`\{\{#runtime-import\??[ \t]+([^\}]+)\}\}`)
-)
 
 // This file contains job building functions extracted from compiler.go
 // These functions are responsible for constructing the various jobs that make up
@@ -437,33 +430,6 @@ func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool
 
 	compilerJobsLog.Print("Completed building all custom jobs")
 	return nil
-}
-
-// containsRuntimeImports checks if markdown content contains runtime-import macros
-// that reference files from the repository (not URLs).
-// Patterns detected:
-//   - {{#runtime-import filepath}} or {{#runtime-import? filepath}} where filepath is not a URL
-//
-// URLs (http:// or https://) are excluded as they don't require repository checkout.
-func containsRuntimeImports(markdownContent string) bool {
-	if markdownContent == "" {
-		return false
-	}
-
-	// Use pre-compiled regex from package level for performance
-	matches := runtimeImportMacroRe.FindAllStringSubmatch(markdownContent, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			filepath := strings.TrimSpace(match[1])
-			// Check if it's NOT a URL (URLs don't require checkout)
-			// Any non-URL path requires checkout since it's a file in the repository
-			if !strings.HasPrefix(filepath, "http://") && !strings.HasPrefix(filepath, "https://") {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // shouldAddCheckoutStep determines if the checkout step should be added based on permissions and custom steps

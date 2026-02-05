@@ -382,7 +382,7 @@ func TestCheckoutWithAgentFromImports(t *testing.T) {
 		compiler := NewCompiler()
 		// Set action mode to release to prevent automatic contents:read addition
 		compiler.SetActionMode(ActionModeRelease)
-		
+
 		workflowData := &WorkflowData{
 			EngineConfig: &EngineConfig{
 				ID: "copilot",
