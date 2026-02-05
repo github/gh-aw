@@ -28,6 +28,17 @@ Agentic workflows follow a principle of least privilege:
 
 This model prevents AI agents from accidentally or maliciously modifying repository content during execution.
 
+### Why This Model?
+
+In enterprise environments, AI agents require careful security controls:
+
+- **Audit Trail**: Separating read (agent) from write (safe outputs) provides clear accountability for all changes
+- **Blast Radius Containment**: If an agent misbehaves, it cannot modify code, merge PRs, or delete resources
+- **Compliance**: Many organizations require approval workflows for automated changes - safe outputs provide the approval gate
+- **Defense in Depth**: Even if prompt injection occurs, the agent cannot perform destructive actions
+
+This model trades convenience for enterprise-grade security. Safe outputs add one extra job but provide critical safety guarantees.
+
 ### Permission Scopes
 
 Key permissions include `contents` (code access), `issues` (issue management), `pull-requests` (PR management), `discussions`, `actions` (workflow control), `checks`, `deployments`, `packages`, `pages`, and `statuses`. Each has read and write levels. See [GitHub's permissions reference](https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs) for the complete list.
