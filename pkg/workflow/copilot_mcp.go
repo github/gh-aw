@@ -18,16 +18,12 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 	// Create unified renderer with Copilot-specific options
 	// Copilot uses JSON format with type and tools fields, and inline args
 	createRenderer := func(isLast bool) *MCPConfigRendererUnified {
-		actionMode := ActionModeDev // Default to dev mode
-		if workflowData != nil {
-			actionMode = workflowData.ActionMode
-		}
 		return NewMCPConfigRenderer(MCPRendererOptions{
 			IncludeCopilotFields: true, // Copilot uses "type" and "tools" fields
 			InlineArgs:           true, // Copilot uses inline args format
 			Format:               "json",
 			IsLast:               isLast,
-			ActionMode:           actionMode,
+			ActionMode:           GetActionModeFromWorkflowData(workflowData),
 		})
 	}
 
