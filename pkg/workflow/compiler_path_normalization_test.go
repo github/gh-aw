@@ -124,7 +124,7 @@ This is a shared workflow.`
 			for _, importPath := range tt.expectedImportPaths {
 				expectedLine := "#     - " + importPath
 				assert.Contains(t, lockYAML, expectedLine, "Lock file should contain import path: %s", importPath)
-				
+
 				// Ensure no backslash version exists
 				backslashPath := strings.ReplaceAll(importPath, "/", "\\")
 				backslashLine := "#     - " + backslashPath
@@ -135,7 +135,7 @@ This is a shared workflow.`
 			for _, includePath := range tt.expectedIncludePaths {
 				expectedLine := "#     - " + includePath
 				assert.Contains(t, lockYAML, expectedLine, "Lock file should contain include path: %s", includePath)
-				
+
 				// Ensure no backslash version exists
 				backslashPath := strings.ReplaceAll(includePath, "/", "\\")
 				backslashLine := "#     - " + backslashPath
@@ -146,7 +146,7 @@ This is a shared workflow.`
 			if tt.expectedSourcePath != "" {
 				expectedLine := "# Source: " + tt.expectedSourcePath
 				assert.Contains(t, lockYAML, expectedLine, "Lock file should contain source path: %s", tt.expectedSourcePath)
-				
+
 				// Ensure no backslash version exists
 				backslashPath := strings.ReplaceAll(tt.expectedSourcePath, "/", "\\")
 				backslashLine := "# Source: " + backslashPath
