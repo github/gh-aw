@@ -25,18 +25,15 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
       return;
     }
 
-    // Display file size info
-    core.info(`  ${fileName} (${stats.size} bytes)`);
-
     // Handle empty files
     if (stats.size === 0) {
-      core.info(`    (empty file)`);
+      core.info(`  ${fileName} (empty file)`);
       return;
     }
 
     // Handle files too large to read
     if (stats.size >= 1024 * 1024) {
-      core.info(`    (file too large to display, ${stats.size} bytes)`);
+      core.info(`  ${fileName} (file too large to display, ${stats.size} bytes)`);
       return;
     }
 
@@ -46,7 +43,7 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
     const shouldDisplayContent = displayExtensions.includes(fileExtension);
 
     if (!shouldDisplayContent) {
-      core.info(`    (content not displayed for ${fileExtension} files)`);
+      core.info(`  ${fileName} (content not displayed for ${fileExtension} files)`);
       return;
     }
 
@@ -55,8 +52,8 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
     const contentToDisplay = content.length > maxBytes ? content.substring(0, maxBytes) : content;
     const wasTruncated = content.length > maxBytes;
 
-    // Use collapsible group for file content with just the filename as title
-    core.startGroup(fileName);
+    // Use collapsible group for file content with filename and size as title
+    core.startGroup(`${fileName} (${stats.size} bytes)`);
     const lines = contentToDisplay.split("\n");
     for (const line of lines) {
       core.info(line);

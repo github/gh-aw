@@ -23,6 +23,7 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 			InlineArgs:           true, // Copilot uses inline args format
 			Format:               "json",
 			IsLast:               isLast,
+			ActionMode:           GetActionModeFromWorkflowData(workflowData),
 		})
 	}
 

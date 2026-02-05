@@ -258,6 +258,7 @@ func (e *CustomEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]a
 			InlineArgs:           false, // Custom engine uses multi-line args format
 			Format:               "json",
 			IsLast:               isLast,
+			ActionMode:           GetActionModeFromWorkflowData(workflowData),
 		})
 	}
 

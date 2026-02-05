@@ -485,7 +485,30 @@ function formatMcpParameters(input) {
   const paramStrs = [];
   for (const key of keys.slice(0, 4)) {
     // Show up to 4 parameters
-    const value = String(input[key] || "");
+    const rawValue = input[key];
+    let value;
+
+    if (Array.isArray(rawValue)) {
+      // Format arrays as [item1, item2, ...]
+      if (rawValue.length === 0) {
+        value = "[]";
+      } else if (rawValue.length <= 3) {
+        // Show all items for small arrays
+        const items = rawValue.map(item => (typeof item === "object" && item !== null ? JSON.stringify(item) : String(item)));
+        value = `[${items.join(", ")}]`;
+      } else {
+        // Show first 2 items and count for larger arrays
+        const items = rawValue.slice(0, 2).map(item => (typeof item === "object" && item !== null ? JSON.stringify(item) : String(item)));
+        value = `[${items.join(", ")}, ...${rawValue.length - 2} more]`;
+      }
+    } else if (typeof rawValue === "object" && rawValue !== null) {
+      // Format objects as JSON
+      value = JSON.stringify(rawValue);
+    } else {
+      // Primitive values (string, number, boolean, null, undefined)
+      value = String(rawValue || "");
+    }
+
     paramStrs.push(`${key}: ${truncateString(value, 40)}`);
   }
 

@@ -23,6 +23,7 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 			InlineArgs:           false, // Codex uses multi-line args format
 			Format:               "toml",
 			IsLast:               isLast,
+			ActionMode:           GetActionModeFromWorkflowData(workflowData),
 		})
 	}
 
@@ -104,11 +105,16 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 
 	// Use shared JSON renderer for gateway input
 	createJSONRenderer := func(isLast bool) *MCPConfigRendererUnified {
+		actionMode := ActionModeDev // Default to dev mode
+		if workflowData != nil {
+			actionMode = workflowData.ActionMode
+		}
 		return NewMCPConfigRenderer(MCPRendererOptions{
 			IncludeCopilotFields: false, // Gateway doesn't need Copilot fields
 			InlineArgs:           false, // Use standard multi-line format
 			Format:               "json",
 			IsLast:               isLast,
+			ActionMode:           actionMode,
 		})
 	}
 

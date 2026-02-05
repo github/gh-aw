@@ -390,17 +390,16 @@ Some content here.`;
         // Check directories are listed
         expect(allGroups).toContain("/tmp/gh-aw/mcp-logs");
 
-        // Check files are listed
-        expect(allOutput).toContain("gateway.log");
-        expect(allOutput).toContain("stderr.log");
-        expect(allOutput).toContain("gateway.md");
+        // Check files are listed (filenames appear in startGroup calls for files with content)
+        expect(allGroups).toContain("gateway.log");
+        expect(allGroups).toContain("stderr.log");
+        expect(allGroups).toContain("gateway.md");
 
         // Check file contents are printed for .log files
         expect(allOutput).toContain("Gateway log content");
         expect(allOutput).toContain("Error message");
 
-        // Check .md file is listed and content IS displayed (now supported)
-        expect(allOutput).toContain("gateway.md");
+        // Check .md file content IS displayed (now supported)
         expect(allOutput).toContain("# Gateway Summary");
 
         // Restore original functions

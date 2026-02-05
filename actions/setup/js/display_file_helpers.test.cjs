@@ -20,12 +20,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "test.txt");
 
-        // Check file info was displayed
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.txt"));
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("bytes"));
-
-        // Check group was started with just the filename
-        expect(mockCore.startGroup).toHaveBeenCalledWith("test.txt");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("test.txt"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("Line 1");
@@ -51,9 +48,8 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "empty.txt");
 
-        // Check file info was displayed
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("empty.txt"));
-        expect(mockCore.info).toHaveBeenCalledWith("    (empty file)");
+        // Check empty file message was displayed
+        expect(mockCore.info).toHaveBeenCalledWith("  empty.txt (empty file)");
 
         // Should not start group for empty file
         expect(mockCore.startGroup).not.toHaveBeenCalled();
@@ -135,6 +131,7 @@ describe("display_file_helpers", () => {
         displayFileContent(filePath, "huge.txt");
 
         // Check "too large" message was displayed
+        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("huge.txt"));
         expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("file too large to display"));
 
         // Should not start group for too large file
@@ -171,12 +168,8 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "test.pdf");
 
-        // Check file info was displayed
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("test.pdf"));
-        expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("bytes"));
-
         // Check message about not displaying content
-        expect(mockCore.info).toHaveBeenCalledWith("    (content not displayed for .pdf files)");
+        expect(mockCore.info).toHaveBeenCalledWith("  test.pdf (content not displayed for .pdf files)");
 
         // Should not start group for unsupported file type
         expect(mockCore.startGroup).not.toHaveBeenCalled();
@@ -200,8 +193,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "test.json");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("test.json");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("test.json"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith('{"key": "value"}');
@@ -222,8 +216,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "test.log");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("test.log");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("test.log"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("Log entry 1");
@@ -245,8 +240,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "test.md");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("test.md");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("test.md"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("# Markdown Title");
@@ -268,8 +264,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "config.yml");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("config.yml");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("config.yml"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("key: value");
@@ -291,8 +288,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "config.yaml");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("config.yaml");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("config.yaml"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("name: test");
@@ -314,8 +312,9 @@ describe("display_file_helpers", () => {
       try {
         displayFileContent(filePath, "config.toml");
 
-        // Check group was started
-        expect(mockCore.startGroup).toHaveBeenCalledWith("config.toml");
+        // Check group was started with filename and size
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("config.toml"));
+        expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining("bytes"));
 
         // Check content was displayed
         expect(mockCore.info).toHaveBeenCalledWith("[package]");
@@ -349,10 +348,11 @@ describe("display_file_helpers", () => {
         // Check directory group was started
         expect(mockCore.startGroup).toHaveBeenCalledWith(expect.stringContaining(tmpDir));
 
-        // Check both files were displayed
-        const infoMessages = mockCore.info.mock.calls.map(call => call[0]).join("\n");
-        expect(infoMessages).toContain("file1.txt");
-        expect(infoMessages).toContain("file2.txt");
+        // Check both files were displayed in startGroup calls (with file size)
+        const startGroupMessages = mockCore.startGroup.mock.calls.map(call => call[0]).join("\n");
+        expect(startGroupMessages).toContain("file1.txt");
+        expect(startGroupMessages).toContain("file2.txt");
+        expect(startGroupMessages).toContain("bytes");
 
         // Check group was ended
         expect(mockCore.endGroup).toHaveBeenCalled();
