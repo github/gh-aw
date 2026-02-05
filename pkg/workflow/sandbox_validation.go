@@ -33,7 +33,7 @@ func validateMountsSyntax(mounts []string) error {
 				fmt.Sprintf("sandbox.mounts[%d]", i),
 				mount,
 				"mount syntax must follow 'source:destination:mode' format with exactly 3 colon-separated parts",
-				"Use the format 'source:destination:mode'.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md",
+				fmt.Sprintf("Use the format 'source:destination:mode'.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: %s", constants.DocsSandboxURL),
 			)
 		}
 
@@ -47,7 +47,7 @@ func validateMountsSyntax(mounts []string) error {
 				fmt.Sprintf("sandbox.mounts[%d].source", i),
 				mount,
 				"source path cannot be empty",
-				"Provide a valid source path.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md",
+				fmt.Sprintf("Provide a valid source path.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: %s", constants.DocsSandboxURL),
 			)
 		}
 		if dest == "" {
@@ -55,7 +55,7 @@ func validateMountsSyntax(mounts []string) error {
 				fmt.Sprintf("sandbox.mounts[%d].destination", i),
 				mount,
 				"destination path cannot be empty",
-				"Provide a valid destination path.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md",
+				fmt.Sprintf("Provide a valid destination path.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"\n\nSee: %s", constants.DocsSandboxURL),
 			)
 		}
 
@@ -65,7 +65,7 @@ func validateMountsSyntax(mounts []string) error {
 				fmt.Sprintf("sandbox.mounts[%d].mode", i),
 				mode,
 				"mount mode must be 'ro' (read-only) or 'rw' (read-write)",
-				"Change the mount mode to either 'ro' or 'rw'.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"  # read-only\n    - \"/host/path:/container/path:rw\"  # read-write\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md",
+				fmt.Sprintf("Change the mount mode to either 'ro' or 'rw'.\n\nExample:\nsandbox:\n  mounts:\n    - \"/host/path:/container/path:ro\"  # read-only\n    - \"/host/path:/container/path:rw\"  # read-write\n\nSee: %s", constants.DocsSandboxURL),
 			)
 		}
 
@@ -136,7 +136,7 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 				"sandbox",
 				"sandbox-runtime with network.firewall",
 				"sandbox-runtime and AWF firewall cannot be used together",
-				"Choose one sandbox approach:\n\nOption 1 (sandbox-runtime):\nsandbox: sandbox-runtime\n\nOption 2 (AWF firewall):\nnetwork:\n  firewall: true\n\nSee: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md",
+				fmt.Sprintf("Choose one sandbox approach:\n\nOption 1 (sandbox-runtime):\nsandbox: sandbox-runtime\n\nOption 2 (AWF firewall):\nnetwork:\n  firewall: true\n\nSee: %s", constants.DocsSandboxURL),
 			)
 		}
 	}

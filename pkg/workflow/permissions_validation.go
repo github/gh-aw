@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -322,7 +323,7 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 		lines = append(lines, fmt.Sprintf("  %s: %s", scope, level))
 	}
 	lines = append(lines, "")
-	lines = append(lines, "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/permissions.md")
+	lines = append(lines, fmt.Sprintf("See: %s", constants.DocsPermissionsURL))
 
 	// Add suggestion to reduce toolsets if we have toolset details
 	if len(result.MissingToolsetDetails) > 0 {

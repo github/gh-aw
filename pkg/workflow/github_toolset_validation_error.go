@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -67,7 +68,7 @@ func (e *GitHubToolsetValidationError) Error() string {
 		lines = append(lines, fmt.Sprintf("      - %s", toolset))
 	}
 	lines = append(lines, "")
-	lines = append(lines, "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools")
+	lines = append(lines, fmt.Sprintf("See: %s", constants.DocsGitHubToolsURL))
 
 	return strings.Join(lines, "\n")
 }

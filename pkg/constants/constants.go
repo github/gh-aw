@@ -225,6 +225,46 @@ func (e EngineName) IsValid() bool {
 	return len(e) > 0
 }
 
+// DocURL represents a documentation URL for error messages and help text.
+// This semantic type distinguishes documentation URLs from arbitrary URLs,
+// making documentation references explicit and centralized for easier maintenance.
+//
+// Example usage:
+//
+//	const DocsEnginesURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md"
+//	func formatError(msg string, docURL DocURL) string { ... }
+type DocURL string
+
+// String returns the string representation of the documentation URL
+func (d DocURL) String() string {
+	return string(d)
+}
+
+// IsValid returns true if the documentation URL is non-empty
+func (d DocURL) IsValid() bool {
+	return len(d) > 0
+}
+
+// Documentation URLs for validation error messages.
+// These URLs point to the relevant documentation pages that help users
+// understand and resolve validation errors.
+const (
+	// DocsEnginesURL is the documentation URL for engine configuration
+	DocsEnginesURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/engines.md"
+
+	// DocsToolsURL is the documentation URL for tools and MCP server configuration
+	DocsToolsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md"
+
+	// DocsGitHubToolsURL is the documentation URL for GitHub tools configuration
+	DocsGitHubToolsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/tools.md#github-tools"
+
+	// DocsPermissionsURL is the documentation URL for GitHub permissions configuration
+	DocsPermissionsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/permissions.md"
+
+	// DocsSandboxURL is the documentation URL for sandbox configuration
+	DocsSandboxURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md"
+)
+
 // MaxExpressionLineLength is the maximum length for a single line expression before breaking into multiline.
 const MaxExpressionLineLength LineLength = 120
 
