@@ -446,8 +446,15 @@ func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 		return true // Custom agent file requires checkout to access the file
 	}
 
-	// Agent job always gets contents: read permission for .github and .actions access
-	// Therefore, we always add checkout for runtime-import and workflow files
-	log.Print("Adding checkout step: agent job has contents read access for .github and .actions")
+	// Check condition 3: Only skip checkout in explicit release mode without agent file
+	// Dev mode, script mode, and uninitialized mode all need checkout for .github and .actions access
+	if c.actionMode.IsRelease() {
+		// In release mode without agent file, checkout is not needed
+		log.Print("Skipping checkout step: release mode without agent file")
+		return false
+	}
+
+	// Default: add checkout for dev/script mode and uninitialized mode
+	log.Printf("Adding checkout step: %s mode requires .github and .actions access", c.actionMode)
 	return true
 }
