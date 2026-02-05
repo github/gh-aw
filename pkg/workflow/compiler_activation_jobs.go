@@ -784,24 +784,21 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	agentConcurrency := GenerateJobConcurrencyConfig(data)
 
 	// Set up permissions for the agent job
-	// If using local actions (dev mode without action-tag), we need to add contents: read to access the actions folder
+	// Agent job ALWAYS needs contents: read to access .github and .actions folders
 	permissions := data.Permissions
-	if setupActionRef != "" && len(c.generateCheckoutActionsFolder(data)) > 0 {
-		// Need to merge contents: read with existing permissions
-		if permissions == "" {
-			// No permissions specified, just add contents: read
-			perms := NewPermissionsContentsRead()
-			permissions = perms.RenderToYAML()
-		} else {
-			// Parse existing permissions and add contents: read
-			parser := NewPermissionsParser(permissions)
-			perms := parser.ToPermissions()
+	if permissions == "" {
+		// No permissions specified, just add contents: read
+		perms := NewPermissionsContentsRead()
+		permissions = perms.RenderToYAML()
+	} else {
+		// Parse existing permissions and add contents: read
+		parser := NewPermissionsParser(permissions)
+		perms := parser.ToPermissions()
 
-			// Only add contents: read if not already present
-			if level, exists := perms.Get(PermissionContents); !exists || level == PermissionNone {
-				perms.Set(PermissionContents, PermissionRead)
-				permissions = perms.RenderToYAML()
-			}
+		// Only add contents: read if not already present
+		if level, exists := perms.Get(PermissionContents); !exists || level == PermissionNone {
+			perms.Set(PermissionContents, PermissionRead)
+			permissions = perms.RenderToYAML()
 		}
 	}
 
