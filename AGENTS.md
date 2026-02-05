@@ -1126,7 +1126,7 @@ Skills provide specialized, detailed knowledge on specific topics. **Use them on
 - **[documentation](skills/documentation/SKILL.md)** - Documentation guidelines using Diátaxis framework and GitHub-flavored markdown
 - **[reporting](skills/reporting/SKILL.md)** - Report format guidelines using HTML details/summary tags
 - **[dictation](skills/dictation/SKILL.md)** - Fixing text-to-speech errors in dictated text
-- **[agentic-chat](skills/agentic-chat/SKILL.md)** - AI assistant for creating task descriptions
+- **[agentic-chat](.github/aw/agentic-chat.md)** - AI assistant for creating task descriptions
 
 ### MCP & Tools
 - **[skillz-integration](skills/skillz-integration/SKILL.md)** - Skillz MCP server integration with Docker
