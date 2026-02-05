@@ -166,7 +166,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 			permissions.Merge(NewPermissionsContentsReadIssuesWrite())
 		}
 		if data.SafeOutputs.CreateDiscussions != nil {
-			permissions.Merge(NewPermissionsContentsReadDiscussionsWrite())
+			permissions.Merge(NewPermissionsContentsReadIssuesWriteDiscussionsWrite())
 		}
 		if data.SafeOutputs.AddComments != nil {
 			permissions.Merge(NewPermissionsContentsReadIssuesWritePRWriteDiscussionsWrite())

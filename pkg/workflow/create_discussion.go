@@ -193,7 +193,7 @@ func (c *Compiler) buildCreateOutputDiscussionJob(data *WorkflowData, mainJobNam
 		MainJobName:    mainJobName,
 		CustomEnvVars:  customEnvVars,
 		Script:         getCreateDiscussionScript(),
-		Permissions:    NewPermissionsContentsReadDiscussionsWrite(),
+		Permissions:    NewPermissionsContentsReadIssuesWriteDiscussionsWrite(),
 		Outputs:        outputs,
 		Needs:          needs,
 		Token:          data.SafeOutputs.CreateDiscussions.GitHubToken,

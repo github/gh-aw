@@ -148,6 +148,16 @@ func NewPermissionsContentsReadDiscussionsWrite() *Permissions {
 	})
 }
 
+// NewPermissionsContentsReadIssuesWriteDiscussionsWrite creates permissions with contents: read, issues: write, discussions: write
+// This is used for create-discussion jobs that support fallback-to-issue when discussion creation fails
+func NewPermissionsContentsReadIssuesWriteDiscussionsWrite() *Permissions {
+	return NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
+		PermissionContents:    PermissionRead,
+		PermissionIssues:      PermissionWrite,
+		PermissionDiscussions: PermissionWrite,
+	})
+}
+
 // NewPermissionsContentsReadPRWrite creates permissions with contents: read and pull-requests: write
 func NewPermissionsContentsReadPRWrite() *Permissions {
 	return NewPermissionsFromMap(map[PermissionScope]PermissionLevel{
