@@ -56,8 +56,16 @@ safe-outputs:
     expires: 7d
     title-prefix: "[Dependabot Bundle] "
     labels: [dependencies, security, dependabot]
+    assignees: copilot  # Simple approach - assign Copilot when creating issues
     max: 20
     group: false
+
+  assign-to-agent:
+    name: "copilot"
+    allowed: [copilot]
+    target: "*"  # Requires explicit issue_number in agent output
+    max: 10
+    github-token: ${{ secrets.GH_AW_AGENT_TOKEN }}  # Required: PAT with actions, contents, issues, pull requests write access
 
   add-comment:
     max: 10
@@ -167,7 +175,13 @@ For each bundle identified in Phase 2:
 
 ### Phase 4: Create GitHub Issues for Copilot Assignment
 
-For each bundle, create a GitHub issue that can be assigned to a Copilot agent:
+For each bundle, create a GitHub issue that can be assigned to a Copilot agent.
+
+**Two Assignment Approaches:**
+
+**Approach A (Simple - Recommended):** Issues are automatically assigned to Copilot when created via the `assignees: copilot` configuration in the `create-issue` safe output. This is already configured in the frontmatter and requires no additional action.
+
+**Approach B (Programmatic):** Use the `assign-to-agent` safe output to programmatically assign Copilot to issues after creation. This provides more control and can assign to existing issues, but requires the `GH_AW_AGENT_TOKEN` secret.
 
 1. **Create issue** using `create_issue`:
    ```javascript
@@ -201,14 +215,26 @@ For each bundle, create a GitHub issue that can be assigned to a Copilot agent:
    - [ ] PR created and linked to this issue
    - [ ] PR moved to "Review Required" status in project board
    
-   **Assigned to**: @copilot
+   **Note**: This issue will be automatically assigned to @copilot via the workflow's safe-output configuration.
    **Project**: See the corresponding project item for tracking`,
-     assignees: ["copilot"],  // If available, otherwise leave empty
      labels: ["dependencies", "security", "dependabot", "automation"]
    })
    ```
+   
+   **Note**: The `assignees: copilot` configuration in frontmatter automatically assigns @copilot to created issues. No need to include `assignees` in the `create_issue` call.
 
-2. **Link issue to project item**: After creating the issue, add it to the project using `update_project` with `content_type: "issue"` and the issue number
+2. **(Optional) Programmatic assignment** using `assign-to-agent`:
+   If you need to assign Copilot to existing issues or want more control over assignment, use:
+   ```javascript
+   assign_to_agent({
+     issue_number: {issue_number},  // The issue number from create_issue
+     name: "copilot"
+   })
+   ```
+   
+   **Important**: This requires the `GH_AW_AGENT_TOKEN` secret to be configured.
+
+3. **Link issue to project item**: After creating the issue, add it to the project using `update_project` with `content_type: "issue"` and the issue number
 
 ### Phase 5: Create Status Update
 
@@ -320,13 +346,24 @@ The workflow uses these custom fields (will be created if they don't exist):
    - Example: Change `https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>` to `https://github.com/orgs/myorg/projects/42`
    - The URL must be for an existing project with appropriate permissions
 
-2. **GitHub Token**: You must create a PAT or GitHub App token with Projects permissions and store it as `GH_AW_PROJECT_GITHUB_TOKEN` secret
+2. **Required GitHub Tokens**: This workflow requires two special tokens to be configured as secrets:
+   - **`GH_AW_PROJECT_GITHUB_TOKEN`**: Required for GitHub Projects v2 operations
+     - PAT or GitHub App token with Projects (read/write) permissions
+     - Used by `update-project` and `create-project-status-update` safe outputs
+     - See: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+   
+   - **`GH_AW_AGENT_TOKEN`**: Required for assigning Copilot agents to issues
+     - Fine-grained PAT with actions, contents, issues, pull requests (write) permissions
+     - Used by `assign-to-agent` safe output to programmatically assign @copilot to issues
+     - See: https://github.github.io/gh-aw/reference/tokens/#gh_aw_agent_token-agent-assignment-operations
 
-3. **Bundle Deduplication**: Check if a bundle already exists before creating a new one to avoid duplicates
+3. **Copilot Assignment Options**: This workflow supports two approaches for assigning Copilot to issues:
+   - **Simple (recommended)**: Use `assignees: copilot` in `create-issue` config - automatically assigns when creating issues (no extra token needed)
+   - **Programmatic**: Use `assign-to-agent` safe output - for assigning to existing issues or more control (requires `GH_AW_AGENT_TOKEN`)
 
-4. **Alert Threshold**: If there are more than 50 alerts, prioritize critical and high severity bundles first
+4. **Bundle Deduplication**: Check if a bundle already exists before creating a new one to avoid duplicates
 
-5. **Copilot Assignment**: The workflow creates issues assigned to @copilot (if your organization has Copilot agents configured)
+5. **Alert Threshold**: If there are more than 50 alerts, prioritize critical and high severity bundles first
 
 6. **Human Review**: The "Review Required" status is the key handoff point between automated fixes and human oversight
 
