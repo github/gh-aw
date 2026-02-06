@@ -374,14 +374,14 @@ func TestAddCustomStepsAsIs(t *testing.T) {
 // TestAddCustomStepsWithRuntimeInsertion tests adding custom steps with runtime insertion
 func TestAddCustomStepsWithRuntimeInsertion(t *testing.T) {
 	tests := []struct {
-		name               string
-		customSteps        string
-		runtimeSetupSteps  []GitHubActionStep
-		tools              *ToolsConfig
-		expectInOutput     []string
-		expectStepOrder    []string
-		notInOutput        []string
-		insertionHappened  bool
+		name              string
+		customSteps       string
+		runtimeSetupSteps []GitHubActionStep
+		tools             *ToolsConfig
+		expectInOutput    []string
+		expectStepOrder   []string
+		notInOutput       []string
+		insertionHappened bool
 	}{
 		{
 			name: "insert runtime after checkout",
@@ -660,7 +660,7 @@ func TestGenerateMainJobSteps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			compiler := NewCompiler()
 			compiler.stepOrderTracker = NewStepOrderTracker()
-			
+
 			if tt.setupCompiler != nil {
 				tt.setupCompiler(compiler)
 			}
@@ -751,10 +751,10 @@ func TestGenerateMainJobStepsStepOrdering(t *testing.T) {
 // TestShouldAddCheckoutStepEdgeCases tests edge cases for checkout step detection
 func TestShouldAddCheckoutStepEdgeCases(t *testing.T) {
 	tests := []struct {
-		name            string
-		setupData       func() *WorkflowData
-		setupCompiler   func(*Compiler)
-		expectCheckout  bool
+		name           string
+		setupData      func() *WorkflowData
+		setupCompiler  func(*Compiler)
+		expectCheckout bool
 	}{
 		{
 			name: "checkout needed in dev mode (default)",
