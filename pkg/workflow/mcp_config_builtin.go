@@ -185,7 +185,8 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 
 	if actionMode.IsDev() {
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
-		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--cmd", "gh-aw"]
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server"]
+		// Binary path is automatically detected via os.Executable()
 		// So we don't need to specify entrypoint or entrypointArgs
 		containerImage = constants.DevModeGhAwImage
 		entrypoint = ""      // Use container's default entrypoint

@@ -745,4 +745,211 @@ describe("add_comment", () => {
       expect(errorCalls.length).toBeGreaterThan(0);
     });
   });
+
+  describe("discussion fallback", () => {
+    it("should retry as discussion when item_number returns 404 as issue/PR", async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+
+      let infoCalls = [];
+      mockCore.info = msg => {
+        infoCalls.push(msg);
+      };
+
+      // Mock REST API to return 404 (not found as issue/PR)
+      mockGithub.rest.issues.createComment = async () => {
+        const error = new Error("Not Found");
+        // @ts-ignore
+        error.status = 404;
+        throw error;
+      };
+
+      // Mock GraphQL to return discussion
+      let graphqlCalls = [];
+      mockGithub.graphql = async (query, vars) => {
+        graphqlCalls.push({ query, vars });
+
+        // First call is to check if discussion exists
+        if (query.includes("query") && query.includes("discussion(number:")) {
+          return {
+            repository: {
+              discussion: {
+                id: "D_kwDOTest789",
+                url: "https://github.com/owner/repo/discussions/14117",
+              },
+            },
+          };
+        }
+
+        // Second call is to add comment
+        if (query.includes("mutation") && query.includes("addDiscussionComment")) {
+          return {
+            addDiscussionComment: {
+              comment: {
+                id: "DC_kwDOTest999",
+                body: "Test comment",
+                createdAt: "2026-02-06T12:00:00Z",
+                url: "https://github.com/owner/repo/discussions/14117#discussioncomment-999",
+              },
+            },
+          };
+        }
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+
+      const message = {
+        type: "add_comment",
+        item_number: 14117,
+        body: "Test comment on discussion",
+      };
+
+      const result = await handler(message, {});
+
+      expect(result.success).toBe(true);
+      expect(result.isDiscussion).toBe(true);
+      expect(result.itemNumber).toBe(14117);
+      expect(result.url).toContain("discussions/14117");
+
+      // Verify it logged the retry
+      const retryLog = infoCalls.find(msg => msg.includes("retrying as discussion"));
+      expect(retryLog).toBeTruthy();
+
+      const foundLog = infoCalls.find(msg => msg.includes("Found discussion"));
+      expect(foundLog).toBeTruthy();
+    });
+
+    it("should return skipped when item_number not found as issue/PR or discussion", async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+
+      let warningCalls = [];
+      mockCore.warning = msg => {
+        warningCalls.push(msg);
+      };
+
+      // Mock REST API to return 404
+      mockGithub.rest.issues.createComment = async () => {
+        const error = new Error("Not Found");
+        // @ts-ignore
+        error.status = 404;
+        throw error;
+      };
+
+      // Mock GraphQL to also return 404 (discussion doesn't exist either)
+      mockGithub.graphql = async (query, vars) => {
+        if (query.includes("query") && query.includes("discussion(number:")) {
+          return {
+            repository: {
+              discussion: null,
+            },
+          };
+        }
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+
+      const message = {
+        type: "add_comment",
+        item_number: 99999,
+        body: "Test comment",
+      };
+
+      const result = await handler(message, {});
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.warning).toContain("not found");
+
+      // Verify warning was logged
+      const notFoundWarning = warningCalls.find(msg => msg.includes("not found"));
+      expect(notFoundWarning).toBeTruthy();
+    });
+
+    it("should not retry as discussion when 404 occurs without explicit item_number", async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+
+      let warningCalls = [];
+      mockCore.warning = msg => {
+        warningCalls.push(msg);
+      };
+
+      // Mock REST API to return 404
+      mockGithub.rest.issues.createComment = async () => {
+        const error = new Error("Not Found");
+        // @ts-ignore
+        error.status = 404;
+        throw error;
+      };
+
+      // GraphQL should not be called
+      let graphqlCalled = false;
+      mockGithub.graphql = async () => {
+        graphqlCalled = true;
+        throw new Error("GraphQL should not be called");
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+
+      const message = {
+        type: "add_comment",
+        // No item_number - using target resolution
+        body: "Test comment",
+      };
+
+      const result = await handler(message, {});
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(graphqlCalled).toBe(false);
+
+      // Verify warning was logged
+      const notFoundWarning = warningCalls.find(msg => msg.includes("not found"));
+      expect(notFoundWarning).toBeTruthy();
+    });
+
+    it("should not retry as discussion when already detected as discussion context", async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+
+      // Set discussion context
+      mockContext.eventName = "discussion";
+      mockContext.payload = {
+        discussion: {
+          number: 100,
+        },
+      };
+
+      let warningCalls = [];
+      mockCore.warning = msg => {
+        warningCalls.push(msg);
+      };
+
+      // Mock GraphQL to return 404 for discussion
+      let graphqlCallCount = 0;
+      mockGithub.graphql = async (query, vars) => {
+        graphqlCallCount++;
+
+        if (query.includes("query") && query.includes("discussion(number:")) {
+          return {
+            repository: {
+              discussion: null,
+            },
+          };
+        }
+      };
+
+      const handler = await eval(`(async () => { ${addCommentScript}; return await main({ target: 'triggering' }); })()`);
+
+      const message = {
+        type: "add_comment",
+        body: "Test comment",
+      };
+
+      const result = await handler(message, {});
+
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(true);
+
+      // Should only call GraphQL once (not retry)
+      expect(graphqlCallCount).toBe(1);
+    });
+  });
 });

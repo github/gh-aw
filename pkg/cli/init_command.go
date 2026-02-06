@@ -28,13 +28,8 @@ Interactive Mode (default):
 
 This command:
 - Configures .gitattributes to mark .lock.yml files as generated
-- Creates GitHub Copilot custom instructions at .github/aw/github-agentic-workflows.md
 - Creates the dispatcher agent at .github/agents/agentic-workflows.agent.md
-- Creates workflow creation prompt at .github/aw/create-agentic-workflow.md (for new workflows)
-- Creates workflow update prompt at .github/aw/update-agentic-workflow.md (for updating existing workflows)
-- Creates shared workflow creation prompt at .github/aw/create-shared-agentic-workflow.md
-- Creates debug workflow prompt at .github/aw/debug-agentic-workflow.md
-- Creates upgrade workflow prompt at .github/aw/upgrade-agentic-workflows.md
+- Verifies workflow prompt files exist in .github/aw/ (create-agentic-workflow.md, update-agentic-workflow.md, etc.)
 - Removes old prompt files from .github/prompts/ if they exist
 - Configures VSCode settings (.vscode/settings.json)
 - Generates/updates .github/workflows/agentics-maintenance.yml if any workflows use expires field for discussions or issues

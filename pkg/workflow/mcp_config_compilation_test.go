@@ -285,6 +285,14 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					}
 				}
 
+				// Verify binary copy step for user-defined steps that execute ./gh-aw
+				if !strings.Contains(string(lockContent), "cp dist/gh-aw-linux-amd64 ./gh-aw") {
+					t.Error("Expected 'cp dist/gh-aw-linux-amd64 ./gh-aw' in dev mode build step")
+				}
+				if !strings.Contains(string(lockContent), "chmod +x ./gh-aw") {
+					t.Error("Expected 'chmod +x ./gh-aw' in dev mode build step")
+				}
+
 				// Verify NO entrypoint field (uses container's default ENTRYPOINT)
 				if strings.Contains(string(lockContent), `"entrypoint"`) {
 					t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")

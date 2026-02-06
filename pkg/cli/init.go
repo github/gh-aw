@@ -159,16 +159,6 @@ func initializeBasicRepository(verbose bool) error {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured .gitattributes"))
 	}
 
-	// Write copilot instructions
-	initLog.Print("Writing GitHub Copilot instructions")
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		initLog.Printf("Failed to write copilot instructions: %v", err)
-		return fmt.Errorf("failed to write copilot instructions: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created GitHub Copilot instructions"))
-	}
-
 	// Write dispatcher agent
 	initLog.Print("Writing agentic workflows dispatcher agent")
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
@@ -179,71 +169,11 @@ func initializeBasicRepository(verbose bool) error {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created dispatcher agent"))
 	}
 
-	// Write create workflow prompt
-	initLog.Print("Writing create workflow prompt")
-	if err := ensureCreateWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write create workflow prompt: %v", err)
-		return fmt.Errorf("failed to write create workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create workflow prompt"))
-	}
-
-	// Write update workflow prompt
-	initLog.Print("Writing update workflow prompt")
-	if err := ensureUpdateWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write update workflow prompt: %v", err)
-		return fmt.Errorf("failed to write update workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created update workflow prompt"))
-	}
-
-	// Write create shared agentic workflow prompt
-	initLog.Print("Writing create shared agentic workflow prompt")
-	if err := ensureCreateSharedAgenticWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write create shared workflow prompt: %v", err)
-		return fmt.Errorf("failed to write create shared workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created shared workflow creation prompt"))
-	}
-
 	// Delete existing setup agentic workflows agent if it exists
 	initLog.Print("Cleaning up setup agentic workflows agent")
 	if err := deleteSetupAgenticWorkflowsAgent(verbose); err != nil {
 		initLog.Printf("Failed to delete setup agentic workflows agent: %v", err)
 		return fmt.Errorf("failed to delete setup agentic workflows agent: %w", err)
-	}
-
-	// Write debug workflow prompt
-	initLog.Print("Writing debug workflow prompt")
-	if err := ensureDebugWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write debug workflow prompt: %v", err)
-		return fmt.Errorf("failed to write debug workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created debug workflow prompt"))
-	}
-
-	// Write upgrade agentic workflows prompt
-	initLog.Print("Writing upgrade agentic workflows prompt")
-	if err := ensureUpgradeAgenticWorkflowsPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write upgrade workflows prompt: %v", err)
-		return fmt.Errorf("failed to write upgrade workflows prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created upgrade workflows prompt"))
-	}
-
-	// Write Serena tool documentation
-	initLog.Print("Writing Serena tool documentation")
-	if err := ensureSerenaTool(verbose, false); err != nil {
-		initLog.Printf("Failed to write Serena tool documentation: %v", err)
-		return fmt.Errorf("failed to write Serena tool documentation: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
 	}
 
 	return nil
@@ -477,16 +407,6 @@ func InitRepository(verbose bool, mcp bool, tokens bool, engine string, codespac
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured .gitattributes"))
 	}
 
-	// Write copilot instructions
-	initLog.Print("Writing GitHub Copilot instructions")
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		initLog.Printf("Failed to write copilot instructions: %v", err)
-		return fmt.Errorf("failed to write copilot instructions: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created GitHub Copilot instructions"))
-	}
-
 	// Write dispatcher agent
 	initLog.Print("Writing agentic workflows dispatcher agent")
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
@@ -497,71 +417,11 @@ func InitRepository(verbose bool, mcp bool, tokens bool, engine string, codespac
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created dispatcher agent"))
 	}
 
-	// Write create workflow prompt
-	initLog.Print("Writing create workflow prompt")
-	if err := ensureCreateWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write create workflow prompt: %v", err)
-		return fmt.Errorf("failed to write create workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created create workflow prompt"))
-	}
-
-	// Write update workflow prompt (new)
-	initLog.Print("Writing update workflow prompt")
-	if err := ensureUpdateWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write update workflow prompt: %v", err)
-		return fmt.Errorf("failed to write update workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created update workflow prompt"))
-	}
-
-	// Write create shared agentic workflow prompt
-	initLog.Print("Writing create shared agentic workflow prompt")
-	if err := ensureCreateSharedAgenticWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write create shared workflow prompt: %v", err)
-		return fmt.Errorf("failed to write create shared workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created shared workflow creation prompt"))
-	}
-
 	// Delete existing setup agentic workflows agent if it exists
 	initLog.Print("Cleaning up setup agentic workflows agent")
 	if err := deleteSetupAgenticWorkflowsAgent(verbose); err != nil {
 		initLog.Printf("Failed to delete setup agentic workflows agent: %v", err)
 		return fmt.Errorf("failed to delete setup agentic workflows agent: %w", err)
-	}
-
-	// Write debug workflow prompt
-	initLog.Print("Writing debug workflow prompt")
-	if err := ensureDebugWorkflowPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write debug workflow prompt: %v", err)
-		return fmt.Errorf("failed to write debug workflow prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created debug workflow prompt"))
-	}
-
-	// Write upgrade agentic workflows prompt
-	initLog.Print("Writing upgrade agentic workflows prompt")
-	if err := ensureUpgradeAgenticWorkflowsPrompt(verbose, false); err != nil {
-		initLog.Printf("Failed to write upgrade workflows prompt: %v", err)
-		return fmt.Errorf("failed to write upgrade workflows prompt: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created upgrade workflows prompt"))
-	}
-
-	// Write Serena tool documentation
-	initLog.Print("Writing Serena tool documentation")
-	if err := ensureSerenaTool(verbose, false); err != nil {
-		initLog.Printf("Failed to write Serena tool documentation: %v", err)
-		return fmt.Errorf("failed to write Serena tool documentation: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created Serena tool documentation"))
 	}
 
 	// Configure MCP if requested
