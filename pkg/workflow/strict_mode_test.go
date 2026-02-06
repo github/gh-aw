@@ -391,7 +391,7 @@ engine: copilot
 tools:
   github:
     allowed: [issue_read]
-  bash:
+  bash: []
 ---
 
 # Test Workflow`,
@@ -463,7 +463,7 @@ permissions:
 timeout-minutes: 10
 engine: copilot
 tools:
-  bash:
+  bash: []
 network:
   allowed:
     - "api.example.com"
