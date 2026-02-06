@@ -26,7 +26,7 @@
             "workflows": "write"
           }
         },
-        "githubnext/gh-aw": {
+        "github/agentic-workflow-workbench": {
           "permissions": {
             "actions": "write",
             "contents": "write",

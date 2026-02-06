@@ -224,6 +224,8 @@ These resources contain workflow patterns, best practices, safe outputs, and per
      - Media manipulation → `ffmpeg` (installed via `steps:`)
      - Code parsing/analysis → `ast-grep`, `codeql` (installed via `steps:`)
      - **Advanced static analysis** → See `.github/aw/serena-tool.md` for guidance on when and how to use Serena language server (only for advanced coding tasks when user explicitly requests it)
+     - **Orchestration patterns** → See `.github/aw/orchestration.md` for guidance on coordinating multi-step work and tracking progress across runs (use when the workflow is acting as a coordinator)
+     - **GitHub Projects (v2)** → See `.github/aw/projects.md` for GitHub Projects (v2) integration patterns and safe-outputs setup (use when the workflow updates project boards or posts project status updates)
 
    - ⚠️ For GitHub write operations (creating issues, adding comments, etc.), always use `safe-outputs` instead of GitHub tools
 
@@ -413,8 +415,10 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    - **Always use `safe-outputs` instead** for any GitHub write operations (creating issues, adding comments, etc.)
    - **Mode configuration** - Both `mode: local` (Docker-based, default) and `mode: remote` (hosted) are supported. Remote mode offers faster startup and no Docker requirement.
 
-   **Advanced static analysis tools**:
-   For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
+  **Advanced static analysis tools**:
+  For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
+  For coordinator-style workflows, see `.github/aw/orchestration.md` for orchestration patterns.
+  For goal-oriented workflows, see `.github/aw/monitoring.md` for goals, KPIs/metrics, and memory guidance.
 
    ⚠️ **IMPORTANT - Default Tools (Sandboxed by Default)**: 
    - **Agentic workflows are sandboxed by the Agent Workflow Firewall (AWF)** - The agent runs in a secure, sandboxed environment with domain-based access control

@@ -41,9 +41,8 @@ This command:
   4. Compiles all workflows to generate lock files (like 'compile' command)
 
 The upgrade process ensures:
-- GitHub Copilot instructions are up-to-date (.github/aw/github-agentic-workflows.md)
 - Dispatcher agent is current (.github/agents/agentic-workflows.agent.md)
-- All workflow prompts are updated (create, update, debug, upgrade)
+- All workflow prompts exist in .github/aw/ (create, update, debug, upgrade)
 - All workflows use the latest syntax and configuration options
 - Deprecated fields are automatically migrated across all workflows
 - GitHub Actions are pinned to the latest versions
@@ -258,52 +257,10 @@ func runUpgradeCommand(verbose bool, workflowDir string, noFix bool, noCompile b
 
 // updateAgentFiles updates all agent and prompt files to the latest templates
 func updateAgentFiles(verbose bool) error {
-	// Update copilot instructions
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update copilot instructions: %v", err)
-		return fmt.Errorf("failed to update copilot instructions: %w", err)
-	}
-
 	// Update dispatcher agent
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
 		upgradeLog.Printf("Failed to update dispatcher agent: %v", err)
 		return fmt.Errorf("failed to update dispatcher agent: %w", err)
-	}
-
-	// Update create workflow prompt
-	if err := ensureCreateWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update create workflow prompt: %v", err)
-		return fmt.Errorf("failed to update create workflow prompt: %w", err)
-	}
-
-	// Update update workflow prompt
-	if err := ensureUpdateWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update update workflow prompt: %v", err)
-		return fmt.Errorf("failed to update update workflow prompt: %w", err)
-	}
-
-	// Update create shared agentic workflow prompt
-	if err := ensureCreateSharedAgenticWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update create shared workflow prompt: %v", err)
-		return fmt.Errorf("failed to update create shared workflow prompt: %w", err)
-	}
-
-	// Update debug workflow prompt
-	if err := ensureDebugWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update debug workflow prompt: %v", err)
-		return fmt.Errorf("failed to update debug workflow prompt: %w", err)
-	}
-
-	// Update upgrade agentic workflows prompt
-	if err := ensureUpgradeAgenticWorkflowsPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update upgrade workflows prompt: %v", err)
-		return fmt.Errorf("failed to update upgrade workflows prompt: %w", err)
-	}
-
-	// Update Serena tool documentation
-	if err := ensureSerenaTool(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update Serena tool documentation: %v", err)
-		return fmt.Errorf("failed to update Serena tool documentation: %w", err)
 	}
 
 	// Upgrade copilot-setup-steps.yml version
