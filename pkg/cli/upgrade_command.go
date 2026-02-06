@@ -263,42 +263,6 @@ func updateAgentFiles(verbose bool) error {
 		return fmt.Errorf("failed to update dispatcher agent: %w", err)
 	}
 
-	// Update create workflow prompt
-	if err := ensureCreateWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update create workflow prompt: %v", err)
-		return fmt.Errorf("failed to update create workflow prompt: %w", err)
-	}
-
-	// Update update workflow prompt
-	if err := ensureUpdateWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update update workflow prompt: %v", err)
-		return fmt.Errorf("failed to update update workflow prompt: %w", err)
-	}
-
-	// Update create shared agentic workflow prompt
-	if err := ensureCreateSharedAgenticWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update create shared workflow prompt: %v", err)
-		return fmt.Errorf("failed to update create shared workflow prompt: %w", err)
-	}
-
-	// Update debug workflow prompt
-	if err := ensureDebugWorkflowPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update debug workflow prompt: %v", err)
-		return fmt.Errorf("failed to update debug workflow prompt: %w", err)
-	}
-
-	// Update upgrade agentic workflows prompt
-	if err := ensureUpgradeAgenticWorkflowsPrompt(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update upgrade workflows prompt: %v", err)
-		return fmt.Errorf("failed to update upgrade workflows prompt: %w", err)
-	}
-
-	// Update Serena tool documentation
-	if err := ensureSerenaTool(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update Serena tool documentation: %v", err)
-		return fmt.Errorf("failed to update Serena tool documentation: %w", err)
-	}
-
 	// Upgrade copilot-setup-steps.yml version
 	actionMode := workflow.DetectActionMode(GetVersion())
 	if err := upgradeCopilotSetupSteps(verbose, actionMode, GetVersion()); err != nil {
