@@ -30,6 +30,7 @@ var CopilotDefaultDomains = []string{
 	"host.docker.internal",
 	"raw.githubusercontent.com",
 	"registry.npmjs.org",
+	"telemetry.enterprise.githubcopilot.com",
 }
 
 // CodexDefaultDomains are the minimal default domains required for Codex CLI operation
