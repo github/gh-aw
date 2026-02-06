@@ -60,7 +60,8 @@ func generatePluginInstallStep(plugin, engineID, githubToken string) GitHubActio
 		command = fmt.Sprintf("%s install plugin %s", engineID, plugin)
 	}
 
-	stepName := fmt.Sprintf("Install plugin: %s", plugin)
+	// Quote the step name to avoid YAML syntax issues with special characters
+	stepName := fmt.Sprintf("'Install plugin: %s'", plugin)
 
 	return GitHubActionStep{
 		fmt.Sprintf("      - name: %s", stepName),

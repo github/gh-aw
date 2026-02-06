@@ -2490,10 +2490,7 @@
         "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
         "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
       },
-      "examples": [
-        ["github/copilot-plugin", "acme/custom-tools"],
-        ["my-org/workflow-enhancer"]
-      ]
+      "examples": [["github/copilot-plugin", "acme/custom-tools"], ["my-org/workflow-enhancer"]]
     },
     "if": {
       "type": "string",
