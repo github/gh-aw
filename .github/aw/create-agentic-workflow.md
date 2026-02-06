@@ -324,96 +324,12 @@ These resources contain workflow patterns, best practices, safe outputs, and per
 
    **CLI Automation Discovery:**
 
-   ⚡ **IMPORTANT**: Before recommending complex manual setup instructions, **always check if `gh aw` provides a CLI command** that automates the task.
+   ⚡ **IMPORTANT**: Before recommending manual setup, check if `gh aw` provides a CLI command (use `gh aw --help` to explore). Examples:
+   - `gh aw project new --with-project-setup` - Creates project boards with views and fields
+   - `gh aw secrets` - Manages repository secrets
+   - `gh aw init` / `gh aw new` / `gh aw add` - Repository and workflow setup
 
-   **Principle**: Minimize user configuration burden by discovering and recommending built-in CLI automation.
-
-   **Available CLI Commands:**
-
-   - **`gh aw project new`** - Create GitHub Projects V2 with optional automated setup:
-     ```bash
-     gh aw project new "Project Title" --owner myorg --with-project-setup
-     ```
-     - **When to recommend**: User wants to create a project board for tracking workflow
-     - **Key feature**: `--with-project-setup` automatically creates:
-       - Standard views (Progress Board, Task Tracker, Roadmap)
-       - Custom fields (Tracker Id, Worker Workflow, Target Repo, Priority, Size, dates)
-       - Enhanced Status field with "Review Required" option
-     - **Token requirements**: Requires `GH_AW_PROJECT_GITHUB_TOKEN` with Projects permissions (not the default `GITHUB_TOKEN`)
-     - **Link to repo**: Use `--link owner/repo` to associate project with repository
-
-   - **`gh aw init`** - Initialize repository for agentic workflows
-   - **`gh aw new <workflow-name>`** - Scaffold a new workflow with examples
-   - **`gh aw add <source>`** - Add workflows from other repositories
-   - **`gh aw secrets`** - Manage repository secrets and tokens
-
-   **When creating workflows that involve GitHub Projects:**
-
-   1. **First**: Recommend using `gh aw project new --with-project-setup` to create the project board
-   2. **Then**: Configure the workflow with the project URL in frontmatter
-   3. **Result**: User runs one CLI command instead of manually creating views and fields
-
-   **Example Workflow Creation Flow (Projects):**
-
-   ```markdown
-   ## Setup Steps
-
-   1. Create your project board:
-      ```bash
-      gh aw project new "Dependabot Tracker" \
-        --owner myorg \
-        --link myorg/myrepo \
-        --with-project-setup
-      ```
-      This creates a project with standard views and custom fields.
-
-   2. Generate a PAT with Projects permissions and store it:
-      ```bash
-      gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN
-      ```
-
-   3. Copy the project URL from the output above and paste it into the workflow frontmatter
-
-   4. Compile and run your workflow
-   ```
-
-   **Anti-Pattern (what NOT to do):**
-   ```markdown
-   ## Configuration Required ❌
-
-   Users must:
-   1. Create Projects v2 board: https://github.com/orgs/<ORG>/projects/<NUMBER>
-   2. Manually create views: Progress Board, Task Tracker, Roadmap
-   3. Manually create fields: Tracker Id, Worker Workflow, Priority, Size, etc.
-   4. Generate PAT with Projects permissions → GH_AW_PROJECT_GITHUB_TOKEN secret
-   5. Update placeholder project URLs in frontmatter
-   6. Recompile: gh aw compile workflow-name
-   ```
-
-   **Better Approach (recommended):**
-   ```markdown
-   ## Quick Setup ✅
-
-   Run this command to create a fully configured project board:
-   ```bash
-   gh aw project new "Dependabot Tracker" --owner myorg --link myorg/myrepo --with-project-setup
-   ```
-
-   Then store your Projects PAT:
-   ```bash
-   gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN
-   ```
-
-   Copy the project URL from the output and paste it into the workflow frontmatter, then compile.
-   ```
-
-   **Discovery Process:**
-
-   When a user asks to create a workflow:
-   1. **Identify automation needs** - Does the workflow need project boards, secrets management, etc?
-   2. **Check for CLI tools** - Does `gh aw` provide a command for this setup?
-   3. **Recommend CLI first** - Guide users to CLI commands before manual configuration
-   4. **Provide workflow config** - Show the frontmatter that integrates with the CLI-created resources
+   **For GitHub Projects workflows**: Recommend `gh aw project new "Title" --owner org --with-project-setup` instead of manual board/field creation
 
    **Security Education for Common Patterns:**
 
