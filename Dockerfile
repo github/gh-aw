@@ -25,6 +25,10 @@ COPY ${BINARY} /usr/local/bin/gh-aw
 # Ensure the binary is executable
 RUN chmod +x /usr/local/bin/gh-aw
 
+# Configure git to trust all directories to avoid "dubious ownership" errors
+# This is necessary when the container runs with mounted volumes owned by different users
+RUN git config --global --add safe.directory '*'
+
 # Set working directory for users
 WORKDIR /workspace
 
