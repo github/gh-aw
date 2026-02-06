@@ -83,7 +83,7 @@
 // Example agentic-workflows config:
 //
 //	{
-//	  "agentic_workflows": {
+//	  "agenticworkflows": {
 //	    "type": "stdio",
 //	    "container": "alpine:3.20",
 //	    "entrypoint": "/opt/gh-aw/gh-aw",
@@ -170,7 +170,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
-	yaml.WriteString("              \"agentic_workflows\": {\n")
+	yaml.WriteString("              \"" + constants.AgenticWorkflowsMCPServerID + "\": {\n")
 
 	// Add type field for Copilot (per MCP Gateway Specification v1.0.0, use "stdio" for containerized servers)
 	if includeCopilotFields {
@@ -286,7 +286,7 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
 func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
-	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
+	yaml.WriteString("          [mcp_servers." + constants.AgenticWorkflowsMCPServerID + "]\n")
 
 	containerImage := constants.DefaultAlpineImage
 	var entrypoint string

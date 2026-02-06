@@ -541,6 +541,9 @@ const SafeInputsMCPServerID = "safeinputs"
 // SafeInputsMCPVersion is the version of the safe-inputs MCP server
 const SafeInputsMCPVersion = "1.0.0"
 
+// AgenticWorkflowsMCPServerID is the identifier for the agentic-workflows MCP server
+const AgenticWorkflowsMCPServerID = "agenticworkflows"
+
 // Feature flag identifiers
 const (
 	// SafeInputsFeatureFlag is the name of the feature flag for safe-inputs

@@ -583,7 +583,7 @@ jobs:
           cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
-              "agentic_workflows": {
+              "agenticworkflows": {
                 "container": "localhost/gh-aw:dev",
                 "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "args": ["-w", "${{ github.workspace }}"],
