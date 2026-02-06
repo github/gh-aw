@@ -64,14 +64,16 @@ func generatePluginInstallStep(plugin, engineID, githubToken string) GitHubActio
 	var command string
 	switch engineID {
 	case "copilot":
-		command = fmt.Sprintf("copilot install plugin %s", plugin)
+		command = fmt.Sprintf("copilot plugin install %s", plugin)
 	case "claude":
-		command = fmt.Sprintf("claude install plugin %s", plugin)
+		// TODO: validate the correct claude CLI plugin install command syntax
+		command = fmt.Sprintf("claude plugin install %s", plugin)
 	case "codex":
-		command = fmt.Sprintf("codex install plugin %s", plugin)
+		// TODO: validate the correct codex CLI plugin install command syntax
+		command = fmt.Sprintf("codex plugin install %s", plugin)
 	default:
 		// For unknown engines, use a generic format
-		command = fmt.Sprintf("%s install plugin %s", engineID, plugin)
+		command = fmt.Sprintf("%s plugin install %s", engineID, plugin)
 	}
 
 	// Quote the step name to avoid YAML syntax issues with special characters

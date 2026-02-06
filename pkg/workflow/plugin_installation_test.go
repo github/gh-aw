@@ -35,7 +35,7 @@ func TestGeneratePluginInstallationSteps(t *testing.T) {
 			engineID:     "copilot",
 			githubToken:  "${{ secrets.CUSTOM_TOKEN }}",
 			expectSteps:  1,
-			expectCmds:   []string{"copilot install plugin github/test-plugin"},
+			expectCmds:   []string{"copilot plugin install github/test-plugin"},
 			expectTokens: []string{"${{ secrets.CUSTOM_TOKEN }}"},
 		},
 		{
@@ -45,8 +45,8 @@ func TestGeneratePluginInstallationSteps(t *testing.T) {
 			githubToken: "${{ secrets.CUSTOM_TOKEN }}",
 			expectSteps: 2,
 			expectCmds: []string{
-				"claude install plugin github/plugin1",
-				"claude install plugin acme/plugin2",
+				"claude plugin install github/plugin1",
+				"claude plugin install acme/plugin2",
 			},
 			expectTokens: []string{
 				"${{ secrets.CUSTOM_TOKEN }}",
@@ -59,7 +59,7 @@ func TestGeneratePluginInstallationSteps(t *testing.T) {
 			engineID:     "codex",
 			githubToken:  "",
 			expectSteps:  1,
-			expectCmds:   []string{"codex install plugin org/codex-plugin"},
+			expectCmds:   []string{"codex plugin install org/codex-plugin"},
 			expectTokens: []string{"${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"}, // Cascading fallback
 		},
 	}
@@ -203,7 +203,7 @@ func TestPluginInstallationIntegration(t *testing.T) {
 			}
 
 			// Verify plugin installation step is present
-			assert.Contains(t, allStepsText, fmt.Sprintf("%s install plugin github/test-plugin", e.engineID),
+			assert.Contains(t, allStepsText, fmt.Sprintf("%s plugin install github/test-plugin", e.engineID),
 				"Installation steps should include plugin installation command")
 
 			// Verify GITHUB_TOKEN is set
@@ -278,7 +278,7 @@ func TestPluginObjectFormatWithCustomToken(t *testing.T) {
 			}
 
 			// Verify plugin installation step is present
-			assert.Contains(t, allStepsText, fmt.Sprintf("%s install plugin github/test-plugin", e.engineID),
+			assert.Contains(t, allStepsText, fmt.Sprintf("%s plugin install github/test-plugin", e.engineID),
 				"Installation steps should include plugin installation command")
 
 			// Verify custom token is used (not the cascading fallback)
