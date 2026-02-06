@@ -108,9 +108,12 @@ func runMCPServer(port int, cmdPath string) error {
 		mcpLog.Print("Starting MCP server with stdio transport")
 	}
 
-	// Determine, log, and validate the binary path
-	// Note: logAndValidateBinaryPath handles all logging internally
-	_ = logAndValidateBinaryPath()
+	// Determine, log, and validate the binary path only if --cmd flag is not provided
+	// When --cmd is provided, the user explicitly specified the binary path to use
+	if cmdPath == "" {
+		// Note: logAndValidateBinaryPath handles all logging internally
+		_ = logAndValidateBinaryPath()
+	}
 
 	// Log current working directory
 	if cwd, err := os.Getwd(); err == nil {

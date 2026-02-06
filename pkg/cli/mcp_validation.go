@@ -224,9 +224,12 @@ func validateServerSecrets(config parser.MCPServerConfig, verbose bool, useActio
 func validateMCPServerConfiguration(cmdPath string) error {
 	mcpValidationLog.Printf("Validating MCP server configuration: cmdPath=%s", cmdPath)
 
-	// Determine, log, and validate the binary path
-	// Note: logAndValidateBinaryPath handles all logging internally
-	_ = logAndValidateBinaryPath()
+	// Determine, log, and validate the binary path only if --cmd flag is not provided
+	// When --cmd is provided, the user explicitly specified the binary path to use
+	if cmdPath == "" {
+		// Note: logAndValidateBinaryPath handles all logging internally
+		_ = logAndValidateBinaryPath()
+	}
 
 	// Try to run the status command to verify CLI is working
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
