@@ -592,3 +592,97 @@ func TestGetSanitizedPATHExport_ShellExecution(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNpmBinPathSetup(t *testing.T) {
+	pathSetup := GetNpmBinPathSetup()
+
+	// Should use find command to locate bin directories in hostedtoolcache
+	if !strings.Contains(pathSetup, "/opt/hostedtoolcache") {
+		t.Errorf("PATH setup should reference /opt/hostedtoolcache, got: %s", pathSetup)
+	}
+
+	// Should search for bin directories
+	if !strings.Contains(pathSetup, "-name bin") {
+		t.Errorf("PATH setup should search for bin directories, got: %s", pathSetup)
+	}
+
+	// Should preserve existing PATH
+	if !strings.Contains(pathSetup, "$PATH") {
+		t.Errorf("PATH setup should include $PATH, got: %s", pathSetup)
+	}
+
+	// Should re-prepend GOROOT/bin after the find to preserve correct Go version ordering
+	// (find returns alphabetically, so go/1.23 can shadow go/1.25)
+	if !strings.Contains(pathSetup, "$GOROOT") {
+		t.Errorf("PATH setup should re-prepend GOROOT/bin after find, got: %s", pathSetup)
+	}
+
+	// GOROOT re-prepend should come AFTER the find command
+	findIdx := strings.Index(pathSetup, "find /opt/hostedtoolcache")
+	gorootIdx := strings.Index(pathSetup, "$GOROOT")
+	if gorootIdx < findIdx {
+		t.Errorf("GOROOT re-prepend should come after find command, got: %s", pathSetup)
+	}
+}
+
+// TestGetNpmBinPathSetup_GorootOrdering verifies that GOROOT/bin takes precedence
+// over alphabetically-ordered Go versions in hostedtoolcache.
+func TestGetNpmBinPathSetup_GorootOrdering(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping shell-based test on non-Linux platform")
+	}
+
+	// Create a temporary hostedtoolcache structure with two Go versions
+	tmpDir := t.TempDir()
+	goOld := filepath.Join(tmpDir, "go", "1.23.12", "x64", "bin")
+	goNew := filepath.Join(tmpDir, "go", "1.25.0", "x64", "bin")
+	os.MkdirAll(goOld, 0o755)
+	os.MkdirAll(goNew, 0o755)
+
+	// Write fake go scripts: old reports 1.23, new reports 1.25
+	os.WriteFile(filepath.Join(goOld, "go"), []byte("#!/bin/bash\necho 'go version go1.23.12 linux/amd64'\n"), 0o755)
+	os.WriteFile(filepath.Join(goNew, "go"), []byte("#!/bin/bash\necho 'go version go1.25.0 linux/amd64'\n"), 0o755)
+
+	// Simulate the PATH setup with GOROOT pointing to the newer version
+	shellCmd := fmt.Sprintf(
+		`export GOROOT=%q; export PATH="$(find %q -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true; go version`,
+		filepath.Join(tmpDir, "go", "1.25.0", "x64"),
+		tmpDir,
+	)
+
+	cmd := exec.Command("bash", "-c", shellCmd)
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to execute shell command: %v", err)
+	}
+
+	result := strings.TrimSpace(string(output))
+	if !strings.Contains(result, "go1.25.0") {
+		t.Errorf("Expected go1.25.0 to take precedence, but got: %s", result)
+	}
+}
+
+// TestGetNpmBinPathSetup_NoGorootDoesNotBreakChain verifies that when GOROOT is
+// not set, the command chain continues (the || true prevents short-circuit).
+func TestGetNpmBinPathSetup_NoGorootDoesNotBreakChain(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping shell-based test on non-Linux platform")
+	}
+
+	// The full command pattern used by engines:
+	//   GetNpmBinPathSetup() && INSTRUCTION="..." && codex exec ...
+	// When GOROOT is empty, [ -n "$GOROOT" ] is false. Without || true,
+	// the && chain short-circuits and INSTRUCTION is never set.
+	shellCmd := `unset GOROOT; export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true && echo "chain-continued"`
+
+	cmd := exec.Command("bash", "-c", shellCmd)
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Command chain should not fail when GOROOT is empty: %v", err)
+	}
+
+	result := strings.TrimSpace(string(output))
+	if !strings.Contains(result, "chain-continued") {
+		t.Errorf("Expected command chain to continue when GOROOT is empty, got: %q", result)
+	}
+}

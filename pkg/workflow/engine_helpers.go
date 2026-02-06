@@ -377,7 +377,12 @@ func GetHostedToolcachePathSetup() string {
 func GetNpmBinPathSetup() string {
 	// Find all bin directories in hostedtoolcache (Node.js, Python, etc.)
 	// This finds paths like /opt/hostedtoolcache/node/22.13.0/x64/bin
-	return `export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"`
+	//
+	// After the find, re-prepend GOROOT/bin if set. The find returns directories
+	// alphabetically, so go/1.23.12 shadows go/1.25.0. Re-prepending GOROOT/bin
+	// ensures the Go version set by actions/setup-go takes precedence.
+	// AWF's entrypoint.sh exports GOROOT before the user command runs.
+	return `export PATH="$(find /opt/hostedtoolcache -maxdepth 4 -type d -name bin 2>/dev/null | tr '\n' ':')$PATH"; [ -n "$GOROOT" ] && export PATH="$GOROOT/bin:$PATH" || true`
 }
 
 // GetSanitizedPATHExport returns a shell command that sets PATH to the given value
