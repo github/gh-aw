@@ -84,6 +84,10 @@ func NewTools(toolsMap map[string]any) *Tools {
 	}
 	if val, exists := toolsMap["bash"]; exists {
 		tools.Bash = parseBashTool(val)
+		// Check if parsing returned nil - this indicates invalid configuration
+		if tools.Bash == nil {
+			toolsParserLog.Print("Warning: bash tool configuration is invalid (nil/anonymous syntax not supported)")
+		}
 	}
 	if val, exists := toolsMap["web-fetch"]; exists {
 		tools.WebFetch = parseWebFetchTool(val)
@@ -241,8 +245,21 @@ func parseGitHubTool(val any) *GitHubToolConfig {
 // parseBashTool converts raw bash tool configuration to BashToolConfig
 func parseBashTool(val any) *BashToolConfig {
 	if val == nil {
-		// nil means all commands allowed
-		return &BashToolConfig{}
+		// nil is no longer supported - return nil to indicate invalid configuration
+		// The compiler will handle this as a validation error
+		return nil
+	}
+
+	// Handle boolean values
+	if boolVal, ok := val.(bool); ok {
+		if boolVal {
+			// bash: true means all commands allowed
+			return &BashToolConfig{}
+		}
+		// bash: false means explicitly disabled
+		return &BashToolConfig{
+			AllowedCommands: []string{}, // Empty slice indicates explicitly disabled
+		}
 	}
 
 	// Handle array of allowed commands
@@ -258,7 +275,8 @@ func parseBashTool(val any) *BashToolConfig {
 		return config
 	}
 
-	return &BashToolConfig{}
+	// Invalid configuration
+	return nil
 }
 
 // parsePlaywrightTool converts raw playwright tool configuration to PlaywrightToolConfig
