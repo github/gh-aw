@@ -46,4 +46,19 @@ func TestGetBinaryPath(t *testing.T) {
 		assert.NotEmpty(t, base, "Binary path should have a base name")
 		// Don't check for specific name as it could be the test binary
 	})
+
+	t.Run("resolves symlinks", func(t *testing.T) {
+		path, err := GetBinaryPath()
+		require.NoError(t, err, "Should get binary path without error")
+
+		// The path should be the resolved path, not a symlink
+		// We can verify this by checking that EvalSymlinks returns the same path
+		resolved, err := filepath.EvalSymlinks(path)
+		if err == nil {
+			// If we can resolve symlinks, the path should already be resolved
+			assert.Equal(t, path, resolved, "Path should already be resolved (no symlinks)")
+		}
+		// If EvalSymlinks fails, that's OK - the original path is still valid
+	})
 }
+
