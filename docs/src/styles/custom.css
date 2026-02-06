@@ -3,9 +3,25 @@
    Color: https://brand.github.com/foundations/color
 */
 
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/gh-aw/fonts/MonaSans-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/gh-aw/fonts/MonaSans-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 /* CSS Variables - Theme Colors */
 :root {
-  --sl-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --sl-font: "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
   --sl-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   
   --sl-color-accent-low: #6639ba;
@@ -1302,15 +1318,10 @@ starlight-toc h2 {
   outline-color: #5b3da3;
 }
 
-/* Smooth Scrolling */
+/* Scroll Behavior */
 html {
-  scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+  scroll-behavior: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Site Title */
@@ -1318,6 +1329,9 @@ html {
   font-size: 1rem;
   font-weight: 700;
   text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .site-title:hover {
@@ -1326,6 +1340,10 @@ html {
 
 .site-title span {
   color: #f0f6fc;
+}
+
+.site-title img {
+  display: block;
 }
 
 /* Mobile-specific: Ensure site title has adequate touch target */

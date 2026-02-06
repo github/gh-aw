@@ -129,6 +129,9 @@ jobs:
             -ldflags "-s -w -X main.version=${VERSION}" \
             -o dist/gh-aw-linux-amd64 \
             ./cmd/gh-aw
+          # Copy binary to root for direct execution in user-defined steps
+          cp dist/gh-aw-linux-amd64 ./gh-aw
+          chmod +x ./gh-aw
           echo "✓ Built gh-aw CLI successfully"
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -186,7 +189,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
-        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.403
+        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.405
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.11
       - name: Determine automatic lockdown mode for GitHub MCP server
@@ -513,7 +516,7 @@ jobs:
               engine_name: "GitHub Copilot CLI",
               model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
               version: "",
-              agent_version: "0.0.403",
+              agent_version: "0.0.405",
               workflow_name: "Agent Persona Explorer",
               experimental: false,
               supports_tools_allowlist: true,
@@ -1072,7 +1075,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
-        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.403
+        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.405
       - name: Execute GitHub Copilot CLI
         id: agentic_execution
         # Copilot CLI tool arguments (sorted):

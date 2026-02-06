@@ -436,12 +436,6 @@ This workflow is already up to date.
 	exec.Command("git", "add", ".").Run()
 	exec.Command("git", "commit", "-m", "Initial commit").Run()
 
-	// Create all the agent files to ensure no changes will be made
-	if err := ensureCopilotInstructions(false, false); err == nil {
-		exec.Command("git", "add", ".").Run()
-		exec.Command("git", "commit", "-m", "Add agent files").Run()
-	}
-
 	// Run upgrade command with --push (should fail because no remote is configured)
 	config := UpgradeConfig{
 		Verbose:     false,

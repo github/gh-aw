@@ -499,9 +499,87 @@ async function main(config = {}) {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
 
-      // Check if this is a 404 error (discussion/issue was deleted)
+      // Check if this is a 404 error (discussion/issue was deleted or wrong type)
       // @ts-expect-error - Error handling with optional chaining
       const is404 = error?.status === 404 || errorMessage.includes("404") || errorMessage.toLowerCase().includes("not found");
+
+      // If 404 and item_number was explicitly provided and we tried as issue/PR,
+      // retry as a discussion (the user may have provided a discussion number)
+      if (is404 && !isDiscussion && item.item_number !== undefined && item.item_number !== null) {
+        core.info(`Item #${itemNumber} not found as issue/PR, retrying as discussion...`);
+
+        try {
+          // Try to find and comment on the discussion
+          const discussionQuery = `
+            query($owner: String!, $repo: String!, $number: Int!) {
+              repository(owner: $owner, name: $repo) {
+                discussion(number: $number) {
+                  id
+                }
+              }
+            }
+          `;
+          const queryResult = await github.graphql(discussionQuery, {
+            owner: repoParts.owner,
+            repo: repoParts.repo,
+            number: itemNumber,
+          });
+
+          const discussionId = queryResult?.repository?.discussion?.id;
+          if (!discussionId) {
+            throw new Error(`Discussion #${itemNumber} not found in ${itemRepo}`);
+          }
+
+          core.info(`Found discussion #${itemNumber}, adding comment...`);
+          const comment = await commentOnDiscussion(github, repoParts.owner, repoParts.repo, itemNumber, processedBody, null);
+
+          core.info(`Created comment on discussion: ${comment.html_url}`);
+
+          // Add tracking metadata
+          const commentResult = {
+            id: comment.id,
+            html_url: comment.html_url,
+            _tracking: {
+              commentId: comment.id,
+              itemNumber: itemNumber,
+              repo: itemRepo,
+              isDiscussion: true,
+            },
+          };
+
+          createdComments.push(commentResult);
+
+          return {
+            success: true,
+            commentId: comment.id,
+            url: comment.html_url,
+            itemNumber: itemNumber,
+            repo: itemRepo,
+            isDiscussion: true,
+          };
+        } catch (discussionError) {
+          const discussionErrorMessage = getErrorMessage(discussionError);
+          // @ts-expect-error - Error handling with optional chaining
+          const isDiscussion404 = discussionError?.status === 404 || discussionErrorMessage.toLowerCase().includes("not found");
+
+          if (isDiscussion404) {
+            // Neither issue/PR nor discussion found - truly doesn't exist
+            core.warning(`Target #${itemNumber} was not found as issue, PR, or discussion (may have been deleted): ${discussionErrorMessage}`);
+            return {
+              success: true,
+              warning: `Target not found: ${discussionErrorMessage}`,
+              skipped: true,
+            };
+          }
+
+          // Other error when trying as discussion
+          core.error(`Failed to add comment to discussion: ${discussionErrorMessage}`);
+          return {
+            success: false,
+            error: discussionErrorMessage,
+          };
+        }
+      }
 
       if (is404) {
         // Treat 404s as warnings - the target was deleted between execution and safe output processing

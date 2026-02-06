@@ -28,7 +28,7 @@
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: bec978437452c1fb240df07354f2b40ee77acce619bca67902ff5cb79f2a1240
+# frontmatter-hash: f4a489b173291cb259fee27500d061b423b9a987c5238f9267455896c29a4fb3
 
 name: "Copilot PR Conversation NLP Analysis"
 "on":
@@ -151,7 +151,7 @@ jobs:
         name: Fetch PR comments for detailed analysis
         run: "# Create comments directory\nmkdir -p /tmp/gh-aw/pr-comments\n\n# Fetch detailed comments for each PR from the pre-fetched data\nPR_COUNT=$(jq 'length' /tmp/gh-aw/pr-data/copilot-prs.json)\necho \"Fetching comments for $PR_COUNT PRs...\"\n\njq -r '.[].number' /tmp/gh-aw/pr-data/copilot-prs.json | while read -r PR_NUM; do\n  echo \"Fetching comments for PR #${PR_NUM}\"\n  gh pr view \"${PR_NUM}\" \\\n    --json comments,reviews,reviewComments \\\n    > \"/tmp/gh-aw/pr-comments/pr-${PR_NUM}.json\" 2>/dev/null || echo \"{}\" > \"/tmp/gh-aw/pr-comments/pr-${PR_NUM}.json\"\n  sleep 0.5  # Rate limiting\ndone\n\necho \"Comment data saved to /tmp/gh-aw/pr-comments/\"\n"
       - name: Install NLP libraries
-        run: "pip install --user --quiet nltk scikit-learn textblob wordcloud\n\n# Download required NLTK data (using punkt_tab for NLTK 3.9+)\npython3 -c \"import nltk; nltk.download('punkt_tab', quiet=True); nltk.download('stopwords', quiet=True); nltk.download('vader_lexicon', quiet=True); nltk.download('averaged_perceptron_tagger_eng', quiet=True)\"\n\n# Verify installations\npython3 -c \"import nltk; print(f'NLTK {nltk.__version__} installed')\"\npython3 -c \"import sklearn; print(f'scikit-learn {sklearn.__version__} installed')\"\npython3 -c \"import textblob; print(f'TextBlob {textblob.__version__} installed')\"\npython3 -c \"import wordcloud; print(f'WordCloud {wordcloud.__version__} installed')\"\n\necho \"All NLP libraries installed successfully\"\n"
+        run: "pip install --user --quiet nltk scikit-learn textblob wordcloud\n\n# Download required NLTK data (using punkt_tab for NLTK 3.9+)\npython3 -c \"import nltk; nltk.download('punkt_tab', quiet=True); nltk.download('stopwords', quiet=True); nltk.download('vader_lexicon', quiet=True); nltk.download('averaged_perceptron_tagger_eng', quiet=True)\"\n\n# Verify installations\npython3 -c \"import nltk; print(f'NLTK {nltk.__version__} installed')\"\npython3 -c \"import sklearn; print(f'scikit-learn {sklearn.__version__} installed')\"\npython3 -c \"from importlib.metadata import version; print(f'TextBlob {version(\\\"textblob\\\")} installed')\"\npython3 -c \"import wordcloud; print(f'WordCloud {wordcloud.__version__} installed')\"\n\necho \"All NLP libraries installed successfully\"\n"
 
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
@@ -205,7 +205,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
-        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.403
+        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.405
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.11
       - name: Determine automatic lockdown mode for GitHub MCP server
@@ -526,7 +526,7 @@ jobs:
               engine_name: "GitHub Copilot CLI",
               model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
               version: "",
-              agent_version: "0.0.403",
+              agent_version: "0.0.405",
               workflow_name: "Copilot PR Conversation NLP Analysis",
               experimental: false,
               supports_tools_allowlist: true,
@@ -1469,7 +1469,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
-        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.403
+        run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.405
       - name: Execute GitHub Copilot CLI
         id: agentic_execution
         # Copilot CLI tool arguments (sorted):

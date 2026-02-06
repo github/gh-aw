@@ -55,9 +55,7 @@ As a meta-orchestrator for workflow health, you oversee the operational health o
 - Scan `.github/workflows/` for all `.md` workflow files
 - **EXCLUDE** files in `.github/workflows/shared/` subdirectory (these are reusable imports, not standalone workflows)
 - Categorize workflows:
-  - Campaign orchestrators (`.campaign.g.md`)
-  - Campaign specs (`.campaign.md`)
-  - Regular agentic workflows (`.md`)
+  - Agentic workflows
   - GitHub Actions workflows (`.yml`)
 - Build workflow inventory with metadata:
   - Workflow name and description

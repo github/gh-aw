@@ -5,6 +5,21 @@ import Default from '@astrojs/starlight/components/Head.astro';
 
 <Default {...Astro.props}><slot /></Default>
 
+<link
+  rel="preload"
+  href="/gh-aw/fonts/MonaSans-Regular.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+<link
+  rel="preload"
+  href="/gh-aw/fonts/MonaSans-Bold.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+
 <link rel="icon" type="image/svg+xml" href="/gh-aw/favicon.svg" />
 
 <!-- Responsive tables enhancement script -->

@@ -80,7 +80,7 @@ steps:
       # Verify installations
       python3 -c "import nltk; print(f'NLTK {nltk.__version__} installed')"
       python3 -c "import sklearn; print(f'scikit-learn {sklearn.__version__} installed')"
-      python3 -c "import textblob; print(f'TextBlob {textblob.__version__} installed')"
+      python3 -c "from importlib.metadata import version; print(f'TextBlob {version(\"textblob\")} installed')"
       python3 -c "import wordcloud; print(f'WordCloud {wordcloud.__version__} installed')"
       
       echo "All NLP libraries installed successfully"

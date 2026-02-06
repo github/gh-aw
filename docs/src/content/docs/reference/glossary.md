@@ -122,6 +122,10 @@ Software Bill of Materials - a comprehensive inventory of all components, librar
 
 Pre-approved actions the AI can take without requiring elevated permissions. The AI generates structured output describing what it wants to create (issues, comments, pull requests), which is processed by separate, permission-controlled jobs. Configured using the `safe-outputs:` section in frontmatter. This approach lets AI agents create GitHub content without direct write access, reducing security risks.
 
+### Threat Detection
+
+Automated security analysis that scans agent output and code changes for potential security issues before they are applied. When safe outputs are configured, a threat detection job automatically runs to identify prompt injection attempts, secret leaks, and malicious code patches. Uses AI-powered analysis to detect malicious instructions, exposed credentials, and suspicious code patterns. The threat detection job runs after the main agent job completes but before safe outputs are processed, providing an additional security layer. See [Threat Detection Reference](/gh-aw/reference/threat-detection/) for configuration options.
+
 ### Staged Mode
 
 A preview mode where workflows simulate their actions without making changes. The AI generates output showing what would happen, but no GitHub API write operations are performed. Use for testing and validation before running workflows in production.
@@ -273,7 +277,11 @@ The process of checking workflow files for errors, security issues, and best pra
 
 ### Cache Memory
 
-Persistent storage for workflows that preserves data between runs. Configured using `cache-memory:` in the tools section, it enables workflows to remember information and build on previous interactions.
+Persistent storage for workflows that preserves data between runs. Configured using `cache-memory:` in the tools section, it enables workflows to remember information and build on previous interactions. Files are stored in GitHub Actions cache with 7-day retention. See [Memory Reference](/gh-aw/reference/memory/) for configuration options.
+
+### Repo Memory
+
+Persistent file storage via Git branches with unlimited retention. Unlike cache-memory (7-day retention via GitHub Actions cache), repo-memory stores files permanently in dedicated Git branches. The compiler automatically configures branch cloning, file access at `/tmp/gh-aw/repo-memory-{id}/`, commits, pushes, and merge conflict resolution. Useful for long-term data persistence, audit trails, and workflows requiring permanent storage. See [Memory Reference](/gh-aw/reference/memory/) for configuration details.
 
 ### Command Triggers
 

@@ -7,6 +7,7 @@ import starlightGitHubAlerts from 'starlight-github-alerts';
 import starlightBlog from 'starlight-blog';
 import mermaid from 'astro-mermaid';
 import { fileURLToPath } from 'node:url';
+import remarkStripEmojis from './src/lib/remark/stripEmojis.js';
 
 /**
  * Creates blog authors config with GitHub profile pictures
@@ -32,6 +33,9 @@ function createAuthors(authors) {
 export default defineConfig({
 	site: 'https://github.github.io',
 	base: '/gh-aw/',
+	markdown: {
+		remarkPlugins: [remarkStripEmojis],
+	},
 	vite: {
 		server: {
 			fs: {

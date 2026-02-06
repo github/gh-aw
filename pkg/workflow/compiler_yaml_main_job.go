@@ -661,6 +661,9 @@ func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
 	yaml.WriteString("            -ldflags \"-s -w -X main.version=${VERSION}\" \\\n")
 	yaml.WriteString("            -o dist/gh-aw-linux-amd64 \\\n")
 	yaml.WriteString("            ./cmd/gh-aw\n")
+	yaml.WriteString("          # Copy binary to root for direct execution in user-defined steps\n")
+	yaml.WriteString("          cp dist/gh-aw-linux-amd64 ./gh-aw\n")
+	yaml.WriteString("          chmod +x ./gh-aw\n")
 	yaml.WriteString("          echo \"✓ Built gh-aw CLI successfully\"\n")
 
 	// Step 3: Setup Docker Buildx

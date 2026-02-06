@@ -59,22 +59,6 @@ Here are the common actions you may be asked to do, with links to the appropriat
 - "I need a workflow to label pull requests"
 - "Design a weekly research automation"
 
-**Common shared components**:
-
-When the workflow produces reports, manages GitHub Projects, or acts as an orchestrator, prefer importing existing shared guidance instead of duplicating instructions.
-
-Pin to a semantic tag like `@v1.2.3` for stability (use `@main` for latest, or a commit SHA for immutability).
-
-```yaml
-imports:
-
-  - github/gh-aw/.github/workflows/shared/reporting.md@vX.Y.Z
-  - github/gh-aw/.github/workflows/shared/projects.md@vX.Y.Z
-  - github/gh-aw/.github/workflows/shared/orchestration.md@vX.Y.Z
-```
-
-Note: When developing *inside* the gh-aw repository itself, these same files also exist under `.github/workflows/shared/` and can be imported locally as `shared/<name>.md`.
-
 ### Update Existing Workflow
 
 **Load when**: User wants to modify, improve, or refactor an existing workflow

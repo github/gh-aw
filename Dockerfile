@@ -32,7 +32,8 @@ WORKDIR /workspace
 ENTRYPOINT ["gh-aw"]
 
 # Default command runs MCP server
-CMD ["mcp-server", "--cmd", "gh-aw"]
+# Note: Binary path detection is automatic via os.Executable()
+CMD ["mcp-server"]
 
 # Metadata labels
 LABEL org.opencontainers.image.source="https://github.com/github/gh-aw"
