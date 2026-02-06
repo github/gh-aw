@@ -477,6 +477,7 @@ jobs:
               "agentic_workflows": {
                 "container": "localhost/gh-aw:dev",
                 "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "args": ["-w", "${{ github.workspace }}"],
                 "env": {
                   "DEBUG": "*",
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"

@@ -108,6 +108,15 @@ func runMCPServer(port int, cmdPath string) error {
 		mcpLog.Print("Starting MCP server with stdio transport")
 	}
 
+	// Log current working directory
+	if cwd, err := os.Getwd(); err == nil {
+		mcpLog.Printf("Current working directory: %s", cwd)
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Current working directory: %s", cwd)))
+	} else {
+		mcpLog.Printf("WARNING: Failed to get current working directory: %v", err)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to get current working directory: %v", err)))
+	}
+
 	// Check and log gh CLI version
 	checkAndLogGHVersion()
 
