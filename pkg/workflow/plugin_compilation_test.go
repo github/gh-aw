@@ -37,7 +37,7 @@ plugins:
 
 Test single plugin installation
 `,
-			expectedPlugins:     []string{"copilot install plugin github/test-plugin"},
+			expectedPlugins:     []string{"copilot plugin install github/test-plugin"},
 			expectedTokenString: "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
 		},
 		{
@@ -57,9 +57,9 @@ plugins:
 Test multiple plugins
 `,
 			expectedPlugins: []string{
-				"claude install plugin github/plugin1",
-				"claude install plugin acme/plugin2",
-				"claude install plugin org/plugin3",
+				"claude plugin install github/plugin1",
+				"claude plugin install acme/plugin2",
+				"claude plugin install org/plugin3",
 			},
 			expectedTokenString: "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
 		},
@@ -77,7 +77,7 @@ plugins:
 
 Test Codex plugin
 `,
-			expectedPlugins:     []string{"codex install plugin openai/codex-plugin"},
+			expectedPlugins:     []string{"codex plugin install openai/codex-plugin"},
 			expectedTokenString: "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
 		},
 	}
@@ -146,8 +146,8 @@ plugins:
 Test object format with custom token
 `,
 			expectedPlugins: []string{
-				"copilot install plugin github/test-plugin",
-				"copilot install plugin acme/custom-plugin",
+				"copilot plugin install github/test-plugin",
+				"copilot plugin install acme/custom-plugin",
 			},
 			expectedToken:    "GITHUB_TOKEN: ${{ secrets.CUSTOM_PLUGIN_TOKEN }}",
 			shouldNotContain: "GH_AW_PLUGINS_TOKEN",
@@ -168,7 +168,7 @@ plugins:
 Test object format without custom token
 `,
 			expectedPlugins: []string{
-				"claude install plugin github/plugin1",
+				"claude plugin install github/plugin1",
 			},
 			expectedToken:    "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
 			shouldNotContain: "",
@@ -247,7 +247,7 @@ Test with top-level github-token
 	lockContent := string(content)
 
 	// Verify plugin install command is present
-	assert.Contains(t, lockContent, "copilot install plugin github/test-plugin",
+	assert.Contains(t, lockContent, "copilot plugin install github/test-plugin",
 		"Lock file should contain plugin install command")
 
 	// Verify top-level github-token is used (not cascading)
@@ -358,9 +358,9 @@ func TestPluginCompilationAllEngines(t *testing.T) {
 		engineID    string
 		expectedCmd string
 	}{
-		{"copilot", "copilot install plugin github/test-plugin"},
-		{"claude", "claude install plugin github/test-plugin"},
-		{"codex", "codex install plugin github/test-plugin"},
+		{"copilot", "copilot plugin install github/test-plugin"},
+		{"claude", "claude plugin install github/test-plugin"},
+		{"codex", "codex plugin install github/test-plugin"},
 	}
 
 	for _, engine := range engines {
@@ -440,7 +440,7 @@ Test without plugins
 	lockContent := string(content)
 
 	// Verify no plugin installation steps are present
-	assert.NotContains(t, lockContent, "install plugin",
+	assert.NotContains(t, lockContent, "plugin install",
 		"Lock file should not contain plugin installation when no plugins specified")
 }
 
