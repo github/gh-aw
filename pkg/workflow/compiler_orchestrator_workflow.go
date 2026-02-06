@@ -51,6 +51,12 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 	// Store a stable workflow identifier derived from the file name.
 	workflowData.WorkflowID = GetWorkflowIDFromPath(cleanPath)
 
+	// Validate bash tool configuration BEFORE applying defaults
+	// This must happen before applyDefaults() which converts nil bash to default commands
+	if err := validateBashToolConfig(workflowData.ParsedTools, workflowData.Name); err != nil {
+		return nil, fmt.Errorf("%s: %w", cleanPath, err)
+	}
+
 	// Use shared action cache and resolver from the compiler
 	actionCache, actionResolver := c.getSharedActionResolver()
 	workflowData.ActionCache = actionCache

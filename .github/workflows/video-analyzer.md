@@ -19,7 +19,7 @@ imports:
   - shared/ffmpeg.md
 
 tools:
-  bash:
+  bash: true
 
 safe-outputs:
   create-issue:
@@ -167,4 +167,3 @@ Create your issue with the following markdown structure:
 
 *Generated using ffmpeg via GitHub Agentic Workflows*
 ```
-

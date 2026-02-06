@@ -15,7 +15,7 @@ tools:
     description: "Historical code quality and health metrics"
     file-glob: ["*.json", "*.jsonl", "*.csv", "*.md"]
     max-file-size: 102400  # 100KB
-  bash:
+  bash: true
 safe-outputs:
   upload-asset:
   create-discussion:
@@ -456,4 +456,3 @@ This ensures the quality score reflects actionable source code volatility, not n
 - Upload charts as assets for permanent URLs
 - Embed charts in discussion report with analysis
 - Store metrics to repo memory, create discussion report with visualizations
-

@@ -34,5 +34,6 @@ func GetAllCodemods() []Codemod {
 		getDiscussionFlagRemovalCodemod(),
 		getMCPModeToTypeCodemod(),
 		getInstallScriptURLCodemod(),
+		getBashAnonymousRemovalCodemod(), // Replace bash: with bash: false
 	}
 }

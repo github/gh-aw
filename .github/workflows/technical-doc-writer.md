@@ -66,7 +66,7 @@ tools:
   github:
     toolsets: [default]
   edit:
-  bash:
+  bash: true
 
 timeout-minutes: 10
 

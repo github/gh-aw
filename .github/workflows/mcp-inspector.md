@@ -47,7 +47,7 @@ tools:
   agentic-workflows:
   serena: ["go"]
   edit:
-  bash:
+  bash: true
   cache-memory: true
 ---
 

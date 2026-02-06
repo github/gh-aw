@@ -12,7 +12,7 @@ engine: copilot
 tools:
   github:
     toolsets: [repos, code_security]
-  bash:
+  bash: true
 safe-outputs:
   create-code-scanning-alert:
     driver: "Malicious Code Scanner"

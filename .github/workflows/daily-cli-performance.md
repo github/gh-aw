@@ -15,7 +15,7 @@ tools:
     description: "Historical CLI compilation performance benchmark results"
     file-glob: ["memory/cli-performance/*.json", "memory/cli-performance/*.jsonl", "memory/cli-performance/*.txt"]
     max-file-size: 512000  # 500KB
-  bash:
+  bash: true
   edit:
   github:
     toolsets: [default, issues]

@@ -14,7 +14,7 @@ tracker-id: daily-secrets-analysis
 tools:
   github:
     toolsets: [default, discussions]
-  bash:
+  bash: true
 safe-outputs:
   create-discussion:
     expires: 3d

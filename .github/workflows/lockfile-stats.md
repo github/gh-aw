@@ -10,7 +10,7 @@ permissions:
 engine: claude
 tools:
   cache-memory: true
-  bash:
+  bash: true
 safe-outputs:
   create-discussion:
     category: "audits"
