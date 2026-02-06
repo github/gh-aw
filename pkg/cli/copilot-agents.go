@@ -34,7 +34,8 @@ func cleanupOldPromptFile(promptFileName string, verbose bool) error {
 	return nil
 }
 
-// ensureCopilotInstructions ensures that .github/aw/github-agentic-workflows.md exists
+// ensureCopilotInstructions checks if .github/aw/github-agentic-workflows.md exists and cleans up old file locations
+// This function does NOT create the file - it only exists in the gh-aw repository itself
 func ensureCopilotInstructions(verbose bool, skipInstructions bool) error {
 	copilotAgentsLog.Print("Checking Copilot instructions file")
 

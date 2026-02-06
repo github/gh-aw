@@ -187,12 +187,6 @@ func runFixCommand(workflowIDs []string, write bool, verbose bool, workflowDir s
 	// This ensures the latest templates are always used
 	fixLog.Print("Updating prompt and agent files")
 
-	// Update copilot instructions
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		fixLog.Printf("Failed to update copilot instructions: %v", err)
-		fmt.Fprintf(os.Stderr, "%s\n", console.FormatWarningMessage(fmt.Sprintf("Warning: Failed to update copilot instructions: %v", err)))
-	}
-
 	// Update dispatcher agent
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
 		fixLog.Printf("Failed to update dispatcher agent: %v", err)

@@ -159,16 +159,6 @@ func initializeBasicRepository(verbose bool) error {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured .gitattributes"))
 	}
 
-	// Write copilot instructions
-	initLog.Print("Writing GitHub Copilot instructions")
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		initLog.Printf("Failed to write copilot instructions: %v", err)
-		return fmt.Errorf("failed to write copilot instructions: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created GitHub Copilot instructions"))
-	}
-
 	// Write dispatcher agent
 	initLog.Print("Writing agentic workflows dispatcher agent")
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
@@ -475,16 +465,6 @@ func InitRepository(verbose bool, mcp bool, tokens bool, engine string, codespac
 	}
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Configured .gitattributes"))
-	}
-
-	// Write copilot instructions
-	initLog.Print("Writing GitHub Copilot instructions")
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		initLog.Printf("Failed to write copilot instructions: %v", err)
-		return fmt.Errorf("failed to write copilot instructions: %w", err)
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Created GitHub Copilot instructions"))
 	}
 
 	// Write dispatcher agent

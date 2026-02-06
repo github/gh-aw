@@ -41,9 +41,8 @@ This command:
   4. Compiles all workflows to generate lock files (like 'compile' command)
 
 The upgrade process ensures:
-- GitHub Copilot instructions are up-to-date (.github/aw/github-agentic-workflows.md)
 - Dispatcher agent is current (.github/agents/agentic-workflows.agent.md)
-- All workflow prompts are updated (create, update, debug, upgrade)
+- All workflow prompts exist in .github/aw/ (create, update, debug, upgrade)
 - All workflows use the latest syntax and configuration options
 - Deprecated fields are automatically migrated across all workflows
 - GitHub Actions are pinned to the latest versions
@@ -258,12 +257,6 @@ func runUpgradeCommand(verbose bool, workflowDir string, noFix bool, noCompile b
 
 // updateAgentFiles updates all agent and prompt files to the latest templates
 func updateAgentFiles(verbose bool) error {
-	// Update copilot instructions
-	if err := ensureCopilotInstructions(verbose, false); err != nil {
-		upgradeLog.Printf("Failed to update copilot instructions: %v", err)
-		return fmt.Errorf("failed to update copilot instructions: %w", err)
-	}
-
 	// Update dispatcher agent
 	if err := ensureAgenticWorkflowsDispatcher(verbose, false); err != nil {
 		upgradeLog.Printf("Failed to update dispatcher agent: %v", err)
