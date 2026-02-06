@@ -144,7 +144,9 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GITHUB_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
 		// GH_TOKEN is an alias for GITHUB_TOKEN, using the same token resolution as other gh CLI tools
 		// The agentic-workflows MCP server uses GH_TOKEN for gh extension operations
-		envVars["GH_TOKEN"] = "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
+		// Use the effective token which respects custom tokens and top-level github-token
+		effectiveToken := getEffectiveGitHubToken("", workflowData.GitHubToken)
+		envVars["GH_TOKEN"] = effectiveToken
 	}
 
 	// Check for Playwright domain secrets
