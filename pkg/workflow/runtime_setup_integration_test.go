@@ -294,8 +294,9 @@ steps:
 		t.Error("Expected to preserve user's Python version 3.9")
 	}
 
-	// Should not add default version (3.12)
-	if strings.Contains(lockContent, "3.12") {
+	// Should not add default version (3.12) - check specifically for python-version to avoid
+	// false positives from other version strings like AWF version "0.13.12"
+	if strings.Contains(lockContent, `python-version: '3.12'`) || strings.Contains(lockContent, `python-version: "3.12"`) {
 		t.Error("Should not override user's version with default version")
 	}
 

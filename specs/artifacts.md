@@ -23,17 +23,17 @@ This section provides an overview of artifacts organized by job name, with dupli
 **Artifacts Uploaded:**
 
 - `agent-artifacts`
-  - **Paths**: `/tmp/gh-aw/agent-stdio.log`, `/tmp/gh-aw/aw-prompts/prompt.txt`, `/tmp/gh-aw/aw.patch`, `/tmp/gh-aw/aw_info.json`, `/tmp/gh-aw/mcp-logs/`, `/tmp/gh-aw/safe-inputs/logs/`, `/tmp/gh-aw/sandbox/firewall/logs/`
-  - **Used in**: 79 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, chroma-issue-indexer.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, codex-github-remote-mcp-test.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, example-custom-error-patterns.md, example-permissions-warning.md, firewall.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, metrics-collector.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, test-workflow.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Paths**: `/tmp/gh-aw/agent-stdio.log`, `/tmp/gh-aw/agent/`, `/tmp/gh-aw/aw-prompts/prompt.txt`, `/tmp/gh-aw/aw.patch`, `/tmp/gh-aw/aw_info.json`, `/tmp/gh-aw/mcp-logs/`, `/tmp/gh-aw/safe-inputs/logs/`, `/tmp/gh-aw/sandbox/firewall/logs/`
+  - **Used in**: 80 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, chroma-issue-indexer.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, codex-github-remote-mcp-test.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, example-custom-error-patterns.md, example-permissions-warning.md, firewall.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, metrics-collector.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, test-workflow.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 - `agent-output`
   - **Paths**: `${{ env.GH_AW_AGENT_OUTPUT }}`
-  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 73 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 - `agent_outputs`
   - **Paths**: `/tmp/gh-aw/mcp-config/logs/`, `/tmp/gh-aw/redacted-urls.log`, `/tmp/gh-aw/sandbox/agent/logs/`
-  - **Used in**: 69 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, chroma-issue-indexer.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, code-scanning-fixer.md, codex-github-remote-mcp-test.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, example-custom-error-patterns.md, example-permissions-warning.md, firewall.md, functional-pragmatist.md, glossary-maintainer.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, metrics-collector.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-dispatcher.md, test-project-url-default.md, test-workflow.md, tidy.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 70 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, chroma-issue-indexer.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, code-scanning-fixer.md, codex-github-remote-mcp-test.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, example-custom-error-patterns.md, example-permissions-warning.md, firewall.md, functional-pragmatist.md, glossary-maintainer.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, metrics-collector.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-dispatcher.md, test-project-url-default.md, test-workflow.md, tidy.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 - `cache-memory`
   - **Paths**: `/tmp/gh-aw/cache-memory`
-  - **Used in**: 29 workflow(s) - agent-persona-explorer.md, ci-coach.md, ci-doctor.md, cloclo.md, code-scanning-fixer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-news.md, daily-repo-chronicle.md, deep-report.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, grumpy-reviewer.md, pdf-summary.md, poem-bot.md, pr-nitpick-reviewer.md, python-data-charts.md, q.md, scout.md, security-fix-pr.md, security-review.md, slide-deck-maintainer.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, weekly-issue-summary.md
+  - **Used in**: 29 workflow(s) - agent-persona-explorer.md, ci-coach.md, ci-doctor.md, cloclo.md, code-scanning-fixer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-repo-chronicle.md, deep-report.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, grumpy-reviewer.md, pdf-summary.md, poem-bot.md, pr-nitpick-reviewer.md, python-data-charts.md, q.md, scout.md, security-review.md, slide-deck-maintainer.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, weekly-issue-summary.md
 - `cache-memory-focus-areas`
   - **Paths**: `/tmp/gh-aw/cache-memory-focus-areas`
   - **Used in**: 1 workflow(s) - repository-quality-improver.md
@@ -48,13 +48,13 @@ This section provides an overview of artifacts organized by job name, with dupli
   - **Used in**: 9 workflow(s) - copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-news.md, daily-repo-chronicle.md, github-mcp-structural-analysis.md, python-data-charts.md, stale-repo-identifier.md, weekly-issue-summary.md
 - `repo-memory-campaigns`
   - **Paths**: `/tmp/gh-aw/repo-memory/campaigns`
-  - **Used in**: 2 workflow(s) - code-scanning-fixer.md, security-fix-pr.md
+  - **Used in**: 1 workflow(s) - code-scanning-fixer.md
 - `repo-memory-default`
   - **Paths**: `/tmp/gh-aw/repo-memory/default`
   - **Used in**: 9 workflow(s) - agent-performance-analyzer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-news.md, deep-report.md, metrics-collector.md, pr-triage-agent.md, security-compliance.md, workflow-health-manager.md
 - `safe-output`
   - **Paths**: `${{ env.GH_AW_SAFE_OUTPUTS }}`
-  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 73 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 - `safe-outputs-assets`
   - **Paths**: `/tmp/gh-aw/safeoutputs/assets/`
   - **Used in**: 12 workflow(s) - copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-news.md, daily-repo-chronicle.md, deep-report.md, github-mcp-structural-analysis.md, poem-bot.md, python-data-charts.md, stale-repo-identifier.md, technical-doc-writer.md, weekly-issue-summary.md
@@ -77,7 +77,7 @@ This section provides an overview of artifacts organized by job name, with dupli
 
 - `agent-output`
   - **Download paths**: `/tmp/gh-aw/safeoutputs/`
-  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 73 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 
 ### Job: `detection`
 
@@ -85,16 +85,16 @@ This section provides an overview of artifacts organized by job name, with dupli
 
 - `threat-detection.log`
   - **Paths**: `/tmp/gh-aw/threat-detection/detection.log`
-  - **Used in**: 71 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 
 **Artifacts Downloaded:**
 
 - `agent-artifacts`
   - **Download paths**: `/tmp/gh-aw/threat-detection/`
-  - **Used in**: 71 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 - `agent-output`
   - **Download paths**: `/tmp/gh-aw/threat-detection/`
-  - **Used in**: 71 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 
 ### Job: `notion_add_comment`
 
@@ -110,7 +110,7 @@ This section provides an overview of artifacts organized by job name, with dupli
 
 - `repo-memory-campaigns`
   - **Download paths**: `/tmp/gh-aw/repo-memory/campaigns`
-  - **Used in**: 2 workflow(s) - code-scanning-fixer.md, security-fix-pr.md
+  - **Used in**: 1 workflow(s) - code-scanning-fixer.md
 - `repo-memory-default`
   - **Download paths**: `/tmp/gh-aw/repo-memory/default`
   - **Used in**: 9 workflow(s) - agent-performance-analyzer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-news.md, deep-report.md, metrics-collector.md, pr-triage-agent.md, security-compliance.md, workflow-health-manager.md
@@ -132,7 +132,7 @@ This section provides an overview of artifacts organized by job name, with dupli
   - **Used in**: 18 workflow(s) - changeset.md, ci-coach.md, cloclo.md, code-scanning-fixer.md, craft.md, dev.md, dictation-prompt.md, functional-pragmatist.md, glossary-maintainer.md, hourly-ci-cleaner.md, layout-spec-maintainer.md, mergefest.md, poem-bot.md, q.md, slide-deck-maintainer.md, technical-doc-writer.md, test-create-pr-error-handling.md, tidy.md
 - `agent-output`
   - **Download paths**: `/tmp/gh-aw/safeoutputs/`
-  - **Used in**: 72 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-fix-pr.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
+  - **Used in**: 73 workflow(s) - agent-performance-analyzer.md, agent-persona-explorer.md, ai-moderator.md, archie.md, brave.md, breaking-change-checker.md, changeset.md, ci-coach.md, ci-doctor.md, cli-consistency-checker.md, cloclo.md, code-scanning-fixer.md, commit-changes-analyzer.md, copilot-pr-merged-report.md, copilot-pr-nlp-analysis.md, craft.md, daily-choice-test.md, daily-copilot-token-report.md, daily-fact.md, daily-file-diet.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-observability-report.md, daily-repo-chronicle.md, daily-team-status.md, deep-report.md, dependabot-go-checker.md, dependabot-project-manager.md, dev-hawk.md, dev.md, dictation-prompt.md, functional-pragmatist.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, go-pattern-detector.md, grumpy-reviewer.md, hourly-ci-cleaner.md, issue-classifier.md, issue-triage-agent.md, layout-spec-maintainer.md, mergefest.md, notion-issue-summary.md, pdf-summary.md, plan.md, poem-bot.md, pr-nitpick-reviewer.md, pr-triage-agent.md, python-data-charts.md, q.md, release.md, repo-audit-analyzer.md, repository-quality-improver.md, research.md, scout.md, security-compliance.md, security-guard.md, security-review.md, slide-deck-maintainer.md, smoke-project.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, test-dispatcher.md, test-project-url-default.md, tidy.md, typist.md, video-analyzer.md, weekly-issue-summary.md, workflow-generator.md, workflow-health-manager.md
 
 ### Job: `super_linter`
 
@@ -156,7 +156,7 @@ This section provides an overview of artifacts organized by job name, with dupli
 
 - `cache-memory`
   - **Download paths**: `/tmp/gh-aw/cache-memory`
-  - **Used in**: 29 workflow(s) - agent-persona-explorer.md, ci-coach.md, ci-doctor.md, cloclo.md, code-scanning-fixer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-news.md, daily-repo-chronicle.md, deep-report.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, grumpy-reviewer.md, pdf-summary.md, poem-bot.md, pr-nitpick-reviewer.md, python-data-charts.md, q.md, scout.md, security-fix-pr.md, security-review.md, slide-deck-maintainer.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, weekly-issue-summary.md
+  - **Used in**: 29 workflow(s) - agent-persona-explorer.md, ci-coach.md, ci-doctor.md, cloclo.md, code-scanning-fixer.md, copilot-pr-nlp-analysis.md, daily-copilot-token-report.md, daily-issues-report.md, daily-mcp-concurrency-analysis.md, daily-news.md, daily-repo-chronicle.md, deep-report.md, github-mcp-structural-analysis.md, glossary-maintainer.md, go-fan.md, grumpy-reviewer.md, pdf-summary.md, poem-bot.md, pr-nitpick-reviewer.md, python-data-charts.md, q.md, scout.md, security-review.md, slide-deck-maintainer.md, stale-repo-identifier.md, super-linter.md, technical-doc-writer.md, test-create-pr-error-handling.md, weekly-issue-summary.md
 - `cache-memory-focus-areas`
   - **Download paths**: `/tmp/gh-aw/cache-memory-focus-areas`
   - **Used in**: 1 workflow(s) - repository-quality-improver.md
@@ -207,6 +207,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -280,6 +281,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -349,6 +351,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -392,6 +395,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -453,6 +457,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -514,6 +519,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -575,6 +581,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -633,6 +640,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### ci-coach.md
 
@@ -664,6 +672,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -742,6 +751,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -811,6 +821,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -871,6 +882,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -953,6 +965,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -1027,6 +1040,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### commit-changes-analyzer.md
 
@@ -1049,6 +1063,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1111,6 +1126,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/safe-inputs/logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1193,6 +1209,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1282,6 +1299,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -1343,6 +1361,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1433,6 +1452,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1522,6 +1542,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1583,6 +1604,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1661,6 +1683,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1716,6 +1739,80 @@ This section provides an overview of artifacts organized by job name, with dupli
   - **Download path**: `/tmp/gh-aw/safeoutputs/`
   - **Depends on jobs**: [agent detection]
 
+### daily-mcp-concurrency-analysis.md
+
+#### Job: `agent`
+
+**Uploads:**
+
+- **Artifact**: `safe-output`
+  - **Upload paths**:
+    - `${{ env.GH_AW_SAFE_OUTPUTS }}`
+
+- **Artifact**: `agent-output`
+  - **Upload paths**:
+    - `${{ env.GH_AW_AGENT_OUTPUT }}`
+
+- **Artifact**: `agent_outputs`
+  - **Upload paths**:
+    - `/tmp/gh-aw/sandbox/agent/logs/`
+    - `/tmp/gh-aw/redacted-urls.log`
+
+- **Artifact**: `cache-memory`
+  - **Upload paths**:
+    - `/tmp/gh-aw/cache-memory`
+
+- **Artifact**: `agent-artifacts`
+  - **Upload paths**:
+    - `/tmp/gh-aw/aw-prompts/prompt.txt`
+    - `/tmp/gh-aw/aw_info.json`
+    - `/tmp/gh-aw/mcp-logs/`
+    - `/tmp/gh-aw/sandbox/firewall/logs/`
+    - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
+
+#### Job: `conclusion`
+
+**Downloads:**
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/safeoutputs/`
+  - **Depends on jobs**: [activation agent detection safe_outputs update_cache_memory]
+
+#### Job: `detection`
+
+**Uploads:**
+
+- **Artifact**: `threat-detection.log`
+  - **Upload paths**:
+    - `/tmp/gh-aw/threat-detection/detection.log`
+
+**Downloads:**
+
+- **Artifact**: `agent-artifacts` (by name)
+  - **Download path**: `/tmp/gh-aw/threat-detection/`
+  - **Depends on jobs**: [agent]
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/threat-detection/`
+  - **Depends on jobs**: [agent]
+
+#### Job: `safe_outputs`
+
+**Downloads:**
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/safeoutputs/`
+  - **Depends on jobs**: [agent detection]
+
+#### Job: `update_cache_memory`
+
+**Downloads:**
+
+- **Artifact**: `cache-memory` (by name)
+  - **Download path**: `/tmp/gh-aw/cache-memory`
+  - **Depends on jobs**: [agent detection]
+
 ### daily-news.md
 
 #### Job: `agent`
@@ -1763,6 +1860,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1852,6 +1950,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -1930,6 +2029,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2011,6 +2111,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2084,6 +2185,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2173,6 +2275,69 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
+
+#### Job: `conclusion`
+
+**Downloads:**
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/safeoutputs/`
+  - **Depends on jobs**: [activation agent detection safe_outputs]
+
+#### Job: `detection`
+
+**Uploads:**
+
+- **Artifact**: `threat-detection.log`
+  - **Upload paths**:
+    - `/tmp/gh-aw/threat-detection/detection.log`
+
+**Downloads:**
+
+- **Artifact**: `agent-artifacts` (by name)
+  - **Download path**: `/tmp/gh-aw/threat-detection/`
+  - **Depends on jobs**: [agent]
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/threat-detection/`
+  - **Depends on jobs**: [agent]
+
+#### Job: `safe_outputs`
+
+**Downloads:**
+
+- **Artifact**: `agent-output` (by name)
+  - **Download path**: `/tmp/gh-aw/safeoutputs/`
+  - **Depends on jobs**: [agent detection]
+
+### dependabot-project-manager.md
+
+#### Job: `agent`
+
+**Uploads:**
+
+- **Artifact**: `safe-output`
+  - **Upload paths**:
+    - `${{ env.GH_AW_SAFE_OUTPUTS }}`
+
+- **Artifact**: `agent-output`
+  - **Upload paths**:
+    - `${{ env.GH_AW_AGENT_OUTPUT }}`
+
+- **Artifact**: `agent_outputs`
+  - **Upload paths**:
+    - `/tmp/gh-aw/sandbox/agent/logs/`
+    - `/tmp/gh-aw/redacted-urls.log`
+
+- **Artifact**: `agent-artifacts`
+  - **Upload paths**:
+    - `/tmp/gh-aw/aw-prompts/prompt.txt`
+    - `/tmp/gh-aw/aw_info.json`
+    - `/tmp/gh-aw/mcp-logs/`
+    - `/tmp/gh-aw/sandbox/firewall/logs/`
+    - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2234,6 +2399,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2295,6 +2461,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -2361,6 +2528,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -2419,6 +2587,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### example-permissions-warning.md
 
@@ -2438,6 +2607,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### firewall.md
 
@@ -2457,6 +2627,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### functional-pragmatist.md
 
@@ -2484,6 +2655,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -2562,6 +2734,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2647,6 +2820,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -2720,6 +2894,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2784,6 +2959,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2849,6 +3025,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -2918,6 +3095,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -2978,6 +3156,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/aw_info.json`
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3039,6 +3218,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3100,6 +3280,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -3166,6 +3347,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -3228,6 +3410,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `push_repo_memory`
 
@@ -3263,6 +3446,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3336,6 +3520,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3405,6 +3590,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3474,6 +3660,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -3564,6 +3751,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3637,6 +3825,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3723,6 +3912,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3808,6 +3998,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -3882,6 +4073,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -3956,6 +4148,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4029,6 +4222,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4098,6 +4292,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4158,6 +4353,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4231,6 +4427,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4274,91 +4471,6 @@ This section provides an overview of artifacts organized by job name, with dupli
   - **Download path**: `/tmp/gh-aw/safeoutputs/`
   - **Depends on jobs**: [agent detection]
 
-### security-fix-pr.md
-
-#### Job: `agent`
-
-**Uploads:**
-
-- **Artifact**: `safe-output`
-  - **Upload paths**:
-    - `${{ env.GH_AW_SAFE_OUTPUTS }}`
-
-- **Artifact**: `agent-output`
-  - **Upload paths**:
-    - `${{ env.GH_AW_AGENT_OUTPUT }}`
-
-- **Artifact**: `agent_outputs`
-  - **Upload paths**:
-    - `/tmp/gh-aw/sandbox/agent/logs/`
-    - `/tmp/gh-aw/redacted-urls.log`
-
-- **Artifact**: `repo-memory-campaigns`
-  - **Upload paths**:
-    - `/tmp/gh-aw/repo-memory/campaigns`
-
-- **Artifact**: `cache-memory`
-  - **Upload paths**:
-    - `/tmp/gh-aw/cache-memory`
-
-- **Artifact**: `agent-artifacts`
-  - **Upload paths**:
-    - `/tmp/gh-aw/aw-prompts/prompt.txt`
-    - `/tmp/gh-aw/aw_info.json`
-    - `/tmp/gh-aw/mcp-logs/`
-    - `/tmp/gh-aw/sandbox/firewall/logs/`
-    - `/tmp/gh-aw/agent-stdio.log`
-
-#### Job: `conclusion`
-
-**Downloads:**
-
-- **Artifact**: `agent-output` (by name)
-  - **Download path**: `/tmp/gh-aw/safeoutputs/`
-  - **Depends on jobs**: [activation agent detection push_repo_memory safe_outputs update_cache_memory]
-
-#### Job: `detection`
-
-**Uploads:**
-
-- **Artifact**: `threat-detection.log`
-  - **Upload paths**:
-    - `/tmp/gh-aw/threat-detection/detection.log`
-
-**Downloads:**
-
-- **Artifact**: `agent-artifacts` (by name)
-  - **Download path**: `/tmp/gh-aw/threat-detection/`
-  - **Depends on jobs**: [agent]
-
-- **Artifact**: `agent-output` (by name)
-  - **Download path**: `/tmp/gh-aw/threat-detection/`
-  - **Depends on jobs**: [agent]
-
-#### Job: `push_repo_memory`
-
-**Downloads:**
-
-- **Artifact**: `repo-memory-campaigns` (by name)
-  - **Download path**: `/tmp/gh-aw/repo-memory/campaigns`
-  - **Depends on jobs**: [agent detection]
-
-#### Job: `safe_outputs`
-
-**Downloads:**
-
-- **Artifact**: `agent-output` (by name)
-  - **Download path**: `/tmp/gh-aw/safeoutputs/`
-  - **Depends on jobs**: [agent detection]
-
-#### Job: `update_cache_memory`
-
-**Downloads:**
-
-- **Artifact**: `cache-memory` (by name)
-  - **Download path**: `/tmp/gh-aw/cache-memory`
-  - **Depends on jobs**: [agent detection]
-
 ### security-guard.md
 
 #### Job: `agent`
@@ -4385,6 +4497,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4450,6 +4563,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4523,6 +4637,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -4598,6 +4713,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/safe-inputs/logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4685,6 +4801,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -4770,6 +4887,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 **Downloads:**
 
@@ -4861,6 +4979,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -4946,6 +5065,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -5020,6 +5140,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5081,6 +5202,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5134,6 +5256,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 ### tidy.md
 
@@ -5161,6 +5284,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
     - `/tmp/gh-aw/aw.patch`
 
 #### Job: `conclusion`
@@ -5222,6 +5346,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5283,6 +5408,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5361,6 +5487,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5442,6 +5569,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
@@ -5507,6 +5635,7 @@ This section provides an overview of artifacts organized by job name, with dupli
     - `/tmp/gh-aw/mcp-logs/`
     - `/tmp/gh-aw/sandbox/firewall/logs/`
     - `/tmp/gh-aw/agent-stdio.log`
+    - `/tmp/gh-aw/agent/`
 
 #### Job: `conclusion`
 
