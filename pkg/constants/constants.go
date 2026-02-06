@@ -315,7 +315,7 @@ const DefaultCodexVersion Version = "0.97.0"
 const DefaultGitHubMCPServerVersion Version = "v0.30.3"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
-const DefaultFirewallVersion Version = "v0.13.6"
+const DefaultFirewallVersion Version = "v0.13.7"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
 const DefaultMCPGatewayVersion Version = "v0.0.103"
@@ -382,6 +382,10 @@ const DefaultPythonAlpineLTSImage = "python:alpine"
 // DefaultAlpineImage is the default minimal Alpine container image for running Go binaries
 // Used for MCP servers that run statically-linked Go binaries like gh-aw mcp-server
 const DefaultAlpineImage = "alpine:latest"
+
+// DevModeGhAwImage is the Docker image tag for locally built gh-aw container in dev mode
+// This image is built during workflow execution and includes the gh-aw binary and dependencies
+const DevModeGhAwImage = "localhost/gh-aw:dev"
 
 // DefaultGhAwMount is the mount path for the gh-aw directory in containerized MCP servers
 // The gh-aw binary and supporting files are mounted read-only from /opt/gh-aw

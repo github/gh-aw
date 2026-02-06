@@ -34,6 +34,18 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 			effectiveToken := getEffectiveGitHubToken("", data.GitHubToken)
 			fmt.Fprintf(yaml, "          token: %s\n", effectiveToken)
 		}
+
+		// Add CLI build steps in dev mode (after automatic checkout, before other steps)
+		// This builds the gh-aw CLI and Docker image for use by the agentic-workflows MCP server
+		// Only generate build steps if agentic-workflows tool is enabled
+		if c.actionMode.IsDev() {
+			if _, hasAgenticWorkflows := data.Tools["agentic-workflows"]; hasAgenticWorkflows {
+				compilerYamlLog.Printf("Generating CLI build steps for dev mode (agentic-workflows tool enabled)")
+				c.generateDevModeCLIBuildSteps(yaml)
+			} else {
+				compilerYamlLog.Printf("Skipping CLI build steps in dev mode (agentic-workflows tool not enabled)")
+			}
+		}
 	}
 
 	// Add checkout steps for repository imports
@@ -614,4 +626,57 @@ func sanitizeRefForPath(ref string) string {
 	sanitized = strings.ReplaceAll(sanitized, ":", "-")
 	sanitized = strings.ReplaceAll(sanitized, "\\", "-")
 	return sanitized
+}
+
+// generateDevModeCLIBuildSteps generates the steps needed to build the gh-aw CLI and Docker image in dev mode
+// These steps are injected after checkout in dev mode to create a locally built Docker image that includes
+// the gh-aw binary and all dependencies. The agentic-workflows MCP server uses this image instead of alpine:latest.
+//
+// The build process:
+// 1. Setup Go using go.mod version
+// 2. Build the gh-aw CLI binary for linux/amd64 (since it runs in a Linux container)
+// 3. Setup Docker Buildx for advanced build features
+// 4. Build Docker image and tag it as localhost/gh-aw:dev
+//
+// The built image is used by the agentic-workflows MCP server configuration (see mcp_config_builtin.go)
+func (c *Compiler) generateDevModeCLIBuildSteps(yaml *strings.Builder) {
+	compilerYamlLog.Print("Generating dev mode CLI build steps")
+
+	// Step 1: Setup Go for building the CLI
+	yaml.WriteString("      - name: Setup Go for CLI build\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/setup-go"))
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          go-version-file: go.mod\n")
+	yaml.WriteString("          cache: true\n")
+
+	// Step 2: Build CLI binary for linux/amd64
+	// Use the standard build command from CI/Makefile (not release build)
+	// CGO_ENABLED=0 for static linking (required for Alpine containers)
+	yaml.WriteString("      - name: Build gh-aw CLI\n")
+	yaml.WriteString("        run: |\n")
+	yaml.WriteString("          echo \"Building gh-aw CLI for linux/amd64...\"\n")
+	yaml.WriteString("          mkdir -p dist\n")
+	yaml.WriteString("          VERSION=$(git describe --tags --always --dirty)\n")
+	yaml.WriteString("          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \\\n")
+	yaml.WriteString("            -ldflags \"-s -w -X main.version=${VERSION}\" \\\n")
+	yaml.WriteString("            -o dist/gh-aw-linux-amd64 \\\n")
+	yaml.WriteString("            ./cmd/gh-aw\n")
+	yaml.WriteString("          echo \"✓ Built gh-aw CLI successfully\"\n")
+
+	// Step 3: Setup Docker Buildx
+	yaml.WriteString("      - name: Setup Docker Buildx\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("docker/setup-buildx-action"))
+
+	// Step 4: Build Docker image
+	// Use the Dockerfile at the repository root which expects BINARY build arg
+	yaml.WriteString("      - name: Build gh-aw Docker image\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("docker/build-push-action"))
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          context: .\n")
+	yaml.WriteString("          platforms: linux/amd64\n")
+	yaml.WriteString("          push: false\n")
+	yaml.WriteString("          load: true\n")
+	yaml.WriteString("          tags: localhost/gh-aw:dev\n")
+	yaml.WriteString("          build-args: |\n")
+	yaml.WriteString("            BINARY=dist/gh-aw-linux-amd64\n")
 }

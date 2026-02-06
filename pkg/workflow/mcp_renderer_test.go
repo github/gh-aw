@@ -169,6 +169,7 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 		InlineArgs:           true,
 		Format:               "json",
 		IsLast:               true,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -184,11 +185,34 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 		t.Error("Expected agentic_workflows server ID")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
-	if !strings.Contains(output, `"container": "alpine:latest"`) {
-		t.Error("Expected container field for containerized server")
+	// In dev mode, should use locally built image
+	if !strings.Contains(output, `"container": "localhost/gh-aw:dev"`) {
+		t.Error("Expected dev mode container image for containerized server")
 	}
-	if !strings.Contains(output, `"entrypoint": "/opt/gh-aw/gh-aw"`) {
-		t.Error("Expected entrypoint field for containerized server")
+	// In dev mode, should NOT have entrypoint (uses container's default ENTRYPOINT)
+	if strings.Contains(output, `"entrypoint"`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
+	}
+	// In dev mode, should NOT have entrypointArgs (uses container's default CMD)
+	if strings.Contains(output, `"entrypointArgs"`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
+	}
+	// In dev mode, should NOT have binary mounts
+	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
+		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+	}
+	// Should have DEBUG, GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"DEBUG": "*"`) {
+		t.Error("Expected DEBUG set to literal '*' in env vars")
+	}
+	if !strings.Contains(output, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env vars")
+	}
+	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
 }
 
@@ -198,6 +222,7 @@ func TestRenderAgenticWorkflowsMCP_JSON_Claude(t *testing.T) {
 		InlineArgs:           false,
 		Format:               "json",
 		IsLast:               false,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -220,6 +245,7 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 		InlineArgs:           false,
 		Format:               "toml",
 		IsLast:               false,
+		ActionMode:           ActionModeDev, // Default action mode is dev
 	})
 
 	var yaml strings.Builder
@@ -232,14 +258,34 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 		t.Error("Expected TOML section header")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
-	if !strings.Contains(output, `container = "alpine:latest"`) {
-		t.Error("Expected TOML container field for containerized server")
+	// In dev mode, should use locally built image
+	if !strings.Contains(output, `container = "localhost/gh-aw:dev"`) {
+		t.Error("Expected dev mode container image for containerized server")
 	}
-	if !strings.Contains(output, `entrypoint = "/opt/gh-aw/gh-aw"`) {
-		t.Error("Expected TOML entrypoint field for containerized server")
+	// In dev mode, should NOT have entrypoint (uses container's default ENTRYPOINT)
+	if strings.Contains(output, `entrypoint =`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
 	}
-	if !strings.Contains(output, `entrypointArgs = ["mcp-server"]`) {
-		t.Error("Expected TOML entrypointArgs field")
+	// In dev mode, should NOT have entrypointArgs (uses container's default CMD)
+	if strings.Contains(output, `entrypointArgs =`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
+	}
+	// In dev mode, should NOT have binary mounts
+	if strings.Contains(output, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+	if strings.Contains(output, `/usr/bin/gh:/usr/bin/gh:ro`) {
+		t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+	}
+	// Should have DEBUG, GH_TOKEN and GITHUB_TOKEN
+	if !strings.Contains(output, `"DEBUG"`) {
+		t.Error("Expected DEBUG in env_vars")
+	}
+	if !strings.Contains(output, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env_vars")
+	}
+	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env_vars")
 	}
 }
 

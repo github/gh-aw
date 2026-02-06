@@ -186,3 +186,139 @@ func TestHasMCPConfigDetection(t *testing.T) {
 		})
 	}
 }
+
+// TestDevModeAgenticWorkflowsContainer verifies that the agentic-workflows MCP server
+// uses the locally built Docker image in dev mode instead of alpine:latest
+func TestDevModeAgenticWorkflowsContainer(t *testing.T) {
+	tests := []struct {
+		name              string
+		actionMode        ActionMode
+		expectedContainer string
+	}{
+		{
+			name:              "dev mode uses local image",
+			actionMode:        ActionModeDev,
+			expectedContainer: "localhost/gh-aw:dev",
+		},
+		{
+			name:              "release mode uses alpine",
+			actionMode:        ActionModeRelease,
+			expectedContainer: "alpine:latest",
+		},
+		{
+			name:              "script mode uses alpine",
+			actionMode:        ActionModeScript,
+			expectedContainer: "alpine:latest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a workflow with agentic-workflows tool
+			workflowContent := `---
+on:
+  workflow_dispatch:
+strict: false
+permissions:
+  contents: read
+  actions: read
+engine: copilot
+tools:
+  agentic-workflows:
+---
+
+# Test Agentic Workflows Dev Mode
+
+This workflow tests that agentic-workflows uses the correct container in dev mode.
+`
+
+			// Create temporary file
+			tmpFile, err := os.CreateTemp("", "test-dev-mode-*.md")
+			if err != nil {
+				t.Fatalf("Failed to create temp file: %v", err)
+			}
+			defer os.Remove(tmpFile.Name())
+
+			// Write content to file
+			if _, err := tmpFile.WriteString(workflowContent); err != nil {
+				t.Fatalf("Failed to write to temp file: %v", err)
+			}
+			tmpFile.Close()
+
+			// Compile the workflow with the specified action mode
+			compiler := NewCompiler()
+			compiler.SetActionMode(tt.actionMode)
+
+			if err := compiler.CompileWorkflow(tmpFile.Name()); err != nil {
+				t.Fatalf("Failed to compile workflow: %v", err)
+			}
+
+			// Read the compiled lock file
+			lockFile := strings.TrimSuffix(tmpFile.Name(), ".md") + ".lock.yml"
+			defer os.Remove(lockFile)
+
+			lockContent, err := os.ReadFile(lockFile)
+			if err != nil {
+				t.Fatalf("Failed to read lock file: %v", err)
+			}
+
+			// Check that the container image is correct
+			if !strings.Contains(string(lockContent), `"container": "`+tt.expectedContainer+`"`) {
+				t.Errorf("Expected container %q in lock file, but not found. Lock file content:\n%s",
+					tt.expectedContainer, string(lockContent))
+			}
+
+			// In dev mode, verify dev-specific configuration
+			if tt.actionMode == ActionModeDev {
+				// Check for build steps
+				requiredSteps := []string{
+					"Setup Go for CLI build",
+					"Build gh-aw CLI",
+					"Setup Docker Buildx",
+					"Build gh-aw Docker image",
+					"tags: localhost/gh-aw:dev",
+				}
+
+				for _, step := range requiredSteps {
+					if !strings.Contains(string(lockContent), step) {
+						t.Errorf("Expected build step %q in dev mode lock file, but not found", step)
+					}
+				}
+
+				// Verify NO entrypoint field (uses container's default ENTRYPOINT)
+				if strings.Contains(string(lockContent), `"entrypoint"`) {
+					t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
+				}
+
+				// Verify NO entrypointArgs field (uses container's default CMD)
+				if strings.Contains(string(lockContent), `"entrypointArgs"`) {
+					t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
+				}
+
+				// Verify no --cmd argument
+				if strings.Contains(string(lockContent), `"--cmd"`) {
+					t.Error("Did not expect --cmd argument in dev mode")
+				}
+
+				// Verify binary mounts are NOT present in dev mode
+				if strings.Contains(string(lockContent), `/opt/gh-aw:/opt/gh-aw:ro`) {
+					t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+				}
+				if strings.Contains(string(lockContent), `/usr/bin/gh:/usr/bin/gh:ro`) {
+					t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
+				}
+
+				// Verify DEBUG, GH_TOKEN and GITHUB_TOKEN are present
+				if !strings.Contains(string(lockContent), `"DEBUG": "*"`) {
+					t.Error("Expected DEBUG set to literal '*' in dev mode env vars")
+				}
+				if !strings.Contains(string(lockContent), `"GH_TOKEN"`) {
+					t.Error("Expected GH_TOKEN in dev mode env vars")
+				}
+				if !strings.Contains(string(lockContent), `"GITHUB_TOKEN"`) {
+					t.Error("Expected GITHUB_TOKEN in dev mode env vars")
+				}
+			}
+		})
+	}
+}

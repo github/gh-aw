@@ -18,7 +18,7 @@ next:
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />
 
-Ah, what marvelous timing! Come, come, let me show you the *next wonder* in [Peli's Agent Factory](/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/)!
+Ah, what marvelous timing! Come, come, let me show you the *next wonders* in [Peli's Agent Factory](/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/)!
 
 In our [previous post](/gh-aw/blog/2026-01-13-meet-the-workflows/), we explored how a simple triage workflow helps us stay on top of incoming activity - automatically labeling issues and reducing cognitive load.
 
@@ -33,9 +33,11 @@ The next two agents represent different aspects of  code simplicity: detecting *
 
 The **Automatic Code Simplifier** runs daily, analyzing recently modified code for opportunities to simplify without changing functionality. It looks at what changed in the last few commits and asks: "Could this be clearer? Could it be shorter? Could it be more idiomatic?"
 
-This workflow is particularly valuable after rapid development sessions. When you're racing to implement a feature or fix a bug, code often becomes more complex than necessary. Variables get temporary names, logic becomes nested, error handling gets verbose. The workflow tirelessly cleans up after these development sessions, creating pull requests that preserve functionality while improving clarity, consistency, and maintainability.
+This workflow is particularly valuable after rapid development sessions. When you're racing to implement a feature or fix a bug, code often becomes more complex than necessary. Variables get temporary names, logic becomes nested, error handling gets verbose. The workflow tirelessly cleans up after these development sessions, creating PRs that preserve functionality while improving clarity, consistency, and maintainability.
 
 The kinds of simplifications it proposes range from extracting repeated logic into helper functions to converting nested if-statements to early returns. It spots opportunities to simplify boolean expressions, use standard library functions instead of custom implementations, and consolidate similar error handling patterns.
+
+An example PR from our own use of this workflow is [Simplify validation config code for clarity](https://github.com/github/gh-aw/pull/13118).
 
 The **Duplicate Code Detector** uses traditional, road-tested semantic code analysis in conjunction with agentic reasoning to find duplicate patterns. It understands code *meaning* rather than just textual similarity, catching patterns where:
 
@@ -47,6 +49,8 @@ The **Duplicate Code Detector** uses traditional, road-tested semantic code anal
 What makes this workflow special is its use of semantic analysis through [Serena](https://oraios.github.io/serena/) - a powerful coding agent toolkit capable of turning an LLM into a fully-featured agent that works directly on your codebase. When we use Serena, we understand code at the compiler-resolved level, not just syntax.
 
 The workflow focuses on recent changes in the latest commits, intelligently filtering out test files, workflows, and non-code files. It creates issues only for significant duplication: patterns spanning more than 10 lines or appearing in 3 or more locations. It performs a multi-phase analysis. It starts by setting up Serena's semantic environment for the repository, then finds changed `.go` and `.cjs` files while excluding tests and workflows. Using `get_symbols_overview` and `find_symbol`, it understands structure, identifies similar function signatures and logic blocks, and compares symbol overviews across files for deeper similarities. It creates issues with the `[duplicate-code]` prefix and limits itself to 3 issues per run, preventing overwhelm. Issues include specific file references, code snippets, and refactoring suggestions.
+
+In our use of an early version of Duplicate Code Detector over 2 months, the agent raised 117 issues, of which 84 were marked as completed. Of the 105 PRs created, 82 were successfully merged, demonstrating the practical value of its suggestions.
 
 ## Continuous AI for Simplicity - A New Paradigm
 

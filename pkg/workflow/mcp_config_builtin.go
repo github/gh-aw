@@ -159,12 +159,18 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
 func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode) {
-	envVars := []string{
-		"GITHUB_TOKEN",
+	// Environment variables: map of env var name to value (literal) or source variable (reference)
+	envVars := []struct {
+		name      string
+		value     string
+		isLiteral bool
+	}{
+		{"DEBUG", "*", true},                    // Literal value "*"
+		{"GH_TOKEN", "GH_TOKEN", false},         // Variable reference
+		{"GITHUB_TOKEN", "GITHUB_TOKEN", false}, // Variable reference
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
-	// The gh-aw binary is mounted from /opt/gh-aw and executed directly inside a minimal Alpine container
 	yaml.WriteString("              \"agentic_workflows\": {\n")
 
 	// Add type field for Copilot (per MCP Gateway Specification v1.0.0, use "stdio" for containerized servers)
@@ -173,19 +179,52 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 
 	// MCP Gateway spec fields for containerized stdio servers
-	yaml.WriteString("                \"container\": \"" + constants.DefaultAlpineImage + "\",\n")
-	yaml.WriteString("                \"entrypoint\": \"/opt/gh-aw/gh-aw\",\n")
+	containerImage := constants.DefaultAlpineImage
+	var entrypoint string
+	var entrypointArgs []string
+	var mounts []string
 
-	// In dev mode, add --cmd argument to specify the binary path
-	// This is required for the MCP server to execute commands like 'compile', 'status', etc.
 	if actionMode.IsDev() {
-		yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"],\n")
+		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--cmd", "gh-aw"]
+		// So we don't need to specify entrypoint or entrypointArgs
+		containerImage = constants.DevModeGhAwImage
+		entrypoint = ""      // Use container's default entrypoint
+		entrypointArgs = nil // Use container's default CMD
+		// Only mount workspace and temp directory - binary and gh CLI are in the image
+		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
+		// Release mode: Use minimal Alpine image with mounted binaries
+		// The gh-aw binary is mounted from /opt/gh-aw and executed directly
+		entrypoint = "/opt/gh-aw/gh-aw"
+		entrypointArgs = []string{"mcp-server"}
+		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
+		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
+	}
+
+	yaml.WriteString("                \"container\": \"" + containerImage + "\",\n")
+
+	// Only write entrypoint if it's specified (release mode)
+	// In dev mode, use the container's default ENTRYPOINT
+	if entrypoint != "" {
+		yaml.WriteString("                \"entrypoint\": \"" + entrypoint + "\",\n")
+	}
+
+	// Only write entrypointArgs if specified (release mode)
+	// In dev mode, use the container's default CMD
+	if entrypointArgs != nil {
 		yaml.WriteString("                \"entrypointArgs\": [\"mcp-server\"],\n")
 	}
 
-	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
-	yaml.WriteString("                \"mounts\": [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"],\n")
+	// Write mounts
+	yaml.WriteString("                \"mounts\": [")
+	for i, mount := range mounts {
+		if i > 0 {
+			yaml.WriteString(", ")
+		}
+		yaml.WriteString("\"" + mount + "\"")
+	}
+	yaml.WriteString("],\n")
 
 	// Note: tools field is NOT included here - the converter script adds it back
 	// for Copilot. This keeps the gateway config compatible with the schema.
@@ -199,13 +238,22 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 			comma = ","
 		}
 
-		if includeCopilotFields {
-			// Copilot format: backslash-escaped shell variable reference
-			yaml.WriteString("                  \"" + envVar + "\": \"\\${" + envVar + "}\"" + comma + "\n")
+		var valueStr string
+		if envVar.isLiteral {
+			// Literal value (e.g., DEBUG = "*")
+			valueStr = envVar.value
 		} else {
-			// Claude/Custom format: direct shell variable reference
-			yaml.WriteString("                  \"" + envVar + "\": \"$" + envVar + "\"" + comma + "\n")
+			// Variable reference
+			if includeCopilotFields {
+				// Copilot format: backslash-escaped shell variable reference
+				valueStr = "\\${" + envVar.value + "}"
+			} else {
+				// Claude/Custom format: direct shell variable reference
+				valueStr = "$" + envVar.value
+			}
 		}
+
+		yaml.WriteString("                  \"" + envVar.name + "\": \"" + valueStr + "\"" + comma + "\n")
 	}
 	yaml.WriteString("                }\n")
 
@@ -235,18 +283,53 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
-	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
-	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
 
-	// In dev mode, add --cmd argument to specify the binary path
+	containerImage := constants.DefaultAlpineImage
+	var entrypoint string
+	var entrypointArgs []string
+	var mounts []string
+
 	if actionMode.IsDev() {
-		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
+		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--cmd", "gh-aw"]
+		// So we don't need to specify entrypoint or entrypointArgs
+		containerImage = constants.DevModeGhAwImage
+		entrypoint = ""      // Use container's default ENTRYPOINT
+		entrypointArgs = nil // Use container's default CMD
+		// Only mount workspace and temp directory - binary and gh CLI are in the image
+		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
+		// Release mode: Use minimal Alpine image with mounted binaries
+		entrypoint = "/opt/gh-aw/gh-aw"
+		entrypointArgs = []string{"mcp-server"}
+		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
+		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
+	}
+
+	yaml.WriteString("          container = \"" + containerImage + "\"\n")
+
+	// Only write entrypoint if it's specified (release mode)
+	// In dev mode, use the container's default ENTRYPOINT
+	if entrypoint != "" {
+		yaml.WriteString("          entrypoint = \"" + entrypoint + "\"\n")
+	}
+
+	// Only write entrypointArgs if specified (release mode)
+	// In dev mode, use the container's default CMD
+	if entrypointArgs != nil {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 	}
 
-	// Mount gh-aw binary (read-only), gh CLI binary (read-only), workspace (read-write for status/compile), and temp directory (read-write for logs)
-	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\", \"" + constants.DefaultGhBinaryMount + "\", \"" + constants.DefaultWorkspaceMount + "\", \"" + constants.DefaultTmpGhAwMount + "\"]\n")
+	// Write mounts
+	yaml.WriteString("          mounts = [")
+	for i, mount := range mounts {
+		if i > 0 {
+			yaml.WriteString(", ")
+		}
+		yaml.WriteString("\"" + mount + "\"")
+	}
+	yaml.WriteString("]\n")
+
 	// Use env_vars array to reference environment variables instead of embedding secrets
-	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\"]\n")
 }

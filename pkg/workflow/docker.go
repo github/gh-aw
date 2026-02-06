@@ -12,7 +12,7 @@ import (
 var dockerLog = logger.New("workflow:docker")
 
 // collectDockerImages collects all Docker images used in MCP configurations
-func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []string {
+func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actionMode ActionMode) []string {
 	var images []string
 	imageSet := make(map[string]bool) // Use a set to avoid duplicates
 
@@ -66,14 +66,20 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData) []str
 		}
 	}
 
-	// Check for agentic-workflows tool (uses alpine container for gh-aw mcp-server)
+	// Check for agentic-workflows tool
+	// In dev mode, the image is built locally in the workflow, so don't add to pull list
+	// In release/script mode, use alpine:latest which needs to be pulled
 	if _, hasAgenticWorkflows := tools["agentic-workflows"]; hasAgenticWorkflows {
-		image := constants.DefaultAlpineImage
-		if !imageSet[image] {
-			images = append(images, image)
-			imageSet[image] = true
-			dockerLog.Printf("Added agentic-workflows MCP server container: %s", image)
+		if !actionMode.IsDev() {
+			// Release/script mode: Use alpine:latest (needs to be pulled)
+			image := constants.DefaultAlpineImage
+			if !imageSet[image] {
+				images = append(images, image)
+				imageSet[image] = true
+				dockerLog.Printf("Added agentic-workflows MCP server container: %s", image)
+			}
 		}
+		// Dev mode: localhost/gh-aw:dev is built locally, not pulled
 	}
 
 	// Collect AWF (firewall) container images when firewall is enabled

@@ -7,9 +7,6 @@ sidebar:
 
 GitHub Agentic Workflows combine deterministic computation with AI reasoning, enabling data preprocessing, custom trigger filtering, and post-processing patterns.
 
-> [!CAUTION]
-> Security Notice: Custom steps, post-steps, and custom jobs run OUTSIDE the firewall sandbox. These components execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Only use them for deterministic data preparation, preprocessing, filtering, or post-processing—never for agentic compute or untrusted AI execution.
-
 ## When to Use
 
 Combine deterministic steps with AI agents to precompute data, filter triggers, preprocess inputs, post-process outputs, or build multi-stage computation and reasoning pipelines.
@@ -37,9 +34,6 @@ Define deterministic jobs in frontmatter alongside agentic execution:
 │  - GitHub API calls    │
 └────────────────────────┘
 ```
-
-> [!WARNING]
-> The deterministic jobs and steps shown above run OUTSIDE the firewall sandbox. Only the central "Agent Job (AI)" runs with network egress controls and firewall protection. Custom steps, post-steps, and custom jobs execute with standard GitHub Actions security.
 
 ## Precomputation Example
 
@@ -191,8 +185,6 @@ Reference in prompts: "Analyze issues in `/tmp/gh-aw/agent/issues.json` and PRs 
 **Data sharing**: Store data in `/tmp/gh-aw/agent/` for automatic artifact upload, or pass via environment variables (`echo "KEY=value" >> "$GITHUB_ENV"`).
 
 **Job dependencies**: Use `needs: [job-name]` to define execution order between jobs.
-
-**Security considerations**: Custom steps, post-steps, and custom jobs run OUTSIDE the firewall sandbox with standard GitHub Actions security. Use them only for deterministic operations like data fetching, preprocessing, filtering, or post-processing. Never run agentic compute or untrusted AI execution in these components—reserve that for the protected agent job.
 
 ## Related Documentation
 

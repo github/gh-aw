@@ -229,14 +229,40 @@ Uses imported agentic-workflows tool.
 	workflowData := string(lockFileContent)
 
 	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
-	// In dev mode (default), should include --cmd argument
-	if !strings.Contains(workflowData, `"entrypointArgs": ["mcp-server", "--cmd", "/opt/gh-aw/gh-aw"]`) {
-		t.Error("Expected compiled workflow to contain 'mcp-server' entrypointArgs with --cmd in dev mode")
+	// In dev mode, no entrypoint or entrypointArgs (uses container's defaults)
+	if strings.Contains(workflowData, `"entrypointArgs"`) {
+		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
+	}
+
+	if strings.Contains(workflowData, `"--cmd"`) {
+		t.Error("Did not expect --cmd argument in dev mode")
 	}
 
 	// Verify container format is used (not command format)
-	if !strings.Contains(workflowData, `"container": "alpine:latest"`) {
-		t.Error("Expected compiled workflow to contain alpine container for agentic-workflows")
+	// In dev mode, should use locally built image
+	if !strings.Contains(workflowData, `"container": "localhost/gh-aw:dev"`) {
+		t.Error("Expected compiled workflow to contain localhost/gh-aw:dev container for agentic-workflows in dev mode")
+	}
+
+	// Verify NO entrypoint field (uses container's default ENTRYPOINT)
+	if strings.Contains(workflowData, `"entrypoint"`) {
+		t.Error("Did not expect entrypoint field in dev mode (uses container's ENTRYPOINT)")
+	}
+
+	// Verify binary mounts are NOT present in dev mode
+	if strings.Contains(workflowData, `/opt/gh-aw:/opt/gh-aw:ro`) {
+		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
+	}
+
+	// Verify DEBUG, GH_TOKEN and GITHUB_TOKEN are present
+	if !strings.Contains(workflowData, `"DEBUG": "*"`) {
+		t.Error("Expected DEBUG set to literal '*' in env vars")
+	}
+	if !strings.Contains(workflowData, `"GH_TOKEN"`) {
+		t.Error("Expected GH_TOKEN in env vars")
+	}
+	if !strings.Contains(workflowData, `"GITHUB_TOKEN"`) {
+		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
 }
 
@@ -397,11 +423,12 @@ Uses imported serena with language config.
 
 	// Verify that language runtime setup steps are NOT present
 	// since Serena now runs in a container with language services included
-	if strings.Contains(workflowData, "Setup Go") {
-		t.Error("Did not expect Go setup step (Serena runs in container)")
+	// Note: "Setup Go for CLI build" is for building the gh-aw CLI in dev mode, not for runtime
+	if strings.Contains(workflowData, "- name: Setup Go\n") {
+		t.Error("Did not expect Go runtime setup step (Serena runs in container)")
 	}
 
-	if strings.Contains(workflowData, "Setup Node.js") {
+	if strings.Contains(workflowData, "- name: Setup Node.js\n") {
 		t.Error("Did not expect Node.js setup step (Serena runs in container)")
 	}
 

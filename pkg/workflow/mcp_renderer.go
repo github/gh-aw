@@ -413,18 +413,54 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Builder) {
 	yaml.WriteString("          \n")
 	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
-	yaml.WriteString("          container = \"" + constants.DefaultAlpineImage + "\"\n")
-	yaml.WriteString("          entrypoint = \"/opt/gh-aw/gh-aw\"\n")
 
-	// In dev mode, add --cmd argument to specify the binary path
+	containerImage := constants.DefaultAlpineImage
+	var entrypoint string
+	var entrypointArgs []string
+	var mounts []string
+
 	if r.options.ActionMode.IsDev() {
-		yaml.WriteString("          entrypointArgs = [\"mcp-server\", \"--cmd\", \"/opt/gh-aw/gh-aw\"]\n")
+		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--cmd", "gh-aw"]
+		// So we don't need to specify entrypoint or entrypointArgs
+		containerImage = constants.DevModeGhAwImage
+		entrypoint = ""      // Use container's default ENTRYPOINT
+		entrypointArgs = nil // Use container's default CMD
+		// Only mount workspace and temp directory - binary and gh CLI are in the image
+		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
+		// Release mode: Use minimal Alpine image with mounted binaries
+		entrypoint = "/opt/gh-aw/gh-aw"
+		entrypointArgs = []string{"mcp-server"}
+		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
+		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
+	}
+
+	yaml.WriteString("          container = \"" + containerImage + "\"\n")
+
+	// Only write entrypoint if it's specified (release mode)
+	// In dev mode, use the container's default ENTRYPOINT
+	if entrypoint != "" {
+		yaml.WriteString("          entrypoint = \"" + entrypoint + "\"\n")
+	}
+
+	// Only write entrypointArgs if specified (release mode)
+	// In dev mode, use the container's default CMD
+	if entrypointArgs != nil {
 		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
 	}
 
-	yaml.WriteString("          mounts = [\"" + constants.DefaultGhAwMount + "\"]\n")
-	yaml.WriteString("          env_vars = [\"GITHUB_TOKEN\"]\n")
+	// Write mounts
+	yaml.WriteString("          mounts = [")
+	for i, mount := range mounts {
+		if i > 0 {
+			yaml.WriteString(", ")
+		}
+		yaml.WriteString("\"" + mount + "\"")
+	}
+	yaml.WriteString("]\n")
+
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\"]\n")
 }
 
 // renderGitHubTOML generates GitHub MCP configuration in TOML format (for Codex engine)

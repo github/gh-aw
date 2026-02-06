@@ -200,7 +200,7 @@ func TestMCPGatewayVersionFromFrontmatter(t *testing.T) {
 				"Version after normalization should be %s (%s)", tt.expectedVersion, tt.description)
 
 			// Test 1: Verify docker image collection uses the correct version
-			dockerImages := collectDockerImages(workflowData.Tools, workflowData)
+			dockerImages := collectDockerImages(workflowData.Tools, workflowData, ActionModeRelease)
 			expectedImage := constants.DefaultMCPGatewayContainer + ":" + tt.expectedVersion
 
 			found := false
