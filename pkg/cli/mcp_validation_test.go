@@ -30,7 +30,7 @@ func TestGetBinaryPath(t *testing.T) {
 
 		// Check if the file exists
 		info, err := os.Stat(path)
-		assert.NoError(t, err, "Binary file should exist at the returned path")
+		require.NoError(t, err, "Binary file should exist at the returned path")
 		if err == nil {
 			assert.False(t, info.IsDir(), "Binary path should not be a directory")
 		}
