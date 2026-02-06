@@ -111,8 +111,13 @@ func runMCPServer(port int, cmdPath string) error {
 	// Determine, log, and validate the binary path only if --cmd flag is not provided
 	// When --cmd is provided, the user explicitly specified the binary path to use
 	if cmdPath == "" {
-		// Note: logAndValidateBinaryPath handles all logging internally
-		_ = logAndValidateBinaryPath()
+		// Attempt to detect the binary path and assign it to cmdPath
+		// This ensures createMCPServer receives the actual binary path instead of falling back to "gh aw"
+		detectedPath, err := logAndValidateBinaryPath()
+		if err == nil && detectedPath != "" {
+			cmdPath = detectedPath
+			mcpLog.Printf("Using detected binary path: %s", cmdPath)
+		}
 	}
 
 	// Log current working directory
