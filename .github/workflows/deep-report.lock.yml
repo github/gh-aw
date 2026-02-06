@@ -598,7 +598,7 @@ jobs:
           inherit = "core"
           include_only = ["CODEX_API_KEY", "GH_AW_ASSETS_ALLOWED_EXTS", "GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_SAFE_OUTPUTS", "GITHUB_PERSONAL_ACCESS_TOKEN", "GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_TOKEN", "HOME", "OPENAI_API_KEY", "PATH"]
           
-          [mcp_servers.agentic_workflows]
+          [mcp_servers.agenticworkflows]
           container = "localhost/gh-aw:dev"
           mounts = ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]
           env_vars = ["DEBUG", "GH_TOKEN", "GITHUB_TOKEN"]
@@ -623,7 +623,7 @@ jobs:
           cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
-              "agentic_workflows": {
+              "agenticworkflows": {
                 "container": "localhost/gh-aw:dev",
                 "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
                 "args": ["-w", "${{ github.workspace }}"],
