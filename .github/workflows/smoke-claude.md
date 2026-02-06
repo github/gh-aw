@@ -67,7 +67,7 @@ safe-outputs:
       run-started: "💥 **WHOOSH!** [{workflow_name}]({run_url}) springs into action on this {event_type}! *[Panel 1 begins...]*"
       run-success: "🎬 **THE END** — [{workflow_name}]({run_url}) **MISSION: ACCOMPLISHED!** The hero saves the day! ✨"
       run-failure: "💫 **TO BE CONTINUED...** [{workflow_name}]({run_url}) {status}! Our hero faces unexpected challenges..."
-timeout-minutes: 15
+timeout-minutes: 10
 ---
 
 # Smoke Test: Claude Engine Validation.
@@ -91,20 +91,25 @@ timeout-minutes: 15
    - Extract the discussion number from the result (e.g., if the result is `{"number": 123, "title": "...", ...}`, extract 123)
    - Use the `add_comment` tool with `discussion_number: <extracted_number>` to add a fun, comic-book style comment stating that the smoke test agent was here
 10. **Agentic Workflows MCP Testing**: 
-   - Use the `agentic-workflows` MCP tool with the `status` method to query the status of the "smoke-claude" workflow in ${{ github.repository }}
-   - Extract key information: total runs, recent success/failure status, last run time
-   - Write a summary of the smoke-claude workflow status to `/tmp/gh-aw/agent/smoke-claude-status-${{ github.run_id }}.txt`
-   - Use bash to display the file contents
+   - Call the `agentic-workflows` MCP tool using the `status` method with workflow name `smoke-claude` to query workflow status
+   - If the tool returns an error or no results, mark this test as ❌ and note "Tool unavailable or workflow not found" but continue to the Output section
+   - If the tool succeeds, extract key information from the response: total runs, success/failure counts, last run timestamp
+   - Write a summary of the results to `/tmp/gh-aw/agent/smoke-claude-status-${{ github.run_id }}.txt` (create directory if needed)
+   - Use bash to verify the file was created and display its contents
 
 ## Output
 
-1. **Create an issue** with a summary of the smoke test run:
+**CRITICAL: You MUST create an issue regardless of test results - this is a required safe output.**
+
+1. **ALWAYS create an issue** with a summary of the smoke test run:
    - Title: "Smoke Test: Claude - ${{ github.run_id }}"
    - Body should include:
      - Test results (✅ or ❌ for each test)
      - Overall status: PASS or FAIL
      - Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
      - Timestamp
+   - If ANY test fails, include error details in the issue body
+   - This issue MUST be created before any other safe output operations
 
 2. **Only if this workflow was triggered by a pull_request event**: Use the `add_comment` tool to add a **very brief** comment (max 5-10 lines) to the triggering pull request (omit the `item_number` parameter to auto-target the triggering PR) with:
    - PR titles only (no descriptions)
@@ -112,5 +117,6 @@ timeout-minutes: 15
    - Overall status: PASS or FAIL
 
 3. Use the `add_comment` tool with `item_number` set to the discussion number you extracted in step 9 to add a **fun comic-book style comment** to that discussion - be playful and use comic-book language like "💥 WHOOSH!"
+   - If step 9 failed to extract a discussion number, skip this step
 
 If all tests pass, use the `add_labels` tool to add the label `smoke-claude` to the pull request (omit the `item_number` parameter to auto-target the triggering PR if this workflow was triggered by a pull_request event).
