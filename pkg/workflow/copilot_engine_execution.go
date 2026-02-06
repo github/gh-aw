@@ -303,10 +303,6 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		awfArgs = append(awfArgs, "--skip-pull")
 		copilotExecLog.Print("Using --skip-pull since images are pre-downloaded")
 
-		// Use ACT agent container for GitHub Actions parity
-		awfArgs = append(awfArgs, "--agent-image", "act")
-		copilotExecLog.Print("Using ACT agent container for GitHub Actions parity")
-
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
 		sslBumpArgs := getSSLBumpArgs(firewallConfig)
 		awfArgs = append(awfArgs, sslBumpArgs...)

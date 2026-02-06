@@ -97,8 +97,8 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 			dockerLog.Printf("Added AWF squid (proxy) container: %s", squidImage)
 		}
 
-		// Add agent container (using act preset which is the GitHub Actions parity image)
-		agentImage := constants.DefaultFirewallRegistry + "/agent-act:" + awfImageTag
+		// Add default agent container
+		agentImage := constants.DefaultFirewallRegistry + "/agent:" + awfImageTag
 		if !imageSet[agentImage] {
 			images = append(images, agentImage)
 			imageSet[agentImage] = true
