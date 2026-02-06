@@ -6,26 +6,6 @@ description: GitHub Projects (v2) integration patterns for agentic workflows
 
 When designing workflows that manage GitHub Projects, use these patterns and best practices.
 
-## Quick Setup with CLI
-
-⚡ **Recommended**: Use `gh aw project new` to create a fully configured project board:
-
-```bash
-gh aw project new "Project Title" --owner myorg --link myorg/myrepo --with-project-setup
-```
-
-**What this creates:**
-- Project board in GitHub Projects V2
-- Standard views: Progress Board, Task Tracker, Roadmap
-- Custom fields: Tracker Id, Worker Workflow, Target Repo, Priority, Size, Start Date, End Date
-- Enhanced Status field with "Review Required" option
-
-**Requirements:**
-- Token: Set `GH_AW_PROJECT_GITHUB_TOKEN` with Projects permissions (Classic PAT: `project` scope; Fine-grained PAT: Organization → Projects: Read & Write)
-- The default `GITHUB_TOKEN` cannot create projects
-
-**Then**: Copy the project URL from the output and use it in your workflow frontmatter.
-
 ## When to Use Projects Integration
 
 Use GitHub Projects safe-outputs when designing workflows that:
