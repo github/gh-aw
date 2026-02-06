@@ -1095,6 +1095,14 @@ sandbox:
     # (optional)
     domain: "localhost"
 
+# List of plugin repository slugs to install before workflow execution. Each
+# plugin is installed using the engine's plugin installation command (e.g.,
+# 'copilot install plugin', 'claude install plugin', 'codex install plugin').
+# (optional)
+plugins: []
+  # Array of Plugin repository slug in the format 'org/repo' (e.g.,
+  # 'github/example-plugin')
+
 # Conditional execution expression
 # (optional)
 if: "example-value"
