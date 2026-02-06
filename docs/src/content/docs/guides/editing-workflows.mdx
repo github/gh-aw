@@ -5,6 +5,8 @@ sidebar:
   order: 5
 ---
 
+import { Icon } from '@astrojs/starlight/components';
+
 Agentic workflows consist of two distinct parts with different editing requirements: the **YAML frontmatter** (configuration) and the **markdown body** (AI instructions). Understanding when changes require recompilation helps you iterate quickly and efficiently.
 
 See [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/) for guidance on creating workflows with AI assistance.
@@ -87,7 +89,7 @@ For priority, consider:
 - `low-priority`: Nice-to-have improvements, minor enhancements
 ```
 
-✅ This change takes effect immediately without recompilation.
+<Icon name="check-circle" /> This change takes effect immediately without recompilation.
 
 ## Editing With Recompilation Required
 
@@ -141,7 +143,7 @@ tools:
 ---
 ```
 
-⚠️ Run `gh aw compile my-workflow` before committing this change.
+<Icon name="alert" /> Run `gh aw compile my-workflow` before committing this change.
 
 ## Expressions and Environment Variables
 
@@ -172,7 +174,7 @@ These expressions are evaluated at runtime and validated for security. See [Temp
 Arbitrary expressions are blocked for security. This will fail at runtime:
 
 ```markdown
-# ❌ WRONG - Will be rejected
+# WRONG - Will be rejected
 Run this command: ${{ github.event.comment.body }}
 ```
 
@@ -182,17 +184,17 @@ Use `needs.activation.outputs.text` for sanitized user input instead.
 
 | Change Type | Example | Recompilation? | Edit Location |
 |-------------|---------|----------------|---------------|
-| **AI instructions** | Add task steps | ❌ No | GitHub.com or any editor |
-| **Output templates** | Change issue format | ❌ No | GitHub.com or any editor |
-| **Conditional logic** | "If bug, then..." | ❌ No | GitHub.com or any editor |
-| **GitHub expressions** | Add `${{ github.actor }}` | ❌ No | GitHub.com or any editor |
-| **Tools** | Add GitHub toolset | ✅ Yes | Local + compile |
-| **Permissions** | Add `contents: write` | ✅ Yes | Local + compile |
-| **Triggers** | Add `schedule:` | ✅ Yes | Local + compile |
-| **Network rules** | Add allowed domain | ✅ Yes | Local + compile |
-| **Safe outputs** | Add `create-issue:` | ✅ Yes | Local + compile |
-| **Engine** | Change to Claude | ✅ Yes | Local + compile |
-| **Imports** | Add shared config | ✅ Yes | Local + compile |
+| **AI instructions** | Add task steps | <Icon name="x-circle" /> No | GitHub.com or any editor |
+| **Output templates** | Change issue format | <Icon name="x-circle" /> No | GitHub.com or any editor |
+| **Conditional logic** | "If bug, then..." | <Icon name="x-circle" /> No | GitHub.com or any editor |
+| **GitHub expressions** | Add `${{ github.actor }}` | <Icon name="x-circle" /> No | GitHub.com or any editor |
+| **Tools** | Add GitHub toolset | <Icon name="check-circle" /> Yes | Local + compile |
+| **Permissions** | Add `contents: write` | <Icon name="check-circle" /> Yes | Local + compile |
+| **Triggers** | Add `schedule:` | <Icon name="check-circle" /> Yes | Local + compile |
+| **Network rules** | Add allowed domain | <Icon name="check-circle" /> Yes | Local + compile |
+| **Safe outputs** | Add `create-issue:` | <Icon name="check-circle" /> Yes | Local + compile |
+| **Engine** | Change to Claude | <Icon name="check-circle" /> Yes | Local + compile |
+| **Imports** | Add shared config | <Icon name="check-circle" /> Yes | Local + compile |
 
 ## Related Documentation
 

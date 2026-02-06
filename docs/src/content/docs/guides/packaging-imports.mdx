@@ -5,6 +5,8 @@ sidebar:
   order: 2
 ---
 
+import { Icon } from '@astrojs/starlight/components';
+
 ## Adding Workflows
 
 Install workflows from external repositories with optional versioning:
@@ -73,15 +75,15 @@ Main Workflow
 | Field | Merge Strategy | Main Workflow Precedence |
 |-------|---------------|-------------------------|
 | `tools:` | Deep merge, arrays concatenate | Keys merged, arrays deduplicated |
-| `mcp-servers:` | Override by name | ❌ Imported servers override |
-| `network:` | Union of allowed domains | ✅ Mode and firewall settings |
-| `permissions:` | Validation only | ✅ Main must explicitly declare |
-| `safe-outputs:` | Type-level override | ✅ Main overrides imported types |
+| `mcp-servers:` | Override by name | <Icon name="x-circle" /> Imported servers override |
+| `network:` | Union of allowed domains | <Icon name="check-circle" /> Mode and firewall settings |
+| `permissions:` | Validation only | <Icon name="check-circle" /> Main must explicitly declare |
+| `safe-outputs:` | Type-level override | <Icon name="check-circle" /> Main overrides imported types |
 | `safe-outputs.jobs:` | Conflict detection | Neither (names must be unique) |
-| `runtimes:` | Version override | ✅ Main versions override |
+| `runtimes:` | Version override | <Icon name="check-circle" /> Main versions override |
 | `services:` | Conflict detection | Neither (must be unique) |
 | `steps:` | Array prepend | Imported first, then main |
-| `jobs:` | Not importable | ✅ Main only (ignored in imports) |
+| `jobs:` | Not importable | <Icon name="check-circle" /> Main only (ignored in imports) |
 
 **Example: Tool merging**
 ```yaml wrap
