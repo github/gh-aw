@@ -139,9 +139,12 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 		envVars["GH_AW_SERENA_PORT"] = "${{ steps.serena-config.outputs.serena_port }}"
 	}
 
-	// Check for agentic-workflows GITHUB_TOKEN
+	// Check for agentic-workflows GITHUB_TOKEN and GH_TOKEN
 	if hasAgenticWorkflows {
 		envVars["GITHUB_TOKEN"] = "${{ secrets.GITHUB_TOKEN }}"
+		// GH_TOKEN is an alias for GITHUB_TOKEN, using the same token resolution as other gh CLI tools
+		// The agentic-workflows MCP server uses GH_TOKEN for gh extension operations
+		envVars["GH_TOKEN"] = "${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
 	}
 
 	// Check for Playwright domain secrets
