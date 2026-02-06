@@ -9,7 +9,7 @@ import (
 var pluginInstallLog = logger.New("workflow:plugin_installation")
 
 // getEffectivePluginGitHubToken returns the GitHub token to use for plugin installation, with cascading precedence:
-// 1. Custom token passed as parameter (e.g., from frontmatter github-token field)
+// 1. Custom token from plugins.github-token field (highest priority, overrides all defaults)
 // 2. secrets.GH_AW_PLUGINS_TOKEN (recommended token for plugin operations)
 // 3. secrets.GH_AW_GITHUB_TOKEN (general-purpose gh-aw token)
 // 4. secrets.GITHUB_TOKEN (default GitHub Actions token)
@@ -17,7 +17,7 @@ var pluginInstallLog = logger.New("workflow:plugin_installation")
 // providing sensible fallbacks for common use cases.
 func getEffectivePluginGitHubToken(customToken string) string {
 	if customToken != "" {
-		pluginInstallLog.Print("Using custom plugin GitHub token from frontmatter")
+		pluginInstallLog.Print("Using custom plugin GitHub token (from plugins.github-token or top-level github-token)")
 		return customToken
 	}
 	pluginInstallLog.Print("Using cascading plugin GitHub token (GH_AW_PLUGINS_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN)")

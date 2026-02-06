@@ -255,15 +255,16 @@ func extractRuntimesFromFrontmatter(frontmatter map[string]any) map[string]any {
 	return ExtractMapField(frontmatter, "runtimes")
 }
 
-// extractPluginsFromFrontmatter extracts plugins array from frontmatter map
-// Returns a slice of plugin repository slugs (e.g., ["org/repo", "org2/repo2"])
-func extractPluginsFromFrontmatter(frontmatter map[string]any) []string {
+// extractPluginsFromFrontmatter extracts plugins configuration from frontmatter map
+// Returns: (repos []string, customToken string)
+// Supports both array format and object format with optional github-token
+func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string) {
 	value, exists := frontmatter["plugins"]
 	if !exists {
-		return nil
+		return nil, ""
 	}
 
-	// Plugins should be an array of strings
+	// Try array format first: ["org/repo1", "org/repo2"]
 	if pluginsArray, ok := value.([]any); ok {
 		var plugins []string
 		for _, p := range pluginsArray {
@@ -271,8 +272,34 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) []string {
 				plugins = append(plugins, pluginStr)
 			}
 		}
-		return plugins
+		return plugins, ""
 	}
 
-	return nil
+	// Try object format: { "repos": [...], "github-token": "..." }
+	if pluginsMap, ok := value.(map[string]any); ok {
+		var repos []string
+		var token string
+
+		// Extract repos array
+		if reposAny, hasRepos := pluginsMap["repos"]; hasRepos {
+			if reposArray, ok := reposAny.([]any); ok {
+				for _, r := range reposArray {
+					if repoStr, ok := r.(string); ok {
+						repos = append(repos, repoStr)
+					}
+				}
+			}
+		}
+
+		// Extract github-token (optional)
+		if tokenAny, hasToken := pluginsMap["github-token"]; hasToken {
+			if tokenStr, ok := tokenAny.(string); ok {
+				token = tokenStr
+			}
+		}
+
+		return repos, token
+	}
+
+	return nil, ""
 }

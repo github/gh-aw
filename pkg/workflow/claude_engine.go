@@ -129,8 +129,12 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	// Add plugin installation steps after Claude CLI installation
 	if len(workflowData.Plugins) > 0 {
 		claudeLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.Plugins))
-		// Pass the frontmatter github-token (if any) for cascading resolution
-		pluginSteps := GeneratePluginInstallationSteps(workflowData.Plugins, "claude", workflowData.GitHubToken)
+		// Use plugin-specific token if provided, otherwise use top-level github-token
+		tokenToUse := workflowData.PluginsToken
+		if tokenToUse == "" {
+			tokenToUse = workflowData.GitHubToken
+		}
+		pluginSteps := GeneratePluginInstallationSteps(workflowData.Plugins, "claude", tokenToUse)
 		steps = append(steps, pluginSteps...)
 	}
 

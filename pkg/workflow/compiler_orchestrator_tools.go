@@ -18,6 +18,7 @@ type toolsProcessingResult struct {
 	tools                map[string]any
 	runtimes             map[string]any
 	plugins              []string
+	pluginsToken         string
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
@@ -138,9 +139,9 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}
 
 	// Extract plugins from frontmatter
-	plugins := extractPluginsFromFrontmatter(result.Frontmatter)
+	plugins, pluginsToken := extractPluginsFromFrontmatter(result.Frontmatter)
 	if len(plugins) > 0 {
-		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter", len(plugins))
+		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v)", len(plugins), pluginsToken != "")
 	}
 
 	// Add MCP fetch server if needed (when web-fetch is requested but engine doesn't support it)
@@ -254,6 +255,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		tools:                tools,
 		runtimes:             runtimes,
 		plugins:              plugins,
+		pluginsToken:         pluginsToken,
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,
