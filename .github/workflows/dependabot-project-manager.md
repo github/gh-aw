@@ -9,14 +9,9 @@ timeout-minutes: 30
 
 permissions:
   contents: read
-  security-events: read
-  actions: read
   issues: read
   pull-requests: read
-
-engine: copilot
-
-strict: true
+  security-events: read
 
 network:
   allowed:
