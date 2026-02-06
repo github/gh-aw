@@ -5,6 +5,8 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func TestNewMCPConfigRenderer(t *testing.T) {
@@ -181,8 +183,8 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"type": "stdio"`) {
 		t.Error("Expected 'type': 'stdio' field per MCP Gateway Specification")
 	}
-	if !strings.Contains(output, `"agentic_workflows": {`) {
-		t.Error("Expected agentic_workflows server ID")
+	if !strings.Contains(output, `"`+constants.AgenticWorkflowsMCPServerID+`": {`) {
+		t.Error("Expected " + constants.AgenticWorkflowsMCPServerID + " server ID")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
 	// In dev mode, should use locally built image
@@ -255,8 +257,9 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	output := yaml.String()
 
 	// Verify TOML format (per MCP Gateway Specification v1.0.0)
-	if !strings.Contains(output, "[mcp_servers.agentic_workflows]") {
-		t.Error("Expected TOML section header")
+	expectedHeader := `[mcp_servers.` + constants.AgenticWorkflowsMCPServerID + `]`
+	if !strings.Contains(output, expectedHeader) {
+		t.Errorf("Expected TOML section header: %s", expectedHeader)
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
 	// In dev mode, should use locally built image

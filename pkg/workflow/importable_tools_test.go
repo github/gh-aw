@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
-
 	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -342,7 +342,7 @@ Uses all imported tools.
 		t.Error("Expected compiled workflow to contain serena tool")
 	}
 	// Per MCP Gateway Specification v1.0.0, agentic-workflows uses containerized format
-	if !strings.Contains(workflowData, `"agentic_workflows"`) {
+	if !strings.Contains(workflowData, `"`+constants.AgenticWorkflowsMCPServerID+`"`) {
 		t.Error("Expected compiled workflow to contain agentic-workflows tool")
 	}
 

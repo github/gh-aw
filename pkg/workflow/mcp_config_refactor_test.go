@@ -5,6 +5,8 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // TestRenderSafeOutputsMCPConfigWithOptions verifies the shared Safe Outputs config helper
@@ -103,7 +105,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: true,
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
+				`"` + constants.AgenticWorkflowsMCPServerID + `": {`,
 				`"type": "stdio"`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
@@ -129,7 +131,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: true,
 			actionMode:           ActionModeRelease,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
+				`"` + constants.AgenticWorkflowsMCPServerID + `": {`,
 				`"type": "stdio"`,
 				`"container": "alpine:latest"`,
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
@@ -155,7 +157,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: false,
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
+				`"` + constants.AgenticWorkflowsMCPServerID + `": {`,
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
@@ -300,7 +302,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			result := output.String()
 
 			expectedContent := []string{
-				`[mcp_servers.agentic_workflows]`,
+				`[mcp_servers.` + constants.AgenticWorkflowsMCPServerID + `]`,
 				tt.expectedContainer,
 				`args = ["-w", "${{ github.workspace }}"]`, // Docker working directory
 				`env_vars = ["DEBUG", "GITHUB_TOKEN"]`,
