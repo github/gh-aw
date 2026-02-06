@@ -16,16 +16,6 @@
     },
     "codespaces": {
       "repositories": {
-        "github/agentic-workflow-workbench": {
-          "permissions": {
-            "actions": "write",
-            "contents": "write",
-            "discussions": "read",
-            "issues": "read",
-            "pull-requests": "write",
-            "workflows": "write"
-          }
-        },
         "github/gh-aw": {
           "permissions": {
             "actions": "write",
