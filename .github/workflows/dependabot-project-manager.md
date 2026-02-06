@@ -116,7 +116,7 @@ For each bundle identified in Phase 2:
 1. **Create a draft issue in the project** using `update_project`:
    ```javascript
    update_project({
-     project: "https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>",
+     project: "https://github.com/orgs/github/projects/24060",
      content_type: "draft_issue",
      draft_title: "[{runtime}] {manifest} - {count} alert(s)",
      draft_body: `## Bundle Summary
@@ -216,7 +216,7 @@ Create a project status update summarizing the run:
 
 ```javascript
 create_project_status_update({
-  project: "https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>",
+  project: "https://github.com/orgs/github/projects/24060",
   status: "ON_TRACK",  // or "AT_RISK" if critical alerts exist
   start_date: "{today}",
   target_date: "{today_plus_7_days}",
@@ -316,23 +316,19 @@ The workflow uses these custom fields (will be created if they don't exist):
 
 ## Important Notes
 
-1. **Project URL Configuration**: Replace `<ORG>` and `<PROJECT_NUMBER>` in the frontmatter with your actual organization and project number
-   - Example: Change `https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>` to `https://github.com/orgs/myorg/projects/42`
-   - The URL must be for an existing project with appropriate permissions
-
-2. **Required GitHub Token**: This workflow requires a special token to be configured as a secret:
+1. **Required GitHub Token**: This workflow requires a special token to be configured as a secret:
    - **`GH_AW_PROJECT_GITHUB_TOKEN`**: Required for GitHub Projects v2 operations
      - PAT or GitHub App token with Projects (read/write) permissions
      - Used by `update-project` and `create-project-status-update` safe outputs
      - See: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
 
-3. **Copilot Assignment**: Issues are automatically assigned to @copilot when created via the `assignees: copilot` configuration in the `create-issue` safe output. This uses the default GitHub Actions token and requires no additional configuration.
+2. **Copilot Assignment**: Issues are automatically assigned to @copilot when created via the `assignees: copilot` configuration in the `create-issue` safe output. This uses the default GitHub Actions token and requires no additional configuration.
 
-4. **Bundle Deduplication**: Check if a bundle already exists before creating a new one to avoid duplicates
+3. **Bundle Deduplication**: Check if a bundle already exists before creating a new one to avoid duplicates
 
-5. **Alert Threshold**: If there are more than 50 alerts, prioritize critical and high severity bundles first
+4. **Alert Threshold**: If there are more than 50 alerts, prioritize critical and high severity bundles first
 
-6. **Human Review**: The "Review Required" status is the key handoff point between automated fixes and human oversight
+5. **Human Review**: The "Review Required" status is the key handoff point between automated fixes and human oversight
 
 ## Success Metrics
 
