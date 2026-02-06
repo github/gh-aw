@@ -95,6 +95,12 @@ func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 			"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw",
 		}
 	}
+
+	// Ensure default payloadDir is set if not provided
+	if workflowData.SandboxConfig.MCP.PayloadDir == "" {
+		mcpGatewayConfigLog.Print("Setting default gateway payloadDir")
+		workflowData.SandboxConfig.MCP.PayloadDir = constants.DefaultMCPGatewayPayloadDir
+	}
 }
 
 // buildMCPGatewayConfig builds the gateway configuration for inclusion in MCP config files
@@ -117,9 +123,10 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 	// Use ${...} syntax for environment variable references that will be resolved by the gateway at runtime
 	// Per MCP Gateway Specification v1.0.0 section 4.2, variable expressions use "${VARIABLE_NAME}" syntax
 	return &MCPGatewayRuntimeConfig{
-		Port:   int(DefaultMCPGatewayPort), // Will be formatted as "${MCP_GATEWAY_PORT}" in renderer
-		Domain: "${MCP_GATEWAY_DOMAIN}",    // Gateway variable expression
-		APIKey: "${MCP_GATEWAY_API_KEY}",   // Gateway variable expression
+		Port:       int(DefaultMCPGatewayPort),   // Will be formatted as "${MCP_GATEWAY_PORT}" in renderer
+		Domain:     "${MCP_GATEWAY_DOMAIN}",      // Gateway variable expression
+		APIKey:     "${MCP_GATEWAY_API_KEY}",     // Gateway variable expression
+		PayloadDir: "${MCP_GATEWAY_PAYLOAD_DIR}", // Gateway variable expression for payload directory
 	}
 }
 

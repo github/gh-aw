@@ -944,7 +944,13 @@ func RenderJSONMCPConfig(
 		// Port as unquoted variable - shell expands to integer (e.g., 8080) for valid JSON
 		fmt.Fprintf(&configBuilder, "              \"port\": $MCP_GATEWAY_PORT,\n")
 		fmt.Fprintf(&configBuilder, "              \"domain\": \"%s\",\n", options.GatewayConfig.Domain)
-		fmt.Fprintf(&configBuilder, "              \"apiKey\": \"%s\"\n", options.GatewayConfig.APIKey)
+		fmt.Fprintf(&configBuilder, "              \"apiKey\": \"%s\"", options.GatewayConfig.APIKey)
+		// Add payloadDir if specified
+		if options.GatewayConfig.PayloadDir != "" {
+			fmt.Fprintf(&configBuilder, ",\n              \"payloadDir\": \"%s\"\n", options.GatewayConfig.PayloadDir)
+		} else {
+			configBuilder.WriteString("\n")
+		}
 		configBuilder.WriteString("            }\n")
 	} else {
 		configBuilder.WriteString("            }\n")
