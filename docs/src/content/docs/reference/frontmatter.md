@@ -100,7 +100,7 @@ See [GitHub Tokens](/gh-aw/reference/tokens/) for complete documentation.
 
 ### Plugins (`plugins:`)
 
-Specifies plugins to install before workflow execution. Plugins are installed using engine-specific CLI commands (`copilot install plugin`, `claude install plugin`, `codex install plugin`).
+Specifies plugins to install before workflow execution. Plugins are installed using engine-specific CLI commands (`copilot plugin install`, `claude plugin install`, `codex plugin install`).
 
 **Array format** (simple):
 ```yaml wrap
