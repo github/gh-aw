@@ -16,7 +16,7 @@
     },
     "codespaces": {
       "repositories": {
-        "github/gh-aw": {
+        "github/agentic-workflow-workbench": {
           "permissions": {
             "actions": "write",
             "contents": "write",
@@ -26,7 +26,7 @@
             "workflows": "write"
           }
         },
-        "github/agentic-workflow-workbench": {
+        "github/gh-aw": {
           "permissions": {
             "actions": "write",
             "contents": "write",
