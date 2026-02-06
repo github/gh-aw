@@ -502,6 +502,15 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		} else {
 			yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + apiKey + "\"\n")
 		}
+
+		// Export payload directory and ensure it exists
+		payloadDir := gatewayConfig.PayloadDir
+		if payloadDir == "" {
+			payloadDir = constants.DefaultMCPGatewayPayloadDir
+		}
+		yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_DIR=\"" + payloadDir + "\"\n")
+		yaml.WriteString("          mkdir -p \"${MCP_GATEWAY_PAYLOAD_DIR}\"\n")
+
 		yaml.WriteString("          export DEBUG=\"*\"\n")
 		yaml.WriteString("          \n")
 		yaml.WriteString("          # Register API key as secret to mask it from logs\n")
@@ -544,6 +553,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		containerCmd += " -e MCP_GATEWAY_PORT"
 		containerCmd += " -e MCP_GATEWAY_DOMAIN"
 		containerCmd += " -e MCP_GATEWAY_API_KEY"
+		containerCmd += " -e MCP_GATEWAY_PAYLOAD_DIR"
 		containerCmd += " -e DEBUG"
 		// Pass environment variables that MCP servers reference in their config
 		// These are needed because awmg v0.0.12+ validates and resolves ${VAR} patterns at config load time
@@ -624,7 +634,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 			// Mark standard environment variables as already added
 			standardEnvVars := []string{
-				"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_API_KEY", "DEBUG",
+				"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_API_KEY", "MCP_GATEWAY_PAYLOAD_DIR", "DEBUG",
 				"MCP_GATEWAY_LOG_DIR", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS",
 				"GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
 				"GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_ASSETS_ALLOWED_EXTS",
@@ -679,6 +689,12 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		}
 
 		// Add volume mounts
+		// First, add the payload directory mount (rw for both agent and gateway)
+		if payloadDir != "" {
+			containerCmd += " -v " + payloadDir + ":" + payloadDir + ":rw"
+		}
+
+		// Then add user-configured mounts
 		if len(gatewayConfig.Mounts) > 0 {
 			for _, mount := range gatewayConfig.Mounts {
 				containerCmd += " -v " + mount

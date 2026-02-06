@@ -32,6 +32,7 @@ func TestEnsureDefaultMCPGatewayConfig(t *testing.T) {
 				assert.Equal(t, constants.DefaultMCPGatewayContainer, wd.SandboxConfig.MCP.Container, "Container should be default")
 				assert.Equal(t, string(constants.DefaultMCPGatewayVersion), wd.SandboxConfig.MCP.Version, "Version should be default")
 				assert.Equal(t, int(DefaultMCPGatewayPort), wd.SandboxConfig.MCP.Port, "Port should be default")
+				assert.Equal(t, constants.DefaultMCPGatewayPayloadDir, wd.SandboxConfig.MCP.PayloadDir, "PayloadDir should be default")
 				assert.Len(t, wd.SandboxConfig.MCP.Mounts, 3, "Should have 3 default mounts")
 			},
 		},
@@ -133,6 +134,37 @@ func TestEnsureDefaultMCPGatewayConfig(t *testing.T) {
 				assert.Equal(t, "/custom:/mount:ro", wd.SandboxConfig.MCP.Mounts[0], "Custom mount should be preserved")
 			},
 		},
+		{
+			name: "fills in missing payloadDir field",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					MCP: &MCPGatewayRuntimeConfig{
+						Container: "custom-container",
+						Version:   "v1.0.0",
+						Port:      8080,
+					},
+				},
+			},
+			validate: func(t *testing.T, wd *WorkflowData) {
+				assert.Equal(t, constants.DefaultMCPGatewayPayloadDir, wd.SandboxConfig.MCP.PayloadDir, "PayloadDir should be filled with default")
+			},
+		},
+		{
+			name: "preserves custom payloadDir",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					MCP: &MCPGatewayRuntimeConfig{
+						Container:  "custom-container",
+						Version:    "v1.0.0",
+						Port:       8080,
+						PayloadDir: "/custom/payloads",
+					},
+				},
+			},
+			validate: func(t *testing.T, wd *WorkflowData) {
+				assert.Equal(t, "/custom/payloads", wd.SandboxConfig.MCP.PayloadDir, "Custom payloadDir should be preserved")
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -169,9 +201,10 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 			name:         "creates default gateway config",
 			workflowData: &WorkflowData{},
 			expected: &MCPGatewayRuntimeConfig{
-				Port:   int(DefaultMCPGatewayPort),
-				Domain: "${MCP_GATEWAY_DOMAIN}",
-				APIKey: "${MCP_GATEWAY_API_KEY}",
+				Port:       int(DefaultMCPGatewayPort),
+				Domain:     "${MCP_GATEWAY_DOMAIN}",
+				APIKey:     "${MCP_GATEWAY_API_KEY}",
+				PayloadDir: "${MCP_GATEWAY_PAYLOAD_DIR}",
 			},
 		},
 		{
@@ -184,9 +217,10 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 				},
 			},
 			expected: &MCPGatewayRuntimeConfig{
-				Port:   int(DefaultMCPGatewayPort),
-				Domain: "${MCP_GATEWAY_DOMAIN}",
-				APIKey: "${MCP_GATEWAY_API_KEY}",
+				Port:       int(DefaultMCPGatewayPort),
+				Domain:     "${MCP_GATEWAY_DOMAIN}",
+				APIKey:     "${MCP_GATEWAY_API_KEY}",
+				PayloadDir: "${MCP_GATEWAY_PAYLOAD_DIR}",
 			},
 		},
 	}
@@ -201,6 +235,7 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 				assert.Equal(t, tt.expected.Port, result.Port, "Port should match")
 				assert.Equal(t, tt.expected.Domain, result.Domain, "Domain should match")
 				assert.Equal(t, tt.expected.APIKey, result.APIKey, "APIKey should match")
+				assert.Equal(t, tt.expected.PayloadDir, result.PayloadDir, "PayloadDir should match")
 			}
 		})
 	}
