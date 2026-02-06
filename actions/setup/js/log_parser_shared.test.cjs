@@ -2087,6 +2087,66 @@ describe("log_parser_shared.cjs", () => {
     });
   });
 
+  describe("wrapAgentLogInSection", () => {
+    it("should wrap markdown in details/summary with default open attribute", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      const markdown = "```\nConversation:\n\nAgent: Hello\n```";
+      const result = wrapAgentLogInSection(markdown, { parserName: "Copilot" });
+
+      expect(result).toContain("<details open>");
+      expect(result).toContain("<summary>🤖 Copilot CLI Session</summary>");
+      expect(result).toContain(markdown);
+      expect(result).toContain("</details>");
+    });
+
+    it("should support custom parser names", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      const markdown = "Test content";
+      const result = wrapAgentLogInSection(markdown, { parserName: "Claude" });
+
+      expect(result).toContain("🤖 Claude CLI Session");
+    });
+
+    it("should allow closed state when open is false", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      const markdown = "Test content";
+      const result = wrapAgentLogInSection(markdown, { parserName: "Copilot", open: false });
+
+      expect(result).toContain("<details>");
+      expect(result).not.toContain("<details open>");
+    });
+
+    it("should default to Agent parser name when not provided", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      const markdown = "Test content";
+      const result = wrapAgentLogInSection(markdown);
+
+      expect(result).toContain("🤖 Agent CLI Session");
+    });
+
+    it("should return empty string for empty or undefined markdown", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      expect(wrapAgentLogInSection("")).toBe("");
+      expect(wrapAgentLogInSection("   ")).toBe("");
+    });
+
+    it("should properly escape markdown content", async () => {
+      const { wrapAgentLogInSection } = await import("./log_parser_shared.cjs");
+
+      const markdown = "Content with <tags> and `code`";
+      const result = wrapAgentLogInSection(markdown, { parserName: "Copilot" });
+
+      expect(result).toContain(markdown);
+      expect(result).toContain("<details open>");
+      expect(result).toContain("</details>");
+    });
+  });
+
   describe("wrapLogParser", () => {
     it("should call parser function and return result on success", async () => {
       const { wrapLogParser } = await import("./log_parser_shared.cjs");

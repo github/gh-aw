@@ -10,13 +10,14 @@ permissions:
   actions: read
 tools:
   agentic-workflows:
-  bash:
+  bash: ["*"]
+  edit:
 safe-outputs:
   create-issue:
     expires: 7d
     title-prefix: "[cli-tools-test] "
     labels: [testing, automation, cli-tools]
-    max: 5
+    max: 1
   noop:
 timeout-minutes: 60
 strict: true

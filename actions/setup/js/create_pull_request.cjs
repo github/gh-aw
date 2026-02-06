@@ -337,8 +337,8 @@ async function main(config = {}) {
     if (triggeringIssueNumber) {
       const hasClosingKeyword = /(?:fix|fixes|fixed|close|closes|closed|resolve|resolves|resolved)\s+#\d+/i.test(processedBody);
       if (!hasClosingKeyword) {
-        processedBody = processedBody.trimEnd() + `\n\nFixes #${triggeringIssueNumber}`;
-        core.info(`Auto-added "Fixes #${triggeringIssueNumber}" closing keyword to PR body`);
+        processedBody = processedBody.trimEnd() + `\n\n- Fixes #${triggeringIssueNumber}`;
+        core.info(`Auto-added "Fixes #${triggeringIssueNumber}" closing keyword to PR body as bullet point`);
       }
     }
 

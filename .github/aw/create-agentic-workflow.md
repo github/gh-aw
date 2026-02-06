@@ -226,6 +226,7 @@ These resources contain workflow patterns, best practices, safe outputs, and per
      - **Advanced static analysis** → See `.github/aw/serena-tool.md` for guidance on when and how to use Serena language server (only for advanced coding tasks when user explicitly requests it)
      - **Orchestration patterns** → See `.github/aw/orchestration.md` for guidance on coordinating multi-step work and tracking progress across runs (use when the workflow is acting as a coordinator)
      - **GitHub Projects (v2)** → See `.github/aw/projects.md` for GitHub Projects (v2) integration patterns and safe-outputs setup (use when the workflow updates project boards or posts project status updates)
+     - **⚡ CLI Tool Discovery** → Before configuring complex manual setup, check if `gh aw` provides a CLI command for the task (see CLI Automation Discovery section below)
 
    - ⚠️ For GitHub write operations (creating issues, adding comments, etc.), always use `safe-outputs` instead of GitHub tools
 
@@ -320,6 +321,15 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    4. Provide example configuration for their specific use case (e.g., email, Slack)
 
    **DO NOT use `post-steps:` for these scenarios.** `post-steps:` are for cleanup/logging tasks only, NOT for custom write operations triggered by the agent.
+
+   **CLI Automation Discovery:**
+
+   ⚡ **IMPORTANT**: Before recommending manual setup, check if `gh aw` provides a CLI command (use `gh aw --help` to explore). Examples:
+   - `gh aw project new --with-project-setup` - Creates project boards with views and fields
+   - `gh aw secrets` - Manages repository secrets
+   - `gh aw init` / `gh aw new` / `gh aw add` - Repository and workflow setup
+
+   **For GitHub Projects workflows**: Recommend `gh aw project new "Title" --owner org --with-project-setup` instead of manual board/field creation
 
    **Security Education for Common Patterns:**
 

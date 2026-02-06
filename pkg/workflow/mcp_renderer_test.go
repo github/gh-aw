@@ -5,6 +5,8 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 func TestNewMCPConfigRenderer(t *testing.T) {
@@ -181,8 +183,8 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"type": "stdio"`) {
 		t.Error("Expected 'type': 'stdio' field per MCP Gateway Specification")
 	}
-	if !strings.Contains(output, `"agentic_workflows": {`) {
-		t.Error("Expected agentic_workflows server ID")
+	if !strings.Contains(output, `"`+constants.AgenticWorkflowsMCPServerID+`": {`) {
+		t.Error("Expected agenticworkflows server ID")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format
 	// In dev mode, should use locally built image
@@ -211,9 +213,9 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
 		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
-	// Should have working directory args
-	if !strings.Contains(output, `"args": ["-w", "${{ github.workspace }}"]`) {
-		t.Error("Expected args with working directory set to workspace")
+	// Should have network access and working directory args
+	if !strings.Contains(output, `"args": ["--network", "host", "-w", "${{ github.workspace }}"]`) {
+		t.Error("Expected args with network access and working directory set to workspace")
 	}
 }
 
@@ -255,7 +257,7 @@ func TestRenderAgenticWorkflowsMCP_TOML(t *testing.T) {
 	output := yaml.String()
 
 	// Verify TOML format (per MCP Gateway Specification v1.0.0)
-	if !strings.Contains(output, "[mcp_servers.agentic_workflows]") {
+	if !strings.Contains(output, "[mcp_servers."+constants.AgenticWorkflowsMCPServerID+"]") {
 		t.Error("Expected TOML section header")
 	}
 	// Per MCP Gateway Specification v1.0.0, stdio servers MUST use container format

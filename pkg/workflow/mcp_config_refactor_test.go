@@ -103,13 +103,13 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: true,
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
+				`"agenticworkflows": {`,
 				`"type": "stdio"`,
-				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
-				`"DEBUG": "*"`,                                         // Literal value for debug logging
+				`"container": "localhost/gh-aw:dev"`,                             // Dev mode uses locally built image
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
+				`"DEBUG": "*"`,                                                   // Literal value for debug logging
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
@@ -129,16 +129,16 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: true,
 			actionMode:           ActionModeRelease,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
+				`"agenticworkflows": {`,
 				`"type": "stdio"`,
 				`"container": "alpine:latest"`,
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
 				`"entrypointArgs": ["mcp-server"]`,
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                                     // gh-aw binary mount (read-only)
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                                   // gh CLI binary mount (read-only)
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				`"DEBUG": "*"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
@@ -155,11 +155,11 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			includeCopilotFields: false,
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
-				`"agentic_workflows": {`,
-				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
+				`"agenticworkflows": {`,
+				`"container": "localhost/gh-aw:dev"`,                             // Dev mode uses locally built image
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				// Environment variables
 				`"DEBUG": "*"`, // Literal value for debug logging
 				`"GITHUB_TOKEN": "$GITHUB_TOKEN"`,
@@ -300,9 +300,9 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			result := output.String()
 
 			expectedContent := []string{
-				`[mcp_servers.agentic_workflows]`,
+				`[mcp_servers.agenticworkflows]`,
 				tt.expectedContainer,
-				`args = ["-w", "${{ github.workspace }}"]`, // Docker working directory
+				`args = ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				`env_vars = ["DEBUG", "GITHUB_TOKEN"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)

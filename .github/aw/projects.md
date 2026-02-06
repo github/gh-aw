@@ -17,9 +17,10 @@ Use GitHub Projects safe-outputs when designing workflows that:
 
 ## Core Projects Patterns
 
+- **Create projects with automation** - Use `gh aw project new --with-project-setup` for quick setup with standard views and fields (recommended)
 - **Track items and fields** with `update-project` (add issue/PR items, create/update fields, optionally create views)
 - **Post periodic run summaries** with `create-project-status-update` (status, dates, and a concise markdown summary)
-- **Create new projects** with `create-project` (optional; prefer manual creation unless automation is explicitly desired)
+- **Create new projects programmatically** with `create-project` safe-output (advanced; prefer CLI for initial setup)
 
 ## Prerequisites and Authentication
 

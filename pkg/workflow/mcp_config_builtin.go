@@ -26,10 +26,11 @@
 //
 // 2. Agentic-workflows MCP server:
 //   - Transport: stdio (runs in Docker container)
-//   - Container: Alpine Linux with gh-aw binary mounted
-//   - Entrypoint: /opt/gh-aw/gh-aw mcp-server
-//   - Purpose: Enables workflow compilation, validation, and execution
-//   - Tools: compile, validate, list, status, run, etc.
+//   - Container: Alpine Linux with gh-aw binary mounted (or localhost/gh-aw:dev in dev mode)
+//   - Entrypoint: /opt/gh-aw/gh-aw mcp-server (release mode) or container default (dev mode)
+//   - Network: Enabled via --network host for GitHub API access (api.github.com)
+//   - Purpose: Enables workflow compilation, validation, and execution via gh aw CLI
+//   - Tools: compile, validate, list, status, audit, logs, add, update, fix
 //
 // HTTP vs stdio transport:
 // - HTTP: Server runs on host, accessible via HTTP URL with authentication
@@ -57,10 +58,12 @@
 //
 // Agentic-workflows configuration:
 // Agentic-workflows runs in a stdio container and requires:
-//   - Mounted gh-aw binary from /opt/gh-aw
+//   - Mounted gh-aw binary from /opt/gh-aw (release mode) or baked into image (dev mode)
+//   - Mounted gh CLI binary for GitHub API access (release mode) or baked into image (dev mode)
 //   - Mounted workspace for workflow files
 //   - Mounted temp directory for logs
 //   - GITHUB_TOKEN for GitHub API access
+//   - Network access enabled via --network host for api.github.com
 //
 // Related files:
 //   - mcp_renderer.go: Main renderer that calls these functions
@@ -83,7 +86,7 @@
 // Example agentic-workflows config:
 //
 //	{
-//	  "agentic_workflows": {
+//	  "agenticworkflows": {
 //	    "type": "stdio",
 //	    "container": "alpine:3.20",
 //	    "entrypoint": "/opt/gh-aw/gh-aw",
@@ -170,7 +173,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
-	yaml.WriteString("              \"agentic_workflows\": {\n")
+	yaml.WriteString("              \"" + constants.AgenticWorkflowsMCPServerID + "\": {\n")
 
 	// Add type field for Copilot (per MCP Gateway Specification v1.0.0, use "stdio" for containerized servers)
 	if includeCopilotFields {
@@ -226,9 +229,10 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	}
 	yaml.WriteString("],\n")
 
-	// Add Docker runtime args to set working directory to workspace
-	// This ensures .github/workflows folder resolves correctly to workspace/.github/workflows
-	yaml.WriteString("                \"args\": [\"-w\", \"${{ github.workspace }}\"],\n")
+	// Add Docker runtime args:
+	// - --network host: Enables network access for GitHub API calls (gh CLI needs api.github.com)
+	// - -w: Sets working directory to workspace for .github/workflows folder resolution
+	yaml.WriteString("                \"args\": [\"--network\", \"host\", \"-w\", \"${{ github.workspace }}\"],\n")
 
 	// Note: tools field is NOT included here - the converter script adds it back
 	// for Copilot. This keeps the gateway config compatible with the schema.
@@ -286,7 +290,7 @@ func renderSafeOutputsMCPConfigTOML(yaml *strings.Builder) {
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
 func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode ActionMode) {
 	yaml.WriteString("          \n")
-	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
+	yaml.WriteString("          [mcp_servers." + constants.AgenticWorkflowsMCPServerID + "]\n")
 
 	containerImage := constants.DefaultAlpineImage
 	var entrypoint string
@@ -334,9 +338,10 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	}
 	yaml.WriteString("]\n")
 
-	// Add Docker runtime args to set working directory to workspace
-	// This ensures .github/workflows folder resolves correctly to workspace/.github/workflows
-	yaml.WriteString("          args = [\"-w\", \"${{ github.workspace }}\"]\n")
+	// Add Docker runtime args:
+	// - --network host: Enables network access for GitHub API calls (gh CLI needs api.github.com)
+	// - -w: Sets working directory to workspace for .github/workflows folder resolution
+	yaml.WriteString("          args = [\"--network\", \"host\", \"-w\", \"${{ github.workspace }}\"]\n")
 
 	// Use env_vars array to reference environment variables instead of embedding secrets
 	yaml.WriteString("          env_vars = [\"DEBUG\", \"GITHUB_TOKEN\"]\n")

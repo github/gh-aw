@@ -1,7 +1,7 @@
 // @ts-check
 /// <reference types="@actions/github-script" />
 
-const { generatePlainTextSummary, generateCopilotCliStyleSummary, formatSafeOutputsPreview } = require("./log_parser_shared.cjs");
+const { generatePlainTextSummary, generateCopilotCliStyleSummary, wrapAgentLogInSection, formatSafeOutputsPreview } = require("./log_parser_shared.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
@@ -157,8 +157,14 @@ async function runLogParser(options) {
           parserName,
         });
 
+        // Wrap the agent log in a details/summary section (open by default)
+        const wrappedAgentLog = wrapAgentLogInSection(copilotCliStyleMarkdown, {
+          parserName,
+          open: true,
+        });
+
         // Add safe outputs preview to step summary
-        let fullMarkdown = copilotCliStyleMarkdown;
+        let fullMarkdown = wrappedAgentLog;
         if (safeOutputsContent) {
           const safeOutputsMarkdown = formatSafeOutputsPreview(safeOutputsContent, { isPlainText: false });
           if (safeOutputsMarkdown) {
@@ -179,8 +185,14 @@ async function runLogParser(options) {
           }
         }
 
-        // Write original markdown to step summary if available
-        let fullMarkdown = markdown;
+        // Wrap the original markdown in a details/summary section (open by default)
+        const wrappedAgentLog = wrapAgentLogInSection(markdown, {
+          parserName,
+          open: true,
+        });
+
+        // Write wrapped markdown to step summary if available
+        let fullMarkdown = wrappedAgentLog;
         if (safeOutputsContent) {
           const safeOutputsMarkdown = formatSafeOutputsPreview(safeOutputsContent, { isPlainText: false });
           if (safeOutputsMarkdown) {

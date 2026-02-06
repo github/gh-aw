@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,8 +122,8 @@ func TestAgenticWorkflowsMCPConfigGeneration(t *testing.T) {
 			result := yaml.String()
 
 			// Verify the MCP config contains agentic-workflows
-			assert.Contains(t, result, "agentic_workflows",
-				"%s engine should generate MCP config with agentic_workflows server name", e.name)
+			assert.Contains(t, result, constants.AgenticWorkflowsMCPServerID,
+				"%s engine should generate MCP config with agenticworkflows server name", e.name)
 			assert.Contains(t, result, "gh",
 				"%s engine MCP config should use gh CLI command for agentic-workflows", e.name)
 			assert.Contains(t, result, "mcp-server",

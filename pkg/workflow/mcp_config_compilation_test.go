@@ -325,8 +325,8 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 				}
 
 				// Verify working directory args are present
-				if !strings.Contains(string(lockContent), `"args": ["-w", "${{ github.workspace }}"]`) {
-					t.Error("Expected args with working directory in dev mode")
+				if !strings.Contains(string(lockContent), `"args": ["--network", "host", "-w", "${{ github.workspace }}"]`) {
+					t.Error("Expected args with network access and working directory in dev mode")
 				}
 			}
 		})
