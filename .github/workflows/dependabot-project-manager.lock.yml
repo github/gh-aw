@@ -19,9 +19,9 @@
 #   gh aw compile
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
-# Automatically bundles Dependabot alerts by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
+# Automatically bundles Dependabot PRs by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
 #
-# frontmatter-hash: 5eb3606ce96a492342e3901ba99e5e7358798c2c5508c14200fabcdf1230cb59
+# frontmatter-hash: 992600a7e7e33a35c85f02e715809c1fd7c7c1e7bc63f7a167d88bc841b9056b
 
 name: "Dependabot Project Manager"
 "on":
@@ -1205,7 +1205,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           WORKFLOW_NAME: "Dependabot Project Manager"
-          WORKFLOW_DESCRIPTION: "Automatically bundles Dependabot alerts by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a \"Review Required\" status column"
+          WORKFLOW_DESCRIPTION: "Automatically bundles Dependabot PRs by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a \"Review Required\" status column"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
           script: |
