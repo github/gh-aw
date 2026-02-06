@@ -1,7 +1,7 @@
 # GitHub Actions Workflow Layout Specification
 
-> Auto-generated specification documenting patterns used in compiled `.lock.yml` files.
-> Last updated: February 04, 2026
+> Auto-generated specification documenting patterns used in compiled `.lock.yml` files.  
+> Last updated: **2026-02-06**
 
 ## Overview
 
