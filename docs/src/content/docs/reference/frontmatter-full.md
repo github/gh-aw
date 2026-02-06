@@ -1095,13 +1095,30 @@ sandbox:
     # (optional)
     domain: "localhost"
 
-# List of plugin repository slugs to install before workflow execution. Each
-# plugin is installed using the engine's plugin installation command (e.g.,
-# 'copilot install plugin', 'claude install plugin', 'codex install plugin').
+# Plugin configuration for installing plugins before workflow execution. Supports
+# both array format (list of repos) and object format (repos + custom token).
 # (optional)
+# This field supports multiple formats (oneOf):
+
+# Option 1: List of plugin repository slugs to install. Each plugin is installed
+# using the engine's plugin installation command with default token resolution.
 plugins: []
-  # Array of Plugin repository slug in the format 'org/repo' (e.g.,
+  # Array items: Plugin repository slug in the format 'org/repo' (e.g.,
   # 'github/example-plugin')
+
+# Option 2: Plugin configuration with custom GitHub token. The custom token
+# overrides the default token resolution chain.
+plugins:
+  # List of plugin repository slugs to install
+  repos: []
+    # Array of Plugin repository slug in the format 'org/repo' (e.g.,
+    # 'github/example-plugin')
+
+  # Custom GitHub token expression to use for plugin installation. Overrides the
+  # default cascading token resolution (GH_AW_PLUGINS_TOKEN -> GH_AW_GITHUB_TOKEN ->
+  # GITHUB_TOKEN).
+  # (optional)
+  github-token: "${{ secrets.GITHUB_TOKEN }}"
 
 # Conditional execution expression
 # (optional)
