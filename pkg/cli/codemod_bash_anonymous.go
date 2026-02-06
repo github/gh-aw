@@ -8,8 +8,8 @@ var bashAnonymousCodemodLog = logger.New("cli:codemod_bash_anonymous")
 func getBashAnonymousRemovalCodemod() Codemod {
 	return Codemod{
 		ID:           "bash-anonymous-removal",
-		Name:         "Replace anonymous bash tool syntax with explicit false",
-		Description:  "Replaces 'bash:' (anonymous/nil syntax) with 'bash: false' to make configuration explicit",
+		Name:         "Replace anonymous bash tool syntax with explicit true",
+		Description:  "Replaces 'bash:' (anonymous/nil syntax) with 'bash: true' to make configuration explicit",
 		IntroducedIn: "0.9.0",
 		Apply: func(content string, frontmatter map[string]any) (string, bool, error) {
 			// Check if tools.bash exists
@@ -40,22 +40,22 @@ func getBashAnonymousRemovalCodemod() Codemod {
 				return content, false, err
 			}
 
-			// Replace the bash field from anonymous to explicit false
-			modifiedLines, modified := replaceBashAnonymousWithFalse(frontmatterLines)
+			// Replace the bash field from anonymous to explicit true
+			modifiedLines, modified := replaceBashAnonymousWithTrue(frontmatterLines)
 			if !modified {
 				return content, false, nil
 			}
 
 			// Reconstruct the content
 			newContent := reconstructContent(modifiedLines, markdown)
-			bashAnonymousCodemodLog.Print("Applied bash anonymous removal, replaced with 'bash: false'")
+			bashAnonymousCodemodLog.Print("Applied bash anonymous removal, replaced with 'bash: true'")
 			return newContent, true, nil
 		},
 	}
 }
 
-// replaceBashAnonymousWithFalse replaces 'bash:' with 'bash: false' in the tools block
-func replaceBashAnonymousWithFalse(lines []string) ([]string, bool) {
+// replaceBashAnonymousWithTrue replaces 'bash:' with 'bash: true' in the tools block
+func replaceBashAnonymousWithTrue(lines []string) ([]string, bool) {
 	var result []string
 	var modified bool
 	var inToolsBlock bool
@@ -82,14 +82,14 @@ func replaceBashAnonymousWithFalse(lines []string) ([]string, bool) {
 			}
 		}
 
-		// Replace bash: with bash: false if in tools block
+		// Replace bash: with bash: true if in tools block
 		if inToolsBlock && (trimmed == "bash:" || startsWith(trimmed, "bash: ")) {
 			// Check if it's just 'bash:' with nothing after the colon
 			if trimmed == "bash:" {
 				indent := getIndentation(line)
-				result = append(result, indent+"bash: false")
+				result = append(result, indent+"bash: true")
 				modified = true
-				bashAnonymousCodemodLog.Printf("Replaced 'bash:' with 'bash: false'")
+				bashAnonymousCodemodLog.Printf("Replaced 'bash:' with 'bash: true'")
 				continue
 			}
 		}

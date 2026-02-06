@@ -21,7 +21,7 @@ func TestBashAnonymousRemovalCodemod(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "replaces anonymous bash with bash: false",
+			name: "replaces anonymous bash with bash: true",
 			input: `---
 name: Test Workflow
 tools:
@@ -103,7 +103,7 @@ name: Test Workflow
 
 			if tt.expectApply {
 				// Verify the output contains the replacement
-				assert.Contains(t, output, "bash: false", "Output should contain 'bash: false'")
+				assert.Contains(t, output, "bash: true", "Output should contain 'bash: true'")
 				assert.NotContains(t, output, "bash:\n", "Output should not contain anonymous bash:")
 				assert.NotContains(t, output, "bash: \n", "Output should not contain bash with space")
 
@@ -135,7 +135,7 @@ tools:
 	output, applied, err := codemod.Apply(input, result.Frontmatter)
 	require.NoError(t, err)
 	assert.True(t, applied, "Should apply when bash: is present")
-	assert.Contains(t, output, "bash: false", "Should replace with bash: false")
+	assert.Contains(t, output, "bash: true", "Should replace with bash: true")
 	assert.Contains(t, output, "# Enable bash", "Should preserve comments")
 }
 
@@ -162,16 +162,16 @@ tools:
 	lines := strings.Split(output, "\n")
 	var foundBash bool
 	for _, line := range lines {
-		if strings.Contains(line, "bash: false") {
+		if strings.Contains(line, "bash: true") {
 			foundBash = true
 			// Should have 2-space indentation
-			assert.True(t, strings.HasPrefix(line, "  bash: false"), "Should have proper indentation")
+			assert.True(t, strings.HasPrefix(line, "  bash: true"), "Should have proper indentation")
 		}
 	}
-	assert.True(t, foundBash, "Should find bash: false in output")
+	assert.True(t, foundBash, "Should find bash: true in output")
 }
 
-func TestReplaceBashAnonymousWithFalse(t *testing.T) {
+func TestReplaceBashAnonymousWithTrue(t *testing.T) {
 	tests := []struct {
 		name        string
 		lines       []string
@@ -189,7 +189,7 @@ func TestReplaceBashAnonymousWithFalse(t *testing.T) {
 			expectLines: []string{
 				"name: Test",
 				"tools:",
-				"  bash: false",
+				"  bash: true",
 				"  github:",
 			},
 			modified: true,
@@ -230,7 +230,7 @@ func TestReplaceBashAnonymousWithFalse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, modified := replaceBashAnonymousWithFalse(tt.lines)
+			result, modified := replaceBashAnonymousWithTrue(tt.lines)
 			assert.Equal(t, tt.modified, modified, "Modified status mismatch")
 			assert.Equal(t, tt.expectLines, result, "Output lines mismatch")
 		})

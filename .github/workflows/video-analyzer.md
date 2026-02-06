@@ -19,7 +19,7 @@ imports:
   - shared/ffmpeg.md
 
 tools:
-  bash: false
+  bash: true
 
 safe-outputs:
   create-issue:

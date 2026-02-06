@@ -18,7 +18,7 @@ tools:
       branch-name: memory/campaigns
       file-glob: [security-alert-burndown/**]
   edit:
-  bash: false
+  bash: true
   cache-memory:
 safe-outputs:
   add-labels:

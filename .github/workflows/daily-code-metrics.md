@@ -15,7 +15,7 @@ tools:
     description: "Historical code quality and health metrics"
     file-glob: ["*.json", "*.jsonl", "*.csv", "*.md"]
     max-file-size: 102400  # 100KB
-  bash: false
+  bash: true
 safe-outputs:
   upload-asset:
   create-discussion:
