@@ -29,6 +29,7 @@ describe("dispatch_workflow handler factory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.GITHUB_REF = "refs/heads/main";
+    delete process.env.GITHUB_HEAD_REF; // Clean up PR environment variable
   });
 
   it("should create a handler function", async () => {
@@ -261,5 +262,96 @@ describe("dispatch_workflow handler factory", () => {
     // Use a slightly lower threshold (4995ms) to account for timing jitter
     expect(secondDispatchTime - firstDispatchTime).toBeGreaterThanOrEqual(4995);
     expect(secondDispatchTime - firstDispatchTime).toBeLessThan(6000);
+  });
+
+  it("should use PR branch ref when GITHUB_HEAD_REF is set", async () => {
+    // Simulate PR context where GITHUB_REF is the merge ref
+    process.env.GITHUB_REF = "refs/pull/123/merge";
+    process.env.GITHUB_HEAD_REF = "feature-branch";
+
+    const config = {
+      workflows: ["test-workflow"],
+      workflow_files: {
+        "test-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "test-workflow",
+      inputs: {},
+    };
+
+    await handler(message, {});
+
+    // Should use the PR branch ref, not the merge ref
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "test-workflow.lock.yml",
+      ref: "refs/heads/feature-branch",
+      inputs: {},
+    });
+  });
+
+  it("should use GITHUB_REF when not in PR context", async () => {
+    process.env.GITHUB_REF = "refs/heads/main";
+    delete process.env.GITHUB_HEAD_REF;
+
+    const config = {
+      workflows: ["test-workflow"],
+      workflow_files: {
+        "test-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "test-workflow",
+      inputs: {},
+    };
+
+    await handler(message, {});
+
+    // Should use GITHUB_REF directly
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "test-workflow.lock.yml",
+      ref: "refs/heads/main",
+      inputs: {},
+    });
+  });
+
+  it("should handle PR context with slashes in branch names", async () => {
+    process.env.GITHUB_REF = "refs/pull/456/merge";
+    process.env.GITHUB_HEAD_REF = "feature/add-new-feature";
+
+    const config = {
+      workflows: ["test-workflow"],
+      workflow_files: {
+        "test-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "test-workflow",
+      inputs: {},
+    };
+
+    await handler(message, {});
+
+    // Should correctly handle branch names with slashes
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "test-workflow.lock.yml",
+      ref: "refs/heads/feature/add-new-feature",
+      inputs: {},
+    });
   });
 });

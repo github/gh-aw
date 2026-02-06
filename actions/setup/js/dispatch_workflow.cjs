@@ -35,7 +35,19 @@ async function main(config = {}) {
 
   // Get the current repository context and ref
   const repo = context.repo;
-  const ref = process.env.GITHUB_REF || context.ref || "refs/heads/main";
+
+  // When running in a PR context, GITHUB_REF points to the merge ref (refs/pull/{PR_NUMBER}/merge)
+  // which is not a valid branch ref for dispatching workflows. Instead, we need to use
+  // GITHUB_HEAD_REF which contains the actual PR branch name.
+  let ref;
+  if (process.env.GITHUB_HEAD_REF) {
+    // We're in a pull_request event, use the PR branch ref
+    ref = `refs/heads/${process.env.GITHUB_HEAD_REF}`;
+    core.info(`Using PR branch ref: ${ref}`);
+  } else {
+    // Use GITHUB_REF for non-PR contexts (push, workflow_dispatch, etc.)
+    ref = process.env.GITHUB_REF || context.ref || "refs/heads/main";
+  }
 
   /**
    * Message handler function that processes a single dispatch_workflow message
