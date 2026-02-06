@@ -1362,7 +1362,7 @@ mdflow and gh-aw represent two philosophies of AI workflow automation:
 - **mdflow**: "Move fast, trust the user, maximize flexibility"
 - **gh-aw**: "Move carefully, verify everything, maximize safety"
 
-Neither is "better"—they're optimized for different contexts. The opportunity for gh-aw is to learn from mdflow's simplicity and developer experience while maintaining its security guarantees. By adopting mdflow's best ideas (templates, imports, fast iteration) and wrapping them in gh-aw's safety model, we can create the best of both worlds.
+Neither is "better"—they're optimized for different contexts. The opportunity for gh-aw is to learn from mdflow's simplicity and developer experience while maintaining its security guarantees. By adopting mdflow's key features (templates, imports, fast iteration) and wrapping them in gh-aw's safety model, we can combine the strengths of both approaches.
 
 ---
 

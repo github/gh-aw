@@ -1519,10 +1519,10 @@ Merge and Deploy:
 ```
 
 **Benefits**:
-- Maximize development speed (oh-my-opencode)
+- Optimize development velocity (oh-my-opencode)
 - Ensure production safety (gh-aw)
 - Clear separation of concerns
-- Best tools for each phase
+- Appropriate tools for each phase
 
 ---
 
@@ -1550,7 +1550,7 @@ Merge and Deploy:
 
 **Neither project is "better"** - they solve different problems:
 
-- **oh-my-opencode**: Personal productivity maximizer for local development
+- **oh-my-opencode**: Personal productivity tool for local development
 - **gh-aw**: Team automation platform for secure GitHub workflows
 
 **Use cases overlap minimally**:
