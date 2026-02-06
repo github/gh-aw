@@ -219,7 +219,7 @@ jobs:
       - name: Install GitHub Copilot CLI
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.403
       - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.4
+        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.7
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:
@@ -231,7 +231,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent-act:0.13.4 ghcr.io/github/gh-aw-firewall/squid:0.13.4 ghcr.io/github/gh-aw-mcpg:v0.0.103 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.13.7 ghcr.io/github/gh-aw-firewall/squid:0.13.7 ghcr.io/github/gh-aw-mcpg:v0.0.103 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
       - name: Install gh-aw extension
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -586,7 +586,7 @@ jobs:
               staged: false,
               allowed_domains: ["python"],
               firewall_enabled: true,
-              awf_version: "v0.13.4",
+              awf_version: "v0.13.7",
               awmg_version: "v0.0.103",
               steps: {
                 firewall: "squid"
@@ -938,7 +938,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -o pipefail
-          sudo -E awf --enable-chroot --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains '*.pythonhosted.org,anaconda.org,api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,binstar.org,bootstrap.pypa.io,conda.anaconda.org,conda.binstar.org,files.pythonhosted.org,github.com,host.docker.internal,pip.pypa.io,pypi.org,pypi.python.org,raw.githubusercontent.com,registry.npmjs.org,repo.anaconda.com,repo.continuum.io,telemetry.enterprise.githubcopilot.com' --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.13.4 --skip-pull --agent-image act \
+          sudo -E awf --enable-chroot --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains '*.pythonhosted.org,anaconda.org,api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,binstar.org,bootstrap.pypa.io,conda.anaconda.org,conda.binstar.org,files.pythonhosted.org,github.com,host.docker.internal,pip.pypa.io,pypi.org,pypi.python.org,raw.githubusercontent.com,registry.npmjs.org,repo.anaconda.com,repo.continuum.io,telemetry.enterprise.githubcopilot.com' --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.13.7 --skip-pull \
             -- '/usr/local/bin/copilot --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --add-dir "${GITHUB_WORKSPACE}" --disable-builtin-mcps --allow-all-tools --add-dir /tmp/gh-aw/cache-memory/ --allow-all-paths --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"${GH_AW_MODEL_AGENT_COPILOT:+ --model "$GH_AW_MODEL_AGENT_COPILOT"}' \
             2>&1 | tee /tmp/gh-aw/agent-stdio.log
         env:
