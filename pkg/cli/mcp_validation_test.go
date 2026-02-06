@@ -31,9 +31,7 @@ func TestGetBinaryPath(t *testing.T) {
 		// Check if the file exists
 		info, err := os.Stat(path)
 		require.NoError(t, err, "Binary file should exist at the returned path")
-		if err == nil {
-			assert.False(t, info.IsDir(), "Binary path should not be a directory")
-		}
+		assert.False(t, info.IsDir(), "Binary path should not be a directory")
 	})
 
 	t.Run("path ends with executable name", func(t *testing.T) {
@@ -61,4 +59,3 @@ func TestGetBinaryPath(t *testing.T) {
 		// If EvalSymlinks fails, that's OK - the original path is still valid
 	})
 }
-

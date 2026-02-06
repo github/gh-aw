@@ -108,26 +108,10 @@ func runMCPServer(port int, cmdPath string) error {
 		mcpLog.Print("Starting MCP server with stdio transport")
 	}
 
-	// Determine and log the binary path
-	binaryPath, err := GetBinaryPath()
-	if err != nil {
-		mcpLog.Printf("Warning: failed to get binary path: %v", err)
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: failed to get binary path: %v", err)))
-	} else {
-		// Check if the binary file exists
-		if _, err := os.Stat(binaryPath); err != nil {
-			if os.IsNotExist(err) {
-				mcpLog.Printf("ERROR: binary file does not exist at path: %s", binaryPath)
-				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("ERROR: binary file does not exist at path: %s", binaryPath)))
-			} else {
-				mcpLog.Printf("Warning: failed to stat binary file at %s: %v", binaryPath, err)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: failed to stat binary file at %s: %v", binaryPath, err)))
-			}
-		} else {
-			// Log the binary path for debugging
-			mcpLog.Printf("gh-aw binary path: %s", binaryPath)
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("gh-aw binary path: %s", binaryPath)))
-		}
+	// Determine, log, and validate the binary path
+	if err := logAndValidateBinaryPath(); err != nil {
+		// Log error but don't fail - server can still start
+		mcpLog.Printf("Binary path validation warning: %v", err)
 	}
 
 	// Log current working directory
