@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/reporting.md
 #
-# frontmatter-hash: 46a7e02a99ca18ba7d1ef365f5400bcb382fccebeb43b834f1e0cdb91ccbc4f9
+# frontmatter-hash: 31e69cc88ff6a146131dbcfb6e9c73f801d513f4f035ac412598a0c76b5d98f0
 
 name: "Semantic Function Refactoring"
 "on":
@@ -164,7 +164,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent-act:0.13.4 ghcr.io/github/gh-aw-firewall/squid:0.13.4 ghcr.io/github/gh-aw-mcpg:v0.0.103 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent-act:0.13.4 ghcr.io/github/gh-aw-firewall/squid:0.13.4 ghcr.io/github/gh-aw-mcpg:v0.0.103 ghcr.io/github/github-mcp-server:v0.30.3 ghcr.io/github/serena-mcp-server:latest node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -475,6 +475,22 @@ jobs:
                 "headers": {
                   "Authorization": "$GH_AW_SAFE_OUTPUTS_API_KEY"
                 }
+              },
+              "serena": {
+                "container": "ghcr.io/github/serena-mcp-server:latest",
+                "args": [
+                  "--network",
+                  "host"
+                ],
+                "entrypoint": "serena",
+                "entrypointArgs": [
+                  "start-mcp-server",
+                  "--context",
+                  "codex",
+                  "--project",
+                  "${{ github.workspace }}"
+                ],
+                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw"]
               }
             },
             "gateway": {
