@@ -180,12 +180,6 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		return formatCompilerError(markdownPath, "error", err.Error())
 	}
 
-	// Validate bash tool configuration
-	log.Printf("Validating bash tool configuration")
-	if err := validateBashToolConfig(workflowData.ParsedTools, workflowData.Name); err != nil {
-		return formatCompilerError(markdownPath, "error", err.Error())
-	}
-
 	// Validate safe-outputs target configuration
 	log.Printf("Validating safe-outputs target fields")
 	if err := validateSafeOutputsTarget(workflowData.SafeOutputs); err != nil {
