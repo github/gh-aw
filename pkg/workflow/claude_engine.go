@@ -126,6 +126,17 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 		steps = append(steps, npmSteps[1:]...) // Install Claude CLI and subsequent steps
 	}
 
+	// Add plugin installation steps after Claude CLI installation
+	if len(workflowData.Plugins) > 0 {
+		claudeLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.Plugins))
+		githubToken := workflowData.GitHubToken
+		if githubToken == "" {
+			githubToken = "${{ secrets.GITHUB_TOKEN }}"
+		}
+		pluginSteps := GeneratePluginInstallationSteps(workflowData.Plugins, "claude", githubToken)
+		steps = append(steps, pluginSteps...)
+	}
+
 	return steps
 }
 

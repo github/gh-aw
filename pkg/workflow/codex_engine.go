@@ -101,6 +101,17 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		}
 	}
 
+	// Add plugin installation steps after Codex CLI installation
+	if len(workflowData.Plugins) > 0 {
+		codexEngineLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.Plugins))
+		githubToken := workflowData.GitHubToken
+		if githubToken == "" {
+			githubToken = "${{ secrets.GITHUB_TOKEN }}"
+		}
+		pluginSteps := GeneratePluginInstallationSteps(workflowData.Plugins, "codex", githubToken)
+		steps = append(steps, pluginSteps...)
+	}
+
 	return steps
 }
 

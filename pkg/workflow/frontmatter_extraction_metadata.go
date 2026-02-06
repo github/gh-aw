@@ -254,3 +254,25 @@ func extractMCPServersFromFrontmatter(frontmatter map[string]any) map[string]any
 func extractRuntimesFromFrontmatter(frontmatter map[string]any) map[string]any {
 	return ExtractMapField(frontmatter, "runtimes")
 }
+
+// extractPluginsFromFrontmatter extracts plugins array from frontmatter map
+// Returns a slice of plugin repository slugs (e.g., ["org/repo", "org2/repo2"])
+func extractPluginsFromFrontmatter(frontmatter map[string]any) []string {
+	value, exists := frontmatter["plugins"]
+	if !exists {
+		return nil
+	}
+
+	// Plugins should be an array of strings
+	if pluginsArray, ok := value.([]any); ok {
+		var plugins []string
+		for _, p := range pluginsArray {
+			if pluginStr, ok := p.(string); ok {
+				plugins = append(plugins, pluginStr)
+			}
+		}
+		return plugins
+	}
+
+	return nil
+}

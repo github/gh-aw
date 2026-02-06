@@ -2482,6 +2482,19 @@
         }
       ]
     },
+    "plugins": {
+      "type": "array",
+      "description": "List of plugin repository slugs to install before workflow execution. Each plugin is installed using the engine's plugin installation command (e.g., 'copilot install plugin', 'claude install plugin', 'codex install plugin').",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
+        "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
+      },
+      "examples": [
+        ["github/copilot-plugin", "acme/custom-tools"],
+        ["my-org/workflow-enhancer"]
+      ]
+    },
     "if": {
       "type": "string",
       "description": "Conditional execution expression",

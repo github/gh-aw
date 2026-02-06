@@ -115,6 +115,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		Tools:                toolsResult.tools,
 		ParsedTools:          NewTools(toolsResult.tools),
 		Runtimes:             toolsResult.runtimes,
+		Plugins:              toolsResult.plugins,
 		MarkdownContent:      toolsResult.markdownContent,
 		AI:                   engineSetup.engineSetting,
 		EngineConfig:         engineSetup.engineConfig,

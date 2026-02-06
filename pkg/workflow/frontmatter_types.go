@@ -82,6 +82,9 @@ type FrontmatterConfig struct {
 	Network *NetworkPermissions `json:"network,omitempty"`
 	Sandbox *SandboxConfig      `json:"sandbox,omitempty"`
 
+	// Plugin configuration
+	Plugins []string `json:"plugins,omitempty"` // List of plugin repo slugs (e.g., "org/repo")
+
 	// Feature flags and other settings
 	Features map[string]any    `json:"features,omitempty"` // Dynamic feature flags
 	Env      map[string]string `json:"env,omitempty"`
@@ -480,6 +483,11 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 	}
 	if fc.Sandbox != nil {
 		result["sandbox"] = fc.Sandbox
+	}
+
+	// Plugins
+	if len(fc.Plugins) > 0 {
+		result["plugins"] = fc.Plugins
 	}
 
 	// Features and environment
