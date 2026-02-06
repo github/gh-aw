@@ -236,6 +236,7 @@ func TestCopilotDefaultDomains(t *testing.T) {
 		"host.docker.internal",
 		"raw.githubusercontent.com",
 		"registry.npmjs.org",
+		"telemetry.enterprise.githubcopilot.com",
 	}
 
 	// Create a map for O(1) lookups
