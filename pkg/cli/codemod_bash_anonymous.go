@@ -1,5 +1,3 @@
-//go:build !integration
-
 package cli
 
 import "github.com/github/gh-aw/pkg/logger"
