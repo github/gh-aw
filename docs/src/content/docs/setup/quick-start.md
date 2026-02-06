@@ -62,7 +62,7 @@ Once your initial run is complete, a new issue will be created in your repositor
          class="gh-aw-video-element"
          controls
          preload="metadata"
-         poster="/gh-aw/images/install-and-add-workflow-in-cli-thumbnail.png"
+         poster="/gh-aw/videos/install-and-add-workflow-in-cli.png"
          aria-label="Install gh-aw and add a workflow using the CLI"
       >
          <source src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4" type="video/mp4" />
