@@ -32,7 +32,7 @@ Issue triage represents a "hello world" of automated agentic workflows: practica
 
 When a new issue is opened, the triage agent analyzes its content, does research in the codebase and other issues, responds with a comment, and applies appropriate labels based on predefined categories. This helps maintainers quickly understand the nature of incoming issues without manual review.
 
-Let's take a look at the full **[Issue Triage Agent](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-triage-agent.md?plain=1)**:
+Let's take a look at the full **[Issue Triage Agent](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-triage-agent.md?plain=1)**:
 
 ```markdown
 ---
@@ -85,7 +85,7 @@ You can add this workflow to your own repository and remix it as follows:
 **Issue Triage Agent:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-triage-agent.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-triage-agent.md
 ```
 
 Then edit and remix the workflow specification to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

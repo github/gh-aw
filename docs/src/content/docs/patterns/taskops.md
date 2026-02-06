@@ -1,11 +1,11 @@
 ---
-title: ResearchPlanAssign Strategy
+title: TaskOps Strategy
 description: Scaffold AI-powered code improvements with research agents, planning agents, and copilot execution while keeping developers in control
 ---
 
-The ResearchPlanAssign strategy is a scaffolded approach to using AI agents for systematic code improvements. This strategy keeps developers in the driver's seat by providing clear decision points at each phase while leveraging AI agents to handle the heavy lifting of research, planning, and implementation.
+The TaskOps strategy is a scaffolded approach to using AI agents for systematic code improvements. This strategy keeps developers in the driver's seat by providing clear decision points at each phase while leveraging AI agents to handle the heavy lifting of research, planning, and implementation.
 
-## How ResearchPlanAssign Works
+## How TaskOps Works
 
 The strategy follows three distinct phases:
 
@@ -21,13 +21,13 @@ The developer reviews the research report to determine if worthwhile improvement
 
 The developer reviews the generated issues and decides which ones to execute. Approved issues are [assigned to Copilot](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot) for automated implementation and can be executed sequentially or in parallel depending on dependencies. Copilot creates a pull request with the implementation for developer review and merging.
 
-## When to Use ResearchPlanAssign
+## When to Use TaskOps
 
 Use this strategy when code improvements require systematic investigation before action, work needs to be broken down for optimal AI agent execution, or when research findings may vary in priority and require developer oversight at each phase.
 
 ## Example Implementations
 
-The following workflows demonstrate the ResearchPlanAssign pattern in practice:
+The following workflows demonstrate the TaskOps pattern in practice:
 
 ### Static Analysis → Plan → Fix
 
@@ -79,11 +79,11 @@ Performs deep research investigations using multiple research MCPs (Tavily, arXi
 
 ## Customization
 
-Adapt the ResearchPlanAssign strategy by customizing the research focus (static analysis, performance metrics, documentation quality, security, code duplication, test coverage), frequency (daily, weekly, on-demand), report format (discussions vs issues), planning approach (automatic vs manual), and assignment method (pre-assign via `assignees: copilot` in workflow config, [manual assignment through GitHub UI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot), or mixed).
+Adapt the TaskOps strategy by customizing the research focus (static analysis, performance metrics, documentation quality, security, code duplication, test coverage), frequency (daily, weekly, on-demand), report format (discussions vs issues), planning approach (automatic vs manual), and assignment method (pre-assign via `assignees: copilot` in workflow config, [manual assignment through GitHub UI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot), or mixed).
 
 ## Benefits
 
-The ResearchPlanAssign strategy provides developer control through clear decision points, systematic improvement via regular focused analysis, optimal task sizing for AI agents, historical context tracking through cache memory, and reduced overhead by automating research and execution while developers focus on decisions.
+The TaskOps strategy provides developer control through clear decision points, systematic improvement via regular focused analysis, optimal task sizing for AI agents, historical context tracking through cache memory, and reduced overhead by automating research and execution while developers focus on decisions.
 
 ## Limitations
 
@@ -91,9 +91,9 @@ The three-phase approach takes longer than direct execution and requires develop
 
 ## Related Strategies
 
-- **[Orchestration](/gh-aw/guides/orchestration/)**: Coordinate multiple ResearchPlanAssign cycles toward a shared goal
+- **[Orchestration](/gh-aw/patterns/orchestration/)**: Coordinate multiple TaskOps cycles toward a shared goal
 - **[Threat Detection](/gh-aw/reference/threat-detection/)**: Continuous monitoring without planning phase
 - **[Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/)**: Create custom actions for plan phase
 
 > [!NOTE]
-> The ResearchPlanAssign strategy works best when research findings vary in relevance and priority. For issues that always require immediate action, consider using direct execution workflows instead.
+> The TaskOps strategy works best when research findings vary in relevance and priority. For issues that always require immediate action, consider using direct execution workflows instead.

@@ -28,11 +28,11 @@ Now let's talk about the daily rituals of software development: managing issues 
 
 These agents enhance issue and pull request workflows:
 
-- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues  
-- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time
-- **[Mergefest](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches
-- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically
-- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage
+- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues  
+- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time
+- **[Mergefest](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches
+- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically
+- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage
 
 The Issue Arborist automatically links related issues, building a dependency tree we'd never maintain manually.
 
@@ -51,31 +51,31 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Issue Arborist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-arborist.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-arborist.md
 ```
 
 **Issue Monster:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-monster.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-monster.md
 ```
 
 **Mergefest:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/mergefest.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/mergefest.md
 ```
 
 **Sub Issue Closer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/sub-issue-closer.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/sub-issue-closer.md
 ```
 
 **Issue Template Optimizer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/issue-template-optimizer.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/issue-template-optimizer.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

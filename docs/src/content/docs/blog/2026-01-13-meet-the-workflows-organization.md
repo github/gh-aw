@@ -28,9 +28,9 @@ But all that sophisticated functionality has focused on a single repository. Wha
 
 These agents work at organization scale, across multiple repositories:
 
-- **[Org Health Report](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/org-health-report.md?plain=1)** - Organization-wide repository health metrics  
-- **[Stale Repo Identifier](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/stale-repo-identifier.md?plain=1)** - Identifies inactive repositories  
-- **[Ubuntu Image Analyzer](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/ubuntu-image-analyzer.md?plain=1)** - Documents GitHub Actions runner environments  
+- **[Org Health Report](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/org-health-report.md?plain=1)** - Organization-wide repository health metrics  
+- **[Stale Repo Identifier](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/stale-repo-identifier.md?plain=1)** - Identifies inactive repositories  
+- **[Ubuntu Image Analyzer](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/ubuntu-image-analyzer.md?plain=1)** - Documents GitHub Actions runner environments  
 
 Scaling agents across an entire organization changes the game. The Org Health Report analyzes dozens of repositories at once, identifying patterns and outliers ("these three repos have no tests, these five haven't been updated in months"). The Stale Repo Identifier helps with organizational hygiene - finding abandoned projects that should be archived or transferred. We learned that **cross-repo insights are different** - what looks fine in one repository might be an outlier across the organization. These workflows require careful permission management (reading across repos needs organization-level tokens) and thoughtful rate limiting (you can hit API limits fast when analyzing 50+ repos). The Ubuntu Image Analyzer is wonderfully meta - it documents the very environment that runs our agents.
 
@@ -41,19 +41,19 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Org Health Report:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/org-health-report.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/org-health-report.md
 ```
 
 **Stale Repo Identifier:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/stale-repo-identifier.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/stale-repo-identifier.md
 ```
 
 **Ubuntu Image Analyzer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/ubuntu-image-analyzer.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/ubuntu-image-analyzer.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

@@ -75,6 +75,6 @@ Address label explosion with AI-powered periodic audits for consolidation. Preve
 ## Additional Resources
 
 - [Trigger Events](/gh-aw/reference/triggers/) - Complete trigger configuration including label filtering
-- [IssueOps Guide](/gh-aw/examples/issue-pr-events/issueops/) - Learn about issue-triggered workflows
+- [IssueOps](/gh-aw/patterns/issueops/) - Learn about issue-triggered workflows
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Secure output handling
 - [Frontmatter Reference](/gh-aw/reference/frontmatter/) - Complete workflow configuration options

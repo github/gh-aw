@@ -98,6 +98,45 @@ github-token: ${{ secrets.CUSTOM_PAT }}
 
 See [GitHub Tokens](/gh-aw/reference/tokens/) for complete documentation.
 
+### Plugins (`plugins:`)
+
+Specifies plugins to install before workflow execution. Plugins are installed using engine-specific CLI commands (`copilot install plugin`, `claude install plugin`, `codex install plugin`).
+
+**Array format** (simple):
+```yaml wrap
+plugins:
+  - github/test-plugin
+  - acme/custom-tools
+```
+
+**Object format** (with custom token):
+```yaml wrap
+plugins:
+  repos:
+    - github/test-plugin
+    - acme/custom-tools
+  github-token: ${{ secrets.CUSTOM_PLUGIN_TOKEN }}
+```
+
+**Token precedence** for plugin installation (highest to lowest):
+1. Custom `plugins.github-token` from object format
+2. Custom top-level `github-token`
+3. `${{ secrets.GH_AW_PLUGINS_TOKEN }}`
+4. `${{ secrets.GH_AW_GITHUB_TOKEN }}`
+5. `${{ secrets.GITHUB_TOKEN }}` (default)
+
+Each plugin repository must be specified in `org/repo` format. The compiler generates installation steps that run after the engine CLI is installed but before workflow execution begins.
+
+### Payload Directory (`payload-dir:`)
+
+Configures the directory path for sharing large MCP response payloads between agent and gateway containers. Defaults to `/tmp/gh-aw/mcp-payload`.
+
+```yaml wrap
+payload-dir: /tmp/custom/payload-path
+```
+
+The payload directory is mounted read-only in the agent container and read-write in the MCP gateway container, enabling efficient sharing of large tool responses without token overhead. This is automatically configured when using MCP servers.
+
 ### Permissions (`permissions:`)
 
 The `permissions:` section uses standard GitHub Actions permissions syntax to specify the permissions relevant to the agentic (natural language) part of the execution of the workflow. See [GitHub Actions permissions documentation](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions).

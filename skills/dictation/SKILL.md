@@ -210,7 +210,7 @@ remote-repo
 repo-name
 repo-owner
 repository-dispatch
-researchplanassign
+taskops
 reviewer
 run-id
 run-name

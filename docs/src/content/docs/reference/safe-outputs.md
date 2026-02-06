@@ -451,7 +451,7 @@ Optionally include `item_url` (GitHub issue URL) to add the issue as the first p
 > - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
 
 > [!NOTE]
-> You can configure views directly during project creation using the `views` field (see above), or later using `update-project` to add custom fields and additional views. For pattern guidance, see [Projects & Monitoring](/gh-aw/guides/monitoring/).
+> You can configure views directly during project creation using the `views` field (see above), or later using `update-project` to add custom fields and additional views. For pattern guidance, see [Projects & Monitoring](/gh-aw/patterns/monitoring/).
 
 ### Project Board Updates (`update-project:`)
 
@@ -1273,7 +1273,7 @@ safe-outputs:
 
 **Domain Filtering** (`allowed-domains`): Controls which domains are allowed in URLs. URLs from other domains are replaced with `(redacted)`.
 
-**Reference Escaping** (`allowed-github-references`): Controls which GitHub repository references (`#123`, `owner/repo#456`) are allowed in workflow output. When configured, references to unlisted repositories are escaped with backticks to prevent GitHub from creating timeline items. This is particularly useful for [SideRepoOps](/gh-aw/guides/siderepoops/) workflows to prevent automation from cluttering your main repository's timeline.
+**Reference Escaping** (`allowed-github-references`): Controls which GitHub repository references (`#123`, `owner/repo#456`) are allowed in workflow output. When configured, references to unlisted repositories are escaped with backticks to prevent GitHub from creating timeline items. This is particularly useful for [SideRepoOps](/gh-aw/patterns/siderepoops/) workflows to prevent automation from cluttering your main repository's timeline.
 
 Configuration options:
 - `[]` — Escape all references (prevents all timeline items)
@@ -1350,8 +1350,8 @@ Common combinations:
 - **Orchestration:** `dispatch-workflow` (orchestrator/worker pattern), optionally paired with Projects updates
 
 See:
-- [Projects & Monitoring](/gh-aw/guides/monitoring/)
-- [Orchestration](/gh-aw/guides/orchestration/)
+- [Projects & Monitoring](/gh-aw/patterns/monitoring/)
+- [Orchestration](/gh-aw/patterns/orchestration/)
 
 ## Custom Messages (`messages:`)
 

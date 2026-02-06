@@ -35,7 +35,43 @@ async function main(config = {}) {
 
   // Get the current repository context and ref
   const repo = context.repo;
-  const ref = process.env.GITHUB_REF || context.ref || "refs/heads/main";
+
+  // Helper function to get the default branch
+  const getDefaultBranchRef = async () => {
+    // Try to get from context payload first
+    if (context.payload.repository?.default_branch) {
+      return `refs/heads/${context.payload.repository.default_branch}`;
+    }
+
+    // Fall back to querying the repository
+    try {
+      const { data: repoData } = await github.rest.repos.get({
+        owner: repo.owner,
+        repo: repo.repo,
+      });
+      return `refs/heads/${repoData.default_branch}`;
+    } catch (error) {
+      core.warning(`Failed to fetch default branch: ${getErrorMessage(error)}`);
+      return "refs/heads/main";
+    }
+  };
+
+  // When running in a PR context, GITHUB_REF points to the merge ref (refs/pull/{PR_NUMBER}/merge)
+  // which is not a valid branch ref for dispatching workflows. Instead, we need to use
+  // GITHUB_HEAD_REF which contains the actual PR branch name.
+  let ref;
+  if (process.env.GITHUB_HEAD_REF) {
+    // We're in a pull_request event, use the PR branch ref
+    ref = `refs/heads/${process.env.GITHUB_HEAD_REF}`;
+    core.info(`Using PR branch ref: ${ref}`);
+  } else if (process.env.GITHUB_REF || context.ref) {
+    // Use GITHUB_REF for non-PR contexts (push, workflow_dispatch, etc.)
+    ref = process.env.GITHUB_REF || context.ref;
+  } else {
+    // Last resort: fetch the repository's default branch
+    ref = await getDefaultBranchRef();
+    core.info(`Using default branch ref: ${ref}`);
+  }
 
   /**
    * Message handler function that processes a single dispatch_workflow message

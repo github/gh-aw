@@ -323,6 +323,10 @@ const DefaultMCPGatewayVersion Version = "v0.0.103"
 // DefaultMCPGatewayContainer is the default container image for the MCP Gateway
 const DefaultMCPGatewayContainer = "ghcr.io/github/gh-aw-mcpg"
 
+// DefaultMCPGatewayPayloadDir is the default directory for MCP gateway payload files
+// This directory is shared between the agent container and MCP gateway for large payload exchange
+const DefaultMCPGatewayPayloadDir = "/tmp/gh-aw/mcp-payloads"
+
 // DefaultFirewallRegistry is the container image registry for AWF (gh-aw-firewall) Docker images
 const DefaultFirewallRegistry = "ghcr.io/github/gh-aw-firewall"
 

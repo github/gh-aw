@@ -16,7 +16,7 @@ Scheduled workflows run automatically at specified times using cron expressions.
 
 ## Patterns in This Section
 
-- **[DailyOps](/gh-aw/examples/scheduled/dailyops/)** - Make incremental improvements through small daily changes
+- **[DailyOps](/gh-aw/patterns/dailyops/)** - Make incremental improvements through small daily changes
 - **[Research & Planning](/gh-aw/examples/scheduled/research-planning/)** - Automated research, status reports, and planning
 
 ## Example Schedule Triggers

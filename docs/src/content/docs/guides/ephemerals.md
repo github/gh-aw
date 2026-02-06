@@ -170,7 +170,7 @@ See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/#hide-older-comments)
 
 Run agentic workflows from a separate "side" repository that targets your main codebase. This isolates AI-generated issues, comments, and workflow runs from your main repository, keeping automation infrastructure separate from production code.
 
-See [SideRepoOps Guide](/gh-aw/guides/siderepoops/) for complete setup and usage documentation.
+See [SideRepoOps](/gh-aw/patterns/siderepoops/) for complete setup and usage documentation.
 
 ### Allowed GitHub References
 
@@ -266,6 +266,6 @@ This configuration ensures:
 
 - [Triggers Reference](/gh-aw/reference/triggers/) - Complete trigger configuration including `stop-after`
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - All safe output types and expiration options
-- [SideRepoOps Guide](/gh-aw/guides/siderepoops/) - Complete setup for side repository operations
+- [SideRepoOps](/gh-aw/patterns/siderepoops/) - Complete setup for side repository operations
 - [Security Best Practices](/gh-aw/reference/tokens/) - Authentication and security considerations
-- [Orchestration](/gh-aw/guides/orchestration/) - Orchestrating multi-workflow initiatives
+- [Orchestration](/gh-aw/patterns/orchestration/) - Orchestrating multi-workflow initiatives

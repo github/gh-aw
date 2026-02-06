@@ -302,7 +302,7 @@ gh aw run research --ref feature/improve-workflow
 gh pr create --title "Improve workflow"
 ```
 
-The workflow runs with your branch's code and state. Safe outputs (issues, PRs, comments) are created in your branch context. Use [trial mode](/gh-aw/guides/trialops/) for completely isolated testing without affecting the production repository.
+The workflow runs with your branch's code and state. Safe outputs (issues, PRs, comments) are created in your branch context. Use [trial mode](/gh-aw/patterns/trialops/) for completely isolated testing without affecting the production repository.
 
 ## Common Use Cases
 
@@ -350,7 +350,7 @@ Add `workflow_dispatch` to event-triggered workflows for testing without creatin
 
 - [Manual Workflows Example](/gh-aw/examples/manual/) - Example manual workflows
 - [Triggers Reference](/gh-aw/reference/triggers/) - Complete trigger syntax including workflow_dispatch
-- [TrialOps Guide](/gh-aw/guides/trialops/) - Testing workflows in isolation
+- [TrialOps](/gh-aw/patterns/trialops/) - Testing workflows in isolation
 - [CLI Commands](/gh-aw/setup/cli/) - Complete gh aw run command reference
 - [Templating](/gh-aw/reference/templating/) - Using expressions and conditionals
 - [Security Best Practices](/gh-aw/introduction/architecture/) - Securing workflow execution

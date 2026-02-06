@@ -43,7 +43,7 @@ Workflows that coordinate one or more **worker workflows** toward a shared goal.
 - An **orchestrator** decides what work to do next and dispatches workers
 - **Workers** execute the concrete tasks with scoped tools and limits
 
-See the [Orchestration guide](/gh-aw/guides/orchestration/) for implementation patterns.
+See the [Orchestration guide](/gh-aw/patterns/orchestration/) for implementation patterns.
 
 ### Orchestrator Workflow
 
@@ -357,7 +357,7 @@ Manual workflow execution via the GitHub Actions UI or CLI using the `workflow_d
 
 **Use for:** Research tasks, operational commands, development testing, debugging production issues, and ad-hoc analysis that doesn't fit scheduled or event-based triggers.
 
-See the [DispatchOps Guide](/gh-aw/guides/dispatchops/) for implementation details.
+See [DispatchOps](/gh-aw/patterns/dispatchops/) for implementation details.
 
 ### IssueOps
 
@@ -365,7 +365,7 @@ Automated issue management that analyzes, categorizes, and responds to issues wh
 
 **Use for:** Auto-triage, smart routing to teams, initial responses, quality checks, and content analysis of newly created issues.
 
-See the [IssueOps Examples](/gh-aw/examples/issue-pr-events/issueops/) for implementation details.
+See the [IssueOps Examples](/gh-aw/patterns/issueops/) for implementation details.
 
 ### LabelOps
 
@@ -373,7 +373,7 @@ Workflows triggered by label changes on issues and pull requests. Uses labels as
 
 **Use for:** Priority-based workflows, stage transitions, specialized processing based on label categories, and team coordination via label-based handoffs.
 
-See the [LabelOps Examples](/gh-aw/examples/issue-pr-events/labelops/) for implementation details.
+See the [LabelOps Examples](/gh-aw/patterns/labelops/) for implementation details.
 
 ### MemoryOps
 
@@ -381,7 +381,7 @@ Stateful workflows that persist data between runs using `cache-memory` and `repo
 
 **Use for:** Incremental data processing, trend analysis, multi-step tasks requiring state, workflow coordination, and long-running operations that need checkpointing.
 
-See the [MemoryOps Guide](/gh-aw/guides/memoryops/) for implementation details.
+See the [MemoryOps](/gh-aw/guides/memoryops/) for implementation details.
 
 ### MultiRepoOps
 
@@ -389,7 +389,7 @@ Cross-repository coordination that extends automation patterns across multiple G
 
 **Use for:** Feature synchronization across repos, hub-and-spoke issue tracking, organization-wide policy enforcement, security patch rollouts, and coordinating services in separate repositories.
 
-See the [MultiRepoOps Guide](/gh-aw/guides/multirepoops/) for implementation details.
+See the [MultiRepoOps](/gh-aw/patterns/multirepoops/) for implementation details.
 
 ### ProjectOps
 
@@ -397,7 +397,7 @@ AI-powered GitHub Projects board management that automates issue triage, routing
 
 **Use for:** Event-driven workflows (issue opened, PR created) that need to categorize and track work on project boards, content-based routing, AI-driven priority estimation, and automated status transitions.
 
-See the [ProjectOps Guide](/gh-aw/examples/issue-pr-events/projectops/) for implementation details.
+See the [ProjectOps](/gh-aw/patterns/projectops/) for implementation details.
 
 ### SideRepoOps
 
@@ -405,7 +405,7 @@ Development pattern where workflows run from a separate "side" repository that t
 
 **Use for:** Getting started with agentic workflows, experimentation without affecting main repository, keeping automation artifacts separate, and reporting workflows that generate high volumes of content.
 
-See the [SideRepoOps Guide](/gh-aw/guides/siderepoops/) for implementation details.
+See the [SideRepoOps](/gh-aw/patterns/siderepoops/) for implementation details.
 
 ### SpecOps
 
@@ -413,7 +413,7 @@ Maintaining and propagating W3C-style specifications using the `w3c-specificatio
 
 **Use for:** Maintaining formal technical specifications, keeping specifications synchronized across repositories, and ensuring implementations stay compliant with specification updates.
 
-See the [SpecOps Guide](/gh-aw/guides/specops/) for implementation details.
+See the [SpecOps](/gh-aw/patterns/specops/) for implementation details.
 
 ### TrialOps
 
@@ -421,7 +421,7 @@ Testing and validation pattern that executes workflows in isolated trial reposit
 
 **Use for:** Testing workflows before production, comparing implementation approaches, validating prompt changes, debugging in isolation, and demonstrating capabilities with real results.
 
-See the [TrialOps Guide](/gh-aw/guides/trialops/) for implementation details.
+See the [TrialOps](/gh-aw/patterns/trialops/) for implementation details.
 
 ## Related Resources
 

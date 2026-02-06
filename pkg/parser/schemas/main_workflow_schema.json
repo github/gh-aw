@@ -2482,6 +2482,49 @@
         }
       ]
     },
+    "plugins": {
+      "description": "Plugin configuration for installing plugins before workflow execution. Supports both array format (list of repos) and object format (repos + custom token).",
+      "examples": [
+        ["github/copilot-plugin", "acme/custom-tools"],
+        {
+          "repos": ["github/copilot-plugin", "acme/custom-tools"],
+          "github-token": "${{ secrets.CUSTOM_PLUGIN_TOKEN }}"
+        }
+      ],
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of plugin repository slugs to install. Each plugin is installed using the engine's plugin installation command with default token resolution.",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
+            "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
+          }
+        },
+        {
+          "type": "object",
+          "description": "Plugin configuration with custom GitHub token. The custom token overrides the default token resolution chain.",
+          "required": ["repos"],
+          "properties": {
+            "repos": {
+              "type": "array",
+              "description": "List of plugin repository slugs to install",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
+                "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
+              }
+            },
+            "github-token": {
+              "type": "string",
+              "description": "Custom GitHub token expression to use for plugin installation. Overrides the default cascading token resolution (GH_AW_PLUGINS_TOKEN -> GH_AW_GITHUB_TOKEN -> GITHUB_TOKEN).",
+              "examples": ["${{ secrets.CUSTOM_PLUGIN_TOKEN }}"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "if": {
       "type": "string",
       "description": "Conditional execution expression",

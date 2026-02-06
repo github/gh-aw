@@ -24,7 +24,7 @@ In our [previous posts](/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-sim
 
 ## A Continuous Style Workflow
 
-Today's post is dedicated to one agent, and the larger concept it represents: the **[Terminal Stylist](https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/terminal-stylist.md?plain=1)** workflow. This agent's purpose is to **make things look better**, by reviewing and enhancing the style of command-line interface (CLI) output.
+Today's post is dedicated to one agent, and the larger concept it represents: the **[Terminal Stylist](https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/terminal-stylist.md?plain=1)** workflow. This agent's purpose is to **make things look better**, by reviewing and enhancing the style of command-line interface (CLI) output.
 
 Command-line interfaces are a primary interaction point for developer tools. When output is inconsistent or noisy, it still “works,” but it adds friction. When it’s well-styled, information becomes scannable, color highlights what matters, layouts remain readable across light and dark themes, and the overall experience feels professional.
 
@@ -49,7 +49,7 @@ You can add this workflow to your own repository and remix it as follows:
 **Terminal Stylist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/terminal-stylist.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/terminal-stylist.md
 ```
 
 Then edit and remix the workflow specification to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

@@ -166,8 +166,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 		isLiteral bool
 	}{
 		{"DEBUG", "*", true},                    // Literal value "*"
-		{"GH_TOKEN", "GH_TOKEN", false},         // Variable reference
-		{"GITHUB_TOKEN", "GITHUB_TOKEN", false}, // Variable reference
+		{"GITHUB_TOKEN", "GITHUB_TOKEN", false}, // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
@@ -225,6 +224,10 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 		yaml.WriteString("\"" + mount + "\"")
 	}
 	yaml.WriteString("],\n")
+
+	// Add Docker runtime args to set working directory to workspace
+	// This ensures .github/workflows folder resolves correctly to workspace/.github/workflows
+	yaml.WriteString("                \"args\": [\"-w\", \"${{ github.workspace }}\"],\n")
 
 	// Note: tools field is NOT included here - the converter script adds it back
 	// for Copilot. This keeps the gateway config compatible with the schema.
@@ -330,6 +333,10 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	}
 	yaml.WriteString("]\n")
 
+	// Add Docker runtime args to set working directory to workspace
+	// This ensures .github/workflows folder resolves correctly to workspace/.github/workflows
+	yaml.WriteString("          args = [\"-w\", \"${{ github.workspace }}\"]\n")
+
 	// Use env_vars array to reference environment variables instead of embedding secrets
-	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\"]\n")
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GITHUB_TOKEN\"]\n")
 }

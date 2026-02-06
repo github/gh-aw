@@ -47,11 +47,11 @@ Not by default, but yes with proper configuration. Cross-repository access requi
 1. A **Personal Access Token (PAT)** with access to target repositories
 2. Configuring the token in your workflow
 
-See [MultiRepoOps](/gh-aw/guides/multirepoops/) for coordinating across repositories, or [SideRepoOps](/gh-aw/guides/siderepoops/) for running workflows from a separate repository.
+See [MultiRepoOps](/gh-aw/patterns/multirepoops/) for coordinating across repositories, or [SideRepoOps](/gh-aw/patterns/siderepoops/) for running workflows from a separate repository.
 
 ### Can I use agentic workflows in private repositories?
 
-Yes, and in many cases we recommend it. Private repositories are ideal for proprietary code, creating a "sidecar" repository with limited access, testing workflows, and organization-internal automation. See [SideRepoOps](/gh-aw/guides/siderepoops/) for patterns using private repositories.
+Yes, and in many cases we recommend it. Private repositories are ideal for proprietary code, creating a "sidecar" repository with limited access, testing workflows, and organization-internal automation. See [SideRepoOps](/gh-aw/patterns/siderepoops/) for patterns using private repositories.
 
 ## Security & Privacy
 
@@ -180,7 +180,7 @@ Check workflow logs in GitHub Actions or use `gh aw logs`, audit the run with `g
 
 ### Can I test workflows without affecting my repository?
 
-Yes! Use [TrialOps](/gh-aw/guides/trialops/) to test workflows in isolated trial repositories. This lets you validate behavior and iterate on prompts without creating real issues, PRs, or comments in your actual repository.
+Yes! Use [TrialOps](/gh-aw/patterns/trialops/) to test workflows in isolated trial repositories. This lets you validate behavior and iterate on prompts without creating real issues, PRs, or comments in your actual repository.
 
 ## Advanced Topics
 

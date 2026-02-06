@@ -49,6 +49,13 @@ type PermissionsConfig struct {
 	OrganizationPackages string `json:"organization-packages,omitempty"`
 }
 
+// PluginsConfig represents plugin configuration for installation
+// Supports object format with repos list and optional custom github-token
+type PluginsConfig struct {
+	Repos       []string `json:"repos"`                  // List of plugin repository slugs (required)
+	GitHubToken string   `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
+}
+
 // FrontmatterConfig represents the structured configuration from workflow frontmatter
 // This provides compile-time type safety and clearer error messages compared to map[string]any
 type FrontmatterConfig struct {
@@ -81,6 +88,14 @@ type FrontmatterConfig struct {
 	// Network and sandbox configuration
 	Network *NetworkPermissions `json:"network,omitempty"`
 	Sandbox *SandboxConfig      `json:"sandbox,omitempty"`
+
+	// Plugin configuration
+	// Supports both array format ([]string) and object format (PluginsConfig)
+	// This field is handled specially in parsing to support both formats
+	Plugins      any            `json:"plugins,omitempty"` // Can be []string or map[string]any
+	PluginsTyped *PluginsConfig `json:"-"`                 // Typed plugin configuration (not in JSON)
+	PluginsRepos []string       `json:"-"`                 // Extracted plugin repos (not in JSON)
+	PluginsToken string         `json:"-"`                 // Extracted plugin token (not in JSON)
 
 	// Feature flags and other settings
 	Features map[string]any    `json:"features,omitempty"` // Dynamic feature flags
@@ -187,6 +202,18 @@ func ParseFrontmatterConfig(frontmatter map[string]any) (*FrontmatterConfig, err
 		if err == nil {
 			config.PermissionsTyped = permissionsTyped
 			frontmatterTypesLog.Print("Parsed typed permissions config")
+		}
+	}
+
+	// Parse plugins field - supports both array and object formats
+	if config.Plugins != nil {
+		repos, token, err := parsePluginsConfig(config.Plugins)
+		if err == nil {
+			config.PluginsRepos = repos
+			config.PluginsToken = token
+			if len(repos) > 0 {
+				frontmatterTypesLog.Printf("Parsed plugins config: %d repos, custom_token=%v", len(repos), token != "")
+			}
 		}
 	}
 
@@ -306,6 +333,51 @@ func parsePermissionsConfig(permissions map[string]any) (*PermissionsConfig, err
 	}
 
 	return config, nil
+}
+
+// parsePluginsConfig parses the plugins field which can be either:
+// 1. Array format: ["org/repo1", "org/repo2"]
+// 2. Object format: { "repos": ["org/repo1"], "github-token": "${{ secrets.TOKEN }}" }
+// Returns: (repos []string, customToken string, error)
+func parsePluginsConfig(plugins any) ([]string, string, error) {
+	// Try array format first
+	if pluginsArray, ok := plugins.([]any); ok {
+		var repos []string
+		for _, p := range pluginsArray {
+			if pluginStr, ok := p.(string); ok {
+				repos = append(repos, pluginStr)
+			}
+		}
+		return repos, "", nil
+	}
+
+	// Try object format
+	if pluginsMap, ok := plugins.(map[string]any); ok {
+		var repos []string
+		var token string
+
+		// Extract repos array (required)
+		if reposAny, hasRepos := pluginsMap["repos"]; hasRepos {
+			if reposArray, ok := reposAny.([]any); ok {
+				for _, r := range reposArray {
+					if repoStr, ok := r.(string); ok {
+						repos = append(repos, repoStr)
+					}
+				}
+			}
+		}
+
+		// Extract github-token (optional)
+		if tokenAny, hasToken := pluginsMap["github-token"]; hasToken {
+			if tokenStr, ok := tokenAny.(string); ok {
+				token = tokenStr
+			}
+		}
+
+		return repos, token, nil
+	}
+
+	return nil, "", fmt.Errorf("plugins must be either an array of strings or an object with 'repos' field")
 }
 
 // countRuntimes counts the number of non-nil runtimes in RuntimesConfig
@@ -480,6 +552,23 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 	}
 	if fc.Sandbox != nil {
 		result["sandbox"] = fc.Sandbox
+	}
+
+	// Plugins - use parsed repos and token if available
+	if len(fc.PluginsRepos) > 0 {
+		if fc.PluginsToken != "" {
+			// Object format with custom token
+			result["plugins"] = map[string]any{
+				"repos":        fc.PluginsRepos,
+				"github-token": fc.PluginsToken,
+			}
+		} else {
+			// Array format
+			result["plugins"] = fc.PluginsRepos
+		}
+	} else if fc.Plugins != nil {
+		// Fallback to original value if parsing didn't populate PluginsRepos
+		result["plugins"] = fc.Plugins
 	}
 
 	// Features and environment

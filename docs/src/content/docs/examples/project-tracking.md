@@ -231,8 +231,8 @@ Use for progress reports, milestone summaries, or workflow health indicators.
 - **Orchestration:** An orchestrator can dispatch workers and use the same project safe-outputs to keep a shared board updated.
 
 See:
-- [Projects & Monitoring](/gh-aw/guides/monitoring/)
-- [Orchestration](/gh-aw/guides/orchestration/)
+- [Projects & Monitoring](/gh-aw/patterns/monitoring/)
+- [Orchestration](/gh-aw/patterns/orchestration/)
 
 ## Common Patterns
 
@@ -324,5 +324,5 @@ Update the project item with the team field.
 - [update-project](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) - Detailed update-project configuration
 - [create-project-status-update](/gh-aw/reference/safe-outputs/#project-status-updates-create-project-status-update) - Status update configuration
 - [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) - Token setup guide
-- [Projects & Monitoring](/gh-aw/guides/monitoring/) - Design pattern guide
-- [Orchestration](/gh-aw/guides/orchestration/) - Design pattern guide
+- [Projects & Monitoring](/gh-aw/patterns/monitoring/) - Design pattern guide
+- [Orchestration](/gh-aw/patterns/orchestration/) - Design pattern guide

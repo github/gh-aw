@@ -28,7 +28,7 @@ Use SideRepoOps for workflow experimentation, creating a centralized automation 
 
 ## How It Differs from MultiRepoOps
 
-While [MultiRepoOps](/gh-aw/guides/multirepoops/) runs workflows **from** your main repository that create resources **in** other repositories, SideRepoOps inverts this pattern:
+While [MultiRepoOps](/gh-aw/patterns/multirepoops/) runs workflows **from** your main repository that create resources **in** other repositories, SideRepoOps inverts this pattern:
 
 | Pattern | Workflow Location | Target Repository | Use Case |
 |---------|------------------|-------------------|----------|
@@ -52,7 +52,7 @@ In SideRepoOps, workflows run in GitHub Actions **on the side repository** but p
 
 > [!TIP]
 > Testing with TrialOps
-> Before deploying SideRepoOps workflows to production, use [TrialOps](/gh-aw/guides/trialops/) to test them in isolated trial repositories. This lets you validate behavior and iterate on prompts without creating real issues in your repositories.
+> Before deploying SideRepoOps workflows to production, use [TrialOps](/gh-aw/patterns/trialops/) to test them in isolated trial repositories. This lets you validate behavior and iterate on prompts without creating real issues in your repositories.
 
 ## Setup Requirements
 
@@ -496,9 +496,9 @@ This creates a feedback loop where the side repository tracks automation effecti
 
 ## Related Patterns
 
-- **[MultiRepoOps](/gh-aw/guides/multirepoops/)** - Coordinate work across multiple repositories from main repo
-- **[Orchestration](/gh-aw/guides/orchestration/)** - Orchestrate multi-issue initiatives
-- **[IssueOps](/gh-aw/examples/issue-pr-events/issueops/)** - Issue-driven automation patterns
+- **[MultiRepoOps](/gh-aw/patterns/multirepoops/)** - Coordinate work across multiple repositories from main repo
+- **[Orchestration](/gh-aw/patterns/orchestration/)** - Orchestrate multi-issue initiatives
+- **[IssueOps](/gh-aw/patterns/issueops/)** - Issue-driven automation patterns
 
 ## Related Documentation
 

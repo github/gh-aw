@@ -165,8 +165,8 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 ## Additional Resources
 
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Complete safe output configuration and API details
-- [Projects & Monitoring](/gh-aw/guides/monitoring/) - Design pattern guide
-- [Orchestration](/gh-aw/guides/orchestration/) - Design pattern guide
+- [Projects & Monitoring](/gh-aw/patterns/monitoring/) - Design pattern guide
+- [Orchestration](/gh-aw/patterns/orchestration/) - Design pattern guide
 - [Trigger Events](/gh-aw/reference/triggers/) - Event trigger configuration options
-- [IssueOps Guide](/gh-aw/examples/issue-pr-events/issueops/) - Related issue automation patterns
+- [IssueOps](/gh-aw/patterns/issueops/) - Related issue automation patterns
 - [Token Reference](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2) - GitHub Projects token setup

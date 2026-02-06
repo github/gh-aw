@@ -76,7 +76,7 @@ Here are our tips!
 - Add help text for `/command help`
 - Use cache-memory to track command history
 
-**Learn more**: [ChatOps Examples](https://github.github.com/gh-aw/examples/comment-triggered/chatops/)
+**Learn more**: [ChatOps Examples](https://github.github.com/gh-aw/patterns/chatops/)
 
 ---
 
@@ -124,7 +124,7 @@ Here are our tips!
 - Include progress reports in PR descriptions
 - Allow human intervention at any phase
 
-**Learn more**: [DailyOps Examples](https://github.github.com/gh-aw/examples/scheduled/dailyops/)
+**Learn more**: [DailyOps Examples](https://github.github.com/gh-aw/patterns/dailyops/)
 
 ---
 
@@ -174,7 +174,7 @@ Here are our tips!
 - Track triage accuracy
 - Update classification rules based on feedback
 
-**Learn more**: [IssueOps Examples](https://github.github.com/gh-aw/examples/issue-pr-events/issueops/)
+**Learn more**: [IssueOps Examples](https://github.github.com/gh-aw/patterns/issueops/)
 
 ---
 
@@ -223,7 +223,7 @@ Here are our tips!
 - Avoid label proliferation
 - Use label descriptions
 
-**Learn more**: [LabelOps Examples](https://github.github.com/gh-aw/examples/issue-pr-events/labelops/)
+**Learn more**: [LabelOps Examples](https://github.github.com/gh-aw/patterns/labelops/)
 
 ---
 
@@ -273,11 +273,11 @@ Here are our tips!
 - Allow manual overrides
 - Track automation accuracy
 
-**Learn more**: [ProjectOps Examples](https://github.github.com/gh-aw/examples/issue-pr-events/projectops/)
+**Learn more**: [ProjectOps Examples](https://github.github.com/gh-aw/patterns/projectops/)
 
 ---
 
-## Pattern 6: ResearchPlanAssign - Scaffolded Improvement Strategy 🔬
+## Pattern 6: TaskOps - Scaffolded Improvement Strategy 🔬
 
 A three-phase strategy that keeps developers in control while leveraging AI agents for systematic code improvements. Provides clear decision points at each phase: Research (investigate), Plan (break down work), Assign (execute).
 
@@ -314,7 +314,7 @@ These workflows do the following:
 
 ### Example: Duplicate Code Detection
 
-The [`duplicate-code-detector`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md) uses ResearchPlanAssign:
+The [`duplicate-code-detector`](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/duplicate-code-detector.md) uses TaskOps:
 
 **Research**: Uses Serena MCP for semantic analysis, creates report
 **Plan**: Creates well-scoped issues (max 3 per run) with refactoring strategies
@@ -336,7 +336,7 @@ Here are our tips!
 - Include acceptance criteria
 - Review and iterate
 
-**Learn more**: [ResearchPlanAssign Guide](https://github.github.com/gh-aw/guides/researchplanassign/)
+**Learn more**: [TaskOps](https://github.github.com/gh-aw/patterns/taskops/)
 
 ---
 
@@ -387,7 +387,7 @@ Here are our tips!
 - Batch operations efficiently
 - Monitor cross-repo dependencies
 
-**Learn more**: [MultiRepoOps Guide](https://github.github.com/gh-aw/guides/multirepoops/)
+**Learn more**: [MultiRepoOps](https://github.github.com/gh-aw/patterns/multirepoops/)
 
 ---
 
@@ -426,7 +426,7 @@ Here are our tips!
 - Set up appropriate notifications
 - Plan for eventual migration if successful
 
-**Learn more**: [SideRepoOps Guide](https://github.github.com/gh-aw/guides/siderepoops/)
+**Learn more**: [SideRepoOps](https://github.github.com/gh-aw/patterns/siderepoops/)
 
 ---
 
@@ -451,7 +451,7 @@ These workflows do the following:
 5. Capture and validate outputs
 6. Delete trial repo or keep for reference
 
-**Learn more**: [TrialOps Guide](https://github.github.com/gh-aw/guides/trialops/)
+**Learn more**: [TrialOps](https://github.github.com/gh-aw/patterns/trialops/)
 
 ---
 
@@ -461,7 +461,7 @@ Many successful agent systems combine multiple operational patterns:
 
 - **ChatOps + IssueOps**: User triggers analysis via `/analyze`, which creates issue with results
 - **DailyOps + MultiRepoOps**: Daily dependency updates across organization
-- **ResearchPlanAssign + ProjectOps**: Research creates project board populated with planned work
+- **TaskOps + ProjectOps**: Research creates project board populated with planned work
 - **SideRepoOps + TrialOps**: Test in trial repo, then deploy to side repo, then main repo
 
 ## Choosing the Right Operational Pattern
@@ -471,7 +471,7 @@ When designing agent operations, consider:
 1. **Trigger mechanism**: Manual (ChatOps), scheduled (DailyOps), or event-driven (IssueOps, LabelOps)?
 2. **Scope**: Single repo or multi-repo (MultiRepoOps)?
 3. **Isolation needs**: Production or separate (SideRepoOps, TrialOps)?
-4. **Coordination**: Simple or complex (ProjectOps, ResearchPlanAssign)?
+4. **Coordination**: Simple or complex (ProjectOps, TaskOps)?
 5. **State management**: Stateless or stateful (LabelOps, ProjectOps)?
 
 ## What's Next?

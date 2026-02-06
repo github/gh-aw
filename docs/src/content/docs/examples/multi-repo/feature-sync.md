@@ -289,7 +289,7 @@ safe-outputs:
 
 ## Related Documentation
 
-- [MultiRepoOps Design Pattern](/gh-aw/guides/multirepoops/) - Complete multi-repo overview
+- [MultiRepoOps Design Pattern](/gh-aw/patterns/multirepoops/) - Complete multi-repo overview
 - [Cross-Repo Issue Tracking](/gh-aw/examples/multi-repo/issue-tracking/) - Issue management patterns
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Pull request configuration
 - [GitHub Tools](/gh-aw/reference/tools/#github-tools-github) - Repository access tools

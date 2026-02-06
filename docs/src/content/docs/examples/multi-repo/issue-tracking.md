@@ -310,7 +310,7 @@ Use consistent title prefixes and component labels for organization. Automate st
 
 ## Related Documentation
 
-- [MultiRepoOps Design Pattern](/gh-aw/guides/multirepoops/) - Complete multi-repo overview
+- [MultiRepoOps Design Pattern](/gh-aw/patterns/multirepoops/) - Complete multi-repo overview
 - [Feature Synchronization](/gh-aw/examples/multi-repo/feature-sync/) - Code sync patterns
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Issue creation configuration
 - [GitHub Tools](/gh-aw/reference/tools/#github-tools-github) - API access configuration

@@ -66,7 +66,7 @@ The terminology for starting an agent is changing from "New Agent Task" to "New 
 - `docs/src/content/docs/reference/safe-outputs.md` - Safe outputs reference
 - `docs/src/content/docs/reference/frontmatter-full.md` - Frontmatter reference
 - `docs/src/content/docs/reference/tokens.md` - Token reference
-- `docs/src/content/docs/guides/multirepoops.md` - Multi-repo guide
+- `docs/src/content/docs/patterns/multirepoops.md` - Multi-repo guide
 - `docs/src/content/docs/examples/multi-repo.md` - Multi-repo example
 - `pkg/cli/templates/github-agentic-workflows.md` - Template
 - `AGENTS.md` - Main agents documentation
@@ -202,7 +202,7 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
    - `docs/src/content/docs/reference/tokens.md`
 
 3. **Update Guides and Examples**
-   - `docs/src/content/docs/guides/multirepoops.md`
+   - `docs/src/content/docs/patterns/multirepoops.md`
    - `docs/src/content/docs/examples/multi-repo.md`
 
 4. **Update Root Documentation**
@@ -336,7 +336,7 @@ During transition period:
   - [ ] `docs/src/content/docs/reference/tokens.md`
   
 - [ ] Update Guides
-  - [ ] `docs/src/content/docs/guides/multirepoops.md`
+  - [ ] `docs/src/content/docs/patterns/multirepoops.md`
   
 - [ ] Update Examples
   - [ ] `docs/src/content/docs/examples/multi-repo.md`

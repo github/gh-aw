@@ -46,13 +46,13 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Plan Command:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/plan.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/plan.md
 ```
 
 **Discussion Task Miner:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.40.0/.github/workflows/discussion-task-miner.md
+gh aw add https://github.com/github/gh-aw/blob/v0.42.4/.github/workflows/discussion-task-miner.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

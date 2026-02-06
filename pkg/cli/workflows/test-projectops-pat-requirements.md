@@ -180,5 +180,5 @@ Create an issue summarizing the test results:
 - Project ownership (user vs org)
 - GitHub API rate limits
 
-For manual testing, see the [TrialOps Guide](/gh-aw/guides/trialops/) and [ProjectOps Documentation](/gh-aw/examples/issue-pr-events/projectops/).
+For manual testing, see the [TrialOps](/gh-aw/guides/trialops/) and [ProjectOps Documentation](/gh-aw/examples/issue-pr-events/projectops/).
 
