@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,38 @@ import (
 )
 
 var mcpValidationLog = logger.New("cli:mcp_validation")
+
+// GetBinaryPath returns the path to the currently running gh-aw binary.
+// This is used by the MCP server to determine where the gh-aw binary is located
+// when launching itself with different arguments.
+//
+// Returns the absolute path to the binary, or an error if the path cannot be determined.
+func GetBinaryPath() (string, error) {
+	// Get the path to the currently running executable
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Resolve any symlinks to get the actual binary path
+	// This is important because gh extensions are typically symlinked
+	resolvedPath, err := filepath.EvalSymlinks(exePath)
+	if err != nil {
+		// If we can't resolve symlinks, use the original path
+		mcpValidationLog.Printf("Warning: failed to resolve symlinks for %s: %v", exePath, err)
+		return exePath, nil
+	}
+
+	// Get absolute path
+	absPath, err := filepath.Abs(resolvedPath)
+	if err != nil {
+		// If we can't get absolute path, use the resolved path
+		mcpValidationLog.Printf("Warning: failed to get absolute path for %s: %v", resolvedPath, err)
+		return resolvedPath, nil
+	}
+
+	return absPath, nil
+}
 
 // validateServerSecrets checks if required environment variables/secrets are available
 func validateServerSecrets(config parser.MCPServerConfig, verbose bool, useActionsSecrets bool) error {
@@ -168,6 +201,28 @@ func validateServerSecrets(config parser.MCPServerConfig, verbose bool, useActio
 // by running the status command as a test
 func validateMCPServerConfiguration(cmdPath string) error {
 	mcpValidationLog.Printf("Validating MCP server configuration: cmdPath=%s", cmdPath)
+
+	// Determine and log the binary path
+	binaryPath, err := GetBinaryPath()
+	if err != nil {
+		mcpValidationLog.Printf("Warning: failed to get binary path: %v", err)
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: failed to get binary path: %v", err)))
+	} else {
+		// Check if the binary file exists
+		if _, err := os.Stat(binaryPath); err != nil {
+			if os.IsNotExist(err) {
+				mcpValidationLog.Printf("ERROR: binary file does not exist at path: %s", binaryPath)
+				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("ERROR: binary file does not exist at path: %s", binaryPath)))
+				return fmt.Errorf("binary file does not exist at path: %s", binaryPath)
+			}
+			mcpValidationLog.Printf("Warning: failed to stat binary file at %s: %v", binaryPath, err)
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Warning: failed to stat binary file at %s: %v", binaryPath, err)))
+		} else {
+			// Log the binary path for debugging
+			mcpValidationLog.Printf("gh-aw binary path: %s", binaryPath)
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("gh-aw binary path: %s", binaryPath)))
+		}
+	}
 
 	// Try to run the status command to verify CLI is working
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
