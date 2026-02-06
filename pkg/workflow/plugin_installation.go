@@ -8,13 +8,29 @@ import (
 
 var pluginInstallLog = logger.New("workflow:plugin_installation")
 
+// getEffectivePluginGitHubToken returns the GitHub token to use for plugin installation, with cascading precedence:
+// 1. Custom token passed as parameter (e.g., from frontmatter github-token field)
+// 2. secrets.GH_AW_PLUGINS_TOKEN (recommended token for plugin operations)
+// 3. secrets.GH_AW_GITHUB_TOKEN (general-purpose gh-aw token)
+// 4. secrets.GITHUB_TOKEN (default GitHub Actions token)
+// This cascading approach allows users to configure a dedicated token for plugin operations while
+// providing sensible fallbacks for common use cases.
+func getEffectivePluginGitHubToken(customToken string) string {
+	if customToken != "" {
+		pluginInstallLog.Print("Using custom plugin GitHub token from frontmatter")
+		return customToken
+	}
+	pluginInstallLog.Print("Using cascading plugin GitHub token (GH_AW_PLUGINS_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN)")
+	return "${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"
+}
+
 // GeneratePluginInstallationSteps generates GitHub Actions steps to install plugins for the given engine.
 // Each plugin is installed using the engine-specific CLI command with the github-token environment variable set.
 //
 // Parameters:
 //   - plugins: List of plugin repository slugs (e.g., ["org/repo", "org2/repo2"])
 //   - engineID: The engine identifier ("copilot", "claude", "codex")
-//   - githubToken: The GitHub token expression to use for authentication (defaults to "${{ secrets.GITHUB_TOKEN }}")
+//   - githubToken: The GitHub token expression to use for authentication (uses cascading resolution if empty)
 //
 // Returns:
 //   - Slice of GitHubActionStep containing the installation steps for all plugins
@@ -26,16 +42,14 @@ func GeneratePluginInstallationSteps(plugins []string, engineID string, githubTo
 
 	pluginInstallLog.Printf("Generating plugin installation steps: engine=%s, plugins=%d", engineID, len(plugins))
 
-	// Default to GITHUB_TOKEN if no token is specified
-	if githubToken == "" {
-		githubToken = "${{ secrets.GITHUB_TOKEN }}"
-	}
+	// Use cascading token resolution
+	effectiveToken := getEffectivePluginGitHubToken(githubToken)
 
 	var steps []GitHubActionStep
 
 	// Generate installation steps for each plugin
 	for _, plugin := range plugins {
-		step := generatePluginInstallStep(plugin, engineID, githubToken)
+		step := generatePluginInstallStep(plugin, engineID, effectiveToken)
 		steps = append(steps, step)
 		pluginInstallLog.Printf("Generated plugin install step: plugin=%s, engine=%s", plugin, engineID)
 	}

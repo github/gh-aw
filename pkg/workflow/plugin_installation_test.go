@@ -30,16 +30,16 @@ func TestGeneratePluginInstallationSteps(t *testing.T) {
 			expectTokens: []string{},
 		},
 		{
-			name:         "Single plugin for Copilot",
+			name:         "Single plugin for Copilot with custom token",
 			plugins:      []string{"github/test-plugin"},
 			engineID:     "copilot",
-			githubToken:  "${{ secrets.GITHUB_TOKEN }}",
+			githubToken:  "${{ secrets.CUSTOM_TOKEN }}",
 			expectSteps:  1,
 			expectCmds:   []string{"copilot install plugin github/test-plugin"},
-			expectTokens: []string{"${{ secrets.GITHUB_TOKEN }}"},
+			expectTokens: []string{"${{ secrets.CUSTOM_TOKEN }}"},
 		},
 		{
-			name:        "Multiple plugins for Claude",
+			name:        "Multiple plugins for Claude with custom token",
 			plugins:     []string{"github/plugin1", "acme/plugin2"},
 			engineID:    "claude",
 			githubToken: "${{ secrets.CUSTOM_TOKEN }}",
@@ -54,13 +54,13 @@ func TestGeneratePluginInstallationSteps(t *testing.T) {
 			},
 		},
 		{
-			name:         "Plugin for Codex",
+			name:         "Plugin for Codex with cascading token fallback",
 			plugins:      []string{"org/codex-plugin"},
 			engineID:     "codex",
 			githubToken:  "",
 			expectSteps:  1,
 			expectCmds:   []string{"codex install plugin org/codex-plugin"},
-			expectTokens: []string{"${{ secrets.GITHUB_TOKEN }}"}, // Default token
+			expectTokens: []string{"${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}"}, // Cascading fallback
 		},
 	}
 
@@ -181,6 +181,41 @@ func TestPluginInstallationIntegration(t *testing.T) {
 			// Verify GITHUB_TOKEN is set
 			assert.Contains(t, allStepsText, "GITHUB_TOKEN:",
 				"Plugin installation should have GITHUB_TOKEN environment variable")
+
+			// Verify cascading token is used when no custom token provided
+			assert.Contains(t, allStepsText, "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
+				"Plugin installation should use cascading token when no custom token provided")
+		})
+	}
+}
+
+func TestPluginTokenCascading(t *testing.T) {
+	tests := []struct {
+		name          string
+		customToken   string
+		expectedToken string
+	}{
+		{
+			name:          "Custom token provided",
+			customToken:   "${{ secrets.CUSTOM_PLUGIN_TOKEN }}",
+			expectedToken: "${{ secrets.CUSTOM_PLUGIN_TOKEN }}",
+		},
+		{
+			name:          "No custom token - uses cascading fallback",
+			customToken:   "",
+			expectedToken: "${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
+		},
+		{
+			name:          "Frontmatter github-token provided",
+			customToken:   "${{ secrets.MY_GITHUB_TOKEN }}",
+			expectedToken: "${{ secrets.MY_GITHUB_TOKEN }}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getEffectivePluginGitHubToken(tt.customToken)
+			assert.Equal(t, tt.expectedToken, result, "Token resolution should match expected")
 		})
 	}
 }
