@@ -1415,6 +1415,28 @@ function generateCopilotCliStyleSummary(logEntries, options = {}) {
 }
 
 /**
+ * Wraps agent log markdown in a details/summary section
+ * @param {string} markdown - The agent log markdown content
+ * @param {Object} options - Configuration options
+ * @param {string} [options.parserName="Agent"] - Name of the parser (e.g., "Copilot", "Claude")
+ * @param {boolean} [options.open=true] - Whether the section should be open by default
+ * @returns {string} Wrapped markdown in details/summary tags
+ */
+function wrapAgentLogInSection(markdown, options = {}) {
+  const { parserName = "Agent", open = true } = options;
+
+  if (!markdown || markdown.trim().length === 0) {
+    return "";
+  }
+
+  const openAttr = open ? " open" : "";
+  const emoji = "🤖";
+  const title = `${emoji} ${parserName} CLI Session`;
+
+  return `<details${openAttr}>\n<summary>${title}</summary>\n\n${markdown}\n</details>`;
+}
+
+/**
  * Formats safe outputs preview for display in logs
  * @param {string} safeOutputsContent - The raw JSONL content from safe outputs file
  * @param {Object} options - Configuration options
@@ -1591,6 +1613,7 @@ module.exports = {
   formatToolCallAsDetails,
   generatePlainTextSummary,
   generateCopilotCliStyleSummary,
+  wrapAgentLogInSection,
   formatSafeOutputsPreview,
   wrapLogParser,
   createEngineLogParser,
