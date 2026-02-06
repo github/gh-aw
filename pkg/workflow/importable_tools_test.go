@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -228,7 +229,7 @@ Uses imported agentic-workflows tool.
 
 	workflowData := string(lockFileContent)
 
-	// Verify containerized agentic_workflows server is present (per MCP Gateway Specification v1.0.0)
+	// Verify containerized agenticworkflows server is present (per MCP Gateway Specification v1.0.0)
 	// In dev mode, no entrypoint or entrypointArgs (uses container's defaults)
 	if strings.Contains(workflowData, `"entrypointArgs"`) {
 		t.Error("Did not expect entrypointArgs field in dev mode (uses container's CMD)")
@@ -342,7 +343,7 @@ Uses all imported tools.
 		t.Error("Expected compiled workflow to contain serena tool")
 	}
 	// Per MCP Gateway Specification v1.0.0, agentic-workflows uses containerized format
-	if !strings.Contains(workflowData, `"agentic_workflows"`) {
+	if !strings.Contains(workflowData, `"`+constants.AgenticWorkflowsMCPServerID+`"`) {
 		t.Error("Expected compiled workflow to contain agentic-workflows tool")
 	}
 

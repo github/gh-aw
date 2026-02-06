@@ -412,7 +412,7 @@ func (r *MCPConfigRendererUnified) RenderAgenticWorkflowsMCP(yaml *strings.Build
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Builder) {
 	yaml.WriteString("          \n")
-	yaml.WriteString("          [mcp_servers.agentic_workflows]\n")
+	yaml.WriteString("          [mcp_servers." + constants.AgenticWorkflowsMCPServerID + "]\n")
 
 	containerImage := constants.DefaultAlpineImage
 	var entrypoint string
