@@ -384,10 +384,6 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-
-html {
-  scrollbar-gutter: stable;
-}
   background: 
     radial-gradient(ellipse 800px 600px at 20% 30%, rgba(139, 92, 246, 0.15), transparent),
     radial-gradient(ellipse 600px 800px at 80% 70%, rgba(192, 110, 255, 0.12), transparent),
@@ -1325,6 +1321,7 @@ starlight-toc h2 {
 /* Scroll Behavior */
 html {
   scroll-behavior: auto;
+  scrollbar-gutter: stable;
 }
 
 /* Site Title */
