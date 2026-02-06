@@ -34,6 +34,7 @@ func GetBinaryPath() (string, error) {
 
 	// Resolve any symlinks to get the actual binary path
 	// This is important because gh extensions are typically symlinked
+	// Note: EvalSymlinks already returns an absolute path
 	resolvedPath, err := filepath.EvalSymlinks(exePath)
 	if err != nil {
 		// If we can't resolve symlinks, use the original path
@@ -41,15 +42,7 @@ func GetBinaryPath() (string, error) {
 		return exePath, nil
 	}
 
-	// Get absolute path
-	absPath, err := filepath.Abs(resolvedPath)
-	if err != nil {
-		// If we can't get absolute path, use the resolved path
-		mcpValidationLog.Printf("Warning: failed to get absolute path for %s: %v", resolvedPath, err)
-		return resolvedPath, nil
-	}
-
-	return absPath, nil
+	return resolvedPath, nil
 }
 
 // logAndValidateBinaryPath determines the binary path, logs it, and validates it exists.
@@ -232,10 +225,8 @@ func validateMCPServerConfiguration(cmdPath string) error {
 	mcpValidationLog.Printf("Validating MCP server configuration: cmdPath=%s", cmdPath)
 
 	// Determine, log, and validate the binary path
-	if err := logAndValidateBinaryPath(); err != nil {
-		// Log error but don't fail - continue with validation
-		mcpValidationLog.Printf("Binary path validation warning: %v", err)
-	}
+	// Note: logAndValidateBinaryPath handles all logging internally
+	_ = logAndValidateBinaryPath()
 
 	// Try to run the status command to verify CLI is working
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

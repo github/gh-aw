@@ -109,10 +109,8 @@ func runMCPServer(port int, cmdPath string) error {
 	}
 
 	// Determine, log, and validate the binary path
-	if err := logAndValidateBinaryPath(); err != nil {
-		// Log error but don't fail - server can still start
-		mcpLog.Printf("Binary path validation warning: %v", err)
-	}
+	// Note: logAndValidateBinaryPath handles all logging internally
+	_ = logAndValidateBinaryPath()
 
 	// Log current working directory
 	if cwd, err := os.Getwd(); err == nil {
