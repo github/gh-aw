@@ -213,9 +213,9 @@ func TestRenderAgenticWorkflowsMCP_JSON_Copilot(t *testing.T) {
 	if !strings.Contains(output, `"GITHUB_TOKEN"`) {
 		t.Error("Expected GITHUB_TOKEN in env vars")
 	}
-	// Should have working directory args
-	if !strings.Contains(output, `"args": ["-w", "${{ github.workspace }}"]`) {
-		t.Error("Expected args with working directory set to workspace")
+	// Should have network access and working directory args
+	if !strings.Contains(output, `"args": ["--network", "host", "-w", "${{ github.workspace }}"]`) {
+		t.Error("Expected args with network access and working directory set to workspace")
 	}
 }
 

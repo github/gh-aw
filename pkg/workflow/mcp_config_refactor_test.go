@@ -105,11 +105,11 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			expectedContent: []string{
 				`"agenticworkflows": {`,
 				`"type": "stdio"`,
-				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
-				`"DEBUG": "*"`,                                         // Literal value for debug logging
+				`"container": "localhost/gh-aw:dev"`,                             // Dev mode uses locally built image
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
+				`"DEBUG": "*"`,                                                   // Literal value for debug logging
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
@@ -134,11 +134,11 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"container": "alpine:latest"`,
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
 				`"entrypointArgs": ["mcp-server"]`,
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                           // gh-aw binary mount (read-only)
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                                     // gh-aw binary mount (read-only)
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                                   // gh CLI binary mount (read-only)
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				`"DEBUG": "*"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
@@ -156,10 +156,10 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 			actionMode:           ActionModeDev,
 			expectedContent: []string{
 				`"agenticworkflows": {`,
-				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
-				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
-				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
+				`"container": "localhost/gh-aw:dev"`,                             // Dev mode uses locally built image
+				`"${{ github.workspace }}:${{ github.workspace }}:rw"`,           // workspace mount (read-write)
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                     // temp directory mount (read-write)
+				`"args": ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				// Environment variables
 				`"DEBUG": "*"`, // Literal value for debug logging
 				`"GITHUB_TOKEN": "$GITHUB_TOKEN"`,
@@ -302,7 +302,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContent := []string{
 				`[mcp_servers.agenticworkflows]`,
 				tt.expectedContainer,
-				`args = ["-w", "${{ github.workspace }}"]`, // Docker working directory
+				`args = ["--network", "host", "-w", "${{ github.workspace }}"]`, // Network access + working directory
 				`env_vars = ["DEBUG", "GITHUB_TOKEN"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)
