@@ -21,7 +21,7 @@
 #
 # Automatically bundles Dependabot alerts by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
 #
-# frontmatter-hash: 485eda9f24fd2c917f1a0aa2ea86dcb1d1a3bfaa36b8aa5bb1d8804d8b4674d2
+# frontmatter-hash: eb0b886c721f604412472d702a15c426f2ba5fde3eae8948cff0390e8440c449
 
 name: "Dependabot Project Manager"
 "on":
@@ -163,7 +163,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
-          {"add_comment":{"max":10},"assign_to_agent":{"allowed":["copilot"],"default_agent":"copilot","max":10,"target":"*"},"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":50}}
+          {"add_comment":{"max":10},"create_issue":{"max":1},"create_project_status_update":{"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_project":{"max":50}}
           EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
           [
@@ -227,34 +227,6 @@ jobs:
                 "type": "object"
               },
               "name": "add_comment"
-            },
-            {
-              "description": "Assign the GitHub Copilot coding agent to work on an issue or pull request. The agent will analyze the issue/PR and attempt to implement a solution, creating a pull request when complete. Use this to delegate coding tasks to Copilot. Example usage: assign_to_agent(issue_number=123, agent=\"copilot\") or assign_to_agent(pull_number=456, agent=\"copilot\") CONSTRAINTS: Maximum 10 issue(s) can be assigned to agent.",
-              "inputSchema": {
-                "additionalProperties": false,
-                "properties": {
-                  "agent": {
-                    "description": "Agent identifier to assign. Defaults to 'copilot' (the Copilot coding agent) if not specified.",
-                    "type": "string"
-                  },
-                  "issue_number": {
-                    "description": "Issue number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/issues/234). Can also be a temporary_id (e.g., 'aw_abc123def456') from an issue created earlier in the same workflow run. The issue should contain clear, actionable requirements. Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  },
-                  "pull_number": {
-                    "description": "Pull request number to assign the Copilot agent to. This is the numeric ID from the GitHub URL (e.g., 456 in github.com/owner/repo/pull/456). Either issue_number or pull_number must be provided, but not both.",
-                    "type": [
-                      "number",
-                      "string"
-                    ]
-                  }
-                },
-                "type": "object"
-              },
-              "name": "assign_to_agent"
             },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
@@ -509,23 +481,6 @@ jobs:
                   "issueOrPRNumber": true
                 }
               }
-            },
-            "assign_to_agent": {
-              "defaultMax": 1,
-              "fields": {
-                "agent": {
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 128
-                },
-                "issue_number": {
-                  "issueNumberOrTemporaryId": true
-                },
-                "pull_number": {
-                  "optionalPositiveInteger": true
-                }
-              },
-              "customValidation": "requiresOneOf:issue_number,pull_number"
             },
             "create_issue": {
               "defaultMax": 1,
@@ -1186,8 +1141,6 @@ jobs:
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
-          GH_AW_ASSIGNMENT_ERRORS: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_errors }}
-          GH_AW_ASSIGNMENT_ERROR_COUNT: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_error_count }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1338,9 +1291,6 @@ jobs:
       GH_AW_WORKFLOW_ID: "dependabot-project-manager"
       GH_AW_WORKFLOW_NAME: "Dependabot Project Manager"
     outputs:
-      assign_to_agent_assigned: ${{ steps.assign_to_agent.outputs.assigned }}
-      assign_to_agent_assignment_error_count: ${{ steps.assign_to_agent.outputs.assignment_error_count }}
-      assign_to_agent_assignment_errors: ${{ steps.assign_to_agent.outputs.assignment_errors }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
       process_safe_outputs_processed_count: ${{ steps.process_safe_outputs.outputs.processed_count }}
@@ -1395,23 +1345,5 @@ jobs:
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/assign_copilot_to_created_issues.cjs');
-            await main();
-      - name: Assign To Agent
-        id: assign_to_agent
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'assign_to_agent'))
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_AGENT_MAX_COUNT: 10
-          GH_AW_AGENT_DEFAULT: "copilot"
-          GH_AW_AGENT_TARGET: "*"
-          GH_AW_AGENT_ALLOWED: "copilot"
-          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
-        with:
-          github-token: ${{ secrets.GH_AW_AGENT_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/assign_to_agent.cjs');
             await main();
 
