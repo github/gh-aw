@@ -10,7 +10,8 @@ permissions:
   actions: read
 tools:
   agentic-workflows:
-  bash:
+  bash: ["*"]
+  edit:
 safe-outputs:
   create-issue:
     expires: 7d
