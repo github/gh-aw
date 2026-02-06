@@ -60,7 +60,7 @@ func TestValidateBashToolConfig(t *testing.T) {
 			err := validateBashToolConfig(tools, "test-workflow")
 
 			if tt.shouldError {
-				assert.Error(t, err, "Expected error for %s", tt.name)
+				require.Error(t, err, "Expected error for %s", tt.name)
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg, "Error message should contain expected text")
 				}
@@ -132,7 +132,7 @@ func TestNewToolsWithInvalidBash(t *testing.T) {
 
 		// Validation should catch this
 		err := validateBashToolConfig(tools, "test-workflow")
-		assert.Error(t, err, "Expected validation error")
+		require.Error(t, err, "Expected validation error")
 		assert.Contains(t, err.Error(), "anonymous syntax", "Error should mention anonymous syntax")
 	})
 

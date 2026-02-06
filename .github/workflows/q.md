@@ -22,7 +22,7 @@ tools:
       - actions
       - discussions
   edit:
-  bash:
+  bash: false
   cache-memory: true
 safe-outputs:
   add-comment:

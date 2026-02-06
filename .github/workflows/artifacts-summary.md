@@ -15,7 +15,7 @@ sandbox:
   agent: awf  # Firewall enabled (migrated from network.firewall)
 tools:
   edit:
-  bash:
+  bash: false
   github:
     toolsets: [actions, repos]
 safe-outputs:

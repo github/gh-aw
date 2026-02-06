@@ -19,7 +19,7 @@ tools:
     toolsets:
       - default
   edit:
-  bash:
+  bash: false
 safe-outputs:
   add-comment:
     max: 1
