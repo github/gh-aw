@@ -2,7 +2,7 @@
 name: Dependabot Project Manager
 description: Automatically bundles Dependabot alerts by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
 on:
-  schedule: daily
+  #schedule: daily
   workflow_dispatch:
 
 timeout-minutes: 30
@@ -34,7 +34,7 @@ tools:
 
 safe-outputs:
   update-project:
-    project: "https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>"
+    project: "https://github.com/orgs/github/projects/24060"
     max: 50
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     views:
@@ -48,7 +48,7 @@ safe-outputs:
         layout: table
 
   create-project-status-update:
-    project: "https://github.com/orgs/<ORG>/projects/<PROJECT_NUMBER>"
+    project: "https://github.com/orgs/github/projects/24060"
     max: 1
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 
