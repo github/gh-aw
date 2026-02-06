@@ -254,15 +254,17 @@ Uses imported agentic-workflows tool.
 		t.Error("Did not expect /opt/gh-aw mount in dev mode (binary is in image)")
 	}
 
-	// Verify DEBUG, GH_TOKEN and GITHUB_TOKEN are present
+	// Verify DEBUG and GITHUB_TOKEN are present
 	if !strings.Contains(workflowData, `"DEBUG": "*"`) {
 		t.Error("Expected DEBUG set to literal '*' in env vars")
 	}
-	if !strings.Contains(workflowData, `"GH_TOKEN"`) {
-		t.Error("Expected GH_TOKEN in env vars")
-	}
 	if !strings.Contains(workflowData, `"GITHUB_TOKEN"`) {
 		t.Error("Expected GITHUB_TOKEN in env vars")
+	}
+
+	// Verify working directory args are present
+	if !strings.Contains(workflowData, `"args": ["-w", "${{ github.workspace }}"]`) {
+		t.Error("Expected args with working directory")
 	}
 }
 

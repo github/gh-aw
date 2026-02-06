@@ -108,8 +108,8 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
 				`"DEBUG": "*"`,                                         // Literal value for debug logging
-				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
@@ -138,8 +138,8 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                         // gh CLI binary mount (read-only)
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
 				`"DEBUG": "*"`,
-				`"GH_TOKEN": "\${GH_TOKEN}"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
 				`              },`,
 			},
@@ -159,9 +159,9 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"container": "localhost/gh-aw:dev"`,                   // Dev mode uses locally built image
 				`"${{ github.workspace }}:${{ github.workspace }}:rw"`, // workspace mount (read-write)
 				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                           // temp directory mount (read-write)
+				`"args": ["-w", "${{ github.workspace }}"]`,            // Docker working directory
 				// Environment variables
 				`"DEBUG": "*"`, // Literal value for debug logging
-				`"GH_TOKEN": "$GH_TOKEN"`,
 				`"GITHUB_TOKEN": "$GITHUB_TOKEN"`,
 				`              }`,
 			},
@@ -302,7 +302,8 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContent := []string{
 				`[mcp_servers.agentic_workflows]`,
 				tt.expectedContainer,
-				`env_vars = ["DEBUG", "GH_TOKEN", "GITHUB_TOKEN"]`,
+				`args = ["-w", "${{ github.workspace }}"]`, // Docker working directory
+				`env_vars = ["DEBUG", "GITHUB_TOKEN"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)
 

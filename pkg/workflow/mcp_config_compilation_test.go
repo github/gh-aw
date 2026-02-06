@@ -308,15 +308,17 @@ This workflow tests that agentic-workflows uses the correct container in dev mod
 					t.Error("Did not expect /usr/bin/gh mount in dev mode (gh CLI is in image)")
 				}
 
-				// Verify DEBUG, GH_TOKEN and GITHUB_TOKEN are present
+				// Verify DEBUG and GITHUB_TOKEN are present
 				if !strings.Contains(string(lockContent), `"DEBUG": "*"`) {
 					t.Error("Expected DEBUG set to literal '*' in dev mode env vars")
 				}
-				if !strings.Contains(string(lockContent), `"GH_TOKEN"`) {
-					t.Error("Expected GH_TOKEN in dev mode env vars")
-				}
 				if !strings.Contains(string(lockContent), `"GITHUB_TOKEN"`) {
 					t.Error("Expected GITHUB_TOKEN in dev mode env vars")
+				}
+
+				// Verify working directory args are present
+				if !strings.Contains(string(lockContent), `"args": ["-w", "${{ github.workspace }}"]`) {
+					t.Error("Expected args with working directory in dev mode")
 				}
 			}
 		})
