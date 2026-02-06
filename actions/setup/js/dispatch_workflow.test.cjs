@@ -15,12 +15,24 @@ global.context = {
     repo: "test-repo",
   },
   ref: "refs/heads/main",
+  payload: {
+    repository: {
+      default_branch: "main",
+    },
+  },
 };
 
 global.github = {
   rest: {
     actions: {
       createWorkflowDispatch: vi.fn().mockResolvedValue({}),
+    },
+    repos: {
+      get: vi.fn().mockResolvedValue({
+        data: {
+          default_branch: "main",
+        },
+      }),
     },
   },
 };
@@ -351,6 +363,81 @@ describe("dispatch_workflow handler factory", () => {
       repo: "test-repo",
       workflow_id: "test-workflow.lock.yml",
       ref: "refs/heads/feature/add-new-feature",
+      inputs: {},
+    });
+  });
+
+  it("should use repository default branch when no GITHUB_REF is set", async () => {
+    delete process.env.GITHUB_REF;
+    delete process.env.GITHUB_HEAD_REF;
+    global.context.ref = undefined;
+    global.context.payload.repository.default_branch = "develop";
+
+    const config = {
+      workflows: ["test-workflow"],
+      workflow_files: {
+        "test-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "test-workflow",
+      inputs: {},
+    };
+
+    await handler(message, {});
+
+    // Should use the repository's default branch from context
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "test-workflow.lock.yml",
+      ref: "refs/heads/develop",
+      inputs: {},
+    });
+  });
+
+  it("should fall back to API when context payload is missing", async () => {
+    delete process.env.GITHUB_REF;
+    delete process.env.GITHUB_HEAD_REF;
+    global.context.ref = undefined;
+    global.context.payload = {};
+
+    github.rest.repos.get.mockResolvedValueOnce({
+      data: {
+        default_branch: "staging",
+      },
+    });
+
+    const config = {
+      workflows: ["test-workflow"],
+      workflow_files: {
+        "test-workflow": ".lock.yml",
+      },
+    };
+    const handler = await main(config);
+
+    const message = {
+      type: "dispatch_workflow",
+      workflow_name: "test-workflow",
+      inputs: {},
+    };
+
+    await handler(message, {});
+
+    // Should fetch default branch from API
+    expect(github.rest.repos.get).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+    });
+
+    expect(github.rest.actions.createWorkflowDispatch).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      workflow_id: "test-workflow.lock.yml",
+      ref: "refs/heads/staging",
       inputs: {},
     });
   });
