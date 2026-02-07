@@ -49,11 +49,17 @@ type PermissionsConfig struct {
 	OrganizationPackages string `json:"organization-packages,omitempty"`
 }
 
+// PluginMCPConfig represents MCP configuration for a plugin
+type PluginMCPConfig struct {
+	Env map[string]string `json:"env,omitempty"` // Environment variables for MCP server instantiation
+}
+
 // PluginsConfig represents plugin configuration for installation
-// Supports object format with repos list and optional custom github-token
+// Supports object format with repos list, optional custom github-token, and optional MCP configuration
 type PluginsConfig struct {
-	Repos       []string `json:"repos"`                  // List of plugin repository slugs (required)
-	GitHubToken string   `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
+	Repos       []string          `json:"repos"`                  // List of plugin repository slugs (required)
+	GitHubToken string            `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
+	MCP         *PluginMCPConfig  `json:"mcp,omitempty"`          // Optional MCP configuration for plugin
 }
 
 // FrontmatterConfig represents the structured configuration from workflow frontmatter

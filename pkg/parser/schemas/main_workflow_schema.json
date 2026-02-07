@@ -2483,12 +2483,21 @@
       ]
     },
     "plugins": {
-      "description": "Plugin configuration for installing plugins before workflow execution. Supports both array format (list of repos) and object format (repos + custom token).",
+      "description": "Plugin configuration for installing plugins before workflow execution. Supports both array format (list of repos) and object format (repos + custom token + MCP configuration).",
       "examples": [
         ["github/copilot-plugin", "acme/custom-tools"],
         {
           "repos": ["github/copilot-plugin", "acme/custom-tools"],
           "github-token": "${{ secrets.CUSTOM_PLUGIN_TOKEN }}"
+        },
+        {
+          "repos": ["github/mcp-plugin"],
+          "mcp": {
+            "env": {
+              "API_KEY": "${{ secrets.API_KEY }}",
+              "API_URL": "https://api.example.com"
+            }
+          }
         }
       ],
       "oneOf": [
@@ -2503,7 +2512,7 @@
         },
         {
           "type": "object",
-          "description": "Plugin configuration with custom GitHub token. The custom token overrides the default token resolution chain.",
+          "description": "Plugin configuration with optional custom GitHub token and MCP configuration. The custom token overrides the default token resolution chain. The MCP configuration allows plugins to expose MCP servers that are mounted in the gateway.",
           "required": ["repos"],
           "properties": {
             "repos": {
@@ -2519,6 +2528,26 @@
               "type": "string",
               "description": "Custom GitHub token expression to use for plugin installation. Overrides the default cascading token resolution (GH_AW_PLUGINS_TOKEN -> GH_AW_GITHUB_TOKEN -> GITHUB_TOKEN).",
               "examples": ["${{ secrets.CUSTOM_PLUGIN_TOKEN }}"]
+            },
+            "mcp": {
+              "type": "object",
+              "description": "MCP server configuration for the plugin. When defined, the compiler scans the plugin's MCP JSON and mounts it in the gateway with the specified environment variables.",
+              "properties": {
+                "env": {
+                  "type": "object",
+                  "description": "Environment variables to pass when instantiating the MCP server. These variables are made available to the MCP server at runtime and can reference secrets using ${{ secrets.SECRET_NAME }} syntax.",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "examples": [
+                    {
+                      "API_KEY": "${{ secrets.API_KEY }}",
+                      "API_URL": "https://api.example.com"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

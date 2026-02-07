@@ -256,12 +256,12 @@ func extractRuntimesFromFrontmatter(frontmatter map[string]any) map[string]any {
 }
 
 // extractPluginsFromFrontmatter extracts plugins configuration from frontmatter map
-// Returns: (repos []string, customToken string)
-// Supports both array format and object format with optional github-token
-func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string) {
+// Returns: (repos []string, customToken string, mcpConfig *PluginMCPConfig)
+// Supports both array format and object format with optional github-token and mcp configuration
+func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string, *PluginMCPConfig) {
 	value, exists := frontmatter["plugins"]
 	if !exists {
-		return nil, ""
+		return nil, "", nil
 	}
 
 	// Try array format first: ["org/repo1", "org/repo2"]
@@ -272,13 +272,14 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 				plugins = append(plugins, pluginStr)
 			}
 		}
-		return plugins, ""
+		return plugins, "", nil
 	}
 
-	// Try object format: { "repos": [...], "github-token": "..." }
+	// Try object format: { "repos": [...], "github-token": "...", "mcp": {...} }
 	if pluginsMap, ok := value.(map[string]any); ok {
 		var repos []string
 		var token string
+		var mcpConfig *PluginMCPConfig
 
 		// Extract repos array
 		if reposAny, hasRepos := pluginsMap["repos"]; hasRepos {
@@ -298,8 +299,27 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 			}
 		}
 
-		return repos, token
+		// Extract MCP configuration (optional)
+		if mcpAny, hasMCP := pluginsMap["mcp"]; hasMCP {
+			if mcpMap, ok := mcpAny.(map[string]any); ok {
+				mcpConfig = &PluginMCPConfig{}
+
+				// Extract env variables
+				if envAny, hasEnv := mcpMap["env"]; hasEnv {
+					if envMap, ok := envAny.(map[string]any); ok {
+						mcpConfig.Env = make(map[string]string)
+						for k, v := range envMap {
+							if vStr, ok := v.(string); ok {
+								mcpConfig.Env[k] = vStr
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return repos, token, mcpConfig
 	}
 
-	return nil, ""
+	return nil, "", nil
 }

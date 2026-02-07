@@ -19,6 +19,7 @@ type toolsProcessingResult struct {
 	runtimes             map[string]any
 	plugins              []string
 	pluginsToken         string
+	pluginMCPConfig      *PluginMCPConfig // MCP configuration for plugins
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
@@ -139,9 +140,9 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}
 
 	// Extract plugins from frontmatter
-	plugins, pluginsToken := extractPluginsFromFrontmatter(result.Frontmatter)
+	plugins, pluginsToken, pluginMCPConfig := extractPluginsFromFrontmatter(result.Frontmatter)
 	if len(plugins) > 0 {
-		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v)", len(plugins), pluginsToken != "")
+		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v, has_mcp=%v)", len(plugins), pluginsToken != "", pluginMCPConfig != nil)
 	}
 
 	// Merge plugins from imports with top-level plugins
@@ -285,6 +286,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		runtimes:             runtimes,
 		plugins:              plugins,
 		pluginsToken:         pluginsToken,
+		pluginMCPConfig:      pluginMCPConfig,
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,

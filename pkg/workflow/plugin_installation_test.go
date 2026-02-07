@@ -167,7 +167,7 @@ func TestExtractPluginsFromFrontmatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos, token := extractPluginsFromFrontmatter(tt.frontmatter)
+			repos, token, _ := extractPluginsFromFrontmatter(tt.frontmatter)
 			assert.Equal(t, tt.expectedRepos, repos, "Extracted plugin repos should match expected")
 			assert.Equal(t, tt.expectedToken, token, "Extracted plugin token should match expected")
 		})
