@@ -19,7 +19,7 @@ engine:
   id: claude
   max-turns: 15
 plugins:
-  - explanatory-output-style@claude-plugins-official
+  - anthropics/claude-code/plugins/explanatory-output-style
 strict: true
 imports:
   - shared/mood.md

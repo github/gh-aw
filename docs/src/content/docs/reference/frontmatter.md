@@ -108,7 +108,6 @@ plugins:
   - github/test-plugin
   - acme/custom-tools
   - anthropics/claude-code/plugins/explanatory-output-style
-  - pyright-lsp@claude-plugins-official
 ```
 
 **Object format** (with custom token):
@@ -123,8 +122,8 @@ plugins:
 **Plugin identifier formats:**
 - **GitHub repository**: `org/repo` (e.g., `github/test-plugin`)
 - **Sub-plugin path**: `org/repo/path/to/plugin` (e.g., `anthropics/claude-code/plugins/explanatory-output-style`)
-- **Marketplace reference**: `plugin-name@marketplace` (e.g., `pyright-lsp@claude-plugins-official`)
-- **Repository with marketplace**: `org/repo@marketplace` (e.g., `anthropics/claude-code@anthropic-plugins`)
+
+**Note**: The plugin format must be compatible with the engine's CLI `plugin install` command. Currently, GitHub repository paths (with optional sub-paths) are the standard format supported across engines.
 
 **Token precedence** for plugin installation (highest to lowest):
 1. Custom `plugins.github-token` from object format

@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 72ba32a133819f05b1e261c22ffb6b8b8f3ba8d20e79d38d48c22d128efc4d14
+# frontmatter-hash: 0897bff6c9f6cc36ba1c2bb267dfb3f5517ac7af6dfe29f6c1d95fe23a18cf9d
 
 name: "Agent Container Smoke Test"
 "on":
@@ -179,10 +179,10 @@ jobs:
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.405
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.12
-      - name: 'Install plugin: explanatory-output-style@claude-plugins-official'
+      - name: 'Install plugin: anthropics/claude-code/plugins/explanatory-output-style'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-        run: copilot plugin install explanatory-output-style@claude-plugins-official
+        run: copilot plugin install anthropics/claude-code/plugins/explanatory-output-style
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:

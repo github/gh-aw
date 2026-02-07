@@ -27,7 +27,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 1a19cc6d450d2660aed67a43699e03d38308953660647e3c9ba2253071dd5935
+# frontmatter-hash: 6b156db0729a740b5637b61953f291f8439aebda05cd394904d7c4a5dfbd2c01
 
 name: "Smoke Project"
 "on":
@@ -153,10 +153,10 @@ jobs:
         run: npm install -g --silent @openai/codex@0.98.0
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.13.12
-      - name: 'Install plugin: explanatory-output-style@claude-plugins-official'
+      - name: 'Install plugin: anthropics/claude-code/plugins/explanatory-output-style'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-        run: codex plugin install explanatory-output-style@claude-plugins-official
+        run: codex plugin install anthropics/claude-code/plugins/explanatory-output-style
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         env:
