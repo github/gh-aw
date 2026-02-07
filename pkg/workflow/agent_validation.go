@@ -84,11 +84,11 @@ func (c *Compiler) validateAgentFile(workflowData *WorkflowData, markdownPath st
 	if _, err := os.Stat(fullAgentPath); err != nil {
 		if os.IsNotExist(err) {
 			return formatCompilerError(markdownPath, "error",
-				fmt.Sprintf("agent file '%s' does not exist. Ensure the file exists in the repository and is properly imported.", agentPath))
+				fmt.Sprintf("agent file '%s' does not exist. Ensure the file exists in the repository and is properly imported.", agentPath), nil)
 		}
 		// Other error (permissions, etc.)
 		return formatCompilerError(markdownPath, "error",
-			fmt.Sprintf("failed to access agent file '%s': %v", agentPath, err))
+			fmt.Sprintf("failed to access agent file '%s': %v", agentPath, err), err)
 	}
 
 	if c.verbose {
@@ -228,7 +228,7 @@ func (c *Compiler) validateWorkflowRunBranches(workflowData *WorkflowData, markd
 
 	if c.strictMode {
 		// In strict mode, this is an error
-		return formatCompilerError(markdownPath, "error", message)
+		return formatCompilerError(markdownPath, "error", message, nil)
 	}
 
 	// In normal mode, this is a warning
