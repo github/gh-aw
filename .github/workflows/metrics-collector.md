@@ -16,6 +16,8 @@ tools:
     branch-name: memory/meta-orchestrators
     file-glob: "metrics/**"
 timeout-minutes: 15
+imports:
+  - shared/mood.md
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

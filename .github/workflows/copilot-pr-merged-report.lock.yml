@@ -24,9 +24,10 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/gh.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: b2d1a655e9fff80c9bfc631b18a0e649d4f4ab8e2cee7dd7fc13ad3fc15b1248
+# frontmatter-hash: 23f9a8f7cae20a36f4b98dc42128ab7db5d3677130de2a0cb9bd1d77d3e57670
 
 name: "Daily Copilot PR Merged Report"
 "on":
@@ -600,6 +601,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           **IMPORTANT**: Always use the `safeinputs-gh` tool for GitHub CLI commands instead of running `gh` directly via bash. The `safeinputs-gh` tool has proper authentication configured with `GITHUB_TOKEN`, while bash commands do not have GitHub CLI authentication by default.
           
           **Correct**:

@@ -23,9 +23,10 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 4de0cb9c50900cdb511c7ba802591b45de96c981c9bf20b207d94fdfd328ee95
+# frontmatter-hash: ecdacefedd21b4c7137f4d517cbc6e88cffbcf923d831cf2fdfb11d2c073302a
 
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":
@@ -753,6 +754,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels

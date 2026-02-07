@@ -28,9 +28,9 @@ But here's a question that kept us up at night: what if the *infrastructure itse
 
 These agents monitor and analyze the agentic infrastructure itself:
 
-- **[MCP Inspector](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/mcp-inspector.md?plain=1)** - Validates Model Context Protocol configurations — ensures agents can access tools  
-- **[GitHub MCP Tools Report](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/github-mcp-tools-report.md?plain=1)** - Analyzes available MCP tools — **5 merged PRs out of 6 proposed (83% merge rate)**  
-- **[Agent Performance Analyzer](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/agent-performance-analyzer.md?plain=1)** - Meta-orchestrator for agent quality — **29 issues created, 14 leading to PRs (8 merged)**  
+- **[MCP Inspector](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mcp-inspector.md?plain=1)** - Validates Model Context Protocol configurations — ensures agents can access tools  
+- **[GitHub MCP Tools Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/github-mcp-tools-report.md?plain=1)** - Analyzes available MCP tools — **5 merged PRs out of 6 proposed (83% merge rate)**  
+- **[Agent Performance Analyzer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/agent-performance-analyzer.md?plain=1)** - Meta-orchestrator for agent quality — **29 issues created, 14 leading to PRs (8 merged)**  
 
 Infrastructure for AI agents is different from traditional infrastructure - you need to validate that tools are available, properly configured, and actually working. The MCP Inspector continuously validates Model Context Protocol server configurations because a misconfigured MCP server means an agent can't access the tools it needs.
 
@@ -49,19 +49,19 @@ You can add these workflows to your own repository and remix them. Get going wit
 **MCP Inspector:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/mcp-inspector.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mcp-inspector.md
 ```
 
 **GitHub MCP Tools Report:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/github-mcp-tools-report.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/github-mcp-tools-report.md
 ```
 
 **Agent Performance Analyzer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/agent-performance-analyzer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/agent-performance-analyzer.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

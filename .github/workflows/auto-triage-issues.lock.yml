@@ -23,9 +23,10 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: f4071111cd7731031293126bde50e2a0a2fd7006e4fa3c16e2254c0e4c077b43
+# frontmatter-hash: e45aaf413ad8d0b82e2190a8aab5711d2c9842f2a68dae9334a386ceae611752
 
 name: "Auto-Triage Issues"
 "on":
@@ -581,6 +582,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels

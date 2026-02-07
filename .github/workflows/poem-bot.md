@@ -33,6 +33,7 @@ engine:
 
 # Import shared reporting guidelines
 imports:
+  - shared/mood.md
   - shared/reporting.md
 
 # Deny all network access

@@ -51,6 +51,8 @@ steps:
       # Exclude all .yml files in .github/workflows/
       .github/workflows/*.yml
       EOF
+imports:
+  - shared/mood.md
 ---
 
 # Mergefest - Merge Main into Pull Request Branch

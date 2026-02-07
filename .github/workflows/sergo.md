@@ -22,6 +22,7 @@ network:
     - go
 
 imports:
+  - shared/mood.md
   - shared/reporting.md
 
 safe-outputs:

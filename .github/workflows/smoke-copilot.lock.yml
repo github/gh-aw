@@ -25,9 +25,10 @@
 #   Imports:
 #     - shared/gh.md
 #     - shared/github-queries-safe-input.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: df8bdffae79339d3f5310982a1b77d3b57f5a89c9ac800b357ace0c79f9cb682
+# frontmatter-hash: b81319e0683d2730b59ce3601546860e0914e8a155eb123d3c913de9f7737264
 
 name: "Smoke Copilot"
 "on":
@@ -1327,6 +1328,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           **IMPORTANT**: Always use the `safeinputs-gh` tool for GitHub CLI commands instead of running `gh` directly via bash. The `safeinputs-gh` tool has proper authentication configured with `GITHUB_TOKEN`, while bash commands do not have GitHub CLI authentication by default.
           
           **Correct**:

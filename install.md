@@ -102,8 +102,8 @@ If there is branch protection on the default branch, create a pull request inste
 
 After successful initialization, the user can:
 
-- **Add workflows from the catalog**: `gh aw add githubnext/agentics`
-- **Create new workflows**: `gh aw new <workflow-name>`
+- **Add workflows from repos**: `gh aw add githubnext/agentics`
+- **Create new workflows**: `gh aw new <workflow-name>` os using the agent
 - **Use the AI agent**: Type `/agent` in GitHub Copilot Chat and select `agentic-workflows`
 - **Read documentation**: View `.github/aw/github-agentic-workflows.md`
 

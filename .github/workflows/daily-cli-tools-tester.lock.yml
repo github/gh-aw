@@ -21,7 +21,11 @@
 #
 # Daily exploratory testing of audit, logs, and compile tools in gh-aw CLI
 #
-# frontmatter-hash: 58157c3361534be3a0e560ec4352c03e1c40abb58017d361979084761537bfc0
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 66142a570abd73c9369ad0914b9e623a277d6a57179415f8d89d3c3cedaf5fb5
 
 name: "Daily CLI Tools Exploratory Tester"
 "on":
@@ -623,6 +627,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-cli-tools-tester.md}}

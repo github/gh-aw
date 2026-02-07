@@ -11,6 +11,8 @@ safe-outputs:
   create-project-status-update:
     max: 1
     project: "https://github.com/orgs/<ORG>/projects/<NUMBER>"
+imports:
+  - shared/mood.md
 ---
 
 # Test Explicit Project URL Requirement

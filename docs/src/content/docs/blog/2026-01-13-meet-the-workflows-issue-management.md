@@ -28,11 +28,11 @@ Now let's talk about the daily rituals of software development: managing issues 
 
 These agents enhance issue and pull request workflows:
 
-- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues — **77 discussion reports** and **18 parent issues** created  
-- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time — **task dispatcher** for the whole system
-- **[Mergefest](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches — **orchestrator workflow**
-- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically — **orchestrator workflow**
-- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage — **2 merged PRs out of 2 proposed (100% merge rate)**
+- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues — **77 discussion reports** and **18 parent issues** created  
+- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time — **task dispatcher** for the whole system
+- **[Mergefest](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches — **orchestrator workflow**
+- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically — **orchestrator workflow**
+- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage — **2 merged PRs out of 2 proposed (100% merge rate)**
 
 The Issue Arborist is an **organizational workflow** that has created **77 discussion reports** (titled "[Issue Arborist] Issue Arborist Report") and **18 parent issues** to group related sub-issues. It keeps the issue tracker organized by automatically linking related issues, building a dependency tree we'd never maintain manually. For example, [#12037](https://github.com/github/gh-aw/issues/12037) grouped engine documentation updates.
 
@@ -53,31 +53,31 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Issue Arborist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-arborist.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-arborist.md
 ```
 
 **Issue Monster:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-monster.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-monster.md
 ```
 
 **Mergefest:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/mergefest.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mergefest.md
 ```
 
 **Sub Issue Closer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/sub-issue-closer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/sub-issue-closer.md
 ```
 
 **Issue Template Optimizer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/issue-template-optimizer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-template-optimizer.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

@@ -25,9 +25,10 @@
 #   Imports:
 #     - shared/changeset-format.md
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/safe-output-app.md
 #
-# frontmatter-hash: 7e6053030f70916a77adbbfb53db29f50d92e131241225fdaf96cc0085f812ad
+# frontmatter-hash: 00323cca485d5df798f96395c7fafab1ccb655152ac6133c84088fd8277b0255
 
 name: "Changeset Generator"
 "on":
@@ -668,6 +669,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Changeset Format Reference
           
           Based on https://github.com/changesets/changesets/blob/main/docs/adding-a-changeset.md

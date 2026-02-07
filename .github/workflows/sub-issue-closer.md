@@ -25,6 +25,8 @@ safe-outputs:
     target: "*"
     max: 20
 timeout-minutes: 15
+imports:
+  - shared/mood.md
 ---
 
 # Sub-Issue Closer 🔒

@@ -49,6 +49,6 @@ on:
 Add event-triggered workflows to your repository:
 
 ```bash
-gh aw add githubnext/agentics/issue-triage
-gh aw add githubnext/agentics/pr-assistant
+gh aw add-wizard githubnext/agentics/issue-triage
+gh aw add-wizard githubnext/agentics/pr-fix
 ```

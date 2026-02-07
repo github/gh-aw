@@ -20,6 +20,7 @@ engine:
   max-turns: 15
 strict: true
 imports:
+  - shared/mood.md
   - shared/mcp-pagination.md
   - shared/gh.md
   - shared/mcp/tavily.md

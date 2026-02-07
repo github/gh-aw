@@ -24,33 +24,33 @@ In our [previous posts](/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-sim
 
 ## Continuous Improvement Workflows
 
-- **[Go Fan](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer  
-- **[Typist](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/typist.md?plain=1)** - Analyzes type usage patterns for improved safety  
+- **[Go Module Usage Expert (aka Go Fan)](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/go-fan.md?plain=1)** - Daily Go module usage reviewer  
+- **[Typist](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/typist.md?plain=1)** - Analyzes type usage patterns for improved safety  
 - **[Functional Pragmatist](https://github.com/github/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md?plain=1)** - Applies functional techniques pragmatically  
-- **[Repository Quality Improver](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/repository-quality-improver.md?plain=1)** - Holistic code quality analysis  
+- **[Repository Quality Improver](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/repository-quality-improver.md?plain=1)** - Holistic code quality analysis  
 
-### Go Fan: The Dependency Enthusiast 🐹
+### Go Module Usage Expert: The Dependency Enthusiast 🐹
 
-The **Go Fan** is perhaps the most uniquely characterized workflow in the factory - an "enthusiastic Go module expert" who performs daily deep-dive reviews of the project's Go dependencies. This isn't just dependency scanning - it's thoughtful analysis of **how well we're using the tools we've chosen**.
+The **Go Module Usage Expert** is perhaps the most uniquely characterized workflow in the factory - an "enthusiastic Go module expert" who performs daily deep-dive reviews of the project's Go dependencies. This isn't just dependency scanning - it's thoughtful analysis of **how well we're using the tools we've chosen**.
 
-Most dependency tools focus on vulnerabilities or outdated versions. Go Fan asks deeper and more positive questions: Are we using this module's best features? Have recent updates introduced better patterns we should adopt? Could we use a more appropriate module for this use case? Are we following the module's recommended practices?
+Most dependency tools focus on vulnerabilities or outdated versions. Go Module Usage Expert asks deeper and more positive questions: Are we using this module's best features? Have recent updates introduced better patterns we should adopt? Could we use a more appropriate module for this use case? Are we following the module's recommended practices?
 
-Go Fan uses an intelligent selection algorithm. It extracts direct dependencies from `go.mod`, fetches GitHub metadata for each dependency including last update time, sorts by recency to prioritize recently updated modules, uses round-robin selection to cycle through modules ensuring comprehensive coverage, and maintains persistent memory through cache-memory to track which modules were recently reviewed.
+Go Module Usage Expert uses an intelligent selection algorithm. It extracts direct dependencies from `go.mod`, fetches GitHub metadata for each dependency including last update time, sorts by recency to prioritize recently updated modules, uses round-robin selection to cycle through modules ensuring comprehensive coverage, and maintains persistent memory through cache-memory to track which modules were recently reviewed.
 
 This ensures recently updated modules get reviewed first since new features might be relevant, all modules eventually get reviewed so nothing is forgotten, and reviews don't repeat unnecessarily thanks to cache tracking.
 
-For each module, Go Fan researches the repository (releases, docs, best practices), analyzes actual usage patterns using Serena, and generates actionable recommendations. It saves summaries under `scratchpad/mods/` and opens GitHub Discussions.
+For each module, Go Module Usage Expert researches the repository (releases, docs, best practices), analyzes actual usage patterns using Serena, and generates actionable recommendations. It saves summaries under `scratchpad/mods/` and opens GitHub Discussions.
 
-The output of Go Fan is a discussion, which is then often "task mined" for actionable tasks using the [TaskOps](https://github.github.com/gh-aw/patterns/taskops/) design pattern.
+The output of Go Module Usage Expert is a discussion, which is then often "task mined" for actionable tasks using the [TaskOps](https://github.github.com/gh-aw/patterns/taskops/) design pattern.
 
 Let's take a look at an example of how this works:
 
-1. Go Fan created the [Go Module Review: actionlint](https://github.com/github/gh-aw/discussions/7472) after the `actionlint` module was updated.
+1. Go Module Usage Expert created the [Go Module Review: actionlint](https://github.com/github/gh-aw/discussions/7472) discussion after noticing the `actionlint` module was updated.
 2. Peli [requested the Plan agent](https://github.com/github/gh-aw/discussions/7472#discussioncomment-15342254) mine for actionable tasks.
 3. This created [a parent issue](https://github.com/github/gh-aw/issues/7648) and 5 sub-tasks.
 4. The subtasks were then solved by further workflow runs. An example PR is [Implement parallel multi-file actionlint execution](https://github.com/github/gh-aw/issues/7649).
 
-Through this multi-agent causal chain pattern, Go Fan has generated **58 merged PRs out of 74 proposed (78% merge rate)** across 67 module reviews. Notable chains include: spinner improvements (4 PRs from [briandowns/spinner review](https://github.com/github/gh-aw/discussions/5094)), MCP SDK v1.2.0 upgrade (5 PRs from [go-sdk review](https://github.com/github/gh-aw/discussions/7710)), and terminal styling overhaul (3 PRs from [lipgloss review](https://github.com/github/gh-aw/discussions/5158)).
+Through this multi-agent causal chain pattern, Go Module Usage Expert has generated **58 merged PRs out of 74 proposed (78% merge rate)** across 67 module reviews. Notable chains include: spinner improvements (4 PRs from [briandowns/spinner review](https://github.com/github/gh-aw/discussions/5094)), MCP SDK v1.2.0 upgrade (5 PRs from [go-sdk review](https://github.com/github/gh-aw/discussions/7710)), and terminal styling overhaul (3 PRs from [lipgloss review](https://github.com/github/gh-aw/discussions/5158)).
 
 ### Typist: The Type Safety Advocate
 
@@ -71,7 +71,7 @@ Let's take a look at an example of this in practice:
 
 Through this multi-agent causal chain, Typist has produced **19 merged PRs out of 25 proposed (76% merge rate)** from 57 discussions → 22 issues → 25 PRs. The blog example (Discussion #4082 → Issue #4155 → PR #4158) is a verified causal chain.
 
-The static v. dynamic typing debate has raged for decades. Today's hybrid languages like Go, C# and F# support both strong and dynamic typing. Continuous typing improvement offers **a new and refreshing perspective on this old debate**: rather than enforcing strict typing upfront, we can develop quickly with flexibility, then let autonomous agents like Typist trail behind, strengthening type safety over time. This allows us to get the best of both worlds: rapid development without getting bogged down in type design, while still achieving strong typing and safety as the codebase matures.
+The static v. dynamic typing debate has raged for decades. Today's hybrid languages like Go, C#, TypeScript and F# support both strong and dynamic typing. Continuous typing improvement offers **a new and refreshing perspective on this old debate**: rather than enforcing strict typing upfront, we can develop quickly with flexibility, then let autonomous agents like Typist trail behind, strengthening type safety over time. This allows us to get the best of both worlds: rapid development without getting bogged down in type design, while still achieving strong typing and safety as the codebase matures.
 
 ### Functional Pragmatist: The Pragmatic Purist 🔄
 
@@ -106,9 +106,9 @@ Through its multi-agent causal chain (59 discussions → 30 issues → 40 PRs), 
 
 ## The Power of Continuous Improvement
 
-These workflows complete the autonomous improvement picture: Go Fan keeps dependencies fresh, Typist strengthens type safety, Functional Pragmatist applies functional techniques, and Repository Quality Improver maintains coherence.
+These workflows complete the autonomous improvement picture: Go Module Usage Expert keeps dependencies fresh, Typist strengthens type safety, Functional Pragmatist applies functional techniques, and Repository Quality Improver maintains coherence.
 
-Combined with earlier workflows, we have agents improving code at every level: line-level output (Terminal Stylist), function-level complexity (Code Simplifier), file-level organization (Semantic Function Refactor), pattern-level consistency (Go Pattern Detector), functional clarity (Functional Pragmatist), type safety (Typist), module dependencies (Go Fan), and repository coherence (Repository Quality Improver).
+Combined with earlier workflows, we have agents improving code at every level: line-level output (Terminal Stylist), function-level complexity (Code Simplifier), file-level organization (Semantic Function Refactor), pattern-level consistency (Go Pattern Detector), functional clarity (Functional Pragmatist), type safety (Typist), module dependencies (Go Module Usage Expert), and repository coherence (Repository Quality Improver).
 
 This is the future of code quality: not periodic cleanup sprints, but continuous autonomous improvement across every dimension simultaneously.
 
@@ -116,28 +116,28 @@ This is the future of code quality: not periodic cleanup sprints, but continuous
 
 You can add these workflows to your own repository and remix them. Get going with our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/), then run one of the following:
 
-**Go Fan:**
+**Go Module Usage Expert:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/go-fan.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/go-fan.md
 ```
 
 **Typist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/typist.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/typist.md
 ```
 
 **Functional Pragmatist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/main/.github/workflows/functional-programming-enhancer.md
 ```
 
 **Repository Quality Improver:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/repository-quality-improver.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/repository-quality-improver.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

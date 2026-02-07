@@ -23,9 +23,10 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 3755e21d8e5a0add665c8853b7087d700f82e811dc89990a3f626bf933f52158
+# frontmatter-hash: 66c4bfdfd0f5eac2801b02270acb529c9a880bb904e75df280f747faedaff0cf
 
 name: "PR Nitpick Reviewer 🔍"
 "on":
@@ -717,6 +718,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels

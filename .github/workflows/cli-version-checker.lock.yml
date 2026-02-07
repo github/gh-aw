@@ -24,9 +24,10 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: d7c4b4b2ceac740da1e27536d6bda2e84e18bc4aa0ffac6d38594b354ad25bdf
+# frontmatter-hash: 06a1ed687485d95b8fe3d26ba07c4047561ae20018e0e5b010028ab367d63a41
 
 name: "CLI Version Checker"
 "on":
@@ -583,6 +584,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## jqschema - JSON Schema Discovery
           
           A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.

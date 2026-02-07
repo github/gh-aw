@@ -51,6 +51,7 @@ tools:
     - "date *"
 
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/reporting.md
 

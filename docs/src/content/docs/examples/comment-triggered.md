@@ -39,7 +39,7 @@ on:
 Add a ChatOps workflow to your repository:
 
 ```bash
-gh aw add githubnext/agentics/chatops-example
+gh aw add-wizard githubnext/agentics/repo-ask
 ```
 
 Then trigger it by commenting `/review` on a pull request!

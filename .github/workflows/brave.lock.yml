@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/brave.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 0a6c0719f7f50195870d75e86ab032a93a3b0690eac631aafac12778d8b38a73
+# frontmatter-hash: 683e68dc826ae90ab36845403914608d2ae16919e3d0956152b061c60167576d
 
 name: "Brave Web Search Agent"
 "on":
@@ -572,6 +573,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           
           
           

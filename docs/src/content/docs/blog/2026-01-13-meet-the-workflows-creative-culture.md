@@ -28,15 +28,15 @@ But here's the thing: work doesn't have to be all business. While we've built se
 
 These agents facilitate team communication and remind us that work can be fun:
 
-- **[Daily Team Status](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-team-status.md?plain=1)** - Shares team mood and status updates — **22 issues**, **17 discussions** (plus 2 causal chain PRs!)  
-- **[Daily News](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-news.md?plain=1)** - Curates relevant news for the team — **45 news digest discussions**
-- **[Poem Bot](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/poem-bot.md?plain=1)** - Responds to `/poem-bot` commands with creative verses (yes, really)  
-- **[Weekly Issue Summary](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/weekly-issue-summary.md?plain=1)** - Creates digestible summaries complete with charts and trends — **5 weekly analysis discussions**
-- **[Daily Repo Chronicle](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-repo-chronicle.md?plain=1)** - Narrates the day's activity like a storyteller — **6 chronicle discussions**
+- **[Daily Team Status](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-team-status.md?plain=1)** - Shares team mood and status updates — **22 issues**, **17 discussions** (plus 2 causal chain PRs!)  
+- **[Daily News](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-news.md?plain=1)** - Curates relevant news for the team — **45 news digest discussions**
+- **[Poem Bot](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/poem-bot.md?plain=1)** - Responds to `/poem-bot` commands with creative verses (yes, really)  
+- **[Weekly Issue Summary](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/weekly-issue-summary.md?plain=1)** - Creates digestible summaries complete with charts and trends — **5 weekly analysis discussions**
+- **[Daily Repo Chronicle](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-repo-chronicle.md?plain=1)** - Narrates the day's activity like a storyteller — **6 chronicle discussions**
 
 The Poem Bot started as a whimsy in our Copilot for PRs project in 2022. Someone said "wouldn't it be funny if we had an agent that writes poems about our code?" and then we built it. Poem Bot responds to `/poem-bot` commands with creative verses about code, adding a touch of whimsy to the development workflow. We learned that AI agents don't have to be all business - they can build culture and create moments of joy.
 
-Daily News has created **45 news digest discussions** curating relevant developments for the team — for example, [#6932](https://github.com/github/gh-aw/discussions/6932) with the daily status roundup. It doesn't just share links; it adds commentary and connects them to our work.
+Daily News has created **45 news digest discussions** curating relevant developments for the team — for example, [#6932](https://github.com/github/gh-aw/discussions/6932) with the daily status roundup. It shares links, adds commentary and connects them to our work.
 
 Daily Team Status has created **22 issues** and **17 discussions** sharing daily team status updates — for example, [#6930](https://github.com/github/gh-aw/discussions/6930) with the daily team status report. Two of its issues even led to merged PRs by downstream agents, showing that even "soft" workflows can drive concrete improvements.
 
@@ -57,31 +57,31 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Daily Team Status:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-team-status.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-team-status.md
 ```
 
 **Daily News:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-news.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-news.md
 ```
 
 **Poem Bot:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/poem-bot.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/poem-bot.md
 ```
 
 **Weekly Issue Summary:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/weekly-issue-summary.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/weekly-issue-summary.md
 ```
 
 **Daily Repo Chronicle:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-repo-chronicle.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-repo-chronicle.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

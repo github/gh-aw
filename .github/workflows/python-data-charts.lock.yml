@@ -23,11 +23,12 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/trends.md
 #     - shared/charts-with-trending.md
 #
-# frontmatter-hash: b027e9362860b49b84156824c068e8d5ca32806b8edab27a9df20566b6090429
+# frontmatter-hash: 86d56c5df1106cf5af7c52d643d1ddeb70dea4f6aec028a1e7324c9f0f3db65c
 
 name: "Python Data Visualization Generator"
 "on":
@@ -671,6 +672,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           # Charts with Trending - Complete Guide
           
           This shared workflow provides everything you need to create compelling trend visualizations with persistent data storage.
@@ -1217,6 +1222,8 @@ jobs:
           import seaborn as sns
           
           # Set style
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           sns.set_style("whitegrid")
           sns.set_palette("husl")
           
@@ -1228,8 +1235,6 @@ jobs:
           
           # Create chart
           fig, ax = plt.subplots(figsize=(10, 6), dpi=300)
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           summary.plot(kind='bar', ax=ax)
           
           # Customize

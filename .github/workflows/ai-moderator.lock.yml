@@ -20,7 +20,11 @@
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: c44a9cb143fa9505dbd3b9d5c7afe4a543d82deea1a4c5052a636fbec1a2849e
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 8100c57c738a6edcbae1a4445a8370c200ee4dabe1da348a6ab75c64c7e57e47
 
 name: "AI Moderator"
 "on":
@@ -579,6 +583,13 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/ai-moderator.md}}
           PROMPT_EOF
       - name: Substitute placeholders
@@ -791,7 +802,7 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          script: |-
+          script: |
             const actor = context.actor;
             const { owner, repo } = context.repo;
 

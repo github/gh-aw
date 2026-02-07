@@ -15,6 +15,7 @@ permissions:
 name: Smoke Project
 engine: codex
 imports:
+  - shared/mood.md
   - shared/gh.md
   - shared/reporting.md
 network:

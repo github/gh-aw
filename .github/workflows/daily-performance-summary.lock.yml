@@ -24,10 +24,11 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/github-queries-safe-input.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 4fe173ff899c6116bad234c3b2dd4ace4e85f88b65bb683225ece8952be7749a
+# frontmatter-hash: 7d1e69bc3b0d2756d8434c23d8b1b17ece62c437fe7d47ac5823550d63442ae3
 
 name: "Daily Project Performance Summary Generator (Using Safe Inputs)"
 "on":
@@ -1169,6 +1170,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           
           
           # Python Environment Ready

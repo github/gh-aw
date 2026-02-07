@@ -31,6 +31,8 @@ safe-outputs:
     run-success: "🎨 Blueprint complete! [{workflow_name}]({run_url}) has visualized the connections. The architecture speaks for itself! ✅"
     run-failure: "📐 Drafting interrupted! [{workflow_name}]({run_url}) {status}. The diagram remains incomplete..."
 timeout-minutes: 10
+imports:
+  - shared/mood.md
 ---
 
 # Archie - Mermaid Diagram Generator

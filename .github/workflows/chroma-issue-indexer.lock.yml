@@ -23,8 +23,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/chroma.md
+#     - shared/mood.md
 #
-# frontmatter-hash: dbc1d32a392c06506e26b62a1ca05966a17d9f802ce08e8f9fcad9e93603737f
+# frontmatter-hash: 220671e8cf1bf8b27b0d78691d637c2c7f012db6effdd8def4d7940072a79ad2
 
 name: "Chroma Issue Indexer"
 "on":
@@ -351,6 +352,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           
           
           

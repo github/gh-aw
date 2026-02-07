@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/ffmpeg.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 94cc0589aede07110b1d6cf1389de05ec934688bb94f1c2d067d22c1b6b31915
+# frontmatter-hash: f2304eadcdad1d6d90cedf29453667ccc710f1775b3ffc0adb9684b85740b9c0
 
 name: "Video Analysis Agent"
 "on":
@@ -574,6 +575,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           # FFmpeg Usage Guide
           
           FFmpeg and ffprobe have been installed and are available in your PATH. A temporary folder `/tmp/gh-aw/ffmpeg` is available for caching intermediate results.

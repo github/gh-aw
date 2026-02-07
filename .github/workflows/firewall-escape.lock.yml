@@ -21,7 +21,11 @@
 #
 # Security testing to find escape paths in the AWF (Agent Workflow Firewall)
 #
-# frontmatter-hash: 45c40ad663418749f58caddf5c3397cd9a5952095edf17b03e29bdab56a24411
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: fe3a2df8fd1997bea5ed310c527762f76c1e696a8aa649c51e6437865f20e570
 
 name: "The Great Escapi"
 "on":
@@ -593,6 +597,13 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/firewall-escape.md}}
           PROMPT_EOF
       - name: Substitute placeholders
@@ -1043,7 +1054,7 @@ jobs:
       - name: Create issue on test failure
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          script: |-
+          script: |
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,

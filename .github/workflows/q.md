@@ -41,6 +41,8 @@ safe-outputs:
     run-failure: "🔧 Technical difficulties! [{workflow_name}]({run_url}) {status}. Even Q Branch has bad days..."
 timeout-minutes: 15
 strict: true
+imports:
+  - shared/mood.md
 ---
 
 # Q - Agentic Workflow Optimizer

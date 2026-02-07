@@ -16,6 +16,7 @@ permissions:
 engine: copilot
 
 imports:
+  - shared/mood.md
   - shared/ffmpeg.md
 
 tools:

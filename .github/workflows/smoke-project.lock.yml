@@ -24,9 +24,10 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/gh.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: a455dbc6f9efd58fe53f18496559f39f27cf6285ba98edf7970e1baffc4fb505
+# frontmatter-hash: 444a34a300c5972bb914d3c10b44ef630d57544b9654a07681fed0038bf51692
 
 name: "Smoke Project"
 "on":
@@ -886,6 +887,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           **IMPORTANT**: Always use the `safeinputs-gh` tool for GitHub CLI commands instead of running `gh` directly via bash. The `safeinputs-gh` tool has proper authentication configured with `GITHUB_TOKEN`, while bash commands do not have GitHub CLI authentication by default.
           
           **Correct**:

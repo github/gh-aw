@@ -57,6 +57,8 @@ safe-outputs:
 
   add-comment:
     max: 10
+imports:
+  - shared/mood.md
 ---
 
 # Dependabot Project Manager

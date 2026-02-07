@@ -15,6 +15,7 @@ network:
     - defaults
     - github
 imports:
+  - shared/mood.md
   - shared/reporting.md
 tools:
   github:
