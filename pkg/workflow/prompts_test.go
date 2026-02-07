@@ -180,7 +180,7 @@ This is a test workflow with cache-memory enabled.
 	if !strings.Contains(lockStr, "cache_memory_prompt.md") {
 		t.Error("Expected cache template file reference in generated workflow")
 	}
-	if !strings.Contains(lockStr, "GH_AW_CACHE_DIR: ${{ '/tmp/gh-aw/cache-memory/' }}") {
+	if !strings.Contains(lockStr, "GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'") {
 		t.Error("Expected GH_AW_CACHE_DIR environment variable in generated workflow")
 	}
 	if !strings.Contains(lockStr, "GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR") {

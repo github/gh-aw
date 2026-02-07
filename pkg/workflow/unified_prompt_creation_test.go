@@ -532,7 +532,7 @@ func TestGenerateUnifiedPromptCreationStep_CacheAndRepoMemory(t *testing.T) {
 
 	// Verify cache template file reference and environment variables
 	assert.Contains(t, output, "cache_memory_prompt.md", "Should reference cache template file")
-	assert.Contains(t, output, "GH_AW_CACHE_DIR: ${{ '/tmp/gh-aw/cache-memory/' }}", "Should have cache dir env var")
+	assert.Contains(t, output, "GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'", "Should have cache dir env var")
 	assert.Contains(t, output, "GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR", "Should have cache dir in substitution")
 	assert.Contains(t, output, "Repo Memory Available", "Should have repo memory prompt")
 	assert.Contains(t, output, "/tmp/gh-aw/repo-memory/", "Should reference repo memory directory")
@@ -626,7 +626,7 @@ func TestGenerateUnifiedPromptCreationStep_AllToolsCombined(t *testing.T) {
 	assert.Contains(t, output, "temp_folder_prompt.md", "Should have temp folder")
 	assert.Contains(t, output, "playwright_prompt.md", "Should have playwright")
 	assert.Contains(t, output, "cache_memory_prompt.md", "Should have cache memory template")
-	assert.Contains(t, output, "GH_AW_CACHE_DIR: ${{ '/tmp/gh-aw/cache-memory/' }}", "Should have cache dir env var")
+	assert.Contains(t, output, "GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'", "Should have cache dir env var")
 	assert.Contains(t, output, "GH_AW_CACHE_DIR: process.env.GH_AW_CACHE_DIR", "Should have cache dir in substitution")
 	assert.Contains(t, output, "Repo Memory Available", "Should have repo memory")
 	assert.Contains(t, output, "<safe-outputs>", "Should have safe outputs")

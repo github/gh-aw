@@ -391,3 +391,90 @@ func TestGenerateCheckoutGitHubFolder(t *testing.T) {
 		}
 	})
 }
+
+// TestGeneratePlaceholderSubstitutionStep tests the generatePlaceholderSubstitutionStep function
+// to ensure static quoted values are not wrapped in ${{ }} but GitHub expressions are
+func TestGeneratePlaceholderSubstitutionStep(t *testing.T) {
+	tests := []struct {
+		name        string
+		mappings    []*ExpressionMapping
+		expectInStr []string
+		notInStr    []string
+	}{
+		{
+			name: "static quoted values not wrapped",
+			mappings: []*ExpressionMapping{
+				{EnvVar: "GH_AW_CACHE_DESCRIPTION", Content: "''"},
+				{EnvVar: "GH_AW_CACHE_DIR", Content: "'/tmp/gh-aw/cache-memory/'"},
+			},
+			expectInStr: []string{
+				"GH_AW_CACHE_DESCRIPTION: ''",
+				"GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'",
+			},
+			notInStr: []string{
+				"${{ '' }}",
+				"${{ '/tmp/gh-aw/cache-memory/' }}",
+			},
+		},
+		{
+			name: "github expressions wrapped in ${{}}}",
+			mappings: []*ExpressionMapping{
+				{EnvVar: "GH_AW_GITHUB_REPOSITORY", Content: "github.repository"},
+				{EnvVar: "GH_AW_GITHUB_ACTOR", Content: "github.actor"},
+			},
+			expectInStr: []string{
+				"GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}",
+				"GH_AW_GITHUB_ACTOR: ${{ github.actor }}",
+			},
+		},
+		{
+			name: "mixed static and expression values",
+			mappings: []*ExpressionMapping{
+				{EnvVar: "STATIC_VALUE", Content: "'hello'"},
+				{EnvVar: "EXPRESSION_VALUE", Content: "github.event.issue.number"},
+				{EnvVar: "EMPTY_STATIC", Content: "''"},
+			},
+			expectInStr: []string{
+				"STATIC_VALUE: 'hello'",
+				"EXPRESSION_VALUE: ${{ github.event.issue.number }}",
+				"EMPTY_STATIC: ''",
+			},
+			notInStr: []string{
+				"${{ 'hello' }}",
+				"${{ '' }}",
+			},
+		},
+		{
+			name: "double-quoted static values",
+			mappings: []*ExpressionMapping{
+				{EnvVar: "DOUBLE_QUOTED", Content: `"value"`},
+			},
+			expectInStr: []string{
+				`DOUBLE_QUOTED: "value"`,
+			},
+			notInStr: []string{
+				`${{ "value" }}`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var yaml strings.Builder
+			generatePlaceholderSubstitutionStep(&yaml, tt.mappings, "      ")
+			result := yaml.String()
+
+			for _, expected := range tt.expectInStr {
+				if !strings.Contains(result, expected) {
+					t.Errorf("Result missing expected string %q\nGot:\n%s", expected, result)
+				}
+			}
+
+			for _, notExpected := range tt.notInStr {
+				if strings.Contains(result, notExpected) {
+					t.Errorf("Result should not contain %q\nGot:\n%s", notExpected, result)
+				}
+			}
+		})
+	}
+}

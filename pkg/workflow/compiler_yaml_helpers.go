@@ -68,8 +68,19 @@ func generatePlaceholderSubstitutionStep(yaml *strings.Builder, expressionMappin
 	yaml.WriteString(indent + "    GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
 
 	// Add all environment variables
+	// For static values (wrapped in quotes), output them directly without ${{ }}
+	// For GitHub expressions, wrap them in ${{ }}
 	for _, mapping := range expressionMappings {
-		fmt.Fprintf(yaml, indent+"    %s: ${{ %s }}\n", mapping.EnvVar, mapping.Content)
+		content := mapping.Content
+		// Check if this is a static quoted value (starts and ends with quotes)
+		if (strings.HasPrefix(content, "'") && strings.HasSuffix(content, "'")) ||
+			(strings.HasPrefix(content, "\"") && strings.HasSuffix(content, "\"")) {
+			// Static value - output directly without ${{ }} wrapper
+			fmt.Fprintf(yaml, indent+"    %s: %s\n", mapping.EnvVar, content)
+		} else {
+			// GitHub expression - wrap in ${{ }}
+			fmt.Fprintf(yaml, indent+"    %s: ${{ %s }}\n", mapping.EnvVar, content)
+		}
 	}
 
 	yaml.WriteString(indent + "  with:\n")
