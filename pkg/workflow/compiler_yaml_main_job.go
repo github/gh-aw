@@ -76,10 +76,9 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 			// Convert to JSON array for the script
 			repoImportsJSON, err := json.Marshal(data.RepositoryImports)
 			if err != nil {
-				compilerYamlLog.Printf("Warning: failed to marshal repository imports: %v", err)
-			} else {
-				fmt.Fprintf(yaml, "          GH_AW_REPOSITORY_IMPORTS: '%s'\n", string(repoImportsJSON))
+				return fmt.Errorf("failed to marshal repository imports for merge step: %w", err)
 			}
+			fmt.Fprintf(yaml, "          GH_AW_REPOSITORY_IMPORTS: '%s'\n", string(repoImportsJSON))
 		}
 
 		// Set agent import spec if present (legacy path)
