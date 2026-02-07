@@ -22,7 +22,7 @@ tools:
 
 ## Frontmatter Elements
 
-The frontmatter combines standard GitHub Actions properties (`on`, `permissions`, `run-name`, `runs-on`, `timeout-minutes`, `concurrency`, `env`, `environment`, `container`, `services`, `if`, `steps`, `cache`) with GitHub Agentic Workflows-specific elements (`description`, `source`, `github-token`, `imports`, `engine`, `strict`, `roles`, `features`, `safe-inputs`, `safe-outputs`, `network`, `tools`).
+The frontmatter combines standard GitHub Actions properties (`on`, `permissions`, `run-name`, `runs-on`, `timeout-minutes`, `concurrency`, `env`, `environment`, `container`, `services`, `if`, `steps`, `cache`) with GitHub Agentic Workflows-specific elements (`description`, `source`, `github-token`, `imports`, `engine`, `strict`, `roles`, `features`, `plugins`, `runtimes`, `safe-inputs`, `safe-outputs`, `network`, `tools`).
 
 Tool configurations (such as `bash`, `edit`, `github`, `web-fetch`, `web-search`, `playwright`, `cache-memory`, and custom [Model Context Protocol](/gh-aw/reference/glossary/#mcp-model-context-protocol) (MCP) [servers](/gh-aw/reference/glossary/#mcp-server)) are specified under the `tools:` key. Custom inline tools can be defined with the [`safe-inputs:`](/gh-aw/reference/safe-inputs/) (custom tools defined inline) key. See [Tools](/gh-aw/reference/tools/) and [Safe Inputs](/gh-aw/reference/safe-inputs/) for complete documentation.
 
@@ -126,6 +126,72 @@ plugins:
 5. `${{ secrets.GITHUB_TOKEN }}` (default)
 
 Each plugin repository must be specified in `org/repo` format. The compiler generates installation steps that run after the engine CLI is installed but before workflow execution begins.
+
+### Runtimes (`runtimes:`)
+
+Override default runtime versions for languages and tools used in workflows. The compiler automatically detects runtime requirements from tool configurations and workflow steps, then installs the specified versions.
+
+**Format**: Object with runtime name as key and configuration as value
+
+**Fields per runtime**:
+- `version`: Runtime version string (required)
+- `action-repo`: Custom GitHub Actions setup action (optional, overrides default)
+- `action-version`: Version of the setup action (optional, overrides default)
+
+**Supported runtimes**:
+
+| Runtime | Default Version | Default Setup Action |
+|---------|----------------|---------------------|
+| `node` | 24 | `actions/setup-node@v6` |
+| `python` | 3.12 | `actions/setup-python@v5` |
+| `go` | 1.25 | `actions/setup-go@v5` |
+| `uv` | latest | `astral-sh/setup-uv@v5` |
+| `bun` | 1.1 | `oven-sh/setup-bun@v2` |
+| `deno` | 2.x | `denoland/setup-deno@v2` |
+| `ruby` | 3.3 | `ruby/setup-ruby@v1` |
+| `java` | 21 | `actions/setup-java@v4` |
+| `dotnet` | 8.0 | `actions/setup-dotnet@v4` |
+| `elixir` | 1.17 | `erlef/setup-beam@v1` |
+| `haskell` | 9.10 | `haskell-actions/setup@v2` |
+
+**Examples**:
+
+Override Node.js version:
+```yaml wrap
+runtimes:
+  node:
+    version: "22"
+```
+
+Use specific Python version with custom setup action:
+```yaml wrap
+runtimes:
+  python:
+    version: "3.12"
+    action-repo: "actions/setup-python"
+    action-version: "v5"
+```
+
+Multiple runtime overrides:
+```yaml wrap
+runtimes:
+  node:
+    version: "20"
+  python:
+    version: "3.11"
+  go:
+    version: "1.22"
+```
+
+**Default Behavior**: If not specified, workflows use default runtime versions as defined in the system. The compiler automatically detects which runtimes are needed based on tool configurations (e.g., `bash: ["node"]`, `bash: ["python"]`) and workflow steps.
+
+**Use Cases**:
+- Pin specific runtime versions for reproducibility
+- Use preview/beta runtime versions for testing
+- Use custom setup actions (forks, enterprise mirrors)
+- Override system defaults for compatibility requirements
+
+**Note**: Runtimes from imported shared workflows are automatically merged with your workflow's runtime configuration.
 
 ### Permissions (`permissions:`)
 
