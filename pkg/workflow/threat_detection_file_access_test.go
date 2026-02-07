@@ -306,4 +306,3 @@ func TestBuildThreatDetectionAnalysisStep_ConfiguresEnvironment(t *testing.T) {
 		})
 	}
 }
-
