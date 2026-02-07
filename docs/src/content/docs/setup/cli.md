@@ -565,6 +565,23 @@ gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link
 
 **Related:** See [Tokens Reference](/gh-aw/reference/tokens/) for complete token configuration guide.
 
+#### `hash-frontmatter`
+
+Compute a deterministic SHA-256 hash of workflow frontmatter for detecting configuration changes.
+
+```bash wrap
+gh aw hash-frontmatter my-workflow.md
+gh aw hash-frontmatter .github/workflows/audit-workflows.md
+```
+
+The hash includes:
+- All frontmatter fields from the main workflow
+- Frontmatter from all imported workflows (BFS traversal)
+- Template expressions containing `env.` or `vars.` from the markdown body
+- Version information (gh-aw, awf, agents)
+
+The hash can be used to detect configuration changes between compilation and execution.
+
 ## Shell Completions
 
 Enable tab completion for workflow names, engines, and paths.
