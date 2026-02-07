@@ -24,6 +24,8 @@ safe-outputs:
     run-success: "😤 Fine. [{workflow_name}]({run_url}) finished the review. It wasn't completely terrible. I guess. 🙄"
     run-failure: "😤 Great. [{workflow_name}]({run_url}) {status}. As if my day couldn't get any worse..."
 timeout-minutes: 10
+imports:
+  - shared/mood.md
 ---
 
 # Grumpy Code Reviewer 🔥

@@ -31,6 +31,8 @@ safe-outputs:
     run-success: "🔒 [{workflow_name}]({run_url}) completed the security review."
     run-failure: "⚠️ [{workflow_name}]({run_url}) {status} during security review."
 timeout-minutes: 15
+imports:
+  - shared/mood.md
 ---
 
 # Security Review Agent 🔒

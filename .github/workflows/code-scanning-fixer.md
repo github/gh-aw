@@ -31,6 +31,8 @@ safe-outputs:
     labels: [security, automated-fix, agentic-campaign, z_campaign_security-alert-burndown]
     reviewers: [copilot]
 timeout-minutes: 20
+imports:
+  - shared/mood.md
 ---
 
 # Code Scanning Alert Fixer Agent

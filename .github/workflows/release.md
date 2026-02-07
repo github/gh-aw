@@ -365,6 +365,8 @@ steps:
       find docs -type f -name "*.md" 2>/dev/null > /tmp/gh-aw/release-data/docs_files.txt || echo "No docs directory found"
       
       echo "✓ Setup complete. Data available in /tmp/gh-aw/release-data/"
+imports:
+  - shared/mood.md
 ---
 
 # Release Highlights Generator

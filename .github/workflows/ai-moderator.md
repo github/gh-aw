@@ -87,6 +87,8 @@ jobs:
               core.info(`✅ Running workflow - assuming external user`);
               core.setOutput('should_skip', 'false');
             }
+imports:
+  - shared/mood.md
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

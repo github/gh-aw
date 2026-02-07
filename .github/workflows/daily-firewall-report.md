@@ -34,6 +34,7 @@ tools:
     - "*"
   edit:
 imports:
+  - shared/mood.md
   - shared/reporting.md
   - shared/trending-charts-simple.md
 ---

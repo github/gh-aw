@@ -24,6 +24,8 @@ safe-outputs:
   close-discussion:
     required-category: "Ideas"
 timeout-minutes: 10
+imports:
+  - shared/mood.md
 ---
 
 # Planning Assistant

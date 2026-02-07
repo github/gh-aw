@@ -16,6 +16,7 @@ permissions:
 name: Smoke Copilot
 engine: copilot
 imports:
+  - shared/mood.md
   - shared/gh.md
   - shared/reporting.md
   - shared/github-queries-safe-input.md

@@ -32,6 +32,7 @@ safe-outputs:
   upload-asset:
 timeout-minutes: 20
 imports:
+  - shared/mood.md
   - shared/reporting.md
   - shared/jqschema.md
   - shared/trending-charts-simple.md

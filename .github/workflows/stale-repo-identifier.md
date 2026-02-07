@@ -22,6 +22,7 @@ strict: true
 timeout-minutes: 45
 
 imports:
+  - shared/mood.md
   - shared/python-dataviz.md
   - shared/jqschema.md
   - shared/trending-charts-simple.md

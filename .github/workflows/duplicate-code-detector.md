@@ -21,6 +21,8 @@ safe-outputs:
     max: 3
 timeout-minutes: 15
 strict: true
+imports:
+  - shared/mood.md
 ---
 
 # Duplicate Code Detection

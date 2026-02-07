@@ -25,6 +25,8 @@ safe-outputs:
     max: 6  # 1 parent + 5 sub-issues
     group: true
 timeout-minutes: 20
+imports:
+  - shared/mood.md
 ---
 
 # CLI Consistency Checker

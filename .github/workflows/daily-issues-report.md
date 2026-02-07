@@ -27,6 +27,7 @@ safe-outputs:
     max: 10
 timeout-minutes: 30
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/issues-data-fetch.md
   - shared/python-dataviz.md

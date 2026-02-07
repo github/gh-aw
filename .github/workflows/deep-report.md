@@ -53,6 +53,7 @@ tools:
   edit:
 
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/weekly-issues-data-fetch.md
   - shared/reporting.md

@@ -29,6 +29,8 @@ safe-outputs:
     expires: 2h
     title-prefix: "[dev] "
     draft: true
+imports:
+  - shared/mood.md
 ---
 
 # Build, Test, and Add Poem

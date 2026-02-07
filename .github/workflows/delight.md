@@ -56,6 +56,7 @@ tools:
 timeout-minutes: 30
 
 imports:
+  - shared/mood.md
   - shared/reporting.md
   - shared/jqschema.md
 

@@ -50,6 +50,7 @@ engine: claude
 timeout-minutes: 10
 
 imports:
+  - shared/mood.md
   - shared/mcp/ast-grep.md
 
 safe-outputs:

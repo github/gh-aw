@@ -44,6 +44,7 @@ safe-outputs:
     close-older-discussions: true
 timeout-minutes: 20
 imports:
+  - shared/mood.md
   - copilot-setup-steps.yml    # Import setup steps from copilot-setup-steps.yml
   - shared/reporting.md
   - shared/python-dataviz.md

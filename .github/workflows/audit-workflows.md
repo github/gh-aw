@@ -26,6 +26,7 @@ safe-outputs:
     close-older-discussions: true
 timeout-minutes: 30
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/reporting.md
   - shared/trending-charts-simple.md

@@ -15,6 +15,7 @@ safe-outputs:
     max: 1
 timeout-minutes: 5
 imports:
+  - shared/mood.md
   - shared/actions-ai-inference.md
 strict: true
 ---

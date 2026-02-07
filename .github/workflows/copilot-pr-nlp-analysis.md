@@ -31,6 +31,7 @@ safe-outputs:
     close-older-discussions: true
 
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/python-dataviz.md
   - shared/reporting.md
