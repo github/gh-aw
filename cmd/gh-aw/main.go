@@ -8,7 +8,7 @@ import (
 	"github.com/github/gh-aw/pkg/cli"
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
-	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
@@ -28,15 +28,15 @@ func validateEngine(engine string) error {
 	validEngines := []string{"claude", "codex", "copilot", "custom"}
 
 	if engine != "" && engine != "claude" && engine != "codex" && engine != "copilot" && engine != "custom" {
-		// Try to find a close match for "did you mean" suggestion
-		suggestion := stringutil.FindClosestMatch(engine, validEngines)
+		// Try to find close matches for "did you mean" suggestion
+		suggestions := parser.FindClosestMatches(engine, validEngines, 1)
 
 		errMsg := fmt.Sprintf("invalid engine value '%s'. Must be '%s'",
 			engine, strings.Join(validEngines, "', '"))
 
-		if suggestion != "" {
+		if len(suggestions) > 0 {
 			errMsg = fmt.Sprintf("invalid engine value '%s'. Must be '%s'.\n\nDid you mean: %s?",
-				engine, strings.Join(validEngines, "', '"), suggestion)
+				engine, strings.Join(validEngines, "', '"), suggestions[0])
 		}
 
 		return fmt.Errorf("%s", errMsg)

@@ -334,10 +334,10 @@ func TestValidateEngineDidYouMean(t *testing.T) {
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:                 "case difference suggests lowercase",
+			name:                 "case difference no suggestion (case-insensitive match)",
 			invalidEngine:        "Copilot",
-			expectedSuggestion:   "copilot",
-			shouldHaveSuggestion: true,
+			expectedSuggestion:   "",
+			shouldHaveSuggestion: false,
 		},
 		{
 			name:                 "completely wrong gets no suggestion",

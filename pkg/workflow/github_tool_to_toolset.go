@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/stringutil"
+	"github.com/github/gh-aw/pkg/parser"
 )
 
 var githubToolToToolsetLog = logger.New("workflow:github_tool_to_toolset")
@@ -69,12 +69,12 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 			}
 			sort.Strings(validTools)
 
-			// Try to find a close match
-			suggestion := stringutil.FindClosestMatch(tool, validTools)
-			if suggestion != "" {
-				githubToolToToolsetLog.Printf("Found suggestion for unknown tool %s: %s", tool, suggestion)
+			// Try to find close matches
+			matches := parser.FindClosestMatches(tool, validTools, 1)
+			if len(matches) > 0 {
+				githubToolToToolsetLog.Printf("Found suggestion for unknown tool %s: %s", tool, matches[0])
 				unknownTools = append(unknownTools, tool)
-				suggestions = append(suggestions, fmt.Sprintf("%s → %s", tool, suggestion))
+				suggestions = append(suggestions, fmt.Sprintf("%s → %s", tool, matches[0]))
 			} else {
 				githubToolToToolsetLog.Printf("No suggestion found for unknown tool: %s", tool)
 				unknownTools = append(unknownTools, tool)
