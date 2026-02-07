@@ -30,7 +30,9 @@ func stableHash(s string, modulo int) int {
 // ScatterSchedule takes a fuzzy cron expression and a workflow identifier
 // and returns a deterministic scattered time for that workflow
 func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
+	scheduleFuzzyScatterLog.Printf("Scattering schedule: fuzzyCron=%s, workflowId=%s", fuzzyCron, workflowIdentifier)
 	if !IsFuzzyCron(fuzzyCron) {
+		scheduleFuzzyScatterLog.Printf("Invalid fuzzy cron expression: %s", fuzzyCron)
 		return "", fmt.Errorf("not a fuzzy schedule: %s", fuzzyCron)
 	}
 
@@ -85,8 +87,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := scatteredMinutes / 60
 		minute := scatteredMinutes % 60
 
+		result := fmt.Sprintf("%d %d * * *", minute, hour)
+		scheduleFuzzyScatterLog.Printf("FUZZY:DAILY_AROUND scattered: original=%d:%d, scattered=%d:%d, result=%s", targetHour, targetMinute, hour, minute, result)
 		// Return scattered daily cron: minute hour * * *
-		return fmt.Sprintf("%d %d * * *", minute, hour), nil
+		return result, nil
 	}
 
 	// For FUZZY:DAILY_BETWEEN:START_H:START_M:END_H:END_M * * *, scatter within the time range
@@ -152,8 +156,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := scatteredMinutes / 60
 		minute := scatteredMinutes % 60
 
+		result := fmt.Sprintf("%d %d * * *", minute, hour)
+		scheduleFuzzyScatterLog.Printf("FUZZY:DAILY_BETWEEN scattered: start=%d:%d, end=%d:%d, scattered=%d:%d, result=%s", startHour, startMinute, endHour, endMinute, hour, minute, result)
 		// Return scattered daily cron: minute hour * * *
-		return fmt.Sprintf("%d %d * * *", minute, hour), nil
+		return result, nil
 	}
 
 	// For FUZZY:DAILY * * *, we scatter across 24 hours
@@ -164,8 +170,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := hash / 60
 		minute := hash % 60
 
+		result := fmt.Sprintf("%d %d * * *", minute, hour)
+		scheduleFuzzyScatterLog.Printf("FUZZY:DAILY scattered: hash=%d, result=%s", hash, result)
 		// Return scattered daily cron: minute hour * * *
-		return fmt.Sprintf("%d %d * * *", minute, hour), nil
+		return result, nil
 	}
 
 	// For FUZZY:HOURLY/N * * *, we scatter the minute offset within the hour
@@ -186,8 +194,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		// Use a stable hash to get a deterministic minute offset (0-59)
 		minute := stableHash(workflowIdentifier, 60)
 
+		result := fmt.Sprintf("%d */%d * * *", minute, interval)
+		scheduleFuzzyScatterLog.Printf("FUZZY:HOURLY/%d scattered: minute=%d, result=%s", interval, minute, result)
 		// Return scattered hourly cron: minute */N * * *
-		return fmt.Sprintf("%d */%d * * *", minute, interval), nil
+		return result, nil
 	}
 
 	// For FUZZY:WEEKLY_AROUND:DOW:HH:MM * * *, scatter around the target time on specific weekday
@@ -242,8 +252,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := scatteredMinutes / 60
 		minute := scatteredMinutes % 60
 
+		result := fmt.Sprintf("%d %d * * %s", minute, hour, weekday)
+		scheduleFuzzyScatterLog.Printf("FUZZY:WEEKLY_AROUND scattered: weekday=%s, target=%d:%d, scattered=%d:%d, result=%s", weekday, targetHour, targetMinute, hour, minute, result)
 		// Return scattered weekly cron: minute hour * * DOW
-		return fmt.Sprintf("%d %d * * %s", minute, hour, weekday), nil
+		return result, nil
 	}
 
 	// For FUZZY:WEEKLY:DOW * * *, we scatter time on specific weekday
@@ -263,8 +275,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := hash / 60
 		minute := hash % 60
 
+		result := fmt.Sprintf("%d %d * * %s", minute, hour, weekday)
+		scheduleFuzzyScatterLog.Printf("FUZZY:WEEKLY:%s scattered: hash=%d, result=%s", weekday, hash, result)
 		// Return scattered weekly cron: minute hour * * DOW
-		return fmt.Sprintf("%d %d * * %s", minute, hour, weekday), nil
+		return result, nil
 	}
 
 	// For FUZZY:WEEKLY * * *, we scatter across all weekdays and times
@@ -279,8 +293,10 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := minutesInDay / 60
 		minute := minutesInDay % 60
 
+		result := fmt.Sprintf("%d %d * * %d", minute, hour, weekday)
+		scheduleFuzzyScatterLog.Printf("FUZZY:WEEKLY scattered: weekday=%d, time=%d:%d, result=%s", weekday, hour, minute, result)
 		// Return scattered weekly cron: minute hour * * DOW
-		return fmt.Sprintf("%d %d * * %d", minute, hour, weekday), nil
+		return result, nil
 	}
 
 	// For FUZZY:BI_WEEKLY * * *, we scatter across 2 weeks (14 days)
@@ -294,9 +310,11 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := minutesInDay / 60
 		minute := minutesInDay % 60
 
+		result := fmt.Sprintf("%d %d */%d * *", minute, hour, 14)
+		scheduleFuzzyScatterLog.Printf("FUZZY:BI_WEEKLY scattered: time=%d:%d, result=%s", hour, minute, result)
 		// Convert to cron: We use day-of-month pattern with 14-day interval
 		// Schedule every 14 days at the scattered time
-		return fmt.Sprintf("%d %d */%d * *", minute, hour, 14), nil
+		return result, nil
 	}
 
 	// For FUZZY:TRI_WEEKLY * * *, we scatter across 3 weeks (21 days)
@@ -310,10 +328,13 @@ func ScatterSchedule(fuzzyCron, workflowIdentifier string) (string, error) {
 		hour := minutesInDay / 60
 		minute := minutesInDay % 60
 
+		result := fmt.Sprintf("%d %d */%d * *", minute, hour, 21)
+		scheduleFuzzyScatterLog.Printf("FUZZY:TRI_WEEKLY scattered: time=%d:%d, result=%s", hour, minute, result)
 		// Convert to cron: We use day-of-month pattern with 21-day interval
 		// Schedule every 21 days at the scattered time
-		return fmt.Sprintf("%d %d */%d * *", minute, hour, 21), nil
+		return result, nil
 	}
 
+	scheduleFuzzyScatterLog.Printf("Unsupported fuzzy schedule type: %s", fuzzyCron)
 	return "", fmt.Errorf("unsupported fuzzy schedule type: %s", fuzzyCron)
 }

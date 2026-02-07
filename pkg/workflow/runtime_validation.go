@@ -60,8 +60,8 @@ var runtimeValidationLog = logger.New("workflow:runtime_validation")
 
 // validateExpressionSizes validates that no expression values in the generated YAML exceed GitHub Actions limits
 func (c *Compiler) validateExpressionSizes(yamlContent string) error {
-	runtimeValidationLog.Print("Validating expression sizes in generated YAML")
 	lines := strings.Split(yamlContent, "\n")
+	runtimeValidationLog.Printf("Validating expression sizes: yaml_lines=%d, max_size=%d", len(lines), MaxExpressionSize)
 	maxSize := MaxExpressionSize
 
 	for lineNum, line := range lines {
@@ -97,6 +97,7 @@ func (c *Compiler) validateExpressionSizes(yamlContent string) error {
 // validateContainerImages validates that container images specified in MCP configs exist and are accessible
 func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 	if workflowData.Tools == nil {
+		runtimeValidationLog.Print("No tools configured, skipping container validation")
 		return nil
 	}
 
@@ -145,6 +146,7 @@ func (c *Compiler) validateContainerImages(workflowData *WorkflowData) error {
 		)
 	}
 
+	runtimeValidationLog.Print("Container image validation passed")
 	return nil
 }
 
@@ -159,23 +161,30 @@ func (c *Compiler) validateRuntimePackages(workflowData *WorkflowData) error {
 		switch req.Runtime.ID {
 		case "node":
 			// Validate npx packages used in the workflow
+			runtimeValidationLog.Print("Validating npx packages")
 			if err := c.validateNpxPackages(workflowData); err != nil {
+				runtimeValidationLog.Printf("Npx package validation failed: %v", err)
 				errors = append(errors, err.Error())
 			}
 		case "python":
 			// Validate pip packages used in the workflow
+			runtimeValidationLog.Print("Validating pip packages")
 			if err := c.validatePipPackages(workflowData); err != nil {
+				runtimeValidationLog.Printf("Pip package validation failed: %v", err)
 				errors = append(errors, err.Error())
 			}
 		case "uv":
 			// Validate uv packages used in the workflow
+			runtimeValidationLog.Print("Validating uv packages")
 			if err := c.validateUvPackages(workflowData); err != nil {
+				runtimeValidationLog.Printf("Uv package validation failed: %v", err)
 				errors = append(errors, err.Error())
 			}
 		}
 	}
 
 	if len(errors) > 0 {
+		runtimeValidationLog.Printf("Runtime package validation completed with %d errors", len(errors))
 		return NewValidationError(
 			"runtime.packages",
 			fmt.Sprintf("%d package validation errors", len(errors)),
@@ -184,6 +193,7 @@ func (c *Compiler) validateRuntimePackages(workflowData *WorkflowData) error {
 		)
 	}
 
+	runtimeValidationLog.Print("Runtime package validation passed")
 	return nil
 }
 
@@ -195,6 +205,7 @@ func collectPackagesFromWorkflow(
 	extractor func(string) []string,
 	toolCommand string,
 ) []string {
+	runtimeValidationLog.Printf("Collecting packages from workflow: toolCommand=%s", toolCommand)
 	var packages []string
 	seen := make(map[string]bool)
 
@@ -264,14 +275,17 @@ func collectPackagesFromWorkflow(
 		}
 	}
 
+	runtimeValidationLog.Printf("Collected %d unique packages", len(packages))
 	return packages
 }
 
 // validateNoDuplicateCacheIDs checks for duplicate cache IDs and returns an error if found
 func validateNoDuplicateCacheIDs(caches []CacheMemoryEntry) error {
+	runtimeValidationLog.Printf("Validating cache IDs: checking %d caches for duplicates", len(caches))
 	seen := make(map[string]bool)
 	for _, cache := range caches {
 		if seen[cache.ID] {
+			runtimeValidationLog.Printf("Duplicate cache ID found: %s", cache.ID)
 			return NewValidationError(
 				"sandbox.cache-memory",
 				cache.ID,
@@ -281,16 +295,19 @@ func validateNoDuplicateCacheIDs(caches []CacheMemoryEntry) error {
 		}
 		seen[cache.ID] = true
 	}
+	runtimeValidationLog.Print("Cache ID validation passed: no duplicates found")
 	return nil
 }
 
 // validateSecretReferences validates that secret references are valid
 func validateSecretReferences(secrets []string) error {
+	runtimeValidationLog.Printf("Validating secret references: checking %d secrets", len(secrets))
 	// Secret names must be valid environment variable names
 	secretNamePattern := regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
 	for _, secret := range secrets {
 		if !secretNamePattern.MatchString(secret) {
+			runtimeValidationLog.Printf("Invalid secret name format: %s", secret)
 			return NewValidationError(
 				"secrets",
 				secret,
@@ -310,11 +327,14 @@ func (c *Compiler) validateFirewallConfig(workflowData *WorkflowData) error {
 	}
 
 	config := workflowData.NetworkPermissions.Firewall
+	runtimeValidationLog.Printf("Validating firewall config: enabled=%v, logLevel=%s", config.Enabled, config.LogLevel)
 	if config.LogLevel != "" {
 		if err := ValidateLogLevel(config.LogLevel); err != nil {
+			runtimeValidationLog.Printf("Invalid firewall log level: %s", config.LogLevel)
 			return err
 		}
 	}
 
+	runtimeValidationLog.Print("Firewall config validation passed")
 	return nil
 }
