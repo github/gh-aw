@@ -22,8 +22,8 @@ type toolsProcessingResult struct {
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
-	importedMarkdown     string   // deprecated - kept for backwards compatibility
-	importPaths          []string // NEW: Import paths for runtime-import macro generation
+	importedMarkdown     string   // Only imports WITH inputs (for compile-time substitution)
+	importPaths          []string // Import paths for runtime-import macro generation (imports without inputs)
 	mainWorkflowMarkdown string   // main workflow markdown without imports (for runtime-import)
 	allIncludedFiles     []string
 	workflowName         string
@@ -229,14 +229,15 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		orchestratorToolsLog.Printf("Found %d import paths for runtime-import macros", len(importPaths))
 	}
 
-	// Prepend imported markdown from frontmatter imports field (deprecated - kept for backwards compatibility)
+	// Handle imported markdown from frontmatter imports field
+	// Only imports WITH inputs will have markdown content (for compile-time substitution)
 	var importedMarkdown string
 	if importsResult.MergedMarkdown != "" {
 		importedMarkdown = importsResult.MergedMarkdown
 		markdownContent = importsResult.MergedMarkdown + markdownContent
-		orchestratorToolsLog.Printf("Stored imported markdown: %d bytes, combined markdown: %d bytes", len(importedMarkdown), len(markdownContent))
+		orchestratorToolsLog.Printf("Stored imported markdown with inputs: %d bytes, combined markdown: %d bytes", len(importedMarkdown), len(markdownContent))
 	} else {
-		orchestratorToolsLog.Print("No imported markdown")
+		orchestratorToolsLog.Print("No imported markdown with inputs")
 	}
 
 	log.Print("Expanded includes in markdown content")
@@ -296,8 +297,8 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,
-		importedMarkdown:     importedMarkdown, // deprecated
-		importPaths:          importPaths,      // NEW: Import paths for runtime-import macros
+		importedMarkdown:     importedMarkdown, // Only imports WITH inputs
+		importPaths:          importPaths,      // Import paths for runtime-import macros (imports without inputs)
 		mainWorkflowMarkdown: mainWorkflowMarkdown,
 		allIncludedFiles:     allIncludedFiles,
 		workflowName:         workflowName,

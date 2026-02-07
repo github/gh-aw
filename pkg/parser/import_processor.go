@@ -20,7 +20,7 @@ type ImportsResult struct {
 	MergedEngines       []string // Merged engine configurations from all imports
 	MergedSafeOutputs   []string // Merged safe-outputs configurations from all imports
 	MergedSafeInputs    []string // Merged safe-inputs configurations from all imports
-	MergedMarkdown      string   // Merged markdown content from all imports (deprecated - use ImportPaths for runtime imports)
+	MergedMarkdown      string   // Only contains imports WITH inputs (for compile-time substitution)
 	ImportPaths         []string // List of import file paths for runtime-import macro generation (replaces MergedMarkdown)
 	MergedSteps         string   // Merged steps configuration from all imports (excluding copilot-setup-steps)
 	CopilotSetupSteps   string   // Steps from copilot-setup-steps.yml (inserted at start)
@@ -168,8 +168,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	// Initialize result accumulators
 	var toolsBuilder strings.Builder
 	var mcpServersBuilder strings.Builder
-	var markdownBuilder strings.Builder // Deprecated - kept for backwards compatibility
-	var importPaths []string            // NEW: Track import paths for runtime-import macro generation
+	var markdownBuilder strings.Builder // Only used for imports WITH inputs (compile-time substitution)
+	var importPaths []string             // NEW: Track import paths for runtime-import macro generation
 	var stepsBuilder strings.Builder
 	var copilotSetupStepsBuilder strings.Builder // Track copilot-setup-steps.yml separately
 	var runtimesBuilder strings.Builder
@@ -311,25 +311,27 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			// Track import path for runtime-import macro generation (only if no inputs)
 			// Imports with inputs must be inlined for compile-time substitution
 			if len(item.inputs) == 0 {
+				// No inputs - use runtime-import macro
 				importPaths = append(importPaths, importRelPath)
 				log.Printf("Added agent import path for runtime-import: %s", importRelPath)
 			} else {
+				// Has inputs - must inline for compile-time substitution
 				log.Printf("Agent file has inputs - will be inlined instead of runtime-imported")
-			}
-
-			// For agent files, still extract markdown content for backwards compatibility
-			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
-			if err != nil {
-				return nil, fmt.Errorf("failed to process markdown from agent file '%s': %w", item.fullPath, err)
-			}
-			if markdownContent != "" {
-				markdownBuilder.WriteString(markdownContent)
-				// Add blank line separator between imported files
-				if !strings.HasSuffix(markdownContent, "\n\n") {
-					if strings.HasSuffix(markdownContent, "\n") {
-						markdownBuilder.WriteString("\n")
-					} else {
-						markdownBuilder.WriteString("\n\n")
+				
+				// For agent files, extract markdown content (only when inputs are present)
+				markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
+				if err != nil {
+					return nil, fmt.Errorf("failed to process markdown from agent file '%s': %w", item.fullPath, err)
+				}
+				if markdownContent != "" {
+					markdownBuilder.WriteString(markdownContent)
+					// Add blank line separator between imported files
+					if !strings.HasSuffix(markdownContent, "\n\n") {
+						if strings.HasSuffix(markdownContent, "\n") {
+							markdownBuilder.WriteString("\n")
+						} else {
+							markdownBuilder.WriteString("\n\n")
+						}
 					}
 				}
 			}
@@ -481,25 +483,27 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		}
 
 		if len(item.inputs) == 0 {
+			// No inputs - use runtime-import macro
 			importPaths = append(importPaths, importRelPath)
 			log.Printf("Added import path for runtime-import: %s", importRelPath)
 		} else {
+			// Has inputs - must inline for compile-time substitution
 			log.Printf("Import %s has inputs - will be inlined for compile-time substitution", importRelPath)
-		}
-
-		// Extract markdown content from imported file for backwards compatibility
-		markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
-		if err != nil {
-			return nil, fmt.Errorf("failed to process markdown from imported file '%s': %w", item.fullPath, err)
-		}
-		if markdownContent != "" {
-			markdownBuilder.WriteString(markdownContent)
-			// Add blank line separator between imported files
-			if !strings.HasSuffix(markdownContent, "\n\n") {
-				if strings.HasSuffix(markdownContent, "\n") {
-					markdownBuilder.WriteString("\n")
-				} else {
-					markdownBuilder.WriteString("\n\n")
+			
+			// Extract markdown content from imported file (only for imports with inputs)
+			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
+			if err != nil {
+				return nil, fmt.Errorf("failed to process markdown from imported file '%s': %w", item.fullPath, err)
+			}
+			if markdownContent != "" {
+				markdownBuilder.WriteString(markdownContent)
+				// Add blank line separator between imported files
+				if !strings.HasSuffix(markdownContent, "\n\n") {
+					if strings.HasSuffix(markdownContent, "\n") {
+						markdownBuilder.WriteString("\n")
+					} else {
+						markdownBuilder.WriteString("\n\n")
+					}
 				}
 			}
 		}
@@ -634,8 +638,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedEngines:       engines,
 		MergedSafeOutputs:   safeOutputs,
 		MergedSafeInputs:    safeInputs,
-		MergedMarkdown:      markdownBuilder.String(), // Deprecated - kept for backwards compatibility
-		ImportPaths:         importPaths,              // NEW: Import paths for runtime-import macro generation
+		MergedMarkdown:      markdownBuilder.String(), // Only imports WITH inputs (for compile-time substitution)
+		ImportPaths:         importPaths,               // Import paths for runtime-import macro generation
 		MergedSteps:         stepsBuilder.String(),
 		CopilotSetupSteps:   copilotSetupStepsBuilder.String(),
 		MergedRuntimes:      runtimesBuilder.String(),
