@@ -47,6 +47,79 @@ jobs:
             const { owner, repo } = context.repo;
             
             try {
+              // Check for recent rate-limited PRs to avoid scheduling more work during rate limiting
+              core.info('Checking for recent rate-limited PRs...');
+              const rateLimitCheckDate = new Date();
+              rateLimitCheckDate.setHours(rateLimitCheckDate.getHours() - 1); // Check last hour
+              // Format as YYYY-MM-DDTHH:MM:SS for GitHub search API
+              const rateLimitCheckISO = rateLimitCheckDate.toISOString().split('.')[0] + 'Z';
+              
+              const recentPRsQuery = `is:pr author:app/copilot-swe-agent created:>${rateLimitCheckISO} repo:${owner}/${repo}`;
+              const recentPRsResponse = await github.rest.search.issuesAndPullRequests({
+                q: recentPRsQuery,
+                per_page: 10,
+                sort: 'created',
+                order: 'desc'
+              });
+              
+              core.info(`Found ${recentPRsResponse.data.total_count} recent Copilot PRs to check for rate limiting`);
+              
+              // Check if any recent PRs have rate limit indicators
+              let rateLimitDetected = false;
+              for (const pr of recentPRsResponse.data.items) {
+                try {
+                  const prTimelineQuery = `
+                    query($owner: String!, $repo: String!, $number: Int!) {
+                      repository(owner: $owner, name: $repo) {
+                        pullRequest(number: $number) {
+                          timelineItems(first: 50, itemTypes: [ISSUE_COMMENT]) {
+                            nodes {
+                              __typename
+                              ... on IssueComment {
+                                body
+                                createdAt
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  `;
+                  
+                  const prTimelineResult = await github.graphql(prTimelineQuery, {
+                    owner,
+                    repo,
+                    number: pr.number
+                  });
+                  
+                  const comments = prTimelineResult?.repository?.pullRequest?.timelineItems?.nodes || [];
+                  const rateLimitPattern = /rate limit|API rate limit|secondary rate limit|abuse detection|429|too many requests/i;
+                  
+                  for (const comment of comments) {
+                    if (comment.body && rateLimitPattern.test(comment.body)) {
+                      core.warning(`Rate limiting detected in PR #${pr.number}: ${comment.body.substring(0, 200)}`);
+                      rateLimitDetected = true;
+                      break;
+                    }
+                  }
+                  
+                  if (rateLimitDetected) break;
+                } catch (error) {
+                  core.warning(`Could not check PR #${pr.number} for rate limiting: ${error.message}`);
+                }
+              }
+              
+              if (rateLimitDetected) {
+                core.warning('🛑 Rate limiting detected in recent PRs. Skipping issue assignment to prevent further rate limit issues.');
+                core.setOutput('issue_count', 0);
+                core.setOutput('issue_numbers', '');
+                core.setOutput('issue_list', '');
+                core.setOutput('has_issues', 'false');
+                return;
+              }
+              
+              core.info('✓ No rate limiting detected. Proceeding with issue search.');
+              
               // Labels that indicate an issue should NOT be auto-assigned
               const excludeLabels = [
                 'wontfix',
@@ -326,6 +399,11 @@ Find up to three issues that need work and assign them to the Copilot agent for 
 
 The issue search has already been performed in a previous job with smart filtering and prioritization:
 
+**Rate Limiting Protection:**
+- 🛡️ **Checks for rate-limited PRs in the last hour** before scheduling new work
+- If rate limiting is detected in recent Copilot PRs, the workflow skips all assignments to prevent further API issues
+- Looks for patterns: "rate limit", "API rate limit", "secondary rate limit", "abuse detection", "429", "too many requests"
+
 **Filtering Applied:**
 - ✅ Only open issues **with "cookie" label** (indicating approved work queue items from automated workflows)
 - ✅ Excluded issues with labels: wontfix, duplicate, invalid, question, discussion, needs-discussion, blocked, on-hold, waiting-for-feedback, needs-more-info, no-bot, no-campaign
@@ -469,24 +547,26 @@ safeoutputs/add_comment(item_number=<issue_number>, body="🍪 **Issue Monster h
 ## Success Criteria
 
 A successful run means:
-1. You reviewed the pre-searched, filtered, and prioritized issue list
-2. The search already excluded issues with problematic labels (wontfix, question, discussion, etc.)
-3. The search already excluded issues with campaign labels (campaign:*) as these are managed by campaign orchestrators
-4. The search already excluded issues that already have assignees
-5. The search already excluded issues that have sub-issues (parent/organizing issues are not tasks)
-6. The search already excluded issues with closed or merged PRs (treated as complete)
-7. The search already excluded issues with open PRs from Copilot agent (already being worked on)
-8. Issues are sorted by priority score (good-first-issue, bug, security, etc. get higher scores)
-9. For "task" or "plan" issues: You checked for parent issues and sibling sub-issue PRs if necessary
-10. You selected up to three appropriate issues from the top of the priority list that are completely separate in topic
-11. You read and understood each issue
-12. You verified that the selected issues don't have overlapping concerns or file changes
-13. You assigned each issue to the Copilot agent using `assign_to_agent`
-14. You commented on each issue being assigned
+1. **Rate limiting check passed** - The search verified no recent PRs are rate-limited (or workflow skipped if rate limiting detected)
+2. You reviewed the pre-searched, filtered, and prioritized issue list
+3. The search already excluded issues with problematic labels (wontfix, question, discussion, etc.)
+4. The search already excluded issues with campaign labels (campaign:*) as these are managed by campaign orchestrators
+5. The search already excluded issues that already have assignees
+6. The search already excluded issues that have sub-issues (parent/organizing issues are not tasks)
+7. The search already excluded issues with closed or merged PRs (treated as complete)
+8. The search already excluded issues with open PRs from Copilot agent (already being worked on)
+9. Issues are sorted by priority score (good-first-issue, bug, security, etc. get higher scores)
+10. For "task" or "plan" issues: You checked for parent issues and sibling sub-issue PRs if necessary
+11. You selected up to three appropriate issues from the top of the priority list that are completely separate in topic
+12. You read and understood each issue
+13. You verified that the selected issues don't have overlapping concerns or file changes
+14. You assigned each issue to the Copilot agent using `assign_to_agent`
+15. You commented on each issue being assigned
 
 ## Error Handling
 
 If anything goes wrong or no work can be assigned:
+- **Rate limiting detected**: The workflow automatically skips (no action needed - the search job handles this)
 - **No issues found**: Use the `noop` tool with message: "🍽️ No suitable candidate issues - the plate is empty!"
 - **All issues assigned**: Use the `noop` tool with message: "🍽️ All issues are already being worked on!"
 - **No suitable separate issues**: Use the `noop` tool explaining which issues were considered and why they couldn't be assigned (e.g., overlapping topics, sibling PRs, etc.)
