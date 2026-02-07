@@ -3,10 +3,10 @@ name: Issue Monster
 description: The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 on:
   workflow_dispatch:
-  schedule: every 10m
+  schedule: every 30m
   skip-if-match:
     query: "is:pr is:open is:draft author:app/copilot-swe-agent"
-    max: 9
+    max: 5
   skip-if-no-match: "is:issue is:open"
 
 permissions:

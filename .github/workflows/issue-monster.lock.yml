@@ -25,15 +25,15 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: c8466a41cbcb87d6c96115c81141219d8f61ab3729e1c49750d78dfb5df05032
+# frontmatter-hash: 8e91bc55d5faf1263dcac29c70ce11efc406446e60befb9ee2b6a8c108ab397b
 
 name: "Issue Monster"
 "on":
   schedule:
-  - cron: "*/10 * * * *"
-    # Friendly format: every 10m
+  - cron: "*/30 * * * *"
+    # Friendly format: every 30m
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
-    # max: 9
+    # max: 5
     # query: is:pr is:open is:draft author:app/copilot-swe-agent
   # skip-if-no-match: is:issue is:open # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
@@ -1050,7 +1050,7 @@ jobs:
         env:
           GH_AW_SKIP_QUERY: "is:pr is:open is:draft author:app/copilot-swe-agent"
           GH_AW_WORKFLOW_NAME: "Issue Monster"
-          GH_AW_SKIP_MAX_MATCHES: "9"
+          GH_AW_SKIP_MAX_MATCHES: "5"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
