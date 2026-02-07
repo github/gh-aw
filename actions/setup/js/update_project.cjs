@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { loadTemporaryIdMap, resolveIssueNumber } = require("./temporary_id.cjs");
+const { loadTemporaryIdMap, resolveIssueNumber, generateTemporaryId, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -246,6 +246,56 @@ async function resolveProjectV2(projectInfo, projectNumberInt, github) {
 
   throw new Error(`Project #${projectNumberInt} not found or not accessible for ${who}.${total} Accessible Projects v2: ${summary}`);
 }
+
+/**
+ * Find an existing draft issue in the project by project item ID
+ * @param {string} projectId - Project ID
+ * @param {string} draftItemId - Draft project item ID to find
+ * @param {Object} github - GitHub client (Octokit instance)
+ * @returns {Promise<{id: string, title?: string}|null>} Draft item if found, null otherwise
+ */
+async function findExistingDraftByItemId(projectId, draftItemId, github) {
+  let hasNextPage = true;
+  let endCursor = null;
+
+  while (hasNextPage) {
+    const result = await github.graphql(
+      `query($projectId: ID!, $after: String) {
+        node(id: $projectId) {
+          ... on ProjectV2 {
+            items(first: 100, after: $after) {
+              nodes {
+                id
+                content {
+                  ... on DraftIssue {
+                    id
+                    title
+                  }
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+      }`,
+      { projectId, after: endCursor }
+    );
+
+    const found = result.node.items.nodes.find(item => item.id === draftItemId);
+    if (found) {
+      return { id: found.id, title: found.content?.title };
+    }
+
+    hasNextPage = result.node.items.pageInfo.hasNextPage;
+    endCursor = result.node.items.pageInfo.endCursor;
+  }
+
+  return null;
+}
+
 /**
  * Check if a field name conflicts with unsupported GitHub built-in field types
  * @param {string} fieldName - Original field name
@@ -611,27 +661,79 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         core.warning('content_number/issue/pull_request is ignored when content_type is "draft_issue".');
       }
 
-      const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
-      if (!draftTitle) {
-        throw new Error('Invalid draft_title. When content_type is "draft_issue", draft_title is required and must be a non-empty string.');
+      // Check for draft_issue_id to reference an existing draft
+      let itemId = null;
+      const hasDraftIssueId = output.draft_issue_id !== undefined && output.draft_issue_id !== null;
+
+      if (hasDraftIssueId) {
+        const rawDraftIssueId = output.draft_issue_id;
+        const sanitizedDraftIssueId = typeof rawDraftIssueId === "string" ? rawDraftIssueId.trim() : String(rawDraftIssueId);
+
+        // Check if it's a temporary ID
+        if (isTemporaryId(sanitizedDraftIssueId)) {
+          const normalizedTempId = normalizeTemporaryId(sanitizedDraftIssueId);
+          const resolvedItemId = temporaryIdMap.get(normalizedTempId);
+
+          if (resolvedItemId && typeof resolvedItemId === "string") {
+            // Temporary ID resolved to a project item ID
+            core.info(`✓ Resolved temporary ID ${sanitizedDraftIssueId} to draft item ID`);
+
+            // Verify the item still exists in the project
+            const existingItem = await findExistingDraftByItemId(projectId, resolvedItemId, github);
+            if (existingItem) {
+              itemId = existingItem.id;
+              core.info(`✓ Found existing draft item: "${existingItem.title || "Untitled"}"`);
+            } else {
+              throw new Error(`Draft item with temporary ID ${sanitizedDraftIssueId} no longer exists in project. It may have been deleted or converted to an issue.`);
+            }
+          } else {
+            throw new Error(`Temporary ID '${sanitizedDraftIssueId}' not found in map. Ensure the draft issue was created in a previous step with a temporary_id field.`);
+          }
+        } else {
+          // Direct project item ID provided
+          const existingItem = await findExistingDraftByItemId(projectId, sanitizedDraftIssueId, github);
+          if (existingItem) {
+            itemId = existingItem.id;
+            core.info(`✓ Found existing draft item: "${existingItem.title || "Untitled"}"`);
+          } else {
+            throw new Error(`Draft item with ID "${sanitizedDraftIssueId}" not found in project. Verify the draft_issue_id is correct.`);
+          }
+        }
       }
 
-      const draftBody = typeof output.draft_body === "string" ? output.draft_body : undefined;
-      const result = await github.graphql(
-        `mutation($projectId: ID!, $title: String!, $body: String) {
-          addProjectV2DraftIssue(input: {
-            projectId: $projectId,
-            title: $title,
-            body: $body
-          }) {
-            projectItem {
-              id
+      // If no itemId found yet, create a new draft issue
+      if (!itemId) {
+        const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
+        if (!draftTitle) {
+          throw new Error('Invalid draft_title. When content_type is "draft_issue", draft_title is required and must be a non-empty string.');
+        }
+
+        const draftBody = typeof output.draft_body === "string" ? output.draft_body : undefined;
+        const result = await github.graphql(
+          `mutation($projectId: ID!, $title: String!, $body: String) {
+            addProjectV2DraftIssue(input: {
+              projectId: $projectId,
+              title: $title,
+              body: $body
+            }) {
+              projectItem {
+                id
+              }
             }
-          }
-        }`,
-        { projectId, title: draftTitle, body: draftBody }
-      );
-      const itemId = result.addProjectV2DraftIssue.projectItem.id;
+          }`,
+          { projectId, title: draftTitle, body: draftBody }
+        );
+        itemId = result.addProjectV2DraftIssue.projectItem.id;
+        core.info(`✓ Created new draft issue: "${draftTitle}"`);
+
+        // If temporary_id was provided, store the mapping
+        if (output.temporary_id && isTemporaryId(String(output.temporary_id))) {
+          const normalizedTempId = normalizeTemporaryId(String(output.temporary_id));
+          temporaryIdMap.set(normalizedTempId, itemId);
+          core.setOutput("temporary-id", normalizedTempId);
+          core.info(`✓ Stored temporary ID mapping: ${normalizedTempId} -> ${itemId}`);
+        }
+      }
 
       const fieldsToUpdate = output.fields ? { ...output.fields } : {};
       if (Object.keys(fieldsToUpdate).length > 0) {

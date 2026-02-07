@@ -600,7 +600,7 @@
   },
   {
     "name": "update_project",
-    "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title.\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
+    "description": "Add or update items in GitHub Projects v2 boards. Can add issues/PRs to a project and update custom field values. Requires the project URL, content type (issue or pull_request), and content number.\n\nThree usage modes:\n1. Add/update project item: Requires project + content_type. For 'issue' or 'pull_request', also requires content_number. For 'draft_issue', requires draft_title (to create) or draft_issue_id (to update existing).\n2. Create project fields: Requires project + operation='create_fields' + field_definitions.\n3. Create project view: Requires project + operation='create_view' + view.",
     "inputSchema": {
       "type": "object",
       "required": ["project"],
@@ -626,11 +626,20 @@
         },
         "draft_title": {
           "type": "string",
-          "description": "Title for a Projects v2 draft issue. Required when content_type is 'draft_issue'."
+          "description": "Title for a Projects v2 draft issue. Required when content_type is 'draft_issue' and draft_issue_id is not provided."
         },
         "draft_body": {
           "type": "string",
           "description": "Optional body for a Projects v2 draft issue (markdown). Only used when content_type is 'draft_issue'."
+        },
+        "draft_issue_id": {
+          "type": "string",
+          "description": "Project item ID or temporary ID of an existing draft issue to update. Use this to reference a specific draft issue instead of creating a new one. Format: either a GitHub project item ID or a temporary ID (aw_XXXXXXXXXXXX). If provided with content_type='draft_issue', draft_title is optional."
+        },
+        "temporary_id": {
+          "type": "string",
+          "pattern": "^aw_[0-9a-f]{12}$",
+          "description": "Optional temporary identifier for a draft issue being created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). Use this to reference the draft issue in subsequent update_project calls via draft_issue_id before it's converted to a real issue."
         },
         "fields": {
           "type": "object",
