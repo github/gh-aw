@@ -632,6 +632,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
                     nodes {
                       id
                       content {
+                        __typename
                         ... on DraftIssue {
                           id
                           title
