@@ -248,20 +248,22 @@ This is the main workflow content.`
 		t.Error("Lock file should contain runtime-import macro for main workflow")
 	}
 
-	// With the new approach:
-	// - Imported content (from frontmatter imports) → inlined in lock file
+	// With the new runtime-import approach:
+	// - Imported content (from frontmatter imports) → uses runtime-import macro
 	// - Main workflow content (including @include expansion) → runtime-imported
 
-	// Verify imported content is in lock file (inlined)
-	if !strings.Contains(lockContent, "# Imported Content") {
-		t.Error("Imported content from frontmatter imports should be inlined in lock file")
-	}
-	if !strings.Contains(lockContent, "This comes from frontmatter imports") {
-		t.Error("Imported markdown content should be inlined in lock file")
+	// Verify runtime-import macro for imports is in lock file
+	if !strings.Contains(lockContent, "{{#runtime-import shared/import.md}}") {
+		t.Error("Lock file should contain runtime-import macro for imported file")
 	}
 
-	// Note: Main workflow content and @include content are runtime-imported
-	// They are NOT in the lock file - only the runtime-import macro is present
+	// Verify runtime-import macro for main workflow is in lock file
+	if !strings.Contains(lockContent, "{{#runtime-import combo-workflow.md}}") {
+		t.Error("Lock file should contain runtime-import macro for main workflow")
+	}
+
+	// Note: Neither imported content nor main workflow content are inlined -
+	// they are all loaded at runtime via runtime-import macros
 }
 
 // TestImportsXMLCommentsRemoval tests that XML comments are removed from imported markdown
@@ -335,31 +337,24 @@ This is the main workflow content.`
 
 	lockContent := string(content)
 
-	// Verify XML comments are NOT present in the actual prompt content
-	// The prompt is written after "Create prompt" step
-	promptSectionStart := strings.Index(lockContent, "Create prompt")
-	if promptSectionStart == -1 {
-		t.Fatal("Could not find 'Create prompt' section in lock file")
+	// Verify XML comments are NOT present in the lock file
+	// (They would only be present if we were inlining content, which we're not doing anymore)
+	if strings.Contains(lockContent, "<!-- This is an XML comment") {
+		t.Error("XML comment should not appear in lock file")
 	}
-	promptSection := lockContent[promptSectionStart:]
-
-	if strings.Contains(promptSection, "<!-- This is an XML comment") {
-		t.Error("XML comment should not appear in actual prompt content")
-	}
-	if strings.Contains(promptSection, "Multi-line XML comment") {
-		t.Error("Multi-line XML comment should not appear in actual prompt content")
+	if strings.Contains(lockContent, "Multi-line XML comment") {
+		t.Error("Multi-line XML comment should not appear in lock file")
 	}
 
-	// Verify that actual content IS present (not removed along with comments)
-	if !strings.Contains(lockContent, "This is important imported content") {
-		t.Error("Expected imported content to be present in lock file")
-	}
-	if !strings.Contains(lockContent, "More imported content here") {
-		t.Error("Expected imported content to be present in lock file")
+	// With runtime-import approach:
+	// - Imported content is NOT inlined, so we check for runtime-import macros instead
+	// - XML comments will be removed at runtime when the import is processed
+	if !strings.Contains(lockContent, "{{#runtime-import shared/with-comments.md}}") {
+		t.Error("Expected runtime-import macro for imported file in lock file")
 	}
 
-	// With new approach, main workflow content is runtime-imported (not inlined)
-	if !strings.Contains(lockContent, "{{#runtime-import") {
-		t.Error("Expected runtime-import macro in lock file")
+	// Verify runtime-import macro for main workflow is present
+	if !strings.Contains(lockContent, "{{#runtime-import test-xml-workflow.md}}") {
+		t.Error("Expected runtime-import macro for main workflow in lock file")
 	}
 }
