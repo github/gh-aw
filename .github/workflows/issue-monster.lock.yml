@@ -21,15 +21,19 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: 4f5ae406acc40ef2c9e567820a3be71a99715c6122346359b37b2b3cdfd12bbe
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 6d27381fbefe1f8df297e560d35c99e7954fe5d862a9dfc1d1233ac4d11711d9
 
 name: "Issue Monster"
 "on":
   schedule:
-  - cron: "*/10 * * * *"
-    # Friendly format: every 10m
+  - cron: "*/30 * * * *"
+    # Friendly format: every 30m
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
-    # max: 9
+    # max: 5
     # query: is:pr is:open is:draft author:app/copilot-swe-agent
   # skip-if-no-match: is:issue is:open # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
@@ -579,6 +583,13 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/issue-monster.md}}
           PROMPT_EOF
       - name: Substitute placeholders
@@ -1039,7 +1050,7 @@ jobs:
         env:
           GH_AW_SKIP_QUERY: "is:pr is:open is:draft author:app/copilot-swe-agent"
           GH_AW_WORKFLOW_NAME: "Issue Monster"
-          GH_AW_SKIP_MAX_MATCHES: "9"
+          GH_AW_SKIP_MAX_MATCHES: "5"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
