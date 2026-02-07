@@ -21,7 +21,11 @@
 #
 # Automated security guard that reviews every PR for changes that could weaken security posture, only commenting when concrete evidence of security concerns exists
 #
-# frontmatter-hash: efaa958475765d547b7369390db122481b6cf5180701fbdb1f753de2b030c6bc
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 6815bb4b5c8b7302ac54000aa0aed31cc58458d1a1edd82c44d83231dcc5ff15
 
 name: "Security Guard Agent 🛡️"
 "on":
@@ -524,6 +528,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/security-guard.md}}

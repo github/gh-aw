@@ -12,6 +12,7 @@ engine: claude
 network: 
    allowed: [defaults, node, "api.github.com", "ghcr.io"]
 imports:
+  - shared/mood.md
   - shared/jqschema.md
   - shared/reporting.md
 tools:

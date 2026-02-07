@@ -21,7 +21,11 @@
 #
 # Scheduled workflow that recursively closes parent issues when all sub-issues are 100% complete
 #
-# frontmatter-hash: a264c4ba93f8e06faac6ccf53833c472a92e3eb4fd9930e9910a4719562e3337
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 67a1744589def0d89133d581aee4b752753adbdc77f9d76790c1e16ee98b2508
 
 name: "Sub-Issue Closer"
 "on":
@@ -608,6 +612,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/sub-issue-closer.md}}

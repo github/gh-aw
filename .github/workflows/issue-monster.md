@@ -3,10 +3,10 @@ name: Issue Monster
 description: The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 on:
   workflow_dispatch:
-  schedule: every 10m
+  schedule: every 30m
   skip-if-match:
     query: "is:pr is:open is:draft author:app/copilot-swe-agent"
-    max: 9
+    max: 5
   skip-if-no-match: "is:issue is:open"
 
 permissions:
@@ -301,6 +301,8 @@ safe-outputs:
     run-started: "🍪 ISSUE! ISSUE! [{workflow_name}]({run_url}) hungry for issues on this {event_type}! Om nom nom..."
     run-success: "🍪 YUMMY! [{workflow_name}]({run_url}) ate the issues! That was DELICIOUS! Me want MORE! 😋"
     run-failure: "🍪 Aww... [{workflow_name}]({run_url}) {status}. No cookie for monster today... 😢"
+imports:
+  - shared/mood.md
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

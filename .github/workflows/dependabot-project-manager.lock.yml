@@ -21,7 +21,11 @@
 #
 # Automatically bundles Dependabot PRs by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
 #
-# frontmatter-hash: 992600a7e7e33a35c85f02e715809c1fd7c7c1e7bc63f7a167d88bc841b9056b
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 3a91a286e566cd6f6e9b7370c5e41efbd4e4bc22aa02f2b3f54fc2b9486cee3c
 
 name: "Dependabot Project Manager"
 "on":
@@ -840,6 +844,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/dependabot-project-manager.md}}

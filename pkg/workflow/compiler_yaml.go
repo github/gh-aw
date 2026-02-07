@@ -241,23 +241,26 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	builtinSections := c.collectPromptSections(data)
 	compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
 
-	// NEW APPROACH (based on feedback from @pelikhan):
-	// - Imported markdown (from frontmatter imports) is ALWAYS inlined
+	// NEW APPROACH: Use runtime-import macros for imports without inputs
+	// - Imported markdown without inputs uses runtime-import macros (loaded at runtime)
+	// - Imported markdown with inputs is still inlined (compile-time substitution required)
 	// - Main workflow markdown body uses runtime-import to allow editing without recompilation
-	// This means: inline the imports, then add a runtime-import macro for the main workflow file
+	// This ensures consistency for most imports while maintaining import inputs functionality
 
 	var userPromptChunks []string
 	var expressionMappings []*ExpressionMapping
 
-	// Step 1: Process and inline imported markdown (if any)
+	// Step 1a: Process and inline imported markdown with inputs (if any)
+	// Imports with inputs MUST be inlined because substitution happens at compile time
 	if data.ImportedMarkdown != "" {
-		compilerYamlLog.Printf("Inlining imported markdown (%d bytes)", len(data.ImportedMarkdown))
+		compilerYamlLog.Printf("Processing imported markdown (%d bytes)", len(data.ImportedMarkdown))
 
 		// Clean and process imported markdown
 		cleanedImportedMarkdown := removeXMLComments(data.ImportedMarkdown)
 
 		// Substitute import inputs in imported content
 		if len(data.ImportInputs) > 0 {
+			compilerYamlLog.Printf("Substituting %d import input values", len(data.ImportInputs))
 			cleanedImportedMarkdown = SubstituteImportInputs(cleanedImportedMarkdown, data.ImportInputs)
 		}
 
@@ -275,7 +278,20 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 		// Split imported content into chunks and add to user prompt
 		importedChunks := splitContentIntoChunks(cleanedImportedMarkdown)
 		userPromptChunks = append(userPromptChunks, importedChunks...)
-		compilerYamlLog.Printf("Inlined imported markdown in %d chunks", len(importedChunks))
+		compilerYamlLog.Printf("Inlined imported markdown with inputs in %d chunks", len(importedChunks))
+	}
+
+	// Step 1b: Generate runtime-import macros for imported markdown without inputs
+	// These imports don't need compile-time substitution, so they can be loaded at runtime
+	if len(data.ImportPaths) > 0 {
+		compilerYamlLog.Printf("Generating runtime-import macros for %d imports without inputs", len(data.ImportPaths))
+		for _, importPath := range data.ImportPaths {
+			// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+			importPath = filepath.ToSlash(importPath)
+			runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", importPath)
+			userPromptChunks = append(userPromptChunks, runtimeImportMacro)
+			compilerYamlLog.Printf("Added runtime-import macro for: %s", importPath)
+		}
 	}
 
 	// Step 1.5: Extract expressions from main workflow markdown (not imported content)

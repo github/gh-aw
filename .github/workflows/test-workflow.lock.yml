@@ -20,7 +20,11 @@
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: c1289924ef5c241c6bf7aede9e9822e6fe5e48cd5d6242834bb75725a19e6fd8
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 7e28df1a5884fe8ab7987791066296378c3d879a1c3674706d645017734ec3de
 
 name: "Test Workflow"
 "on":
@@ -289,6 +293,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/test-workflow.md}}

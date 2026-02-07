@@ -678,3 +678,111 @@ func TestDeduplicateErrorMessageFormat(t *testing.T) {
 			len(errMsg), errMsg)
 	}
 }
+
+// TestDeduplicatePreservesUserPythonVersion tests that when a user specifies
+// a custom Python version in their setup-python step, the deduplication logic
+// correctly identifies it as a customization and filters out the auto-detected
+// Python runtime requirement. This prevents the compiler from generating a
+// duplicate Python setup step with the default version.
+//
+// Regression test to ensure user-specified versions are preserved when they
+// differ from default versions (e.g., user specifies 3.9 vs default 3.12).
+func TestDeduplicatePreservesUserPythonVersion(t *testing.T) {
+	// Test case: User has setup-python with python-version: '3.9'
+	// and runs a python command, which auto-detects Python runtime
+	customSteps := `steps:
+  - name: Setup Python
+    uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+    with:
+      python-version: '3.9'
+  - name: Run script
+    run: python test.py`
+
+	// Auto-detected Python runtime requirement (no version specified)
+	pythonRuntime := findRuntimeByID("python")
+	if pythonRuntime == nil {
+		t.Fatal("Python runtime not found")
+	}
+
+	requirements := []RuntimeRequirement{
+		{
+			Runtime: pythonRuntime,
+			Version: "", // Empty - detected from 'python' command but no version info
+		},
+	}
+
+	// Verify initial state
+	if pythonRuntime.DefaultVersion != "3.12" {
+		t.Fatalf("Expected Python default version to be 3.12, got %q", pythonRuntime.DefaultVersion)
+	}
+
+	// Run deduplication
+	deduplicatedSteps, filteredRequirements, err := DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps, requirements)
+	if err != nil {
+		t.Fatalf("Deduplication failed: %v", err)
+	}
+
+	// CRITICAL: The Python runtime requirement should be filtered out
+	// because the user has a customized setup-python step with python-version: '3.9'
+	if len(filteredRequirements) != 0 {
+		t.Errorf("Expected 0 filtered requirements (user's custom Python step should be preserved), got %d", len(filteredRequirements))
+		for _, req := range filteredRequirements {
+			t.Errorf("  - Unexpected requirement: %s (version=%q)", req.Runtime.ID, req.Version)
+		}
+	}
+
+	// Verify the user's setup step is preserved in deduplicated steps
+	if !strings.Contains(deduplicatedSteps, "Setup Python") {
+		t.Error("Expected deduplicated steps to contain 'Setup Python'")
+	}
+	if !strings.Contains(deduplicatedSteps, "python-version") {
+		t.Error("Expected deduplicated steps to contain 'python-version'")
+	}
+	if !strings.Contains(deduplicatedSteps, "3.9") {
+		t.Error("Expected deduplicated steps to contain user's version '3.9'")
+	}
+
+	// Verify the user's step still has the SHA reference
+	if !strings.Contains(deduplicatedSteps, "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065") {
+		t.Error("Expected deduplicated steps to preserve user's SHA reference")
+	}
+}
+
+// TestDeduplicatePreservesUserNodeVersion tests that when a user specifies
+// a custom Node.js version, the deduplication logic correctly preserves it
+func TestDeduplicatePreservesUserNodeVersion(t *testing.T) {
+	customSteps := `steps:
+  - name: Setup Node
+    uses: actions/setup-node@v6
+    with:
+      node-version: '16'
+  - name: Run npm
+    run: npm install`
+
+	nodeRuntime := findRuntimeByID("node")
+	if nodeRuntime == nil {
+		t.Fatal("Node runtime not found")
+	}
+
+	requirements := []RuntimeRequirement{
+		{
+			Runtime: nodeRuntime,
+			Version: "", // Auto-detected
+		},
+	}
+
+	deduplicatedSteps, filteredRequirements, err := DeduplicateRuntimeSetupStepsFromCustomSteps(customSteps, requirements)
+	if err != nil {
+		t.Fatalf("Deduplication failed: %v", err)
+	}
+
+	// Node runtime should be filtered out (user has custom version)
+	if len(filteredRequirements) != 0 {
+		t.Errorf("Expected 0 filtered requirements, got %d", len(filteredRequirements))
+	}
+
+	// Verify user's version is preserved
+	if !strings.Contains(deduplicatedSteps, "16") {
+		t.Error("Expected deduplicated steps to contain user's version '16'")
+	}
+}

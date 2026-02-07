@@ -15,6 +15,7 @@ permissions:
 tools:
   github:
 imports:
+  - shared/mood.md
   - shared/mcp/notion.md
 strict: true
 ---

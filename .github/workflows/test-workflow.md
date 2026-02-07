@@ -9,6 +9,8 @@ on:
         required: true
 permissions:
   contents: read
+imports:
+  - shared/mood.md
 ---
 
 # Instructions for Test Workflow

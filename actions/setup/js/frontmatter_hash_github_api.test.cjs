@@ -166,8 +166,9 @@ describe("frontmatter_hash with GitHub API", () => {
 
       // This hash was computed by the Go implementation:
       // go test -run TestHashWithRealWorkflow ./pkg/parser/
-      // Output: "Hash for audit-workflows.md: ff56a35b191afe28f76a09217de1597695a225e8f41502cc815a0a9e0eb2f96e"
-      const goHash = "ff56a35b191afe28f76a09217de1597695a225e8f41502cc815a0a9e0eb2f96e";
+      // Output: "Hash for audit-workflows.md: bb5cbd9552401591e9476ae803f1736a88dca3f654f725dadffa5a7dbc31d639"
+      // Note: Hash changed when imports were migrated to use runtime-import macros
+      const goHash = "bb5cbd9552401591e9476ae803f1736a88dca3f654f725dadffa5a7dbc31d639";
 
       // Verify JavaScript hash matches Go hash
       expect(jsHash).toBe(goHash);

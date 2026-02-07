@@ -129,37 +129,47 @@ This is the main workflow content.`,
 
 			lockContent := string(content)
 
-			// With the new approach:
-			// - Imported content IS in the lock file (inlined)
-			// - Main workflow content is NOT in lock file (runtime-imported)
-			// So we check lock file for imported content and runtime-import macro
+			// With the new runtime-import approach:
+			// - Both imported content AND main workflow use runtime-import macros
+			// - NO content is inlined in the lock file (all loaded at runtime)
+			// So we check lock file for runtime-import macros, not inlined content
 
-			// Verify imported content is in the lock file (inlined)
-			importedExpected := []string{"# Common Setup", "This is common setup content"}
-			for _, expected := range importedExpected {
-				if !strings.Contains(lockContent, expected) {
-					t.Errorf("%s: Expected to find imported content '%s' in lock file but it was not found", tt.description, expected)
+			// Verify runtime-import macros are present for imported files
+			// Check for the first import in the test (all tests have shared/common.md)
+			if !strings.Contains(lockContent, "{{#runtime-import shared/common.md}}") {
+				t.Errorf("%s: Expected to find runtime-import macro for shared/common.md in lock file", tt.description)
+			}
+
+			// For multiple imports test, also check for security.md
+			if strings.Contains(tt.name, "multiple_imports") {
+				if !strings.Contains(lockContent, "{{#runtime-import shared/security.md}}") {
+					t.Errorf("%s: Expected to find runtime-import macro for shared/security.md in lock file", tt.description)
 				}
 			}
 
 			// Verify runtime-import macro is present for main workflow
-			if !strings.Contains(lockContent, "{{#runtime-import") {
-				t.Errorf("%s: Expected to find runtime-import macro in lock file", tt.description)
+			workflowFilename := tt.name + "-workflow.md"
+			expectedMainWorkflowMacro := "{{#runtime-import " + workflowFilename + "}}"
+			if !strings.Contains(lockContent, expectedMainWorkflowMacro) {
+				t.Errorf("%s: Expected to find runtime-import macro '%s' for main workflow in lock file", tt.description, expectedMainWorkflowMacro)
 			}
 
-			// Verify ordering: imported content should come before runtime-import macro
+			// Verify ordering: import macros should come before main workflow macro
 			if tt.expectedOrderBefore != "" {
-				beforeIdx := strings.Index(lockContent, tt.expectedOrderBefore)
-				runtimeImportIdx := strings.Index(lockContent, "{{#runtime-import")
+				// For runtime imports, we check the order of the runtime-import macros
+				// Import macro should come before main workflow macro
+				firstImportIdx := strings.Index(lockContent, "{{#runtime-import shared/")
+				mainWorkflowMacroIdx := strings.Index(lockContent, expectedMainWorkflowMacro)
 
-				if beforeIdx == -1 {
-					t.Errorf("%s: Expected to find '%s' in lock file", tt.description, tt.expectedOrderBefore)
+				if firstImportIdx == -1 {
+					t.Errorf("%s: Expected to find import runtime-import macro in lock file", tt.description)
 				}
-				if runtimeImportIdx == -1 {
-					t.Errorf("%s: Expected to find runtime-import in lock file", tt.description)
+				if mainWorkflowMacroIdx == -1 {
+					t.Errorf("%s: Expected to find main workflow runtime-import macro '%s' in lock file", tt.description, expectedMainWorkflowMacro)
 				}
-				if beforeIdx != -1 && runtimeImportIdx != -1 && beforeIdx >= runtimeImportIdx {
-					t.Errorf("%s: Expected imported content '%s' to come before runtime-import macro", tt.description, tt.expectedOrderBefore)
+				// Import macros should come before the main workflow macro
+				if firstImportIdx != -1 && mainWorkflowMacroIdx != -1 && firstImportIdx >= mainWorkflowMacroIdx {
+					t.Errorf("%s: Expected import runtime-import macro to come before main workflow runtime-import macro", tt.description)
 				}
 			}
 		})
@@ -238,20 +248,22 @@ This is the main workflow content.`
 		t.Error("Lock file should contain runtime-import macro for main workflow")
 	}
 
-	// With the new approach:
-	// - Imported content (from frontmatter imports) → inlined in lock file
+	// With the new runtime-import approach:
+	// - Imported content (from frontmatter imports) → uses runtime-import macro
 	// - Main workflow content (including @include expansion) → runtime-imported
 
-	// Verify imported content is in lock file (inlined)
-	if !strings.Contains(lockContent, "# Imported Content") {
-		t.Error("Imported content from frontmatter imports should be inlined in lock file")
-	}
-	if !strings.Contains(lockContent, "This comes from frontmatter imports") {
-		t.Error("Imported markdown content should be inlined in lock file")
+	// Verify runtime-import macro for imports is in lock file
+	if !strings.Contains(lockContent, "{{#runtime-import shared/import.md}}") {
+		t.Error("Lock file should contain runtime-import macro for imported file")
 	}
 
-	// Note: Main workflow content and @include content are runtime-imported
-	// They are NOT in the lock file - only the runtime-import macro is present
+	// Verify runtime-import macro for main workflow is in lock file
+	if !strings.Contains(lockContent, "{{#runtime-import combo-workflow.md}}") {
+		t.Error("Lock file should contain runtime-import macro for main workflow")
+	}
+
+	// Note: Neither imported content nor main workflow content are inlined -
+	// they are all loaded at runtime via runtime-import macros
 }
 
 // TestImportsXMLCommentsRemoval tests that XML comments are removed from imported markdown
@@ -325,31 +337,24 @@ This is the main workflow content.`
 
 	lockContent := string(content)
 
-	// Verify XML comments are NOT present in the actual prompt content
-	// The prompt is written after "Create prompt" step
-	promptSectionStart := strings.Index(lockContent, "Create prompt")
-	if promptSectionStart == -1 {
-		t.Fatal("Could not find 'Create prompt' section in lock file")
+	// Verify XML comments are NOT present in the lock file
+	// (They would only be present if we were inlining content, which we're not doing anymore)
+	if strings.Contains(lockContent, "<!-- This is an XML comment") {
+		t.Error("XML comment should not appear in lock file")
 	}
-	promptSection := lockContent[promptSectionStart:]
-
-	if strings.Contains(promptSection, "<!-- This is an XML comment") {
-		t.Error("XML comment should not appear in actual prompt content")
-	}
-	if strings.Contains(promptSection, "Multi-line XML comment") {
-		t.Error("Multi-line XML comment should not appear in actual prompt content")
+	if strings.Contains(lockContent, "Multi-line XML comment") {
+		t.Error("Multi-line XML comment should not appear in lock file")
 	}
 
-	// Verify that actual content IS present (not removed along with comments)
-	if !strings.Contains(lockContent, "This is important imported content") {
-		t.Error("Expected imported content to be present in lock file")
-	}
-	if !strings.Contains(lockContent, "More imported content here") {
-		t.Error("Expected imported content to be present in lock file")
+	// With runtime-import approach:
+	// - Imported content is NOT inlined, so we check for runtime-import macros instead
+	// - XML comments will be removed at runtime when the import is processed
+	if !strings.Contains(lockContent, "{{#runtime-import shared/with-comments.md}}") {
+		t.Error("Expected runtime-import macro for imported file in lock file")
 	}
 
-	// With new approach, main workflow content is runtime-imported (not inlined)
-	if !strings.Contains(lockContent, "{{#runtime-import") {
-		t.Error("Expected runtime-import macro in lock file")
+	// Verify runtime-import macro for main workflow is present
+	if !strings.Contains(lockContent, "{{#runtime-import test-xml-workflow.md}}") {
+		t.Error("Expected runtime-import macro for main workflow in lock file")
 	}
 }

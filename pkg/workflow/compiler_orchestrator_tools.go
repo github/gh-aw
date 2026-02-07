@@ -23,8 +23,9 @@ type toolsProcessingResult struct {
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
-	importedMarkdown     string // imported markdown from frontmatter imports (separate from main body)
-	mainWorkflowMarkdown string // main workflow markdown without imports (for runtime-import)
+	importedMarkdown     string   // Only imports WITH inputs (for compile-time substitution)
+	importPaths          []string // Import paths for runtime-import macro generation (imports without inputs)
+	mainWorkflowMarkdown string   // main workflow markdown without imports (for runtime-import)
 	allIncludedFiles     []string
 	workflowName         string
 	frontmatterName      string
@@ -222,14 +223,22 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	mainWorkflowMarkdown := markdownContent
 	orchestratorToolsLog.Printf("Main workflow markdown: %d bytes", len(mainWorkflowMarkdown))
 
-	// Prepend imported markdown from frontmatter imports field
+	// Get import paths for runtime-import macro generation
+	var importPaths []string
+	if len(importsResult.ImportPaths) > 0 {
+		importPaths = importsResult.ImportPaths
+		orchestratorToolsLog.Printf("Found %d import paths for runtime-import macros", len(importPaths))
+	}
+
+	// Handle imported markdown from frontmatter imports field
+	// Only imports WITH inputs will have markdown content (for compile-time substitution)
 	var importedMarkdown string
 	if importsResult.MergedMarkdown != "" {
 		importedMarkdown = importsResult.MergedMarkdown
 		markdownContent = importsResult.MergedMarkdown + markdownContent
-		orchestratorToolsLog.Printf("Stored imported markdown: %d bytes, combined markdown: %d bytes", len(importedMarkdown), len(markdownContent))
+		orchestratorToolsLog.Printf("Stored imported markdown with inputs: %d bytes, combined markdown: %d bytes", len(importedMarkdown), len(markdownContent))
 	} else {
-		orchestratorToolsLog.Print("No imported markdown")
+		orchestratorToolsLog.Print("No imported markdown with inputs")
 	}
 
 	log.Print("Expanded includes in markdown content")
@@ -290,7 +299,8 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,
-		importedMarkdown:     importedMarkdown,
+		importedMarkdown:     importedMarkdown, // Only imports WITH inputs
+		importPaths:          importPaths,      // Import paths for runtime-import macros (imports without inputs)
 		mainWorkflowMarkdown: mainWorkflowMarkdown,
 		allIncludedFiles:     allIncludedFiles,
 		workflowName:         workflowName,

@@ -21,7 +21,11 @@
 #
 # Generates project plans and task breakdowns when invoked with /plan command in issues or PRs
 #
-# frontmatter-hash: ef15c568ed52f4f6c83a797e5c7c67c79c210cc7ba2bcc35d346df50fd910f72
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 0a2d3aa7c0c7bb80d7620d01e614b021bb7177b6c027826cfb36eb23ae8f2f25
 
 name: "Plan Command"
 "on":
@@ -653,6 +657,9 @@ jobs:
           fi
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/plan.md}}

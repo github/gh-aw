@@ -21,7 +21,11 @@
 #
 # Tests network firewall functionality and validates security rules for workflow network access
 #
-# frontmatter-hash: 2a0e834ee3cd0e91a2b612df54c1ffa488ab6e446f79ede1851d9af4a6365de0
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 92f2186cfc3bb66ef47342e0e23abc1ed566cc0dee63d87b741daf49a91d9041
 
 name: "Firewall Test Agent"
 "on":
@@ -287,6 +291,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/firewall.md}}

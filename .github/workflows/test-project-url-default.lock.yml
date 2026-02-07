@@ -20,7 +20,11 @@
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 919aa9db316c03def96f98fa19bea30f29ce46d039263de87340d928180c4ab8
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 4b8eb1036171f89a3f37409cafdf433cf2dab9a4199718beb62624953b63c1a5
 
 name: "Test Project URL Explicit Requirement"
 "on":
@@ -727,6 +731,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/test-project-url-default.md}}

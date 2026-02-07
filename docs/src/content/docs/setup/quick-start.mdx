@@ -9,9 +9,13 @@ import Video from '../../../components/Video.astro';
 
 ## Adding an Automated Daily Status Workflow to Your Repo
 
-In this guide you will add the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md?plain=1) to an existing GitHub repository where you are a maintainer, running in GitHub Actions.
+In this guide you will add an existing, pre-backed workflow to an existing GitHub repository where you are a maintainer - the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md?plain=1), running in GitHub Actions.
 
-The aim here is **automated AI**: to install something that will run **automatically** every day, in the context of your repository. The workflow will regularly create or update a fresh status report issue in your repository, without any further manual intervention. If you're familiar with GitHub Actions, you will be aware of the power of automation in repositories; this is simply taking that to the next level with AI.
+The aim here is to become familiar with **automated AI**: to install something that will run **automatically**, **recurringly**, in the context of your repository. In this case the workflow will run daily, though you can also invoke it manually. Every day, the workflow will create or update a fresh status report issue in your repository, without any further manual intervention. If you're familiar with GitHub Actions, you will be aware of the power of automation in repositories; this is simply taking that to the next level with AI.
+
+Alternatively:
+- To add a custom workflow of your own design, see [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/).
+- You can find more examples of pre-baked workflows in [Peli's Agent Factory](https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/).
 
 <Video
   src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
@@ -49,7 +53,7 @@ gh extension install github/gh-aw
 From your repository root run:
 
 ```bash wrap
-gh aw add githubnext/agentics/daily-repo-status
+gh aw add-wizard githubnext/agentics/daily-repo-status
 ```
 
 This will take you through an interactive process to:

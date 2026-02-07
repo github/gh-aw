@@ -25,6 +25,8 @@ safe-outputs:
     run-success: "🛡️ [{workflow_name}]({run_url}) completed security posture analysis."
     run-failure: "⚠️ [{workflow_name}]({run_url}) {status} during security analysis."
 timeout-minutes: 15
+imports:
+  - shared/mood.md
 ---
 
 # Security Guard Agent 🛡️

@@ -25,6 +25,7 @@ safe-outputs:
 timeout-minutes: 45
 strict: true
 imports:
+  - shared/mood.md
   - shared/reporting.md
 steps:
   - name: Pull static analysis Docker images

@@ -28,6 +28,7 @@ safe-outputs:
     max: 1
     close-older-discussions: true
 imports:
+  - shared/mood.md
   - shared/python-dataviz.md
   - shared/reporting.md
 ---

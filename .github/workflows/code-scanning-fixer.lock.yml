@@ -21,7 +21,11 @@
 #
 # Automatically fixes code scanning alerts by creating pull requests with remediation
 #
-# frontmatter-hash: 0597ad0df613bbb3cb159272bda8297794f7ae994dbcaa20b7ae721c8b6b8158
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: df4e5ab4fc5119bf995e3fec24af6c53d2784cc75385acdfc307b209ae05b14f
 
 name: "Code Scanning Fixer"
 "on":
@@ -625,6 +629,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/code-scanning-fixer.md}}

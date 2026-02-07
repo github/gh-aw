@@ -21,7 +21,11 @@
 #
 # Build and test this project
 #
-# frontmatter-hash: 56c9efc011ab8ce3ba02bc16ae69656bae41fdb999945f32cf17a12a52763787
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: cf9aa8ef718e4e141587441cc4dd1f3b3fa7d48154269b347ec4569e4705b766
 
 name: "Dev"
 "on":
@@ -543,6 +547,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/dev.md}}

@@ -61,6 +61,8 @@ steps:
   - name: Dev dependencies
     run: make deps-dev
 strict: true
+imports:
+  - shared/mood.md
 ---
 
 # Code Tidying Agent

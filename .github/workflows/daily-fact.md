@@ -36,6 +36,8 @@ safe-outputs:
     run-started: "📜 Hark! The muse awakens — [{workflow_name}]({run_url}) begins its verse upon this {event_type}..."
     run-success: "✨ Lo! [{workflow_name}]({run_url}) hath woven its tale to completion, like a sonnet finding its final rhyme. 🌟"
     run-failure: "🌧️ Alas! [{workflow_name}]({run_url}) {status}, its quill fallen mid-verse. The poem remains unfinished..."
+imports:
+  - shared/mood.md
 ---
 
 {{#runtime-import? .github/shared-instructions.md}}

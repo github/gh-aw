@@ -21,6 +21,8 @@ tools:
   web-fetch:
 
 timeout-minutes: 5
+imports:
+  - shared/mood.md
 ---
 
 # Firewall Test Agent

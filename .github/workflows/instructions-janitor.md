@@ -38,6 +38,8 @@ tools:
 
 timeout-minutes: 15
 
+imports:
+  - shared/mood.md
 ---
 
 # Instructions Janitor

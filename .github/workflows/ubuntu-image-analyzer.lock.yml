@@ -21,7 +21,11 @@
 #
 # Weekly analysis of the default Ubuntu Actions runner image and guidance for creating Docker mimics
 #
-# frontmatter-hash: 850d9cd8c98cdc8fafecfbecbe0815db09364b1ecf15579eab52f3a1d424b13e
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 7bb7eac890185909417e71ee92611ebdb1178a8040b32184641b53458eba10a5
 
 name: "Ubuntu Actions Image Analyzer"
 "on":
@@ -550,6 +554,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/ubuntu-image-analyzer.md}}

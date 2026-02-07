@@ -21,6 +21,7 @@ safe-outputs:
     title-prefix: "[ci-coach] "
 timeout-minutes: 30
 imports:
+  - shared/mood.md
   - shared/ci-data-analysis.md
   - shared/ci-optimization-strategies.md
   - shared/reporting.md

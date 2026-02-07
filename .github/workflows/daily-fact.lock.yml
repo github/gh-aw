@@ -21,7 +21,11 @@
 #
 # Posts a daily poetic verse about the gh-aw project to a discussion thread
 #
-# frontmatter-hash: 1c7734c2a56766a64613f4db8d53ca84127705f40ca1574a8edef469cd0e5ccd
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: e6b7befeee92e59a65fad768672f3717fc7f9824814c87c56f035b11b6c5050c
 
 name: "Daily Fact About gh-aw"
 "on":
@@ -537,6 +541,9 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-fact.md}}

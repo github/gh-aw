@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/go-make.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 93b0b741aaf78ab0878fc902fdf0bef6a93e2b59d4cd830ad1a62ddb2caaebc5
+# frontmatter-hash: 0e1aba924e4cf5c011642211ede5dbc28e1abdc2db601bb0bf1c2e83c9793575
 
 name: "Go Logger Enhancement"
 "on":
@@ -719,26 +720,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          **IMPORTANT**: Always use the `safeinputs-go` and `safeinputs-make` tools for Go and Make commands instead of running them directly via bash. These safe-input tools provide consistent execution and proper logging.
-          
-          **Correct**:
-          ```
-          Use the safeinputs-go tool with args: "test ./..."
-          Use the safeinputs-make tool with args: "build"
-          Use the safeinputs-make tool with args: "lint"
-          Use the safeinputs-make tool with args: "test-unit"
-          ```
-          
-          **Incorrect**:
-          ```
-          Use the go safe-input tool with args: "test ./..."  ❌ (Wrong tool name - use safeinputs-go)
-          Run: go test ./...  ❌ (Use safeinputs-go instead)
-          Execute bash: make build  ❌ (Use safeinputs-make instead)
-          ```
-          
-          
-          
-          
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/go-make.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/go-logger.md}}

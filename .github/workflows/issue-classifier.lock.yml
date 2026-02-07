@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/actions-ai-inference.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 54f03e982897cef563bad67d710a24a27930f6a2a26d1bf07e8422e8ab351fe7
+# frontmatter-hash: 02b7e24d808524620d830fa791b35807c3e603a0307c0b370d87e50cb7d7277b
 
 name: "Issue Classifier"
 "on":
@@ -540,9 +541,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          
-          
-          
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/actions-ai-inference.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/issue-classifier.md}}

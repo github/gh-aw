@@ -153,13 +153,13 @@ You can add any existing workflow you have access to.
 3. Use the `gh aw add` command to add the workflow to your repository:
 
    ```bash wrap
-   gh aw add <workflow-url>
+   gh aw add-wizard <workflow-url>
    ```
 
    For example, to add the daily-repo-status workflow from the top-level `workflows` directory of the `github/agentics` repository, you would run:
 
    ```bash wrap
-   gh aw add https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md
+   gh aw add-wizard https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md
    ```
 
    This will work for any URL to a workflow markdown file on GitHub.
@@ -167,7 +167,7 @@ You can add any existing workflow you have access to.
    If the workflow is in the top-level `workflows` directory, you can use a shorter form:
 
    ```bash wrap
-   gh aw add githubnext/agentics/daily-repo-status
+   gh aw add-wizard githubnext/agentics/daily-repo-status
    ```
 
    Either way this will check various requirements and add the workflow markdown file to your repository and generate the corresponding YAML workflow.

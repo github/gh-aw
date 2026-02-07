@@ -14,6 +14,7 @@ safe-outputs:
     allowed: [bug, feature, enhancement, documentation, question, help-wanted, good-first-issue]
   add-comment: {}
 imports:
+  - shared/mood.md
   - shared/reporting.md
 ---
 

@@ -78,11 +78,13 @@ Provide findings based on the requested depth level.
 ## Running Manual Workflows
 
 Via CLI:
+
 ```bash
 gh aw run workflow
 ```
 
 Via GitHub Actions UI:
+
 1. Go to Actions tab
 2. Select workflow
 3. Click "Run workflow"
@@ -94,10 +96,11 @@ Via GitHub Actions UI:
 Add a manual workflow to your repository:
 
 ```bash
-gh aw add githubnext/agentics/research
+gh aw add-wizard githubnext/agentics/weekly-research
 ```
 
 Then run it:
+
 ```bash
-gh aw run research
+gh aw run weekly-research
 ```

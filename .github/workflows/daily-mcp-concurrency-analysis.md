@@ -15,6 +15,7 @@ tracker-id: mcp-concurrency-analysis
 engine: copilot
 
 imports:
+  - shared/mood.md
   - shared/reporting.md
   - shared/safe-output-app.md
 

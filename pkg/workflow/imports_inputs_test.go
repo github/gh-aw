@@ -165,9 +165,15 @@ This workflow tests that string imports still work.
 
 	lockContent := string(lockFileContent)
 
-	// Verify that the shared content is included
-	if !strings.Contains(lockContent, "Simple Shared Instructions") {
-		t.Error("Expected lock file to contain content from shared workflow")
+	// With runtime-import approach, imports without inputs use runtime-import macros
+	// (not inlined content)
+	if !strings.Contains(lockContent, "{{#runtime-import shared/simple.md}}") {
+		t.Error("Expected lock file to contain runtime-import macro for shared workflow")
+	}
+
+	// The content should NOT be inlined (it's loaded at runtime)
+	if strings.Contains(lockContent, "Simple Shared Instructions") {
+		t.Error("Expected shared content to NOT be inlined (should use runtime-import)")
 	}
 }
 

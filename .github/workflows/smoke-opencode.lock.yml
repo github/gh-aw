@@ -25,9 +25,10 @@
 #   Imports:
 #     - shared/gh.md
 #     - shared/github-queries-safe-input.md
+#     - shared/mood.md
 #     - shared/opencode.md
 #
-# frontmatter-hash: 8048975ef16e92f9381b252166bb75b0c5bba9faf07e18bf69d7c2404edc0168
+# frontmatter-hash: 1378f6a6cfb514d196a1e4788301ea292d9944fa5fb9cd9b1750bdd2b19bc278
 
 name: "Smoke OpenCode"
 "on":
@@ -1167,28 +1168,16 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          
-          
-          **IMPORTANT**: Always use the `safeinputs-gh` tool for GitHub CLI commands instead of running `gh` directly via bash. The `safeinputs-gh` tool has proper authentication configured with `GITHUB_TOKEN`, while bash commands do not have GitHub CLI authentication by default.
-          
-          **Correct**:
-          ```
-          Use the safeinputs-gh tool with args: "pr list --limit 5"
-          Use the safeinputs-gh tool with args: "issue view 123"
-          ```
-          
-          **Incorrect**:
-          ```
-          Use the gh safe-input tool with args: "pr list --limit 5"  ❌ (Wrong tool name - use safeinputs-gh)
-          Run: gh pr list --limit 5  ❌ (No authentication in bash)
-          Execute bash: gh issue view 123  ❌ (No authentication in bash)
-          ```
-          
-          
-          
-          
-          
-          
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/opencode.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/gh.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/github-queries-safe-input.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/smoke-opencode.md}}

@@ -24,7 +24,7 @@ In our [previous posts](/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-sim
 
 ## A Continuous Style Workflow
 
-Today's post is dedicated to one agent, and the larger concept it represents: the **[Terminal Stylist](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/terminal-stylist.md?plain=1)** workflow. This agent's purpose is to **make things look better**, by reviewing and enhancing the style of command-line interface (CLI) output.
+Today's post is dedicated to one agent, and the larger concept it represents: the **[Terminal Stylist](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/terminal-stylist.md?plain=1)** workflow. This agent's purpose is to **make things look better**, by reviewing and enhancing the style of command-line interface (CLI) output.
 
 Command-line interfaces are a primary interaction point for developer tools. When output is inconsistent or noisy, it still “works,” but it adds friction. When it’s well-styled, information becomes scannable, color highlights what matters, layouts remain readable across light and dark themes, and the overall experience feels professional.
 
@@ -32,7 +32,7 @@ Under the hood, the workflow looks for non-test Go files with console-related co
 
 Rather than opening issues or PRs, the Terminal Stylist posts GitHub Discussions in the "General" category. Styling changes are often subjective, and discussions make it easier to converge on the right balance between simplicity and polish.
 
-Terminal Stylist demonstrates multi-agent collaboration at its best. The workflow creates **31 daily analysis reports** as discussions, which are then mined by Discussion Task Miner and Plan Command into **25 actionable issues**. Those issues spawned **16 merged PRs (80% merge rate)** improving console output across the codebase — from [Charmbracelet best practices adoption](https://github.com/github/gh-aw/pull/9928) to [progress bars](https://github.com/github/gh-aw/pull/8731) to [stderr routing fixes](https://github.com/github/gh-aw/pull/12302). Terminal Stylist never creates PRs directly; instead, it identifies opportunities that other agents implement, showing how workflows can collaborate through GitHub's discussion → issue → PR pipeline.
+Terminal Stylist demonstrates multi-agent collaboration at its best. The workflow created **31 daily analysis reports** as discussions, which were then mined by Discussion Task Miner and Plan Command into **25 actionable issues**. Those issues spawned **16 merged PRs (80% merge rate)** improving console output across the codebase — from [Charmbracelet best practices adoption](https://github.com/github/gh-aw/pull/9928) to [progress bars](https://github.com/github/gh-aw/pull/8731) to [stderr routing fixes](https://github.com/github/gh-aw/pull/12302). Terminal Stylist never creates PRs directly; instead, it identifies opportunities that other agents implement, showing how workflows can collaborate through GitHub's discussion → issue → PR pipeline.
 
 The Terminal Stylist is proof that autonomous cleanup agents can have surprisingly specific taste. It focuses on terminal UI craft, using the Charmbracelet ecosystem (especially Lipgloss and Huh) to keep the CLI not just correct, but pleasant to use.
 
@@ -51,7 +51,7 @@ You can add this workflow to your own repository and remix it as follows:
 **Terminal Stylist:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/terminal-stylist.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/terminal-stylist.md
 ```
 
 Then edit and remix the workflow specification to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

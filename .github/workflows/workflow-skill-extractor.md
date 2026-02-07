@@ -40,6 +40,7 @@ safe-outputs:
     group: true
 
 imports:
+  - shared/mood.md
   - shared/reporting.md
 ---
 

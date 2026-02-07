@@ -38,6 +38,8 @@ safe-outputs:
 
 timeout-minutes: 30
 
+imports:
+  - shared/mood.md
 ---
 
 # Ubuntu Actions Image Analyzer

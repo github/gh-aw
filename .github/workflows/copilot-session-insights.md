@@ -47,6 +47,7 @@ tools:
     - "date *"
 
 imports:
+  - shared/mood.md
   - shared/jqschema.md  # Must come before copilot-session-data-fetch.md (dependency)
   - shared/copilot-session-data-fetch.md
   - shared/session-analysis-charts.md

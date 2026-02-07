@@ -44,6 +44,6 @@ See the [Schedule Syntax reference](/gh-aw/reference/schedule-syntax/) for compl
 Add a scheduled workflow to your repository:
 
 ```bash
-gh aw add githubnext/agentics/weekly-research
-gh aw add githubnext/agentics/daily-team-status
+gh aw add-wizard githubnext/agentics/weekly-research
+gh aw add-wizard githubnext/agentics/daily-repo-status
 ```

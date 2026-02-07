@@ -27,6 +27,7 @@ safe-outputs:
     max: 5
     group: true
 imports:
+  - shared/mood.md
   - shared/reporting.md
 ---
 

@@ -28,13 +28,13 @@ Now let's address one of software development's eternal challenges: keeping docu
 
 These agents maintain high-quality documentation and content:
 
-- **[Daily Documentation Updater](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-doc-updater.md?plain=1)** - Reviews and updates documentation to ensure accuracy and completeness — **57 merged PRs out of 59 proposed (96% merge rate)**  
-- **[Glossary Maintainer](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/glossary-maintainer.md?plain=1)** - Keeps glossary synchronized with codebase — **10 merged PRs out of 10 proposed (100% merge rate)**  
-- **[Documentation Unbloat](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/unbloat-docs.md?plain=1)** - Reviews and simplifies documentation by reducing verbosity — **88 merged PRs out of 103 proposed (85% merge rate)**  
-- **[Documentation Noob Tester](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/docs-noob-tester.md?plain=1)** - Tests documentation as a new user would, identifying confusing steps — **9 merged PRs (43% merge rate)** via causal chain  
-- **[Slide Deck Maintainer](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/slide-deck-maintainer.md?plain=1)** - Maintains presentation slide decks — **2 merged PRs out of 5 proposed (40% merge rate)**  
-- **[Multi-device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation site across mobile, tablet, and desktop devices — **2 merged PRs out of 2 proposed (100% merge rate)**  
-- **[Blog Auditor](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/blog-auditor.md?plain=1)** - Verifies blog posts are accessible and contain expected content — **6 audits completed** (5 passed, 1 flagged issues)  
+- **[Daily Documentation Updater](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-doc-updater.md?plain=1)** - Reviews and updates documentation to ensure accuracy and completeness — **57 merged PRs out of 59 proposed (96% merge rate)**  
+- **[Glossary Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/glossary-maintainer.md?plain=1)** - Keeps glossary synchronized with codebase — **10 merged PRs out of 10 proposed (100% merge rate)**  
+- **[Documentation Unbloat](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/unbloat-docs.md?plain=1)** - Reviews and simplifies documentation by reducing verbosity — **88 merged PRs out of 103 proposed (85% merge rate)**  
+- **[Documentation Noob Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/docs-noob-tester.md?plain=1)** - Tests documentation as a new user would, identifying confusing steps — **9 merged PRs (43% merge rate)** via causal chain  
+- **[Slide Deck Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/slide-deck-maintainer.md?plain=1)** - Maintains presentation slide decks — **2 merged PRs out of 5 proposed (40% merge rate)**  
+- **[Multi-device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation site across mobile, tablet, and desktop devices — **2 merged PRs out of 2 proposed (100% merge rate)**  
+- **[Blog Auditor](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/blog-auditor.md?plain=1)** - Verifies blog posts are accessible and contain expected content — **6 audits completed** (5 passed, 1 flagged issues)  
   
 Documentation is where we challenged conventional wisdom. Can AI agents write *good* documentation?
 
@@ -59,43 +59,43 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Daily Documentation Updater:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-doc-updater.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-doc-updater.md
 ```
 
 **Glossary Maintainer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/glossary-maintainer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/glossary-maintainer.md
 ```
 
 **Documentation Unbloat:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/unbloat-docs.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/unbloat-docs.md
 ```
 
 **Documentation Noob Tester:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/docs-noob-tester.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/docs-noob-tester.md
 ```
 
 **Slide Deck Maintainer:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/slide-deck-maintainer.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/slide-deck-maintainer.md
 ```
 
 **Multi-device Docs Tester:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/daily-multi-device-docs-tester.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md
 ```
 
 **Blog Auditor:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/blog-auditor.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/blog-auditor.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.

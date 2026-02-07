@@ -35,6 +35,8 @@ tools:
   web-fetch:
   bash: [":*"]
 
+imports:
+  - shared/mood.md
 ---
 # Dependabot Dependency Checker
 

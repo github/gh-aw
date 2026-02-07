@@ -21,15 +21,19 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: fda3821e70fae5f450a65c2b0ce82f1b94aba2c48f8cb148c6d788f9678cb214
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 8e91bc55d5faf1263dcac29c70ce11efc406446e60befb9ee2b6a8c108ab397b
 
 name: "Issue Monster"
 "on":
   schedule:
-  - cron: "*/10 * * * *"
-    # Friendly format: every 10m
+  - cron: "*/30 * * * *"
+    # Friendly format: every 30m
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
-    # max: 9
+    # max: 5
     # query: is:pr is:open is:draft author:app/copilot-swe-agent
   # skip-if-no-match: is:issue is:open # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
@@ -579,6 +583,9 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/issue-monster.md}}
           PROMPT_EOF
       - name: Substitute placeholders
@@ -1039,7 +1046,7 @@ jobs:
         env:
           GH_AW_SKIP_QUERY: "is:pr is:open is:draft author:app/copilot-swe-agent"
           GH_AW_WORKFLOW_NAME: "Issue Monster"
-          GH_AW_SKIP_MAX_MATCHES: "9"
+          GH_AW_SKIP_MAX_MATCHES: "5"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

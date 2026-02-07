@@ -28,6 +28,7 @@ engine:
 
 # Shared instructions
 imports:
+  - shared/mood.md
   - shared/reporting.md
   - shared/docs-server-lifecycle.md
 

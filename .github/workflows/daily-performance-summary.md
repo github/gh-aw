@@ -29,6 +29,7 @@ safe-outputs:
     max: 10
 timeout-minutes: 30
 imports:
+  - shared/mood.md
   - shared/github-queries-safe-input.md
   - shared/trending-charts-simple.md
   - shared/reporting.md

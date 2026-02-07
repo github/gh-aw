@@ -21,6 +21,8 @@ safe-outputs:
 tools:
   cache-memory: true
 
+imports:
+  - shared/mood.md
 ---
 
 # Test Create PR Error Handling

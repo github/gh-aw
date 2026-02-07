@@ -28,10 +28,10 @@ Beyond tracking basic metrics (run time, cost, success rate), we wanted deeper i
 
 These agents use sophisticated analysis techniques to extract insights:
 
-- **[Copilot Session Insights](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-session-insights.md?plain=1)** - Analyzes Copilot agent usage patterns and metrics — **32 analysis discussions**  
-- **[Copilot PR NLP Analysis](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-pr-nlp-analysis.md?plain=1)** - Natural language processing on PR conversations  
-- **[Prompt Clustering Analysis](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/prompt-clustering-analysis.md?plain=1)** - Clusters and categorizes agent prompts using ML — **27 analysis discussions**  
-- **[Copilot Agent Analysis](https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-agent-analysis.md?plain=1)** - Deep analysis of agent behavior patterns — **48 daily analysis discussions**  
+- **[Copilot Session Insights](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-session-insights.md?plain=1)** - Analyzes Copilot agent usage patterns and metrics — **32 analysis discussions**  
+- **[Copilot PR NLP Analysis](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-pr-nlp-analysis.md?plain=1)** - Natural language processing on PR conversations  
+- **[Prompt Clustering Analysis](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/prompt-clustering-analysis.md?plain=1)** - Clusters and categorizes agent prompts using ML — **27 analysis discussions**  
+- **[Copilot Agent Analysis](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-agent-analysis.md?plain=1)** - Deep analysis of agent behavior patterns — **48 daily analysis discussions**  
 
 Prompt Clustering Analysis has created **27 analysis discussions** using ML to categorize thousands of agent prompts — for example, [#6918](https://github.com/github/gh-aw/discussions/6918) clustering agent prompts to identify patterns and optimization opportunities. It revealed patterns we never noticed ("oh, 40% of our prompts are about error handling").
 
@@ -50,25 +50,25 @@ You can add these workflows to your own repository and remix it as follows:
 **Copilot Session Insights:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-agent-analysis.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-agent-analysis.md
 ```
 
 **Copilot PR NLP Analysis:**
  
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-pr-nlp-analysis
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-pr-nlp-analysis
 ```
 
 **Prompt Clustering Analysis:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/prompt-clustering-analysis.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/prompt-clustering-analysis.md
 ```
 
 **Copilot Agent Analysis:**
 
 ```bash
-gh aw add https://github.com/github/gh-aw/blob/v0.42.11/.github/workflows/copilot-agent-analysis.md
+gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/copilot-agent-analysis.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs,recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
