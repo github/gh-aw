@@ -285,7 +285,7 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	// Use MainWorkflowMarkdown (not MarkdownContent) to avoid extracting from imported content
 	if data.MainWorkflowMarkdown != "" {
 		compilerYamlLog.Printf("Extracting expressions from main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
-		
+
 		// Create a new extractor for main workflow markdown
 		mainExtractor := NewExpressionExtractor()
 		mainExprMappings, err := mainExtractor.ExtractExpressions(data.MainWorkflowMarkdown)
