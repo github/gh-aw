@@ -14,7 +14,7 @@ permissions:
 name: Smoke Codex
 engine: codex
 plugins:
-  - anthropics/claude-code/plugins/explanatory-output-style
+  - explanatory-output-style@claude-plugins-official
 strict: true
 imports:
   - shared/mood.md

@@ -16,7 +16,7 @@ permissions:
 name: Smoke Copilot
 engine: copilot
 plugins:
-  - anthropics/claude-code/plugins/explanatory-output-style
+  - explanatory-output-style@claude-plugins-official
 imports:
   - shared/mood.md
   - shared/gh.md
