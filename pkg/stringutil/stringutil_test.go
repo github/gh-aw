@@ -748,11 +748,11 @@ func TestFindClosestMatch(t *testing.T) {
 	validEngines := []string{"copilot", "claude", "codex", "custom"}
 
 	tests := []struct {
-		name          string
-		input         string
-		validOptions  []string
-		expected      string
-		shouldMatch   bool
+		name         string
+		input        string
+		validOptions []string
+		expected     string
+		shouldMatch  bool
 	}{
 		{
 			name:         "exact match not needed - copiilot",

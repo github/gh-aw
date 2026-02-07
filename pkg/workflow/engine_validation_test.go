@@ -304,51 +304,51 @@ func TestValidateSingleEngineSpecificationErrorMessageQuality(t *testing.T) {
 // TestValidateEngineDidYouMean tests the "did you mean" suggestion feature
 func TestValidateEngineDidYouMean(t *testing.T) {
 	tests := []struct {
-		name               string
-		invalidEngine      string
-		expectedSuggestion string
+		name                 string
+		invalidEngine        string
+		expectedSuggestion   string
 		shouldHaveSuggestion bool
 	}{
 		{
-			name:               "typo copiilot suggests copilot",
-			invalidEngine:      "copiilot",
-			expectedSuggestion: "copilot",
+			name:                 "typo copiilot suggests copilot",
+			invalidEngine:        "copiilot",
+			expectedSuggestion:   "copilot",
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:               "typo claud suggests claude",
-			invalidEngine:      "claud",
-			expectedSuggestion: "claude",
+			name:                 "typo claud suggests claude",
+			invalidEngine:        "claud",
+			expectedSuggestion:   "claude",
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:               "typo codec suggests codex",
-			invalidEngine:      "codec",
-			expectedSuggestion: "codex",
+			name:                 "typo codec suggests codex",
+			invalidEngine:        "codec",
+			expectedSuggestion:   "codex",
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:               "typo custon suggests custom",
-			invalidEngine:      "custon",
-			expectedSuggestion: "custom",
+			name:                 "typo custon suggests custom",
+			invalidEngine:        "custon",
+			expectedSuggestion:   "custom",
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:               "case difference suggests lowercase",
-			invalidEngine:      "Copilot",
-			expectedSuggestion: "copilot",
+			name:                 "case difference suggests lowercase",
+			invalidEngine:        "Copilot",
+			expectedSuggestion:   "copilot",
 			shouldHaveSuggestion: true,
 		},
 		{
-			name:               "completely wrong gets no suggestion",
-			invalidEngine:      "gpt4",
-			expectedSuggestion: "",
+			name:                 "completely wrong gets no suggestion",
+			invalidEngine:        "gpt4",
+			expectedSuggestion:   "",
 			shouldHaveSuggestion: false,
 		},
 		{
-			name:               "totally different gets no suggestion",
-			invalidEngine:      "xyz",
-			expectedSuggestion: "",
+			name:                 "totally different gets no suggestion",
+			invalidEngine:        "xyz",
+			expectedSuggestion:   "",
 			shouldHaveSuggestion: false,
 		},
 	}
@@ -357,21 +357,21 @@ func TestValidateEngineDidYouMean(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			compiler := NewCompiler()
 			err := compiler.validateEngine(tt.invalidEngine)
-			
+
 			if err == nil {
 				t.Fatal("Expected validation to fail for invalid engine")
 			}
-			
+
 			errorMsg := err.Error()
-			
+
 			if tt.shouldHaveSuggestion {
 				// Should have "Did you mean: X?" suggestion
 				if !strings.Contains(errorMsg, "Did you mean:") {
 					t.Errorf("Expected 'Did you mean:' in error message, got: %s", errorMsg)
 				}
-				
+
 				if !strings.Contains(errorMsg, tt.expectedSuggestion) {
-					t.Errorf("Expected suggestion '%s' in error message, got: %s", 
+					t.Errorf("Expected suggestion '%s' in error message, got: %s",
 						tt.expectedSuggestion, errorMsg)
 				}
 			} else {
@@ -381,12 +381,12 @@ func TestValidateEngineDidYouMean(t *testing.T) {
 						tt.invalidEngine, errorMsg)
 				}
 			}
-			
+
 			// All errors should still list valid engines
 			if !strings.Contains(errorMsg, "copilot") {
 				t.Errorf("Error should always list valid engines, got: %s", errorMsg)
 			}
-			
+
 			// All errors should still include an example
 			if !strings.Contains(errorMsg, "Example:") {
 				t.Errorf("Error should always include an example, got: %s", errorMsg)

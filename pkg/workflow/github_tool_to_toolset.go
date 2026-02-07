@@ -47,7 +47,7 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 
 	// Track missing toolsets and which tools need them
 	missingToolsets := make(map[string][]string) // toolset -> list of tools that need it
-	
+
 	// Track unknown tools for suggestions
 	var unknownTools []string
 	var suggestions []string
@@ -56,14 +56,14 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 		requiredToolset, exists := GitHubToolToToolsetMap[tool]
 		if !exists {
 			githubToolToToolsetLog.Printf("Tool %s not found in mapping, checking for typo", tool)
-			
+
 			// Get all valid tool names for suggestion
 			validTools := make([]string, 0, len(GitHubToolToToolsetMap))
 			for validTool := range GitHubToolToToolsetMap {
 				validTools = append(validTools, validTool)
 			}
 			sort.Strings(validTools)
-			
+
 			// Try to find a close match
 			suggestion := stringutil.FindClosestMatch(tool, validTools)
 			if suggestion != "" {
@@ -84,12 +84,12 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 			missingToolsets[requiredToolset] = append(missingToolsets[requiredToolset], tool)
 		}
 	}
-	
+
 	// Report unknown tools with suggestions if any were found
 	if len(unknownTools) > 0 {
 		githubToolToToolsetLog.Printf("Found %d unknown tools", len(unknownTools))
 		errMsg := fmt.Sprintf("Unknown GitHub tool(s): %s\n\n", formatList(unknownTools))
-		
+
 		if len(suggestions) > 0 {
 			errMsg += "Did you mean:\n"
 			for _, s := range suggestions {
@@ -97,21 +97,21 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 			}
 			errMsg += "\n"
 		}
-		
+
 		// Show a few examples of valid tools
 		validTools := make([]string, 0, len(GitHubToolToToolsetMap))
 		for tool := range GitHubToolToToolsetMap {
 			validTools = append(validTools, tool)
 		}
 		sort.Strings(validTools)
-		
+
 		exampleCount := 10
 		if len(validTools) < exampleCount {
 			exampleCount = len(validTools)
 		}
 		errMsg += fmt.Sprintf("Valid GitHub tools include: %s\n\n", formatList(validTools[:exampleCount]))
 		errMsg += "See all tools: https://github.com/github/gh-aw/blob/main/pkg/workflow/data/github_tool_to_toolset.json"
-		
+
 		return fmt.Errorf("%s", errMsg)
 	}
 

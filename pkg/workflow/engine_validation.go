@@ -67,19 +67,19 @@ func (c *Compiler) validateEngine(engineID string) error {
 	}
 
 	engineValidationLog.Printf("Engine ID %s not found: %v", engineID, err)
-	
+
 	// Build list of valid engine IDs
 	validEngines := []string{"copilot", "claude", "codex", "custom"}
-	
+
 	// Try to find a close match for "did you mean" suggestion
 	suggestion := stringutil.FindClosestMatch(engineID, validEngines)
-	
+
 	// Build error message with helpful context
 	errMsg := fmt.Sprintf("invalid engine: %s. Valid engines are: %s.\n\nExample:\nengine: copilot\n\nSee: %s",
-		engineID, 
+		engineID,
 		"copilot, claude, codex, custom",
 		constants.DocsEnginesURL)
-	
+
 	// Add "did you mean" suggestion if we found a close match
 	if suggestion != "" {
 		errMsg = fmt.Sprintf("invalid engine: %s. Valid engines are: %s.\n\nDid you mean: %s?\n\nExample:\nengine: copilot\n\nSee: %s",
@@ -88,7 +88,7 @@ func (c *Compiler) validateEngine(engineID string) error {
 			suggestion,
 			constants.DocsEnginesURL)
 	}
-	
+
 	return fmt.Errorf("%s", errMsg)
 }
 
