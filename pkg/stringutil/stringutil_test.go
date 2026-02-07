@@ -721,7 +721,7 @@ func TestLevenshteinDistance(t *testing.T) {
 		{
 			name:     "long strings with small difference",
 			s1:       "this-is-a-very-long-identifier",
-			s2:       "this-is-a-very-long-identifer",
+			s2:       "this-is-a-very-long-identifer", //nolint:misspell // Intentional typo for testing
 			expected: 1,
 		},
 	}
@@ -953,7 +953,7 @@ func BenchmarkLevenshteinDistance_Short(b *testing.B) {
 
 func BenchmarkLevenshteinDistance_Long(b *testing.B) {
 	s1 := "this-is-a-very-long-identifier-with-many-characters"
-	s2 := "this-is-a-very-long-identifer-with-many-characters"
+	s2 := "this-is-a-very-long-identifer-with-many-characters" //nolint:misspell // Intentional typo for testing
 	for i := 0; i < b.N; i++ {
 		LevenshteinDistance(s1, s2)
 	}

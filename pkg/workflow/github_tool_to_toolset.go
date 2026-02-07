@@ -53,6 +53,11 @@ func ValidateGitHubToolsAgainstToolsets(allowedTools []string, enabledToolsets [
 	var suggestions []string
 
 	for _, tool := range allowedTools {
+		// Skip wildcard - it means "allow all tools"
+		if tool == "*" {
+			continue
+		}
+
 		requiredToolset, exists := GitHubToolToToolsetMap[tool]
 		if !exists {
 			githubToolToToolsetLog.Printf("Tool %s not found in mapping, checking for typo", tool)
