@@ -26,12 +26,13 @@ func InitRepositoryInteractive(verbose bool, rootCmd CommandProvider) error {
 		return fmt.Errorf("interactive init cannot be used in automated tests or CI environments")
 	}
 
-	// Ensure we're in a git repository
-	if !isGitRepo() {
-		initLog.Print("Not in a git repository, initialization failed")
-		return fmt.Errorf("not in a git repository")
+	// Run shared precondition checks (same as `gh aw add`)
+	// This verifies: gh auth, git repo, Actions enabled, user permissions
+	preconditionResult, err := CheckInteractivePreconditions(verbose)
+	if err != nil {
+		return err
 	}
-	initLog.Print("Verified git repository")
+	initLog.Printf("Precondition checks passed, repo: %s, isPublic: %v", preconditionResult.RepoSlug, preconditionResult.IsPublicRepo)
 
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Welcome to GitHub Agentic Workflows setup!"))
