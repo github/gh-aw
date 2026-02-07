@@ -3,10 +3,10 @@ name: Issue Monster
 description: The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 on:
   workflow_dispatch:
-  schedule: every 1h
+  schedule: every 10m
   skip-if-match:
     query: "is:pr is:open is:draft author:app/copilot-swe-agent"
-    max: 9
+    max: 6
   skip-if-no-match: "is:issue is:open"
 
 permissions:
@@ -89,7 +89,7 @@ jobs:
               });
               core.info(`Found ${response.data.total_count} total issues matching basic criteria`);
               
-              // Fetch full details for each issue to get labels, assignees, and sub-issues
+              // Fetch full details for each issue to get labels, assignees, sub-issues, and linked PRs
               const issuesWithDetails = await Promise.all(
                 response.data.items.map(async (issue) => {
                   const fullIssue = await github.rest.issues.get({
@@ -98,34 +98,67 @@ jobs:
                     issue_number: issue.number
                   });
                   
-                  // Check if this issue has sub-issues using GraphQL
+                  // Check if this issue has sub-issues and linked PRs using GraphQL
                   let subIssuesCount = 0;
+                  let linkedPRs = [];
                   try {
-                    const subIssuesQuery = `
+                    const issueDetailsQuery = `
                       query($owner: String!, $repo: String!, $number: Int!) {
                         repository(owner: $owner, name: $repo) {
                           issue(number: $number) {
                             subIssues {
                               totalCount
                             }
+                            timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                              nodes {
+                                ... on CrossReferencedEvent {
+                                  source {
+                                    __typename
+                                    ... on PullRequest {
+                                      number
+                                      state
+                                      isDraft
+                                      author {
+                                        login
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       }
                     `;
-                    const subIssuesResult = await github.graphql(subIssuesQuery, {
+                    const issueDetailsResult = await github.graphql(issueDetailsQuery, {
                       owner,
                       repo,
                       number: issue.number
                     });
-                    subIssuesCount = subIssuesResult?.repository?.issue?.subIssues?.totalCount || 0;
+                    
+                    subIssuesCount = issueDetailsResult?.repository?.issue?.subIssues?.totalCount || 0;
+                    
+                    // Extract linked PRs from timeline
+                    const timelineItems = issueDetailsResult?.repository?.issue?.timelineItems?.nodes || [];
+                    linkedPRs = timelineItems
+                      .filter(item => item?.source?.__typename === 'PullRequest')
+                      .map(item => ({
+                        number: item.source.number,
+                        state: item.source.state,
+                        isDraft: item.source.isDraft,
+                        author: item.source.author?.login
+                      }));
+                      
+                    core.info(`Issue #${issue.number} has ${linkedPRs.length} linked PR(s)`);
                   } catch (error) {
-                    // If GraphQL query fails, continue with 0 sub-issues
-                    core.warning(`Could not check sub-issues for #${issue.number}: ${error.message}`);
+                    // If GraphQL query fails, continue with defaults
+                    core.warning(`Could not check details for #${issue.number}: ${error.message}`);
                   }
                   
                   return {
                     ...fullIssue.data,
-                    subIssuesCount
+                    subIssuesCount,
+                    linkedPRs
                   };
                 })
               );
@@ -156,6 +189,23 @@ jobs:
                   // Exclude issues that have sub-issues (parent/organizing issues)
                   if (issue.subIssuesCount > 0) {
                     core.info(`Skipping #${issue.number}: has ${issue.subIssuesCount} sub-issue(s) - parent issues are used for organizing, not tasks`);
+                    return false;
+                  }
+                  
+                  // Exclude issues with closed PRs (treat as complete)
+                  const closedPRs = issue.linkedPRs?.filter(pr => pr.state === 'CLOSED' || pr.state === 'MERGED') || [];
+                  if (closedPRs.length > 0) {
+                    core.info(`Skipping #${issue.number}: has ${closedPRs.length} closed/merged PR(s) - treating as complete`);
+                    return false;
+                  }
+                  
+                  // Exclude issues with open PRs from Copilot agent
+                  const openCopilotPRs = issue.linkedPRs?.filter(pr => 
+                    pr.state === 'OPEN' && 
+                    (pr.author === 'copilot-swe-agent' || pr.author?.includes('copilot'))
+                  ) || [];
+                  if (openCopilotPRs.length > 0) {
+                    core.info(`Skipping #${issue.number}: has ${openCopilotPRs.length} open PR(s) from Copilot - already being worked on`);
                     return false;
                   }
                   
@@ -280,6 +330,8 @@ The issue search has already been performed in a previous job with smart filteri
 - ✅ Excluded issues with campaign labels (campaign:*) - these are managed by campaign orchestrators
 - ✅ Excluded issues that already have assignees
 - ✅ Excluded issues that have sub-issues (parent/organizing issues)
+- ✅ Excluded issues with closed or merged PRs (treating those as complete)
+- ✅ Excluded issues with open PRs from Copilot agent (already being worked on)
 - ✅ Prioritized issues with labels: good-first-issue, bug, security, documentation, enhancement, feature, performance, tech-debt, refactoring
 
 **Scoring System:**
@@ -323,14 +375,15 @@ For issues with the "task" or "plan" label, check if they are sub-issues linked 
 - Only after #101's PR is merged/closed, process #102
 - This ensures orderly, sequential processing of related tasks
 
-### 2. Filter Out Issues Already Assigned to Copilot
+### 2. Review the Pre-Filtered Issue List
 
-For each issue found, check if it's already assigned to Copilot:
-- Look for issues that have Copilot as an assignee
-- Check if there's already an open pull request linked to it
-- **For "task" or "plan" labeled sub-issues**: Also check if any sibling sub-issue (same parent) has an open PR from Copilot
+The search job has already performed comprehensive filtering, including:
+- Issues already assigned to Copilot
+- Issues with open PRs linked to them (from any author)
+- Issues with closed/merged PRs (treated as complete)
+- **For "task" or "plan" labeled sub-issues**: Check if any sibling sub-issue (same parent) has an open PR from Copilot
 
-**Skip any issue** that is already assigned to Copilot or has an open PR associated with it.
+The list you receive has already been filtered to exclude all of these cases, so you can focus on the actual assignment logic.
 
 ### 3. Select Up to Three Issues to Work On
 
@@ -368,7 +421,7 @@ From the prioritized and filtered list (issues WITHOUT Copilot assignments or op
 
 ### 4. Read and Understand Each Selected Issue
 
-For each selected issue:
+For each selected issue (which has already been pre-filtered to ensure no open/closed PRs exist):
 - Read the full issue body and any comments
 - Understand what fix is needed
 - Identify the files that need to be modified
@@ -419,13 +472,15 @@ A successful run means:
 3. The search already excluded issues with campaign labels (campaign:*) as these are managed by campaign orchestrators
 4. The search already excluded issues that already have assignees
 5. The search already excluded issues that have sub-issues (parent/organizing issues are not tasks)
-6. Issues are sorted by priority score (good-first-issue, bug, security, etc. get higher scores)
-7. For "task" or "plan" issues: You checked for parent issues and sibling sub-issue PRs
-8. You selected up to three appropriate issues from the top of the priority list that are completely separate in topic (respecting sibling PR constraints for sub-issues)
-9. You read and understood each issue
-10. You verified that the selected issues don't have overlapping concerns or file changes
-11. You assigned each issue to the Copilot agent using `assign_to_agent`
-12. You commented on each issue being assigned
+6. The search already excluded issues with closed or merged PRs (treated as complete)
+7. The search already excluded issues with open PRs from Copilot agent (already being worked on)
+8. Issues are sorted by priority score (good-first-issue, bug, security, etc. get higher scores)
+9. For "task" or "plan" issues: You checked for parent issues and sibling sub-issue PRs if necessary
+10. You selected up to three appropriate issues from the top of the priority list that are completely separate in topic
+11. You read and understood each issue
+12. You verified that the selected issues don't have overlapping concerns or file changes
+13. You assigned each issue to the Copilot agent using `assign_to_agent`
+14. You commented on each issue being assigned
 
 ## Error Handling
 

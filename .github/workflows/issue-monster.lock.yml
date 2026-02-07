@@ -21,15 +21,15 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: d561123dcc23e1fbaf9e3b1b9897e29f8e79936a79e763f8e8acbdba6c66142d
+# frontmatter-hash: d3abde5792b76d4609a2dfeba265b24f8c83e91db2dda2dc2762a00b00dbe5b2
 
 name: "Issue Monster"
 "on":
   schedule:
-  - cron: "58 */1 * * *"
-    # Friendly format: every 1h (scattered)
+  - cron: "*/10 * * * *"
+    # Friendly format: every 10m
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
-    # max: 9
+    # max: 6
     # query: is:pr is:open is:draft author:app/copilot-swe-agent
   # skip-if-no-match: is:issue is:open # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
@@ -1039,7 +1039,7 @@ jobs:
         env:
           GH_AW_SKIP_QUERY: "is:pr is:open is:draft author:app/copilot-swe-agent"
           GH_AW_WORKFLOW_NAME: "Issue Monster"
-          GH_AW_SKIP_MAX_MATCHES: "9"
+          GH_AW_SKIP_MAX_MATCHES: "6"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
@@ -1201,7 +1201,7 @@ jobs:
               });
               core.info(`Found ${response.data.total_count} total issues matching basic criteria`);
 
-              // Fetch full details for each issue to get labels, assignees, and sub-issues
+              // Fetch full details for each issue to get labels, assignees, sub-issues, and linked PRs
               const issuesWithDetails = await Promise.all(
                 response.data.items.map(async (issue) => {
                   const fullIssue = await github.rest.issues.get({
@@ -1210,34 +1210,67 @@ jobs:
                     issue_number: issue.number
                   });
 
-                  // Check if this issue has sub-issues using GraphQL
+                  // Check if this issue has sub-issues and linked PRs using GraphQL
                   let subIssuesCount = 0;
+                  let linkedPRs = [];
                   try {
-                    const subIssuesQuery = `
+                    const issueDetailsQuery = `
                       query($owner: String!, $repo: String!, $number: Int!) {
                         repository(owner: $owner, name: $repo) {
                           issue(number: $number) {
                             subIssues {
                               totalCount
                             }
+                            timelineItems(first: 100, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                              nodes {
+                                ... on CrossReferencedEvent {
+                                  source {
+                                    __typename
+                                    ... on PullRequest {
+                                      number
+                                      state
+                                      isDraft
+                                      author {
+                                        login
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       }
                     `;
-                    const subIssuesResult = await github.graphql(subIssuesQuery, {
+                    const issueDetailsResult = await github.graphql(issueDetailsQuery, {
                       owner,
                       repo,
                       number: issue.number
                     });
-                    subIssuesCount = subIssuesResult?.repository?.issue?.subIssues?.totalCount || 0;
+
+                    subIssuesCount = issueDetailsResult?.repository?.issue?.subIssues?.totalCount || 0;
+
+                    // Extract linked PRs from timeline
+                    const timelineItems = issueDetailsResult?.repository?.issue?.timelineItems?.nodes || [];
+                    linkedPRs = timelineItems
+                      .filter(item => item?.source?.__typename === 'PullRequest')
+                      .map(item => ({
+                        number: item.source.number,
+                        state: item.source.state,
+                        isDraft: item.source.isDraft,
+                        author: item.source.author?.login
+                      }));
+
+                    core.info(`Issue #${issue.number} has ${linkedPRs.length} linked PR(s)`);
                   } catch (error) {
-                    // If GraphQL query fails, continue with 0 sub-issues
-                    core.warning(`Could not check sub-issues for #${issue.number}: ${error.message}`);
+                    // If GraphQL query fails, continue with defaults
+                    core.warning(`Could not check details for #${issue.number}: ${error.message}`);
                   }
 
                   return {
                     ...fullIssue.data,
-                    subIssuesCount
+                    subIssuesCount,
+                    linkedPRs
                   };
                 })
               );
@@ -1268,6 +1301,23 @@ jobs:
                   // Exclude issues that have sub-issues (parent/organizing issues)
                   if (issue.subIssuesCount > 0) {
                     core.info(`Skipping #${issue.number}: has ${issue.subIssuesCount} sub-issue(s) - parent issues are used for organizing, not tasks`);
+                    return false;
+                  }
+
+                  // Exclude issues with closed PRs (treat as complete)
+                  const closedPRs = issue.linkedPRs?.filter(pr => pr.state === 'CLOSED' || pr.state === 'MERGED') || [];
+                  if (closedPRs.length > 0) {
+                    core.info(`Skipping #${issue.number}: has ${closedPRs.length} closed/merged PR(s) - treating as complete`);
+                    return false;
+                  }
+
+                  // Exclude issues with open PRs from Copilot agent
+                  const openCopilotPRs = issue.linkedPRs?.filter(pr => 
+                    pr.state === 'OPEN' && 
+                    (pr.author === 'copilot-swe-agent' || pr.author?.includes('copilot'))
+                  ) || [];
+                  if (openCopilotPRs.length > 0) {
+                    core.info(`Skipping #${issue.number}: has ${openCopilotPRs.length} open PR(s) from Copilot - already being worked on`);
                     return false;
                   }
 
