@@ -256,37 +256,92 @@ func extractRuntimesFromFrontmatter(frontmatter map[string]any) map[string]any {
 }
 
 // extractPluginsFromFrontmatter extracts plugins configuration from frontmatter map
-// Returns: (repos []string, customToken string, mcpConfig *PluginMCPConfig)
-// Supports both array format and object format with optional github-token and mcp configuration
-func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string, *PluginMCPConfig) {
+// Returns: (repos []string, customToken string, pluginMCPConfigs map[string]*PluginMCPConfig)
+// Supports both array format and object format with optional github-token
+// Each plugin item can be either a string (repository slug) or an object with url and optional mcp config
+func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string, map[string]*PluginMCPConfig) {
 	value, exists := frontmatter["plugins"]
 	if !exists {
 		return nil, "", nil
 	}
 
-	// Try array format first: ["org/repo1", "org/repo2"]
+	pluginMCPConfigs := make(map[string]*PluginMCPConfig)
+
+	// Helper function to parse plugin items (can be string or object)
+	parsePluginItem := func(item any) (string, *PluginMCPConfig) {
+		// Try string format first: "org/repo"
+		if pluginStr, ok := item.(string); ok {
+			return pluginStr, nil
+		}
+
+		// Try object format: { "url": "org/repo", "mcp": {...} }
+		if pluginObj, ok := item.(map[string]any); ok {
+			// Extract URL (required)
+			url, hasURL := pluginObj["url"]
+			if !hasURL {
+				return "", nil
+			}
+			urlStr, ok := url.(string)
+			if !ok {
+				return "", nil
+			}
+
+			// Extract MCP configuration (optional)
+			var mcpConfig *PluginMCPConfig
+			if mcpAny, hasMCP := pluginObj["mcp"]; hasMCP {
+				if mcpMap, ok := mcpAny.(map[string]any); ok {
+					mcpConfig = &PluginMCPConfig{}
+
+					// Extract env variables
+					if envAny, hasEnv := mcpMap["env"]; hasEnv {
+						if envMap, ok := envAny.(map[string]any); ok {
+							mcpConfig.Env = make(map[string]string)
+							for k, v := range envMap {
+								if vStr, ok := v.(string); ok {
+									mcpConfig.Env[k] = vStr
+								}
+							}
+						}
+					}
+				}
+			}
+
+			return urlStr, mcpConfig
+		}
+
+		return "", nil
+	}
+
+	// Try array format first: ["org/repo1", { "url": "org/repo2", "mcp": {...} }]
 	if pluginsArray, ok := value.([]any); ok {
 		var plugins []string
 		for _, p := range pluginsArray {
-			if pluginStr, ok := p.(string); ok {
-				plugins = append(plugins, pluginStr)
+			url, mcpConfig := parsePluginItem(p)
+			if url != "" {
+				plugins = append(plugins, url)
+				if mcpConfig != nil {
+					pluginMCPConfigs[url] = mcpConfig
+				}
 			}
 		}
-		return plugins, "", nil
+		return plugins, "", pluginMCPConfigs
 	}
 
-	// Try object format: { "repos": [...], "github-token": "...", "mcp": {...} }
+	// Try object format: { "repos": [...], "github-token": "..." }
 	if pluginsMap, ok := value.(map[string]any); ok {
 		var repos []string
 		var token string
-		var mcpConfig *PluginMCPConfig
 
-		// Extract repos array
+		// Extract repos array (items can be strings or objects)
 		if reposAny, hasRepos := pluginsMap["repos"]; hasRepos {
 			if reposArray, ok := reposAny.([]any); ok {
 				for _, r := range reposArray {
-					if repoStr, ok := r.(string); ok {
-						repos = append(repos, repoStr)
+					url, mcpConfig := parsePluginItem(r)
+					if url != "" {
+						repos = append(repos, url)
+						if mcpConfig != nil {
+							pluginMCPConfigs[url] = mcpConfig
+						}
 					}
 				}
 			}
@@ -299,26 +354,7 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 			}
 		}
 
-		// Extract MCP configuration (optional)
-		if mcpAny, hasMCP := pluginsMap["mcp"]; hasMCP {
-			if mcpMap, ok := mcpAny.(map[string]any); ok {
-				mcpConfig = &PluginMCPConfig{}
-
-				// Extract env variables
-				if envAny, hasEnv := mcpMap["env"]; hasEnv {
-					if envMap, ok := envAny.(map[string]any); ok {
-						mcpConfig.Env = make(map[string]string)
-						for k, v := range envMap {
-							if vStr, ok := v.(string); ok {
-								mcpConfig.Env[k] = vStr
-							}
-						}
-					}
-				}
-			}
-		}
-
-		return repos, token, mcpConfig
+		return repos, token, pluginMCPConfigs
 	}
 
 	return nil, "", nil

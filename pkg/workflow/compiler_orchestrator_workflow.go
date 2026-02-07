@@ -123,7 +123,7 @@ func (c *Compiler) buildInitialWorkflowData(
 		Runtimes:             toolsResult.runtimes,
 		Plugins:              toolsResult.plugins,
 		PluginsToken:         toolsResult.pluginsToken,
-		PluginMCPConfig:      toolsResult.pluginMCPConfig,
+		PluginMCPConfigs:     toolsResult.pluginMCPConfigs,
 		MarkdownContent:      toolsResult.markdownContent,
 		AI:                   engineSetup.engineSetting,
 		EngineConfig:         engineSetup.engineConfig,

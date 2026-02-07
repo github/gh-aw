@@ -416,11 +416,11 @@ type WorkflowData struct {
 	Bots                 []string             // allow list of bot identifiers that can trigger workflow
 	CacheMemoryConfig    *CacheMemoryConfig   // parsed cache-memory configuration
 	RepoMemoryConfig     *RepoMemoryConfig    // parsed repo-memory configuration
-	Runtimes             map[string]any       // runtime version overrides from frontmatter
-	Plugins              []string             // plugin repository slugs to install (e.g., ["org/repo", "org2/repo2"])
-	PluginsToken         string               // custom github-token for plugin installation (from plugins.github-token field)
-	PluginMCPConfig      *PluginMCPConfig     // MCP configuration for plugins (from plugins.mcp field)
-	ToolsTimeout         int                  // timeout in seconds for tool/MCP operations (0 = use engine default)
+	Runtimes             map[string]any                    // runtime version overrides from frontmatter
+	Plugins              []string                          // plugin repository slugs to install (e.g., ["org/repo", "org2/repo2"])
+	PluginsToken         string                            // custom github-token for plugin installation (from plugins.github-token field)
+	PluginMCPConfigs     map[string]*PluginMCPConfig       // Per-plugin MCP configurations (map of plugin URL to MCP config)
+	ToolsTimeout         int                               // timeout in seconds for tool/MCP operations (0 = use engine default)
 	GitHubToken          string               // top-level github-token expression from frontmatter
 	ToolsStartupTimeout  int                  // timeout in seconds for MCP server startup (0 = use engine default)
 	Features             map[string]any       // feature flags and configuration options from frontmatter (supports bool and string values)
