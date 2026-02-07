@@ -33,9 +33,6 @@ type CompilerError struct {
 	Hint     string   // Optional hint for fixing the error
 }
 
-// ANSI escape sequences for terminal control
-var clearScreenSequence = "\033[2J\033[H" // Clear screen and move cursor to home position
-
 // isTTY checks if stdout is a terminal
 func isTTY() bool {
 	return tty.IsStdoutTerminal()
@@ -483,11 +480,11 @@ func RenderTableAsJSON(config TableConfig) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// ClearScreen clears the terminal screen if stdout is a TTY
+// ClearScreen clears the terminal screen if stderr is a TTY
 // Uses ANSI escape codes for cross-platform compatibility
 func ClearScreen() {
-	if isTTY() {
-		fmt.Print(clearScreenSequence)
+	if tty.IsStderrTerminal() {
+		fmt.Fprint(os.Stderr, ansiClearScreen)
 	}
 }
 
@@ -495,7 +492,7 @@ func ClearScreen() {
 // Uses ANSI escape codes: \r moves cursor to start, \033[K clears to end of line
 func ClearLine() {
 	if tty.IsStderrTerminal() {
-		fmt.Fprint(os.Stderr, "\r\033[K")
+		fmt.Fprintf(os.Stderr, "%s%s", ansiCarriageReturn, ansiClearLine)
 	}
 }
 

@@ -62,7 +62,7 @@ func RunAddInteractive(ctx context.Context, workflowSpecs []string, verbose bool
 	}
 
 	// Clear the screen for a fresh interactive experience
-	fmt.Fprint(os.Stderr, "\033[H\033[2J")
+	console.ClearScreen()
 
 	// Step 1: Welcome message
 	fmt.Fprintln(os.Stderr, "")
