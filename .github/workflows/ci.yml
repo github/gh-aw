@@ -110,6 +110,7 @@ jobs:
           fi
 
       - name: Run unit tests with coverage
+        id: run-unit-tests
         run: |
           set -o pipefail
           # Run tests with JSON output for artifacts, but also show failures
@@ -123,6 +124,24 @@ jobs:
           
           # Generate coverage HTML report
           go tool cover -html=coverage.out -o coverage.html
+
+      - name: Report test failures
+        if: failure() && steps.run-unit-tests.outcome == 'failure'
+        run: |
+          echo "## 🔍 Unit Test Failure Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Analyzing unit test results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Run the failure report script
+          if ./scripts/report-test-failures.sh test-result-unit.json | tee /tmp/failure-report.txt; then
+            echo "No failures detected in JSON output (unexpected - tests failed but no failure records found)" >> $GITHUB_STEP_SUMMARY
+          else
+            # Script found failures - add to summary
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat /tmp/failure-report.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
 
       # Coverage reports for recent builds only - 7 days is sufficient for debugging recent changes
       - name: Upload coverage report
@@ -343,6 +362,7 @@ jobs:
         run: make build
         
       - name: Run integration tests - ${{ matrix.test-group.name }}
+        id: run-tests
         run: |
           set -o pipefail
           # Sanitize the test group name for use in filename
@@ -357,6 +377,27 @@ jobs:
             fi
           else
             go test -v -parallel=8 -timeout=10m -tags 'integration' -run '${{ matrix.test-group.pattern }}' -json ${{ matrix.test-group.packages }} | tee "test-result-integration-${SAFE_NAME}.json"
+          fi
+
+      - name: Report test failures
+        if: failure() && steps.run-tests.outcome == 'failure'
+        run: |
+          # Sanitize the test group name to match the file created in the previous step
+          SAFE_NAME=$(echo "${{ matrix.test-group.name }}" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/--*/-/g')
+          
+          echo "## 🔍 Test Failure Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Analyzing test results for: **${{ matrix.test-group.name }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Run the failure report script
+          if ./scripts/report-test-failures.sh "test-result-integration-${SAFE_NAME}.json" | tee /tmp/failure-report.txt; then
+            echo "No failures detected in JSON output (unexpected - tests failed but no failure records found)" >> $GITHUB_STEP_SUMMARY
+          else
+            # Script found failures - add to summary
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat /tmp/failure-report.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload integration test results
