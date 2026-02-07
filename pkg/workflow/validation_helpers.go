@@ -234,7 +234,7 @@ func isEmptyOrNil(candidate any) bool {
 		return typedValue == 0.0
 	case bool:
 		// false represents empty boolean state
-		return typedValue == false
+		return !typedValue
 	case []any:
 		return len(typedValue) == 0
 	case map[string]any:
