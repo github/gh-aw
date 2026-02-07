@@ -163,7 +163,10 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	}
 
 	// Add checkout_pr_success to detect PR checkout failures (e.g., PR merged and branch deleted)
-	agentFailureEnvVars = append(agentFailureEnvVars, fmt.Sprintf("          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.%s.outputs.checkout_pr_success }}\n", mainJobName))
+	// Only add if the checkout-pr step will be generated (requires contents read access)
+	if ShouldGeneratePRCheckoutStep(data) {
+		agentFailureEnvVars = append(agentFailureEnvVars, fmt.Sprintf("          GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.%s.outputs.checkout_pr_success }}\n", mainJobName))
+	}
 
 	// Pass assignment error outputs from safe_outputs job if assign-to-agent is configured
 	if data.SafeOutputs != nil && data.SafeOutputs.AssignToAgent != nil {

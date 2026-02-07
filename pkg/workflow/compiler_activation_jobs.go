@@ -738,11 +738,16 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		outputs["has_patch"] = "${{ steps.collect_output.outputs.has_patch }}"
 	}
 
-	// Add checkout_pr_success output to track PR checkout status
+	// Add checkout_pr_success output to track PR checkout status only if the checkout-pr step will be generated
 	// This is used by the conclusion job to skip failure handling when checkout fails
 	// (e.g., when PR is merged and branch is deleted)
-	outputs["checkout_pr_success"] = "${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}"
-	compilerActivationJobsLog.Print("Added checkout_pr_success output")
+	// The checkout-pr step is only generated when the workflow has contents read permission
+	if ShouldGeneratePRCheckoutStep(data) {
+		outputs["checkout_pr_success"] = "${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}"
+		compilerActivationJobsLog.Print("Added checkout_pr_success output (workflow has contents read access)")
+	} else {
+		compilerActivationJobsLog.Print("Skipped checkout_pr_success output (workflow lacks contents read access)")
+	}
 
 	// Build job-level environment variables for safe outputs
 	var env map[string]string

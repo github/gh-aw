@@ -9,12 +9,18 @@ import (
 
 var prLog = logger.New("workflow:pr")
 
+// ShouldGeneratePRCheckoutStep returns true if the checkout-pr step should be generated
+// based on the workflow permissions. The step requires contents read access.
+func ShouldGeneratePRCheckoutStep(data *WorkflowData) bool {
+	permParser := NewPermissionsParser(data.Permissions)
+	return permParser.HasContentsReadAccess()
+}
+
 // generatePRReadyForReviewCheckout generates a step to checkout the PR branch when PR context is available
 func (c *Compiler) generatePRReadyForReviewCheckout(yaml *strings.Builder, data *WorkflowData) {
 	prLog.Print("Generating PR checkout step")
 	// Check that permissions allow contents read access
-	permParser := NewPermissionsParser(data.Permissions)
-	if !permParser.HasContentsReadAccess() {
+	if !ShouldGeneratePRCheckoutStep(data) {
 		prLog.Print("Skipping PR checkout step: no contents read access")
 		return // No contents read access, cannot checkout
 	}
