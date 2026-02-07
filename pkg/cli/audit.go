@@ -50,6 +50,10 @@ This command:
 - Extracts missing tool reports
 - Generates a concise Markdown report
 
+When using the MCP tool (agenticworkflows-audit):
+- Use the 'jq' parameter to filter JSON output (e.g., jq: ".overview")
+- The tool automatically uses --json flag and applies jq filtering
+
 Examples:
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890     # Audit run with ID 1234567890
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.com/owner/repo/actions/runs/1234567890  # Audit from run URL
@@ -59,6 +63,7 @@ Examples:
   ` + string(constants.CLIExtensionPrefix) + ` audit https://github.example.com/owner/repo/actions/runs/1234567890  # Audit from GitHub Enterprise
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -o ./audit-reports  # Custom output directory
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 -v  # Verbose output
+  ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --json  # Output as JSON for programmatic consumption
   ` + string(constants.CLIExtensionPrefix) + ` audit 1234567890 --parse  # Parse agent logs and firewall logs, generating log.md and firewall.md`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
