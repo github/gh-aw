@@ -87,8 +87,11 @@ func TestValidateEngine(t *testing.T) {
 					return
 				}
 
-				if tt.errMessage != "" && err.Error() != fmt.Sprintf("invalid engine value '%s'. Must be 'claude', 'codex', 'copilot', or 'custom'", tt.engine) {
-					t.Errorf("validateEngine(%q) error message = %v, want to contain %v", tt.engine, err.Error(), tt.errMessage)
+				// Check that error message contains the expected format
+				// Error may include "Did you mean" suggestions, so we check if it starts with the base message
+				expectedMsg := fmt.Sprintf("invalid engine value '%s'. Must be 'claude', 'codex', 'copilot', or 'custom'", tt.engine)
+				if tt.errMessage != "" && !strings.HasPrefix(err.Error(), expectedMsg) {
+					t.Errorf("validateEngine(%q) error message = %v, want to start with %v", tt.engine, err.Error(), expectedMsg)
 				}
 			} else {
 				if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/cli"
@@ -23,6 +24,22 @@ var (
 var verboseFlag bool
 var bannerFlag bool
 
+// formatListWithOr formats a list of strings with commas and "or" before the last item
+// Example: ["a", "b", "c"] -> "a, b, or c"
+func formatListWithOr(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+	if len(items) == 1 {
+		return items[0]
+	}
+	if len(items) == 2 {
+		return items[0] + " or " + items[1]
+	}
+	// For 3+ items: "a, b, or c"
+	return strings.Join(items[:len(items)-1], ", ") + ", or " + items[len(items)-1]
+}
+
 // validateEngine validates the engine flag value
 func validateEngine(engine string) error {
 	// Get the global engine registry
@@ -30,15 +47,26 @@ func validateEngine(engine string) error {
 	validEngines := registry.GetSupportedEngines()
 
 	if engine != "" && !registry.IsValidEngine(engine) {
+		// Sort engines for deterministic output
+		sortedEngines := make([]string, len(validEngines))
+		copy(sortedEngines, validEngines)
+		sort.Strings(sortedEngines)
+
+		// Format engines with quotes and "or" conjunction
+		quotedEngines := make([]string, len(sortedEngines))
+		for i, e := range sortedEngines {
+			quotedEngines[i] = "'" + e + "'"
+		}
+		formattedList := formatListWithOr(quotedEngines)
+
 		// Try to find close matches for "did you mean" suggestion
 		suggestions := parser.FindClosestMatches(engine, validEngines, 1)
 
-		errMsg := fmt.Sprintf("invalid engine value '%s'. Must be '%s'",
-			engine, strings.Join(validEngines, "', '"))
+		errMsg := fmt.Sprintf("invalid engine value '%s'. Must be %s", engine, formattedList)
 
 		if len(suggestions) > 0 {
-			errMsg = fmt.Sprintf("invalid engine value '%s'. Must be '%s'.\n\nDid you mean: %s?",
-				engine, strings.Join(validEngines, "', '"), suggestions[0])
+			errMsg = fmt.Sprintf("invalid engine value '%s'. Must be %s.\n\nDid you mean: %s?",
+				engine, formattedList, suggestions[0])
 		}
 
 		return fmt.Errorf("%s", errMsg)

@@ -1,8 +1,7 @@
 // @ts-check
 // <reference types="@actions/github-script" />
 
-const { searchEntitiesWithExpiration } = require("./expired_entity_search_helpers.cjs");
-const { buildExpirationSummary, categorizeByExpiration, DEFAULT_GRAPHQL_DELAY_MS, DEFAULT_MAX_UPDATES_PER_RUN, processExpiredEntities } = require("./expired_entity_cleanup_helpers.cjs");
+const { executeExpiredEntityCleanup } = require("./expired_entity_main_flow.cjs");
 
 /**
  * Add comment to a GitHub Pull Request using REST API
@@ -47,57 +46,12 @@ async function main() {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
 
-  core.info(`Searching for expired pull requests in ${owner}/${repo}`);
-
-  // Search for pull requests with expiration markers
-  const { items: pullRequestsWithExpiration, stats: searchStats } = await searchEntitiesWithExpiration(github, owner, repo, {
+  await executeExpiredEntityCleanup(github, owner, repo, {
     entityType: "pull requests",
     graphqlField: "pullRequests",
     resultKey: "pullRequests",
-  });
-
-  if (pullRequestsWithExpiration.length === 0) {
-    core.info("No pull requests with expiration markers found");
-
-    // Write summary even when no pull requests found
-    let summaryContent = `## Expired Pull Requests Cleanup\n\n`;
-    summaryContent += `**Scanned**: ${searchStats.totalScanned} pull requests across ${searchStats.pageCount} page(s)\n\n`;
-    summaryContent += `**Result**: No pull requests with expiration markers found\n`;
-    await core.summary.addRaw(summaryContent).write();
-
-    return;
-  }
-
-  core.info(`Found ${pullRequestsWithExpiration.length} pull request(s) with expiration markers`);
-
-  const {
-    expired: expiredPullRequests,
-    notExpired: notExpiredPullRequests,
-    now,
-  } = categorizeByExpiration(pullRequestsWithExpiration, {
     entityLabel: "Pull Request",
-  });
-
-  if (expiredPullRequests.length === 0) {
-    core.info("No expired pull requests found");
-
-    // Write summary when no expired pull requests
-    let summaryContent = `## Expired Pull Requests Cleanup\n\n`;
-    summaryContent += `**Scanned**: ${searchStats.totalScanned} pull requests across ${searchStats.pageCount} page(s)\n\n`;
-    summaryContent += `**With expiration markers**: ${pullRequestsWithExpiration.length} pull request(s)\n\n`;
-    summaryContent += `**Expired**: 0 pull requests\n\n`;
-    summaryContent += `**Not yet expired**: ${notExpiredPullRequests.length} pull request(s)\n`;
-    await core.summary.addRaw(summaryContent).write();
-
-    return;
-  }
-
-  core.info(`Found ${expiredPullRequests.length} expired pull request(s)`);
-
-  const { closed, failed } = await processExpiredEntities(expiredPullRequests, {
-    entityLabel: "Pull Request",
-    maxPerRun: DEFAULT_MAX_UPDATES_PER_RUN,
-    delayMs: DEFAULT_GRAPHQL_DELAY_MS,
+    summaryHeading: "Expired Pull Requests Cleanup",
     processEntity: async pr => {
       const closingMessage = `This pull request was automatically closed because it expired on ${pr.expirationDate.toISOString()}.`;
 
@@ -117,22 +71,6 @@ async function main() {
       };
     },
   });
-
-  const summaryContent = buildExpirationSummary({
-    heading: "Expired Pull Requests Cleanup",
-    entityLabel: "Pull Request",
-    searchStats,
-    withExpirationCount: pullRequestsWithExpiration.length,
-    expired: expiredPullRequests,
-    notExpired: notExpiredPullRequests,
-    closed,
-    failed,
-    maxPerRun: DEFAULT_MAX_UPDATES_PER_RUN,
-    now,
-  });
-
-  await core.summary.addRaw(summaryContent).write();
-  core.info(`Successfully closed ${closed.length} expired pull request(s)`);
 }
 
 module.exports = { main };

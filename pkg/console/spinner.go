@@ -83,7 +83,7 @@ func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // render manually prints the spinner frame (required when using WithoutRenderer)
 func (m spinnerModel) render() {
 	if m.output != nil {
-		fmt.Fprintf(m.output, "\r\033[K%s %s", m.spinner.View(), m.message)
+		fmt.Fprintf(m.output, "%s%s%s %s", ansiCarriageReturn, ansiClearLine, m.spinner.View(), m.message)
 	}
 }
 
@@ -138,7 +138,7 @@ func (s *SpinnerWrapper) Stop() {
 			s.mu.Unlock()
 			s.program.Quit()
 			s.wg.Wait() // Wait for the goroutine to complete
-			fmt.Fprint(os.Stderr, "\r\033[K")
+			fmt.Fprintf(os.Stderr, "%s%s", ansiCarriageReturn, ansiClearLine)
 		} else {
 			s.mu.Unlock()
 		}
@@ -153,7 +153,7 @@ func (s *SpinnerWrapper) StopWithMessage(msg string) {
 			s.mu.Unlock()
 			s.program.Quit()
 			s.wg.Wait() // Wait for the goroutine to complete
-			fmt.Fprintf(os.Stderr, "\r\033[K%s\n", msg)
+			fmt.Fprintf(os.Stderr, "%s%s%s\n", ansiCarriageReturn, ansiClearLine, msg)
 		} else {
 			s.mu.Unlock()
 			// Still print the message even if spinner wasn't running

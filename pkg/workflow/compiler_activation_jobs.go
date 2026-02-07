@@ -434,8 +434,9 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 		if data.SafeOutputs != nil && data.SafeOutputs.Messages != nil {
 			messagesJSON, err := serializeMessagesConfig(data.SafeOutputs.Messages)
 			if err != nil {
-				compilerActivationJobsLog.Printf("Warning: failed to serialize messages config for activation job: %v", err)
-			} else if messagesJSON != "" {
+				return nil, fmt.Errorf("failed to serialize messages config for activation job: %w", err)
+			}
+			if messagesJSON != "" {
 				steps = append(steps, fmt.Sprintf("          GH_AW_SAFE_OUTPUT_MESSAGES: %q\n", messagesJSON))
 			}
 		}

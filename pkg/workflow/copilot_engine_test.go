@@ -1345,3 +1345,124 @@ func TestCopilotEngineSkipInstallationWithCommand(t *testing.T) {
 		t.Errorf("Expected 0 installation steps when command is specified, got %d", len(steps))
 	}
 }
+
+func TestCopilotEnginePluginDiscoveryInSandboxMode(t *testing.T) {
+	engine := NewCopilotEngine()
+
+	tests := []struct {
+		name                    string
+		plugins                 []string
+		networkPermissions      *NetworkPermissions
+		shouldIncludeCopilotDir bool
+	}{
+		{
+			name:    "plugins with firewall enabled",
+			plugins: []string{"github/auto-agentics"},
+			networkPermissions: &NetworkPermissions{
+				Allowed: []string{"api.github.com"},
+				Firewall: &FirewallConfig{
+					Enabled: true,
+				},
+			},
+			shouldIncludeCopilotDir: true,
+		},
+		{
+			name:    "multiple plugins with firewall enabled",
+			plugins: []string{"github/auto-agentics", "github/test-plugin"},
+			networkPermissions: &NetworkPermissions{
+				Allowed: []string{"api.github.com"},
+				Firewall: &FirewallConfig{
+					Enabled: true,
+				},
+			},
+			shouldIncludeCopilotDir: true,
+		},
+		{
+			name:    "no plugins with firewall enabled",
+			plugins: []string{},
+			networkPermissions: &NetworkPermissions{
+				Allowed: []string{"api.github.com"},
+				Firewall: &FirewallConfig{
+					Enabled: true,
+				},
+			},
+			shouldIncludeCopilotDir: false,
+		},
+		{
+			name:                    "plugins without firewall (non-sandbox mode)",
+			plugins:                 []string{"github/auto-agentics"},
+			networkPermissions:      nil, // No network permissions = firewall disabled
+			shouldIncludeCopilotDir: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workflowData := &WorkflowData{
+				Name:               "test-workflow",
+				Plugins:            tt.plugins,
+				NetworkPermissions: tt.networkPermissions,
+			}
+			steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+
+			// GetExecutionSteps only returns the execution step
+			if len(steps) != 1 {
+				t.Fatalf("Expected 1 step, got %d", len(steps))
+			}
+
+			stepContent := strings.Join([]string(steps[0]), "\n")
+
+			// Check for --add-dir /home/runner/.copilot/ in the copilot command
+			hasCopilotDir := strings.Contains(stepContent, "--add-dir /home/runner/.copilot/")
+
+			if tt.shouldIncludeCopilotDir && !hasCopilotDir {
+				t.Errorf("Expected step to contain '--add-dir /home/runner/.copilot/' when plugins are declared in sandbox mode, but it was missing:\n%s", stepContent)
+			}
+
+			if !tt.shouldIncludeCopilotDir && hasCopilotDir {
+				t.Errorf("Expected step to NOT contain '--add-dir /home/runner/.copilot/' when conditions not met, but it was present:\n%s", stepContent)
+			}
+
+			// When plugins are declared in sandbox mode, verify the directory is added after workspace
+			if tt.shouldIncludeCopilotDir {
+				// Check that both workspace and copilot directories are present
+				if !strings.Contains(stepContent, "--add-dir \"${GITHUB_WORKSPACE}\"") {
+					t.Errorf("Expected workspace directory in --add-dir:\n%s", stepContent)
+				}
+
+				// Verify the ordering - copilot dir should appear after workspace dir
+				workspaceIdx := strings.Index(stepContent, "--add-dir \"${GITHUB_WORKSPACE}\"")
+				copilotIdx := strings.Index(stepContent, "--add-dir /home/runner/.copilot/")
+				if copilotIdx <= workspaceIdx {
+					t.Errorf("Expected copilot directory to appear after workspace directory in --add-dir flags")
+				}
+			}
+		})
+	}
+}
+
+func TestCopilotEnginePluginDiscoveryWithSRT(t *testing.T) {
+	engine := NewCopilotEngine()
+
+	// Test with SRT enabled (via sandbox config)
+	workflowData := &WorkflowData{
+		Name:    "test-workflow",
+		Plugins: []string{"github/auto-agentics"},
+		SandboxConfig: &SandboxConfig{
+			Type: "sandbox-runtime",
+		},
+	}
+	steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
+
+	// GetExecutionSteps only returns the execution step
+	if len(steps) != 1 {
+		t.Fatalf("Expected 1 step, got %d", len(steps))
+	}
+
+	stepContent := strings.Join([]string(steps[0]), "\n")
+
+	// Should include --add-dir /home/runner/.copilot/ when SRT is enabled with plugins
+	if !strings.Contains(stepContent, "--add-dir /home/runner/.copilot/") {
+		t.Errorf("Expected step to contain '--add-dir /home/runner/.copilot/' when plugins are declared with SRT enabled, but it was missing:\n%s", stepContent)
+	}
+}
