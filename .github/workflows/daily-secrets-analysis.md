@@ -194,6 +194,54 @@ echo "Stats saved for tomorrow's comparison"
 
 ## Generate Discussion Report
 
+## 📝 Report Formatting Guidelines
+
+**CRITICAL**: Follow these formatting guidelines to create well-structured, readable reports:
+
+### 1. Header Levels
+**Use h3 (###) or lower for all headers in your report to maintain proper document hierarchy.**
+
+The issue or discussion title serves as h1, so all content headers should start at h3:
+- Use `###` for main sections (e.g., "### Executive Summary", "### Key Metrics")
+- Use `####` for subsections (e.g., "#### Detailed Analysis", "#### Recommendations")
+- Never use `##` (h2) or `#` (h1) in the report body
+
+### 2. Progressive Disclosure
+**Wrap long sections in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+
+Use collapsible sections for:
+- Detailed analysis and verbose data
+- Per-item breakdowns when there are many items
+- Complete logs, traces, or raw data
+- Secondary information and extra context
+
+Example:
+```markdown
+<details>
+<summary><b>View Detailed Analysis</b></summary>
+
+[Long detailed content here...]
+
+</details>
+```
+
+### 3. Report Structure Pattern
+
+Your report should follow this structure for optimal readability:
+
+1. **Brief Summary** (always visible): 1-2 paragraph overview of key findings
+2. **Key Metrics/Highlights** (always visible): Critical information and important statistics
+3. **Detailed Analysis** (in `<details>` tags): In-depth breakdowns, verbose data, complete lists
+4. **Recommendations** (always visible): Actionable next steps and suggestions
+
+### Design Principles
+
+Create reports that:
+- **Build trust through clarity**: Most important info immediately visible
+- **Exceed expectations**: Add helpful context, trends, comparisons
+- **Create delight**: Use progressive disclosure to reduce overwhelm
+- **Maintain consistency**: Follow the same patterns as other reporting workflows
+
 Create a comprehensive markdown report with your findings:
 
 ### Report Structure

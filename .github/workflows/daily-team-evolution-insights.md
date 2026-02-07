@@ -46,42 +46,33 @@ Analyze the last 24 hours of repository activity to extract meaningful insights 
 - Emerging technologies or practices
 - Team dynamics and productivity
 
-## Formatting Guidelines
+## 📝 Report Formatting Guidelines
 
 **CRITICAL**: Follow these formatting guidelines to create well-structured, readable reports:
 
 ### 1. Header Levels
 **Use h3 (###) or lower for all headers in your report to maintain proper document hierarchy.**
 
-The discussion title serves as h1, so all content headers should start at h3:
-- Use `###` for main sections (e.g., "### Key Observations", "### Development Patterns")
-- Use `####` for subsections (e.g., "#### Team Dynamics", "#### Innovation & Learning")
+The issue or discussion title serves as h1, so all content headers should start at h3:
+- Use `###` for main sections (e.g., "### Executive Summary", "### Key Metrics")
+- Use `####` for subsections (e.g., "#### Detailed Analysis", "#### Recommendations")
 - Never use `##` (h2) or `#` (h1) in the report body
 
 ### 2. Progressive Disclosure
-**Wrap detailed sections in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
+**Wrap long sections in `<details><summary><b>Section Name</b></summary>` tags to improve readability and reduce scrolling.**
 
 Use collapsible sections for:
-- Individual contributor activity breakdowns
-- Detailed commit histories and file change lists
-- Full PR/issue/discussion activity logs
-- Complete code review conversations
-- Raw data, statistics, and technical breakdowns
+- Detailed analysis and verbose data
+- Per-item breakdowns when there are many items
+- Complete logs, traces, or raw data
+- Secondary information and extra context
 
 Example:
 ```markdown
 <details>
-<summary><b>Detailed Activity Breakdown</b></summary>
+<summary><b>View Detailed Analysis</b></summary>
 
-### Individual Contributions
-
-#### `@contributor1`
-- 15 commits across 23 files
-- 2 PRs merged (feat-x, fix-y)
-- 8 code review comments
-
-#### `@contributor2`
-- ...
+[Long detailed content here...]
 
 </details>
 ```
@@ -90,19 +81,18 @@ Example:
 
 Your report should follow this structure for optimal readability:
 
-1. **Executive Summary** (always visible): 2-3 paragraphs with key insights about team evolution
-2. **Key Observations** (always visible): Focus areas, velocity, collaboration, innovation highlights
-3. **Detailed Activity Analysis** (in `<details>` tags): Per-contributor breakdowns, commit histories
-4. **Trends & Patterns** (always visible): What the activity means for the team's evolution
-5. **Recommendations** (always visible): Actionable suggestions for improvement
+1. **Brief Summary** (always visible): 1-2 paragraph overview of key findings
+2. **Key Metrics/Highlights** (always visible): Critical information and important statistics
+3. **Detailed Analysis** (in `<details>` tags): In-depth breakdowns, verbose data, complete lists
+4. **Recommendations** (always visible): Actionable next steps and suggestions
 
 ### Design Principles
 
 Create reports that:
-- **Build trust through clarity**: Most meaningful insights (patterns, trends, observations) immediately visible
-- **Exceed expectations**: Connect raw activity to strategic insights about team evolution
-- **Create delight**: Use progressive disclosure to show supporting data without overwhelming the narrative
-- **Maintain consistency**: Follow the same patterns as other daily reporting workflows
+- **Build trust through clarity**: Most important info immediately visible
+- **Exceed expectations**: Add helpful context, trends, comparisons
+- **Create delight**: Use progressive disclosure to reduce overwhelm
+- **Maintain consistency**: Follow the same patterns as other reporting workflows
 
 ## Current Context
 
