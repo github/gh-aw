@@ -21,7 +21,7 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: fda3821e70fae5f450a65c2b0ce82f1b94aba2c48f8cb148c6d788f9678cb214
+# frontmatter-hash: 6ee7ace3c0aa48b0df83c01e3d00b75cfd4a988e329f43b1310131cebf57ce06
 
 name: "Issue Monster"
 "on":
@@ -1159,6 +1159,78 @@ jobs:
             const { owner, repo } = context.repo;
 
             try {
+              // Check for recent rate-limited PRs to avoid scheduling more work during rate limiting
+              core.info('Checking for recent rate-limited PRs...');
+              const rateLimitCheckDate = new Date();
+              rateLimitCheckDate.setHours(rateLimitCheckDate.getHours() - 1); // Check last hour
+              const rateLimitCheckISO = rateLimitCheckDate.toISOString().split('T')[0];
+
+              const recentPRsQuery = `is:pr author:app/copilot-swe-agent created:>${rateLimitCheckISO} repo:${owner}/${repo}`;
+              const recentPRsResponse = await github.rest.search.issuesAndPullRequests({
+                q: recentPRsQuery,
+                per_page: 10,
+                sort: 'created',
+                order: 'desc'
+              });
+
+              core.info(`Found ${recentPRsResponse.data.total_count} recent Copilot PRs to check for rate limiting`);
+
+              // Check if any recent PRs have rate limit indicators
+              let rateLimitDetected = false;
+              for (const pr of recentPRsResponse.data.items) {
+                try {
+                  const prTimelineQuery = `
+                    query($owner: String!, $repo: String!, $number: Int!) {
+                      repository(owner: $owner, name: $repo) {
+                        pullRequest(number: $number) {
+                          timelineItems(first: 50, itemTypes: [ISSUE_COMMENT]) {
+                            nodes {
+                              __typename
+                              ... on IssueComment {
+                                body
+                                createdAt
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  `;
+
+                  const prTimelineResult = await github.graphql(prTimelineQuery, {
+                    owner,
+                    repo,
+                    number: pr.number
+                  });
+
+                  const comments = prTimelineResult?.repository?.pullRequest?.timelineItems?.nodes || [];
+                  const rateLimitPattern = /rate limit|API rate limit|secondary rate limit|abuse detection|429|too many requests/i;
+
+                  for (const comment of comments) {
+                    if (comment.body && rateLimitPattern.test(comment.body)) {
+                      core.warning(`Rate limiting detected in PR #${pr.number}: ${comment.body.substring(0, 200)}`);
+                      rateLimitDetected = true;
+                      break;
+                    }
+                  }
+
+                  if (rateLimitDetected) break;
+                } catch (error) {
+                  core.warning(`Could not check PR #${pr.number} for rate limiting: ${error.message}`);
+                }
+              }
+
+              if (rateLimitDetected) {
+                core.warning('🛑 Rate limiting detected in recent PRs. Skipping issue assignment to prevent further rate limit issues.');
+                core.setOutput('issue_count', 0);
+                core.setOutput('issue_numbers', '');
+                core.setOutput('issue_list', '');
+                core.setOutput('has_issues', 'false');
+                return;
+              }
+
+              core.info('✓ No rate limiting detected. Proceeding with issue search.');
+
               // Labels that indicate an issue should NOT be auto-assigned
               const excludeLabels = [
                 'wontfix',
