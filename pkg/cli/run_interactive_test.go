@@ -444,9 +444,9 @@ func TestSelectWorkflowFuzzySearchability(t *testing.T) {
 				// For fuzzy patterns like "twf", we just verify the workflow name contains the characters
 				if tt.searchPattern == "twf" {
 					// Check that workflow name contains 't', 'w', and 'f' in order
-					assert.True(t, strings.Contains(tt.workflowName, "t"))
-					assert.True(t, strings.Contains(tt.workflowName, "w"))
-					assert.True(t, strings.Contains(tt.workflowName, "f"))
+					assert.Contains(t, tt.workflowName, "t")
+					assert.Contains(t, tt.workflowName, "w")
+					assert.Contains(t, tt.workflowName, "f")
 				} else {
 					assert.True(t, matched, "Expected workflow %q to match pattern %q", tt.workflowName, tt.searchPattern)
 				}
