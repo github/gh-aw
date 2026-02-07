@@ -584,15 +584,29 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		}
 
 		// Extract plugins from imported file (merge into set to avoid duplicates)
+		// This now handles both simple string format and object format with MCP configs
 		pluginsContent, err := extractPluginsFromContent(string(content))
 		if err == nil && pluginsContent != "" && pluginsContent != "[]" {
-			// Parse plugins JSON array
-			var importedPlugins []string
-			if jsonErr := json.Unmarshal([]byte(pluginsContent), &importedPlugins); jsonErr == nil {
-				for _, plugin := range importedPlugins {
-					if !pluginsSet[plugin] {
-						pluginsSet[plugin] = true
-						plugins = append(plugins, plugin)
+			// Parse plugins - can be array of strings or objects
+			var pluginsRaw []any
+			if jsonErr := json.Unmarshal([]byte(pluginsContent), &pluginsRaw); jsonErr == nil {
+				for _, item := range pluginsRaw {
+					// Handle string format: "org/repo"
+					if pluginStr, ok := item.(string); ok {
+						if !pluginsSet[pluginStr] {
+							pluginsSet[pluginStr] = true
+							plugins = append(plugins, pluginStr)
+						}
+					} else if pluginObj, ok := item.(map[string]any); ok {
+						// Handle object format: { "id": "org/repo", "mcp": {...} }
+						if idVal, hasID := pluginObj["id"]; hasID {
+							if pluginID, ok := idVal.(string); ok && !pluginsSet[pluginID] {
+								pluginsSet[pluginID] = true
+								plugins = append(plugins, pluginID)
+								// Note: MCP configs from imports are currently not merged
+								// They would need to be handled at a higher level in compiler_orchestrator_tools.go
+							}
+						}
 					}
 				}
 			}

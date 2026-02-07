@@ -1935,7 +1935,7 @@
               "type": "string",
               "description": "The name of the environment configured in the repo"
             },
-            "id": {
+            "url": {
               "type": "string",
               "description": "A deployment URL"
             }
@@ -6703,7 +6703,7 @@
           "description": "URI to the installation location when MCP is installed from a registry",
           "examples": ["https://api.mcp.github.com/v0/servers/microsoft/markitdown"]
         },
-        "id": {
+        "url": {
           "type": "string",
           "minLength": 1,
           "description": "URL for HTTP MCP connections"
@@ -6727,7 +6727,7 @@
           "examples": [["*"], ["store_memory", "retrieve_memory"], ["brave_web_search"]]
         }
       },
-      "required": ["id"],
+      "required": ["url"],
       "additionalProperties": false
     },
     "github_token": {
