@@ -17,6 +17,7 @@ tools:
     key: copilot-session-data
   bash:
     - "gh api *"
+    - "gh agent-task *"
     - "jq *"
     - "/tmp/gh-aw/jqschema.sh"
     - "mkdir *"
@@ -25,6 +26,7 @@ tools:
     - "unzip *"
     - "find *"
     - "rm *"
+    - "cat *"
 
 steps:
   - name: Fetch Copilot session data
@@ -81,27 +83,50 @@ steps:
         # Generate schema for reference
         /tmp/gh-aw/jqschema.sh < /tmp/gh-aw/session-data/sessions-list.json > /tmp/gh-aw/session-data/sessions-schema.json
 
-        # Download logs for each workflow run (limit to first 50)
+        # Download conversation logs using gh agent-task command (limit to first 50)
         SESSION_COUNT=$(jq 'length' /tmp/gh-aw/session-data/sessions-list.json)
-        echo "Downloading logs for $SESSION_COUNT sessions..."
+        echo "Downloading conversation logs for $SESSION_COUNT sessions..."
         
-        jq -r '.[].id' /tmp/gh-aw/session-data/sessions-list.json | while read -r run_id; do
-          if [ -n "$run_id" ]; then
-            echo "Downloading logs for run: $run_id"
-            # Download workflow run logs using GitHub API
-            gh api "repos/${{ github.repository }}/actions/runs/${run_id}/logs" \
-              > "/tmp/gh-aw/session-data/logs/${run_id}.zip" 2>&1 || true
+        # Use gh agent-task to fetch session logs with conversation transcripts
+        # Extract PR numbers from head_branch (format: copilot/issue-123 or copilot/task-456)
+        jq -r '.[].head_branch' /tmp/gh-aw/session-data/sessions-list.json | while read -r branch; do
+          if [ -n "$branch" ]; then
+            # Extract number from branch name (e.g., copilot/issue-123 -> 123)
+            pr_number=$(echo "$branch" | sed 's/copilot\///' | sed 's/[^0-9]//g')
             
-            # Extract the logs if download succeeded
-            if [ -f "/tmp/gh-aw/session-data/logs/${run_id}.zip" ] && [ -s "/tmp/gh-aw/session-data/logs/${run_id}.zip" ]; then
-              unzip -q "/tmp/gh-aw/session-data/logs/${run_id}.zip" -d "/tmp/gh-aw/session-data/logs/${run_id}/" 2>/dev/null || true
-              rm "/tmp/gh-aw/session-data/logs/${run_id}.zip"
+            if [ -n "$pr_number" ]; then
+              echo "Downloading conversation log for session #$pr_number (branch: $branch)"
+              
+              # Use gh agent-task view --log to get conversation transcript
+              # This contains the agent's internal monologue, tool calls, and reasoning
+              gh agent-task view --repo "${{ github.repository }}" "$pr_number" --log \
+                > "/tmp/gh-aw/session-data/logs/${pr_number}-conversation.txt" 2>&1 || {
+                echo "Warning: Could not fetch conversation log for session #$pr_number"
+                # If gh agent-task fails, fall back to downloading GitHub Actions logs
+                # This ensures we have some data even if agent-task command is unavailable
+                run_id=$(jq -r ".[] | select(.head_branch == \"$branch\") | .id" /tmp/gh-aw/session-data/sessions-list.json)
+                if [ -n "$run_id" ]; then
+                  echo "Falling back to GitHub Actions logs for run ID: $run_id"
+                  gh api "repos/${{ github.repository }}/actions/runs/${run_id}/logs" \
+                    > "/tmp/gh-aw/session-data/logs/${pr_number}-actions.zip" 2>&1 || true
+                  
+                  if [ -f "/tmp/gh-aw/session-data/logs/${pr_number}-actions.zip" ] && [ -s "/tmp/gh-aw/session-data/logs/${pr_number}-actions.zip" ]; then
+                    unzip -q "/tmp/gh-aw/session-data/logs/${pr_number}-actions.zip" -d "/tmp/gh-aw/session-data/logs/${pr_number}/" 2>/dev/null || true
+                    rm "/tmp/gh-aw/session-data/logs/${pr_number}-actions.zip"
+                  fi
+                fi
+              }
             fi
           fi
         done
         
-        LOG_COUNT=$(find /tmp/gh-aw/session-data/logs/ -type d -mindepth 1 | wc -l)
-        echo "Session logs downloaded: $LOG_COUNT log directories"
+        LOG_COUNT=$(find /tmp/gh-aw/session-data/logs/ -type f -name "*-conversation.txt" | wc -l)
+        echo "Conversation logs downloaded: $LOG_COUNT session logs"
+        
+        FALLBACK_COUNT=$(find /tmp/gh-aw/session-data/logs/ -type d -mindepth 1 | wc -l)
+        if [ "$FALLBACK_COUNT" -gt 0 ]; then
+          echo "Fallback GitHub Actions logs: $FALLBACK_COUNT sessions"
+        fi
 
         # Store in cache with today's date
         cp /tmp/gh-aw/session-data/sessions-list.json "$CACHE_DIR/copilot-sessions-${TODAY}.json"
@@ -140,11 +165,19 @@ This shared component fetches GitHub Copilot agent session data by analyzing wor
 4. If cache doesn't exist:
    - Calculates the date 30 days ago (cross-platform compatible)
    - Fetches all workflow runs from branches starting with `copilot/` using GitHub API
-   - Downloads logs for up to 50 most recent runs
-   - Extracts and organizes log files
+   - **Downloads conversation logs** using `gh agent-task view --log` for up to 50 most recent sessions
+   - Falls back to GitHub Actions logs if agent-task command fails
    - Saves data to cache with date-based filename (e.g., `copilot-sessions-2024-11-22.json`)
    - Copies data to working directory for use
 5. Generates a schema of the data structure
+
+### What's New: Conversation Transcript Access
+
+**This module now fetches actual agent conversation logs** instead of just infrastructure logs:
+- Uses `gh agent-task view --log` to access agent session logs
+- Logs include agent's internal monologue, reasoning, and tool usage
+- Enables true behavioral pattern analysis and prompt quality assessment
+- Falls back to GitHub Actions logs if agent-task command is unavailable
 
 ### Caching Strategy
 
@@ -155,13 +188,15 @@ This shared component fetches GitHub Copilot agent session data by analyzing wor
   - Multiple workflows running on the same day share the same session data
   - Reduces GitHub API rate limit usage
   - Faster workflow execution after first fetch of the day
-  - Avoids need for `gh agent-task` extension
+  - Includes conversation transcript cache
 
 ### Output Files
 
 - **`/tmp/gh-aw/session-data/sessions-list.json`**: Full session data including run ID, name, branch, timestamps, status, conclusion, and URL
 - **`/tmp/gh-aw/session-data/sessions-schema.json`**: JSON schema showing the structure of the session data
-- **`/tmp/gh-aw/session-data/logs/`**: Directory containing extracted workflow run logs
+- **`/tmp/gh-aw/session-data/logs/`**: Directory containing session conversation logs
+  - **`{pr_number}-conversation.txt`**: Agent conversation transcript with internal monologue and tool usage (primary)
+  - **`{pr_number}/`**: GitHub Actions infrastructure logs (fallback only)
 - **`/tmp/gh-aw/cache-memory/copilot-sessions-YYYY-MM-DD.json`**: Cached session data with date
 - **`/tmp/gh-aw/cache-memory/copilot-sessions-YYYY-MM-DD-schema.json`**: Cached schema with date
 - **`/tmp/gh-aw/cache-memory/session-logs-YYYY-MM-DD/`**: Cached log files with date
@@ -187,29 +222,46 @@ jq --arg today "$TODAY" '[.[] | select(.created_at >= $today)]' /tmp/gh-aw/sessi
 # Count total sessions
 jq 'length' /tmp/gh-aw/session-data/sessions-list.json
 
-# Get run IDs
-jq '[.[].id]' /tmp/gh-aw/session-data/sessions-list.json
+# Get PR numbers for conversation logs
+jq -r '.[].head_branch' /tmp/gh-aw/session-data/sessions-list.json | sed 's/copilot\///' | sed 's/[^0-9]//g'
 
-# List log directories
-find /tmp/gh-aw/session-data/logs -type d -mindepth 1
+# List conversation log files
+find /tmp/gh-aw/session-data/logs -type f -name "*-conversation.txt"
+
+# Read a specific conversation log
+cat /tmp/gh-aw/session-data/logs/123-conversation.txt
 ```
 
 ### Requirements
 
 - Automatically imports `jqschema.md` for schema generation (via transitive import closure)
 - Uses GitHub Actions API to fetch workflow runs from `copilot/*` branches
+- **Uses `gh agent-task view --log` to fetch conversation transcripts** (requires gh CLI v2.80.0+)
 - Cross-platform date calculation (works on both GNU and BSD date commands)
 - Cache-memory tool is automatically configured for data persistence
+- Falls back to GitHub Actions infrastructure logs if `gh agent-task` is unavailable
 
 ### Why Branch-Based Search?
 
-GitHub Copilot creates branches with the `copilot/` prefix, making branch-based workflow run search a reliable way to identify Copilot agent sessions without requiring the `gh agent-task` extension.
+GitHub Copilot creates branches with the `copilot/` prefix, making branch-based workflow run search a reliable way to identify Copilot agent sessions.
 
-### Advantages Over gh agent-task Extension
+### Conversation Log Access
 
-- **No Extension Required**: Works without installing `gh agent-task` CLI extension
-- **Better Caching**: Leverages cache-memory for efficient data reuse
-- **API-Based**: Uses standard GitHub API endpoints accessible to all users
+This module now provides access to **actual agent conversation transcripts** via the `gh agent-task view --log` command:
+
+**What's in the conversation logs:**
+- Agent's internal monologue and reasoning
+- Tool calls and their results
+- Step-by-step problem-solving approach
+- Code changes and validations
+- Error handling and recovery attempts
+
+**Benefits for analysis:**
+- True behavioral pattern analysis (not just infrastructure metrics)
+- Prompt quality assessment based on actual responses
+- Success factor identification from agent reasoning
+- Failure signal detection from error patterns
+- Tool usage effectiveness analysis
 - **Broader Access**: Works in all GitHub environments, not just Enterprise with Copilot
 
 ### Cache Behavior
