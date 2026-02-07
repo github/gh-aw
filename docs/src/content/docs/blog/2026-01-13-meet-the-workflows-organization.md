@@ -28,13 +28,13 @@ But all that sophisticated functionality has focused on a single repository. Wha
 
 These agents work at organization scale, across multiple repositories:
 
-- **[Org Health Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/org-health-report.md?plain=1)** - Organization-wide repository health metrics — **4 organization health discussions** created  
-- **[Stale Repo Identifier](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/stale-repo-identifier.md?plain=1)** - Identifies inactive repositories — **2 issues** flagging truly stale repos  
-- **[Ubuntu Image Analyzer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ubuntu-image-analyzer.md?plain=1)** - Documents GitHub Actions runner environments — **4 merged PRs out of 8 proposed (50% merge rate)**  
+- **[Org Health Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/org-health-report.md?plain=1)** - Organization-wide repository health metrics - **4 organization health discussions** created  
+- **[Stale Repo Identifier](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/stale-repo-identifier.md?plain=1)** - Identifies inactive repositories - **2 issues** flagging truly stale repos  
+- **[Ubuntu Image Analyzer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ubuntu-image-analyzer.md?plain=1)** - Documents GitHub Actions runner environments - **4 merged PRs out of 8 proposed (50% merge rate)**  
 
-Scaling agents across an entire organization changes the game. Org Health Report has created **4 organization health discussions** analyzing dozens of repositories at scale — for example, [#6777](https://github.com/github/gh-aw/discussions/6777) with the December 2025 organization health report. It identifies patterns and outliers ("these three repos have no tests, these five haven't been updated in months").
+Scaling agents across an entire organization changes the game. Org Health Report has created **4 organization health discussions** analyzing dozens of repositories at scale - for example, [#6777](https://github.com/github/gh-aw/discussions/6777) with the December 2025 organization health report. It identifies patterns and outliers ("these three repos have no tests, these five haven't been updated in months").
 
-Stale Repo Identifier has created **2 issues** flagging truly stale repositories for organizational hygiene — for example, [#5384](https://github.com/github/gh-aw/issues/5384) identifying Skills-Based-Volunteering-Public as truly stale. It helps find abandoned projects that should be archived or transferred.
+Stale Repo Identifier has created **2 issues** flagging truly stale repositories for organizational hygiene - for example, [#5384](https://github.com/github/gh-aw/issues/5384) identifying Skills-Based-Volunteering-Public as truly stale. It helps find abandoned projects that should be archived or transferred.
 
 We learned that **cross-repo insights are different** - what looks fine in one repository might be an outlier across the organization. These workflows require careful permission management (reading across repos needs organization-level tokens) and thoughtful rate limiting (you can hit API limits fast when analyzing 50+ repos).
 

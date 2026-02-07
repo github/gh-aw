@@ -30,27 +30,27 @@ These agents keep everything running smoothly through continuous testing:
 
 ### Code Quality & Test Validation
 
-- **[Daily Testify Uber Super Expert](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-testify-uber-super-expert.md?plain=1)** - Analyzes test files daily and suggests testify-based improvements — **19 issues created**, **13 led to merged PRs (100% causal chain merge rate)**
+- **[Daily Testify Uber Super Expert](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-testify-uber-super-expert.md?plain=1)** - Analyzes test files daily and suggests testify-based improvements - **19 issues created**, **13 led to merged PRs (100% causal chain merge rate)**
 - **[Daily Test Improver](https://github.com/githubnext/agentics/blob/main/workflows/daily-test-improver.md?plain=1)** - Identifies coverage gaps and implements new tests incrementally
 - **[Daily Compiler Quality Check](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-compiler-quality.md?plain=1)** - Analyzes compiler code to ensure it meets quality standards
 
 ### User Experience & Integration Testing
 
-- **[Daily Multi-Device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation across devices with Playwright — **2 merged PRs out of 2 proposed (100% merge rate)**
-- **[CLI Consistency Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/cli-consistency-checker.md?plain=1)** - Inspects the CLI for inconsistencies, typos, and documentation gaps — **80 merged PRs out of 102 proposed (78% merge rate)**
+- **[Daily Multi-Device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation across devices with Playwright - **2 merged PRs out of 2 proposed (100% merge rate)**
+- **[CLI Consistency Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/cli-consistency-checker.md?plain=1)** - Inspects the CLI for inconsistencies, typos, and documentation gaps - **80 merged PRs out of 102 proposed (78% merge rate)**
 
 ### CI/CD Optimization
 
-- **[CI Coach](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ci-coach.md?plain=1)** - Analyzes CI pipelines and suggests optimizations — **9 merged PRs out of 9 proposed (100% merge rate)**
-- **[Workflow Health Manager](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/workflow-health-manager.md?plain=1)** - Meta-orchestrator monitoring health of all agentic workflows — **40 issues created**, **5 direct PRs + 14 causal chain PRs merged**
+- **[CI Coach](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ci-coach.md?plain=1)** - Analyzes CI pipelines and suggests optimizations - **9 merged PRs out of 9 proposed (100% merge rate)**
+- **[Workflow Health Manager](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/workflow-health-manager.md?plain=1)** - Meta-orchestrator monitoring health of all agentic workflows - **40 issues created**, **5 direct PRs + 14 causal chain PRs merged**
 
-The Daily Testify Expert has created **19 issues** analyzing test quality, and **13 of those issues led to merged PRs** by downstream agents — a perfect 100% causal chain merge rate. For example, [issue #13701](https://github.com/github/gh-aw/issues/13701) led to [#13722](https://github.com/github/gh-aw/pull/13722) modernizing console render tests with testify assertions. The Daily Test Improver works alongside it to identify coverage gaps and implement new tests.
+The Daily Testify Expert has created **19 issues** analyzing test quality, and **13 of those issues led to merged PRs** by downstream agents - a perfect 100% causal chain merge rate. For example, [issue #13701](https://github.com/github/gh-aw/issues/13701) led to [#13722](https://github.com/github/gh-aw/pull/13722) modernizing console render tests with testify assertions. The Daily Test Improver works alongside it to identify coverage gaps and implement new tests.
 
-The Multi-Device Docs Tester uses Playwright to test our documentation on different screen sizes — it has created **2 PRs (both merged)**, including [adding --network host to Playwright Docker containers](https://github.com/github/gh-aw/pull/7158). It found mobile rendering issues we never would have caught manually. The CLI Consistency Checker has contributed **80 merged PRs out of 102 proposed (78% merge rate)**, maintaining consistency in CLI interface and documentation. Recent examples include [removing undocumented CLI commands](https://github.com/github/gh-aw/pull/12762) and [fixing upgrade command documentation](https://github.com/github/gh-aw/pull/11559).
+The Multi-Device Docs Tester uses Playwright to test our documentation on different screen sizes - it has created **2 PRs (both merged)**, including [adding --network host to Playwright Docker containers](https://github.com/github/gh-aw/pull/7158). It found mobile rendering issues we never would have caught manually. The CLI Consistency Checker has contributed **80 merged PRs out of 102 proposed (78% merge rate)**, maintaining consistency in CLI interface and documentation. Recent examples include [removing undocumented CLI commands](https://github.com/github/gh-aw/pull/12762) and [fixing upgrade command documentation](https://github.com/github/gh-aw/pull/11559).
 
 CI Optimization Coach has contributed **9 merged PRs out of 9 proposed (100% merge rate)**, optimizing CI pipelines for speed and efficiency with perfect execution. Examples include [removing unnecessary test dependencies](https://github.com/github/gh-aw/pull/13925) and [fixing duplicate test execution](https://github.com/github/gh-aw/pull/8176).
 
-The Workflow Health Manager has created **40 issues** monitoring the health of all other workflows, with **25 of those issues leading to 34 PRs** (14 merged) by downstream agents — plus **5 direct PRs merged**. For example, [issue #14105](https://github.com/github/gh-aw/issues/14105) about a missing runtime file led to [#14127](https://github.com/github/gh-aw/pull/14127) fixing the workflow configuration.
+The Workflow Health Manager has created **40 issues** monitoring the health of all other workflows, with **25 of those issues leading to 34 PRs** (14 merged) by downstream agents - plus **5 direct PRs merged**. For example, [issue #14105](https://github.com/github/gh-aw/issues/14105) about a missing runtime file led to [#14127](https://github.com/github/gh-aw/pull/14127) fixing the workflow configuration.
 
 These workflows embody the principle: **trust but verify**. Just because it worked yesterday doesn't mean it works today.
 

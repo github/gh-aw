@@ -9,7 +9,7 @@ ProjectOps automates [GitHub Projects](https://docs.github.com/en/issues/plannin
 
 When a new issue or pull request arrives, the agent analyzes it and determines where it belongs, what status to set, which fields to update (priority, effort, etc.), and whether to create or update project structures.
 
-Safe outputs handle all project operations in separate, scoped jobs with minimal permissions—the agent job never sees the Projects token, ensuring secure automation.
+Safe outputs handle all project operations in separate, scoped jobs with minimal permissions - the agent job never sees the Projects token, ensuring secure automation.
 
 ## Prerequisites
 

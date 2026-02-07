@@ -28,8 +28,8 @@ But here's the ultimate challenge: how do you coordinate *multiple* agents worki
 
 These agents coordinate multi-agent plans and projects:
 
-- **[Plan Command](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/plan.md?plain=1)** - Breaks down issues into actionable sub-tasks via `/plan` command — **514 merged PRs out of 761 proposed (67% merge rate)**
-- **[Discussion Task Miner](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/discussion-task-miner.md?plain=1)** - Extracts actionable tasks from discussion threads — **60 merged PRs out of 105 proposed (57% merge rate)**
+- **[Plan Command](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/plan.md?plain=1)** - Breaks down issues into actionable sub-tasks via `/plan` command - **514 merged PRs out of 761 proposed (67% merge rate)**
+- **[Discussion Task Miner](https://github.com/github/gh-aw/tree/2c1f68a721ae7b3b67d0c2d93decf1fa5bcf7ee3/.github/workflows/discussion-task-miner.md?plain=1)** - Extracts actionable tasks from discussion threads - **60 merged PRs out of 105 proposed (57% merge rate)**
 
 Plan Command has contributed **514 merged PRs out of 761 proposed (67% merge rate)**, providing on-demand task decomposition that breaks complex issues into actionable sub-tasks. This is the **highest-volume workflow by attribution** in the entire factory. Developers can comment `/plan` on any issue to get an AI-generated breakdown into actionable sub-issues that agents can work on. A verified example causal chain: [Discussion #7631](https://github.com/github/gh-aw/discussions/7631) → [Issue #8058](https://github.com/github/gh-aw/issues/8058) → [PR #8110](https://github.com/github/gh-aw/pull/8110).
 

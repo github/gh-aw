@@ -71,7 +71,7 @@ If safe outputs are configured, the workflow has limited, highly specific write 
 
 All safe outputs from the AI agent are sanitized before being applied to your repository. Sanitization includes secret redaction, URL domain filtering, XML escaping, size limits, control character stripping, GitHub reference escaping and HTTPS enforcement.
 
-Additionally, safe outputs enforce permission separation—write operations happen in separate jobs with scoped permissions, never in the agentic job itself.
+Additionally, safe outputs enforce permission separation - write operations happen in separate jobs with scoped permissions, never in the agentic job itself.
 
 See [Safe Outputs - Security and Sanitization](/gh-aw/reference/safe-outputs/#security-and-sanitization) for configuration options.
 
@@ -148,7 +148,7 @@ When using **GitHub Copilot CLI**, a Personal Access Token (PAT) with "Copilot R
 
 ### What hidden runtime dependencies does this have?
 
-The executing agentic workflow uses your nominated coding agent (defaulting to GitHub Copilot CLI), a GitHub Actions VM with NodeJS, pinned Actions from [github/gh-aw](https://github.com/github/gh-aw) releases, and an Agent Workflow Firewall container for network control (optional but default). The exact YAML workflow can be inspected in the compiled `.lock.yml` file—there's no hidden configuration.
+The executing agentic workflow uses your nominated coding agent (defaulting to GitHub Copilot CLI), a GitHub Actions VM with NodeJS, pinned Actions from [github/gh-aw](https://github.com/github/gh-aw) releases, and an Agent Workflow Firewall container for network control (optional but default). The exact YAML workflow can be inspected in the compiled `.lock.yml` file - there's no hidden configuration.
 
 ### I'm not using a supported AI Engine (coding agent). What should I do?
 
@@ -166,7 +166,7 @@ Either approach works well. AI-assisted authoring using `/agent agentic-workflow
 
 ### You use 'agent' and 'agentic workflow' interchangeably. Are they the same thing?
 
-Yes, for the purpose of this technology. An **"agent"** is an agentic workflow in a repository—an AI-powered automation that can reason, make decisions, and take actions. We use **"agentic workflow"** as it's plainer and emphasizes the workflow nature of the automation, but the terms are synonymous in this context.
+Yes, for the purpose of this technology. An **"agent"** is an agentic workflow in a repository - an AI-powered automation that can reason, make decisions, and take actions. We use **"agentic workflow"** as it's plainer and emphasizes the workflow nature of the automation, but the terms are synonymous in this context.
 
 ## Troubleshooting
 

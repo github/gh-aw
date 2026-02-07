@@ -78,7 +78,7 @@ You are analyzing PR #${{ github.event.pull_request.number }}.
 
 ### Limitations
 
-The template system supports only basic conditionals—no nesting, `else` clauses, variables, loops, or complex evaluation.
+The template system supports only basic conditionals - no nesting, `else` clauses, variables, loops, or complex evaluation.
 
 ## Runtime Imports
 

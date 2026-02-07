@@ -97,9 +97,27 @@ This workflow imports a custom agent with array-format tools.`
 		t.Errorf("AgentFile = %q, want %q", result.AgentFile, expectedAgentPath)
 	}
 
-	// Verify that markdown was extracted from the agent file
-	if result.MergedMarkdown == "" {
-		t.Errorf("Expected MergedMarkdown to contain agent markdown content")
+	// Verify that the import path was added for runtime-import macro (new behavior)
+	// Agent imports without inputs should go into ImportPaths, not MergedMarkdown
+	if len(result.ImportPaths) == 0 {
+		t.Errorf("Expected ImportPaths to contain agent import path")
+	}
+
+	expectedImportPath := ".github/agents/feature-flag-remover.agent.md"
+	found := false
+	for _, path := range result.ImportPaths {
+		if path == expectedImportPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("ImportPaths = %v, want to contain %q", result.ImportPaths, expectedImportPath)
+	}
+
+	// MergedMarkdown should be empty for imports without inputs (runtime-import behavior)
+	if result.MergedMarkdown != "" {
+		t.Errorf("Expected MergedMarkdown to be empty for agent import without inputs, got: %q", result.MergedMarkdown)
 	}
 
 	// Verify that tools were NOT merged from the agent file (they're in array format)

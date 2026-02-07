@@ -117,7 +117,7 @@ All host binaries are available without explicit mounts: system utilities, `gh`,
 AWF passes all environment variables via `--env-all`. The host `PATH` is captured as `AWF_HOST_PATH` and restored inside the container, preserving setup action tool paths.
 
 > [!NOTE]
-> Go's "trimmed" binaries require `GOROOT`—AWF automatically captures it after `actions/setup-go`.
+> Go's "trimmed" binaries require `GOROOT` - AWF automatically captures it after `actions/setup-go`.
 
 #### Runtime Tools
 

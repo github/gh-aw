@@ -29,7 +29,7 @@ The CLI creates a temporary private repository (default: `gh-aw-trial`), install
 
 ### Default Mode
 
-Simulates running against your current repository—`github.repository` points to your repo, but outputs go to the trial repository.
+Simulates running against your current repository - `github.repository` points to your repo, but outputs go to the trial repository.
 
 ```bash
 gh aw trial githubnext/agentics/my-workflow

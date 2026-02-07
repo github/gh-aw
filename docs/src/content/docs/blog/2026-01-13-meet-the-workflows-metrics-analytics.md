@@ -28,13 +28,13 @@ But here's a question: when you're running dozens of AI agents, how do you know 
 
 Data scientists, rejoice! These agents turn raw repository activity into actual insights:
 
-- **[Metrics Collector](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/metrics-collector.md?plain=1)** - Tracks daily performance across the entire agent ecosystem — **41 daily metrics discussions** created
-- **[Portfolio Analyst](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/portfolio-analyst.md?plain=1)** - Identifies cost reduction opportunities — **7 portfolio analysis discussions** created  
-- **[Audit Workflows](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/audit-workflows.md?plain=1)** - A meta-agent that audits all the other agents' runs — **93 audit report discussions**, **9 issues**, very Inception
+- **[Metrics Collector](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/metrics-collector.md?plain=1)** - Tracks daily performance across the entire agent ecosystem - **41 daily metrics discussions** created
+- **[Portfolio Analyst](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/portfolio-analyst.md?plain=1)** - Identifies cost reduction opportunities - **7 portfolio analysis discussions** created  
+- **[Audit Workflows](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/audit-workflows.md?plain=1)** - A meta-agent that audits all the other agents' runs - **93 audit report discussions**, **9 issues**, very Inception
 
-Here's where things got meta: we built agents to monitor agents. The Metrics Collector has created **41 daily metrics discussions** tracking performance across the agent ecosystem — for example, [#6986](https://github.com/github/gh-aw/discussions/6986) with the daily code metrics report. It became our central nervous system, gathering performance data that feeds into higher-level orchestrators.
+Here's where things got meta: we built agents to monitor agents. The Metrics Collector has created **41 daily metrics discussions** tracking performance across the agent ecosystem - for example, [#6986](https://github.com/github/gh-aw/discussions/6986) with the daily code metrics report. It became our central nervous system, gathering performance data that feeds into higher-level orchestrators.
 
-What we learned: **you can't optimize what you don't measure**. Portfolio Analyst has created **7 portfolio analysis discussions** identifying cost reduction opportunities and token optimization patterns — for example, [#6499](https://github.com/github/gh-aw/discussions/6499) with a weekly portfolio analysis. It was eye-opening - it identified workflows that were costing us money unnecessarily (turns out some agents were way too chatty with their LLM calls).
+What we learned: **you can't optimize what you don't measure**. Portfolio Analyst has created **7 portfolio analysis discussions** identifying cost reduction opportunities and token optimization patterns - for example, [#6499](https://github.com/github/gh-aw/discussions/6499) with a weekly portfolio analysis. It was eye-opening - it identified workflows that were costing us money unnecessarily (turns out some agents were way too chatty with their LLM calls).
 
 Audit Workflows is the most prolific discussion-creating agent with **93 audit report discussions** and **9 issues**, acting as a meta-agent that analyzes logs, costs, errors, and success patterns across all other workflow runs. Four of its issues even led to PRs by downstream agents.
 

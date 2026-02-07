@@ -85,7 +85,7 @@ The workflow is pragmatic: Go's simple style is respected, for-loops stay when c
 
 An example PR from our own use of this workflow is [Apply functional programming and immutability improvements](https://github.com/github/gh-aw/pull/12921).
 
-Functional Pragmatist (originally named "Functional Enhancer") is a recent addition — so far it has created **2 PRs (both merged, 100% merge rate)**, demonstrating that its pragmatic approach to functional patterns is well-received.
+Functional Pragmatist (originally named "Functional Enhancer") is a recent addition - so far it has created **2 PRs (both merged, 100% merge rate)**, demonstrating that its pragmatic approach to functional patterns is well-received.
 
 ### Repository Quality Improver: The Holistic Analyst
 

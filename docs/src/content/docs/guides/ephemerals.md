@@ -185,10 +185,10 @@ safe-outputs:
 
 **Configuration options**:
 
-- `[]` — Escape all references (prevents all timeline items)
-- `["repo"]` — Allow only the target repository's references
-- `["repo", "owner/other-repo"]` — Allow specific repositories
-- Not specified (default) — All references allowed
+- `[]` - Escape all references (prevents all timeline items)
+- `["repo"]` - Allow only the target repository's references
+- `["repo", "owner/other-repo"]` - Allow specific repositories
+- Not specified (default) - All references allowed
 
 **How it works**: References like `#123` become `` `#123` `` and `other/repo#456` becomes `` `other/repo#456` ``, preventing timeline clutter while preserving the information.
 

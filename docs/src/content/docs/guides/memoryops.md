@@ -14,9 +14,10 @@ Use MemoryOps for incremental processing, trend analysis, multi-step tasks, and 
 > [!TIP]
 > **Let the AI Agent Do the Work**
 >
-> When using these patterns, **state your high-level goal** in the workflow prompt and let the AI agent generate the concrete implementation. The patterns below are conceptual guides—you don't need to write the detailed code yourself.
+> When using these patterns, **state your high-level goal** in the workflow prompt and let the AI agent generate the concrete implementation. The patterns below are conceptual guides - you don't need to write the detailed code yourself.
 >
 > **Example approach:**
+>
 > ```markdown
 > # Process All Open Issues
 > 
@@ -185,9 +186,10 @@ charts showing whether performance is improving or declining over time.
 
 Use multiple memory instances for different purposes and retention policies.
 
-**Your goal**: "Organize data with different lifecycles—temporary session data, historical metrics, configuration, and archived snapshots."
+**Your goal**: "Organize data with different lifecycles - temporary session data, historical metrics, configuration, and archived snapshots."
 
 **How to state it in your workflow**:
+
 ```markdown
 Use cache-memory for temporary API responses during this run. Store daily 
 metrics in one repo-memory branch for trend analysis. Keep data schemas in 
@@ -197,6 +199,7 @@ another branch. Archive full snapshots in a third branch with compression.
 **What the agent will implement**: Separate hot data (cache-memory) from historical data (repo-memory). Use different repo-memory branches for metrics vs. configuration vs. archives.
 
 **Configuration to include**:
+
 ```yaml
 tools:
   cache-memory:

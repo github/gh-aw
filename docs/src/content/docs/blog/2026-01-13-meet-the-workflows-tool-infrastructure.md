@@ -28,15 +28,15 @@ But here's a question that kept us up at night: what if the *infrastructure itse
 
 These agents monitor and analyze the agentic infrastructure itself:
 
-- **[MCP Inspector](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mcp-inspector.md?plain=1)** - Validates Model Context Protocol configurations — ensures agents can access tools  
-- **[GitHub MCP Tools Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/github-mcp-tools-report.md?plain=1)** - Analyzes available MCP tools — **5 merged PRs out of 6 proposed (83% merge rate)**  
-- **[Agent Performance Analyzer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/agent-performance-analyzer.md?plain=1)** - Meta-orchestrator for agent quality — **29 issues created, 14 leading to PRs (8 merged)**  
+- **[MCP Inspector](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mcp-inspector.md?plain=1)** - Validates Model Context Protocol configurations - ensures agents can access tools  
+- **[GitHub MCP Tools Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/github-mcp-tools-report.md?plain=1)** - Analyzes available MCP tools - **5 merged PRs out of 6 proposed (83% merge rate)**  
+- **[Agent Performance Analyzer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/agent-performance-analyzer.md?plain=1)** - Meta-orchestrator for agent quality - **29 issues created, 14 leading to PRs (8 merged)**  
 
 Infrastructure for AI agents is different from traditional infrastructure - you need to validate that tools are available, properly configured, and actually working. The MCP Inspector continuously validates Model Context Protocol server configurations because a misconfigured MCP server means an agent can't access the tools it needs.
 
 GitHub MCP Tools Report Generator has contributed **5 merged PRs out of 6 proposed (83% merge rate)**, analyzing MCP tool availability and keeping tool configurations up to date. For example, [PR #13169](https://github.com/github/gh-aw/pull/13169) updates MCP server tool configurations.
 
-Agent Performance Analyzer has created **29 issues** identifying performance problems across the agent ecosystem, and **14 of those issues led to PRs** (8 merged) by downstream agents — for example, it detected that draft PRs accounted for 9.6% of open PRs, created issue #12168, which led to [#12174](https://github.com/github/gh-aw/pull/12174) implementing automated draft cleanup.
+Agent Performance Analyzer has created **29 issues** identifying performance problems across the agent ecosystem, and **14 of those issues led to PRs** (8 merged) by downstream agents - for example, it detected that draft PRs accounted for 9.6% of open PRs, created issue #12168, which led to [#12174](https://github.com/github/gh-aw/pull/12174) implementing automated draft cleanup.
 
 We learned that **layered observability** is crucial: you need monitoring at the infrastructure level (are servers up?), the tool level (can agents access what they need?), and the agent level (are they performing well?).
 

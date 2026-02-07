@@ -42,7 +42,7 @@ It then identifies functions that don't fit their current file's theme as outlie
 
 The workflow follows a "one file per feature" principle: files should be named after their primary purpose, and functions within each file should align with that purpose. It closes existing open issues with the `[refactor]` prefix before creating new ones. This prevents issue accumulation and ensures recommendations stay current.
 
-In our extended use of Semantic Function Refactoring, the workflow has driven **112 merged PRs out of 142 proposed (79% merge rate)** through causal chains — creating 99 refactoring issues that downstream agents turn into code changes. For example, [issue #12291](https://github.com/github/gh-aw/issues/12291) analyzing code organization opportunities led to [PR #12363 splitting permissions.go into focused modules](https://github.com/github/gh-aw/pull/12363) (928→133 lines).
+In our extended use of Semantic Function Refactoring, the workflow has driven **112 merged PRs out of 142 proposed (79% merge rate)** through causal chains - creating 99 refactoring issues that downstream agents turn into code changes. For example, [issue #12291](https://github.com/github/gh-aw/issues/12291) analyzing code organization opportunities led to [PR #12363 splitting permissions.go into focused modules](https://github.com/github/gh-aw/pull/12363) (928→133 lines).
 
 An example PR from our own use of this workflow is [Move misplaced extraction functions to frontmatter_extraction.go](https://github.com/github/gh-aw/pull/7043).
 
@@ -54,7 +54,7 @@ The workflow runs on weekdays, analyzing all Go source files in the `pkg/` direc
 
 What makes this workflow effective is its focus and prioritization. Instead of overwhelming developers with issues about every large file, it creates at most one issue, targeting the largest offender. The workflow also skips if an open `[file-diet]` issue already exists, preventing duplicate work.
 
-In our extended use, Large File Simplifier (also known as "Daily File Diet") has driven **26 merged PRs out of 33 proposed (79% merge rate)** through causal chains — creating 37 file-diet issues targeting the largest files, which downstream agents turn into modular code changes. For example, [issue #12535](https://github.com/github/gh-aw/issues/12535) targeting add_interactive.go led to [PR #12545 refactoring it into 6 domain-focused modules](https://github.com/github/gh-aw/pull/12545).
+In our extended use, Large File Simplifier (also known as "Daily File Diet") has driven **26 merged PRs out of 33 proposed (79% merge rate)** through causal chains - creating 37 file-diet issues targeting the largest files, which downstream agents turn into modular code changes. For example, [issue #12535](https://github.com/github/gh-aw/issues/12535) targeting add_interactive.go led to [PR #12545 refactoring it into 6 domain-focused modules](https://github.com/github/gh-aw/pull/12545).
 
 The workflow uses Serena for semantic code analysis to understand function relationships and propose logical boundaries for splitting. It both counts lines and analyzes the code structure to suggest meaningful module boundaries that make sense.
 

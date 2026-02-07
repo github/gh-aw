@@ -30,13 +30,13 @@ Now let's shift from collaboration ceremony to fault investigation.
 
 These are our diligent caretakers - the agents that spot problems before they become bigger problems:
 
-- **[CI Doctor](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ci-doctor.md?plain=1)** - Investigates failed workflows and opens diagnostic issues — **9 merged PRs out of 13 proposed (69% merge rate)**  
-- **[Schema Consistency Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/schema-consistency-checker.md?plain=1)** - Detects when schemas, code, and docs drift apart — **55 analysis discussions** created  
-- **[Breaking Change Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/breaking-change-checker.md?plain=1)** - Watches for changes that might break things for users — creates alert issues  
+- **[CI Doctor](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/ci-doctor.md?plain=1)** - Investigates failed workflows and opens diagnostic issues - **9 merged PRs out of 13 proposed (69% merge rate)**  
+- **[Schema Consistency Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/schema-consistency-checker.md?plain=1)** - Detects when schemas, code, and docs drift apart - **55 analysis discussions** created  
+- **[Breaking Change Checker](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/breaking-change-checker.md?plain=1)** - Watches for changes that might break things for users - creates alert issues  
 
 The CI Doctor (also known as "CI Failure Doctor") was one of our most important workflows. Instead of drowning in CI failure notifications, we now get *timely*, *investigated* failures with actual diagnostic insights. The agent doesn't just tell us something broke - it analyzes logs, identifies patterns, searches for similar past issues, and even suggests fixes - even before the human has read the failure notification. CI Failure Doctor has contributed **9 merged PRs out of 13 proposed (69% merge rate)**, including fixes like [adding Go module download pre-flight checks](https://github.com/github/gh-aw/pull/13740) and [adding retry logic to prevent proxy 403 failures](https://github.com/github/gh-aw/pull/13155). We learned that agents excel at the tedious investigation work that humans find draining.
 
-The Schema Consistency Checker has created **55 analysis discussions** examining schema drift between JSON schemas, Go structs, and documentation — for example, [#7020](https://github.com/github/gh-aw/discussions/7020) analyzing conditional logic consistency across the codebase. It caught drift that would have taken us days to notice manually.
+The Schema Consistency Checker has created **55 analysis discussions** examining schema drift between JSON schemas, Go structs, and documentation - for example, [#7020](https://github.com/github/gh-aw/discussions/7020) analyzing conditional logic consistency across the codebase. It caught drift that would have taken us days to notice manually.
 
 Breaking Change Checker is a newer workflow that monitors for backward-incompatible changes and creates alert issues (e.g., [#14113](https://github.com/github/gh-aw/issues/14113) flagging CLI version updates) before they reach production.
 

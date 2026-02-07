@@ -28,21 +28,21 @@ Now let's talk about the daily rituals of software development: managing issues 
 
 These agents enhance issue and pull request workflows:
 
-- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues — **77 discussion reports** and **18 parent issues** created  
-- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time — **task dispatcher** for the whole system
-- **[Mergefest](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches — **orchestrator workflow**
-- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically — **orchestrator workflow**
-- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage — **2 merged PRs out of 2 proposed (100% merge rate)**
+- **[Issue Arborist](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-arborist.md?plain=1)** - Links related issues as sub-issues - **77 discussion reports** and **18 parent issues** created  
+- **[Issue Monster](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-monster.md?plain=1)** - Assigns issues to Copilot agents one at a time - **task dispatcher** for the whole system
+- **[Mergefest](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/mergefest.md?plain=1)** - Automatically merges main branch into PR branches - **orchestrator workflow**
+- **[Sub Issue Closer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/sub-issue-closer.md?plain=1)** - Closes completed sub-issues automatically - **orchestrator workflow**
+- **[Issue Template Optimizer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-template-optimizer.md?plain=1)** - Improves issue templates based on usage - **2 merged PRs out of 2 proposed (100% merge rate)**
 
 The Issue Arborist is an **organizational workflow** that has created **77 discussion reports** (titled "[Issue Arborist] Issue Arborist Report") and **18 parent issues** to group related sub-issues. It keeps the issue tracker organized by automatically linking related issues, building a dependency tree we'd never maintain manually. For example, [#12037](https://github.com/github/gh-aw/issues/12037) grouped engine documentation updates.
 
-The Issue Monster is the **task dispatcher** — it assigns issues to Copilot agents one at a time. It doesn't create PRs itself, but enables every other agent's work by feeding them tasks. This prevents the chaos of parallel work on the same codebase.
+The Issue Monster is the **task dispatcher** - it assigns issues to Copilot agents one at a time. It doesn't create PRs itself, but enables every other agent's work by feeding them tasks. This prevents the chaos of parallel work on the same codebase.
 
 Mergefest is an **orchestrator workflow** that automatically merges main into PR branches, keeping long-lived PRs up to date without manual intervention. It eliminates the "please merge main" dance.
 
 Sub Issue Closer automatically closes completed sub-issues when their parent issue is resolved, keeping the issue tracker clean.
 
-Issue Template Optimizer is a recent addition — so far it has created **2 PRs (both merged)**, improving issue templates based on usage patterns. It analyzes which fields in our templates actually get filled out and suggests improvements.
+Issue Template Optimizer is a recent addition - so far it has created **2 PRs (both merged)**, improving issue templates based on usage patterns. It analyzes which fields in our templates actually get filled out and suggests improvements.
 
 Issue and PR management workflows don't replace GitHub's features; they enhance them, removing ceremony and making collaboration feel smoother.
 

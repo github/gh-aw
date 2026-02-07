@@ -8,6 +8,8 @@ sidebar:
 import CopyEntireFileButton from '../../../components/CopyEntireFileButton.astro';
 import Video from '../../../components/Video.astro';
 
+**⏱️ Estimated time: 5-15 minutes** depending on complexity
+
 You can author new agentic workflows using a coding agent or other AI chat system, under your guidance. For interactive coding agents, this can be a conversation about what you want the workflow to do, with the agent asking clarifying questions and generating the workflow for you.
 
 In this guide, we show you how to create agentic workflows in the GitHub web interface (github.com), your coding agent, or in VS Code Agent Mode.
@@ -42,11 +44,11 @@ Follow these steps to create an agentic workflow using VSCode or your coding age
 
    You can replace the last line with your desired workflow purpose and as much additional detail, context, goals, guardrails and purpose as you like.
 
-   This will create a new workflow file in `.github/workflows/` with the appropriate YAML configuration and markdown content for the workflow. Some agents will create a pull request to add these changes to your repository.
+   This will create a new [workflow markdown file](/gh-aw/reference/workflow-structure/) in `.github/workflows/` with the appropriate configuration. Some agents will create a pull request to add these changes to your repository.
 
 3. **Setup required secrets**.
 
-   If you haven't done so already, [set up your repository secrets](/gh-aw/reference/engines/) for the coding agent your workflow will be using (Copilot, Claude, Codex). Also need to adjust the `engine:` setting in your generated workflow to match if not using Copilot CLI.
+   If you haven't done so already, [set up your repository secrets](/gh-aw/reference/engines/) for your chosen engine (Copilot, Claude, or Codex). If not using Copilot, also adjust the `engine:` field in your workflow's [frontmatter](/gh-aw/reference/frontmatter/).
 
 After merging the pull request, you can run the workflow to see it in action. Either:
 - trigger runs manually from the Actions tab in GitHub.com, or

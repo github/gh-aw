@@ -29,20 +29,20 @@ But reliability alone isn't enough - we also need *security*. When AI agents can
 These agents are our security guards, keeping watch and enforcing the rules:
 
 - **[Security Compliance](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/security-compliance.md?plain=1)** - Runs vulnerability campaigns with deadline tracking  
-- **[Firewall](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/firewall.md?plain=1)** - Tests network security and validates rules — **59 daily firewall report discussions**, **5 smoke test issues**
+- **[Firewall](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/firewall.md?plain=1)** - Tests network security and validates rules - **59 daily firewall report discussions**, **5 smoke test issues**
 - **[Daily Secrets Analysis](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-secrets-analysis.md?plain=1)** - Scans for exposed credentials (yes, it happens)  
 - **[Daily Malicious Code Scan](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-malicious-code-scan.md?plain=1)** - Reviews recent code changes for suspicious patterns
-- **[Static Analysis Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/static-analysis-report.md?plain=1)** - Daily security scans using zizmor, poutine, and actionlint — **57 analysis discussions** plus **12 Zizmor security reports**
+- **[Static Analysis Report](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/static-analysis-report.md?plain=1)** - Daily security scans using zizmor, poutine, and actionlint - **57 analysis discussions** plus **12 Zizmor security reports**
 
 Security Compliance manages vulnerability remediation campaigns with deadline tracking, ensuring security issues are addressed within defined SLAs - perfect for those "audit in 3 weeks" panic moments.
 
-The Firewall workflow has created **59 daily firewall report discussions** and **5 smoke test issues**, validating that our agents can't access unauthorized resources — for example, [#6943](https://github.com/github/gh-aw/discussions/6943) with the daily firewall analysis. It's the bouncer that enforces network rules.
+The Firewall workflow has created **59 daily firewall report discussions** and **5 smoke test issues**, validating that our agents can't access unauthorized resources - for example, [#6943](https://github.com/github/gh-aw/discussions/6943) with the daily firewall analysis. It's the bouncer that enforces network rules.
 
 Daily Secrets Analysis scans for exposed credentials in commits and discussions, providing an automated security net against accidental secret exposure - catching those "oops, I committed my API key" moments before they become incidents.
 
 Daily Malicious Code Scan reviews recent code changes for suspicious patterns, adding an automated defense layer against supply chain attacks.
 
-Static Analysis Report has created **57 analysis discussions** plus **12 Zizmor security reports**, running comprehensive daily security audits using industry-standard tools — for example, [#6973](https://github.com/github/gh-aw/discussions/6973) with the latest static analysis findings and [#3033](https://github.com/github/gh-aw/discussions/3033) with a Zizmor security analysis. This shows how traditional security tools can be integrated into an AI agent workflow.
+Static Analysis Report has created **57 analysis discussions** plus **12 Zizmor security reports**, running comprehensive daily security audits using industry-standard tools - for example, [#6973](https://github.com/github/gh-aw/discussions/6973) with the latest static analysis findings and [#3033](https://github.com/github/gh-aw/discussions/3033) with a Zizmor security analysis. This shows how traditional security tools can be integrated into an AI agent workflow.
 
 ## Using These Workflows
 

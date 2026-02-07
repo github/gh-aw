@@ -44,7 +44,7 @@ func GenerateRuntimeSetupSteps(requirements []RuntimeRequirement) []GitHubAction
 func generateEnvCaptureStep(envVar string, captureCmd string) GitHubActionStep {
 	return GitHubActionStep{
 		fmt.Sprintf("      - name: Capture %s for AWF chroot mode", envVar),
-		fmt.Sprintf("        run: echo \"%s=$(%s)\" >> $GITHUB_ENV", envVar, captureCmd),
+		fmt.Sprintf("        run: echo \"%s=$(%s)\" >> \"$GITHUB_ENV\"", envVar, captureCmd),
 	}
 }
 

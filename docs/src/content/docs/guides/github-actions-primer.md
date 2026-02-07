@@ -5,11 +5,11 @@ sidebar:
   order: 1
 ---
 
-This guide introduces GitHub Actions—GitHub's native automation platform—and explains how it forms the foundation for agentic workflows. Understanding GitHub Actions helps you leverage its capabilities effectively while appreciating the enhanced security and AI-powered features that agentic workflows provide.
+This guide introduces GitHub Actions - GitHub's native automation platform - and explains how it forms the foundation for agentic workflows. Understanding GitHub Actions helps you leverage its capabilities effectively while appreciating the enhanced security and AI-powered features that agentic workflows provide.
 
 ## What is GitHub Actions?
 
-**GitHub Actions** is GitHub's integrated automation platform that enables you to build, test, and deploy code directly from your repository. It allows you to automate workflows in response to repository events, schedules, or manual triggers—all defined in YAML files stored in your repository.
+**GitHub Actions** is GitHub's integrated automation platform that enables you to build, test, and deploy code directly from your repository. It allows you to automate workflows in response to repository events, schedules, or manual triggers - all defined in YAML files stored in your repository.
 
 ## Core Concepts
 

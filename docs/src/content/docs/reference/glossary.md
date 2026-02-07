@@ -15,7 +15,7 @@ This glossary provides definitions for key technical terms and concepts used in 
 
 ### Agentic
 
-The term **"agentic"** means having agency—the ability to act independently, make context-aware decisions, and adapt behavior based on circumstances. When applied to workflows:
+The term **"agentic"** means having agency - the ability to act independently, make context-aware decisions, and adapt behavior based on circumstances. When applied to workflows:
 
 - **Agentic workflows** use AI to understand context and choose appropriate actions, rather than just following predefined steps
 - **Agentic systems** can reason about situations and make informed decisions without explicit programming for every scenario
@@ -177,7 +177,7 @@ The AI system that powers the [agentic workflow](#agentic-workflow). GitHub Agen
 
 - **GitHub Copilot** (default): Uses GitHub's coding assistant
 
-An engine is essentially "which AI to use"—think of it as choosing between different AI assistants (like Copilot, Claude, or others) to execute your workflow instructions.
+An engine is essentially "which AI to use" - think of it as choosing between different AI assistants (like Copilot, Claude, or others) to execute your workflow instructions.
 
 ### Triggers
 

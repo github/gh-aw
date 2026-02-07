@@ -70,6 +70,8 @@ Analyze approximately 50 Copilot agent sessions to identify:
 - Prompt quality indicators
 - Opportunities for improvement
 
+**NEW**: This workflow now has access to actual agent conversation transcripts (not just infrastructure logs), enabling true behavioral analysis through the agent's internal monologue and reasoning process.
+
 Create a comprehensive report and publish it as a GitHub Discussion for team review.
 
 ## Current Context
@@ -78,6 +80,7 @@ Create a comprehensive report and publish it as a GitHub Discussion for team rev
 - **Analysis Period**: Most recent ~50 agent sessions
 - **Cache Memory**: `/tmp/gh-aw/cache-memory/`
 - **Pre-fetched Data**: Available at `/tmp/gh-aw/session-data/`
+- **Conversation Logs**: Now available with agent's internal monologue and reasoning
 
 ## Task Overview
 
@@ -85,22 +88,50 @@ Create a comprehensive report and publish it as a GitHub Discussion for team rev
 
 **Pre-fetched Data Available**: Session data has been fetched by the `copilot-session-data-fetch` shared module:
 - `/tmp/gh-aw/session-data/sessions-list.json` - List of sessions with metadata
-- `/tmp/gh-aw/session-data/logs/` - Individual session log files
+- `/tmp/gh-aw/session-data/logs/` - **Conversation transcript files** (new!)
+  - `{session_number}-conversation.txt` - Agent's internal monologue, reasoning, and tool usage
+  - `{session_number}/` - GitHub Actions logs (fallback only)
+
+**What's in the Conversation Logs**:
+- Agent's step-by-step reasoning and planning
+- Internal monologue showing decision-making process
+- Tool calls and their outputs
+- Code changes and validation attempts
+- Error handling and recovery strategies
 
 **Verify Setup**:
 1. Confirm session data was downloaded successfully
-2. Initialize or restore cache-memory from `/tmp/gh-aw/cache-memory/`
-3. Load historical analysis data if available
+2. Check that conversation logs are available (primary source)
+3. Initialize or restore cache-memory from `/tmp/gh-aw/cache-memory/`
+4. Load historical analysis data if available
 
 ### Phase 1: Session Analysis
 
-For each downloaded session log in `/tmp/gh-aw/session-data/logs/`:
+For each downloaded session in `/tmp/gh-aw/session-data/`:
 
-1. **Load Historical Context**: Check cache memory for previous analysis results, known strategies, and identified patterns (see `session-analysis-strategies` shared module)
+1. **Load Conversation Logs**: Read the agent's conversation transcript from `{session_number}-conversation.txt` files. These contain:
+   - Agent's internal reasoning and planning
+   - Tool usage and results
+   - Code changes and validation steps
+   - Error recovery attempts
 
-2. **Apply Analysis Strategies**: Use the standard and experimental strategies defined in the imported `session-analysis-strategies` module
+2. **Load Historical Context**: Check cache memory for previous analysis results, known strategies, and identified patterns (see `session-analysis-strategies` shared module)
 
-3. **Collect Session Data**: Gather metrics for each session as defined in the shared module
+3. **Apply Analysis Strategies**: Use the standard and experimental strategies defined in the imported `session-analysis-strategies` module
+
+4. **Extract Behavioral Insights**: From the conversation logs, identify:
+   - **Reasoning patterns**: How does the agent approach problems?
+   - **Tool usage effectiveness**: Which tools are used and how successful are they?
+   - **Error recovery**: How does the agent handle and recover from errors?
+   - **Planning quality**: Does the agent plan before acting or iterate randomly?
+   - **Prompt understanding**: Does the agent correctly interpret the user's request?
+
+5. **Collect Session Metrics**: Gather metrics for each session:
+   - Session duration and completion status
+   - Number of tool calls and types
+   - Error count and recovery success
+   - Code quality indicators from the conversation
+   - Prompt clarity assessment based on agent's understanding
 
 ### Phase 2: Generate Trend Charts
 
@@ -367,6 +398,36 @@ _Workflow: ${{ github.workflow }}_
 - **Sanitization**: Redact any sensitive information from examples
 - **Validation**: Verify all data before analysis
 - **Safe Processing**: Never execute code from sessions
+- **Conversation Log Analysis**: Analyze the agent's reasoning and tool usage patterns, but always sanitize examples before including in reports
+
+### Working with Conversation Logs
+
+**Accessing Logs**:
+```bash
+# List available conversation logs
+find /tmp/gh-aw/session-data/logs -type f -name "*-conversation.txt"
+
+# Read a specific conversation log
+cat /tmp/gh-aw/session-data/logs/123-conversation.txt
+
+# Count conversation logs
+find /tmp/gh-aw/session-data/logs -type f -name "*-conversation.txt" | wc -l
+```
+
+**What to Look For in Conversation Logs**:
+1. **Agent's Planning**: Does the agent plan before acting?
+2. **Tool Selection**: Which tools does the agent choose and why?
+3. **Error Handling**: How does the agent respond to errors?
+4. **Code Quality**: Does the agent validate its changes?
+5. **Prompt Understanding**: Does the agent correctly interpret the task?
+6. **Iteration Patterns**: Does the agent get stuck in loops?
+
+**Analysis Patterns**:
+- Look for repeated phrases indicating confusion or loops
+- Identify successful tool usage patterns
+- Track error recovery strategies
+- Measure clarity of agent's reasoning
+- Assess quality of code changes from the log commentary
 
 ### Analysis Quality
 

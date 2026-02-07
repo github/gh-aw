@@ -5,7 +5,7 @@ sidebar:
   badge: { text: 'Advanced', variant: 'caution' }
 ---
 
-MultiRepoOps extends operational automation patterns (IssueOps, ChatOps, etc.) across multiple GitHub repositories. Using cross-repository safe outputs and secure authentication, MultiRepoOps enables coordinating work between related projects—creating tracking issues in central repos, synchronizing features to sub-repositories, and enforcing organization-wide policies—all through AI-powered workflows.
+MultiRepoOps extends operational automation patterns (IssueOps, ChatOps, etc.) across multiple GitHub repositories. Using cross-repository safe outputs and secure authentication, MultiRepoOps enables coordinating work between related projects-creating tracking issues in central repos, synchronizing features to sub-repositories, and enforcing organization-wide policies-all through AI-powered workflows.
 
 ## When to Use MultiRepoOps
 

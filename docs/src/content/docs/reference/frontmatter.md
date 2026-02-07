@@ -481,7 +481,7 @@ steps:
 Use custom steps to precompute data, filter triggers, or prepare context for AI agents. See [Deterministic & Agentic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) for combining computation with AI reasoning.
 
 > [!CAUTION]
-> Security Notice: Custom steps run OUTSIDE the firewall sandbox. These steps execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in custom steps—use them only for deterministic data preparation, preprocessing, or filtering.
+> Security Notice: Custom steps run OUTSIDE the firewall sandbox. These steps execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in custom steps - use them only for deterministic data preparation, preprocessing, or filtering.
 
 ## Post-Execution Steps (`post-steps:`)
 
@@ -501,7 +501,7 @@ post-steps:
 Useful for artifact uploads, summaries, cleanup, or triggering downstream workflows.
 
 > [!CAUTION]
-> Security Notice: Post-execution steps run OUTSIDE the firewall sandbox. These steps execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in post-steps—use them only for deterministic cleanup, artifact uploads, or notifications.
+> Security Notice: Post-execution steps run OUTSIDE the firewall sandbox. These steps execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in post-steps - use them only for deterministic cleanup, artifact uploads, or notifications.
 
 ## Custom Jobs (`jobs:`)
 
@@ -522,7 +522,7 @@ jobs:
 The agentic execution job waits for all custom jobs to complete. Custom jobs can share data through artifacts or job outputs. See [Deterministic & Agentic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) for multi-job workflows.
 
 > [!CAUTION]
-> Security Notice: Custom jobs run OUTSIDE the firewall sandbox. These jobs execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in custom jobs—use them only for deterministic preprocessing, data fetching, or static analysis.
+> Security Notice: Custom jobs run OUTSIDE the firewall sandbox. These jobs execute with standard GitHub Actions security but do NOT have the network egress controls that protect the agent job. Do not run agentic compute or untrusted AI execution in custom jobs - use them only for deterministic preprocessing, data fetching, or static analysis.
 
 ### Job Outputs
 

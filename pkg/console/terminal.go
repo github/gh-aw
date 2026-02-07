@@ -19,6 +19,22 @@ const (
 	ansiCarriageReturn = "\r"
 )
 
+// ClearScreen clears the terminal screen if stderr is a TTY
+// Uses ANSI escape codes for cross-platform compatibility
+func ClearScreen() {
+	if tty.IsStderrTerminal() {
+		fmt.Fprint(os.Stderr, ansiClearScreen)
+	}
+}
+
+// ClearLine clears the current line in the terminal if stderr is a TTY
+// Uses ANSI escape codes: \r moves cursor to start, \033[K clears to end of line
+func ClearLine() {
+	if tty.IsStderrTerminal() {
+		fmt.Fprintf(os.Stderr, "%s%s", ansiCarriageReturn, ansiClearLine)
+	}
+}
+
 // MoveCursorUp moves cursor up n lines if stderr is a TTY.
 // Uses ANSI escape code: \033[nA where n is the number of lines.
 func MoveCursorUp(n int) {

@@ -37,7 +37,7 @@ This workflow is particularly valuable after rapid development sessions. When yo
 
 The kinds of simplifications it proposes range from extracting repeated logic into helper functions to converting nested if-statements to early returns. It spots opportunities to simplify boolean expressions, use standard library functions instead of custom implementations, and consolidate similar error handling patterns.
 
-Code Simplifier is a recent addition — so far it has created **6 PRs (5 merged, 83% merge rate)**, such as [extracting an action mode helper to reduce code duplication](https://github.com/github/gh-aw/pull/13982) and [simplifying validation config code for clarity](https://github.com/github/gh-aw/pull/13118).
+Code Simplifier is a recent addition - so far it has created **6 PRs (5 merged, 83% merge rate)**, such as [extracting an action mode helper to reduce code duplication](https://github.com/github/gh-aw/pull/13982) and [simplifying validation config code for clarity](https://github.com/github/gh-aw/pull/13118).
 
 The **Duplicate Code Detector** uses traditional, road-tested semantic code analysis in conjunction with agentic reasoning to find duplicate patterns. It understands code *meaning* rather than just textual similarity, catching patterns where:
 

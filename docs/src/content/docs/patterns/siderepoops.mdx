@@ -58,7 +58,7 @@ In SideRepoOps, workflows run in GitHub Actions **on the side repository** but p
 
 ### 1. Create the Side Repository
 
-Create a new repository (public or private) to host your agentic workflows. No code is required—just workflows.
+Create a new repository (public or private) to host your agentic workflows. No code is required - just workflows.
 
 ```bash
 gh repo create my-org/my-project-automation --private
@@ -409,7 +409,7 @@ This prevents GitHub from auto-linking issue numbers and creating timeline entri
 
 ## Controlling GitHub References
 
-When workflows create issues or comments in the main repository, GitHub automatically converts text like `#123` or `owner/repo#456` into clickable links. While useful for organic development, these automatic links can clutter the main repository's timeline with unwanted cross-references from automation—a particular concern for SideRepoOps where automation runs from a separate repository.
+When workflows create issues or comments in the main repository, GitHub automatically converts text like `#123` or `owner/repo#456` into clickable links. While useful for organic development, these automatic links can clutter the main repository's timeline with unwanted cross-references from automation - a particular concern for SideRepoOps where automation runs from a separate repository.
 
 Use the `allowed-github-references` field to control which repository references are allowed in workflow output. For SideRepoOps, we recommend setting this to an empty array to prevent all timeline clutter:
 

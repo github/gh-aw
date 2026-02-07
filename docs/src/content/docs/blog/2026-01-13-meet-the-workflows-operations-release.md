@@ -27,7 +27,7 @@ In our [previous post](/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analyti
 The agents that help us actually ship software:
 
 - **[Release](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/release.md?plain=1)** - Orchestrates builds, tests, and release note generation
-- **[Changeset](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/changeset.md?plain=1)** - Manages version bumps and changelog entries for releases — **22 merged PRs out of 28 proposed (78% merge rate)**
+- **[Changeset](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/changeset.md?plain=1)** - Manages version bumps and changelog entries for releases - **22 merged PRs out of 28 proposed (78% merge rate)**
 - **[Daily Workflow Updater](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-workflow-updater.md?plain=1)** - Keeps GitHub Actions and dependencies current
 
 Shipping software is stressful enough without worrying about whether you formatted your release notes correctly.

@@ -28,13 +28,13 @@ Now let's address one of software development's eternal challenges: keeping docu
 
 These agents maintain high-quality documentation and content:
 
-- **[Daily Documentation Updater](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-doc-updater.md?plain=1)** - Reviews and updates documentation to ensure accuracy and completeness — **57 merged PRs out of 59 proposed (96% merge rate)**  
-- **[Glossary Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/glossary-maintainer.md?plain=1)** - Keeps glossary synchronized with codebase — **10 merged PRs out of 10 proposed (100% merge rate)**  
-- **[Documentation Unbloat](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/unbloat-docs.md?plain=1)** - Reviews and simplifies documentation by reducing verbosity — **88 merged PRs out of 103 proposed (85% merge rate)**  
-- **[Documentation Noob Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/docs-noob-tester.md?plain=1)** - Tests documentation as a new user would, identifying confusing steps — **9 merged PRs (43% merge rate)** via causal chain  
-- **[Slide Deck Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/slide-deck-maintainer.md?plain=1)** - Maintains presentation slide decks — **2 merged PRs out of 5 proposed (40% merge rate)**  
-- **[Multi-device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation site across mobile, tablet, and desktop devices — **2 merged PRs out of 2 proposed (100% merge rate)**  
-- **[Blog Auditor](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/blog-auditor.md?plain=1)** - Verifies blog posts are accessible and contain expected content — **6 audits completed** (5 passed, 1 flagged issues)  
+- **[Daily Documentation Updater](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-doc-updater.md?plain=1)** - Reviews and updates documentation to ensure accuracy and completeness - **57 merged PRs out of 59 proposed (96% merge rate)**  
+- **[Glossary Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/glossary-maintainer.md?plain=1)** - Keeps glossary synchronized with codebase - **10 merged PRs out of 10 proposed (100% merge rate)**  
+- **[Documentation Unbloat](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/unbloat-docs.md?plain=1)** - Reviews and simplifies documentation by reducing verbosity - **88 merged PRs out of 103 proposed (85% merge rate)**  
+- **[Documentation Noob Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/docs-noob-tester.md?plain=1)** - Tests documentation as a new user would, identifying confusing steps - **9 merged PRs (43% merge rate)** via causal chain  
+- **[Slide Deck Maintainer](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/slide-deck-maintainer.md?plain=1)** - Maintains presentation slide decks - **2 merged PRs out of 5 proposed (40% merge rate)**  
+- **[Multi-device Docs Tester](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-multi-device-docs-tester.md?plain=1)** - Tests documentation site across mobile, tablet, and desktop devices - **2 merged PRs out of 2 proposed (100% merge rate)**  
+- **[Blog Auditor](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/blog-auditor.md?plain=1)** - Verifies blog posts are accessible and contain expected content - **6 audits completed** (5 passed, 1 flagged issues)  
   
 Documentation is where we challenged conventional wisdom. Can AI agents write *good* documentation?
 
@@ -46,7 +46,7 @@ The **Multi-device Docs Tester** uses Playwright to verify our documentation sit
 
 The **Blog Auditor** ensures our blog posts stay accurate as the codebase evolves - it flags outdated code examples and broken links. Blog Auditor is a **validation-only workflow** that creates audit reports rather than code changes. It has run **6 audits** (5 passed, [1 flagged out-of-date content](https://github.com/github/gh-aw/issues/2162)), confirming blog accuracy.
 
-Documentation Noob Tester deserves special mention for its exploratory nature. It has produced **9 merged PRs out of 21 proposed (43% merge rate)** through a causal chain: 62 discussions analyzed → 21 issues created → 21 PRs. The lower merge rate reflects this workflow's exploratory nature — it identifies many potential improvements, some of which are too ambitious for immediate implementation. For example, [Discussion #8477](https://github.com/github/gh-aw/discussions/8477) led to [Issue #8486](https://github.com/github/gh-aw/issues/8486) which spawned PRs [#8716](https://github.com/github/gh-aw/pull/8716) and [#8717](https://github.com/github/gh-aw/pull/8717), both merged.
+Documentation Noob Tester deserves special mention for its exploratory nature. It has produced **9 merged PRs out of 21 proposed (43% merge rate)** through a causal chain: 62 discussions analyzed → 21 issues created → 21 PRs. The lower merge rate reflects this workflow's exploratory nature - it identifies many potential improvements, some of which are too ambitious for immediate implementation. For example, [Discussion #8477](https://github.com/github/gh-aw/discussions/8477) led to [Issue #8486](https://github.com/github/gh-aw/issues/8486) which spawned PRs [#8716](https://github.com/github/gh-aw/pull/8716) and [#8717](https://github.com/github/gh-aw/pull/8717), both merged.
 
 AI-generated docs need human/agent review, but they're dramatically better than *no* docs (which is often the alternative). Validation can be automated to a large extent, freeing writers to focus on content shaping, topic, clarity, tone, and accuracy.
 

@@ -327,10 +327,10 @@ gh aw compile my-workflow --validate --strict
 
 Continue learning with these resources:
 
-- [Using MCPs](/gh-aw/guides/mcps/) — Complete MCP configuration reference
-- [Tools Reference](/gh-aw/reference/tools/) — All available tools and options
-- [Security Guide](/gh-aw/introduction/architecture/) — MCP security best practices
-- [CLI Commands](/gh-aw/setup/cli/) — Full CLI documentation including `mcp` commands
-- [Imports](/gh-aw/reference/imports/) — Modularize configurations with shared MCP files
+- [Using MCPs](/gh-aw/guides/mcps/) - Complete MCP configuration reference
+- [Tools Reference](/gh-aw/reference/tools/) - All available tools and options
+- [Security Guide](/gh-aw/introduction/architecture/) - MCP security best practices
+- [CLI Commands](/gh-aw/setup/cli/) - Full CLI documentation including `mcp` commands
+- [Imports](/gh-aw/reference/imports/) - Modularize configurations with shared MCP files
 
 Explore shared MCP configurations in `.github/workflows/shared/mcp/` for ready-to-use integrations with popular services.

@@ -5,7 +5,7 @@ sidebar:
   order: 800
 ---
 
-The [`safe-outputs:`](/gh-aw/reference/glossary/#safe-outputs) (validated GitHub operations) element of your workflow's [frontmatter](/gh-aw/reference/glossary/#frontmatter) declares that your agentic workflow should conclude with optional automated actions based on the agentic workflow's output. This enables your workflow to write content that is then automatically processed to create GitHub issues, comments, pull requests, or add labels—all without giving the agentic portion of the workflow any write permissions.
+The [`safe-outputs:`](/gh-aw/reference/glossary/#safe-outputs) (validated GitHub operations) element of your workflow's [frontmatter](/gh-aw/reference/glossary/#frontmatter) declares that your agentic workflow should conclude with optional automated actions based on the agentic workflow's output. This enables your workflow to write content that is then automatically processed to create GitHub issues, comments, pull requests, or add labels - all without giving the agentic portion of the workflow any write permissions.
 
 ## Why Safe Outputs?
 
@@ -26,53 +26,53 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 
 ### Issues & Discussions
 
-- [**Create Issue**](#issue-creation-create-issue) (`create-issue`) — Create GitHub issues (max: 1)
-- [**Update Issue**](#issue-updates-update-issue) (`update-issue`) — Update issue status, title, or body (max: 1)
-- [**Close Issue**](#close-issue-close-issue) (`close-issue`) — Close issues with comment (max: 1)
-- [**Link Sub-Issue**](#link-sub-issue-link-sub-issue) (`link-sub-issue`) — Link issues as sub-issues (max: 1)
-- [**Create Discussion**](#discussion-creation-create-discussion) (`create-discussion`) — Create GitHub discussions (max: 1)
-- [**Update Discussion**](#discussion-updates-update-discussion) (`update-discussion`) — Update discussion title, body, or labels (max: 1)
-- [**Close Discussion**](#close-discussion-close-discussion) (`close-discussion`) — Close discussions with comment and resolution (max: 1)
+- [**Create Issue**](#issue-creation-create-issue) (`create-issue`) - Create GitHub issues (max: 1)
+- [**Update Issue**](#issue-updates-update-issue) (`update-issue`) - Update issue status, title, or body (max: 1)
+- [**Close Issue**](#close-issue-close-issue) (`close-issue`) - Close issues with comment (max: 1)
+- [**Link Sub-Issue**](#link-sub-issue-link-sub-issue) (`link-sub-issue`) - Link issues as sub-issues (max: 1)
+- [**Create Discussion**](#discussion-creation-create-discussion) (`create-discussion`) - Create GitHub discussions (max: 1)
+- [**Update Discussion**](#discussion-updates-update-discussion) (`update-discussion`) - Update discussion title, body, or labels (max: 1)
+- [**Close Discussion**](#close-discussion-close-discussion) (`close-discussion`) - Close discussions with comment and resolution (max: 1)
 
 ### Pull Requests
 
-- [**Create PR**](#pull-request-creation-create-pull-request) (`create-pull-request`) — Create pull requests with code changes (max: 1)
-- [**Update PR**](#pull-request-updates-update-pull-request) (`update-pull-request`) — Update PR title or body (max: 1)
-- [**Close PR**](#close-pull-request-close-pull-request) (`close-pull-request`) — Close pull requests without merging (max: 10)
-- [**PR Review Comments**](#pr-review-comments-create-pull-request-review-comment) (`create-pull-request-review-comment`) — Create review comments on code lines (max: 10)
-- [**Push to PR Branch**](#push-to-pr-branch-push-to-pull-request-branch) (`push-to-pull-request-branch`) — Push changes to PR branch (max: 1, same-repo only)
+- [**Create PR**](#pull-request-creation-create-pull-request) (`create-pull-request`) - Create pull requests with code changes (max: 1)
+- [**Update PR**](#pull-request-updates-update-pull-request) (`update-pull-request`) - Update PR title or body (max: 1)
+- [**Close PR**](#close-pull-request-close-pull-request) (`close-pull-request`) - Close pull requests without merging (max: 10)
+- [**PR Review Comments**](#pr-review-comments-create-pull-request-review-comment) (`create-pull-request-review-comment`) - Create review comments on code lines (max: 10)
+- [**Push to PR Branch**](#push-to-pr-branch-push-to-pull-request-branch) (`push-to-pull-request-branch`) - Push changes to PR branch (max: 1, same-repo only)
 
 ### Labels, Assignments & Reviews
 
-- [**Add Comment**](#comment-creation-add-comment) (`add-comment`) — Post comments on issues, PRs, or discussions (max: 1)
-- [**Hide Comment**](#hide-comment-hide-comment) (`hide-comment`) — Hide comments on issues, PRs, or discussions (max: 5)
-- [**Add Labels**](#add-labels-add-labels) (`add-labels`) — Add labels to issues or PRs (max: 3)
-- [**Remove Labels**](#remove-labels-remove-labels) (`remove-labels`) — Remove labels from issues or PRs (max: 3)
-- [**Add Reviewer**](#add-reviewer-add-reviewer) (`add-reviewer`) — Add reviewers to pull requests (max: 3)
-- [**Assign Milestone**](#assign-milestone-assign-milestone) (`assign-milestone`) — Assign issues to milestones (max: 1)
-- [**Assign to Agent**](#assign-to-agent-assign-to-agent) (`assign-to-agent`) — Assign Copilot agents to issues or PRs (max: 1)
-- [**Assign to User**](#assign-to-user-assign-to-user) (`assign-to-user`) — Assign users to issues (max: 1)
+- [**Add Comment**](#comment-creation-add-comment) (`add-comment`) - Post comments on issues, PRs, or discussions (max: 1)
+- [**Hide Comment**](#hide-comment-hide-comment) (`hide-comment`) - Hide comments on issues, PRs, or discussions (max: 5)
+- [**Add Labels**](#add-labels-add-labels) (`add-labels`) - Add labels to issues or PRs (max: 3)
+- [**Remove Labels**](#remove-labels-remove-labels) (`remove-labels`) - Remove labels from issues or PRs (max: 3)
+- [**Add Reviewer**](#add-reviewer-add-reviewer) (`add-reviewer`) - Add reviewers to pull requests (max: 3)
+- [**Assign Milestone**](#assign-milestone-assign-milestone) (`assign-milestone`) - Assign issues to milestones (max: 1)
+- [**Assign to Agent**](#assign-to-agent-assign-to-agent) (`assign-to-agent`) - Assign Copilot agents to issues or PRs (max: 1)
+- [**Assign to User**](#assign-to-user-assign-to-user) (`assign-to-user`) - Assign users to issues (max: 1)
 
 ### Projects, Releases & Assets
 
-- [**Create Project**](#project-creation-create-project) (`create-project`) — Create new GitHub Projects boards (max: 1, cross-repo)
-- [**Update Project**](#project-board-updates-update-project) (`update-project`) — Manage GitHub Projects boards (max: 10, same-repo only)
-- [**Create Project Status Update**](#project-status-updates-create-project-status-update) (`create-project-status-update`) — Create project status updates
-- [**Update Release**](#release-updates-update-release) (`update-release`) — Update GitHub release descriptions (max: 1)
-- [**Upload Assets**](#asset-uploads-upload-asset) (`upload-asset`) — Upload files to orphaned git branch (max: 10, same-repo only)
+- [**Create Project**](#project-creation-create-project) (`create-project`) - Create new GitHub Projects boards (max: 1, cross-repo)
+- [**Update Project**](#project-board-updates-update-project) (`update-project`) - Manage GitHub Projects boards (max: 10, same-repo only)
+- [**Create Project Status Update**](#project-status-updates-create-project-status-update) (`create-project-status-update`) - Create project status updates
+- [**Update Release**](#release-updates-update-release) (`update-release`) - Update GitHub release descriptions (max: 1)
+- [**Upload Assets**](#asset-uploads-upload-asset) (`upload-asset`) - Upload files to orphaned git branch (max: 10, same-repo only)
 
 ### Security & Agent Tasks
 
-- [**Dispatch Workflow**](#workflow-dispatch-dispatch-workflow) (`dispatch-workflow`) — Trigger other workflows with inputs (max: 3, same-repo only)
-- [**Code Scanning Alerts**](#code-scanning-alerts-create-code-scanning-alert) (`create-code-scanning-alert`) — Generate SARIF security advisories (max: unlimited, same-repo only)
-- [**Autofix Code Scanning Alerts**](#autofix-code-scanning-alerts-autofix-code-scanning-alert) (`autofix-code-scanning-alert`) — Create automated fixes for code scanning alerts (max: 10, same-repo only)
-- [**Create Agent Session**](#agent-session-creation-create-agent-session) (`create-agent-session`) — Create Copilot agent sessions (max: 1)
+- [**Dispatch Workflow**](#workflow-dispatch-dispatch-workflow) (`dispatch-workflow`) - Trigger other workflows with inputs (max: 3, same-repo only)
+- [**Code Scanning Alerts**](#code-scanning-alerts-create-code-scanning-alert) (`create-code-scanning-alert`) - Generate SARIF security advisories (max: unlimited, same-repo only)
+- [**Autofix Code Scanning Alerts**](#autofix-code-scanning-alerts-autofix-code-scanning-alert) (`autofix-code-scanning-alert`) - Create automated fixes for code scanning alerts (max: 10, same-repo only)
+- [**Create Agent Session**](#agent-session-creation-create-agent-session) (`create-agent-session`) - Create Copilot agent sessions (max: 1)
 
 ### System Types (Auto-Enabled)
 
-- [**No-Op**](#no-op-logging-noop) (`noop`) — Log completion message for transparency (max: 1, same-repo only)
-- [**Missing Tool**](#missing-tool-reporting-missing-tool) (`missing-tool`) — Report missing tools (max: unlimited, same-repo only)
-- [**Missing Data**](#missing-data-reporting-missing-data) (`missing-data`) — Report missing data required to achieve goals (max: unlimited, same-repo only)
+- [**No-Op**](#no-op-logging-noop) (`noop`) - Log completion message for transparency (max: 1, same-repo only)
+- [**Missing Tool**](#missing-tool-reporting-missing-tool) (`missing-tool`) - Report missing tools (max: unlimited, same-repo only)
+- [**Missing Data**](#missing-data-reporting-missing-data) (`missing-data`) - Report missing data required to achieve goals (max: unlimited, same-repo only)
 
 > [!TIP]
 > Custom safe output types: [Custom Safe Output Jobs](/gh-aw/reference/custom-safe-outputs/). See [Deterministic & Agentic Patterns](/gh-aw/guides/deterministic-agentic-patterns/) for combining computation and AI reasoning.
@@ -402,7 +402,7 @@ Agent output includes `parent_issue_number` and `sub_issue_number`. Validation e
 
 ### Project Creation (`create-project:`)
 
-Creates new GitHub Projects V2 boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access. Supports optional view configuration to create custom project views at creation time.
+Creates new GitHub Projects V2 boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))-default `GITHUB_TOKEN` lacks Projects v2 access. Supports optional view configuration to create custom project views at creation time.
 
 ```yaml wrap
 safe-outputs:
@@ -455,7 +455,7 @@ Optionally include `item_url` (GitHub issue URL) to add the issue as the first p
 
 ### Project Board Updates (`update-project:`)
 
-Manages GitHub Projects boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access. Update-only by default; set `create_if_missing: true` to create boards (requires appropriate token permissions).
+Manages GitHub Projects boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))-default `GITHUB_TOKEN` lacks Projects v2 access. Update-only by default; set `create_if_missing: true` to create boards (requires appropriate token permissions).
 
 ```yaml wrap
 safe-outputs:
@@ -484,11 +484,11 @@ safe-outputs:
 
 GitHub Projects V2 supports various custom field types. The following field types are automatically detected and handled:
 
-- **`TEXT`** — Text fields (default)
-- **`DATE`** — Date fields (format: `YYYY-MM-DD`)
-- **`NUMBER`** — Numeric fields (story points, estimates, etc.)
-- **`ITERATION`** — Sprint/iteration fields (matched by iteration title)
-- **`SINGLE_SELECT`** — Dropdown/select fields (creates missing options automatically)
+- **`TEXT`** - Text fields (default)
+- **`DATE`** - Date fields (format: `YYYY-MM-DD`)
+- **`NUMBER`** - Numeric fields (story points, estimates, etc.)
+- **`ITERATION`** - Sprint/iteration fields (matched by iteration title)
+- **`SINGLE_SELECT`** - Dropdown/select fields (creates missing options automatically)
 
 **Example field usage:**
 ```yaml
@@ -533,16 +533,16 @@ safe-outputs:
 | `visible-fields` | array | No | Field IDs to display (table/board only, not roadmap) |
 
 **Layout types:**
-- **`table`** — List view with customizable columns for detailed tracking
-- **`board`** — Kanban-style cards grouped by status or custom field
-- **`roadmap`** — Timeline visualization with date-based swimlanes
+- **`table`** - List view with customizable columns for detailed tracking
+- **`board`** - Kanban-style cards grouped by status or custom field
+- **`roadmap`** - Timeline visualization with date-based swimlanes
 
 **Filter syntax examples:**
-- `is:issue is:open` — Open issues only
-- `is:pr` — Pull requests only  
-- `is:issue is:pr` — Both issues and PRs
-- `label:bug` — Items with bug label
-- `assignee:@me` — Items assigned to viewer
+- `is:issue is:open` - Open issues only
+- `is:pr` - Pull requests only  
+- `is:issue is:pr` - Both issues and PRs
+- `label:bug` - Items with bug label
+- `assignee:@me` - Items assigned to viewer
 
 Views are created automatically during workflow execution. The workflow must include at least one `update_project` operation to provide the target project URL.
 
@@ -550,7 +550,7 @@ Views are created automatically during workflow execution. The workflow must inc
 
 ### Project Status Updates (`create-project-status-update:`)
 
-Creates status updates on GitHub Projects boards to communicate progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))—default `GITHUB_TOKEN` lacks Projects v2 access.
+Creates status updates on GitHub Projects boards to communicate progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2))-default `GITHUB_TOKEN` lacks Projects v2 access.
 
 ```yaml wrap
 safe-outputs:
@@ -908,19 +908,19 @@ safe-outputs:
 
 #### Configuration
 
-- **`workflows`** (required) — List of workflow names (without `.md` extension) that the agent is allowed to dispatch. Each workflow must exist in the same repository and support the `workflow_dispatch` trigger.
-- **`max`** (optional) — Maximum number of workflow dispatches allowed (default: 1, maximum: 50). This prevents excessive workflow triggering.
+- **`workflows`** (required) - List of workflow names (without `.md` extension) that the agent is allowed to dispatch. Each workflow must exist in the same repository and support the `workflow_dispatch` trigger.
+- **`max`** (optional) - Maximum number of workflow dispatches allowed (default: 1, maximum: 50). This prevents excessive workflow triggering.
 
 #### Validation Rules
 
 At compile time, the compiler validates:
 
-1. **Workflow existence** — Each workflow in the `workflows` list must exist as either:
+1. **Workflow existence** - Each workflow in the `workflows` list must exist as either:
    - A markdown workflow file (`.md`)
    - A compiled lock file (`.lock.yml`)  
    - A standard GitHub Actions workflow (`.yml`)
 
-2. **workflow_dispatch trigger** — Each workflow must include `workflow_dispatch` in its `on:` trigger section:
+2. **workflow_dispatch trigger** - Each workflow must include `workflow_dispatch` in its `on:` trigger section:
    ```yaml
    on: [push, workflow_dispatch]  # or
    on:
@@ -932,9 +932,9 @@ At compile time, the compiler validates:
            required: true
    ```
 
-3. **No self-reference** — A workflow cannot dispatch itself to prevent infinite loops.
+3. **No self-reference** - A workflow cannot dispatch itself to prevent infinite loops.
 
-4. **File resolution** — The compiler resolves the correct file extension (`.lock.yml` or `.yml`) at compile time and embeds it in the safe output configuration, ensuring the runtime handler dispatches the correct workflow file.
+4. **File resolution** - The compiler resolves the correct file extension (`.lock.yml` or `.yml`) at compile time and embeds it in the safe output configuration, ensuring the runtime handler dispatches the correct workflow file.
 
 #### How It Works: MCP Tool Generation
 
@@ -948,8 +948,8 @@ safe-outputs:
 ```
 
 **Generated MCP Tools:**
-- `deploy_app` tool — Dispatches the deploy-app workflow
-- `run_tests` tool — Dispatches the run-tests workflow
+- `deploy_app` tool - Dispatches the deploy-app workflow
+- `run_tests` tool - Dispatches the run-tests workflow
 
 The compiler:
 1. **Reads workflow_dispatch inputs** from the target workflow's YAML
@@ -1157,9 +1157,9 @@ on:
 
 #### Security Considerations
 
-- **Same-repository only** — Cannot dispatch workflows in other repositories. This prevents cross-repository workflow triggering which could be a security risk.
-- **Allowlist enforcement** — Only workflows explicitly listed in the `workflows` configuration can be dispatched. Requests for unlisted workflows are rejected.
-- **Compile-time validation** — Workflows are validated at compile time to catch configuration errors early.
+- **Same-repository only** - Cannot dispatch workflows in other repositories. This prevents cross-repository workflow triggering which could be a security risk.
+- **Allowlist enforcement** - Only workflows explicitly listed in the `workflows` configuration can be dispatched. Requests for unlisted workflows are rejected.
+- **Compile-time validation** - Workflows are validated at compile time to catch configuration errors early.
 
 #### Use Cases
 
@@ -1192,7 +1192,7 @@ A workflow can trigger deployment and testing workflows as separate, trackable r
 
 ### Agent Session Creation (`create-agent-session:`)
 
-Creates Copilot agent sessions. Requires `COPILOT_GITHUB_TOKEN` or `GH_AW_GITHUB_TOKEN` PAT—default `GITHUB_TOKEN` lacks permissions.
+Creates Copilot agent sessions. Requires `COPILOT_GITHUB_TOKEN` or `GH_AW_GITHUB_TOKEN` PAT-default `GITHUB_TOKEN` lacks permissions.
 
 ### Assign to Agent (`assign-to-agent:`)
 
@@ -1211,9 +1211,9 @@ safe-outputs:
 ```
 
 **Behavior:**
-- `target: "triggering"` — Auto-resolves from `github.event.issue.number` or `github.event.pull_request.number`
-- `target: "*"` — Requires explicit `issue_number` or `pull_number` in agent output
-- `target: "123"` — Always uses issue/PR #123
+- `target: "triggering"` - Auto-resolves from `github.event.issue.number` or `github.event.pull_request.number`
+- `target: "*"` - Requires explicit `issue_number` or `pull_number` in agent output
+- `target: "123"` - Always uses issue/PR #123
 
 **Assignee Filtering:**
 When `allowed` list is configured, existing agent assignees not in the list are removed while regular user assignees are preserved.
@@ -1248,7 +1248,7 @@ safe-outputs:
 
 ## Cross-Repository Operations
 
-Many safe outputs support `target-repo`. Requires PAT (`github-token` or `GH_AW_GITHUB_TOKEN`)—default `GITHUB_TOKEN` is current-repo only. Use specific names (no wildcards).
+Many safe outputs support `target-repo`. Requires PAT (`github-token` or `GH_AW_GITHUB_TOKEN`)-default `GITHUB_TOKEN` is current-repo only. Use specific names (no wildcards).
 
 ```yaml wrap
 safe-outputs:
@@ -1276,10 +1276,10 @@ safe-outputs:
 **Reference Escaping** (`allowed-github-references`): Controls which GitHub repository references (`#123`, `owner/repo#456`) are allowed in workflow output. When configured, references to unlisted repositories are escaped with backticks to prevent GitHub from creating timeline items. This is particularly useful for [SideRepoOps](/gh-aw/patterns/siderepoops/) workflows to prevent automation from cluttering your main repository's timeline.
 
 Configuration options:
-- `[]` — Escape all references (prevents all timeline items)
-- `["repo"]` — Allow only the target repository's references
-- `["repo", "owner/other-repo"]` — Allow specific repositories
-- Not specified (default) — All references allowed
+- `[]` - Escape all references (prevents all timeline items)
+- `["repo"]` - Allow only the target repository's references
+- `["repo", "owner/other-repo"]` - Allow specific repositories
+- Not specified (default) - All references allowed
 
 Example for clean automation:
 
@@ -1332,7 +1332,7 @@ safe-outputs:
 
 ## Assigning to Copilot
 
-Use `assignees: copilot` or `reviewers: copilot` for bot assignment. Requires `GH_AW_AGENT_TOKEN` (or fallback to `GH_AW_GITHUB_TOKEN`/`GITHUB_TOKEN`)—uses GraphQL API to assign the bot.
+Use `assignees: copilot` or `reviewers: copilot` for bot assignment. Requires `GH_AW_AGENT_TOKEN` (or fallback to `GH_AW_GITHUB_TOKEN`/`GITHUB_TOKEN`) - uses GraphQL API to assign the bot.
 
 ## Custom Runner Image
 

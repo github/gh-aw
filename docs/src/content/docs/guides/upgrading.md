@@ -16,9 +16,9 @@ This guide walks you through upgrading your agentic workflows to the latest vers
 
 The upgrade process updates three key areas:
 
-1. **Agent and prompt files** — GitHub Copilot instructions, dispatcher agent, and workflow creation prompts
-2. **Workflow syntax** — Automatically migrates deprecated fields and applies the latest configuration patterns
-3. **Workflow compilation** — Automatically compiles all workflows to generate up-to-date `.lock.yml` files
+1. **Agent and prompt files** - GitHub Copilot instructions, dispatcher agent, and workflow creation prompts
+2. **Workflow syntax** - Automatically migrates deprecated fields and applies the latest configuration patterns
+3. **Workflow compilation** - Automatically compiles all workflows to generate up-to-date `.lock.yml` files
 
 > [!TIP]
 > Quick Upgrade
@@ -71,13 +71,13 @@ This command performs three main operations:
 
 The upgrade updates these files to the latest templates (similar to running `gh aw init`):
 
-- `.github/aw/github-agentic-workflows.md` — GitHub Copilot custom instructions
-- `.github/agents/agentic-workflows.agent.md` — Dispatcher agent for routing tasks
-- `.github/aw/create-agentic-workflow.md` — Prompt for creating new workflows
-- `.github/aw/update-agentic-workflow.md` — Prompt for updating existing workflows
-- `.github/aw/create-shared-agentic-workflow.md` — Prompt for shared workflows
-- `.github/aw/debug-agentic-workflow.md` — Prompt for debugging workflows
-- `.github/aw/upgrade-agentic-workflows.md` — Prompt for upgrade guidance
+- `.github/aw/github-agentic-workflows.md` - GitHub Copilot custom instructions
+- `.github/agents/agentic-workflows.agent.md` - Dispatcher agent for routing tasks
+- `.github/aw/create-agentic-workflow.md` - Prompt for creating new workflows
+- `.github/aw/update-agentic-workflow.md` - Prompt for updating existing workflows
+- `.github/aw/create-shared-agentic-workflow.md` - Prompt for shared workflows
+- `.github/aw/debug-agentic-workflow.md` - Prompt for debugging workflows
+- `.github/aw/upgrade-agentic-workflows.md` - Prompt for upgrade guidance
 
 ### 3.2 Applies Codemods to All Workflows
 
@@ -155,7 +155,7 @@ The upgrade automatically compiles workflows. To validate specific workflows, ru
 
 ## Step 6: Review Lock Files
 
-Verify that each `.md` workflow has a corresponding `.lock.yml` file with `git status | grep .lock.yml`. Never edit `.lock.yml` files directly—they're auto-generated. Always edit the `.md` source and recompile.
+Verify that each `.md` workflow has a corresponding `.lock.yml` file with `git status | grep .lock.yml`. Never edit `.lock.yml` files directly-they're auto-generated. Always edit the `.md` source and recompile.
 
 ## Step 7: Test Your Workflows
 
@@ -171,7 +171,7 @@ git commit -m "Upgrade agentic workflows to latest version"
 git push origin main
 ```
 
-For better traceability, consider separate commits for agent files, workflow migrations, and lock files. Always commit both `.md` and `.lock.yml` files together—never add `.lock.yml` to `.gitignore`.
+For better traceability, consider separate commits for agent files, workflow migrations, and lock files. Always commit both `.md` and `.lock.yml` files together - never add `.lock.yml` to `.gitignore`.
 
 ## Troubleshooting
 

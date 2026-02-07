@@ -45,31 +45,31 @@ You can add these workflows to your own repository and remix them. Get going wit
 **Daily Backlog Burner:**
 
 ```bash
-gh aw add githubnext/agentics/workflows/daily-backlog-burner.md
+gh aw add-wizard githubnext/agentics/workflows/daily-backlog-burner.md
 ```
 
 **Daily Perf Improver:**
 
 ```bash
-gh aw add githubnext/agentics/workflows/daily-perf-improver.md
+gh aw add-wizard githubnext/agentics/workflows/daily-perf-improver.md
 ```
 
 **Daily QA:**
 
 ```bash
-gh aw add githubnext/agentics/workflows/daily-qa.md
+gh aw add-wizard githubnext/agentics/workflows/daily-qa.md
 ```
 
 **Daily Accessibility Review:**
 
 ```bash
-gh aw add githubnext/agentics/workflows/daily-accessibility-review.md
+gh aw add-wizard githubnext/agentics/workflows/daily-accessibility-review.md
 ```
 
 **PR Fix:**
 
 ```bash
-gh aw add githubnext/agentics/workflows/pr-fix.md
+gh aw add-wizard githubnext/agentics/workflows/pr-fix.md
 ```
 
 Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
