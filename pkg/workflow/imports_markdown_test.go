@@ -129,37 +129,47 @@ This is the main workflow content.`,
 
 			lockContent := string(content)
 
-			// With the new approach:
-			// - Imported content IS in the lock file (inlined)
-			// - Main workflow content is NOT in lock file (runtime-imported)
-			// So we check lock file for imported content and runtime-import macro
+			// With the new runtime-import approach:
+			// - Both imported content AND main workflow use runtime-import macros
+			// - NO content is inlined in the lock file (all loaded at runtime)
+			// So we check lock file for runtime-import macros, not inlined content
 
-			// Verify imported content is in the lock file (inlined)
-			importedExpected := []string{"# Common Setup", "This is common setup content"}
-			for _, expected := range importedExpected {
-				if !strings.Contains(lockContent, expected) {
-					t.Errorf("%s: Expected to find imported content '%s' in lock file but it was not found", tt.description, expected)
+			// Verify runtime-import macros are present for imported files
+			// Check for the first import in the test (all tests have shared/common.md)
+			if !strings.Contains(lockContent, "{{#runtime-import shared/common.md}}") {
+				t.Errorf("%s: Expected to find runtime-import macro for shared/common.md in lock file", tt.description)
+			}
+
+			// For multiple imports test, also check for security.md
+			if strings.Contains(tt.name, "multiple_imports") {
+				if !strings.Contains(lockContent, "{{#runtime-import shared/security.md}}") {
+					t.Errorf("%s: Expected to find runtime-import macro for shared/security.md in lock file", tt.description)
 				}
 			}
 
 			// Verify runtime-import macro is present for main workflow
-			if !strings.Contains(lockContent, "{{#runtime-import") {
-				t.Errorf("%s: Expected to find runtime-import macro in lock file", tt.description)
+			workflowFilename := tt.name + "-workflow.md"
+			expectedMainWorkflowMacro := "{{#runtime-import " + workflowFilename + "}}"
+			if !strings.Contains(lockContent, expectedMainWorkflowMacro) {
+				t.Errorf("%s: Expected to find runtime-import macro '%s' for main workflow in lock file", tt.description, expectedMainWorkflowMacro)
 			}
 
-			// Verify ordering: imported content should come before runtime-import macro
+			// Verify ordering: import macros should come before main workflow macro
 			if tt.expectedOrderBefore != "" {
-				beforeIdx := strings.Index(lockContent, tt.expectedOrderBefore)
-				runtimeImportIdx := strings.Index(lockContent, "{{#runtime-import")
+				// For runtime imports, we check the order of the runtime-import macros
+				// Import macro should come before main workflow macro
+				firstImportIdx := strings.Index(lockContent, "{{#runtime-import shared/")
+				mainWorkflowMacroIdx := strings.Index(lockContent, expectedMainWorkflowMacro)
 
-				if beforeIdx == -1 {
-					t.Errorf("%s: Expected to find '%s' in lock file", tt.description, tt.expectedOrderBefore)
+				if firstImportIdx == -1 {
+					t.Errorf("%s: Expected to find import runtime-import macro in lock file", tt.description)
 				}
-				if runtimeImportIdx == -1 {
-					t.Errorf("%s: Expected to find runtime-import in lock file", tt.description)
+				if mainWorkflowMacroIdx == -1 {
+					t.Errorf("%s: Expected to find main workflow runtime-import macro '%s' in lock file", tt.description, expectedMainWorkflowMacro)
 				}
-				if beforeIdx != -1 && runtimeImportIdx != -1 && beforeIdx >= runtimeImportIdx {
-					t.Errorf("%s: Expected imported content '%s' to come before runtime-import macro", tt.description, tt.expectedOrderBefore)
+				// Import macros should come before the main workflow macro
+				if firstImportIdx != -1 && mainWorkflowMacroIdx != -1 && firstImportIdx >= mainWorkflowMacroIdx {
+					t.Errorf("%s: Expected import runtime-import macro to come before main workflow runtime-import macro", tt.description)
 				}
 			}
 		})
