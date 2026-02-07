@@ -182,38 +182,20 @@ Check workflow logs in GitHub Actions or use `gh aw logs`, audit the run with `g
 
 Yes! Use [TrialOps](/gh-aw/patterns/trialops/) to test workflows in isolated trial repositories. This lets you validate behavior and iterate on prompts without creating real issues, PRs, or comments in your actual repository.
 
-### My workflows won't run because Actions is disabled or restricted. How do I fix this?
+### The init command reports Actions restrictions. What does this mean?
 
-Agentic workflows depend on GitHub Actions being enabled with specific permission settings. The `gh aw init` command performs validation checks that may reveal configuration issues in your repository. There are three common scenarios:
+When running `gh aw init`, you may encounter errors about repository Actions configuration. Agentic workflows compile to standard GitHub Actions YAML that depends on infrastructure actions like `actions/checkout`. If your repository blocks these, workflows won't execute.
 
-**Scenario 1: GitHub Actions is completely disabled**
+The CLI validates three permission layers:
 
-If Actions is disabled for your repository, workflows can be added but won't execute until enabled.
+**Actions completely turned off:** Your repo has Actions disabled entirely. Workflows upload successfully but never trigger. Fix: Repository Settings → Actions → General → toggle Actions on. Reference: [Managing Actions settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository).
 
-**Solution:** Navigate to your repository Settings → Actions → General, and enable GitHub Actions.
+**Local-only restriction:** You've configured "Allow [owner] actions only", which blocks external actions including GitHub's own. Agentic workflows need `actions/checkout`, `actions/setup-node`, etc. Fix: Settings → Actions → General → switch to "Allow all actions" or "Allow select actions" with GitHub-created ones enabled. Reference: [Managing Actions permissions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository).
 
-See [GitHub's documentation on managing Actions settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository) for detailed instructions.
+**Selective allowlist without GitHub:** You're using action allowlists but didn't check "Allow actions created by GitHub". Fix: Settings → Actions → General → Actions permissions → enable the GitHub checkbox. Reference: [Allowing specific actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#allowing-select-actions-and-reusable-workflows-to-run).
 
-**Scenario 2: Only local actions are permitted ("local_only" restriction)**
-
-Your repository is configured to only run actions defined within the repository itself. Agentic workflows require GitHub-owned actions like `actions/checkout` and `actions/setup-node` to function.
-
-**Solution:** In Settings → Actions → General → Actions permissions, change from "Allow [owner] actions" to either:
-- "Allow all actions and reusable workflows", or  
-- "Allow select actions and reusable workflows" (then enable "Allow actions created by GitHub")
-
-See [GitHub's Actions permissions documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository) for configuration steps.
-
-**Scenario 3: Selected actions without GitHub-owned actions enabled**
-
-Your repository uses selective action allowlists but hasn't enabled GitHub-owned actions.
-
-**Solution:** In Settings → Actions → General → Actions permissions, under "Allow select actions and reusable workflows", check the box for "Allow actions created by GitHub".
-
-See [GitHub's documentation on allowing specific actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#allowing-select-actions-and-reusable-workflows-to-run) for details.
-
-> [!NOTE]
-> For repositories within organizations, these settings may be controlled at the organization level. If you cannot modify repository settings, contact your organization administrator to adjust organization-wide Actions policies.
+> [!CAUTION]
+> Organization-owned repositories inherit org-level Actions policies that override repository settings. If settings appear grayed out, request changes from org admins.
 
 ## Advanced Topics
 
