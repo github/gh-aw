@@ -114,7 +114,8 @@ func (c *Compiler) buildInitialWorkflowData(
 		Source:               c.extractSource(result.Frontmatter),
 		TrackerID:            toolsResult.trackerID,
 		ImportedFiles:        importsResult.ImportedFiles,
-		ImportedMarkdown:     toolsResult.importedMarkdown,
+		ImportedMarkdown:     toolsResult.importedMarkdown, // deprecated
+		ImportPaths:          toolsResult.importPaths,      // NEW: Import paths for runtime-import macros
 		MainWorkflowMarkdown: toolsResult.mainWorkflowMarkdown,
 		IncludedFiles:        toolsResult.allIncludedFiles,
 		ImportInputs:         importsResult.ImportInputs,

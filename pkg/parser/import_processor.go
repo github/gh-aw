@@ -20,7 +20,8 @@ type ImportsResult struct {
 	MergedEngines       []string // Merged engine configurations from all imports
 	MergedSafeOutputs   []string // Merged safe-outputs configurations from all imports
 	MergedSafeInputs    []string // Merged safe-inputs configurations from all imports
-	MergedMarkdown      string   // Merged markdown content from all imports
+	MergedMarkdown      string   // Merged markdown content from all imports (deprecated - use ImportPaths for runtime imports)
+	ImportPaths         []string // List of import file paths for runtime-import macro generation (replaces MergedMarkdown)
 	MergedSteps         string   // Merged steps configuration from all imports (excluding copilot-setup-steps)
 	CopilotSetupSteps   string   // Steps from copilot-setup-steps.yml (inserted at start)
 	MergedRuntimes      string   // Merged runtimes configuration from all imports
@@ -167,7 +168,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	// Initialize result accumulators
 	var toolsBuilder strings.Builder
 	var mcpServersBuilder strings.Builder
-	var markdownBuilder strings.Builder
+	var markdownBuilder strings.Builder // Deprecated - kept for backwards compatibility
+	var importPaths []string             // NEW: Track import paths for runtime-import macro generation
 	var stepsBuilder strings.Builder
 	var copilotSetupStepsBuilder strings.Builder // Track copilot-setup-steps.yml separately
 	var runtimesBuilder strings.Builder
@@ -291,10 +293,13 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			}
 			// Extract relative path from repository root (from .github/ onwards)
 			// This ensures the path works at runtime with $GITHUB_WORKSPACE
+			var importRelPath string
 			if idx := strings.Index(item.fullPath, "/.github/"); idx >= 0 {
 				agentFile = item.fullPath[idx+1:] // +1 to skip the leading slash
+				importRelPath = agentFile
 			} else {
 				agentFile = item.fullPath
+				importRelPath = item.fullPath
 			}
 			log.Printf("Found agent file: %s (resolved to: %s)", item.fullPath, agentFile)
 
@@ -303,7 +308,11 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			agentImportSpec = item.importPath
 			log.Printf("Agent import specification: %s", agentImportSpec)
 
-			// For agent files, only extract markdown content
+			// Track import path for runtime-import macro generation
+			importPaths = append(importPaths, importRelPath)
+			log.Printf("Added agent import path for runtime-import: %s", importRelPath)
+
+			// For agent files, still extract markdown content for backwards compatibility
 			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
 			if err != nil {
 				return nil, fmt.Errorf("failed to process markdown from agent file '%s': %w", item.fullPath, err)
@@ -455,7 +464,19 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		}
 		toolsBuilder.WriteString(toolsContent + "\n")
 
-		// Extract markdown content from imported file
+		// Track import path for runtime-import macro generation
+		// Extract relative path from repository root (from .github/ onwards)
+		var importRelPath string
+		if idx := strings.Index(item.fullPath, "/.github/"); idx >= 0 {
+			importRelPath = item.fullPath[idx+1:] // +1 to skip the leading slash
+		} else {
+			// For files not under .github/, use the original import path
+			importRelPath = item.importPath
+		}
+		importPaths = append(importPaths, importRelPath)
+		log.Printf("Added import path for runtime-import: %s", importRelPath)
+
+		// Extract markdown content from imported file for backwards compatibility
 		markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process markdown from imported file '%s': %w", item.fullPath, err)
@@ -602,7 +623,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedEngines:       engines,
 		MergedSafeOutputs:   safeOutputs,
 		MergedSafeInputs:    safeInputs,
-		MergedMarkdown:      markdownBuilder.String(),
+		MergedMarkdown:      markdownBuilder.String(), // Deprecated - kept for backwards compatibility
+		ImportPaths:         importPaths,               // NEW: Import paths for runtime-import macro generation
 		MergedSteps:         stepsBuilder.String(),
 		CopilotSetupSteps:   copilotSetupStepsBuilder.String(),
 		MergedRuntimes:      runtimesBuilder.String(),

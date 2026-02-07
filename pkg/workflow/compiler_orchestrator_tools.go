@@ -22,8 +22,9 @@ type toolsProcessingResult struct {
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
-	importedMarkdown     string // imported markdown from frontmatter imports (separate from main body)
-	mainWorkflowMarkdown string // main workflow markdown without imports (for runtime-import)
+	importedMarkdown     string   // deprecated - kept for backwards compatibility
+	importPaths          []string // NEW: Import paths for runtime-import macro generation
+	mainWorkflowMarkdown string   // main workflow markdown without imports (for runtime-import)
 	allIncludedFiles     []string
 	workflowName         string
 	frontmatterName      string
@@ -221,7 +222,14 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	mainWorkflowMarkdown := markdownContent
 	orchestratorToolsLog.Printf("Main workflow markdown: %d bytes", len(mainWorkflowMarkdown))
 
-	// Prepend imported markdown from frontmatter imports field
+	// Get import paths for runtime-import macro generation
+	var importPaths []string
+	if len(importsResult.ImportPaths) > 0 {
+		importPaths = importsResult.ImportPaths
+		orchestratorToolsLog.Printf("Found %d import paths for runtime-import macros", len(importPaths))
+	}
+
+	// Prepend imported markdown from frontmatter imports field (deprecated - kept for backwards compatibility)
 	var importedMarkdown string
 	if importsResult.MergedMarkdown != "" {
 		importedMarkdown = importsResult.MergedMarkdown
@@ -288,7 +296,8 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,
-		importedMarkdown:     importedMarkdown,
+		importedMarkdown:     importedMarkdown, // deprecated
+		importPaths:          importPaths,      // NEW: Import paths for runtime-import macros
 		mainWorkflowMarkdown: mainWorkflowMarkdown,
 		allIncludedFiles:     allIncludedFiles,
 		workflowName:         workflowName,

@@ -241,41 +241,25 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	builtinSections := c.collectPromptSections(data)
 	compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
 
-	// NEW APPROACH (based on feedback from @pelikhan):
-	// - Imported markdown (from frontmatter imports) is ALWAYS inlined
+	// NEW APPROACH: Use runtime-import macros for all imports
+	// - Imported markdown (from frontmatter imports) now uses runtime-import macros
 	// - Main workflow markdown body uses runtime-import to allow editing without recompilation
-	// This means: inline the imports, then add a runtime-import macro for the main workflow file
+	// This ensures consistency - all markdown is loaded at runtime, not compile time
 
 	var userPromptChunks []string
 	var expressionMappings []*ExpressionMapping
 
-	// Step 1: Process and inline imported markdown (if any)
-	if data.ImportedMarkdown != "" {
-		compilerYamlLog.Printf("Inlining imported markdown (%d bytes)", len(data.ImportedMarkdown))
-
-		// Clean and process imported markdown
-		cleanedImportedMarkdown := removeXMLComments(data.ImportedMarkdown)
-
-		// Substitute import inputs in imported content
-		if len(data.ImportInputs) > 0 {
-			cleanedImportedMarkdown = SubstituteImportInputs(cleanedImportedMarkdown, data.ImportInputs)
+	// Step 1: Generate runtime-import macros for imported markdown (if any)
+	// Instead of inlining imported content, we generate runtime-import macros
+	if len(data.ImportPaths) > 0 {
+		compilerYamlLog.Printf("Generating runtime-import macros for %d imports", len(data.ImportPaths))
+		for _, importPath := range data.ImportPaths {
+			// Normalize to Unix paths (forward slashes) for cross-platform compatibility
+			importPath = filepath.ToSlash(importPath)
+			runtimeImportMacro := fmt.Sprintf("{{#runtime-import %s}}", importPath)
+			userPromptChunks = append(userPromptChunks, runtimeImportMacro)
+			compilerYamlLog.Printf("Added runtime-import macro for: %s", importPath)
 		}
-
-		// Wrap GitHub expressions in template conditionals
-		cleanedImportedMarkdown = wrapExpressionsInTemplateConditionals(cleanedImportedMarkdown)
-
-		// Extract expressions from imported content
-		extractor := NewExpressionExtractor()
-		importedExprMappings, err := extractor.ExtractExpressions(cleanedImportedMarkdown)
-		if err == nil && len(importedExprMappings) > 0 {
-			cleanedImportedMarkdown = extractor.ReplaceExpressionsWithEnvVars(cleanedImportedMarkdown)
-			expressionMappings = importedExprMappings
-		}
-
-		// Split imported content into chunks and add to user prompt
-		importedChunks := splitContentIntoChunks(cleanedImportedMarkdown)
-		userPromptChunks = append(userPromptChunks, importedChunks...)
-		compilerYamlLog.Printf("Inlined imported markdown in %d chunks", len(importedChunks))
 	}
 
 	// Step 1.5: Extract expressions from main workflow markdown (not imported content)
