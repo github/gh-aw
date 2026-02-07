@@ -169,7 +169,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	var toolsBuilder strings.Builder
 	var mcpServersBuilder strings.Builder
 	var markdownBuilder strings.Builder // Deprecated - kept for backwards compatibility
-	var importPaths []string             // NEW: Track import paths for runtime-import macro generation
+	var importPaths []string            // NEW: Track import paths for runtime-import macro generation
 	var stepsBuilder strings.Builder
 	var copilotSetupStepsBuilder strings.Builder // Track copilot-setup-steps.yml separately
 	var runtimesBuilder strings.Builder
@@ -635,7 +635,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedSafeOutputs:   safeOutputs,
 		MergedSafeInputs:    safeInputs,
 		MergedMarkdown:      markdownBuilder.String(), // Deprecated - kept for backwards compatibility
-		ImportPaths:         importPaths,               // NEW: Import paths for runtime-import macro generation
+		ImportPaths:         importPaths,              // NEW: Import paths for runtime-import macro generation
 		MergedSteps:         stepsBuilder.String(),
 		CopilotSetupSteps:   copilotSetupStepsBuilder.String(),
 		MergedRuntimes:      runtimesBuilder.String(),
