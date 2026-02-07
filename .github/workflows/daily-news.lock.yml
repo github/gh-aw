@@ -1315,6 +1315,24 @@ jobs:
           
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/tavily.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/jqschema.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/reporting.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/trends.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/python-dataviz.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-news.md}}
           PROMPT_EOF
       - name: Substitute placeholders

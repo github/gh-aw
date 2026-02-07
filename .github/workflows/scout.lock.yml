@@ -822,6 +822,30 @@ jobs:
           
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/reporting.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/arxiv.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/tavily.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/microsoft-docs.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/deepwiki.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mcp/markitdown.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/jqschema.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/scout.md}}
           PROMPT_EOF
       - name: Substitute placeholders

@@ -657,6 +657,12 @@ jobs:
           
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/aw/imports/githubnext/agentics/d3422bf940923ef1d43db5559652b8e1e71869f3/workflows_shared_reporting.md}}
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-team-status.md}}
           PROMPT_EOF
       - name: Substitute placeholders
