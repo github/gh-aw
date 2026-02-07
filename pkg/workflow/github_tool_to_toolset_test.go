@@ -76,14 +76,15 @@ func TestValidateGitHubToolsAgainstToolsets(t *testing.T) {
 			name:            "Unknown tool is ignored",
 			allowedTools:    []string{"get_repository", "unknown_tool_xyz"},
 			enabledToolsets: []string{"repos"},
-			expectError:     false,
+			expectError:     true,
+			errorContains:   []string{"Unknown GitHub tool", "unknown_tool_xyz"},
 		},
 		{
 			name:            "Mix of known and unknown tools",
 			allowedTools:    []string{"get_repository", "unknown_tool", "list_issues"},
 			enabledToolsets: []string{"repos"}, // issues missing
 			expectError:     true,
-			errorContains:   []string{"issues", "list_issues"},
+			errorContains:   []string{"Unknown GitHub tool", "unknown_tool"},
 		},
 		{
 			name:            "Actions toolset tools",
@@ -307,4 +308,130 @@ func expandToolsetsForTesting(toolsets []string) []string {
 	}
 
 	return expanded
+}
+
+// TestValidateGitHubToolsDidYouMean tests the "did you mean" suggestion feature for GitHub tools
+func TestValidateGitHubToolsDidYouMean(t *testing.T) {
+	tests := []struct {
+		name               string
+		invalidTool        string
+		expectedSuggestion string
+		shouldHaveSuggestion bool
+	}{
+		{
+			name:               "typo issue_raed suggests issue_read",
+			invalidTool:        "issue_raed",
+			expectedSuggestion: "issue_read",
+			shouldHaveSuggestion: true,
+		},
+		{
+			name:               "typo crate_issue suggests create_issue",
+			invalidTool:        "crate_issue",
+			expectedSuggestion: "create_issue",
+			shouldHaveSuggestion: true,
+		},
+		{
+			name:               "typo get_repositry suggests get_repository",
+			invalidTool:        "get_repositry",
+			expectedSuggestion: "get_repository",
+			shouldHaveSuggestion: true,
+		},
+		{
+			name:               "typo list_workflos suggests list_workflows",
+			invalidTool:        "list_workflos",
+			expectedSuggestion: "list_workflows",
+			shouldHaveSuggestion: true,
+		},
+		{
+			name:               "typo serch_code suggests search_code",
+			invalidTool:        "serch_code",
+			expectedSuggestion: "search_code",
+			shouldHaveSuggestion: true,
+		},
+		{
+			name:               "completely wrong tool gets no suggestion",
+			invalidTool:        "xyz_abc_123",
+			expectedSuggestion: "",
+			shouldHaveSuggestion: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test with the invalid tool
+			allowedTools := []string{"get_repository", tt.invalidTool}
+			enabledToolsets := []string{"repos"}
+
+			err := ValidateGitHubToolsAgainstToolsets(allowedTools, enabledToolsets)
+			
+			if err == nil {
+				t.Fatal("Expected validation to fail for unknown tool")
+			}
+			
+			errorMsg := err.Error()
+			
+			// Should mention the unknown tool
+			if !strings.Contains(errorMsg, "Unknown GitHub tool") {
+				t.Errorf("Expected 'Unknown GitHub tool' in error message, got: %s", errorMsg)
+			}
+			
+			if !strings.Contains(errorMsg, tt.invalidTool) {
+				t.Errorf("Expected invalid tool '%s' in error message, got: %s", 
+					tt.invalidTool, errorMsg)
+			}
+			
+			if tt.shouldHaveSuggestion {
+				// Should have "Did you mean:" suggestion
+				if !strings.Contains(errorMsg, "Did you mean:") {
+					t.Errorf("Expected 'Did you mean:' in error message, got: %s", errorMsg)
+				}
+				
+				if !strings.Contains(errorMsg, tt.expectedSuggestion) {
+					t.Errorf("Expected suggestion '%s' in error message, got: %s", 
+						tt.expectedSuggestion, errorMsg)
+				}
+			} else {
+				// Should NOT have "Did you mean:" suggestion
+				if strings.Contains(errorMsg, "Did you mean:") {
+					t.Errorf("Should not suggest anything for '%s', but got: %s",
+						tt.invalidTool, errorMsg)
+				}
+			}
+			
+			// All errors should list some valid tools
+			if !strings.Contains(errorMsg, "Valid GitHub tools") {
+				t.Errorf("Error should list valid GitHub tools, got: %s", errorMsg)
+			}
+		})
+	}
+}
+
+// TestValidateGitHubToolsMultipleUnknown tests error message when multiple unknown tools are used
+func TestValidateGitHubToolsMultipleUnknown(t *testing.T) {
+	allowedTools := []string{"get_repository", "issue_raed", "crate_issue", "unknown_xyz"}
+	enabledToolsets := []string{"repos", "issues"}
+
+	err := ValidateGitHubToolsAgainstToolsets(allowedTools, enabledToolsets)
+	
+	if err == nil {
+		t.Fatal("Expected validation to fail for unknown tools")
+	}
+	
+	errorMsg := err.Error()
+	
+	// Should mention all unknown tools
+	if !strings.Contains(errorMsg, "issue_raed") {
+		t.Errorf("Expected 'issue_raed' in error message, got: %s", errorMsg)
+	}
+	if !strings.Contains(errorMsg, "crate_issue") {
+		t.Errorf("Expected 'crate_issue' in error message, got: %s", errorMsg)
+	}
+	if !strings.Contains(errorMsg, "unknown_xyz") {
+		t.Errorf("Expected 'unknown_xyz' in error message, got: %s", errorMsg)
+	}
+	
+	// Should have suggestions section
+	if !strings.Contains(errorMsg, "Did you mean:") {
+		t.Errorf("Expected 'Did you mean:' in error message, got: %s", errorMsg)
+	}
 }
