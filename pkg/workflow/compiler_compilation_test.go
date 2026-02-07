@@ -114,7 +114,7 @@ permissions:
   issues: write
 tools:
   github:
-    allowed: [add_issue_comment]
+    allowed: [create_issue_comment]
 engine: claude
 features:
   dangerous-permissions-write: true
@@ -134,7 +134,7 @@ permissions:
   issues: write
 tools:
   github:
-    allowed: [add_issue_comment]
+    allowed: [create_issue_comment]
 engine: claude
 features:
   dangerous-permissions-write: true
@@ -157,7 +157,7 @@ permissions:
   issues: write
 tools:
   github:
-    allowed: [add_issue_comment]
+    allowed: [create_issue_comment]
 engine: claude
 features:
   dangerous-permissions-write: true
@@ -188,7 +188,7 @@ permissions:
   pull-requests: read
 tools:
   github:
-    allowed: [add_issue_comment]
+    allowed: [create_issue_comment]
 engine: claude
 features:
   dangerous-permissions-write: true
@@ -215,7 +215,7 @@ permissions:
   pull-requests: read
 tools:
   github:
-    allowed: [add_issue_comment]
+    allowed: [create_issue_comment]
 engine: claude
 features:
   dangerous-permissions-write: true
