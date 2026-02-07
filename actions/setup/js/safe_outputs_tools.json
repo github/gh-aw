@@ -639,7 +639,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[0-9a-f]{12}$",
-          "description": "Temporary identifier for a draft issue being created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). REQUIRED when creating a new draft issue (content_type='draft_issue' without draft_issue_id). Use this to reference the draft issue in subsequent update_project calls via draft_issue_id."
+          "description": "Temporary identifier for a draft issue being created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). Must be provided when creating a new draft issue (content_type='draft_issue' without draft_issue_id); this constraint is enforced by the tool at runtime, not by the static schema validator. Use this to reference the draft issue in subsequent update_project calls via draft_issue_id."
         },
         "fields": {
           "type": "object",

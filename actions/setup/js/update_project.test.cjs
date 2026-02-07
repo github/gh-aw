@@ -634,7 +634,11 @@ describe("updateProject", () => {
 
     expect(getOutput("item-id")).toBe("draft-item-temp-123");
     expect(getOutput("temporary-id")).toBe("aw_abc123def456");
-    expect(temporaryIdMap.get("aw_abc123def456")).toBe("draft-item-temp-123");
+
+    // Verify the mapping is stored as a structured object
+    const mapping = temporaryIdMap.get("aw_abc123def456");
+    expect(mapping).toBeDefined();
+    expect(mapping.draftItemId).toBe("draft-item-temp-123");
   });
 
   it("updates an existing draft issue by draft_issue_id using temporary ID", async () => {
@@ -647,23 +651,19 @@ describe("updateProject", () => {
       fields: { Status: "In Progress" },
     };
 
-    // Temporary ID map with existing mapping
-    const temporaryIdMap = new Map([["aw_abc123def456", "draft-item-existing-123"]]);
+    // Temporary ID map with existing mapping (structured format)
+    const temporaryIdMap = new Map([["aw_abc123def456", { draftItemId: "draft-item-existing-123" }]]);
 
-    // Mock response for finding the draft by item ID
+    // Mock response for direct node query
     const draftItemResponse = {
       node: {
-        items: {
-          nodes: [
-            {
-              id: "draft-item-existing-123",
-              content: {
-                id: "draft-content-123",
-                title: "Existing Draft",
-              },
-            },
-          ],
-          pageInfo: { hasNextPage: false, endCursor: null },
+        id: "draft-item-existing-123",
+        content: {
+          id: "draft-content-123",
+          title: "Existing Draft",
+        },
+        project: {
+          id: "project-update-draft",
         },
       },
     };
@@ -692,20 +692,16 @@ describe("updateProject", () => {
       fields: { Status: "Done" },
     };
 
-    // Mock response for finding the draft by item ID
+    // Mock response for direct node query
     const draftItemResponse = {
       node: {
-        items: {
-          nodes: [
-            {
-              id: "PVTI_lADOABCD1234567890",
-              content: {
-                id: "draft-content-456",
-                title: "Direct ID Draft",
-              },
-            },
-          ],
-          pageInfo: { hasNextPage: false, endCursor: null },
+        id: "PVTI_lADOABCD1234567890",
+        content: {
+          id: "draft-content-456",
+          title: "Direct ID Draft",
+        },
+        project: {
+          id: "project-direct-id",
         },
       },
     };
@@ -746,19 +742,73 @@ describe("updateProject", () => {
       draft_issue_id: "PVTI_nonexistent",
     };
 
-    // Mock response with no matching items
+    // Mock response - node not found
     const emptyDraftResponse = {
-      node: {
-        items: {
-          nodes: [],
-          pageInfo: { hasNextPage: false, endCursor: null },
-        },
-      },
+      node: null,
     };
 
     queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-missing-item"), emptyDraftResponse]);
 
     await expect(updateProject(output)).rejects.toThrow(/Draft item with ID "PVTI_nonexistent" not found in project/);
+  });
+
+  it("handles draft_issue_id with leading # prefix", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "#aw_abc123def456",
+      fields: { Status: "In Progress" },
+    };
+
+    // Temporary ID map with existing mapping (structured format)
+    const temporaryIdMap = new Map([["aw_abc123def456", { draftItemId: "draft-item-hash-prefix" }]]);
+
+    // Mock response for direct node query
+    const draftItemResponse = {
+      node: {
+        id: "draft-item-hash-prefix",
+        content: {
+          id: "draft-content-hash",
+          title: "Draft with Hash Prefix",
+        },
+        project: {
+          id: "project-hash-test",
+        },
+      },
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-hash-test"), draftItemResponse, fieldsResponse([{ id: "field-status", name: "Status" }]), updateFieldValueResponse()]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(getOutput("item-id")).toBe("draft-item-hash-prefix");
+  });
+
+  it("handles temporary_id with leading # prefix", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_title: "Draft with hash prefix temp ID",
+      temporary_id: "#aw_fedcba987654",
+    };
+
+    const temporaryIdMap = new Map();
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-hash-temp"), addDraftIssueResponse("draft-item-hash-temp")]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(getOutput("item-id")).toBe("draft-item-hash-temp");
+    expect(getOutput("temporary-id")).toBe("aw_fedcba987654");
+
+    // Verify the mapping is stored without the # prefix
+    const mapping = temporaryIdMap.get("aw_fedcba987654");
+    expect(mapping).toBeDefined();
+    expect(mapping.draftItemId).toBe("draft-item-hash-temp");
   });
 
   it("updates a single select field when the option exists", async () => {

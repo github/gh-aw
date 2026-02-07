@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { loadTemporaryIdMap, resolveIssueNumber, generateTemporaryId, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
+const { loadTemporaryIdMap, resolveIssueNumber, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -249,51 +249,48 @@ async function resolveProjectV2(projectInfo, projectNumberInt, github) {
 
 /**
  * Find an existing draft issue in the project by project item ID
+ * Queries the item directly for efficiency instead of paginating through all items
  * @param {string} projectId - Project ID
  * @param {string} draftItemId - Draft project item ID to find
  * @param {Object} github - GitHub client (Octokit instance)
  * @returns {Promise<{id: string, title?: string}|null>} Draft item if found, null otherwise
  */
 async function findExistingDraftByItemId(projectId, draftItemId, github) {
-  let hasNextPage = true;
-  let endCursor = null;
-
-  while (hasNextPage) {
+  try {
     const result = await github.graphql(
-      `query($projectId: ID!, $after: String) {
-        node(id: $projectId) {
-          ... on ProjectV2 {
-            items(first: 100, after: $after) {
-              nodes {
+      `query($draftItemId: ID!, $projectId: ID!) {
+        node(id: $draftItemId) {
+          ... on ProjectV2Item {
+            id
+            content {
+              ... on DraftIssue {
                 id
-                content {
-                  ... on DraftIssue {
-                    id
-                    title
-                  }
-                }
+                title
               }
-              pageInfo {
-                hasNextPage
-                endCursor
-              }
+            }
+            project {
+              id
             }
           }
         }
       }`,
-      { projectId, after: endCursor }
+      { draftItemId, projectId }
     );
 
-    const found = result.node.items.nodes.find(item => item.id === draftItemId);
-    if (found) {
-      return { id: found.id, title: found.content?.title };
+    const node = result?.node;
+    if (!node || !node.content || node.project?.id !== projectId) {
+      return null;
     }
 
-    hasNextPage = result.node.items.pageInfo.hasNextPage;
-    endCursor = result.node.items.pageInfo.endCursor;
+    return {
+      id: node.id,
+      title: node.content.title,
+    };
+  } catch (error) {
+    // If the item doesn't exist or isn't accessible, return null
+    core.debug(`Draft item ${draftItemId} not found: ${getErrorMessage(error)}`);
+    return null;
   }
-
-  return null;
 }
 
 /**
@@ -667,14 +664,27 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
 
       if (hasDraftIssueId) {
         const rawDraftIssueId = output.draft_issue_id;
-        const sanitizedDraftIssueId = typeof rawDraftIssueId === "string" ? rawDraftIssueId.trim() : String(rawDraftIssueId);
+        let sanitizedDraftIssueId = typeof rawDraftIssueId === "string" ? rawDraftIssueId.trim() : String(rawDraftIssueId);
+
+        // Strip optional leading # prefix (consistent with content_number and project handling)
+        if (sanitizedDraftIssueId.startsWith("#")) {
+          sanitizedDraftIssueId = sanitizedDraftIssueId.substring(1);
+        }
 
         // Check if it's a temporary ID
         if (isTemporaryId(sanitizedDraftIssueId)) {
           const normalizedTempId = normalizeTemporaryId(sanitizedDraftIssueId);
-          const resolvedItemId = temporaryIdMap.get(normalizedTempId);
+          const resolved = temporaryIdMap.get(normalizedTempId);
 
-          if (resolvedItemId && typeof resolvedItemId === "string") {
+          // Handle both string (direct item ID) and structured object formats
+          let resolvedItemId = null;
+          if (typeof resolved === "string") {
+            resolvedItemId = resolved;
+          } else if (resolved && typeof resolved === "object" && resolved.draftItemId) {
+            resolvedItemId = resolved.draftItemId;
+          }
+
+          if (resolvedItemId) {
             // Temporary ID resolved to a project item ID
             core.info(`✓ Resolved temporary ID ${sanitizedDraftIssueId} to draft item ID`);
 
@@ -704,7 +714,14 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       // If no itemId found yet, create a new draft issue
       if (!itemId) {
         // Require temporary_id for new draft creation (similar to content_number for issues/PRs)
-        if (!output.temporary_id || !isTemporaryId(String(output.temporary_id))) {
+        let tempIdValue = output.temporary_id;
+
+        // Strip optional leading # prefix
+        if (typeof tempIdValue === "string" && tempIdValue.startsWith("#")) {
+          tempIdValue = tempIdValue.substring(1);
+        }
+
+        if (!tempIdValue || !isTemporaryId(String(tempIdValue))) {
           throw new Error(
             'When content_type is "draft_issue" and creating a new draft, temporary_id is required. ' +
               'Provide a valid temporary ID (format: aw_XXXXXXXXXXXX, e.g., "aw_abc123def456"). ' +
@@ -735,9 +752,10 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         itemId = result.addProjectV2DraftIssue.projectItem.id;
         core.info(`✓ Created new draft issue: "${draftTitle}"`);
 
-        // Store the temporary_id mapping
-        const normalizedTempId = normalizeTemporaryId(String(output.temporary_id));
-        temporaryIdMap.set(normalizedTempId, itemId);
+        // Store the temporary_id mapping as a structured object to distinguish from issue mappings
+        const normalizedTempId = normalizeTemporaryId(String(tempIdValue));
+        const draftMapping = { draftItemId: itemId };
+        temporaryIdMap.set(normalizedTempId, draftMapping);
         core.setOutput("temporary-id", normalizedTempId);
         core.info(`✓ Stored temporary ID mapping: ${normalizedTempId} -> ${itemId}`);
       }
