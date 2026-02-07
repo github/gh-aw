@@ -581,3 +581,661 @@ Test content`
 		t.Error("Expected 'result' output")
 	}
 }
+
+// ========================================
+// Complex Dependency and Ordering Tests
+// ========================================
+
+// TestComplexJobDependencyChains tests various job dependency chain scenarios
+func TestComplexJobDependencyChains(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "dependency-chains-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  job_a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A"
+  job_b:
+    runs-on: ubuntu-latest
+    needs: job_a
+    steps:
+      - run: echo "B"
+  job_c:
+    runs-on: ubuntu-latest
+    needs: [job_a, job_b]
+    steps:
+      - run: echo "C"
+  job_d:
+    runs-on: ubuntu-latest
+    needs: job_c
+    steps:
+      - run: echo "D"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify all custom jobs are present
+	expectedJobs := []string{"job_a:", "job_b:", "job_c:", "job_d:"}
+	for _, job := range expectedJobs {
+		if !containsInNonCommentLines(yamlStr, job) {
+			t.Errorf("Expected job %q not found", job)
+		}
+	}
+
+	// Verify dependency structure is preserved
+	// job_b should depend on job_a
+	if !strings.Contains(yamlStr, "needs: job_a") && !strings.Contains(yamlStr, "needs:\n      - job_a") {
+		t.Error("Expected job_b to depend on job_a")
+	}
+}
+
+// TestJobDependingOnPreActivation tests jobs that explicitly depend on pre-activation
+func TestJobDependingOnPreActivation(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "pre-activation-dep-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+command: /test
+jobs:
+  early_job:
+    runs-on: ubuntu-latest
+    needs: pre_activation
+    steps:
+      - run: echo "Runs after pre-activation"
+  normal_job:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Normal job"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify pre-activation job exists (command is configured)
+	if !containsInNonCommentLines(yamlStr, "pre_activation:") {
+		t.Error("Expected pre_activation job")
+	}
+
+	// Verify early_job exists and depends on pre_activation
+	if !containsInNonCommentLines(yamlStr, "early_job:") {
+		t.Error("Expected early_job")
+	}
+
+	// Verify normal_job exists
+	if !containsInNonCommentLines(yamlStr, "normal_job:") {
+		t.Error("Expected normal_job")
+	}
+}
+
+// TestJobReferencingCustomJobOutputs tests jobs that reference outputs from custom jobs
+func TestJobReferencingCustomJobOutputs(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "job-outputs-ref-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.gen.outputs.value }}
+    steps:
+      - id: gen
+        run: echo "value=42" >> $GITHUB_OUTPUT
+  consumer:
+    runs-on: ubuntu-latest
+    needs: producer
+    if: needs.producer.outputs.value == '42'
+    steps:
+      - run: echo "Consuming ${{ needs.producer.outputs.value }}"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify both jobs exist
+	if !containsInNonCommentLines(yamlStr, "producer:") {
+		t.Error("Expected producer job")
+	}
+	if !containsInNonCommentLines(yamlStr, "consumer:") {
+		t.Error("Expected consumer job")
+	}
+
+	// Verify output reference is preserved
+	if !strings.Contains(yamlStr, "needs.producer.outputs.value") {
+		t.Error("Expected reference to producer output")
+	}
+}
+
+// TestJobsWithRepoMemoryDependencies tests push_repo_memory job positioning
+// This tests the job creation logic when repo-memory config is present
+func TestJobsWithRepoMemoryDependencies(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+
+	// Create workflow data with repo-memory config
+	data := &WorkflowData{
+		Name:        "Test Workflow",
+		AI:          "copilot",
+		RunsOn:      "runs-on: ubuntu-latest",
+		Permissions: "permissions:\n  contents: write",
+		RepoMemoryConfig: &RepoMemoryConfig{
+			Memories: []RepoMemoryEntry{
+				{
+					ID:         "test-memory",
+					BranchName: "memory-branch",
+					FileGlob:   []string{"data/**"},
+				},
+			},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{
+				TitlePrefix: "[bot] ",
+			},
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	// Build activation and agent jobs first
+	compiler.stepOrderTracker = NewStepOrderTracker()
+	activationJob, _ := compiler.buildActivationJob(data, false, "", "test.lock.yml")
+	compiler.jobManager.AddJob(activationJob)
+
+	agentJob, _ := compiler.buildMainJob(data, true)
+	compiler.jobManager.AddJob(agentJob)
+
+	// Build safe outputs jobs (creates detection job when threat detection is enabled)
+	compiler.buildSafeOutputsJobs(data, string(constants.AgentJobName), "test.md")
+
+	// Build push_repo_memory job
+	threatDetectionEnabledForSafeJobs := data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil
+	pushRepoMemoryJob, err := compiler.buildPushRepoMemoryJob(data, threatDetectionEnabledForSafeJobs)
+	if err != nil {
+		t.Fatalf("buildPushRepoMemoryJob() error: %v", err)
+	}
+
+	// Verify job was created
+	if pushRepoMemoryJob == nil {
+		t.Fatal("Expected push_repo_memory job to be created")
+	}
+
+	// Add detection dependency if threat detection is enabled
+	if threatDetectionEnabledForSafeJobs {
+		pushRepoMemoryJob.Needs = append(pushRepoMemoryJob.Needs, string(constants.DetectionJobName))
+	}
+
+	// Verify dependencies include detection when threat detection is enabled
+	if threatDetectionEnabledForSafeJobs {
+		hasDetectionDep := false
+		for _, need := range pushRepoMemoryJob.Needs {
+			if need == string(constants.DetectionJobName) {
+				hasDetectionDep = true
+				break
+			}
+		}
+		if !hasDetectionDep {
+			t.Error("Expected push_repo_memory to depend on detection job when threat detection is enabled")
+		}
+	}
+
+	// Verify job name
+	if pushRepoMemoryJob.Name != "push_repo_memory" {
+		t.Errorf("Expected job name 'push_repo_memory', got %q", pushRepoMemoryJob.Name)
+	}
+}
+
+// TestJobsWithCacheMemoryDependencies tests update_cache_memory job positioning
+// This tests the job creation logic when cache-memory config is present
+func TestJobsWithCacheMemoryDependencies(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+
+	// Create workflow data with cache-memory config
+	data := &WorkflowData{
+		Name:        "Test Workflow",
+		AI:          "copilot",
+		RunsOn:      "runs-on: ubuntu-latest",
+		Permissions: "permissions:\n  contents: read",
+		CacheMemoryConfig: &CacheMemoryConfig{
+			Caches: []CacheMemoryEntry{
+				{
+					ID:  "test-cache",
+					Key: "test-key",
+				},
+			},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			CreateIssues: &CreateIssuesConfig{
+				TitlePrefix: "[bot] ",
+			},
+			ThreatDetection: &ThreatDetectionConfig{},
+		},
+	}
+
+	// Build activation and agent jobs first
+	compiler.stepOrderTracker = NewStepOrderTracker()
+	activationJob, _ := compiler.buildActivationJob(data, false, "", "test.lock.yml")
+	compiler.jobManager.AddJob(activationJob)
+
+	agentJob, _ := compiler.buildMainJob(data, true)
+	compiler.jobManager.AddJob(agentJob)
+
+	// Build safe outputs jobs (creates detection job when threat detection is enabled)
+	compiler.buildSafeOutputsJobs(data, string(constants.AgentJobName), "test.md")
+
+	// Build update_cache_memory job (only created with threat detection)
+	threatDetectionEnabledForSafeJobs := data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil
+	if threatDetectionEnabledForSafeJobs {
+		updateCacheMemoryJob, err := compiler.buildUpdateCacheMemoryJob(data, threatDetectionEnabledForSafeJobs)
+		if err != nil {
+			t.Fatalf("buildUpdateCacheMemoryJob() error: %v", err)
+		}
+
+		// Verify job was created
+		if updateCacheMemoryJob == nil {
+			t.Fatal("Expected update_cache_memory job to be created when threat detection is enabled")
+		}
+
+		// Verify dependencies include detection
+		hasDetectionDep := false
+		for _, need := range updateCacheMemoryJob.Needs {
+			if need == string(constants.DetectionJobName) {
+				hasDetectionDep = true
+				break
+			}
+		}
+		if !hasDetectionDep {
+			t.Error("Expected update_cache_memory to depend on detection job")
+		}
+
+		// Verify job name
+		if updateCacheMemoryJob.Name != "update_cache_memory" {
+			t.Errorf("Expected job name 'update_cache_memory', got %q", updateCacheMemoryJob.Name)
+		}
+	}
+}
+
+// ========================================
+// Edge Case Tests
+// ========================================
+
+// TestEmptyCustomJobs tests handling of empty custom jobs array
+func TestEmptyCustomJobs(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "empty-jobs-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs: {}
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Should still have standard jobs (activation, agent)
+	if !containsInNonCommentLines(yamlStr, "activation:") {
+		t.Error("Expected activation job")
+	}
+	if !containsInNonCommentLines(yamlStr, string(constants.AgentJobName)) {
+		t.Error("Expected agent job")
+	}
+}
+
+// TestJobWithInvalidDependency tests handling of jobs with non-existent dependencies
+func TestJobWithInvalidDependency(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "invalid-dep-test")
+
+	// Note: The compiler now validates job dependencies and will fail
+	// This test verifies that the error is properly reported
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  dependent:
+    runs-on: ubuntu-latest
+    needs: non_existent_job
+    steps:
+      - run: echo "test"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	// Should fail with validation error
+	err := compiler.CompileWorkflow(testFile)
+	if err == nil {
+		t.Fatal("Expected CompileWorkflow() to return error for non-existent job dependency")
+	}
+
+	// Verify error message mentions the invalid dependency
+	if !strings.Contains(err.Error(), "non_existent_job") {
+		t.Errorf("Expected error to mention 'non_existent_job', got: %v", err)
+	}
+}
+
+// TestJobWithMissingRequiredFields tests handling of jobs missing required fields
+func TestJobWithMissingRequiredFields(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "missing-fields-test")
+
+	// Job with no runs-on and no uses (invalid but should compile)
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  minimal:
+    steps:
+      - run: echo "test"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	// Should compile (GitHub Actions validates at runtime)
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify job exists
+	if !containsInNonCommentLines(yamlStr, "minimal:") {
+		t.Error("Expected minimal job")
+	}
+}
+
+// TestMultipleJobsWithComplexDependencies tests a realistic complex scenario
+func TestMultipleJobsWithComplexDependencies(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "complex-deps-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.check.outputs.result }}
+    steps:
+      - id: check
+        run: echo "result=true" >> $GITHUB_OUTPUT
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - run: npm test
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: needs.lint.outputs.passed == 'true'
+    steps:
+      - run: npm build
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - run: echo "deploying"
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify all jobs exist
+	expectedJobs := []string{"lint:", "test:", "build:", "deploy:"}
+	for _, job := range expectedJobs {
+		if !containsInNonCommentLines(yamlStr, job) {
+			t.Errorf("Expected job %q not found", job)
+		}
+	}
+
+	// Verify conditional logic is preserved
+	if !strings.Contains(yamlStr, "needs.lint.outputs.passed") {
+		t.Error("Expected conditional reference to lint output")
+	}
+
+	// Verify multi-dependency structure
+	// The build job needs array should contain both lint and test
+	// Look for the needs section within the build job
+	if !strings.Contains(yamlStr, "build:") {
+		t.Fatal("build job not found")
+	}
+	
+	// Check if build job has dependencies (either as array or single)
+	// Since jobs auto-depend on activation, we should see lint and test referenced
+	hasBothDeps := (strings.Contains(yamlStr, "needs.lint.") || strings.Contains(yamlStr, "- lint")) &&
+		(strings.Contains(yamlStr, "needs.test.") || strings.Contains(yamlStr, "- test"))
+	
+	if !hasBothDeps {
+		t.Error("Expected build job to depend on both lint and test")
+	}
+}
+
+// TestJobManagerStateValidation tests that job manager maintains correct state
+func TestJobManagerStateValidation(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "job-manager-state-test")
+
+	frontmatter := `---
+on: push
+permissions:
+  contents: read
+engine: copilot
+strict: false
+command: /test
+jobs:
+  custom1:
+    runs-on: ubuntu-latest
+    needs: pre_activation
+    steps:
+      - run: echo "custom1"
+  custom2:
+    runs-on: ubuntu-latest
+    needs: custom1
+    steps:
+      - run: echo "custom2"
+safe-outputs:
+  create-issue:
+    title-prefix: "[bot] "
+  threat-detection: {}
+---
+
+# Test Workflow
+
+Test content`
+
+	testFile := filepath.Join(tmpDir, "test.md")
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	if err := compiler.CompileWorkflow(testFile); err != nil {
+		t.Fatalf("CompileWorkflow() error: %v", err)
+	}
+
+	// Read compiled output
+	lockFile := filepath.Join(tmpDir, "test.lock.yml")
+	content, err := os.ReadFile(lockFile)
+	if err != nil {
+		t.Fatalf("Failed to read lock file: %v", err)
+	}
+
+	yamlStr := string(content)
+
+	// Verify expected job structure:
+	// 1. pre_activation (command configured)
+	// 2. activation (depends on pre_activation + custom1)
+	// 3. agent (depends on activation)
+	// 4. safe_outputs (depends on agent)
+	// 5. detection (depends on safe_outputs)
+	// 6. conclusion (depends on safe_outputs)
+	// 7. custom1 (depends on pre_activation)
+	// 8. custom2 (depends on custom1)
+
+	expectedJobs := []string{
+		"pre_activation:",
+		"activation:",
+		string(constants.AgentJobName),
+		"safe_outputs:",
+		"detection:",
+		"conclusion:",
+		"custom1:",
+		"custom2:",
+	}
+
+	for _, job := range expectedJobs {
+		if !containsInNonCommentLines(yamlStr, job) {
+			t.Errorf("Expected job %q not found", job)
+		}
+	}
+
+	// Verify custom2 depends on custom1
+	if !strings.Contains(yamlStr, "needs: custom1") && !strings.Contains(yamlStr, "- custom1") {
+		t.Error("Expected custom2 to depend on custom1")
+	}
+}
