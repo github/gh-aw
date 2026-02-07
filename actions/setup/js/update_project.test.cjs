@@ -267,6 +267,24 @@ const addDraftIssueResponse = (itemId = "draft-item") => ({
   },
 });
 
+const existingDraftItemResponse = (title, itemId = "existing-draft-item") => ({
+  node: {
+    items: {
+      nodes: [
+        {
+          id: itemId,
+          content: {
+            __typename: "DraftIssue",
+            id: `draft-content-${itemId}`,
+            title: title,
+          },
+        },
+      ],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    },
+  },
+});
+
 function queueResponses(responses) {
   responses.forEach(response => {
     mockGithub.graphql.mockResolvedValueOnce(response);
@@ -427,13 +445,20 @@ describe("updateProject", () => {
       draft_body: "Draft body",
     };
 
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), addDraftIssueResponse("draft-item-1")]);
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      emptyItemsResponse(), // No existing drafts with this title
+      addDraftIssueResponse("draft-item-1"),
+    ]);
 
     await updateProject(output);
 
     expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(true);
     expect(mockGithub.rest.issues.addLabels).not.toHaveBeenCalled();
     expect(getOutput("item-id")).toBe("draft-item-1");
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Created new draft issue "Draft title"');
   });
 
   it("rejects draft issues without a title", async () => {
@@ -448,6 +473,36 @@ describe("updateProject", () => {
     queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft")]);
 
     await expect(updateProject(output)).rejects.toThrow(/draft_title/);
+  });
+
+  it("reuses existing draft issue instead of creating duplicate", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_title: "Existing Draft",
+      fields: { Status: "In Progress" },
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      existingDraftItemResponse("Existing Draft", "existing-draft-123"), // Draft with same title exists
+      fieldsResponse([{ id: "field-status", name: "Status" }]),
+      updateFieldValueResponse(),
+    ]);
+
+    await updateProject(output);
+
+    // Should NOT call addProjectV2DraftIssue since draft already exists
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(false);
+    // Should call updateProjectV2ItemFieldValue to update the existing draft
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2ItemFieldValue"))).toBe(true);
+    expect(mockGithub.rest.issues.addLabels).not.toHaveBeenCalled();
+    expect(getOutput("item-id")).toBe("existing-draft-123");
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Found existing draft issue "Existing Draft" - updating fields instead of creating duplicate');
   });
 
   it("skips adding an issue that already exists on the board", async () => {
@@ -583,6 +638,7 @@ describe("updateProject", () => {
       repoResponse(),
       viewerResponse(),
       orgProjectV2Response(projectUrl, 60, "project-draft-fields"),
+      emptyItemsResponse(), // No existing drafts with this title
       addDraftIssueResponse("draft-item-fields"),
       fieldsResponse([{ id: "field-status", name: "Status" }]),
       updateFieldValueResponse(),
@@ -1263,7 +1319,13 @@ describe("updateProject", () => {
       draft_body: "This is a test",
     };
 
-    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(messageProjectUrl, 60, "project-message"), addDraftIssueResponse("draft-item-message")]);
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(messageProjectUrl, 60, "project-message"),
+      emptyItemsResponse(), // No existing drafts with this title
+      addDraftIssueResponse("draft-item-message"),
+    ]);
 
     const result = await messageHandler(messageWithProject, new Map());
 

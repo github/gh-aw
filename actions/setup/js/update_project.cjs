@@ -617,21 +617,70 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       }
 
       const draftBody = typeof output.draft_body === "string" ? output.draft_body : undefined;
-      const result = await github.graphql(
-        `mutation($projectId: ID!, $title: String!, $body: String) {
-          addProjectV2DraftIssue(input: {
-            projectId: $projectId,
-            title: $title,
-            body: $body
-          }) {
-            projectItem {
-              id
+
+      // Check for existing draft issue with the same title
+      const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
+        let hasNextPage = true;
+        let endCursor = null;
+
+        while (hasNextPage) {
+          const result = await github.graphql(
+            `query($projectId: ID!, $after: String) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  items(first: 100, after: $after) {
+                    nodes {
+                      id
+                      content {
+                        ... on DraftIssue {
+                          id
+                          title
+                        }
+                      }
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                  }
+                }
+              }
+            }`,
+            { projectId, after: endCursor }
+          );
+
+          const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
+          if (found) return found;
+
+          hasNextPage = result.node.items.pageInfo.hasNextPage;
+          endCursor = result.node.items.pageInfo.endCursor;
+        }
+
+        return null;
+      })(projectId, draftTitle);
+
+      let itemId;
+      if (existingDraftItem) {
+        itemId = existingDraftItem.id;
+        core.info(`✓ Found existing draft issue "${draftTitle}" - updating fields instead of creating duplicate`);
+      } else {
+        const result = await github.graphql(
+          `mutation($projectId: ID!, $title: String!, $body: String) {
+            addProjectV2DraftIssue(input: {
+              projectId: $projectId,
+              title: $title,
+              body: $body
+            }) {
+              projectItem {
+                id
+              }
             }
-          }
-        }`,
-        { projectId, title: draftTitle, body: draftBody }
-      );
-      const itemId = result.addProjectV2DraftIssue.projectItem.id;
+          }`,
+          { projectId, title: draftTitle, body: draftBody }
+        );
+        itemId = result.addProjectV2DraftIssue.projectItem.id;
+        core.info(`✓ Created new draft issue "${draftTitle}"`);
+      }
 
       const fieldsToUpdate = output.fields ? { ...output.fields } : {};
       if (Object.keys(fieldsToUpdate).length > 0) {
