@@ -91,41 +91,9 @@ func (c *Compiler) CompileWorkflow(markdownPath string) error {
 	return c.CompileWorkflowData(workflowData, markdownPath)
 }
 
-// CompileWorkflowData compiles a workflow from already-parsed WorkflowData
-// This avoids re-parsing when the data has already been parsed
-func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error {
-	// Store markdownPath for use in dynamic tool generation and prompt generation
-	c.markdownPath = markdownPath
-
-	// Track compilation time for performance monitoring
-	startTime := time.Now()
-	defer func() {
-		if log.Enabled() {
-			log.Printf("Compilation completed in %v", time.Since(startTime))
-		}
-	}()
-
-	// Reset the step order tracker for this compilation
-	c.stepOrderTracker = NewStepOrderTracker()
-
-	// Reset schedule friendly formats for this compilation
-	c.scheduleFriendlyFormats = nil
-
-	// Reset the artifact manager for this compilation
-	if c.artifactManager == nil {
-		c.artifactManager = NewArtifactManager()
-	} else {
-		c.artifactManager.Reset()
-	}
-
-	// Generate lock file name
-	lockFile := stringutil.MarkdownToLockFile(markdownPath)
-
-	// Sanitize the lock file path to prevent path traversal attacks
-	lockFile = filepath.Clean(lockFile)
-
-	log.Printf("Starting compilation: %s -> %s", markdownPath, lockFile)
-
+// validateWorkflowData performs comprehensive validation of workflow configuration
+// including expressions, features, permissions, and configurations.
+func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath string) error {
 	// Validate expression safety - check that all GitHub Actions expressions are in the allowed list
 	log.Printf("Validating expression safety")
 	if err := validateExpressionSafety(workflowData.MarkdownContent); err != nil {
@@ -300,17 +268,16 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		return formatCompilerError(markdownPath, "error", fmt.Sprintf("dispatch-workflow validation failed: %v", err))
 	}
 
-	// Note: Markdown content size is now handled by splitting into multiple steps in generatePrompt
+	return nil
+}
 
-	log.Printf("Workflow: %s, Tools: %d", workflowData.Name, len(workflowData.Tools))
-
-	// Note: compute-text functionality is now inlined directly in the task job
-	// instead of using a shared action file
-
+// generateAndValidateYAML generates GitHub Actions YAML and validates
+// the output size and format.
+func (c *Compiler) generateAndValidateYAML(workflowData *WorkflowData, markdownPath string, lockFile string) (string, error) {
 	// Generate the YAML content
 	yamlContent, err := c.generateYAML(workflowData, markdownPath)
 	if err != nil {
-		return formatCompilerError(markdownPath, "error", fmt.Sprintf("failed to generate YAML: %v", err))
+		return "", formatCompilerError(markdownPath, "error", fmt.Sprintf("failed to generate YAML: %v", err))
 	}
 
 	// Always validate expression sizes - this is a hard limit from GitHub Actions (21KB)
@@ -324,7 +291,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		if writeErr := os.WriteFile(invalidFile, []byte(yamlContent), 0644); writeErr == nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Invalid workflow YAML written to: %s", console.ToRelativePath(invalidFile))))
 		}
-		return formattedErr
+		return "", formattedErr
 	}
 
 	// Validate for template injection vulnerabilities - detect unsafe expression usage in run: commands
@@ -337,7 +304,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		if writeErr := os.WriteFile(invalidFile, []byte(yamlContent), 0644); writeErr == nil {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Workflow with template injection risks written to: %s", console.ToRelativePath(invalidFile))))
 		}
-		return formattedErr
+		return "", formattedErr
 	}
 
 	// Validate against GitHub Actions schema (unless skipped)
@@ -351,7 +318,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 			if writeErr := os.WriteFile(invalidFile, []byte(yamlContent), 0644); writeErr == nil {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Invalid workflow YAML written to: %s", console.ToRelativePath(invalidFile))))
 			}
-			return formattedErr
+			return "", formattedErr
 		}
 
 		// Validate container images used in MCP configurations
@@ -366,25 +333,31 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		// Validate runtime packages (npx, uv)
 		log.Print("Validating runtime packages")
 		if err := c.validateRuntimePackages(workflowData); err != nil {
-			return formatCompilerError(markdownPath, "error", fmt.Sprintf("runtime package validation failed: %v", err))
+			return "", formatCompilerError(markdownPath, "error", fmt.Sprintf("runtime package validation failed: %v", err))
 		}
 
 		// Validate firewall configuration (log-level enum)
 		log.Print("Validating firewall configuration")
 		if err := c.validateFirewallConfig(workflowData); err != nil {
-			return formatCompilerError(markdownPath, "error", fmt.Sprintf("firewall configuration validation failed: %v", err))
+			return "", formatCompilerError(markdownPath, "error", fmt.Sprintf("firewall configuration validation failed: %v", err))
 		}
 
 		// Validate repository features (discussions, issues)
 		log.Print("Validating repository features")
 		if err := c.validateRepositoryFeatures(workflowData); err != nil {
-			return formatCompilerError(markdownPath, "error", fmt.Sprintf("repository feature validation failed: %v", err))
+			return "", formatCompilerError(markdownPath, "error", fmt.Sprintf("repository feature validation failed: %v", err))
 		}
 	} else if c.verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Schema validation available but skipped (use SetSkipValidation(false) to enable)"))
 		c.IncrementWarningCount()
 	}
 
+	return yamlContent, nil
+}
+
+// writeWorkflowOutput writes the compiled workflow to the lock file
+// and handles console output formatting.
+func (c *Compiler) writeWorkflowOutput(lockFile, yamlContent string, markdownPath string) error {
 	// Write to lock file (unless noEmit is enabled)
 	if c.noEmit {
 		log.Print("Validation completed - no lock file generated (--no-emit enabled)")
@@ -436,6 +409,62 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 		}
 	}
 	return nil
+}
+
+// CompileWorkflowData compiles a workflow from already-parsed WorkflowData
+// This avoids re-parsing when the data has already been parsed
+func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error {
+	// Store markdownPath for use in dynamic tool generation and prompt generation
+	c.markdownPath = markdownPath
+
+	// Track compilation time for performance monitoring
+	startTime := time.Now()
+	defer func() {
+		if log.Enabled() {
+			log.Printf("Compilation completed in %v", time.Since(startTime))
+		}
+	}()
+
+	// Reset the step order tracker for this compilation
+	c.stepOrderTracker = NewStepOrderTracker()
+
+	// Reset schedule friendly formats for this compilation
+	c.scheduleFriendlyFormats = nil
+
+	// Reset the artifact manager for this compilation
+	if c.artifactManager == nil {
+		c.artifactManager = NewArtifactManager()
+	} else {
+		c.artifactManager.Reset()
+	}
+
+	// Generate lock file name
+	lockFile := stringutil.MarkdownToLockFile(markdownPath)
+
+	// Sanitize the lock file path to prevent path traversal attacks
+	lockFile = filepath.Clean(lockFile)
+
+	log.Printf("Starting compilation: %s -> %s", markdownPath, lockFile)
+
+	// Validate workflow data
+	if err := c.validateWorkflowData(workflowData, markdownPath); err != nil {
+		return err
+	}
+
+	// Note: Markdown content size is now handled by splitting into multiple steps in generatePrompt
+	log.Printf("Workflow: %s, Tools: %d", workflowData.Name, len(workflowData.Tools))
+
+	// Note: compute-text functionality is now inlined directly in the task job
+	// instead of using a shared action file
+
+	// Generate and validate YAML
+	yamlContent, err := c.generateAndValidateYAML(workflowData, markdownPath, lockFile)
+	if err != nil {
+		return err
+	}
+
+	// Write output
+	return c.writeWorkflowOutput(lockFile, yamlContent, markdownPath)
 }
 
 // ParseWorkflowFile parses a markdown workflow file and extracts all necessary data

@@ -297,3 +297,227 @@ engine: copilot
 	// Artifact manager should still exist (it's reset, not recreated to nil)
 	require.NotNil(t, compiler.artifactManager, "Artifact manager should persist after reset")
 }
+
+// TestValidateWorkflowData tests the validateWorkflowData function
+func TestValidateWorkflowData(t *testing.T) {
+	tests := []struct {
+		name          string
+		workflowData  *WorkflowData
+		strictMode    bool
+		shouldError   bool
+		errorContains string
+	}{
+		{
+			name: "valid workflow",
+			workflowData: &WorkflowData{
+				Name:            "Valid Workflow",
+				Command:         []string{"echo", "test"},
+				MarkdownContent: "# Test",
+				AI:              "copilot",
+			},
+			strictMode:  false,
+			shouldError: false,
+		},
+		{
+			name: "invalid action-mode feature flag",
+			workflowData: &WorkflowData{
+				Name:            "Invalid Action Mode",
+				Command:         []string{"echo", "test"},
+				MarkdownContent: "# Test",
+				AI:              "copilot",
+				Features: map[string]any{
+					"action-mode": "invalid-mode",
+				},
+			},
+			strictMode:    false,
+			shouldError:   true,
+			errorContains: "invalid action-mode feature flag",
+		},
+		{
+			name: "missing permissions for agentic-workflows tool",
+			workflowData: &WorkflowData{
+				Name:            "Missing Permissions",
+				Command:         []string{"echo", "test"},
+				MarkdownContent: "# Test",
+				AI:              "copilot",
+				Tools: map[string]any{
+					"agentic-workflows": map[string]any{},
+				},
+				Permissions: "", // No permissions
+			},
+			strictMode:    false,
+			shouldError:   true,
+			errorContains: "Missing required permission for agentic-workflows tool",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "validate-test")
+			markdownPath := filepath.Join(tmpDir, "test.md")
+
+			compiler := NewCompiler()
+			compiler.strictMode = tt.strictMode
+			err := compiler.validateWorkflowData(tt.workflowData, markdownPath)
+
+			if tt.shouldError {
+				require.Error(t, err, "Expected validation to fail")
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains, "Error should contain expected message")
+				}
+			} else {
+				require.NoError(t, err, "Expected validation to pass")
+			}
+		})
+	}
+}
+
+// TestGenerateAndValidateYAML tests the generateAndValidateYAML function
+func TestGenerateAndValidateYAML(t *testing.T) {
+	tests := []struct {
+		name          string
+		workflowData  *WorkflowData
+		shouldError   bool
+		errorContains string
+	}{
+		{
+			name: "valid workflow generates YAML",
+			workflowData: &WorkflowData{
+				Name:            "Test Workflow",
+				Command:         []string{"echo", "test"},
+				MarkdownContent: "# Test",
+				AI:              "copilot",
+			},
+			shouldError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "yaml-test")
+			markdownPath := filepath.Join(tmpDir, "test.md")
+			lockFile := stringutil.MarkdownToLockFile(markdownPath)
+
+			compiler := NewCompiler()
+			// Initialize required state
+			compiler.markdownPath = markdownPath
+			compiler.stepOrderTracker = NewStepOrderTracker()
+			compiler.artifactManager = NewArtifactManager()
+
+			yamlContent, err := compiler.generateAndValidateYAML(tt.workflowData, markdownPath, lockFile)
+
+			if tt.shouldError {
+				require.Error(t, err, "Expected YAML generation to fail")
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains, "Error should contain expected message")
+				}
+			} else {
+				require.NoError(t, err, "Expected YAML generation to pass")
+				assert.NotEmpty(t, yamlContent, "YAML content should not be empty")
+				assert.Contains(t, yamlContent, "name:", "YAML should contain workflow name")
+				assert.Contains(t, yamlContent, "jobs:", "YAML should contain jobs section")
+			}
+		})
+	}
+}
+
+// TestWriteWorkflowOutput tests the writeWorkflowOutput function
+func TestWriteWorkflowOutput(t *testing.T) {
+	tests := []struct {
+		name          string
+		yamlContent   string
+		noEmit        bool
+		quiet         bool
+		shouldError   bool
+		checkFileSize bool
+	}{
+		{
+			name:          "write valid YAML",
+			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:        false,
+			quiet:         false,
+			shouldError:   false,
+			checkFileSize: true,
+		},
+		{
+			name:          "no emit mode",
+			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:        true,
+			quiet:         false,
+			shouldError:   false,
+			checkFileSize: false,
+		},
+		{
+			name:          "quiet mode",
+			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:        false,
+			quiet:         true,
+			shouldError:   false,
+			checkFileSize: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := testutil.TempDir(t, "output-test")
+			markdownPath := filepath.Join(tmpDir, "test.md")
+			lockFile := stringutil.MarkdownToLockFile(markdownPath)
+
+			compiler := NewCompiler()
+			compiler.noEmit = tt.noEmit
+			compiler.quiet = tt.quiet
+
+			err := compiler.writeWorkflowOutput(lockFile, tt.yamlContent, markdownPath)
+
+			if tt.shouldError {
+				require.Error(t, err, "Expected write to fail")
+			} else {
+				require.NoError(t, err, "Expected write to pass")
+
+				if tt.checkFileSize {
+					// Verify file was created
+					_, err := os.Stat(lockFile)
+					require.NoError(t, err, "Lock file should be created")
+
+					// Verify content
+					content, err := os.ReadFile(lockFile)
+					require.NoError(t, err, "Should be able to read lock file")
+					assert.Equal(t, tt.yamlContent, string(content), "File content should match")
+				} else {
+					// Verify file was NOT created in noEmit mode
+					_, err := os.Stat(lockFile)
+					assert.True(t, os.IsNotExist(err), "Lock file should not exist in noEmit mode")
+				}
+			}
+		})
+	}
+}
+
+// TestWriteWorkflowOutput_ContentUnchanged tests that the file is not rewritten if content hasn't changed
+func TestWriteWorkflowOutput_ContentUnchanged(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "unchanged-test")
+	markdownPath := filepath.Join(tmpDir, "test.md")
+	lockFile := stringutil.MarkdownToLockFile(markdownPath)
+
+	yamlContent := "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n"
+
+	// Write initial content
+	require.NoError(t, os.WriteFile(lockFile, []byte(yamlContent), 0644))
+
+	// Get initial modification time
+	initialInfo, err := os.Stat(lockFile)
+	require.NoError(t, err)
+	initialModTime := initialInfo.ModTime()
+
+	// Write same content again
+	compiler := NewCompiler()
+	err = compiler.writeWorkflowOutput(lockFile, yamlContent, markdownPath)
+	require.NoError(t, err)
+
+	// Check that modification time hasn't changed (file wasn't rewritten)
+	finalInfo, err := os.Stat(lockFile)
+	require.NoError(t, err)
+	finalModTime := finalInfo.ModTime()
+
+	assert.Equal(t, initialModTime, finalModTime, "File should not be rewritten if content is unchanged")
+}
