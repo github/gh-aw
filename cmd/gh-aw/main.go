@@ -25,9 +25,11 @@ var bannerFlag bool
 
 // validateEngine validates the engine flag value
 func validateEngine(engine string) error {
-	validEngines := []string{"claude", "codex", "copilot", "custom"}
+	// Get the global engine registry
+	registry := workflow.GetGlobalEngineRegistry()
+	validEngines := registry.GetSupportedEngines()
 
-	if engine != "" && engine != "claude" && engine != "codex" && engine != "copilot" && engine != "custom" {
+	if engine != "" && !registry.IsValidEngine(engine) {
 		// Try to find close matches for "did you mean" suggestion
 		suggestions := parser.FindClosestMatches(engine, validEngines, 1)
 
