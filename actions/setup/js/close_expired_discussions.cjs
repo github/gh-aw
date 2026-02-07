@@ -1,8 +1,7 @@
 // @ts-check
 // <reference types="@actions/github-script" />
 
-const { searchEntitiesWithExpiration } = require("./expired_entity_search_helpers.cjs");
-const { buildExpirationSummary, categorizeByExpiration, DEFAULT_GRAPHQL_DELAY_MS, DEFAULT_MAX_UPDATES_PER_RUN, processExpiredEntities } = require("./expired_entity_cleanup_helpers.cjs");
+const { executeExpiredEntityCleanup } = require("./expired_entity_main_flow.cjs");
 
 /**
  * Add comment to a GitHub Discussion using GraphQL
@@ -91,58 +90,14 @@ async function main() {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
 
-  core.info(`Searching for expired discussions in ${owner}/${repo}`);
-
-  // Search for discussions with expiration markers (enable dedupe for discussions)
-  const { items: discussionsWithExpiration, stats: searchStats } = await searchEntitiesWithExpiration(github, owner, repo, {
+  await executeExpiredEntityCleanup(github, owner, repo, {
     entityType: "discussions",
     graphqlField: "discussions",
     resultKey: "discussions",
+    entityLabel: "Discussion",
+    summaryHeading: "Expired Discussions Cleanup",
     enableDedupe: true, // Discussions may have duplicates across pages
-  });
-
-  if (discussionsWithExpiration.length === 0) {
-    core.info("No discussions with expiration markers found");
-
-    // Write summary even when no discussions found
-    let summaryContent = `## Expired Discussions Cleanup\n\n`;
-    summaryContent += `**Scanned**: ${searchStats.totalScanned} discussions across ${searchStats.pageCount} page(s)\n\n`;
-    summaryContent += `**Result**: No discussions with expiration markers found\n`;
-    await core.summary.addRaw(summaryContent).write();
-
-    return;
-  }
-
-  core.info(`Found ${discussionsWithExpiration.length} discussion(s) with expiration markers`);
-
-  const {
-    expired: expiredDiscussions,
-    notExpired: notExpiredDiscussions,
-    now,
-  } = categorizeByExpiration(discussionsWithExpiration, {
-    entityLabel: "Discussion",
-  });
-
-  if (expiredDiscussions.length === 0) {
-    core.info("No expired discussions found");
-
-    // Write summary when no expired discussions
-    let summaryContent = `## Expired Discussions Cleanup\n\n`;
-    summaryContent += `**Scanned**: ${searchStats.totalScanned} discussions across ${searchStats.pageCount} page(s)\n\n`;
-    summaryContent += `**With expiration markers**: ${discussionsWithExpiration.length} discussion(s)\n\n`;
-    summaryContent += `**Expired**: 0 discussions\n\n`;
-    summaryContent += `**Not yet expired**: ${notExpiredDiscussions.length} discussion(s)\n`;
-    await core.summary.addRaw(summaryContent).write();
-
-    return;
-  }
-
-  core.info(`Found ${expiredDiscussions.length} expired discussion(s)`);
-
-  const { closed, skipped, failed } = await processExpiredEntities(expiredDiscussions, {
-    entityLabel: "Discussion",
-    maxPerRun: DEFAULT_MAX_UPDATES_PER_RUN,
-    delayMs: DEFAULT_GRAPHQL_DELAY_MS,
+    includeSkippedHeading: true,
     processEntity: async discussion => {
       core.info(`  Checking for existing expiration comment and closed state on discussion #${discussion.number}`);
       const { hasComment, isClosed } = await hasExpirationComment(github, discussion.id);
@@ -196,24 +151,6 @@ async function main() {
       };
     },
   });
-
-  const summaryContent = buildExpirationSummary({
-    heading: "Expired Discussions Cleanup",
-    entityLabel: "Discussion",
-    searchStats,
-    withExpirationCount: discussionsWithExpiration.length,
-    expired: expiredDiscussions,
-    notExpired: notExpiredDiscussions,
-    closed,
-    skipped,
-    failed,
-    maxPerRun: DEFAULT_MAX_UPDATES_PER_RUN,
-    includeSkippedHeading: true,
-    now,
-  });
-
-  await core.summary.addRaw(summaryContent).write();
-  core.info(`Successfully closed ${closed.length} expired discussion(s)`);
 }
 
 module.exports = { main };
