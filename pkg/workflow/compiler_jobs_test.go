@@ -1145,12 +1145,12 @@ Test content`
 	if !strings.Contains(yamlStr, "build:") {
 		t.Fatal("build job not found")
 	}
-	
+
 	// Check if build job has dependencies (either as array or single)
 	// Since jobs auto-depend on activation, we should see lint and test referenced
 	hasBothDeps := (strings.Contains(yamlStr, "needs.lint.") || strings.Contains(yamlStr, "- lint")) &&
 		(strings.Contains(yamlStr, "needs.test.") || strings.Contains(yamlStr, "- test"))
-	
+
 	if !hasBothDeps {
 		t.Error("Expected build job to depend on both lint and test")
 	}
