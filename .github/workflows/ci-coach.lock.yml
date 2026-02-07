@@ -29,7 +29,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: c85676d872f6d6b43ce2e3561ae38c263405f8c380d10ab9256cbb4887f6a8d7
+# frontmatter-hash: db7f1b6d87e68f8ccd4c7ece4c4b77d401c56eafe9cf91763ae92ed9fe09277a
 
 name: "CI Optimization Coach"
 "on":
@@ -127,7 +127,7 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Download CI workflow runs from last 7 days
-        run: "# Download workflow runs for the ci workflow\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,displayTitle,headBranch,event,url,workflowDatabaseId,number > /tmp/ci-runs.json\n\n# Create directory for artifacts\nmkdir -p /tmp/ci-artifacts\n\n# Download artifacts from recent runs (last 5 successful runs)\necho \"Downloading artifacts from recent CI runs...\"\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --status success --limit 5 --json databaseId | jq -r '.[].databaseId' | while read -r run_id; do\n  echo \"Processing run $run_id\"\n  gh run download \"$run_id\" --repo ${{ github.repository }} --dir \"/tmp/ci-artifacts/$run_id\" 2>/dev/null || echo \"No artifacts for run $run_id\"\ndone\n\necho \"CI runs data saved to /tmp/ci-runs.json\"\necho \"Artifacts saved to /tmp/ci-artifacts/\"\n\n# Summarize downloaded artifacts\necho \"## Downloaded Artifacts\" >> $GITHUB_STEP_SUMMARY\nfind /tmp/ci-artifacts -type f -name \"*.txt\" -o -name \"*.html\" -o -name \"*.json\" | head -20 | while read -r f; do\n  echo \"- $(basename $f)\" >> $GITHUB_STEP_SUMMARY\ndone\n"
+        run: "# Download workflow runs for the ci workflow\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --limit 100 --json databaseId,status,conclusion,createdAt,updatedAt,displayTitle,headBranch,event,url,workflowDatabaseId,number > /tmp/ci-runs.json\n\n# Create directory for artifacts\nmkdir -p /tmp/ci-artifacts\n\n# Download artifacts from recent runs (last 5 successful runs)\necho \"Downloading artifacts from recent CI runs...\"\ngh run list --repo ${{ github.repository }} --workflow=ci.yml --status success --limit 5 --json databaseId | jq -r '.[].databaseId' | while read -r run_id; do\n  echo \"Processing run $run_id\"\n  gh run download \"$run_id\" --repo ${{ github.repository }} --dir \"/tmp/ci-artifacts/$run_id\" 2>/dev/null || echo \"No artifacts for run $run_id\"\ndone\n\necho \"CI runs data saved to /tmp/ci-runs.json\"\necho \"Artifacts saved to /tmp/ci-artifacts/\"\n\n# Summarize downloaded artifacts\necho \"## Downloaded Artifacts\" >> \"$GITHUB_STEP_SUMMARY\"\nfind /tmp/ci-artifacts -type f -name \"*.txt\" -o -name \"*.html\" -o -name \"*.json\" | head -20 | while read -r f; do\n  echo \"- $(basename \"$f\")\" >> \"$GITHUB_STEP_SUMMARY\"\ndone\n"
       - name: Setup Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
         with:

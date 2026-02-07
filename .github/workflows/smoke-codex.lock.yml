@@ -142,7 +142,7 @@ jobs:
         with:
           go-version: '1.25'
       - name: Capture GOROOT for AWF chroot mode
-        run: echo "GOROOT=$(go env GOROOT)" >> $GITHUB_ENV
+        run: echo "GOROOT=$(go env GOROOT)" >> "$GITHUB_ENV"
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       # Cache memory file share configuration from frontmatter processed below
