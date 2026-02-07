@@ -685,7 +685,8 @@ func TestDeduplicateErrorMessageFormat(t *testing.T) {
 // Python runtime requirement. This prevents the compiler from generating a
 // duplicate Python setup step with the default version.
 //
-// Regression test for: https://github.com/github/gh-aw/issues/[issue-number]
+// Regression test to ensure user-specified versions are preserved when they
+// differ from default versions (e.g., user specifies 3.9 vs default 3.12).
 func TestDeduplicatePreservesUserPythonVersion(t *testing.T) {
 	// Test case: User has setup-python with python-version: '3.9'
 	// and runs a python command, which auto-detects Python runtime
