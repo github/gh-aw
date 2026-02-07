@@ -611,76 +611,156 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         core.warning('content_number/issue/pull_request is ignored when content_type is "draft_issue".');
       }
 
-      const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
-      if (!draftTitle) {
-        throw new Error('Invalid draft_title. When content_type is "draft_issue", draft_title is required and must be a non-empty string.');
-      }
+      // Extract and normalize temporary_id and draft_issue_id (strip # prefix if present)
+      const rawTemporaryId = typeof output.temporary_id === "string" ? output.temporary_id.trim() : "";
+      const temporaryId = rawTemporaryId.startsWith("#") ? rawTemporaryId.slice(1) : rawTemporaryId;
+      
+      const rawDraftIssueId = typeof output.draft_issue_id === "string" ? output.draft_issue_id.trim() : "";
+      const draftIssueId = rawDraftIssueId.startsWith("#") ? rawDraftIssueId.slice(1) : rawDraftIssueId;
 
+      const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
       const draftBody = typeof output.draft_body === "string" ? output.draft_body : undefined;
 
-      // Check for existing draft issue with the same title
-      const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
-        let hasNextPage = true;
-        let endCursor = null;
+      let itemId;
+      let resolvedTemporaryId = temporaryId;
 
-        while (hasNextPage) {
-          const result = await github.graphql(
-            `query($projectId: ID!, $after: String) {
-              node(id: $projectId) {
-                ... on ProjectV2 {
-                  items(first: 100, after: $after) {
-                    nodes {
-                      id
-                      content {
-                        __typename
-                        ... on DraftIssue {
-                          id
-                          title
+      // Mode 1: Update existing draft via draft_issue_id
+      if (draftIssueId) {
+        // Try to resolve draft_issue_id from temporaryIdMap
+        const resolved = temporaryIdMap.get(draftIssueId.toLowerCase());
+        if (resolved && resolved.draftItemId) {
+          itemId = resolved.draftItemId;
+          core.info(`✓ Resolved draft_issue_id "${draftIssueId}" to item ${itemId}`);
+        } else {
+          // Fall back to title-based lookup if title is provided
+          if (draftTitle) {
+            const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
+              let hasNextPage = true;
+              let endCursor = null;
+
+              while (hasNextPage) {
+                const result = await github.graphql(
+                  `query($projectId: ID!, $after: String) {
+                    node(id: $projectId) {
+                      ... on ProjectV2 {
+                        items(first: 100, after: $after) {
+                          nodes {
+                            id
+                            content {
+                              __typename
+                              ... on DraftIssue {
+                                id
+                                title
+                              }
+                            }
+                          }
+                          pageInfo {
+                            hasNextPage
+                            endCursor
+                          }
                         }
                       }
                     }
-                    pageInfo {
-                      hasNextPage
-                      endCursor
+                  }`,
+                  { projectId, after: endCursor }
+                );
+
+                const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
+                if (found) return found;
+
+                hasNextPage = result.node.items.pageInfo.hasNextPage;
+                endCursor = result.node.items.pageInfo.endCursor;
+              }
+
+              return null;
+            })(projectId, draftTitle);
+
+            if (existingDraftItem) {
+              itemId = existingDraftItem.id;
+              core.info(`✓ Found draft issue "${draftTitle}" by title fallback`);
+            } else {
+              throw new Error(`draft_issue_id "${draftIssueId}" not found in temporary ID map and no draft with title "${draftTitle}" found`);
+            }
+          } else {
+            throw new Error(`draft_issue_id "${draftIssueId}" not found in temporary ID map and no draft_title provided for fallback lookup`);
+          }
+        }
+      } 
+      // Mode 2: Create new draft or find by title
+      else {
+        if (!draftTitle) {
+          throw new Error('Invalid draft_title. When content_type is "draft_issue" and draft_issue_id is not provided, draft_title is required and must be a non-empty string.');
+        }
+
+        // Check for existing draft issue with the same title
+        const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
+          let hasNextPage = true;
+          let endCursor = null;
+
+          while (hasNextPage) {
+            const result = await github.graphql(
+              `query($projectId: ID!, $after: String) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
+                    items(first: 100, after: $after) {
+                      nodes {
+                        id
+                        content {
+                          __typename
+                          ... on DraftIssue {
+                            id
+                            title
+                          }
+                        }
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
                     }
                   }
                 }
+              }`,
+              { projectId, after: endCursor }
+            );
+
+            const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
+            if (found) return found;
+
+            hasNextPage = result.node.items.pageInfo.hasNextPage;
+            endCursor = result.node.items.pageInfo.endCursor;
+          }
+
+          return null;
+        })(projectId, draftTitle);
+
+        if (existingDraftItem) {
+          itemId = existingDraftItem.id;
+          core.info(`✓ Found existing draft issue "${draftTitle}" - updating fields instead of creating duplicate`);
+        } else {
+          const result = await github.graphql(
+            `mutation($projectId: ID!, $title: String!, $body: String) {
+              addProjectV2DraftIssue(input: {
+                projectId: $projectId,
+                title: $title,
+                body: $body
+              }) {
+                projectItem {
+                  id
+                }
               }
             }`,
-            { projectId, after: endCursor }
+            { projectId, title: draftTitle, body: draftBody }
           );
+          itemId = result.addProjectV2DraftIssue.projectItem.id;
+          core.info(`✓ Created new draft issue "${draftTitle}"`);
 
-          const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
-          if (found) return found;
-
-          hasNextPage = result.node.items.pageInfo.hasNextPage;
-          endCursor = result.node.items.pageInfo.endCursor;
+          // Store temporary_id mapping if provided
+          if (temporaryId) {
+            temporaryIdMap.set(temporaryId.toLowerCase(), { draftItemId: itemId });
+            core.info(`✓ Stored temporary_id mapping: ${temporaryId} -> ${itemId}`);
+          }
         }
-
-        return null;
-      })(projectId, draftTitle);
-
-      let itemId;
-      if (existingDraftItem) {
-        itemId = existingDraftItem.id;
-        core.info(`✓ Found existing draft issue "${draftTitle}" - updating fields instead of creating duplicate`);
-      } else {
-        const result = await github.graphql(
-          `mutation($projectId: ID!, $title: String!, $body: String) {
-            addProjectV2DraftIssue(input: {
-              projectId: $projectId,
-              title: $title,
-              body: $body
-            }) {
-              projectItem {
-                id
-              }
-            }
-          }`,
-          { projectId, title: draftTitle, body: draftBody }
-        );
-        itemId = result.addProjectV2DraftIssue.projectItem.id;
-        core.info(`✓ Created new draft issue "${draftTitle}"`);
       }
 
       const fieldsToUpdate = output.fields ? { ...output.fields } : {};
@@ -811,6 +891,9 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       }
 
       core.setOutput("item-id", itemId);
+      if (resolvedTemporaryId) {
+        core.setOutput("temporary-id", resolvedTemporaryId);
+      }
       return;
     }
     let contentNumber = null;
