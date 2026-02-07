@@ -21,7 +21,7 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: d3abde5792b76d4609a2dfeba265b24f8c83e91db2dda2dc2762a00b00dbe5b2
+# frontmatter-hash: fda3821e70fae5f450a65c2b0ce82f1b94aba2c48f8cb148c6d788f9678cb214
 
 name: "Issue Monster"
 "on":
@@ -29,7 +29,7 @@ name: "Issue Monster"
   - cron: "*/10 * * * *"
     # Friendly format: every 10m
   # skip-if-match: # Skip-if-match processed as search check in pre-activation job
-    # max: 6
+    # max: 9
     # query: is:pr is:open is:draft author:app/copilot-swe-agent
   # skip-if-no-match: is:issue is:open # Skip-if-no-match processed as search check in pre-activation job
   workflow_dispatch:
@@ -1039,7 +1039,7 @@ jobs:
         env:
           GH_AW_SKIP_QUERY: "is:pr is:open is:draft author:app/copilot-swe-agent"
           GH_AW_WORKFLOW_NAME: "Issue Monster"
-          GH_AW_SKIP_MAX_MATCHES: "6"
+          GH_AW_SKIP_MAX_MATCHES: "9"
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
