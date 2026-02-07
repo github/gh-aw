@@ -145,6 +145,11 @@ func extractBotsFromContent(content string) (string, error) {
 	return extractFrontmatterField(content, "bots", "[]")
 }
 
+// extractPluginsFromContent extracts plugins section from frontmatter as JSON string
+func extractPluginsFromContent(content string) (string, error) {
+	return extractFrontmatterField(content, "plugins", "[]")
+}
+
 // extractPostStepsFromContent extracts post-steps section from frontmatter as YAML string
 func extractPostStepsFromContent(content string) (string, error) {
 	result, err := ExtractFrontmatterFromContent(content)

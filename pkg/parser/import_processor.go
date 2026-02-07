@@ -29,6 +29,7 @@ type ImportsResult struct {
 	MergedPermissions   string   // Merged permissions configuration from all imports
 	MergedSecretMasking string   // Merged secret-masking steps from all imports
 	MergedBots          []string // Merged bots list from all imports (union of bot names)
+	MergedPlugins       []string // Merged plugins list from all imports (union of plugin repos)
 	MergedPostSteps     string   // Merged post-steps configuration from all imports (appended in order)
 	MergedLabels        []string // Merged labels from all imports (union of label names)
 	MergedCaches        []string // Merged cache configurations from all imports (appended in order)
@@ -180,6 +181,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	var safeInputs []string
 	var bots []string                    // Track unique bot names
 	botsSet := make(map[string]bool)     // Set for deduplicating bots
+	var plugins []string                 // Track unique plugin repos
+	pluginsSet := make(map[string]bool)  // Set for deduplicating plugins
 	var labels []string                  // Track unique labels
 	labelsSet := make(map[string]bool)   // Set for deduplicating labels
 	var caches []string                  // Track cache configurations (appended in order)
@@ -544,6 +547,21 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			}
 		}
 
+		// Extract plugins from imported file (merge into set to avoid duplicates)
+		pluginsContent, err := extractPluginsFromContent(string(content))
+		if err == nil && pluginsContent != "" && pluginsContent != "[]" {
+			// Parse plugins JSON array
+			var importedPlugins []string
+			if jsonErr := json.Unmarshal([]byte(pluginsContent), &importedPlugins); jsonErr == nil {
+				for _, plugin := range importedPlugins {
+					if !pluginsSet[plugin] {
+						pluginsSet[plugin] = true
+						plugins = append(plugins, plugin)
+					}
+				}
+			}
+		}
+
 		// Extract post-steps from imported file (append in order)
 		postStepsContent, err := extractPostStepsFromContent(string(content))
 		if err == nil && postStepsContent != "" {
@@ -593,6 +611,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedPermissions:   permissionsBuilder.String(),
 		MergedSecretMasking: secretMaskingBuilder.String(),
 		MergedBots:          bots,
+		MergedPlugins:       plugins,
 		MergedPostSteps:     postStepsBuilder.String(),
 		MergedLabels:        labels,
 		MergedCaches:        caches,

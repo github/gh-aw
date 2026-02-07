@@ -144,6 +144,35 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v)", len(plugins), pluginsToken != "")
 	}
 
+	// Merge plugins from imports with top-level plugins
+	if len(importsResult.MergedPlugins) > 0 {
+		orchestratorToolsLog.Printf("Merging %d plugins from imports", len(importsResult.MergedPlugins))
+		// Create a set to track unique plugins
+		pluginsSet := make(map[string]bool)
+
+		// Add imported plugins first (imports have lower priority)
+		for _, plugin := range importsResult.MergedPlugins {
+			pluginsSet[plugin] = true
+		}
+
+		// Add top-level plugins (these override/supplement imports)
+		for _, plugin := range plugins {
+			pluginsSet[plugin] = true
+		}
+
+		// Convert set back to slice
+		mergedPlugins := make([]string, 0, len(pluginsSet))
+		for plugin := range pluginsSet {
+			mergedPlugins = append(mergedPlugins, plugin)
+		}
+
+		// Sort for deterministic output
+		sort.Strings(mergedPlugins)
+		plugins = mergedPlugins
+
+		orchestratorToolsLog.Printf("Merged plugins: %d total unique plugins", len(plugins))
+	}
+
 	// Add MCP fetch server if needed (when web-fetch is requested but engine doesn't support it)
 	tools, _ = AddMCPFetchServerIfNeeded(tools, agenticEngine)
 
