@@ -169,7 +169,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	var toolsBuilder strings.Builder
 	var mcpServersBuilder strings.Builder
 	var markdownBuilder strings.Builder // Only used for imports WITH inputs (compile-time substitution)
-	var importPaths []string             // NEW: Track import paths for runtime-import macro generation
+	var importPaths []string            // NEW: Track import paths for runtime-import macro generation
 	var stepsBuilder strings.Builder
 	var copilotSetupStepsBuilder strings.Builder // Track copilot-setup-steps.yml separately
 	var runtimesBuilder strings.Builder
@@ -317,7 +317,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			} else {
 				// Has inputs - must inline for compile-time substitution
 				log.Printf("Agent file has inputs - will be inlined instead of runtime-imported")
-				
+
 				// For agent files, extract markdown content (only when inputs are present)
 				markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
 				if err != nil {
@@ -489,7 +489,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		} else {
 			// Has inputs - must inline for compile-time substitution
 			log.Printf("Import %s has inputs - will be inlined for compile-time substitution", importRelPath)
-			
+
 			// Extract markdown content from imported file (only for imports with inputs)
 			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
 			if err != nil {
@@ -639,7 +639,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedSafeOutputs:   safeOutputs,
 		MergedSafeInputs:    safeInputs,
 		MergedMarkdown:      markdownBuilder.String(), // Only imports WITH inputs (for compile-time substitution)
-		ImportPaths:         importPaths,               // Import paths for runtime-import macro generation
+		ImportPaths:         importPaths,              // Import paths for runtime-import macro generation
 		MergedSteps:         stepsBuilder.String(),
 		CopilotSetupSteps:   copilotSetupStepsBuilder.String(),
 		MergedRuntimes:      runtimesBuilder.String(),

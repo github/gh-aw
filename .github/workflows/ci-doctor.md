@@ -32,6 +32,7 @@ safe-outputs:
     title-prefix: "[CI Failure Doctor] "
     labels: [cookie]
   add-comment:
+  update-issue:
   noop:
   messages:
     footer: "> 🩺 *Diagnosis provided by [{workflow_name}]({run_url})*"
@@ -124,18 +125,31 @@ You are the CI Failure Doctor, an expert investigative agent that analyzes faile
 2. **Update Pattern Database**: Enhance knowledge with new findings by updating pattern files
 3. **Save Artifacts**: Store detailed logs and analysis in the cached directories
 
-### Phase 6: Looking for existing issues
+### Phase 6: Looking for existing issues and closing older ones
 
-1. **Convert the report to a search query**
-    - Use any advanced search features in GitHub Issues to find related issues
-    - Look for keywords, error messages, and patterns in existing issues
-2. **Judge each match issues for relevance**
-    - Analyze the content of the issues found by the search and judge if they are similar to this issue.
-3. **Add issue comment to duplicate issue and finish**
-    - If you find a duplicate issue, add a comment with your findings and close the investigation.
-    - Do NOT open a new issue since you found a duplicate already (skip next phases).
+1. **Search for existing CI failure doctor issues**
+    - Use GitHub Issues search to find issues with label "cookie" and title prefix "[CI Failure Doctor]"
+    - Look for both open and recently closed issues (within the last 7 days)
+    - Search for keywords, error messages, and patterns from the current failure
+2. **Judge each match for relevance**
+    - Analyze the content of found issues to determine if they are similar to the current failure
+    - Check if they describe the same root cause, error pattern, or affected components
+    - Identify truly duplicate issues vs. unrelated failures
+3. **Close older duplicate issues**
+    - If you find older open issues that are duplicates of the current failure:
+      - Add a comment explaining this is a duplicate of the new investigation
+      - Use the `update-issue` tool with `state: "closed"` and `state_reason: "not_planned"` to close them
+      - Include a link to the new issue in the comment
+    - If older issues describe resolved problems that are recurring:
+      - Keep them open but add a comment linking to the new occurrence
+4. **Handle duplicate detection**
+    - If you find a very recent duplicate issue (opened within the last hour):
+      - Add a comment with your findings to the existing issue
+      - Do NOT open a new issue (skip next phases)
+      - Exit the workflow
+    - Otherwise, continue to create a new issue with fresh investigation data
 
-### Phase 6: Reporting and Recommendations
+### Phase 7: Reporting and Recommendations
 1. **Create Investigation Report**: Generate a comprehensive analysis including:
    - **Executive Summary**: Quick overview of the failure
    - **Root Cause**: Detailed explanation of what went wrong
