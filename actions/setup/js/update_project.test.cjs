@@ -514,7 +514,7 @@ describe("updateProject", () => {
       content_type: "draft_issue",
       draft_title: "Draft with temp ID",
       draft_body: "Body content",
-      temporary_id: "aw_smokedraft01",
+      temporary_id: "aw_9f11121ed7df",
     };
 
     queueResponses([
@@ -529,10 +529,10 @@ describe("updateProject", () => {
 
     expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(true);
     expect(getOutput("item-id")).toBe("draft-item-temp");
-    expect(getOutput("temporary-id")).toBe("aw_smokedraft01");
-    expect(temporaryIdMap.get("aw_smokedraft01")).toEqual({ draftItemId: "draft-item-temp" });
+    expect(getOutput("temporary-id")).toBe("aw_9f11121ed7df");
+    expect(temporaryIdMap.get("aw_9f11121ed7df")).toEqual({ draftItemId: "draft-item-temp" });
     expect(mockCore.info).toHaveBeenCalledWith('✓ Created new draft issue "Draft with temp ID"');
-    expect(mockCore.info).toHaveBeenCalledWith("✓ Stored temporary_id mapping: aw_smokedraft01 -> draft-item-temp");
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Stored temporary_id mapping: aw_9f11121ed7df -> draft-item-temp");
   });
 
   it("creates draft issue with temporary_id (with # prefix) and strips prefix", async () => {
@@ -558,13 +558,13 @@ describe("updateProject", () => {
   it("updates draft issue via draft_issue_id using temporary ID map", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const temporaryIdMap = new Map();
-    temporaryIdMap.set("aw_smokedraft01", { draftItemId: "draft-item-existing" });
+    temporaryIdMap.set("aw_9f11121ed7df", { draftItemId: "draft-item-existing" });
 
     const output = {
       type: "update_project",
       project: projectUrl,
       content_type: "draft_issue",
-      draft_issue_id: "aw_smokedraft01",
+      draft_issue_id: "aw_9f11121ed7df",
       fields: { Priority: "High" },
     };
 
@@ -577,7 +577,7 @@ describe("updateProject", () => {
     // Should update fields on existing draft
     expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2ItemFieldValue"))).toBe(true);
     expect(getOutput("item-id")).toBe("draft-item-existing");
-    expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_smokedraft01" to item draft-item-existing');
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_9f11121ed7df" to item draft-item-existing');
   });
 
   it("updates draft issue via draft_issue_id with # prefix", async () => {
@@ -609,7 +609,7 @@ describe("updateProject", () => {
       type: "update_project",
       project: projectUrl,
       content_type: "draft_issue",
-      draft_issue_id: "aw_notfound123",
+      draft_issue_id: "aw_aefe5b4b9585",
       draft_title: "Fallback Draft",
       fields: { Status: "In Progress" },
     };
@@ -637,7 +637,7 @@ describe("updateProject", () => {
       type: "update_project",
       project: projectUrl,
       content_type: "draft_issue",
-      draft_issue_id: "aw_missing1234",
+      draft_issue_id: "aw_1a2b3c4d5e6f",
     };
 
     queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft")]);
@@ -653,7 +653,7 @@ describe("updateProject", () => {
       type: "update_project",
       project: projectUrl,
       content_type: "draft_issue",
-      draft_issue_id: "aw_notfound456",
+      draft_issue_id: "aw_27a9a9bfcc4e",
       draft_title: "Non-existent Draft",
     };
 

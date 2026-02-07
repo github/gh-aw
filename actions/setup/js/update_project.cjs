@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { loadTemporaryIdMap, resolveIssueNumber } = require("./temporary_id.cjs");
+const { loadTemporaryIdMap, resolveIssueNumber, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -308,6 +308,55 @@ function checkFieldTypeMismatch(fieldName, field, expectedDataType) {
   );
   return false; // Continue with existing field type
 }
+
+/**
+ * Find an existing draft issue by title in a project
+ * @param {Object} github - GitHub client (Octokit instance)
+ * @param {string} projectId - Project ID
+ * @param {string} targetTitle - Title to search for
+ * @returns {Promise<{id: string} | null>} Draft item or null if not found
+ */
+async function findExistingDraftByTitle(github, projectId, targetTitle) {
+  let hasNextPage = true;
+  let endCursor = null;
+
+  while (hasNextPage) {
+    const result = await github.graphql(
+      `query($projectId: ID!, $after: String) {
+        node(id: $projectId) {
+          ... on ProjectV2 {
+            items(first: 100, after: $after) {
+              nodes {
+                id
+                content {
+                  __typename
+                  ... on DraftIssue {
+                    id
+                    title
+                  }
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+      }`,
+      { projectId, after: endCursor }
+    );
+
+    const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
+    if (found) return found;
+
+    hasNextPage = result.node.items.pageInfo.hasNextPage;
+    endCursor = result.node.items.pageInfo.endCursor;
+  }
+
+  return null;
+}
+
 /**
  * Update a GitHub Project v2
  * @param {any} output - Safe output configuration
@@ -611,12 +660,22 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         core.warning('content_number/issue/pull_request is ignored when content_type is "draft_issue".');
       }
 
-      // Extract and normalize temporary_id and draft_issue_id (strip # prefix if present)
+      // Extract and normalize temporary_id and draft_issue_id using shared helpers
       const rawTemporaryId = typeof output.temporary_id === "string" ? output.temporary_id.trim() : "";
       const temporaryId = rawTemporaryId.startsWith("#") ? rawTemporaryId.slice(1) : rawTemporaryId;
 
       const rawDraftIssueId = typeof output.draft_issue_id === "string" ? output.draft_issue_id.trim() : "";
       const draftIssueId = rawDraftIssueId.startsWith("#") ? rawDraftIssueId.slice(1) : rawDraftIssueId;
+
+      // Validate temporary_id format if provided
+      if (temporaryId && !isTemporaryId(temporaryId)) {
+        throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
+      }
+
+      // Validate draft_issue_id format if provided
+      if (draftIssueId && !isTemporaryId(draftIssueId)) {
+        throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
+      }
 
       const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
       const draftBody = typeof output.draft_body === "string" ? output.draft_body : undefined;
@@ -626,54 +685,16 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
 
       // Mode 1: Update existing draft via draft_issue_id
       if (draftIssueId) {
-        // Try to resolve draft_issue_id from temporaryIdMap
-        const resolved = temporaryIdMap.get(draftIssueId.toLowerCase());
+        // Try to resolve draft_issue_id from temporaryIdMap using normalized ID
+        const normalized = normalizeTemporaryId(draftIssueId);
+        const resolved = temporaryIdMap.get(normalized);
         if (resolved && resolved.draftItemId) {
           itemId = resolved.draftItemId;
           core.info(`✓ Resolved draft_issue_id "${draftIssueId}" to item ${itemId}`);
         } else {
           // Fall back to title-based lookup if title is provided
           if (draftTitle) {
-            const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
-              let hasNextPage = true;
-              let endCursor = null;
-
-              while (hasNextPage) {
-                const result = await github.graphql(
-                  `query($projectId: ID!, $after: String) {
-                    node(id: $projectId) {
-                      ... on ProjectV2 {
-                        items(first: 100, after: $after) {
-                          nodes {
-                            id
-                            content {
-                              __typename
-                              ... on DraftIssue {
-                                id
-                                title
-                              }
-                            }
-                          }
-                          pageInfo {
-                            hasNextPage
-                            endCursor
-                          }
-                        }
-                      }
-                    }
-                  }`,
-                  { projectId, after: endCursor }
-                );
-
-                const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
-                if (found) return found;
-
-                hasNextPage = result.node.items.pageInfo.hasNextPage;
-                endCursor = result.node.items.pageInfo.endCursor;
-              }
-
-              return null;
-            })(projectId, draftTitle);
+            const existingDraftItem = await findExistingDraftByTitle(github, projectId, draftTitle);
 
             if (existingDraftItem) {
               itemId = existingDraftItem.id;
@@ -693,46 +714,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         }
 
         // Check for existing draft issue with the same title
-        const existingDraftItem = await (async function findExistingDraftByTitle(projectId, targetTitle) {
-          let hasNextPage = true;
-          let endCursor = null;
-
-          while (hasNextPage) {
-            const result = await github.graphql(
-              `query($projectId: ID!, $after: String) {
-                node(id: $projectId) {
-                  ... on ProjectV2 {
-                    items(first: 100, after: $after) {
-                      nodes {
-                        id
-                        content {
-                          __typename
-                          ... on DraftIssue {
-                            id
-                            title
-                          }
-                        }
-                      }
-                      pageInfo {
-                        hasNextPage
-                        endCursor
-                      }
-                    }
-                  }
-                }
-              }`,
-              { projectId, after: endCursor }
-            );
-
-            const found = result.node.items.nodes.find(item => item.content?.__typename === "DraftIssue" && item.content.title === targetTitle);
-            if (found) return found;
-
-            hasNextPage = result.node.items.pageInfo.hasNextPage;
-            endCursor = result.node.items.pageInfo.endCursor;
-          }
-
-          return null;
-        })(projectId, draftTitle);
+        const existingDraftItem = await findExistingDraftByTitle(github, projectId, draftTitle);
 
         if (existingDraftItem) {
           itemId = existingDraftItem.id;
@@ -757,7 +739,8 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
 
           // Store temporary_id mapping if provided
           if (temporaryId) {
-            temporaryIdMap.set(temporaryId.toLowerCase(), { draftItemId: itemId });
+            const normalized = normalizeTemporaryId(temporaryId);
+            temporaryIdMap.set(normalized, { draftItemId: itemId });
             core.info(`✓ Stored temporary_id mapping: ${temporaryId} -> ${itemId}`);
           }
         }
