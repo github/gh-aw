@@ -1350,9 +1350,9 @@ func TestCopilotEnginePluginDiscoveryInSandboxMode(t *testing.T) {
 	engine := NewCopilotEngine()
 
 	tests := []struct {
-		name                string
-		plugins             []string
-		networkPermissions  *NetworkPermissions
+		name                    string
+		plugins                 []string
+		networkPermissions      *NetworkPermissions
 		shouldIncludeCopilotDir bool
 	}{
 		{
@@ -1378,8 +1378,8 @@ func TestCopilotEnginePluginDiscoveryInSandboxMode(t *testing.T) {
 			shouldIncludeCopilotDir: true,
 		},
 		{
-			name:                    "no plugins with firewall enabled",
-			plugins:                 []string{},
+			name:    "no plugins with firewall enabled",
+			plugins: []string{},
 			networkPermissions: &NetworkPermissions{
 				Allowed: []string{"api.github.com"},
 				Firewall: &FirewallConfig{
