@@ -57,15 +57,15 @@ type PluginMCPConfig struct {
 // PluginConfig represents configuration for a single plugin
 // Supports both simple string format and object format with MCP configuration
 type PluginConfig struct {
-	URL string            `json:"url"`           // Plugin repository slug (e.g., "org/repo")
-	MCP *PluginMCPConfig  `json:"mcp,omitempty"` // Optional MCP configuration
+	URL string           `json:"url"`           // Plugin repository slug (e.g., "org/repo")
+	MCP *PluginMCPConfig `json:"mcp,omitempty"` // Optional MCP configuration
 }
 
 // PluginsConfig represents plugin configuration for installation
 // Supports object format with repos list, optional custom github-token
 type PluginsConfig struct {
-	Repos       []string          `json:"repos"`                  // List of plugin repository slugs (required)
-	GitHubToken string            `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
+	Repos       []string `json:"repos"`                  // List of plugin repository slugs (required)
+	GitHubToken string   `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
 }
 
 // FrontmatterConfig represents the structured configuration from workflow frontmatter

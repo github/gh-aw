@@ -397,40 +397,40 @@ type WorkflowData struct {
 	AgentImportSpec      string        // Original import specification for agent file (e.g., "owner/repo/path@ref")
 	RepositoryImports    []string      // Repository-only imports (format: "owner/repo@ref") for .github folder merging
 	StopTime             string
-	SkipIfMatch          *SkipIfMatchConfig   // skip-if-match configuration with query and max threshold
-	SkipIfNoMatch        *SkipIfNoMatchConfig // skip-if-no-match configuration with query and min threshold
-	ManualApproval       string               // environment name for manual approval from on: section
-	Command              []string             // for /command trigger support - multiple command names
-	CommandEvents        []string             // events where command should be active (nil = all events)
-	CommandOtherEvents   map[string]any       // for merging command with other events
-	AIReaction           string               // AI reaction type like "eyes", "heart", etc.
-	LockForAgent         bool                 // whether to lock the issue during agent workflow execution
-	Jobs                 map[string]any       // custom job configurations with dependencies
-	Cache                string               // cache configuration
-	NeedsTextOutput      bool                 // whether the workflow uses ${{ needs.task.outputs.text }}
-	NetworkPermissions   *NetworkPermissions  // parsed network permissions
-	SandboxConfig        *SandboxConfig       // parsed sandbox configuration (AWF or SRT)
-	SafeOutputs          *SafeOutputsConfig   // output configuration for automatic output routes
-	SafeInputs           *SafeInputsConfig    // safe-inputs configuration for custom MCP tools
-	Roles                []string             // permission levels required to trigger workflow
-	Bots                 []string             // allow list of bot identifiers that can trigger workflow
-	CacheMemoryConfig    *CacheMemoryConfig   // parsed cache-memory configuration
-	RepoMemoryConfig     *RepoMemoryConfig    // parsed repo-memory configuration
-	Runtimes             map[string]any                    // runtime version overrides from frontmatter
-	Plugins              []string                          // plugin repository slugs to install (e.g., ["org/repo", "org2/repo2"])
-	PluginsToken         string                            // custom github-token for plugin installation (from plugins.github-token field)
-	PluginMCPConfigs     map[string]*PluginMCPConfig       // Per-plugin MCP configurations (map of plugin URL to MCP config)
-	ToolsTimeout         int                               // timeout in seconds for tool/MCP operations (0 = use engine default)
-	GitHubToken          string               // top-level github-token expression from frontmatter
-	ToolsStartupTimeout  int                  // timeout in seconds for MCP server startup (0 = use engine default)
-	Features             map[string]any       // feature flags and configuration options from frontmatter (supports bool and string values)
-	ActionCache          *ActionCache         // cache for action pin resolutions
-	ActionResolver       *ActionResolver      // resolver for action pins
-	StrictMode           bool                 // strict mode for action pinning
-	SecretMasking        *SecretMaskingConfig // secret masking configuration
-	ParsedFrontmatter    *FrontmatterConfig   // cached parsed frontmatter configuration (for performance optimization)
-	ActionPinWarnings    map[string]bool      // cache of already-warned action pin failures (key: "repo@version")
-	ActionMode           ActionMode           // action mode for workflow compilation (dev, release, script)
+	SkipIfMatch          *SkipIfMatchConfig          // skip-if-match configuration with query and max threshold
+	SkipIfNoMatch        *SkipIfNoMatchConfig        // skip-if-no-match configuration with query and min threshold
+	ManualApproval       string                      // environment name for manual approval from on: section
+	Command              []string                    // for /command trigger support - multiple command names
+	CommandEvents        []string                    // events where command should be active (nil = all events)
+	CommandOtherEvents   map[string]any              // for merging command with other events
+	AIReaction           string                      // AI reaction type like "eyes", "heart", etc.
+	LockForAgent         bool                        // whether to lock the issue during agent workflow execution
+	Jobs                 map[string]any              // custom job configurations with dependencies
+	Cache                string                      // cache configuration
+	NeedsTextOutput      bool                        // whether the workflow uses ${{ needs.task.outputs.text }}
+	NetworkPermissions   *NetworkPermissions         // parsed network permissions
+	SandboxConfig        *SandboxConfig              // parsed sandbox configuration (AWF or SRT)
+	SafeOutputs          *SafeOutputsConfig          // output configuration for automatic output routes
+	SafeInputs           *SafeInputsConfig           // safe-inputs configuration for custom MCP tools
+	Roles                []string                    // permission levels required to trigger workflow
+	Bots                 []string                    // allow list of bot identifiers that can trigger workflow
+	CacheMemoryConfig    *CacheMemoryConfig          // parsed cache-memory configuration
+	RepoMemoryConfig     *RepoMemoryConfig           // parsed repo-memory configuration
+	Runtimes             map[string]any              // runtime version overrides from frontmatter
+	Plugins              []string                    // plugin repository slugs to install (e.g., ["org/repo", "org2/repo2"])
+	PluginsToken         string                      // custom github-token for plugin installation (from plugins.github-token field)
+	PluginMCPConfigs     map[string]*PluginMCPConfig // Per-plugin MCP configurations (map of plugin URL to MCP config)
+	ToolsTimeout         int                         // timeout in seconds for tool/MCP operations (0 = use engine default)
+	GitHubToken          string                      // top-level github-token expression from frontmatter
+	ToolsStartupTimeout  int                         // timeout in seconds for MCP server startup (0 = use engine default)
+	Features             map[string]any              // feature flags and configuration options from frontmatter (supports bool and string values)
+	ActionCache          *ActionCache                // cache for action pin resolutions
+	ActionResolver       *ActionResolver             // resolver for action pins
+	StrictMode           bool                        // strict mode for action pinning
+	SecretMasking        *SecretMaskingConfig        // secret masking configuration
+	ParsedFrontmatter    *FrontmatterConfig          // cached parsed frontmatter configuration (for performance optimization)
+	ActionPinWarnings    map[string]bool             // cache of already-warned action pin failures (key: "repo@version")
+	ActionMode           ActionMode                  // action mode for workflow compilation (dev, release, script)
 }
 
 // BaseSafeOutputConfig holds common configuration fields for all safe output types
