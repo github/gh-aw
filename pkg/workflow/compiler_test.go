@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
@@ -424,36 +425,36 @@ func TestGenerateAndValidateYAML(t *testing.T) {
 // TestWriteWorkflowOutput tests the writeWorkflowOutput function
 func TestWriteWorkflowOutput(t *testing.T) {
 	tests := []struct {
-		name          string
-		yamlContent   string
-		noEmit        bool
-		quiet         bool
-		shouldError   bool
-		checkFileSize bool
+		name              string
+		yamlContent       string
+		noEmit            bool
+		quiet             bool
+		shouldError       bool
+		expectFileWritten bool
 	}{
 		{
-			name:          "write valid YAML",
-			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
-			noEmit:        false,
-			quiet:         false,
-			shouldError:   false,
-			checkFileSize: true,
+			name:              "write valid YAML",
+			yamlContent:       "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:            false,
+			quiet:             false,
+			shouldError:       false,
+			expectFileWritten: true,
 		},
 		{
-			name:          "no emit mode",
-			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
-			noEmit:        true,
-			quiet:         false,
-			shouldError:   false,
-			checkFileSize: false,
+			name:              "no emit mode",
+			yamlContent:       "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:            true,
+			quiet:             false,
+			shouldError:       false,
+			expectFileWritten: false,
 		},
 		{
-			name:          "quiet mode",
-			yamlContent:   "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
-			noEmit:        false,
-			quiet:         true,
-			shouldError:   false,
-			checkFileSize: true,
+			name:              "quiet mode",
+			yamlContent:       "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo test\n",
+			noEmit:            false,
+			quiet:             true,
+			shouldError:       false,
+			expectFileWritten: true,
 		},
 	}
 
@@ -474,7 +475,7 @@ func TestWriteWorkflowOutput(t *testing.T) {
 			} else {
 				require.NoError(t, err, "Expected write to pass")
 
-				if tt.checkFileSize {
+				if tt.expectFileWritten {
 					// Verify file was created
 					_, err := os.Stat(lockFile)
 					require.NoError(t, err, "Lock file should be created")
@@ -508,6 +509,10 @@ func TestWriteWorkflowOutput_ContentUnchanged(t *testing.T) {
 	initialInfo, err := os.Stat(lockFile)
 	require.NoError(t, err)
 	initialModTime := initialInfo.ModTime()
+
+	// Sleep to ensure filesystem mtime resolution is exceeded
+	// Most filesystems have 1-2 second resolution for mtime
+	time.Sleep(2 * time.Second)
 
 	// Write same content again
 	compiler := NewCompiler()
