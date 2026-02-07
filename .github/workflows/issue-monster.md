@@ -51,7 +51,8 @@ jobs:
               core.info('Checking for recent rate-limited PRs...');
               const rateLimitCheckDate = new Date();
               rateLimitCheckDate.setHours(rateLimitCheckDate.getHours() - 1); // Check last hour
-              const rateLimitCheckISO = rateLimitCheckDate.toISOString();
+              // Format as YYYY-MM-DDTHH:MM:SS for GitHub search API
+              const rateLimitCheckISO = rateLimitCheckDate.toISOString().split('.')[0] + 'Z';
               
               const recentPRsQuery = `is:pr author:app/copilot-swe-agent created:>${rateLimitCheckISO} repo:${owner}/${repo}`;
               const recentPRsResponse = await github.rest.search.issuesAndPullRequests({

@@ -21,7 +21,7 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: 05a7be74ddab6a1c956c2f32d4c61db6e88a8f4800e5e339173dc218faf19b7f
+# frontmatter-hash: 4f5ae406acc40ef2c9e567820a3be71a99715c6122346359b37b2b3cdfd12bbe
 
 name: "Issue Monster"
 "on":
@@ -1163,7 +1163,8 @@ jobs:
               core.info('Checking for recent rate-limited PRs...');
               const rateLimitCheckDate = new Date();
               rateLimitCheckDate.setHours(rateLimitCheckDate.getHours() - 1); // Check last hour
-              const rateLimitCheckISO = rateLimitCheckDate.toISOString();
+              // Format as YYYY-MM-DDTHH:MM:SS for GitHub search API
+              const rateLimitCheckISO = rateLimitCheckDate.toISOString().split('.')[0] + 'Z';
 
               const recentPRsQuery = `is:pr author:app/copilot-swe-agent created:>${rateLimitCheckISO} repo:${owner}/${repo}`;
               const recentPRsResponse = await github.rest.search.issuesAndPullRequests({
