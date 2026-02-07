@@ -23,11 +23,12 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-# frontmatter-hash: 89b5b6dba998ae31facc01073cd87c6510f350e33f999572e0c338e4611c79a6
+# frontmatter-hash: 7699db17b103467fbf6d9699f99e2e2635617f17a2c563bfca8fc6f5c7565434
 
 name: "Weekly Issue Summary"
 "on":
@@ -591,6 +592,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels

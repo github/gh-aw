@@ -21,7 +21,11 @@
 #
 # Test Codex engine with GitHub remote MCP server
 #
-# frontmatter-hash: 5ab6849e01b879f9ef5b024355eb7f903b410418619f128c6a71bbe826a24fd1
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 4a20ced305fc13a621c88fcb860d2fd687bfdf76b64efca648bfe1a6cd0a901d
 
 name: "Codex GitHub Remote MCP Test"
 "on":
@@ -308,6 +312,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/codex-github-remote-mcp-test.md}}

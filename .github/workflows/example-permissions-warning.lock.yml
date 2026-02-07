@@ -21,7 +21,11 @@
 #
 # Example workflow demonstrating proper permission provisioning and security best practices
 #
-# frontmatter-hash: 94ffd5b85d76a2be5b3602a2babffa5a24d9e2bf59e74b4a81355902bdf06e01
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 7885ee82ff0bf979506525a90d1f509fafeac200be62ed4d79552baa077a33ee
 
 name: "Example: Properly Provisioned Permissions"
 "on":
@@ -286,6 +290,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/example-permissions-warning.md}}

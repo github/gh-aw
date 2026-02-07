@@ -25,11 +25,12 @@
 #   Imports:
 #     - shared/issues-data-fetch.md
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-# frontmatter-hash: 4bdb416ec9c2f75031ad5f6652e72b16a25a48092413ac3908e893aec8d64662
+# frontmatter-hash: d26c70b03704dc7abdf5700e4a342cf3c90d6c51c240f54d3e672572bef26b72
 
 name: "Daily Issues Report Generator"
 "on":
@@ -707,6 +708,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## jqschema - JSON Schema Discovery
           
           A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.
@@ -1241,6 +1246,8 @@ jobs:
                       xy=(max_idx, max_val),
                       xytext=(10, 20),
                       textcoords='offset points',
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
                       arrowprops=dict(arrowstyle='->', color='red'),
                       fontsize=10,
                       fontweight='bold')
@@ -1253,8 +1260,6 @@ jobs:
           import seaborn as sns
           
           # Set professional style
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           sns.set_style("whitegrid")
           sns.set_context("notebook", font_scale=1.2)
           

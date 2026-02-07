@@ -25,10 +25,11 @@
 #   Imports:
 #     - shared/copilot-pr-data-fetch.md
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: f4a489b173291cb259fee27500d061b423b9a987c5238f9267455896c29a4fb3
+# frontmatter-hash: 1f5e83674b03930e00d36053ac09cdc5986c07a569a6fecb087103aed195d31d
 
 name: "Copilot PR Conversation NLP Analysis"
 "on":
@@ -658,6 +659,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## jqschema - JSON Schema Discovery
           
           A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.

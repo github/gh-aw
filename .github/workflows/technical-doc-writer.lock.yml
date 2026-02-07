@@ -25,8 +25,9 @@
 #   Imports:
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 42d7e348a6da94a574d4e0108c40481a23dabab96476f5ecedc52a91420594cf
+# frontmatter-hash: e67da591070d85fc2bc01ce3e60211bcadde61ba21e9411373d44e219dd85394
 
 name: "Rebuild the documentation after making changes"
 "on":
@@ -660,6 +661,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ### Documentation
           
           The documentation for this project is available in the `docs/` directory. It uses GitHub-flavored markdown with Astro Starlight for rendering and follows the Diátaxis framework for systematic documentation.

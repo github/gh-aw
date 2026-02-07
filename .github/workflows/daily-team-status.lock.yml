@@ -30,8 +30,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - githubnext/agentics/workflows/shared/reporting.md@d3422bf940923ef1d43db5559652b8e1e71869f3
+#     - shared/mood.md
 #
-# frontmatter-hash: 87d4e30bfbd03e42b46a4241d6ef8b830c8621dbdf371028d52ce9550a19c43b
+# frontmatter-hash: ef044b98d76b213b48ff227e6f13f1a9b57a623dcfab759b1ea5d762b637efd2
 #
 # Effective stop-time: 2026-02-09 04:24:39
 
@@ -572,6 +573,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Formatting
           
           Structure your report with an overview followed by detailed content:

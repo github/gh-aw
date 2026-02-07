@@ -20,7 +20,11 @@
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
 #
-# frontmatter-hash: 37e75cd6eef2db3d45e4efb6e4ac75f7b6b75a288b70906dee75cbb03d8c61e7
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 16b742b68d92065e06d1612cf35998e5deadcd8b624ab48e2912fd1ca04cefaa
 
 name: "Auto-Assign Issue"
 "on":
@@ -567,6 +571,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-assign-issue-to-user.md}}

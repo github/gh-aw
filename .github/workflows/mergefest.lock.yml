@@ -21,7 +21,11 @@
 #
 # Automatically merges the main branch into pull request branches when invoked with /mergefest command
 #
-# frontmatter-hash: b84af66674cb25eda1cd571181ea003462abb952f5a68c60deb0f5d7cd7e3dbc
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 946dbc3d5e53e272910bb2afeb49edbe63b3a9afe24498ff1534dbb1cd64fc84
 
 name: "Mergefest"
 "on":
@@ -129,7 +133,7 @@ jobs:
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
       - name: Setup Git configuration
-        run: "git config user.name \"github-actions[bot]\"\ngit config user.email \"github-actions[bot]@users.noreply.github.com\"\n\n# Create .gitignore to exclude workflow YAML files\ncat > /tmp/merge-gitignore << 'EOF'\n# Exclude all .yml files in .github/workflows/\n.github/workflows/*.yml\nEOF"
+        run: "git config user.name \"github-actions[bot]\"\ngit config user.email \"github-actions[bot]@users.noreply.github.com\"\n\n# Create .gitignore to exclude workflow YAML files\ncat > /tmp/merge-gitignore << 'EOF'\n# Exclude all .yml files in .github/workflows/\n.github/workflows/*.yml\nEOF\n"
 
       - name: Configure Git credentials
         env:
@@ -558,6 +562,13 @@ jobs:
           fi
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/mergefest.md}}

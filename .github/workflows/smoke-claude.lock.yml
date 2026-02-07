@@ -29,9 +29,10 @@
 #     - shared/go-make.md
 #     - shared/mcp-pagination.md
 #     - shared/mcp/tavily.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 78071d0b5aa3dd18c2e0a148703429c5c3859fc89d33b92309116cbbfdcd314c
+# frontmatter-hash: 0837bbb92b5a6973ee2770c91b853a91e6e5113d590fd52ff842d31d1a8bcfd5
 
 name: "Smoke Claude"
 "on":
@@ -1362,6 +1363,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## MCP Response Size Limits
           
           MCP tool responses have a **25,000 token limit**. When GitHub API responses exceed this limit, workflows must retry with pagination parameters, wasting turns and tokens.

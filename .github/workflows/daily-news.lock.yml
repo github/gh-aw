@@ -25,11 +25,12 @@
 #   Imports:
 #     - shared/jqschema.md
 #     - shared/mcp/tavily.md
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/reporting.md
 #     - shared/trends.md
 #
-# frontmatter-hash: 62e2a1d94c5d304f4bbab87faf3cf6ab9526912694e12b28257d877a9503317c
+# frontmatter-hash: b8cd5c9a9049824e9750ef394b8394f20db3a82b550ea7720a3b298221bf222f
 
 name: "Daily News"
 "on":
@@ -727,6 +728,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           
           
           ## jqschema - JSON Schema Discovery
@@ -1237,6 +1242,8 @@ jobs:
           
           data_file = '/tmp/gh-aw/python/data/data.csv'
           if not os.path.exists(data_file):
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
               raise FileNotFoundError(f"Data file not found: {data_file}")
           ```
           
@@ -1250,8 +1257,6 @@ jobs:
           ```
           
           ## Artifact Upload
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           
           Charts and source files are automatically uploaded as artifacts:
           

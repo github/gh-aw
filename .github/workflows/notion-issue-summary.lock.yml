@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mcp/notion.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 92dea2779599cc352b88f4ecc85cd97c218fdb3693e7d906216308624b4aab66
+# frontmatter-hash: 88169c6119cdb607ce1030d8324a45bde076facaa8a5ca819e90fcb9e2c5e18e
 
 name: "Issue Summary to Notion"
 "on":
@@ -524,6 +525,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           
           
           

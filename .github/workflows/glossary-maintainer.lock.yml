@@ -25,8 +25,9 @@
 #   Imports:
 #     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 3b004309888b46e3eb1d9166cc48552891b3fde4cd7b4342eb1107c0e4d8bf83
+# frontmatter-hash: 4f6735e2bc6d4b4e88d81999ae42343c625b64ddcbb50b01e31c6560edb6e0e4
 
 name: "Glossary Maintainer"
 "on":
@@ -584,6 +585,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ### Documentation
           
           The documentation for this project is available in the `docs/` directory. It uses GitHub-flavored markdown with Astro Starlight for rendering and follows the Diátaxis framework for systematic documentation.

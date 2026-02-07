@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/docs-server-lifecycle.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 229fb7d9140404ea02b81438957ab9bb6e8407b82c7c48e5a371c960d1de0191
+# frontmatter-hash: 627069e9867021770aea47a6fa414c88cb825e2578e5c7a8b878ffab63781f79
 
 name: "Documentation Noob Tester"
 "on":
@@ -579,6 +580,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Starting the Documentation Preview Server
           
           **Context**: The documentation has been pre-built using `npm run build`. Use the preview server to serve the static build.

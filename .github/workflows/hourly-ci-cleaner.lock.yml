@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - ../agents/ci-cleaner.agent.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 350723a55d8e6a81fe8555641a2033b7d929d83a2e64715c54391c3bc113f07c
+# frontmatter-hash: 914c3b79f91c617707445172be9641b0a830c27b045563dea090498144c4ed85
 
 name: "CI Cleaner"
 "on":
@@ -591,6 +592,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           # CI Cleaner Agent
           
           You are a specialized AI agent that **tidies up the repository CI state** in the `github/gh-aw` repository. Your job is to ensure the codebase is clean, well-formatted, passes all linters and tests, and has all workflows properly compiled.

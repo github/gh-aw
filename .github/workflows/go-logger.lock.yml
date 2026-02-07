@@ -24,8 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/go-make.md
+#     - shared/mood.md
 #
-# frontmatter-hash: 93b0b741aaf78ab0878fc902fdf0bef6a93e2b59d4cd830ad1a62ddb2caaebc5
+# frontmatter-hash: 0e1aba924e4cf5c011642211ede5dbc28e1abdc2db601bb0bf1c2e83c9793575
 
 name: "Go Logger Enhancement"
 "on":
@@ -719,6 +720,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           **IMPORTANT**: Always use the `safeinputs-go` and `safeinputs-make` tools for Go and Make commands instead of running them directly via bash. These safe-input tools provide consistent execution and proper logging.
           
           **Correct**:

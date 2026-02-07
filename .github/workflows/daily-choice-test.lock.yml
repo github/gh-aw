@@ -21,7 +21,11 @@
 #
 # Daily test workflow using Claude with custom safe-output job containing choice inputs
 #
-# frontmatter-hash: 31a8a1b584135f0ed4cdd3a2450e0021a0313f15b9972029be69b9f417a76e4c
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 539fce339b1d147f6bc4b1027bcaf931b6b380c3328ab9678aec5fe64741e654
 
 name: "Daily Choice Type Test"
 "on":
@@ -518,6 +522,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-choice-test.md}}
@@ -1073,7 +1084,7 @@ jobs:
           find "/opt/gh-aw/safe-jobs/" -type f -print
           echo "GH_AW_AGENT_OUTPUT=/opt/gh-aw/safe-jobs/agent_output.json" >> "$GITHUB_ENV"
       - name: Display test configuration
-        run: |-
+        run: |
           if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
             ENVIRONMENT=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "test_environment") | .environment')
             TEST_TYPE=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "test_environment") | .test_type')

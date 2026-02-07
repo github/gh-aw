@@ -24,10 +24,11 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/python-dataviz.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 3453a74652eef63816e2c079dc39850b4be607e91b53d54c3e6b6257096de9c9
+# frontmatter-hash: a3b50ff1ba1300fdd8d8d88618453935e154327cc0ded0bda5bcf2dcd280b00b
 
 name: "Stale Repository Identifier"
 "on":
@@ -665,6 +666,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           # Python Data Visualization Guide
           
           Python scientific libraries have been installed and are ready for use. A temporary folder structure has been created at `/tmp/gh-aw/python/` for organizing scripts, data, and outputs.

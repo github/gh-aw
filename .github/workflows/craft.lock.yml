@@ -21,7 +21,11 @@
 #
 # Generates new agentic workflow markdown files based on user requests when invoked with /craft command
 #
-# frontmatter-hash: 74092955c7c308f0bb09293fca2b4d55f883bf0b05ad4afb2da14c45fae63742
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 7e75f3aac83ff50e722194da093b5563a5dc8b91af9e08d2d3fe49e9a84f6fb9
 
 name: "Workflow Craft Agent"
 "on":
@@ -607,6 +611,13 @@ jobs:
           fi
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/craft.md}}

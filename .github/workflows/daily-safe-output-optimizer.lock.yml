@@ -24,9 +24,10 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/jqschema.md
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 0577760506d726954280b72c4026a20d8a91a95818f26e54d2d6f3c0f04235c8
+# frontmatter-hash: fc9a9acae9cf90b47c8371c4e620a3847e88d3cb81a9df54a64359b3e5b424f4
 
 name: "Daily Safe Output Tool Optimizer"
 "on":
@@ -655,6 +656,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## jqschema - JSON Schema Discovery
           
           A utility script is available at `/tmp/gh-aw/jqschema.sh` to help you discover the structure of complex JSON responses.

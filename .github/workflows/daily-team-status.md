@@ -14,7 +14,7 @@ tracker-id: daily-team-status
 network: defaults
 imports:
   - shared/mood.md
-- githubnext/agentics/workflows/shared/reporting.md@d3422bf940923ef1d43db5559652b8e1e71869f3
+  - githubnext/agentics/workflows/shared/reporting.md@d3422bf940923ef1d43db5559652b8e1e71869f3
 safe-outputs:
   create-issue:
     expires: 1d

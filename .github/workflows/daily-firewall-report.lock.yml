@@ -23,10 +23,11 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/reporting.md
 #     - shared/trending-charts-simple.md
 #
-# frontmatter-hash: 1db6829e4b4673fefe8e99ead16c3a286883352129d9b6249562a8180590d3b7
+# frontmatter-hash: 1163f4663b60a8977df68ac8f5e1f1e52a651fa202f7d075c0cbabd43a292816
 
 name: "Daily Firewall Logs Collector and Reporter"
 "on":
@@ -676,6 +677,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels

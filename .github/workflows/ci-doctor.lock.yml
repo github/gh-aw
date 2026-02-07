@@ -23,7 +23,11 @@
 #
 # Source: githubnext/agentics/workflows/ci-doctor.md@ea350161ad5dcc9624cf510f134c6a9e39a6f94d
 #
-# frontmatter-hash: 3afdd660b0568a29b8a00b720cdece5a875607e7dd42c62b41f39d054fe16f31
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 1f357e423cb4bfab62f37e64c38505cec9d797e4e00d87b1fd982954d90677f9
 #
 # Effective stop-time: 2026-03-03 16:27:58
 
@@ -625,6 +629,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/ci-doctor.md}}

@@ -21,7 +21,11 @@
 #
 # The Cookie Monster of issues - assigns issues to Copilot agents one at a time
 #
-# frontmatter-hash: fda3821e70fae5f450a65c2b0ce82f1b94aba2c48f8cb148c6d788f9678cb214
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: c8466a41cbcb87d6c96115c81141219d8f61ab3729e1c49750d78dfb5df05032
 
 name: "Issue Monster"
 "on":
@@ -577,6 +581,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/issue-monster.md}}

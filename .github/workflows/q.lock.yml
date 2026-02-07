@@ -21,7 +21,11 @@
 #
 # Intelligent assistant that answers questions, analyzes repositories, and can create PRs for workflow optimizations
 #
-# frontmatter-hash: dd49646805be784cc280539e9bcaee4913e56b2b65cb9a5e08db25929fce4d59
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: b62e483e5601e35c59a7d7e4337e705aeac232b879669f48eb40590599d0d4d7
 
 name: "Q"
 "on":
@@ -732,6 +736,13 @@ jobs:
           fi
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/q.md}}

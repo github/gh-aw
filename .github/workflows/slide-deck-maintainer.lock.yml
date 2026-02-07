@@ -21,7 +21,11 @@
 #
 # Maintains the gh-aw slide deck by scanning repository content and detecting layout issues using Playwright
 #
-# frontmatter-hash: c5c0f4bdb7ab63d168a382562b42054baa070f4982f6750eec7c5b30af5ee0f9
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: a60cf2d491663cafbfc643528a595393a1be134dc595ede1cbaaf94d70753b4c
 
 name: "Slide Deck Maintainer"
 "on":
@@ -586,6 +590,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/slide-deck-maintainer.md}}

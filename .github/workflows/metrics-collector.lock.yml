@@ -21,7 +21,11 @@
 #
 # Collects daily performance metrics for the agent ecosystem and stores them in repo-memory
 #
-# frontmatter-hash: b5f384f27d5b48e0c6e4600f71718bafab6244d85c1bf0e04afeadeef6c76147
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 646580bd53fc97f9fedd2b71ac1a9cc10d11ad2c6d9baff423d9fff5c28a0efd
 
 name: "Metrics Collector - Infrastructure Agent"
 "on":
@@ -393,6 +397,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/metrics-collector.md}}

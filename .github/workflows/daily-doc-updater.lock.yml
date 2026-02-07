@@ -21,7 +21,11 @@
 #
 # Automatically reviews and updates documentation to ensure accuracy and completeness
 #
-# frontmatter-hash: 35460e38111980eca84125eab989981dbfaded007936d021f9e6dda4d294f5f1
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: df624f16a18a15dc441f6bd949264947254b95a623a07f7a8821fb763a686bb0
 
 name: "Daily Documentation Updater"
 "on":
@@ -562,6 +566,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/daily-doc-updater.md}}

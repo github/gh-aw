@@ -21,7 +21,11 @@
 #
 # Test workflow to verify create_pull_request error handling
 #
-# frontmatter-hash: 56ed383223178c83cf59d59dc38aa7e14a9cf53f0a4bc96927b48cfdf328eb16
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: ccda8e38ee3a43619d6ab3ce9db317722d6a78804c4f49a1b4a9117d2ff021c7
 
 name: "Test Create PR Error Handling"
 "on":
@@ -559,6 +563,13 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          PROMPT_EOF
+          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
+          
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/test-create-pr-error-handling.md}}

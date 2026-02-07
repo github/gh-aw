@@ -23,9 +23,10 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 91f3b0110588aca617b7e6aefb2ecab879c1289de471f373b4f5f34069680caf
+# frontmatter-hash: 3de50ec6efe98968b7bc298dbedebd374518c1b8252f78473cb211f79df18092
 
 name: "Daily Compiler Quality Check"
 "on":
@@ -562,6 +563,10 @@ jobs:
           </system>
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          ## Team Mood
+          
+          We are in release mode, focusing on quality and stability. Skip any work that does not directly improve quality or stability. Non-critical fixes or updates are not needed and should be skipped or canceled. If your task does not clearly contribute to product stability or is not mission critical, you should do nothing (call noop).
+          
           ## Report Structure Guidelines
           
           ### 1. Header Levels
