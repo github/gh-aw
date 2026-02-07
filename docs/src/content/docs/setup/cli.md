@@ -366,6 +366,30 @@ gh aw audit 12345678 --parse                              # Parse logs to markdo
 
 Logs are saved to `logs/run-{id}/` with filenames indicating the extraction level (job logs, specific step, or first failing step).
 
+#### `health`
+
+Display workflow health metrics and success rates for analyzing workflow reliability.
+
+```bash wrap
+gh aw health                       # Summary of all workflows (last 7 days)
+gh aw health issue-monster         # Detailed metrics for specific workflow
+gh aw health --days 30             # Summary for last 30 days
+gh aw health --threshold 90        # Alert if below 90% success rate
+gh aw health --json                # Output in JSON format
+gh aw health issue-monster --days 90  # 90-day metrics for workflow
+```
+
+**Options:** `--days`, `--threshold`, `--repo`, `--json`
+
+Shows metrics such as:
+- Success/failure rates over time period
+- Trend indicators (↑ improving, → stable, ↓ degrading)
+- Average execution duration and token usage
+- Average and total cost
+- Alerts when success rate drops below threshold
+
+Use this command to identify problematic workflows and monitor overall workflow health in your repository.
+
 ### Management
 
 #### `enable`
