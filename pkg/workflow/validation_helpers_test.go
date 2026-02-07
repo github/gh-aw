@@ -414,3 +414,334 @@ func TestValidateNonNegativeInt(t *testing.T) {
 		assert.Contains(t, err.Error(), "must be a non-negative integer")
 	})
 }
+
+// TestIsEmptyOrNil tests the isEmptyOrNil helper function
+func TestIsEmptyOrNil(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+	}{
+		// Nil values
+		{"nil value", nil, true},
+
+		// String values
+		{"empty string", "", true},
+		{"whitespace string", "   ", true},
+		{"non-empty string", "hello", false},
+
+		// Integer values
+		{"zero int", 0, true},
+		{"positive int", 5, false},
+		{"negative int", -1, false},
+		{"zero int64", int64(0), true},
+		{"positive int64", int64(5), false},
+
+		// Unsigned integer values
+		{"zero uint", uint(0), true},
+		{"positive uint", uint(5), false},
+		{"zero uint64", uint64(0), true},
+		{"positive uint64", uint64(5), false},
+
+		// Float values
+		{"zero float32", float32(0), true},
+		{"positive float32", float32(5.5), false},
+		{"zero float64", float64(0), true},
+		{"positive float64", float64(5.5), false},
+
+		// Boolean values
+		{"false bool", false, true},
+		{"true bool", true, false},
+
+		// Slice values
+		{"empty slice", []any{}, true},
+		{"non-empty slice", []any{1, 2}, false},
+
+		// Map values
+		{"empty map", map[string]any{}, true},
+		{"non-empty map", map[string]any{"key": "value"}, false},
+
+		// Other types
+		{"struct value", struct{ field string }{"value"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isEmptyOrNil(tt.value)
+			assert.Equal(t, tt.expected, result, "isEmptyOrNil(%v) = %v, want %v", tt.value, result, tt.expected)
+		})
+	}
+}
+
+// TestGetMapFieldAsString tests the getMapFieldAsString helper function
+func TestGetMapFieldAsString(t *testing.T) {
+	tests := []struct {
+		name       string
+		m          map[string]any
+		key        string
+		defaultVal string
+		expected   string
+	}{
+		{
+			name:       "extract existing string",
+			m:          map[string]any{"title": "Test Title"},
+			key:        "title",
+			defaultVal: "",
+			expected:   "Test Title",
+		},
+		{
+			name:       "missing key returns default",
+			m:          map[string]any{"other": "value"},
+			key:        "title",
+			defaultVal: "default",
+			expected:   "default",
+		},
+		{
+			name:       "non-string value returns default",
+			m:          map[string]any{"title": 123},
+			key:        "title",
+			defaultVal: "default",
+			expected:   "default",
+		},
+		{
+			name:       "nil map returns default",
+			m:          nil,
+			key:        "title",
+			defaultVal: "default",
+			expected:   "default",
+		},
+		{
+			name:       "empty string value",
+			m:          map[string]any{"title": ""},
+			key:        "title",
+			defaultVal: "default",
+			expected:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getMapFieldAsString(tt.m, tt.key, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestGetMapFieldAsMap tests the getMapFieldAsMap helper function
+func TestGetMapFieldAsMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		m        map[string]any
+		key      string
+		expected map[string]any
+	}{
+		{
+			name: "extract existing nested map",
+			m: map[string]any{
+				"network": map[string]any{
+					"allowed-domains": "example.com",
+				},
+			},
+			key:      "network",
+			expected: map[string]any{"allowed-domains": "example.com"},
+		},
+		{
+			name:     "missing key returns nil",
+			m:        map[string]any{"other": "value"},
+			key:      "network",
+			expected: nil,
+		},
+		{
+			name:     "non-map value returns nil",
+			m:        map[string]any{"network": "not a map"},
+			key:      "network",
+			expected: nil,
+		},
+		{
+			name:     "nil map returns nil",
+			m:        nil,
+			key:      "network",
+			expected: nil,
+		},
+		{
+			name:     "empty nested map",
+			m:        map[string]any{"network": map[string]any{}},
+			key:      "network",
+			expected: map[string]any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getMapFieldAsMap(tt.m, tt.key)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestGetMapFieldAsBool tests the getMapFieldAsBool helper function
+func TestGetMapFieldAsBool(t *testing.T) {
+	tests := []struct {
+		name       string
+		m          map[string]any
+		key        string
+		defaultVal bool
+		expected   bool
+	}{
+		{
+			name:       "extract true value",
+			m:          map[string]any{"enabled": true},
+			key:        "enabled",
+			defaultVal: false,
+			expected:   true,
+		},
+		{
+			name:       "extract false value",
+			m:          map[string]any{"enabled": false},
+			key:        "enabled",
+			defaultVal: true,
+			expected:   false,
+		},
+		{
+			name:       "missing key returns default",
+			m:          map[string]any{"other": true},
+			key:        "enabled",
+			defaultVal: true,
+			expected:   true,
+		},
+		{
+			name:       "non-bool value returns default",
+			m:          map[string]any{"enabled": "true"},
+			key:        "enabled",
+			defaultVal: false,
+			expected:   false,
+		},
+		{
+			name:       "nil map returns default",
+			m:          nil,
+			key:        "enabled",
+			defaultVal: true,
+			expected:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getMapFieldAsBool(tt.m, tt.key, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestGetMapFieldAsInt tests the getMapFieldAsInt helper function
+func TestGetMapFieldAsInt(t *testing.T) {
+	tests := []struct {
+		name       string
+		m          map[string]any
+		key        string
+		defaultVal int
+		expected   int
+	}{
+		{
+			name:       "extract int value",
+			m:          map[string]any{"max-size": 100},
+			key:        "max-size",
+			defaultVal: 0,
+			expected:   100,
+		},
+		{
+			name:       "extract int64 value",
+			m:          map[string]any{"max-size": int64(200)},
+			key:        "max-size",
+			defaultVal: 0,
+			expected:   200,
+		},
+		{
+			name:       "extract float64 value",
+			m:          map[string]any{"max-size": float64(300)},
+			key:        "max-size",
+			defaultVal: 0,
+			expected:   300,
+		},
+		{
+			name:       "extract uint64 value",
+			m:          map[string]any{"max-size": uint64(400)},
+			key:        "max-size",
+			defaultVal: 0,
+			expected:   400,
+		},
+		{
+			name:       "missing key returns default",
+			m:          map[string]any{"other": 100},
+			key:        "max-size",
+			defaultVal: 50,
+			expected:   50,
+		},
+		{
+			name:       "non-numeric value returns default",
+			m:          map[string]any{"max-size": "100"},
+			key:        "max-size",
+			defaultVal: 50,
+			expected:   50,
+		},
+		{
+			name:       "nil map returns default",
+			m:          nil,
+			key:        "max-size",
+			defaultVal: 50,
+			expected:   50,
+		},
+		{
+			name:       "zero value",
+			m:          map[string]any{"max-size": 0},
+			key:        "max-size",
+			defaultVal: 100,
+			expected:   0,
+		},
+		{
+			name:       "negative value",
+			m:          map[string]any{"max-size": -10},
+			key:        "max-size",
+			defaultVal: 100,
+			expected:   -10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getMapFieldAsInt(tt.m, tt.key, tt.defaultVal)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestDirExists tests the dirExists helper function
+func TestDirExists(t *testing.T) {
+	t.Run("empty path returns false", func(t *testing.T) {
+		result := dirExists("")
+		assert.False(t, result, "empty path should return false")
+	})
+
+	t.Run("non-existent path returns false", func(t *testing.T) {
+		result := dirExists("/nonexistent/path/to/directory")
+		assert.False(t, result, "non-existent path should return false")
+	})
+
+	t.Run("file path returns false", func(t *testing.T) {
+		// validation_helpers.go should exist and be a file, not a directory
+		result := dirExists("validation_helpers.go")
+		assert.False(t, result, "file path should return false")
+	})
+
+	t.Run("directory path returns true", func(t *testing.T) {
+		// Current directory should exist
+		result := dirExists(".")
+		assert.True(t, result, "current directory should return true")
+	})
+
+	t.Run("parent directory returns true", func(t *testing.T) {
+		// Parent directory should exist
+		result := dirExists("..")
+		assert.True(t, result, "parent directory should return true")
+	})
+}
