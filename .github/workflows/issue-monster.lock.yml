@@ -520,6 +520,9 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_COUNT: ${{ needs.search_issues.outputs.issue_count }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST: ${{ needs.search_issues.outputs.issue_list }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_NUMBERS: ${{ needs.search_issues.outputs.issue_numbers }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
           cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
@@ -590,6 +593,9 @@ jobs:
           GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_COUNT: ${{ needs.search_issues.outputs.issue_count }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST: ${{ needs.search_issues.outputs.issue_list }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_NUMBERS: ${{ needs.search_issues.outputs.issue_numbers }}
         with:
           script: |
             const substitutePlaceholders = require('/opt/gh-aw/actions/substitute_placeholders.cjs');
@@ -605,13 +611,20 @@ jobs:
                 GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER: process.env.GH_AW_GITHUB_EVENT_PULL_REQUEST_NUMBER,
                 GH_AW_GITHUB_REPOSITORY: process.env.GH_AW_GITHUB_REPOSITORY,
                 GH_AW_GITHUB_RUN_ID: process.env.GH_AW_GITHUB_RUN_ID,
-                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE
+                GH_AW_GITHUB_WORKSPACE: process.env.GH_AW_GITHUB_WORKSPACE,
+                GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_COUNT: process.env.GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_COUNT,
+                GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST: process.env.GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST,
+                GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_NUMBERS: process.env.GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_NUMBERS
               }
             });
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
+          GH_AW_GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_COUNT: ${{ needs.search_issues.outputs.issue_count }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST: ${{ needs.search_issues.outputs.issue_list }}
+          GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_NUMBERS: ${{ needs.search_issues.outputs.issue_numbers }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');

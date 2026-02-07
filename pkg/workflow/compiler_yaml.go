@@ -278,6 +278,24 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 		compilerYamlLog.Printf("Inlined imported markdown in %d chunks", len(importedChunks))
 	}
 
+	// Step 1.5: Extract expressions from main workflow markdown (not imported content)
+	// This is needed for needs.* expressions and other compile-time expressions
+	// The main workflow markdown uses runtime-import, but expressions like needs.* must be
+	// available at compile time for the substitute placeholders step
+	// Use MainWorkflowMarkdown (not MarkdownContent) to avoid extracting from imported content
+	if data.MainWorkflowMarkdown != "" {
+		compilerYamlLog.Printf("Extracting expressions from main workflow markdown (%d bytes)", len(data.MainWorkflowMarkdown))
+		
+		// Create a new extractor for main workflow markdown
+		mainExtractor := NewExpressionExtractor()
+		mainExprMappings, err := mainExtractor.ExtractExpressions(data.MainWorkflowMarkdown)
+		if err == nil && len(mainExprMappings) > 0 {
+			compilerYamlLog.Printf("Extracted %d expressions from main workflow markdown", len(mainExprMappings))
+			// Merge with imported expressions (append to existing mappings)
+			expressionMappings = append(expressionMappings, mainExprMappings...)
+		}
+	}
+
 	// Step 2: Add runtime-import for main workflow markdown
 	// This allows users to edit the main workflow file without recompilation
 	workflowBasename := filepath.Base(c.markdownPath)

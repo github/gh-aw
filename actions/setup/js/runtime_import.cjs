@@ -208,6 +208,20 @@ function evaluateExpression(expr) {
     return evaluateExpression(rightExpr);
   }
 
+  // Check if this is a needs.* or steps.* expression that should be looked up from environment variables
+  // The compiler extracts these expressions and makes them available as GH_AW_* environment variables
+  // For example: needs.search_issues.outputs.issue_list → GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST
+  if (trimmed.startsWith("needs.") || trimmed.startsWith("steps.")) {
+    // Convert expression to environment variable name
+    // e.g., "needs.search_issues.outputs.issue_list" → "GH_AW_NEEDS_SEARCH_ISSUES_OUTPUTS_ISSUE_LIST"
+    const envVarName = "GH_AW_" + trimmed.toUpperCase().replace(/\./g, "_");
+    const envValue = process.env[envVarName];
+    if (envValue !== undefined && envValue !== null && envValue !== "") {
+      return envValue;
+    }
+    // If not found in environment, continue to try other evaluation methods below
+  }
+
   // Access GitHub context through environment variables
   // The context object is available globally when running in github-script
   if (typeof context !== "undefined") {
