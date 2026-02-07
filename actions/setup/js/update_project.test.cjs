@@ -505,6 +505,182 @@ describe("updateProject", () => {
     expect(mockCore.info).toHaveBeenCalledWith('✓ Found existing draft issue "Existing Draft" - updating fields instead of creating duplicate');
   });
 
+  it("creates draft issue with temporary_id and stores mapping", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_title: "Draft with temp ID",
+      draft_body: "Body content",
+      temporary_id: "aw_smokedraft01",
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      emptyItemsResponse(), // No existing drafts
+      addDraftIssueResponse("draft-item-temp"),
+    ]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(true);
+    expect(getOutput("item-id")).toBe("draft-item-temp");
+    expect(getOutput("temporary-id")).toBe("aw_smokedraft01");
+    expect(temporaryIdMap.get("aw_smokedraft01")).toEqual({ draftItemId: "draft-item-temp" });
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Created new draft issue "Draft with temp ID"');
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Stored temporary_id mapping: aw_smokedraft01 -> draft-item-temp");
+  });
+
+  it("creates draft issue with temporary_id (with # prefix) and strips prefix", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_title: "Draft with hash prefix",
+      temporary_id: "#aw_abc123def456",
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), emptyItemsResponse(), addDraftIssueResponse("draft-item-hash")]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(getOutput("temporary-id")).toBe("aw_abc123def456");
+    expect(temporaryIdMap.get("aw_abc123def456")).toEqual({ draftItemId: "draft-item-hash" });
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Stored temporary_id mapping: aw_abc123def456 -> draft-item-hash");
+  });
+
+  it("updates draft issue via draft_issue_id using temporary ID map", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_smokedraft01", { draftItemId: "draft-item-existing" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_smokedraft01",
+      fields: { Priority: "High" },
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), fieldsResponse([{ id: "field-priority", name: "Priority" }]), updateFieldValueResponse()]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Should NOT create new draft
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(false);
+    // Should update fields on existing draft
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2ItemFieldValue"))).toBe(true);
+    expect(getOutput("item-id")).toBe("draft-item-existing");
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_smokedraft01" to item draft-item-existing');
+  });
+
+  it("updates draft issue via draft_issue_id with # prefix", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_abc123def456", { draftItemId: "draft-item-ref" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "#aw_abc123def456",
+      fields: { Status: "Done" },
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), fieldsResponse([{ id: "field-status", name: "Status" }]), updateFieldValueResponse()]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(getOutput("item-id")).toBe("draft-item-ref");
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_abc123def456" to item draft-item-ref');
+  });
+
+  it("falls back to title lookup when draft_issue_id not in map but title provided", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map(); // Empty map
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_notfound123",
+      draft_title: "Fallback Draft",
+      fields: { Status: "In Progress" },
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      existingDraftItemResponse("Fallback Draft", "draft-item-fallback"),
+      fieldsResponse([{ id: "field-status", name: "Status" }]),
+      updateFieldValueResponse(),
+    ]);
+
+    await updateProject(output, temporaryIdMap);
+
+    expect(getOutput("item-id")).toBe("draft-item-fallback");
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Found draft issue "Fallback Draft" by title fallback');
+  });
+
+  it("throws error when draft_issue_id not found and no title for fallback", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_missing1234",
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft")]);
+
+    await expect(updateProject(output, temporaryIdMap)).rejects.toThrow(/draft_issue_id.*not found.*no draft_title/);
+  });
+
+  it("throws error when draft_issue_id not in map and title not found", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_notfound456",
+      draft_title: "Non-existent Draft",
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      emptyItemsResponse(), // No drafts found
+    ]);
+
+    await expect(updateProject(output, temporaryIdMap)).rejects.toThrow(/draft_issue_id.*not found.*no draft with title/);
+  });
+
+  it("rejects draft_issue without title when creating (no draft_issue_id)", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      // No draft_title, no draft_issue_id
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft")]);
+
+    await expect(updateProject(output)).rejects.toThrow(/draft_title.*required/);
+  });
+
   it("skips adding an issue that already exists on the board", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const output = { type: "update_project", project: projectUrl, content_type: "issue", content_number: 99 };

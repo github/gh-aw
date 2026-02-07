@@ -614,7 +614,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       // Extract and normalize temporary_id and draft_issue_id (strip # prefix if present)
       const rawTemporaryId = typeof output.temporary_id === "string" ? output.temporary_id.trim() : "";
       const temporaryId = rawTemporaryId.startsWith("#") ? rawTemporaryId.slice(1) : rawTemporaryId;
-      
+
       const rawDraftIssueId = typeof output.draft_issue_id === "string" ? output.draft_issue_id.trim() : "";
       const draftIssueId = rawDraftIssueId.startsWith("#") ? rawDraftIssueId.slice(1) : rawDraftIssueId;
 
@@ -685,7 +685,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
             throw new Error(`draft_issue_id "${draftIssueId}" not found in temporary ID map and no draft_title provided for fallback lookup`);
           }
         }
-      } 
+      }
       // Mode 2: Create new draft or find by title
       else {
         if (!draftTitle) {
