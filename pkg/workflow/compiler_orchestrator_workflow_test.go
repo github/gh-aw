@@ -113,8 +113,8 @@ func TestBuildInitialWorkflowData_EmptyFields(t *testing.T) {
 
 	// Should not panic and should create valid structure
 	assert.NotNil(t, workflowData)
-	assert.Equal(t, "", workflowData.Name)
-	assert.Equal(t, "", workflowData.Description)
+	assert.Empty(t, workflowData.Name)
+	assert.Empty(t, workflowData.Description)
 	assert.Empty(t, workflowData.ImportedFiles)
 }
 
