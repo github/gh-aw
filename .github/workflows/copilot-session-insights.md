@@ -89,8 +89,8 @@ Create a comprehensive report and publish it as a GitHub Discussion for team rev
 **Pre-fetched Data Available**: Session data has been fetched by the `copilot-session-data-fetch` shared module:
 - `/tmp/gh-aw/session-data/sessions-list.json` - List of sessions with metadata
 - `/tmp/gh-aw/session-data/logs/` - **Conversation transcript files** (new!)
-  - `{pr_number}-conversation.txt` - Agent's internal monologue, reasoning, and tool usage
-  - `{pr_number}/` - GitHub Actions logs (fallback only)
+  - `{session_number}-conversation.txt` - Agent's internal monologue, reasoning, and tool usage
+  - `{session_number}/` - GitHub Actions logs (fallback only)
 
 **What's in the Conversation Logs**:
 - Agent's step-by-step reasoning and planning
@@ -109,7 +109,7 @@ Create a comprehensive report and publish it as a GitHub Discussion for team rev
 
 For each downloaded session in `/tmp/gh-aw/session-data/`:
 
-1. **Load Conversation Logs**: Read the agent's conversation transcript from `{pr_number}-conversation.txt` files. These contain:
+1. **Load Conversation Logs**: Read the agent's conversation transcript from `{session_number}-conversation.txt` files. These contain:
    - Agent's internal reasoning and planning
    - Tool usage and results
    - Code changes and validation steps
