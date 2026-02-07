@@ -261,6 +261,61 @@ Available log levels:
 
 The default log level is `info`, which provides a balance between visibility and log volume. Use `debug` for troubleshooting network access issues or `error` to minimize log output.
 
+### SSL Bump for HTTPS Inspection
+
+Enable SSL bump to allow the AWF firewall to inspect HTTPS traffic and filter by URL path patterns:
+
+```yaml wrap
+network:
+  firewall:
+    ssl-bump: true
+    allow-urls:
+      - "https://github.com/githubnext/*"
+      - "https://api.github.com/repos/*/issues"
+  allowed:
+    - defaults
+```
+
+The `ssl-bump` feature enables deep packet inspection of HTTPS traffic, allowing the firewall to filter based on URL paths instead of just domain names. When SSL bump is enabled, use `allow-urls` to specify HTTPS URL patterns that should be permitted through the firewall.
+
+**Configuration Options:**
+
+- `ssl-bump`: Boolean flag to enable SSL Bump for HTTPS content inspection (default: `false`)
+- `allow-urls`: Array of HTTPS URL patterns to allow when SSL bump is enabled. Each pattern:
+  - Must use the `https://` scheme
+  - Supports wildcards (`*`) for flexible path matching
+  - Example patterns: `https://github.com/githubnext/*`, `https://api.github.com/repos/*/issues`
+
+**Usage Example with Log Level:**
+
+```yaml wrap
+network:
+  firewall:
+    ssl-bump: true
+    allow-urls:
+      - "https://github.com/githubnext/*"
+      - "https://api.github.com/repos/*"
+    log-level: debug
+  allowed:
+    - defaults
+    - "github.com"
+    - "api.github.com"
+```
+
+> [!CAUTION]
+> Security Considerations
+> - SSL bump intercepts and decrypts HTTPS traffic for inspection, acting as a man-in-the-middle
+> - Only enable SSL bump when URL-level filtering is necessary for your security requirements
+> - Use `allow-urls` patterns carefully to avoid breaking legitimate HTTPS connections
+> - This feature is specific to AWF (Agent Workflow Firewall) and does not apply to Sandbox Runtime (SRT) or other sandbox configurations
+> - Requires AWF version 0.9.0 or later
+
+> [!TIP]
+> When to Use SSL Bump
+> - You need to filter HTTPS traffic by specific URL paths, not just domain names
+> - You want to allow access to specific API endpoints while blocking others on the same domain
+> - You need fine-grained control over HTTPS resources accessed by the AI engine
+
 See the [Sandbox Configuration](/gh-aw/reference/sandbox/) documentation for detailed AWF configuration options.
 
 ### Disabling the Firewall
