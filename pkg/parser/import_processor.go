@@ -308,9 +308,14 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			agentImportSpec = item.importPath
 			log.Printf("Agent import specification: %s", agentImportSpec)
 
-			// Track import path for runtime-import macro generation
-			importPaths = append(importPaths, importRelPath)
-			log.Printf("Added agent import path for runtime-import: %s", importRelPath)
+			// Track import path for runtime-import macro generation (only if no inputs)
+			// Imports with inputs must be inlined for compile-time substitution
+			if len(item.inputs) == 0 {
+				importPaths = append(importPaths, importRelPath)
+				log.Printf("Added agent import path for runtime-import: %s", importRelPath)
+			} else {
+				log.Printf("Agent file has inputs - will be inlined instead of runtime-imported")
+			}
 
 			// For agent files, still extract markdown content for backwards compatibility
 			markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)
@@ -464,7 +469,8 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		}
 		toolsBuilder.WriteString(toolsContent + "\n")
 
-		// Track import path for runtime-import macro generation
+		// Track import path for runtime-import macro generation (only if no inputs)
+		// Imports with inputs must be inlined for compile-time substitution
 		// Extract relative path from repository root (from .github/ onwards)
 		var importRelPath string
 		if idx := strings.Index(item.fullPath, "/.github/"); idx >= 0 {
@@ -473,8 +479,13 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 			// For files not under .github/, use the original import path
 			importRelPath = item.importPath
 		}
-		importPaths = append(importPaths, importRelPath)
-		log.Printf("Added import path for runtime-import: %s", importRelPath)
+
+		if len(item.inputs) == 0 {
+			importPaths = append(importPaths, importRelPath)
+			log.Printf("Added import path for runtime-import: %s", importRelPath)
+		} else {
+			log.Printf("Import %s has inputs - will be inlined for compile-time substitution", importRelPath)
+		}
 
 		// Extract markdown content from imported file for backwards compatibility
 		markdownContent, err := processIncludedFileWithVisited(item.fullPath, item.sectionName, false, visited)

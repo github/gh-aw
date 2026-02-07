@@ -241,18 +241,50 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	builtinSections := c.collectPromptSections(data)
 	compilerYamlLog.Printf("Collected %d built-in prompt sections", len(builtinSections))
 
-	// NEW APPROACH: Use runtime-import macros for all imports
-	// - Imported markdown (from frontmatter imports) now uses runtime-import macros
+	// NEW APPROACH: Use runtime-import macros for imports without inputs
+	// - Imported markdown without inputs uses runtime-import macros (loaded at runtime)
+	// - Imported markdown with inputs is still inlined (compile-time substitution required)
 	// - Main workflow markdown body uses runtime-import to allow editing without recompilation
-	// This ensures consistency - all markdown is loaded at runtime, not compile time
+	// This ensures consistency for most imports while maintaining import inputs functionality
 
 	var userPromptChunks []string
 	var expressionMappings []*ExpressionMapping
 
-	// Step 1: Generate runtime-import macros for imported markdown (if any)
-	// Instead of inlining imported content, we generate runtime-import macros
+	// Step 1a: Process and inline imported markdown with inputs (if any)
+	// Imports with inputs MUST be inlined because substitution happens at compile time
+	if data.ImportedMarkdown != "" {
+		compilerYamlLog.Printf("Processing imported markdown (%d bytes)", len(data.ImportedMarkdown))
+
+		// Clean and process imported markdown
+		cleanedImportedMarkdown := removeXMLComments(data.ImportedMarkdown)
+
+		// Substitute import inputs in imported content
+		if len(data.ImportInputs) > 0 {
+			compilerYamlLog.Printf("Substituting %d import input values", len(data.ImportInputs))
+			cleanedImportedMarkdown = SubstituteImportInputs(cleanedImportedMarkdown, data.ImportInputs)
+		}
+
+		// Wrap GitHub expressions in template conditionals
+		cleanedImportedMarkdown = wrapExpressionsInTemplateConditionals(cleanedImportedMarkdown)
+
+		// Extract expressions from imported content
+		extractor := NewExpressionExtractor()
+		importedExprMappings, err := extractor.ExtractExpressions(cleanedImportedMarkdown)
+		if err == nil && len(importedExprMappings) > 0 {
+			cleanedImportedMarkdown = extractor.ReplaceExpressionsWithEnvVars(cleanedImportedMarkdown)
+			expressionMappings = importedExprMappings
+		}
+
+		// Split imported content into chunks and add to user prompt
+		importedChunks := splitContentIntoChunks(cleanedImportedMarkdown)
+		userPromptChunks = append(userPromptChunks, importedChunks...)
+		compilerYamlLog.Printf("Inlined imported markdown with inputs in %d chunks", len(importedChunks))
+	}
+
+	// Step 1b: Generate runtime-import macros for imported markdown without inputs
+	// These imports don't need compile-time substitution, so they can be loaded at runtime
 	if len(data.ImportPaths) > 0 {
-		compilerYamlLog.Printf("Generating runtime-import macros for %d imports", len(data.ImportPaths))
+		compilerYamlLog.Printf("Generating runtime-import macros for %d imports without inputs", len(data.ImportPaths))
 		for _, importPath := range data.ImportPaths {
 			// Normalize to Unix paths (forward slashes) for cross-platform compatibility
 			importPath = filepath.ToSlash(importPath)
