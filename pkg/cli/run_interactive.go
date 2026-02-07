@@ -11,6 +11,7 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/tty"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -153,20 +154,36 @@ func buildWorkflowDescription(inputs map[string]*workflow.InputDefinition) strin
 	return ""
 }
 
-// selectWorkflow displays an interactive list for workflow selection
+// selectWorkflow displays an interactive list for workflow selection with fuzzy search
 func selectWorkflow(workflows []WorkflowOption) (*WorkflowOption, error) {
 	runInteractiveLog.Printf("Displaying workflow selection: %d workflows", len(workflows))
 
-	// Build list items
-	items := make([]console.ListItem, len(workflows))
-	for i, wf := range workflows {
-		items[i] = console.NewListItem(wf.Name, wf.Description, wf.Name)
+	// Check if we're in a TTY environment
+	if !tty.IsStderrTerminal() {
+		return selectWorkflowNonInteractive(workflows)
 	}
 
-	// Show interactive list
-	selected, err := console.ShowInteractiveList("Select a workflow to run:", items)
-	if err != nil {
-		return nil, err
+	// Build select options
+	options := make([]huh.Option[string], len(workflows))
+	for i, wf := range workflows {
+		options[i] = huh.NewOption(wf.Name, wf.Name)
+	}
+
+	var selected string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select a workflow to run").
+				Description("↑/↓ to navigate, / to search, Enter to select").
+				Options(options...).
+				Filtering(true).
+				Height(15).
+				Value(&selected),
+		),
+	).WithAccessible(console.IsAccessibleMode())
+
+	if err := form.Run(); err != nil {
+		return nil, fmt.Errorf("workflow selection cancelled or failed: %w", err)
 	}
 
 	// Find the selected workflow
@@ -177,6 +194,31 @@ func selectWorkflow(workflows []WorkflowOption) (*WorkflowOption, error) {
 	}
 
 	return nil, fmt.Errorf("selected workflow not found: %s", selected)
+}
+
+// selectWorkflowNonInteractive provides a fallback for non-TTY environments
+func selectWorkflowNonInteractive(workflows []WorkflowOption) (*WorkflowOption, error) {
+	runInteractiveLog.Printf("Non-TTY detected, showing text list: %d workflows", len(workflows))
+
+	fmt.Fprintf(os.Stderr, "\nSelect a workflow to run:\n\n")
+	for i, wf := range workflows {
+		fmt.Fprintf(os.Stderr, "  %d) %s\n", i+1, wf.Name)
+	}
+	fmt.Fprintf(os.Stderr, "\nSelect (1-%d): ", len(workflows))
+
+	var choice int
+	_, err := fmt.Scanf("%d", &choice)
+	if err != nil {
+		return nil, fmt.Errorf("invalid input: %w", err)
+	}
+
+	if choice < 1 || choice > len(workflows) {
+		return nil, fmt.Errorf("selection out of range (must be 1-%d)", len(workflows))
+	}
+
+	selectedWorkflow := &workflows[choice-1]
+	runInteractiveLog.Printf("Selected workflow from text list: %s", selectedWorkflow.Name)
+	return selectedWorkflow, nil
 }
 
 // showWorkflowInfo displays information about the selected workflow
