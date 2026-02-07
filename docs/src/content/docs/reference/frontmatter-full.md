@@ -1096,23 +1096,22 @@ sandbox:
     domain: "localhost"
 
 # Plugin configuration for installing plugins before workflow execution. Supports
-# both array format (list of repos) and object format (repos + custom token).
+# array format (list of repos/plugin configs) and object format (repos + custom
+# token).
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: List of plugin repository slugs to install. Each plugin is installed
-# using the engine's plugin installation command with default token resolution.
+# Option 1: List of plugins to install. Each item can be either a repository slug
+# string (e.g., 'org/repo') or an object with url and optional MCP configuration.
 plugins: []
-  # Array items: Plugin repository slug in the format 'org/repo' (e.g.,
-  # 'github/example-plugin')
+  # Array items: undefined
 
-# Option 2: Plugin configuration with custom GitHub token. The custom token
-# overrides the default token resolution chain.
+# Option 2: Plugin configuration with custom GitHub token. Repos can be either
+# strings or objects with MCP configuration.
 plugins:
-  # List of plugin repository slugs to install
+  # List of plugins to install. Each item can be either a repository slug string or
+  # an object with url and optional MCP configuration.
   repos: []
-    # Array of Plugin repository slug in the format 'org/repo' (e.g.,
-    # 'github/example-plugin')
 
   # Custom GitHub token expression to use for plugin installation. Overrides the
   # default cascading token resolution (GH_AW_PLUGINS_TOKEN -> GH_AW_GITHUB_TOKEN ->
