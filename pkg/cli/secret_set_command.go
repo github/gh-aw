@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/tty"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -139,30 +139,41 @@ func resolveSecretValueForSet(fromEnv, fromFlag string) (string, error) {
 		return fromFlag, nil
 	}
 
+	// Check if stdin is connected to a terminal (interactive mode)
 	info, err := os.Stdin.Stat()
 	if err != nil {
 		return "", err
 	}
 
-	if info.Mode()&os.ModeCharDevice != 0 {
+	isTerminal := (info.Mode() & os.ModeCharDevice) != 0
+
+	// If we're in an interactive terminal, use Huh for a better UX with password masking
+	if isTerminal && tty.IsStderrTerminal() {
+		secretSetLog.Print("Using interactive password prompt with Huh")
+		value, err := console.PromptSecretInput(
+			"Enter secret value",
+			"The value will be encrypted and stored in the repository",
+		)
+		if err != nil {
+			secretSetLog.Printf("Interactive prompt failed: %v", err)
+			return "", fmt.Errorf("failed to read secret value: %w", err)
+		}
+		return value, nil
+	}
+
+	// Fallback to non-interactive stdin reading (piped input or non-TTY)
+	secretSetLog.Print("Using non-interactive stdin reading")
+	if isTerminal {
 		fmt.Fprintln(os.Stderr, "Enter secret value, then press Ctrl+D:")
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-	var b strings.Builder
-
-	for {
-		line, err := reader.ReadString('\n')
-		b.WriteString(line)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return "", err
-		}
+	reader := io.Reader(os.Stdin)
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
 	}
 
-	value := strings.TrimRight(b.String(), "\r\n")
+	value := strings.TrimRight(string(data), "\r\n")
 	if value == "" {
 		return "", errors.New("secret value is empty")
 	}
