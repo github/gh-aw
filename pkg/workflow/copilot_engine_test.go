@@ -1399,8 +1399,10 @@ func TestCopilotEnginePluginDiscoveryInSandboxMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			workflowData := &WorkflowData{
-				Name:               "test-workflow",
-				Plugins:            tt.plugins,
+				Name: "test-workflow",
+				PluginInfo: &PluginInfo{
+					Plugins: tt.plugins,
+				},
 				NetworkPermissions: tt.networkPermissions,
 			}
 			steps := engine.GetExecutionSteps(workflowData, "/tmp/gh-aw/test.log")
@@ -1446,8 +1448,10 @@ func TestCopilotEnginePluginDiscoveryWithSRT(t *testing.T) {
 
 	// Test with SRT enabled (via sandbox config)
 	workflowData := &WorkflowData{
-		Name:    "test-workflow",
-		Plugins: []string{"github/auto-agentics"},
+		Name: "test-workflow",
+		PluginInfo: &PluginInfo{
+			Plugins: []string{"github/auto-agentics"},
+		},
 		SandboxConfig: &SandboxConfig{
 			Type: "sandbox-runtime",
 		},

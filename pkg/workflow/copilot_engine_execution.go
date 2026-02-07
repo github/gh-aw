@@ -56,9 +56,9 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// Add Copilot config directory when plugins are declared so the CLI can discover installed plugins
 		// Plugins are installed to ~/.copilot/plugins/ via copilot plugin install command
 		// The CLI also reads plugin-index.json from ~/.copilot/ to discover installed plugins
-		if len(workflowData.Plugins) > 0 {
+		if workflowData.PluginInfo != nil && len(workflowData.PluginInfo.Plugins) > 0 {
 			copilotArgs = append(copilotArgs, "--add-dir", "/home/runner/.copilot/")
-			copilotExecLog.Printf("Added Copilot config directory to --add-dir for plugin discovery (%d plugins)", len(workflowData.Plugins))
+			copilotExecLog.Printf("Added Copilot config directory to --add-dir for plugin discovery (%d plugins)", len(workflowData.PluginInfo.Plugins))
 		}
 
 		copilotExecLog.Print("Using firewall mode with simplified arguments")

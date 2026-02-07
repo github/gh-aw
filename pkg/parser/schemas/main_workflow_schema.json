@@ -1935,7 +1935,7 @@
               "type": "string",
               "description": "The name of the environment configured in the repo"
             },
-            "url": {
+            "id": {
               "type": "string",
               "description": "A deployment URL"
             }
@@ -2489,7 +2489,7 @@
         [
           "github/simple-plugin",
           {
-            "url": "github/mcp-plugin",
+            "id": "github/mcp-plugin",
             "mcp": {
               "env": {
                 "API_KEY": "${{ secrets.API_KEY }}"
@@ -2505,7 +2505,7 @@
       "oneOf": [
         {
           "type": "array",
-          "description": "List of plugins to install. Each item can be either a repository slug string (e.g., 'org/repo') or an object with url and optional MCP configuration.",
+          "description": "List of plugins to install. Each item can be either a repository slug string (e.g., 'org/repo') or an object with id and optional MCP configuration.",
           "items": {
             "oneOf": [
               {
@@ -2515,10 +2515,10 @@
               },
               {
                 "type": "object",
-                "description": "Plugin configuration with URL and optional MCP settings for environment variables",
-                "required": ["url"],
+                "description": "Plugin configuration with ID and optional MCP settings for environment variables",
+                "required": ["id"],
                 "properties": {
-                  "url": {
+                  "id": {
                     "type": "string",
                     "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
                     "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
@@ -2556,7 +2556,7 @@
           "properties": {
             "repos": {
               "type": "array",
-              "description": "List of plugins to install. Each item can be either a repository slug string or an object with url and optional MCP configuration.",
+              "description": "List of plugins to install. Each item can be either a repository slug string or an object with id and optional MCP configuration.",
               "items": {
                 "oneOf": [
                   {
@@ -2566,10 +2566,10 @@
                   },
                   {
                     "type": "object",
-                    "description": "Plugin configuration with URL and optional MCP settings",
-                    "required": ["url"],
+                    "description": "Plugin configuration with ID and optional MCP settings",
+                    "required": ["id"],
                     "properties": {
-                      "url": {
+                      "id": {
                         "type": "string",
                         "pattern": "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$",
                         "description": "Plugin repository slug in the format 'org/repo' (e.g., 'github/example-plugin')"
@@ -3616,7 +3616,7 @@
                 },
                 "description": "Toolsets to enable"
               },
-              "url": {
+              "id": {
                 "type": "string",
                 "description": "URL for HTTP mode MCP servers"
               },
@@ -6703,7 +6703,7 @@
           "description": "URI to the installation location when MCP is installed from a registry",
           "examples": ["https://api.mcp.github.com/v0/servers/microsoft/markitdown"]
         },
-        "url": {
+        "id": {
           "type": "string",
           "minLength": 1,
           "description": "URL for HTTP MCP connections"
@@ -6727,7 +6727,7 @@
           "examples": [["*"], ["store_memory", "retrieve_memory"], ["brave_web_search"]]
         }
       },
-      "required": ["url"],
+      "required": ["id"],
       "additionalProperties": false
     },
     "github_token": {

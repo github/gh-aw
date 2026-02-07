@@ -143,14 +143,14 @@ func (e *CopilotEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHu
 	}
 
 	// Add plugin installation steps after Copilot CLI installation
-	if len(workflowData.Plugins) > 0 {
-		copilotInstallLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.Plugins))
+	if workflowData.PluginInfo != nil && len(workflowData.PluginInfo.Plugins) > 0 {
+		copilotInstallLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.PluginInfo.Plugins))
 		// Use plugin-specific token if provided, otherwise use top-level github-token
-		tokenToUse := workflowData.PluginsToken
+		tokenToUse := workflowData.PluginInfo.CustomToken
 		if tokenToUse == "" {
 			tokenToUse = workflowData.GitHubToken
 		}
-		pluginSteps := GeneratePluginInstallationSteps(workflowData.Plugins, "copilot", tokenToUse)
+		pluginSteps := GeneratePluginInstallationSteps(workflowData.PluginInfo.Plugins, "copilot", tokenToUse)
 		steps = append(steps, pluginSteps...)
 	}
 

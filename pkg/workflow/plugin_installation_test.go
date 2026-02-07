@@ -167,7 +167,13 @@ func TestExtractPluginsFromFrontmatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos, token, _ := extractPluginsFromFrontmatter(tt.frontmatter)
+			pluginInfo := extractPluginsFromFrontmatter(tt.frontmatter)
+			var repos []string
+			var token string
+			if pluginInfo != nil {
+				repos = pluginInfo.Plugins
+				token = pluginInfo.CustomToken
+			}
 			assert.Equal(t, tt.expectedRepos, repos, "Extracted plugin repos should match expected")
 			assert.Equal(t, tt.expectedToken, token, "Extracted plugin token should match expected")
 		})
@@ -189,8 +195,10 @@ func TestPluginInstallationIntegration(t *testing.T) {
 		t.Run(e.engineID, func(t *testing.T) {
 			// Create workflow data with plugins
 			workflowData := &WorkflowData{
-				Name:    "test-workflow",
-				Plugins: []string{"github/test-plugin"},
+				Name: "test-workflow",
+				PluginInfo: &PluginInfo{
+					Plugins: []string{"github/test-plugin"},
+				},
 			}
 
 			// Get installation steps
@@ -263,9 +271,11 @@ func TestPluginObjectFormatWithCustomToken(t *testing.T) {
 		t.Run(e.engineID, func(t *testing.T) {
 			// Create workflow data with plugins and custom token
 			workflowData := &WorkflowData{
-				Name:         "test-workflow",
-				Plugins:      []string{"github/test-plugin"},
-				PluginsToken: "${{ secrets.CUSTOM_PLUGIN_TOKEN }}",
+				Name: "test-workflow",
+				PluginInfo: &PluginInfo{
+					Plugins:     []string{"github/test-plugin"},
+					CustomToken: "${{ secrets.CUSTOM_PLUGIN_TOKEN }}",
+				},
 			}
 
 			// Get installation steps

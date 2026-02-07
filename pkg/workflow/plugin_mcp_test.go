@@ -32,7 +32,7 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 				"plugins": []any{
 					"github/simple-plugin",
 					map[string]any{
-						"url": "github/mcp-plugin",
+						"id": "github/mcp-plugin",
 						"mcp": map[string]any{
 							"env": map[string]any{
 								"API_KEY": "${{ secrets.API_KEY }}",
@@ -60,7 +60,7 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 					"repos": []any{
 						"github/simple-plugin",
 						map[string]any{
-							"url": "github/mcp-plugin",
+							"id": "github/mcp-plugin",
 							"mcp": map[string]any{
 								"env": map[string]any{
 									"SECRET_KEY": "${{ secrets.SECRET_KEY }}",
@@ -86,7 +86,7 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 			frontmatter: map[string]any{
 				"plugins": []any{
 					map[string]any{
-						"url": "github/plugin1",
+						"id": "github/plugin1",
 						"mcp": map[string]any{
 							"env": map[string]any{
 								"API_KEY_1": "${{ secrets.API_KEY_1 }}",
@@ -94,7 +94,7 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 						},
 					},
 					map[string]any{
-						"url": "github/plugin2",
+						"id": "github/plugin2",
 						"mcp": map[string]any{
 							"env": map[string]any{
 								"API_KEY_2": "${{ secrets.API_KEY_2 }}",
@@ -123,7 +123,7 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 			frontmatter: map[string]any{
 				"plugins": []any{
 					map[string]any{
-						"url": "github/simple-plugin",
+						"id": "github/simple-plugin",
 					},
 				},
 			},
@@ -142,22 +142,34 @@ func TestExtractPluginsFromFrontmatter_WithMCPConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos, token, mcpConfigs := extractPluginsFromFrontmatter(tt.frontmatter)
+			pluginInfo := extractPluginsFromFrontmatter(tt.frontmatter)
+
+			var repos []string
+			var token string
+			var mcpConfigs map[string]*PluginMCPConfig
+
+			if pluginInfo != nil {
+				repos = pluginInfo.Plugins
+				token = pluginInfo.CustomToken
+				mcpConfigs = pluginInfo.MCPConfigs
+			}
 
 			assert.Equal(t, tt.expectedRepos, repos, "Extracted plugin repos should match expected")
 			assert.Equal(t, tt.expectedToken, token, "Extracted plugin token should match expected")
 
 			if tt.expectedMCPConfigs == nil {
-				assert.Nil(t, mcpConfigs, "MCP configs should be nil when none expected")
+				if mcpConfigs != nil {
+					assert.Empty(t, mcpConfigs, "MCP configs should be empty when none expected")
+				}
 			} else {
 				require.NotNil(t, mcpConfigs, "MCP configs should not be nil")
 				assert.Len(t, mcpConfigs, len(tt.expectedMCPConfigs), "Number of MCP configs should match")
 
-				for url, expectedConfig := range tt.expectedMCPConfigs {
-					actualConfig, exists := mcpConfigs[url]
-					assert.True(t, exists, "MCP config for %s should exist", url)
+				for id, expectedConfig := range tt.expectedMCPConfigs {
+					actualConfig, exists := mcpConfigs[id]
+					assert.True(t, exists, "MCP config for %s should exist", id)
 					if exists {
-						assert.Equal(t, expectedConfig.Env, actualConfig.Env, "Env vars for %s should match", url)
+						assert.Equal(t, expectedConfig.Env, actualConfig.Env, "Env vars for %s should match", id)
 					}
 				}
 			}

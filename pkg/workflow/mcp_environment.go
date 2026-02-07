@@ -211,11 +211,11 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 	// Extract environment variables from plugin MCP configurations
 	// Plugins can define MCP servers with environment variables that need to be available during gateway setup
 	// We need to pass ALL env vars (not just secrets) since plugins may need configuration values
-	if workflowData != nil && len(workflowData.PluginMCPConfigs) > 0 {
-		mcpEnvironmentLog.Printf("Extracting environment variables from %d plugin MCP configurations", len(workflowData.PluginMCPConfigs))
-		for pluginURL, mcpConfig := range workflowData.PluginMCPConfigs {
+	if workflowData != nil && workflowData.PluginInfo != nil && len(workflowData.PluginInfo.MCPConfigs) > 0 {
+		mcpEnvironmentLog.Printf("Extracting environment variables from %d plugin MCP configurations", len(workflowData.PluginInfo.MCPConfigs))
+		for pluginID, mcpConfig := range workflowData.PluginInfo.MCPConfigs {
 			if mcpConfig != nil && len(mcpConfig.Env) > 0 {
-				mcpEnvironmentLog.Printf("Adding %d environment variables from plugin '%s' MCP configuration", len(mcpConfig.Env), pluginURL)
+				mcpEnvironmentLog.Printf("Adding %d environment variables from plugin '%s' MCP configuration", len(mcpConfig.Env), pluginID)
 				// Add ALL environment variables from plugin MCP config (not just secrets)
 				for envVarName, envVarValue := range mcpConfig.Env {
 					envVars[envVarName] = envVarValue

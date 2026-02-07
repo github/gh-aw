@@ -256,16 +256,18 @@ func extractRuntimesFromFrontmatter(frontmatter map[string]any) map[string]any {
 }
 
 // extractPluginsFromFrontmatter extracts plugins configuration from frontmatter map
-// Returns: (repos []string, customToken string, pluginMCPConfigs map[string]*PluginMCPConfig)
+// Returns: PluginInfo with plugins list, custom token, and per-plugin MCP configs
 // Supports both array format and object format with optional github-token
-// Each plugin item can be either a string (repository slug) or an object with url and optional mcp config
-func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string, map[string]*PluginMCPConfig) {
+// Each plugin item can be either a string (repository slug) or an object with id and optional mcp config
+func extractPluginsFromFrontmatter(frontmatter map[string]any) *PluginInfo {
 	value, exists := frontmatter["plugins"]
 	if !exists {
-		return nil, "", nil
+		return nil
 	}
 
-	pluginMCPConfigs := make(map[string]*PluginMCPConfig)
+	pluginInfo := &PluginInfo{
+		MCPConfigs: make(map[string]*PluginMCPConfig),
+	}
 
 	// Helper function to parse plugin items (can be string or object)
 	parsePluginItem := func(item any) (string, *PluginMCPConfig) {
@@ -274,14 +276,14 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 			return pluginStr, nil
 		}
 
-		// Try object format: { "url": "org/repo", "mcp": {...} }
+		// Try object format: { "id": "org/repo", "mcp": {...} }
 		if pluginObj, ok := item.(map[string]any); ok {
-			// Extract URL (required)
-			url, hasURL := pluginObj["url"]
-			if !hasURL {
+			// Extract ID (required)
+			id, hasID := pluginObj["id"]
+			if !hasID {
 				return "", nil
 			}
-			urlStr, ok := url.(string)
+			idStr, ok := id.(string)
 			if !ok {
 				return "", nil
 			}
@@ -306,41 +308,37 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 				}
 			}
 
-			return urlStr, mcpConfig
+			return idStr, mcpConfig
 		}
 
 		return "", nil
 	}
 
-	// Try array format first: ["org/repo1", { "url": "org/repo2", "mcp": {...} }]
+	// Try array format first: ["org/repo1", { "id": "org/repo2", "mcp": {...} }]
 	if pluginsArray, ok := value.([]any); ok {
-		var plugins []string
 		for _, p := range pluginsArray {
-			url, mcpConfig := parsePluginItem(p)
-			if url != "" {
-				plugins = append(plugins, url)
+			id, mcpConfig := parsePluginItem(p)
+			if id != "" {
+				pluginInfo.Plugins = append(pluginInfo.Plugins, id)
 				if mcpConfig != nil {
-					pluginMCPConfigs[url] = mcpConfig
+					pluginInfo.MCPConfigs[id] = mcpConfig
 				}
 			}
 		}
-		return plugins, "", pluginMCPConfigs
+		return pluginInfo
 	}
 
 	// Try object format: { "repos": [...], "github-token": "..." }
 	if pluginsMap, ok := value.(map[string]any); ok {
-		var repos []string
-		var token string
-
 		// Extract repos array (items can be strings or objects)
 		if reposAny, hasRepos := pluginsMap["repos"]; hasRepos {
 			if reposArray, ok := reposAny.([]any); ok {
 				for _, r := range reposArray {
-					url, mcpConfig := parsePluginItem(r)
-					if url != "" {
-						repos = append(repos, url)
+					id, mcpConfig := parsePluginItem(r)
+					if id != "" {
+						pluginInfo.Plugins = append(pluginInfo.Plugins, id)
 						if mcpConfig != nil {
-							pluginMCPConfigs[url] = mcpConfig
+							pluginInfo.MCPConfigs[id] = mcpConfig
 						}
 					}
 				}
@@ -350,12 +348,12 @@ func extractPluginsFromFrontmatter(frontmatter map[string]any) ([]string, string
 		// Extract github-token (optional)
 		if tokenAny, hasToken := pluginsMap["github-token"]; hasToken {
 			if tokenStr, ok := tokenAny.(string); ok {
-				token = tokenStr
+				pluginInfo.CustomToken = tokenStr
 			}
 		}
 
-		return repos, token, pluginMCPConfigs
+		return pluginInfo
 	}
 
-	return nil, "", nil
+	return nil
 }

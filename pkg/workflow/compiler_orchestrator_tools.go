@@ -17,9 +17,7 @@ var orchestratorToolsLog = logger.New("workflow:compiler_orchestrator_tools")
 type toolsProcessingResult struct {
 	tools                map[string]any
 	runtimes             map[string]any
-	plugins              []string
-	pluginsToken         string
-	pluginMCPConfigs     map[string]*PluginMCPConfig // Map of plugin URL to MCP configuration
+	pluginInfo           *PluginInfo // Consolidated plugin information
 	toolsTimeout         int
 	toolsStartupTimeout  int
 	markdownContent      string
@@ -141,13 +139,20 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}
 
 	// Extract plugins from frontmatter
-	plugins, pluginsToken, pluginMCPConfigs := extractPluginsFromFrontmatter(result.Frontmatter)
-	if len(plugins) > 0 {
-		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v, mcp_configs=%d)", len(plugins), pluginsToken != "", len(pluginMCPConfigs))
+	pluginInfo := extractPluginsFromFrontmatter(result.Frontmatter)
+	if pluginInfo != nil && len(pluginInfo.Plugins) > 0 {
+		orchestratorToolsLog.Printf("Extracted %d plugins from frontmatter (custom_token=%v, mcp_configs=%d)",
+			len(pluginInfo.Plugins), pluginInfo.CustomToken != "", len(pluginInfo.MCPConfigs))
 	}
 
 	// Merge plugins from imports with top-level plugins
 	if len(importsResult.MergedPlugins) > 0 {
+		if pluginInfo == nil {
+			pluginInfo = &PluginInfo{
+				MCPConfigs: make(map[string]*PluginMCPConfig),
+			}
+		}
+
 		orchestratorToolsLog.Printf("Merging %d plugins from imports", len(importsResult.MergedPlugins))
 		// Create a set to track unique plugins
 		pluginsSet := make(map[string]bool)
@@ -158,7 +163,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		}
 
 		// Add top-level plugins (these override/supplement imports)
-		for _, plugin := range plugins {
+		for _, plugin := range pluginInfo.Plugins {
 			pluginsSet[plugin] = true
 		}
 
@@ -170,9 +175,9 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 
 		// Sort for deterministic output
 		sort.Strings(mergedPlugins)
-		plugins = mergedPlugins
+		pluginInfo.Plugins = mergedPlugins
 
-		orchestratorToolsLog.Printf("Merged plugins: %d total unique plugins", len(plugins))
+		orchestratorToolsLog.Printf("Merged plugins: %d total unique plugins", len(pluginInfo.Plugins))
 	}
 
 	// Add MCP fetch server if needed (when web-fetch is requested but engine doesn't support it)
@@ -293,9 +298,7 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	return &toolsProcessingResult{
 		tools:                tools,
 		runtimes:             runtimes,
-		plugins:              plugins,
-		pluginsToken:         pluginsToken,
-		pluginMCPConfigs:     pluginMCPConfigs,
+		pluginInfo:           pluginInfo,
 		toolsTimeout:         toolsTimeout,
 		toolsStartupTimeout:  toolsStartupTimeout,
 		markdownContent:      markdownContent,

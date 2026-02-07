@@ -54,14 +54,22 @@ type PluginMCPConfig struct {
 	Env map[string]string `json:"env,omitempty"` // Environment variables for MCP server instantiation
 }
 
-// PluginConfig represents configuration for a single plugin
+// PluginItem represents configuration for a single plugin
 // Supports both simple string format and object format with MCP configuration
-type PluginConfig struct {
-	URL string           `json:"url"`           // Plugin repository slug (e.g., "org/repo")
+type PluginItem struct {
+	ID  string           `json:"id"`            // Plugin identifier/repository slug (e.g., "org/repo")
 	MCP *PluginMCPConfig `json:"mcp,omitempty"` // Optional MCP configuration
 }
 
-// PluginsConfig represents plugin configuration for installation
+// PluginInfo encapsulates all plugin-related configuration
+// This consolidates plugins list, custom token, and per-plugin MCP configs
+type PluginInfo struct {
+	Plugins     []string                    // Plugin repository slugs to install
+	CustomToken string                      // Custom github-token for plugin installation
+	MCPConfigs  map[string]*PluginMCPConfig // Per-plugin MCP configurations (keyed by plugin ID)
+}
+
+// PluginsConfig represents plugin configuration for installation (for parsing only)
 // Supports object format with repos list, optional custom github-token
 type PluginsConfig struct {
 	Repos       []string `json:"repos"`                  // List of plugin repository slugs (required)

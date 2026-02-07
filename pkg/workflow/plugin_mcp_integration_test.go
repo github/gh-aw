@@ -34,7 +34,7 @@ permissions:
   contents: read
 plugins:
   - github/simple-plugin
-  - url: github/mcp-plugin
+  - id: github/mcp-plugin
     mcp:
       env:
         API_KEY: ${{ secrets.API_KEY }}
@@ -63,11 +63,11 @@ permissions:
   pull-requests: read
   contents: read
 plugins:
-  - url: github/plugin1
+  - id: github/plugin1
     mcp:
       env:
         PLUGIN1_KEY: ${{ secrets.PLUGIN1_KEY }}
-  - url: github/plugin2
+  - id: github/plugin2
     mcp:
       env:
         PLUGIN2_KEY: ${{ secrets.PLUGIN2_KEY }}
@@ -99,7 +99,7 @@ permissions:
 plugins:
   repos:
     - github/simple1
-    - url: github/mcp-enabled
+    - id: github/mcp-enabled
       mcp:
         env:
           MCP_SECRET: ${{ secrets.MCP_SECRET }}
