@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll } from "vitest";
 const path = require("path");
 const fs = require("fs");
 const { computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
-const { getOctokit } = require("@actions/github");
 
 /**
  * Tests for frontmatter hash computation using GitHub's API to fetch real workflows.
@@ -344,6 +343,9 @@ describe("frontmatter_hash with GitHub API", () => {
         console.log("Example: GITHUB_TOKEN=ghp_xxx npm test -- frontmatter_hash_github_api.test.cjs");
         return;
       }
+
+      // Use dynamic import for ESM module compatibility
+      const { getOctokit } = await import("@actions/github");
 
       // Use real GitHub API client
       const octokit = getOctokit(token);

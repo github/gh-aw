@@ -210,14 +210,14 @@ describe("Unified Safe Output Handler Manager", () => {
   });
 
   describe("setupProjectGitHubClient", () => {
-    it("should throw error if GH_AW_PROJECT_GITHUB_TOKEN is not set", () => {
-      expect(() => setupProjectGitHubClient()).toThrow(/GH_AW_PROJECT_GITHUB_TOKEN environment variable is required/);
+    it("should throw error if GH_AW_PROJECT_GITHUB_TOKEN is not set", async () => {
+      await expect(setupProjectGitHubClient()).rejects.toThrow(/GH_AW_PROJECT_GITHUB_TOKEN environment variable is required/);
     });
 
-    it("should create Octokit instance when token is provided", () => {
+    it("should create Octokit instance when token is provided", async () => {
       process.env.GH_AW_PROJECT_GITHUB_TOKEN = "test-project-token";
 
-      const octokit = setupProjectGitHubClient();
+      const octokit = await setupProjectGitHubClient();
 
       expect(octokit).toBeDefined();
       expect(octokit).toHaveProperty("graphql");

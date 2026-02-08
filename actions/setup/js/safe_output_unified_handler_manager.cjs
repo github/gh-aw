@@ -156,9 +156,9 @@ function loadConfig() {
  * Setup a separate GitHub client for project handlers using Octokit
  * Creates an Octokit instance authenticated with GH_AW_PROJECT_GITHUB_TOKEN
  * This is necessary because project handlers need different permissions than regular handlers
- * @returns {Object} Octokit instance for project handlers
+ * @returns {Promise<Object>} Octokit instance for project handlers
  */
-function setupProjectGitHubClient() {
+async function setupProjectGitHubClient() {
   const projectToken = process.env.GH_AW_PROJECT_GITHUB_TOKEN;
   if (!projectToken) {
     throw new Error("GH_AW_PROJECT_GITHUB_TOKEN environment variable is required for project-related safe outputs. " + "Configure a GitHub token with Projects permissions in your workflow secrets.");
@@ -167,7 +167,8 @@ function setupProjectGitHubClient() {
   core.info("Setting up separate Octokit client for project handlers with GH_AW_PROJECT_GITHUB_TOKEN");
 
   // Lazy-load @actions/github only when needed (may not be installed for workflows without project safe outputs)
-  const { getOctokit } = require("@actions/github");
+  // Use dynamic import for ESM module compatibility
+  const { getOctokit } = await import("@actions/github");
   const octokit = getOctokit(projectToken);
 
   return octokit;
@@ -903,7 +904,7 @@ async function main() {
     let projectOctokit = null;
     if (Object.keys(configs.project).length > 0) {
       core.info("Project handler types detected - setting up separate Octokit client");
-      projectOctokit = setupProjectGitHubClient();
+      projectOctokit = await setupProjectGitHubClient();
     } else {
       core.debug("No project handler types configured - skipping project Octokit setup");
     }

@@ -12,7 +12,6 @@
  * with actual GitHub API calls (no mocks).
  */
 
-const { getOctokit } = require("@actions/github");
 const { computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
 
 async function testLiveGitHubAPI() {
@@ -42,6 +41,9 @@ async function testLiveGitHubAPI() {
   console.log(`Workflow: ${workflowPath}\n`);
 
   try {
+    // Use dynamic import for ESM module compatibility
+    const { getOctokit } = await import("@actions/github");
+
     // Create GitHub API client
     console.log("📡 Connecting to GitHub API...");
     const octokit = getOctokit(token);
