@@ -109,84 +109,32 @@ func (c *Compiler) getReferencedCustomJobs(content string, customJobs map[string
 	})
 }
 
-// buildJobs creates all jobs for the workflow and adds them to the job manager
+// buildJobs creates all jobs for the workflow and adds them to the job manager.
+// This function orchestrates the building of all job types by delegating to focused helper functions.
 func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 	compilerJobsLog.Printf("Building jobs for workflow: %s", markdownPath)
 
 	// Try to read frontmatter to determine event types for safe events check
-	// This is used for the enhanced permission checking logic
 	var frontmatter map[string]any
 	if content, err := os.ReadFile(markdownPath); err == nil {
 		if result, err := parser.ExtractFrontmatterFromContent(string(content)); err == nil {
 			frontmatter = result.Frontmatter
 		}
 	}
-	// If frontmatter cannot be read, we'll fall back to the basic permission check logic
-
-	// Main job ID is always constants.AgentJobName
-
-	// Determine if permission checks or stop-time checks are needed
-	needsPermissionCheck := c.needsRoleCheck(data, frontmatter)
-	hasStopTime := data.StopTime != ""
-	hasSkipIfMatch := data.SkipIfMatch != nil
-	hasSkipIfNoMatch := data.SkipIfNoMatch != nil
-	compilerJobsLog.Printf("Job configuration: needsPermissionCheck=%v, hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCommand=%v", needsPermissionCheck, hasStopTime, hasSkipIfMatch, hasSkipIfNoMatch, len(data.Command) > 0)
-
-	// Determine if we need to add workflow_run repository safety check
-	// Add the check if the agentic workflow declares a workflow_run trigger
-	// This prevents cross-repository workflow_run attacks
-	var workflowRunRepoSafety string
-	if c.hasWorkflowRunTrigger(frontmatter) {
-		workflowRunRepoSafety = c.buildWorkflowRunRepoSafetyCondition()
-		compilerJobsLog.Print("Adding workflow_run repository safety check")
-	}
 
 	// Extract lock filename for timestamp check
 	lockFilename := filepath.Base(stringutil.MarkdownToLockFile(markdownPath))
 
-	// Build pre-activation job if needed (combines membership checks, stop-time validation, skip-if-match check, skip-if-no-match check, and command position check)
-	var preActivationJobCreated bool
-	hasCommandTrigger := len(data.Command) > 0
-	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasCommandTrigger {
-		compilerJobsLog.Print("Building pre-activation job")
-		preActivationJob, err := c.buildPreActivationJob(data, needsPermissionCheck)
-		if err != nil {
-			return fmt.Errorf("failed to build %s job: %w", constants.PreActivationJobName, err)
-		}
-		if err := c.jobManager.AddJob(preActivationJob); err != nil {
-			return fmt.Errorf("failed to add %s job: %w", constants.PreActivationJobName, err)
-		}
-		compilerJobsLog.Printf("Successfully added pre-activation job: %s", constants.PreActivationJobName)
-		preActivationJobCreated = true
-	}
-
-	// Build activation job if needed (preamble job that handles runtime conditions)
-	// If pre-activation job exists, activation job depends on it and checks the "activated" output
-	var activationJobCreated bool
-
-	if c.isActivationJobNeeded() {
-		compilerJobsLog.Print("Building activation job")
-		activationJob, err := c.buildActivationJob(data, preActivationJobCreated, workflowRunRepoSafety, lockFilename)
-		if err != nil {
-			return fmt.Errorf("failed to build activation job: %w", err)
-		}
-		if err := c.jobManager.AddJob(activationJob); err != nil {
-			return fmt.Errorf("failed to add activation job: %w", err)
-		}
-		compilerJobsLog.Print("Successfully added activation job")
-		activationJobCreated = true
+	// Build pre-activation and activation jobs
+	_, activationJobCreated, err := c.buildPreActivationAndActivationJobs(data, frontmatter, lockFilename)
+	if err != nil {
+		return err
 	}
 
 	// Build main workflow job
-	compilerJobsLog.Print("Building main job")
-	mainJob, err := c.buildMainJob(data, activationJobCreated)
-	if err != nil {
-		return fmt.Errorf("failed to build main job: %w", err)
+	if err := c.buildMainJobWrapper(data, activationJobCreated); err != nil {
+		return err
 	}
-	if err := c.jobManager.AddJob(mainJob); err != nil {
-		return fmt.Errorf("failed to add main job: %w", err)
-	}
-	compilerJobsLog.Printf("Successfully added main job: %s", string(constants.AgentJobName))
 
 	// Build safe outputs jobs if configured
 	if err := c.buildSafeOutputsJobs(data, string(constants.AgentJobName), markdownPath); err != nil {
@@ -201,71 +149,180 @@ func (c *Compiler) buildJobs(data *WorkflowData, markdownPath string) error {
 		return fmt.Errorf("failed to build custom jobs: %w", err)
 	}
 
-	// Build push_repo_memory job if repo-memory is configured
-	// This job downloads repo-memory artifacts and pushes changes to git branches
-	// It runs after agent job completes (even if it fails) and has contents: write permission
-	var pushRepoMemoryJobName string
-	if data.RepoMemoryConfig != nil && len(data.RepoMemoryConfig.Memories) > 0 {
-		compilerJobsLog.Print("Building push_repo_memory job")
-		// Determine if threat detection is enabled for safe-jobs
-		threatDetectionEnabledForSafeJobs := data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil
-		pushRepoMemoryJob, err := c.buildPushRepoMemoryJob(data, threatDetectionEnabledForSafeJobs)
-		if err != nil {
-			return fmt.Errorf("failed to build push_repo_memory job: %w", err)
-		}
-		if pushRepoMemoryJob != nil {
-			// Add detection dependency if threat detection is enabled
-			if threatDetectionEnabledForSafeJobs {
-				pushRepoMemoryJob.Needs = append(pushRepoMemoryJob.Needs, string(constants.DetectionJobName))
-				compilerJobsLog.Print("Added detection dependency to push_repo_memory job")
-			}
-			if err := c.jobManager.AddJob(pushRepoMemoryJob); err != nil {
-				return fmt.Errorf("failed to add push_repo_memory job: %w", err)
-			}
-			pushRepoMemoryJobName = pushRepoMemoryJob.Name
-			compilerJobsLog.Printf("Successfully added push_repo_memory job: %s", pushRepoMemoryJobName)
-		}
-	}
-
-	// Update conclusion job to depend on push_repo_memory if it exists
-	if pushRepoMemoryJobName != "" {
-		if conclusionJob, exists := c.jobManager.GetJob("conclusion"); exists {
-			conclusionJob.Needs = append(conclusionJob.Needs, pushRepoMemoryJobName)
-			compilerJobsLog.Printf("Added push_repo_memory dependency to conclusion job")
-		}
-	}
-
-	// Build update_cache_memory job if cache-memory is configured and threat detection is enabled
-	// This job downloads cache-memory artifacts and saves them to GitHub Actions cache
-	// It runs after detection job completes successfully
-	var updateCacheMemoryJobName string
-	if data.CacheMemoryConfig != nil && len(data.CacheMemoryConfig.Caches) > 0 {
-		threatDetectionEnabledForSafeJobs := data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil
-		if threatDetectionEnabledForSafeJobs {
-			compilerJobsLog.Print("Building update_cache_memory job")
-			updateCacheMemoryJob, err := c.buildUpdateCacheMemoryJob(data, threatDetectionEnabledForSafeJobs)
-			if err != nil {
-				return fmt.Errorf("failed to build update_cache_memory job: %w", err)
-			}
-			if updateCacheMemoryJob != nil {
-				if err := c.jobManager.AddJob(updateCacheMemoryJob); err != nil {
-					return fmt.Errorf("failed to add update_cache_memory job: %w", err)
-				}
-				updateCacheMemoryJobName = updateCacheMemoryJob.Name
-				compilerJobsLog.Printf("Successfully added update_cache_memory job: %s", updateCacheMemoryJobName)
-			}
-		}
-	}
-
-	// Update conclusion job to depend on update_cache_memory if it exists
-	if updateCacheMemoryJobName != "" {
-		if conclusionJob, exists := c.jobManager.GetJob("conclusion"); exists {
-			conclusionJob.Needs = append(conclusionJob.Needs, updateCacheMemoryJobName)
-			compilerJobsLog.Printf("Added update_cache_memory dependency to conclusion job")
-		}
+	// Build memory management jobs (repo-memory and cache-memory)
+	if err := c.buildMemoryManagementJobs(data); err != nil {
+		return err
 	}
 
 	compilerJobsLog.Print("Successfully built all jobs for workflow")
+	return nil
+}
+
+// buildPreActivationAndActivationJobs builds the pre-activation and activation jobs if needed.
+// Returns whether each job was created.
+func (c *Compiler) buildPreActivationAndActivationJobs(data *WorkflowData, frontmatter map[string]any, lockFilename string) (preActivationJobCreated bool, activationJobCreated bool, err error) {
+	// Determine if permission checks or stop-time checks are needed
+	needsPermissionCheck := c.needsRoleCheck(data, frontmatter)
+	hasStopTime := data.StopTime != ""
+	hasSkipIfMatch := data.SkipIfMatch != nil
+	hasSkipIfNoMatch := data.SkipIfNoMatch != nil
+	hasCommandTrigger := len(data.Command) > 0
+	compilerJobsLog.Printf("Job configuration: needsPermissionCheck=%v, hasStopTime=%v, hasSkipIfMatch=%v, hasSkipIfNoMatch=%v, hasCommand=%v", needsPermissionCheck, hasStopTime, hasSkipIfMatch, hasSkipIfNoMatch, hasCommandTrigger)
+
+	// Build pre-activation job if needed (combines membership checks, stop-time validation, skip-if-match check, skip-if-no-match check, and command position check)
+	if needsPermissionCheck || hasStopTime || hasSkipIfMatch || hasSkipIfNoMatch || hasCommandTrigger {
+		compilerJobsLog.Print("Building pre-activation job")
+		preActivationJob, err := c.buildPreActivationJob(data, needsPermissionCheck)
+		if err != nil {
+			return false, false, fmt.Errorf("failed to build %s job: %w", constants.PreActivationJobName, err)
+		}
+		if err := c.jobManager.AddJob(preActivationJob); err != nil {
+			return false, false, fmt.Errorf("failed to add %s job: %w", constants.PreActivationJobName, err)
+		}
+		compilerJobsLog.Printf("Successfully added pre-activation job: %s", constants.PreActivationJobName)
+		preActivationJobCreated = true
+	}
+
+	// Determine if we need to add workflow_run repository safety check
+	var workflowRunRepoSafety string
+	if c.hasWorkflowRunTrigger(frontmatter) {
+		workflowRunRepoSafety = c.buildWorkflowRunRepoSafetyCondition()
+		compilerJobsLog.Print("Adding workflow_run repository safety check")
+	}
+
+	// Build activation job if needed (preamble job that handles runtime conditions)
+	if c.isActivationJobNeeded() {
+		compilerJobsLog.Print("Building activation job")
+		activationJob, err := c.buildActivationJob(data, preActivationJobCreated, workflowRunRepoSafety, lockFilename)
+		if err != nil {
+			return preActivationJobCreated, false, fmt.Errorf("failed to build activation job: %w", err)
+		}
+		if err := c.jobManager.AddJob(activationJob); err != nil {
+			return preActivationJobCreated, false, fmt.Errorf("failed to add activation job: %w", err)
+		}
+		compilerJobsLog.Print("Successfully added activation job")
+		activationJobCreated = true
+	}
+
+	return preActivationJobCreated, activationJobCreated, nil
+}
+
+// buildMainJobWrapper builds the main workflow job and adds it to the job manager.
+func (c *Compiler) buildMainJobWrapper(data *WorkflowData, activationJobCreated bool) error {
+	compilerJobsLog.Print("Building main job")
+	mainJob, err := c.buildMainJob(data, activationJobCreated)
+	if err != nil {
+		return fmt.Errorf("failed to build main job: %w", err)
+	}
+	if err := c.jobManager.AddJob(mainJob); err != nil {
+		return fmt.Errorf("failed to add main job: %w", err)
+	}
+	compilerJobsLog.Printf("Successfully added main job: %s", string(constants.AgentJobName))
+	return nil
+}
+
+// buildMemoryManagementJobs builds memory management jobs (push_repo_memory and update_cache_memory).
+// These jobs handle artifact-based memory persistence to git branches and GitHub Actions cache.
+func (c *Compiler) buildMemoryManagementJobs(data *WorkflowData) error {
+	threatDetectionEnabledForSafeJobs := data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil
+
+	// Build push_repo_memory job if repo-memory is configured
+	pushRepoMemoryJobName, err := c.buildPushRepoMemoryJobWrapper(data, threatDetectionEnabledForSafeJobs)
+	if err != nil {
+		return err
+	}
+
+	// Build update_cache_memory job if cache-memory is configured and threat detection is enabled
+	updateCacheMemoryJobName, err := c.buildUpdateCacheMemoryJobWrapper(data, threatDetectionEnabledForSafeJobs)
+	if err != nil {
+		return err
+	}
+
+	// Update conclusion job dependencies
+	if err := c.updateConclusionJobDependencies(pushRepoMemoryJobName, updateCacheMemoryJobName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// buildPushRepoMemoryJobWrapper builds the push_repo_memory job if repo-memory is configured.
+// Returns the job name if created, empty string otherwise.
+func (c *Compiler) buildPushRepoMemoryJobWrapper(data *WorkflowData, threatDetectionEnabled bool) (string, error) {
+	if data.RepoMemoryConfig == nil || len(data.RepoMemoryConfig.Memories) == 0 {
+		return "", nil
+	}
+
+	compilerJobsLog.Print("Building push_repo_memory job")
+	pushRepoMemoryJob, err := c.buildPushRepoMemoryJob(data, threatDetectionEnabled)
+	if err != nil {
+		return "", fmt.Errorf("failed to build push_repo_memory job: %w", err)
+	}
+
+	if pushRepoMemoryJob == nil {
+		return "", nil
+	}
+
+	// Add detection dependency if threat detection is enabled
+	if threatDetectionEnabled {
+		pushRepoMemoryJob.Needs = append(pushRepoMemoryJob.Needs, string(constants.DetectionJobName))
+		compilerJobsLog.Print("Added detection dependency to push_repo_memory job")
+	}
+
+	if err := c.jobManager.AddJob(pushRepoMemoryJob); err != nil {
+		return "", fmt.Errorf("failed to add push_repo_memory job: %w", err)
+	}
+
+	compilerJobsLog.Printf("Successfully added push_repo_memory job: %s", pushRepoMemoryJob.Name)
+	return pushRepoMemoryJob.Name, nil
+}
+
+// buildUpdateCacheMemoryJobWrapper builds the update_cache_memory job if cache-memory is configured.
+// Returns the job name if created, empty string otherwise.
+func (c *Compiler) buildUpdateCacheMemoryJobWrapper(data *WorkflowData, threatDetectionEnabled bool) (string, error) {
+	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
+		return "", nil
+	}
+
+	if !threatDetectionEnabled {
+		return "", nil
+	}
+
+	compilerJobsLog.Print("Building update_cache_memory job")
+	updateCacheMemoryJob, err := c.buildUpdateCacheMemoryJob(data, threatDetectionEnabled)
+	if err != nil {
+		return "", fmt.Errorf("failed to build update_cache_memory job: %w", err)
+	}
+
+	if updateCacheMemoryJob == nil {
+		return "", nil
+	}
+
+	if err := c.jobManager.AddJob(updateCacheMemoryJob); err != nil {
+		return "", fmt.Errorf("failed to add update_cache_memory job: %w", err)
+	}
+
+	compilerJobsLog.Printf("Successfully added update_cache_memory job: %s", updateCacheMemoryJob.Name)
+	return updateCacheMemoryJob.Name, nil
+}
+
+// updateConclusionJobDependencies updates the conclusion job to depend on memory management jobs if they exist.
+func (c *Compiler) updateConclusionJobDependencies(pushRepoMemoryJobName, updateCacheMemoryJobName string) error {
+	conclusionJob, exists := c.jobManager.GetJob("conclusion")
+	if !exists {
+		return nil
+	}
+
+	if pushRepoMemoryJobName != "" {
+		conclusionJob.Needs = append(conclusionJob.Needs, pushRepoMemoryJobName)
+		compilerJobsLog.Printf("Added push_repo_memory dependency to conclusion job")
+	}
+
+	if updateCacheMemoryJobName != "" {
+		conclusionJob.Needs = append(conclusionJob.Needs, updateCacheMemoryJobName)
+		compilerJobsLog.Printf("Added update_cache_memory dependency to conclusion job")
+	}
+
 	return nil
 }
 
