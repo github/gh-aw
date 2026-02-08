@@ -267,7 +267,7 @@ Note: Output can be filtered using the jq parameter.`,
 	}
 
 	// Generate schema with elicitation defaults
-	compileSchema, err := GenerateOutputSchema[compileArgs]()
+	compileSchema, err := GenerateSchema[compileArgs]()
 	if err != nil {
 		mcpLog.Printf("Failed to generate compile tool schema: %v", err)
 		return server
@@ -437,7 +437,7 @@ Note: Output can be filtered using the jq parameter.`,
 	}
 
 	// Generate schema with elicitation defaults
-	logsSchema, err := GenerateOutputSchema[logsArgs]()
+	logsSchema, err := GenerateSchema[logsArgs]()
 	if err != nil {
 		mcpLog.Printf("Failed to generate logs tool schema: %v", err)
 		return server
@@ -614,7 +614,7 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 	}
 
 	// Generate schema for audit tool
-	auditSchema, err := GenerateOutputSchema[auditArgs]()
+	auditSchema, err := GenerateSchema[auditArgs]()
 	if err != nil {
 		mcpLog.Printf("Failed to generate audit tool schema: %v", err)
 		return server
