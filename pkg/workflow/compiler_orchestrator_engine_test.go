@@ -210,7 +210,7 @@ strict: false
 			} else {
 				// CLI strict mode with strict: false in frontmatter may fail validation
 				if err != nil {
-					assert.NotNil(t, err)
+					require.Error(t, err)
 				}
 			}
 

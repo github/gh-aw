@@ -718,7 +718,7 @@ tools:
 	// Custom engine doesn't support tool allowlists - tools should be replaced
 	assert.NotEmpty(t, result.tools)
 	// Should have generated warnings
-	assert.Greater(t, compiler.warningCount, 0, "Custom engine should generate warnings")
+	assert.Positive(t, compiler.warningCount, "Custom engine should generate warnings")
 }
 
 // TestProcessToolsAndMarkdown_IncludeExpansionError tests include expansion errors
