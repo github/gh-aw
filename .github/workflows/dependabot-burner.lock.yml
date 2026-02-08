@@ -21,7 +21,7 @@
 #
 # Automatically bundles Dependabot PRs by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
 #
-# frontmatter-hash: 9fbd9eec38d61a55d717965ec249f0d6e37abf4dda5d7b8eb2717ff3709507cb
+# frontmatter-hash: 852bb37e752cb474bccc41d6942d925f6b2bd9588f560dc9694ab5d0702d6aa6
 
 name: "Dependabot Burner"
 "on":

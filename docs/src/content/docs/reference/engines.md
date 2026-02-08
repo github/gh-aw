@@ -35,11 +35,11 @@ To use Copilot CLI with GitHub Agentic Workflows:
    gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
    ```
 
-## Using Claude Code
+## Using Claude by Anthropic (Claude Code)
 
-[Anthropic Claude Code](https://www.anthropic.com/index/claude) is an AI engine option that provides full MCP tool support and allow-listing capabilities.
+[Claude by Anthropic](https://www.anthropic.com/index/claude) (aka Claude Code) is an AI engine option that provides full MCP tool support and allow-listing capabilities.
 
-1. Request the use of the Claude engine in your workflow frontmatter:
+1. Request the use of the Claude by Anthropic engine in your workflow frontmatter:
 
    ```yaml wrap
    engine: claude

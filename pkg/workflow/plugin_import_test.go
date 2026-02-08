@@ -260,6 +260,54 @@ This workflow has duplicate plugins across imports and top-level.
 		"Expected workflow to install top-level-plugin")
 }
 
+func TestCompileWorkflowWithPluginImportsFromSharedWorkflow(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir := testutil.TempDir(t, "test-*")
+
+	// Create a shared plugins file
+	sharedPluginsPath := filepath.Join(tempDir, "shared-plugins.md")
+	sharedPluginsContent := `---
+on: push
+plugins:
+  - github/plugin-one
+---
+`
+	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0644),
+		"Failed to write shared plugins file")
+
+	// Create a workflow file that imports plugins from shared workflow
+	workflowPath := filepath.Join(tempDir, "test-workflow.md")
+	workflowContent := `---
+on: issues
+engine: copilot
+imports:
+  - shared-plugins.md
+---
+
+# Test Workflow
+
+This workflow imports plugins from a shared workflow.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+		"Failed to write workflow file")
+
+	// Compile the workflow
+	compiler := workflow.NewCompiler()
+	require.NoError(t, compiler.CompileWorkflow(workflowPath),
+		"CompileWorkflow should succeed")
+
+	// Read the generated lock file
+	lockFilePath := stringutil.MarkdownToLockFile(workflowPath)
+	lockFileContent, err := os.ReadFile(lockFilePath)
+	require.NoError(t, err, "Failed to read lock file")
+
+	workflowData := string(lockFileContent)
+
+	// Verify that Copilot engine installs the plugin from import
+	assert.Contains(t, workflowData, "copilot plugin install github/plugin-one",
+		"Expected Copilot engine to install plugin from import")
+}
+
 func TestCompileWorkflowWithPluginImportsClaudeEngineRejectsPlugins(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir := testutil.TempDir(t, "test-*")

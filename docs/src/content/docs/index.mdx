@@ -5,7 +5,7 @@ template: splash
 tableOfContents: true
 hero:
   title: GitHub Agentic Workflows
-  tagline: <strong>Automated repository agents, running in GitHub Actions.</strong>
+  tagline: <strong>Repository automation, running the coding agents you know and love, with strong guardrails in GitHub Actions.</strong>
   actions:
     - text: Quick Start with CLI
       link: /gh-aw/setup/quick-start/
@@ -21,11 +21,13 @@ import FeatureCard from '../../components/FeatureCard.astro';
 import FeatureGrid from '../../components/FeatureGrid.astro';
 import Video from '../../components/Video.astro';
 
-## What are GitHub Agentic Workflows?
+Imagine a world where improvements to your repositories are delivered as pull requests ready for you to review automatically each morning. Issues are automatically triaged, CI failures analyzed, documentation maintained, test coverage improved and compliance monitored - all defined via simple [markdown files](/gh-aw/reference/workflow-structure/).
 
-Imagine a world where improvements to your repositories are delivered automatically each morning. Issues are automatically triaged, CI failures analyzed, documentation maintained, test coverage improved and compliance monitored - all defined via simple markdown files.
+GitHub Agentic Workflows deliver this: repository automation, running the coding agents you know and love, in GitHub Actions, with strong guardrails and security-first design principles.
 
-GitHub Agentic Workflows deliver this: automated repository agents, running in GitHub Actions, with security-first design principles.
+Use [GitHub Copilot, Claude by Anthropic or OpenAI Codex](/gh-aw/reference/engines/) for automated, recurring and [scheduled jobs](/gh-aw/reference/schedule-syntax/) to improve, document, test and analyze your repository. Augment CI/CD with Continuous AI - systematic, automated application of AI to software collaboration.
+
+Developed with security in mind by GitHub Next and Microsoft Research, agentic workflows run with [minimal permissions](/gh-aw/reference/permissions/) by default, with explicit allowlisting for write operations and sandboxed execution to help keep your repository safe.
 
 ## Key Features
 
@@ -87,23 +89,7 @@ The `gh aw` cli converts this into a GitHub Actions Workflow (.yml) that runs an
 
 The AI coding agent reads your repository context, analyzes issues, generates visualizations, and creates reports - all defined in natural language rather than complex code.
 
-## Getting Started
-
-<Video
-  src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
-  aspectRatio="16:9"
-/>
-
-Install the extension, add a sample workflow, and trigger your first run - all from the command line in minutes.
-
-<Video
-  src="/gh-aw/videos/create-workflow-on-github.mp4"
-  aspectRatio="16:9"
-/>
-
-Create custom agentic workflows directly from the GitHub web interface using natural language.
-
-## Workflow Examples
+## Gallery
 
 <FeatureGrid columns={3}>
   <FeatureCard icon="code-review" title="Continuous Improvement" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/">
@@ -134,6 +120,24 @@ Create custom agentic workflows directly from the GitHub web interface using nat
     DailyOps, research, and automated maintenance
   </FeatureCard>
 </FeatureGrid>
+
+## Getting Started
+
+<Video
+  src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
+  aspectRatio="16:9"
+/>
+
+Install the extension, add a sample workflow, and trigger your first run - all from the command line in minutes.
+
+## Creating Workflows
+
+<Video
+  src="/gh-aw/videos/create-workflow-on-github.mp4"
+  aspectRatio="16:9"
+/>
+
+Create custom agentic workflows directly from the GitHub web interface using natural language.
 
 > [!NOTE]
 > GitHub Agentic Workflows is in early development and may change significantly. Using agentic workflows requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.

@@ -1152,14 +1152,14 @@ post-steps: []
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: Simple engine name: 'claude' (default, Claude Code), 'copilot' (GitHub
+# Option 1: Simple engine name: 'claude' (default, Claude by Anthropic), 'copilot' (GitHub
 # Copilot CLI), 'codex' (OpenAI Codex CLI), or 'custom' (user-defined steps)
 engine: "claude"
 
 # Option 2: Extended engine configuration object with advanced options for model
 # selection, turn limiting, environment variables, and custom steps
 engine:
-  # AI engine identifier: 'claude' (Claude Code), 'codex' (OpenAI Codex CLI),
+  # AI engine identifier: 'claude' (Claude by Anthropic), 'codex' (OpenAI Codex CLI),
   # 'copilot' (GitHub Copilot CLI), or 'custom' (user-defined GitHub Actions steps)
   id: "claude"
 
