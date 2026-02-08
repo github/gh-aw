@@ -2,8 +2,8 @@
 marp: true
 ---
 
-<script type="module">
-import mermaid from '/gh-aw/js/mermaid.esm.min.mjs';
+<script src="/gh-aw/js/mermaid.min.js"></script>
+<script>
 mermaid.initialize({ startOnLoad: true });
 </script>
 

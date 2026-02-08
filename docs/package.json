@@ -7,7 +7,7 @@
     "start": "astro dev",
     "prebuild": "npm run generate-agent-factory && npm run build:slides",
     "build": "astro build",
-    "build:slides": "mkdir -p public/js && cp node_modules/mermaid/dist/mermaid.esm.min.mjs public/js/ && npx @marp-team/marp-cli slides/index.md --html --allow-local-files -o public/slides/index.html",
+    "build:slides": "mkdir -p public/js && cp node_modules/mermaid/dist/mermaid.min.js public/js/ && npx @marp-team/marp-cli slides/index.md --html --allow-local-files -o public/slides/index.html",
     "preview": "astro preview",
     "astro": "astro",
     "validate-links": "astro build",
