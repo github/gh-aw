@@ -432,7 +432,18 @@ func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool
 	return nil
 }
 
-// shouldAddCheckoutStep determines if the checkout step should be added based on permissions and custom steps
+// shouldAddCheckoutStep returns true if the workflow requires a checkout step.
+// A checkout is needed when the workflow uses custom agent files, accesses local
+// actions in dev/script mode, or needs to reference .github directory content.
+//
+// The checkout step is skipped in the following cases:
+//   - Custom steps already contain a checkout action
+//   - Workflow is in release mode without a custom agent file
+//
+// The checkout step is always added when:
+//   - A custom agent file is specified (via imports)
+//   - Running in dev or script mode (requires .github and .actions access)
+//   - Action mode is uninitialized (defaults to requiring checkout)
 func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
 	// Check condition 1: If custom steps already contain checkout, don't add another one
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
