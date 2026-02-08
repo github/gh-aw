@@ -571,4 +571,107 @@ If the pull request is still open, verify that:
       expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/Could not retrieve git state/));
     });
   });
+
+  describe("closed pull request handling", () => {
+    it("should treat checkout failure as warning for closed PR (pull_request event)", async () => {
+      mockContext.payload.pull_request.state = "closed";
+      mockExec.exec.mockRejectedValueOnce(new Error("git fetch failed - branch deleted"));
+
+      await runScript();
+
+      // Should log as warning, not error
+      expect(mockCore.startGroup).toHaveBeenCalledWith("⚠️ Closed PR Checkout Warning");
+      expect(mockCore.warning).toHaveBeenCalledWith("Event type: pull_request");
+      expect(mockCore.warning).toHaveBeenCalledWith("PR number: 123");
+      expect(mockCore.warning).toHaveBeenCalledWith("PR state: closed");
+      expect(mockCore.warning).toHaveBeenCalledWith("Checkout failed (expected for closed PR): git fetch failed - branch deleted");
+      expect(mockCore.warning).toHaveBeenCalledWith("Branch likely deleted: feature-branch");
+      expect(mockCore.warning).toHaveBeenCalledWith("This is expected behavior when a PR is closed - the branch may have been deleted.");
+
+      // Should write summary with warning message
+      expect(mockCore.summary.addRaw).toHaveBeenCalled();
+      const summaryCall = mockCore.summary.addRaw.mock.calls[0][0];
+      expect(summaryCall).toContain("⚠️ Closed Pull Request");
+      expect(summaryCall).toContain("Pull request #123 is closed");
+      expect(summaryCall).toContain("This is not an error");
+
+      // Should set output to true (success)
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+
+      // Should NOT fail the step
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should treat checkout failure as warning for closed PR (gh pr checkout)", async () => {
+      mockContext.eventName = "issue_comment";
+      mockContext.payload.pull_request.state = "closed";
+      mockExec.exec.mockRejectedValueOnce(new Error("gh pr checkout failed - PR closed"));
+
+      await runScript();
+
+      // Should log as warning, not error
+      expect(mockCore.startGroup).toHaveBeenCalledWith("⚠️ Closed PR Checkout Warning");
+      expect(mockCore.warning).toHaveBeenCalledWith("Checkout failed (expected for closed PR): gh pr checkout failed - PR closed");
+
+      // Should NOT fail the step
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+    });
+
+    it("should still fail for open PR with checkout error", async () => {
+      // PR is open (default state in mockContext)
+      mockContext.payload.pull_request.state = "open";
+      mockExec.exec.mockRejectedValueOnce(new Error("network error"));
+
+      await runScript();
+
+      // Should log as error
+      expect(mockCore.startGroup).toHaveBeenCalledWith("❌ Checkout Error Details");
+      expect(mockCore.error).toHaveBeenCalledWith("Event type: pull_request");
+
+      // Should fail the step
+      expect(mockCore.setFailed).toHaveBeenCalledWith("Failed to checkout PR branch: network error");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "false");
+    });
+
+    it("should log closed PR info before checkout attempt", async () => {
+      mockContext.payload.pull_request.state = "closed";
+
+      await runScript();
+
+      // Should log that PR is closed
+      expect(mockCore.info).toHaveBeenCalledWith("⚠️ Pull request is closed");
+
+      // If checkout succeeds (branch still exists), should still succeed
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should handle closed PR without head ref", async () => {
+      mockContext.payload.pull_request.state = "closed";
+      delete mockContext.payload.pull_request.head;
+      mockExec.exec.mockRejectedValueOnce(new Error("no branch info"));
+
+      await runScript();
+
+      // Should treat as warning
+      expect(mockCore.startGroup).toHaveBeenCalledWith("⚠️ Closed PR Checkout Warning");
+
+      // Should not try to log branch name
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringMatching(/Branch likely deleted:/));
+
+      // Should NOT fail the step
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
+    });
+
+    it("should include PR state in context logging", async () => {
+      mockContext.payload.pull_request.state = "closed";
+
+      await runScript();
+
+      // State is already logged in logPRContext
+      expect(mockCore.info).toHaveBeenCalledWith("PR state: closed");
+    });
+  });
 });
