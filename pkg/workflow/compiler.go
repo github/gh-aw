@@ -174,6 +174,12 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
+	// Validate network firewall configuration
+	log.Printf("Validating network firewall configuration")
+	if err := validateNetworkFirewallConfig(workflowData.NetworkPermissions); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
 	// Emit experimental warning for sandbox-runtime feature
 	if isSRTEnabled(workflowData) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental feature: sandbox-runtime firewall"))

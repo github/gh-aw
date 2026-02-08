@@ -261,6 +261,9 @@ const (
 	// DocsPermissionsURL is the documentation URL for GitHub permissions configuration
 	DocsPermissionsURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/permissions.md"
 
+	// DocsNetworkURL is the documentation URL for network configuration
+	DocsNetworkURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/network.md"
+
 	// DocsSandboxURL is the documentation URL for sandbox configuration
 	DocsSandboxURL DocURL = "https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/sandbox.md"
 )
