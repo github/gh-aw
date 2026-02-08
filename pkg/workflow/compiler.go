@@ -52,12 +52,12 @@ func formatCompilerError(filePath string, errType string, message string, cause 
 		Type:    errType,
 		Message: message,
 	})
-	
+
 	// Wrap the underlying error if provided (preserves error chain)
 	if cause != nil {
 		return fmt.Errorf("%s: %w", formattedErr, cause)
 	}
-	
+
 	// Create new error for validation errors (no underlying cause)
 	return errors.New(formattedErr)
 }

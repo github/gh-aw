@@ -3,7 +3,6 @@
 package workflow
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -100,7 +99,7 @@ func TestFormatCompilerError(t *testing.T) {
 
 			// If cause is provided, verify error wrapping
 			if tt.cause != nil {
-				assert.True(t, errors.Is(err, tt.cause), "Error should wrap the cause")
+				assert.ErrorIs(t, err, tt.cause, "Error should wrap the cause")
 			}
 		})
 	}
@@ -185,15 +184,15 @@ func TestFormatCompilerMessage(t *testing.T) {
 func TestFormatCompilerError_ErrorWrapping(t *testing.T) {
 	// Create an underlying error
 	underlyingErr := fmt.Errorf("underlying validation error")
-	
+
 	// Wrap it with formatCompilerError
 	wrappedErr := formatCompilerError("test.md", "error", "validation failed", underlyingErr)
-	
+
 	require.Error(t, wrappedErr)
-	
+
 	// Verify error chain is preserved
-	assert.True(t, errors.Is(wrappedErr, underlyingErr), "Should preserve error chain with %w")
-	
+	require.ErrorIs(t, wrappedErr, underlyingErr, "Should preserve error chain with %w")
+
 	// Verify formatted message is in the error string
 	assert.Contains(t, wrappedErr.Error(), "test.md")
 	assert.Contains(t, wrappedErr.Error(), "validation failed")
@@ -202,15 +201,15 @@ func TestFormatCompilerError_ErrorWrapping(t *testing.T) {
 // TestFormatCompilerError_NilCause verifies that nil cause creates a new error
 func TestFormatCompilerError_NilCause(t *testing.T) {
 	err := formatCompilerError("test.md", "error", "validation error", nil)
-	
+
 	require.Error(t, err)
-	
+
 	// Verify error message contains expected content
 	assert.Contains(t, err.Error(), "test.md")
 	assert.Contains(t, err.Error(), "validation error")
-	
+
 	// Verify it's a new error (not wrapping anything)
 	// This is a validation error, so it should not wrap
 	dummyErr := fmt.Errorf("some other error")
-	assert.False(t, errors.Is(err, dummyErr), "Should not wrap any error when cause is nil")
+	assert.NotErrorIs(t, err, dummyErr, "Should not wrap any error when cause is nil")
 }
