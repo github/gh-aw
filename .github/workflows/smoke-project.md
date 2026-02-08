@@ -64,7 +64,7 @@ strict: true
 # Smoke Test: Project Operations Validation
 
 Default status field for any created items: "Todo".
-Do the following operstaions EXACTLY in this order.
+Do the following operations EXACTLY in this order.
 Do not re-create draft items but use their returned temporary-ids for the update operations.
 
 ## Test Requirements
