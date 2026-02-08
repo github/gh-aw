@@ -696,13 +696,15 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       const rawDraftIssueId = typeof output.draft_issue_id === "string" ? output.draft_issue_id.trim() : "";
       const draftIssueId = rawDraftIssueId.startsWith("#") ? rawDraftIssueId.slice(1) : rawDraftIssueId;
 
-      // Validate temporary_id format if provided
-      if (temporaryId && !isTemporaryId(temporaryId)) {
+      // Validate temporary_id format if it uses the auto-generated prefix
+      // Allow user-friendly IDs like "draft-1" but enforce format for auto-generated IDs
+      if (temporaryId && temporaryId.startsWith("aw_") && !isTemporaryId(temporaryId)) {
         throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
       }
 
-      // Validate draft_issue_id format if provided
-      if (draftIssueId && !isTemporaryId(draftIssueId)) {
+      // Validate draft_issue_id format if it uses the auto-generated prefix
+      // Allow user-friendly IDs like "draft-1" but enforce format for auto-generated IDs
+      if (draftIssueId && draftIssueId.startsWith("aw_") && !isTemporaryId(draftIssueId)) {
         throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
       }
 
