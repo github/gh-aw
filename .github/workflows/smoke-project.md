@@ -23,7 +23,7 @@ tools:
   bash:
     - "*"
 features:
-  actions-tag: "2f705cfe9b68ab64d9ac2ac92faee9b7c7890c0d"
+  action-tag: "2f705cfe9b68ab64d9ac2ac92faee9b7c7890c0d"
 safe-outputs:
     add-comment:
       hide-older-comments: true
@@ -77,6 +77,7 @@ Do not re-create draft items but use their returned temporary-ids for the update
       - `content_type`: "draft_issue"
       - `draft_title`: "Test *draft issue* for `smoke-project`"
       - `draft_body`: "Test draft issue for smoke test validation"
+      - `temporary_id`: "draft-1"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
 
    b. **Issue Creation**:
@@ -99,7 +100,7 @@ Do not re-create draft items but use their returned temporary-ids for the update
       Call `update_project` with the draft issue you created (use the returned temporary-id) to change status to "In Progress":
       - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
       - `content_type`: "draft_issue"
-      - `draft_id`: The temporary-id returned from step 1a (e.g., "aw_abc123def456")
+      - `draft_issue_id`: The temporary-id returned from step 1a (e.g., "aw_abc123def456")
       - `fields`: `{"Status": "In Progress"}`
 
    b. **Pull Request Update**:
