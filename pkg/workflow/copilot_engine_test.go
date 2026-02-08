@@ -42,6 +42,10 @@ func TestCopilotEngine(t *testing.T) {
 		t.Error("Expected copilot engine to not support max-turns yet")
 	}
 
+	if !engine.SupportsPlugins() {
+		t.Error("Expected copilot engine to support plugins")
+	}
+
 	// Test declared output files (session files are copied to logs folder)
 	outputFiles := engine.GetDeclaredOutputFiles()
 	if len(outputFiles) != 1 {
@@ -80,6 +84,21 @@ func TestOtherEnginesNoDefaultDetectionModel(t *testing.T) {
 		defaultModel := engine.GetDefaultDetectionModel()
 		if defaultModel != "" {
 			t.Errorf("Expected engine '%s' to return empty default detection model, got '%s'", engine.GetID(), defaultModel)
+		}
+	}
+}
+
+func TestOtherEnginesNoPluginSupport(t *testing.T) {
+	// Test that only Copilot engine supports plugins
+	engines := []CodingAgentEngine{
+		NewClaudeEngine(),
+		NewCodexEngine(),
+		NewCustomEngine(),
+	}
+
+	for _, engine := range engines {
+		if engine.SupportsPlugins() {
+			t.Errorf("Expected engine '%s' to not support plugins, but it does", engine.GetID())
 		}
 	}
 }
