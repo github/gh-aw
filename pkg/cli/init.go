@@ -11,7 +11,6 @@ import (
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
-	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
@@ -203,6 +202,11 @@ func setupEngineSecrets(engine string, verbose bool) error {
 		secretValue := os.Getenv(spec.Name)
 
 		// Try alternative environment variable names
+		// NOTE: We intentionally do NOT use GetGitHubToken() fallback for COPILOT_GITHUB_TOKEN here.
+		// The init command should only detect explicitly set environment variables, not scrape
+		// the user's gh auth token. Using gh auth token for secrets would be a security risk
+		// as users may not realize their personal token is being uploaded to the repository.
+		// The trial command handles this differently with explicit warnings.
 		if secretValue == "" {
 			switch spec.Name {
 			case "ANTHROPIC_API_KEY":
@@ -210,8 +214,9 @@ func setupEngineSecrets(engine string, verbose bool) error {
 			case "OPENAI_API_KEY":
 				secretValue = os.Getenv("OPENAI_KEY")
 			case "COPILOT_GITHUB_TOKEN":
-				// Use the proper GitHub token helper
-				secretValue, _ = parser.GetGitHubToken()
+				// Only check explicit environment variable, do NOT use gh auth token fallback
+				// This prevents accidentally uploading user's personal token to the repository
+				secretValue = os.Getenv("COPILOT_GITHUB_TOKEN")
 			}
 		}
 
@@ -231,12 +236,13 @@ func setupEngineSecrets(engine string, verbose bool) error {
 		fmt.Fprintln(os.Stderr, "")
 
 		// Ask for confirmation before configuring secrets
+		// SECURITY: Default to "No" to prevent accidental token uploads
 		var confirmSetSecrets bool
 		confirmForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewConfirm().
 					Title("Would you like to configure these secrets as repository Actions secrets?").
-					Description("This will use the gh CLI to set the secrets in your repository").
+					Description("This will upload the API keys or tokens as secrets in your repository. Default: No").
 					Affirmative("Yes, configure secrets").
 					Negative("No, skip").
 					Value(&confirmSetSecrets),
@@ -329,19 +335,21 @@ func attemptSetSecret(secretName, repoSlug string, verbose bool) error {
 	}
 
 	// Get secret value from environment
+	// NOTE: We intentionally do NOT use GetGitHubToken() fallback for COPILOT_GITHUB_TOKEN here.
+	// The init command should only use explicitly set environment variables to avoid
+	// accidentally uploading the user's personal gh auth token to the repository.
 	secretValue := os.Getenv(secretName)
 	if secretValue == "" {
-		// Try alternative names
+		// Try alternative names (but NOT gh auth token fallback for security)
 		switch secretName {
 		case "ANTHROPIC_API_KEY":
 			secretValue = os.Getenv("ANTHROPIC_KEY")
 		case "OPENAI_API_KEY":
 			secretValue = os.Getenv("OPENAI_KEY")
 		case "COPILOT_GITHUB_TOKEN":
-			secretValue, err = parser.GetGitHubToken()
-			if err != nil {
-				return fmt.Errorf("failed to get GitHub token: %w", err)
-			}
+			// Only check explicit environment variable, do NOT use gh auth token fallback
+			// This prevents accidentally uploading user's personal token to the repository
+			secretValue = os.Getenv("COPILOT_GITHUB_TOKEN")
 		}
 	}
 
