@@ -50,7 +50,6 @@ safe-outputs:
 
   create-project-status-update:
     project: "https://github.com/orgs/github/projects/24060"
-    github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
     max: 1
     github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}
 ---
