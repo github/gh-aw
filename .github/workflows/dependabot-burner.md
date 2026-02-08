@@ -9,6 +9,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
+  security-events: read
 
 tools:
   github:
