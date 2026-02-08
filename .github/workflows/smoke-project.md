@@ -105,14 +105,14 @@ Do not re-create draft items but use their returned temporary-ids for the update
 
    b. **Pull Request Update**:
       Call `update_project` to update the pull request item to change status to "In Progress":
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1",
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
       - `content_type`: "pull_request"
       - `content_number`: 18
       - `fields`: `{"Status": "In Progress"}`
 
     c. **Issue Update**:
       Call `update_project` to update the issue item to change status to "In Progress":
-      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1",
+      - `project`: "https://github.com/orgs/github-agentic-workflows/projects/1"
       - `content_type`: "issue"
       - `content_number`: 19
       - `fields`: `{"Status": "In Progress"}`
