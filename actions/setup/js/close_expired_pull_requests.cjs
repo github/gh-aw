@@ -49,6 +49,7 @@ async function main() {
 
   // Get workflow metadata for footer
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+  const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
   const runId = context.runId || 0;
   const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
   const runUrl = context.payload?.repository ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${owner}/${repo}/actions/runs/${runId}`;
@@ -60,7 +61,7 @@ async function main() {
     entityLabel: "Pull Request",
     summaryHeading: "Expired Pull Requests Cleanup",
     processEntity: async pr => {
-      const closingMessage = `This pull request was automatically closed because it expired on ${pr.expirationDate.toISOString()}.` + generateExpiredEntityFooter(workflowName, runUrl);
+      const closingMessage = `This pull request was automatically closed because it expired on ${pr.expirationDate.toISOString()}.` + generateExpiredEntityFooter(workflowName, runUrl, workflowId);
 
       await addPullRequestComment(github, owner, repo, pr.number, closingMessage);
       core.info(`  ✓ Comment added successfully`);
