@@ -461,6 +461,36 @@ describe("updateProject", () => {
     expect(mockCore.info).toHaveBeenCalledWith('✓ Created new draft issue "Draft title"');
   });
 
+  it("returns temporary_id when draft issue is created with temporary_id", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryId = "aw_abc123def456";
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_title: "Draft with temp ID",
+      draft_body: "Draft body",
+      temporary_id: temporaryId,
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      emptyItemsResponse(), // No existing drafts with this title
+      addDraftIssueResponse("draft-item-2"),
+    ]);
+
+    const result = await updateProject(output);
+
+    expect(result).toBeDefined();
+    expect(result.temporaryId).toBe(temporaryId);
+    expect(result.draftItemId).toBe("draft-item-2");
+    expect(getOutput("item-id")).toBe("draft-item-2");
+    expect(getOutput("temporary-id")).toBe(temporaryId);
+    expect(mockCore.info).toHaveBeenCalledWith(`✓ Stored temporary_id mapping: ${temporaryId} -> draft-item-2`);
+  });
+
   it("rejects draft issues without a title", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const output = {

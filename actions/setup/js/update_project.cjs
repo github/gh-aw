@@ -362,7 +362,7 @@ async function findExistingDraftByTitle(github, projectId, targetTitle) {
  * @param {any} output - Safe output configuration
  * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
  * @param {Object} githubClient - GitHub client (Octokit instance) to use for GraphQL queries
- * @returns {Promise<void>}
+ * @returns {Promise<void|{temporaryId?: string, draftItemId?: string}>} Returns undefined for most operations, or an object with temporary ID mapping for draft issue creation
  */
 async function updateProject(output, temporaryIdMap = new Map(), githubClient = null) {
   // Use the provided github client, or fall back to the global github object
@@ -877,7 +877,12 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       if (resolvedTemporaryId) {
         core.setOutput("temporary-id", resolvedTemporaryId);
       }
-      return;
+
+      // Return draft item info for handler manager to collect temporary ID mapping
+      return {
+        temporaryId: resolvedTemporaryId,
+        draftItemId: itemId,
+      };
     }
     let contentNumber = null;
     if (hasContentNumber || hasIssue || hasPullRequest) {
@@ -1133,9 +1138,9 @@ async function main(config = {}, githubClient = null) {
   /**
    * Message handler function that processes a single update_project message
    * @param {Object} message - The update_project message to process
-   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string}>} temporaryIdMap - Unified map of temporary IDs
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string, draftItemId?: string}>} temporaryIdMap - Unified map of temporary IDs
    * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
-   * @returns {Promise<Object>} Result with success/error status
+   * @returns {Promise<Object>} Result with success/error status, and optionally temporaryId/draftItemId for draft issue creation
    */
   return async function handleUpdateProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
     // Check max limit
@@ -1237,7 +1242,7 @@ async function main(config = {}, githubClient = null) {
       }
 
       // Process the update_project message
-      await updateProject(effectiveMessage, temporaryIdMap, github);
+      const updateResult = await updateProject(effectiveMessage, temporaryIdMap, github);
 
       // After processing the first message, create configured views if any
       // Views are created after the first item is processed to ensure the project exists
@@ -1273,9 +1278,18 @@ async function main(config = {}, githubClient = null) {
         }
       }
 
-      return {
+      // Return result with temporary ID mapping if draft issue was created
+      const result = {
         success: true,
       };
+
+      // Pass through temporary ID mapping from draft issue creation
+      if (updateResult && updateResult.temporaryId && updateResult.draftItemId) {
+        result.temporaryId = updateResult.temporaryId;
+        result.draftItemId = updateResult.draftItemId;
+      }
+
+      return result;
     } catch (err) {
       // prettier-ignore
       const error = /** @type {Error & { errors?: Array<{ type?: string, message: string, path?: unknown, locations?: unknown }>, request?: unknown, data?: unknown }} */ (err);

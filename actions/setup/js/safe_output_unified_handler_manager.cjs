@@ -335,8 +335,8 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
 
   // Initialize unified temporary ID map
   // This will be populated by handlers as they create entities with temporary IDs
-  // Stores both issue/PR references ({repo, number}) and project URLs ({projectUrl})
-  /** @type {Map<string, {repo?: string, number?: number, projectUrl?: string}>} */
+  // Stores both issue/PR references ({repo, number}), project URLs ({projectUrl}), and draft items ({draftItemId})
+  /** @type {Map<string, {repo?: string, number?: number, projectUrl?: string, draftItemId?: string}>} */
   const temporaryIdMap = new Map();
 
   // Load existing temporary ID map from environment (if provided from previous step)
@@ -486,6 +486,15 @@ async function processMessages(messageHandlers, messages, projectOctokit = null)
           projectUrl: result.projectUrl,
         });
         core.info(`✓ Stored project mapping: ${message.temporary_id} -> ${result.projectUrl}`);
+      }
+
+      // If this was an update_project that created a draft issue, store the draft item mapping
+      if (messageType === "update_project" && result && result.temporaryId && result.draftItemId) {
+        const normalizedTempId = normalizeTemporaryId(result.temporaryId);
+        temporaryIdMap.set(normalizedTempId, {
+          draftItemId: result.draftItemId,
+        });
+        core.info(`✓ Stored draft issue mapping: ${result.temporaryId} -> draft item ${result.draftItemId}`);
       }
 
       // Check if this output was created with unresolved temporary IDs
