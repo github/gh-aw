@@ -151,19 +151,19 @@ If the pull request is still open, verify that:
 
       expect(mockCore.info).toHaveBeenCalledWith("Event: pull_request");
       expect(mockCore.info).toHaveBeenCalledWith("Pull Request #123");
-      
+
       // Verify detailed context logging
       expect(mockCore.startGroup).toHaveBeenCalledWith("📋 PR Context Details");
       expect(mockCore.info).toHaveBeenCalledWith("Event type: pull_request");
-      
+
       // Verify strategy logging
       expect(mockCore.startGroup).toHaveBeenCalledWith("🔄 Checkout Strategy");
       expect(mockCore.info).toHaveBeenCalledWith("Strategy: git fetch + checkout");
-      
+
       // Verify actual checkout commands
       expect(mockCore.info).toHaveBeenCalledWith("Fetching branch: feature-branch from origin");
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "feature-branch"]);
-      
+
       expect(mockCore.info).toHaveBeenCalledWith("Checking out branch: feature-branch");
       expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "feature-branch"]);
 
@@ -214,14 +214,14 @@ If the pull request is still open, verify that:
 
       expect(mockCore.info).toHaveBeenCalledWith("Event: issue_comment");
       expect(mockCore.info).toHaveBeenCalledWith("Pull Request #123");
-      
+
       // Verify detailed context logging
       expect(mockCore.startGroup).toHaveBeenCalledWith("📋 PR Context Details");
-      
+
       // Verify strategy logging
       expect(mockCore.startGroup).toHaveBeenCalledWith("🔄 Checkout Strategy");
       expect(mockCore.info).toHaveBeenCalledWith("Strategy: gh pr checkout");
-      
+
       expect(mockCore.info).toHaveBeenCalledWith("Checking out PR #123 using gh CLI");
 
       // Updated expectation: no env options passed, GH_TOKEN comes from step environment
@@ -422,9 +422,7 @@ If the pull request is still open, verify that:
 
       // Verify fork detection logging
       expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: true");
-      expect(mockCore.warning).toHaveBeenCalledWith(
-        "⚠️ Fork PR detected - gh pr checkout will fetch from fork repository"
-      );
+      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Fork PR detected - gh pr checkout will fetch from fork repository");
       expect(mockExec.exec).toHaveBeenCalledWith("gh", ["pr", "checkout", "123"]);
     });
 
@@ -437,9 +435,7 @@ If the pull request is still open, verify that:
 
       // Verify non-fork detection
       expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: false");
-      expect(mockCore.warning).not.toHaveBeenCalledWith(
-        expect.stringContaining("Fork PR detected")
-      );
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Fork PR detected"));
     });
 
     it("should log detailed PR context with startGroup/endGroup", async () => {
@@ -448,7 +444,7 @@ If the pull request is still open, verify that:
       // Verify group logging is used
       expect(mockCore.startGroup).toHaveBeenCalledWith("📋 PR Context Details");
       expect(mockCore.endGroup).toHaveBeenCalled();
-      
+
       // Verify detailed context logging
       expect(mockCore.info).toHaveBeenCalledWith("Event type: pull_request");
       expect(mockCore.info).toHaveBeenCalledWith("PR number: 123");
@@ -461,9 +457,7 @@ If the pull request is still open, verify that:
 
       expect(mockCore.startGroup).toHaveBeenCalledWith("🔄 Checkout Strategy");
       expect(mockCore.info).toHaveBeenCalledWith("Strategy: git fetch + checkout");
-      expect(mockCore.info).toHaveBeenCalledWith(
-        "Reason: pull_request event runs in merge commit context with PR branch available"
-      );
+      expect(mockCore.info).toHaveBeenCalledWith("Reason: pull_request event runs in merge commit context with PR branch available");
     });
 
     it("should log checkout strategy for pull_request_target events", async () => {
@@ -473,14 +467,12 @@ If the pull request is still open, verify that:
 
       expect(mockCore.startGroup).toHaveBeenCalledWith("🔄 Checkout Strategy");
       expect(mockCore.info).toHaveBeenCalledWith("Strategy: gh pr checkout");
-      expect(mockCore.info).toHaveBeenCalledWith(
-        "Reason: pull_request_target runs in base repo context; for fork PRs, head branch doesn't exist in origin"
-      );
+      expect(mockCore.info).toHaveBeenCalledWith("Reason: pull_request_target runs in base repo context; for fork PRs, head branch doesn't exist in origin");
     });
 
     it("should log current branch after successful gh pr checkout", async () => {
       mockContext.eventName = "issue_comment";
-      
+
       // Mock the git branch command to return a branch name
       mockExec.exec.mockImplementation((cmd, args, options) => {
         if (cmd === "git" && args[0] === "branch" && args[1] === "--show-current") {
@@ -502,9 +494,7 @@ If the pull request is still open, verify that:
 
       await runScript();
 
-      expect(mockCore.warning).toHaveBeenCalledWith(
-        "⚠️ Head repo information not available (repo may be deleted)"
-      );
+      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Head repo information not available (repo may be deleted)");
     });
   });
 
@@ -523,9 +513,7 @@ If the pull request is still open, verify that:
     });
 
     it("should attempt to log git status on error", async () => {
-      mockExec.exec
-        .mockRejectedValueOnce(new Error("checkout failed"))
-        .mockResolvedValue(0); // Subsequent git commands succeed
+      mockExec.exec.mockRejectedValueOnce(new Error("checkout failed")).mockResolvedValue(0); // Subsequent git commands succeed
 
       await runScript();
 
@@ -536,15 +524,11 @@ If the pull request is still open, verify that:
     });
 
     it("should handle git diagnostic command failures gracefully", async () => {
-      mockExec.exec
-        .mockRejectedValueOnce(new Error("checkout failed"))
-        .mockRejectedValue(new Error("git command not available"));
+      mockExec.exec.mockRejectedValueOnce(new Error("checkout failed")).mockRejectedValue(new Error("git command not available"));
 
       await runScript();
 
-      expect(mockCore.warning).toHaveBeenCalledWith(
-        expect.stringMatching(/Could not retrieve git state/)
-      );
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/Could not retrieve git state/));
     });
   });
 });
