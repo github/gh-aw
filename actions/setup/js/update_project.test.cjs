@@ -285,6 +285,24 @@ const existingDraftItemResponse = (title, itemId = "existing-draft-item") => ({
   },
 });
 
+const getDraftIssueIdResponse = (itemId, draftIssueId) => ({
+  node: {
+    content: {
+      __typename: "DraftIssue",
+      id: draftIssueId,
+    },
+  },
+});
+
+const updateDraftIssueResponse = (draftIssueId, title) => ({
+  updateProjectV2DraftIssue: {
+    draftIssue: {
+      id: draftIssueId,
+      title: title,
+    },
+  },
+});
+
 function queueResponses(responses) {
   responses.forEach(response => {
     mockGithub.graphql.mockResolvedValueOnce(response);
@@ -701,6 +719,8 @@ describe("updateProject", () => {
       viewerResponse(),
       orgProjectV2Response(projectUrl, 60, "project-draft"),
       existingDraftItemResponse("Fallback Draft", "draft-item-fallback"),
+      getDraftIssueIdResponse("draft-item-fallback", "draft-content-fallback"),
+      updateDraftIssueResponse("draft-content-fallback", "Fallback Draft"),
       fieldsResponse([{ id: "field-status", name: "Status" }]),
       updateFieldValueResponse(),
     ]);
@@ -709,6 +729,7 @@ describe("updateProject", () => {
 
     expect(getOutput("item-id")).toBe("draft-item-fallback");
     expect(mockCore.info).toHaveBeenCalledWith('✓ Found draft issue "Fallback Draft" by title fallback');
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Updated draft issue title");
   });
 
   it("throws error when draft_issue_id not found and no title for fallback", async () => {
@@ -778,6 +799,126 @@ describe("updateProject", () => {
     expect(result.draftItemId).toBe("draft-item-friendly");
     expect(temporaryIdMap.get("draft-1")).toEqual({ draftItemId: "draft-item-friendly" });
     expect(mockCore.info).toHaveBeenCalledWith("✓ Stored temporary_id mapping: draft-1 -> draft-item-friendly");
+  });
+
+  it("updates draft issue title via draft_issue_id", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_123abc456def", { draftItemId: "draft-item-update" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_123abc456def",
+      draft_title: "Updated Draft Title",
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      getDraftIssueIdResponse("draft-item-update", "draft-content-123"),
+      updateDraftIssueResponse("draft-content-123", "Updated Draft Title"),
+    ]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Should call updateProjectV2DraftIssue
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2DraftIssue"))).toBe(true);
+    expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_123abc456def" to item draft-item-update');
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Updated draft issue title");
+  });
+
+  it("updates draft issue body via draft_issue_id", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_abc123def456", { draftItemId: "draft-item-update-body" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_abc123def456",
+      draft_body: "Updated draft body content",
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      getDraftIssueIdResponse("draft-item-update-body", "draft-content-456"),
+      updateDraftIssueResponse("draft-content-456", "Original Title"),
+    ]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Should call updateProjectV2DraftIssue
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2DraftIssue"))).toBe(true);
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Updated draft issue body");
+  });
+
+  it("updates both draft issue title and body via draft_issue_id", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_abc123def456", { draftItemId: "draft-item-both" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_abc123def456",
+      draft_title: "New Title",
+      draft_body: "New body content",
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), getDraftIssueIdResponse("draft-item-both", "draft-content-789"), updateDraftIssueResponse("draft-content-789", "New Title")]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Verify updateProjectV2DraftIssue was called
+    const updateDraftCall = mockGithub.graphql.mock.calls.find(([query]) => query.includes("updateProjectV2DraftIssue"));
+    expect(updateDraftCall).toBeDefined();
+
+    // Verify the input contained both title and body
+    const input = updateDraftCall[1].input;
+    expect(input.draftIssueId).toBe("draft-content-789");
+    expect(input.title).toBe("New Title");
+    expect(input.body).toBe("New body content");
+
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Updated draft issue title and body");
+  });
+
+  it("updates draft issue title and fields together", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set("aw_456def789abc", { draftItemId: "draft-item-combined" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: "aw_456def789abc",
+      draft_title: "Updated Title",
+      fields: { Status: "In Progress" },
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      getDraftIssueIdResponse("draft-item-combined", "draft-content-combined"),
+      updateDraftIssueResponse("draft-content-combined", "Updated Title"),
+      fieldsResponse([{ id: "field-status", name: "Status" }]),
+      updateFieldValueResponse(),
+    ]);
+
+    await updateProject(output, temporaryIdMap);
+
+    // Should call both updateProjectV2DraftIssue and updateProjectV2ItemFieldValue
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2DraftIssue"))).toBe(true);
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("updateProjectV2ItemFieldValue"))).toBe(true);
+    expect(mockCore.info).toHaveBeenCalledWith("✓ Updated draft issue title");
   });
 
   it("allows user-friendly draft_issue_id like 'draft-1' when updating draft", async () => {

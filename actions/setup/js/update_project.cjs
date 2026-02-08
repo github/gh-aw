@@ -385,6 +385,36 @@ async function findExistingDraftByTitle(github, projectId, targetTitle) {
 }
 
 /**
+ * Get the draft issue ID from a project item ID
+ * @param {Object} github - GitHub client (Octokit instance)
+ * @param {string} itemId - Project item ID
+ * @returns {Promise<string | null>} Draft issue ID or null if not a draft issue
+ */
+async function getDraftIssueIdFromItem(github, itemId) {
+  const result = await github.graphql(
+    `query($itemId: ID!) {
+      node(id: $itemId) {
+        ... on ProjectV2Item {
+          content {
+            __typename
+            ... on DraftIssue {
+              id
+            }
+          }
+        }
+      }
+    }`,
+    { itemId }
+  );
+
+  if (result.node?.content?.__typename === "DraftIssue") {
+    return result.node.content.id;
+  }
+
+  return null;
+}
+
+/**
  * Update a GitHub Project v2
  * @param {any} output - Safe output configuration
  * @param {Map<string, any>} temporaryIdMap - Map of temporary IDs to resolved issue numbers
@@ -739,6 +769,42 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
             }
           } else {
             throw new Error(`draft_issue_id "${draftIssueId}" not found in temporary ID map and no draft_title provided for fallback lookup`);
+          }
+        }
+
+        // Update draft issue title and/or body if provided
+        if (draftTitle || draftBody !== undefined) {
+          // Get the draft issue ID from the project item
+          const actualDraftIssueId = await getDraftIssueIdFromItem(github, itemId);
+
+          if (actualDraftIssueId) {
+            // Build mutation input with only provided fields
+            const input = { draftIssueId: actualDraftIssueId };
+            if (draftTitle) {
+              input.title = draftTitle;
+            }
+            if (draftBody !== undefined) {
+              input.body = draftBody;
+            }
+
+            await github.graphql(
+              `mutation($input: UpdateProjectV2DraftIssueInput!) {
+                updateProjectV2DraftIssue(input: $input) {
+                  draftIssue {
+                    id
+                    title
+                  }
+                }
+              }`,
+              { input }
+            );
+
+            const updatedParts = [];
+            if (draftTitle) updatedParts.push("title");
+            if (draftBody !== undefined) updatedParts.push("body");
+            core.info(`✓ Updated draft issue ${updatedParts.join(" and ")}`);
+          } else {
+            core.warning(`Could not get draft issue ID from project item ${itemId} to update title/body`);
           }
         }
       }
