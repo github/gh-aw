@@ -223,7 +223,7 @@ require (
 	github.com/sonatard/noctx v0.4.0 // indirect
 	github.com/sourcegraph/go-diff v0.7.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
-	github.com/spf13/cast v1.7.0 // indirect
+	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
@@ -286,12 +286,3 @@ require (
 	mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 // indirect
 	mvdan.cc/xurls/v2 v2.6.0 // indirect
 )
-
-// Update semver to v3.4.0 for bug fixes and new features
-replace github.com/Masterminds/semver/v3 => github.com/Masterminds/semver/v3 v3.4.0
-
-// Update cast to v1.10.0 for bug fixes and type conversion improvements
-replace github.com/spf13/cast => github.com/spf13/cast v1.10.0
-
-// Use stable v1.1.0 release instead of pseudo-version
-replace github.com/charmbracelet/lipgloss => github.com/charmbracelet/lipgloss v1.1.0

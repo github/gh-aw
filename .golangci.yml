@@ -8,6 +8,7 @@ run:
 linters:
   enable:
     - misspell
+    - gomoddirectives  # Forbid replace, retract, and excludes directives in go.mod
     # gosec disabled in golangci-lint due to configuration bugs in v2
     # It's run separately via 'make security-gosec' with proper exclusions
     # - gosec
@@ -20,6 +21,10 @@ linters:
     - revive         # Disabled due to exclude-rules not working properly in golangci-lint v2
 
 linters-settings:
+  gomoddirectives:
+    # Forbid all replace directives in go.mod
+    replace-local: false       # Forbid local replace directives (e.g., replace foo => ../foo)
+    replace-allow-list: []     # No replace directives are allowed
   errcheck:
     exclude-functions:
       - (*os.File).Close
