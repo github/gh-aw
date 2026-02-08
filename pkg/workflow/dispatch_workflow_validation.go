@@ -24,7 +24,12 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 	config := data.SafeOutputs.DispatchWorkflow
 
 	if len(config.Workflows) == 0 {
-		return fmt.Errorf("dispatch-workflow: must specify at least one workflow in the list")
+		return fmt.Errorf("dispatch-workflow: must specify at least one workflow in the list\n\n" +
+			"Example configuration in workflow frontmatter:\n" +
+			"safe-outputs:\n" +
+			"  dispatch-workflow:\n" +
+			"    workflows: [workflow-name-1, workflow-name-2]\n\n" +
+			"Workflow names should match the filename without the .md extension.")
 	}
 
 	// Get the current workflow name for self-reference check
@@ -39,7 +44,10 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 
 		// Check for self-reference
 		if workflowName == currentWorkflowName {
-			selfRefErr := fmt.Errorf("dispatch-workflow: self-reference not allowed (workflow '%s' cannot dispatch itself)", workflowName)
+			selfRefErr := fmt.Errorf("dispatch-workflow: self-reference not allowed (workflow '%s' cannot dispatch itself)\n\n"+
+				"A workflow cannot trigger itself to prevent infinite loops.\n"+
+				"If you need recurring execution, use a schedule trigger or workflow_dispatch instead.",
+				workflowName)
 			if returnErr := collector.Add(selfRefErr); returnErr != nil {
 				return returnErr // Fail-fast mode
 			}
@@ -64,8 +72,13 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 			repoRoot := filepath.Dir(githubDir)
 			workflowsDir := filepath.Join(repoRoot, ".github", "workflows")
 
-			notFoundErr := fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s (tried .md, .lock.yml, and .yml extensions)",
-				workflowName, workflowsDir)
+			notFoundErr := fmt.Errorf("dispatch-workflow: workflow '%s' not found in %s\n\n"+
+				"Checked for: %s.md, %s.lock.yml, %s.yml\n\n"+
+				"To fix:\n"+
+				"1. Verify the workflow file exists in .github/workflows/\n"+
+				"2. Ensure the filename matches exactly (case-sensitive)\n"+
+				"3. Use the filename without extension in your configuration",
+				workflowName, workflowsDir, workflowName, workflowName, workflowName)
 			if returnErr := collector.Add(notFoundErr); returnErr != nil {
 				return returnErr // Fail-fast mode
 			}
@@ -100,7 +113,14 @@ func (c *Compiler) validateDispatchWorkflow(data *WorkflowData, workflowPath str
 			}
 		} else {
 			// Only .md exists - needs to be compiled first
-			compileErr := fmt.Errorf("dispatch-workflow: workflow '%s' must be compiled first (run 'gh aw compile %s')", workflowName, fileResult.mdPath)
+			compileErr := fmt.Errorf("dispatch-workflow: workflow '%s' must be compiled first\n\n"+
+				"The workflow source file exists at: %s\n"+
+				"But the compiled .lock.yml file is missing.\n\n"+
+				"To fix:\n"+
+				"1. Compile the workflow: gh aw compile %s\n"+
+				"2. Commit the generated .lock.yml file\n"+
+				"3. Ensure .lock.yml files are not in .gitignore",
+				workflowName, fileResult.mdPath, workflowName)
 			if returnErr := collector.Add(compileErr); returnErr != nil {
 				return returnErr // Fail-fast mode
 			}
