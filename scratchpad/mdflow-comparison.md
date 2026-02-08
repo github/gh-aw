@@ -805,7 +805,7 @@ mdflow and GitHub Agentic Workflows solve different problems with different desi
 - **mdflow**: Personal productivity, local execution, Unix-style composition, convention over configuration
 - **gh-aw**: Team automation, CI/CD integration, security-first, explicit configuration
 
-Both are valuable in their domains. mdflow excels at quick, ad-hoc AI tasks on a developer's machine. GitHub Agentic Workflows excels at safe, auditable, team-wide repository automation.
+Each tool serves its domain effectively. mdflow provides quick, ad-hoc AI tasks on a developer's machine. GitHub Agentic Workflows provides safe, auditable, team-wide repository automation.
 
 The syntax differences reflect these different goals:
 - mdflow prioritizes simplicity and flexibility for local use

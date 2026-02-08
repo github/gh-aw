@@ -12,7 +12,7 @@ This document provides a deep technical analysis of mdflow and GitHub Agentic Wo
 
 ### Key Findings
 
-1. **Custom Engine Opportunities**: mdflow's architecture provides useful patterns for local-execution custom engines in gh-aw
+1. **Custom Engine Opportunities**: mdflow's architecture demonstrates local-execution patterns applicable to gh-aw custom engines
 2. **Template System**: mdflow's LiquidJS template system with special variables offers inspiration for enhanced gh-aw template capabilities
 3. **Import Mechanism**: mdflow's flexible import system (glob, line ranges, symbol extraction) significantly exceeds gh-aw's capabilities
 4. **Security vs Flexibility**: Fundamental tradeoff between mdflow's "trust the user" model and gh-aw's "security-first" approach
@@ -88,7 +88,7 @@ Build ${{ vars.feature_name }} in ${{ vars.target_dir }}.
 - Support workflow_dispatch inputs as template variables
 - Enable conditional sections with `{% if %}` style syntax
 
-**Benefit**: More dynamic prompt generation, better reusability across workflows.
+**Benefit**: Enables dynamic prompt generation and reusability across workflows.
 
 ---
 
@@ -228,7 +228,7 @@ gh aw run workflow.md --local --staged
 #### 3. **Transparent Mapping**
 - Frontmatter keys directly become CLI flags (no magic)
 - Direct mapping: `model: opus` → `--model opus`
-- Debugging is straightforward: `mdflow explain task.claude.md`
+- Debugging through transparent command output: `mdflow explain task.claude.md`
 
 **Lesson for gh-aw**: Add `gh aw explain` command:
 ```bash
@@ -708,7 +708,7 @@ gh aw init daily-report --template mdflow
 - Implement line range imports
 - Support URL imports (from GitHub only initially)
 
-**Priority**: High (significantly improves usability)
+**Priority**: High (reduces manual file path specification and enables pattern-based imports)
 
 #### 3. **Local Development Mode**
 - Add `gh aw run-local` command
@@ -1313,7 +1313,7 @@ CI/CD Execution (gh-aw):
 1. **mdflow excels at**: Personal productivity, local tasks, basic workflows, fast iteration
 2. **gh-aw excels at**: Team automation, CI/CD, security, GitHub integration, structured output
 3. **They serve different needs**: mdflow = developer tool, gh-aw = platform tool
-4. **Cross-pollination is valuable**: Each can learn from the other's strengths
+4. **Both approaches offer insights**: Each implements patterns that address specific use cases
 
 ### Top 3 Recommendations for gh-aw
 
@@ -1330,14 +1330,14 @@ CI/CD Execution (gh-aw):
 - Enable URL imports (GitHub only initially)
 - Support command execution (staged mode)
 
-**Impact**: More flexible context gathering, better prompts
+**Impact**: Reduces manual file specification, enables pattern-based context gathering
 
 #### 3. **Local Development Workflow** (Hybrid approach)
 - Add `gh aw run-local` command for Docker-based local execution
 - Simulate GitHub context for testing
 - Fast feedback loop (seconds instead of minutes)
 
-**Impact**: Dramatically faster development cycle
+**Impact**: Reduces workflow iteration time from minutes to seconds
 
 ### Opportunity: mdflow-to-gh-aw Bridge
 
