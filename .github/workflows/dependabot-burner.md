@@ -1,6 +1,7 @@
 ---
 name: Dependabot Burner
 description: Automatically bundles Dependabot PRs by runtime and manifest, creates project items, and assigns them to Copilot for remediation with a "Review Required" status column
+
 on:
   #schedule: daily
   workflow_dispatch:
@@ -10,6 +11,11 @@ permissions:
   issues: read
   pull-requests: read
   security-events: read
+
+network:
+  allowed:
+    - defaults
+    - github
 
 tools:
   github:
