@@ -111,6 +111,22 @@ Organize findings by severity:
 
 ## Step 5: Report Results
 
+### If NO Issues Found
+
+**YOU MUST CALL** the `noop` tool to log completion:
+
+```json
+{
+  "noop": {
+    "message": "Multi-device documentation testing complete. All {device_count} devices tested successfully with no issues found."
+  }
+}
+```
+
+**DO NOT just write this message in your output text** - you MUST actually invoke the `noop` tool. The workflow will fail if you don't call it.
+
+### If Issues ARE Found
+
 ## 📝 Report Formatting Guidelines
 
 **CRITICAL**: Follow these formatting guidelines to create well-structured, readable reports:
@@ -159,7 +175,7 @@ Create reports that:
 - **Create delight**: Use progressive disclosure to reduce overwhelm
 - **Maintain consistency**: Follow the same patterns as other reporting workflows
 
-If issues are detected, create a GitHub issue titled "🔍 Multi-Device Docs Testing Report - [Date]" with:
+Create a GitHub issue titled "🔍 Multi-Device Docs Testing Report - [Date]" with:
 
 ```markdown
 ### Test Summary
@@ -212,4 +228,8 @@ Follow the shared **Documentation Server Lifecycle Management** instructions for
 
 ## Summary
 
-Provide: total devices tested, test results (passed/failed/warnings), key findings, and link to issue (if created).
+**Always provide a safe output:**
+- **If issues found**: Create GitHub issue with test results, findings, and recommendations
+- **If no issues found**: Call `noop` tool with completion message including total devices tested and pass status
+
+The workflow requires explicit safe output (either issue creation or noop) to confirm completion.
