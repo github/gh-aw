@@ -78,18 +78,18 @@ Do not re-create draft items but use their returned temporary-ids for the update
       - `temporary_id`: "draft-1"
       - `fields`: `{"Status": "Todo", "Priority": "High"}`
 
-   b. **Issue Creation**:
-      Call `update_project` with:
-        - `project`: "https://github.com/orgs/github/projects/24068"
-        - `content_type`: "issue"
-        - `content_number`: 19
-        - `fields`: `{"Status": "Todo", "Priority": "High"}`
-
-   c. **PR Creation**:
+   b. **PR Creation**:
       Call `update_project` with:
         - `project`: "https://github.com/orgs/github/projects/24068"
         - `content_type`: "pull_request"
-        - `content_number`: 18
+        - `content_number`: 14477
+        - `fields`: `{"Status": "Todo", "Priority": "High"}`
+
+   c. **Issue Creation**:
+      Call `update_project` with:
+        - `project`: "https://github.com/orgs/github/projects/24068"
+        - `content_type`: "issue"
+        - `content_number`: 14478
         - `fields`: `{"Status": "Todo", "Priority": "High"}`
 
 2. **Update items**: Update the created items to validate field updates:
@@ -105,14 +105,14 @@ Do not re-create draft items but use their returned temporary-ids for the update
       Call `update_project` to update the pull request item to change status to "In Progress":
       - `project`: "https://github.com/orgs/github/projects/24068"
       - `content_type`: "pull_request"
-      - `content_number`: 18
+      - `content_number`: 14477
       - `fields`: `{"Status": "In Progress"}`
 
     c. **Issue Update**:
       Call `update_project` to update the issue item to change status to "In Progress":
       - `project`: "https://github.com/orgs/github/projects/24068"
       - `content_type`: "issue"
-      - `content_number`: 19
+      - `content_number`: 14478
       - `fields`: `{"Status": "In Progress"}`
 
 3. **Project Status Update**:
