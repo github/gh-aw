@@ -53,21 +53,72 @@ gh pr checkout <pr-number>
 
 ## Fork PR Detection
 
-The script now detects fork PRs by comparing repository names:
+The script uses a robust multi-signal approach to detect fork PRs:
+
+### Detection Logic
 
 ```javascript
-const isFork = pullRequest.head?.repo?.full_name !== pullRequest.base?.repo?.full_name;
+let isFork = false;
+let forkReason = "same repository";
+
+if (!pullRequest.head?.repo) {
+  // Head repo is null - likely a deleted fork
+  isFork = true;
+  forkReason = "head repository deleted (was likely a fork)";
+} else if (pullRequest.head.repo.fork === true) {
+  // GitHub's explicit fork flag
+  isFork = true;
+  forkReason = "head.repo.fork flag is true";
+} else if (pullRequest.head.repo.full_name !== pullRequest.base?.repo?.full_name) {
+  // Different repository names
+  isFork = true;
+  forkReason = "different repository names";
+}
 ```
 
-**Same-repo PR**:
-- `head.repo.full_name`: `owner/repo`
-- `base.repo.full_name`: `owner/repo`
-- `isFork`: `false`
+### Why Multiple Signals?
 
-**Fork PR**:
-- `head.repo.full_name`: `fork-owner/repo`
-- `base.repo.full_name`: `owner/repo`
-- `isFork`: `true`
+**1. Deleted Fork Detection** (`!pullRequest.head?.repo`):
+- When a fork repository is deleted, `pullRequest.head.repo` becomes `null`
+- This is a critical edge case that would cause the workflow to crash without null checks
+- The script correctly identifies this as a fork scenario
+
+**2. GitHub Fork Flag** (`pullRequest.head.repo.fork === true`):
+- GitHub provides an explicit `fork` boolean property on the repository object
+- This is the most reliable signal when the repository still exists
+- More authoritative than comparing names alone
+
+**3. Repository Name Comparison** (`full_name` differs):
+- Fallback for cases where the fork flag might not be set
+- Catches cross-organization PRs that aren't technically forks but behave similarly
+- Compares `owner/repo` format strings
+
+### Edge Cases Handled
+
+**Deleted Fork**:
+```javascript
+// pullRequest.head.repo is null
+isFork = true;
+forkReason = "head repository deleted (was likely a fork)";
+```
+✅ Detected as fork → Uses `gh pr checkout` (will fail if repo truly deleted)
+
+**Forked Repository** (same name, different ownership):
+```javascript
+// pullRequest.head.repo.fork is true
+// OR pullRequest.head.repo.full_name = "fork-owner/repo"
+// vs pullRequest.base.repo.full_name = "original-owner/repo"
+isFork = true;
+```
+✅ Detected as fork → Uses `gh pr checkout`
+
+**Same-Repo PR** (branch in base repository):
+```javascript
+// pullRequest.head.repo.fork is false
+// AND pullRequest.head.repo.full_name = pullRequest.base.repo.full_name
+isFork = false;
+```
+✅ Not a fork → Still uses `gh pr checkout` for non-`pull_request` events
 
 ## Decision Logic
 
@@ -79,6 +130,7 @@ Is event === "pull_request"?
 └─ NO → Use gh pr checkout
           Reason: Running in base repo context
           ├─ For fork PRs: Head branch doesn't exist in origin
+          ├─ For deleted forks: May fail but handles gracefully
           └─ For same-repo PRs: Still safer to use gh pr checkout for consistency
 ```
 
@@ -188,9 +240,15 @@ The enhanced script now logs:
   Base ref: main
   Base SHA: def456
   Base repo: owner/repo
-  Is fork PR: true
+  Is fork PR: true (head.repo.fork flag is true)
   Current repository: owner/repo
 ```
+
+**Fork Detection Reasons**:
+- `(same repository)` - Not a fork, same base and head repo
+- `(head.repo.fork flag is true)` - GitHub's explicit fork flag is set
+- `(different repository names)` - Head and base have different full names
+- `(head repository deleted (was likely a fork))` - Head repo is null, likely deleted fork
 
 ### 2. Checkout Strategy
 ```

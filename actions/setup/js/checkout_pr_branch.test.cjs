@@ -420,22 +420,49 @@ If the pull request is still open, verify that:
 
       await runScript();
 
-      // Verify fork detection logging
-      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: true");
+      // Verify fork detection logging with reason
+      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: true (different repository names)");
       expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Fork PR detected - gh pr checkout will fetch from fork repository");
       expect(mockExec.exec).toHaveBeenCalledWith("gh", ["pr", "checkout", "123"]);
     });
 
+    it("should detect fork using GitHub's fork flag", async () => {
+      mockContext.eventName = "pull_request_target";
+      // Set fork flag explicitly
+      mockContext.payload.pull_request.head.repo.fork = true;
+      mockContext.payload.pull_request.head.repo.full_name = "test-owner/test-repo"; // Same name but forked
+
+      await runScript();
+
+      // Verify fork detection using fork flag
+      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: true (head.repo.fork flag is true)");
+      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Fork PR detected - gh pr checkout will fetch from fork repository");
+    });
+
     it("should detect non-fork PRs in pull_request_target events", async () => {
       mockContext.eventName = "pull_request_target";
-      // Same repo PR
+      // Same repo PR - ensure fork flag is false
       mockContext.payload.pull_request.head.repo.full_name = "test-owner/test-repo";
+      mockContext.payload.pull_request.head.repo.fork = false;
 
       await runScript();
 
       // Verify non-fork detection
-      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: false");
+      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: false (same repository)");
       expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Fork PR detected"));
+    });
+
+    it("should detect deleted fork (null head repo)", async () => {
+      mockContext.eventName = "pull_request_target";
+      // Simulate deleted fork scenario
+      delete mockContext.payload.pull_request.head.repo;
+
+      await runScript();
+
+      // Verify deleted fork detection
+      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Head repo information not available (repo may be deleted)");
+      expect(mockCore.info).toHaveBeenCalledWith("Is fork PR: true (head repository deleted (was likely a fork))");
+      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Fork PR detected - gh pr checkout will fetch from fork repository");
     });
 
     it("should log detailed PR context with startGroup/endGroup", async () => {
@@ -486,15 +513,6 @@ If the pull request is still open, verify that:
       await runScript();
 
       expect(mockCore.info).toHaveBeenCalledWith("Current branch: feature-branch");
-    });
-
-    it("should handle missing head repo information gracefully", async () => {
-      // Simulate deleted fork scenario
-      delete mockContext.payload.pull_request.head.repo;
-
-      await runScript();
-
-      expect(mockCore.warning).toHaveBeenCalledWith("⚠️ Head repo information not available (repo may be deleted)");
     });
   });
 

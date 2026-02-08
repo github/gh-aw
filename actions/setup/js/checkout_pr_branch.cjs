@@ -59,8 +59,28 @@ function logPRContext(eventName, pullRequest) {
   }
 
   // Determine if this is a fork PR
-  const isFork = pullRequest.head?.repo?.full_name !== pullRequest.base?.repo?.full_name;
-  core.info(`Is fork PR: ${isFork}`);
+  // Use multiple signals for robust fork detection:
+  // 1. Check if head.repo.fork is explicitly true (GitHub's fork flag)
+  // 2. Compare repository full names if both repos exist
+  // 3. Handle deleted fork case (head.repo is null)
+  let isFork = false;
+  let forkReason = "same repository";
+
+  if (!pullRequest.head?.repo) {
+    // Head repo is null - likely a deleted fork
+    isFork = true;
+    forkReason = "head repository deleted (was likely a fork)";
+  } else if (pullRequest.head.repo.fork === true) {
+    // GitHub's explicit fork flag
+    isFork = true;
+    forkReason = "head.repo.fork flag is true";
+  } else if (pullRequest.head.repo.full_name !== pullRequest.base?.repo?.full_name) {
+    // Different repository names
+    isFork = true;
+    forkReason = "different repository names";
+  }
+
+  core.info(`Is fork PR: ${isFork} (${forkReason})`);
 
   // Log current repository context
   core.info(`Current repository: ${context.repo.owner}/${context.repo.repo}`);
