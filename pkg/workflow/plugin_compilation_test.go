@@ -291,7 +291,7 @@ Test token precedence
 		{
 			name: "Top-level token used when no plugin token",
 			workflow: `---
-engine: claude
+engine: copilot
 on: workflow_dispatch
 permissions:
   issues: read
@@ -309,7 +309,7 @@ Test top-level token
 		{
 			name: "Cascading fallback when no tokens specified",
 			workflow: `---
-engine: codex
+engine: copilot
 on: workflow_dispatch
 permissions:
   issues: read
@@ -354,13 +354,12 @@ Test cascading fallback
 func TestPluginCompilationAllEngines(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "plugin-all-engines-test")
 
+	// Note: Only copilot engine supports plugins, test different plugin formats
 	engines := []struct {
 		engineID    string
 		expectedCmd string
 	}{
 		{"copilot", "copilot plugin install github/test-plugin"},
-		{"claude", "claude plugin install github/test-plugin"},
-		{"codex", "codex plugin install github/test-plugin"},
 	}
 
 	for _, engine := range engines {
