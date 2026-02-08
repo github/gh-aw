@@ -2,6 +2,11 @@
 marp: true
 ---
 
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.esm.min.mjs';
+mermaid.initialize({ startOnLoad: true });
+</script>
+
 # GitHub Agentic Workflows
 ## Write AI Automation in Natural Language
 ### Research Preview
@@ -82,7 +87,7 @@ AI agents become risky when they combine **three capabilities** at once:
 
 ---
 
-# Combine Github Actions and SWE Agents **SAFELY**.
+# Combine GitHub Actions and SWE Agents **SAFELY**.
 
 ---
 
@@ -382,7 +387,7 @@ GitHub Agentic Workflows implements a comprehensive security architecture with m
 
 # Security Architecture Diagram
 
-```mermaid
+<pre class="mermaid">
 flowchart TB
     subgraph ActionJobVM["Action Job VM"]
         subgraph Sandbox1["Sandbox"]
@@ -390,7 +395,7 @@ flowchart TB
         end
 
         Proxy1["Proxy / Firewall"]
-        Gateway["Gateway<br/>(mcpg)"]
+        Gateway["Gateway&lt;br/&gt;(mcpg)"]
 
         Agent --> Proxy1
         Proxy1 --> Gateway
@@ -418,7 +423,7 @@ flowchart TB
 
     Proxy2 --> Service1
     Proxy3 --> Service2
-```
+</pre>
 
 ---
 
