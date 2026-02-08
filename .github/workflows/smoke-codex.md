@@ -13,8 +13,6 @@ permissions:
   pull-requests: read
 name: Smoke Codex
 engine: codex
-plugins:
-  - anthropics/claude-code/plugins/explanatory-output-style
 strict: true
 imports:
   - shared/mood.md

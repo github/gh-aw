@@ -180,6 +180,15 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		orchestratorToolsLog.Printf("Merged plugins: %d total unique plugins", len(pluginInfo.Plugins))
 	}
 
+	// Validate that the engine supports plugins if plugins are configured
+	if pluginInfo != nil && len(pluginInfo.Plugins) > 0 {
+		if !agenticEngine.SupportsPlugins() {
+			pluginList := strings.Join(pluginInfo.Plugins, ", ")
+			return nil, fmt.Errorf("engine '%s' does not support plugin installation. Plugins specified: %s. Only Copilot and Claude engines support plugins. Please remove the 'plugins:' field from your workflow or use a different engine", agenticEngine.GetID(), pluginList)
+		}
+		orchestratorToolsLog.Printf("Plugin support validation passed for engine: %s", agenticEngine.GetID())
+	}
+
 	// Add MCP fetch server if needed (when web-fetch is requested but engine doesn't support it)
 	tools, _ = AddMCPFetchServerIfNeeded(tools, agenticEngine)
 
