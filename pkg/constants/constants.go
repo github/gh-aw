@@ -274,6 +274,28 @@ const MaxExpressionLineLength LineLength = 120
 // ExpressionBreakThreshold is the threshold for breaking long lines at logical points.
 const ExpressionBreakThreshold LineLength = 100
 
+// Network port constants
+//
+// These constants define standard network port values used throughout the codebase
+// for MCP servers, gateway services, and validation ranges.
+
+const (
+	// DefaultMCPGatewayPort is the default port for the MCP gateway HTTP service
+	DefaultMCPGatewayPort = 80
+
+	// DefaultMCPServerPort is the default port for MCP servers (safe-inputs server)
+	DefaultMCPServerPort = 3000
+
+	// DefaultMCPInspectorPort is the default port for the MCP inspector (safe-outputs server)
+	DefaultMCPInspectorPort = 3001
+
+	// MinNetworkPort is the minimum valid network port number
+	MinNetworkPort = 1
+
+	// MaxNetworkPort is the maximum valid network port number
+	MaxNetworkPort = 65535
+)
+
 // DefaultMCPRegistryURL is the default MCP registry URL.
 const DefaultMCPRegistryURL URL = "https://api.mcp.github.com/v0.1"
 

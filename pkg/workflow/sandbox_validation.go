@@ -155,7 +155,7 @@ func validateSandboxConfig(workflowData *WorkflowData) error {
 
 	// Validate MCP gateway port if configured
 	if sandboxConfig.MCP != nil && sandboxConfig.MCP.Port != 0 {
-		if err := validateIntRange(sandboxConfig.MCP.Port, 1, 65535, "sandbox.mcp.port"); err != nil {
+		if err := validateIntRange(sandboxConfig.MCP.Port, constants.MinNetworkPort, constants.MaxNetworkPort, "sandbox.mcp.port"); err != nil {
 			return err
 		}
 		sandboxValidationLog.Printf("Validated MCP gateway port: %d", sandboxConfig.MCP.Port)

@@ -139,20 +139,20 @@ func parseTimeDeltaWithMinutes(deltaStr string, allowMinutes bool) (*TimeDelta, 
 	}
 
 	// Validate reasonable limits
-	if delta.Months > 12 {
-		return nil, fmt.Errorf("time delta too large: %d months exceeds maximum of 12 months", delta.Months)
+	if delta.Months > MaxTimeDeltaMonths {
+		return nil, fmt.Errorf("time delta too large: %d months exceeds maximum of %d months", delta.Months, MaxTimeDeltaMonths)
 	}
-	if delta.Weeks > 52 {
-		return nil, fmt.Errorf("time delta too large: %d weeks exceeds maximum of 52 weeks", delta.Weeks)
+	if delta.Weeks > MaxTimeDeltaWeeks {
+		return nil, fmt.Errorf("time delta too large: %d weeks exceeds maximum of %d weeks", delta.Weeks, MaxTimeDeltaWeeks)
 	}
-	if delta.Days > 365 {
-		return nil, fmt.Errorf("time delta too large: %d days exceeds maximum of 365 days", delta.Days)
+	if delta.Days > MaxTimeDeltaDays {
+		return nil, fmt.Errorf("time delta too large: %d days exceeds maximum of %d days", delta.Days, MaxTimeDeltaDays)
 	}
-	if delta.Hours > 8760 { // 365 * 24
-		return nil, fmt.Errorf("time delta too large: %d hours exceeds maximum of 8760 hours", delta.Hours)
+	if delta.Hours > MaxTimeDeltaHours {
+		return nil, fmt.Errorf("time delta too large: %d hours exceeds maximum of %d hours", delta.Hours, MaxTimeDeltaHours)
 	}
-	if delta.Minutes > 525600 { // 365 * 24 * 60
-		return nil, fmt.Errorf("time delta too large: %d minutes exceeds maximum of 525600 minutes", delta.Minutes)
+	if delta.Minutes > MaxTimeDeltaMinutes {
+		return nil, fmt.Errorf("time delta too large: %d minutes exceeds maximum of %d minutes", delta.Minutes, MaxTimeDeltaMinutes)
 	}
 
 	timeDeltaLog.Printf("Parsed time delta successfully: %s", delta.String())
