@@ -96,6 +96,12 @@ async function main() {
   core.info(`Event: ${eventName}`);
   core.info(`Pull Request #${pullRequest.number}`);
 
+  // Check if PR is closed
+  const isClosed = pullRequest.state === "closed";
+  if (isClosed) {
+    core.info("⚠️ Pull request is closed");
+  }
+
   try {
     // Log detailed context for debugging
     const { isFork } = logPRContext(eventName, pullRequest);
@@ -151,6 +157,38 @@ async function main() {
   } catch (error) {
     const errorMsg = getErrorMessage(error);
 
+    // Check if PR is closed - if so, treat checkout failure as a warning
+    if (isClosed) {
+      core.startGroup("⚠️ Closed PR Checkout Warning");
+      core.warning(`Event type: ${eventName}`);
+      core.warning(`PR number: ${pullRequest.number}`);
+      core.warning(`PR state: closed`);
+      core.warning(`Checkout failed (expected for closed PR): ${errorMsg}`);
+
+      if (pullRequest.head?.ref) {
+        core.warning(`Branch likely deleted: ${pullRequest.head.ref}`);
+      }
+
+      core.warning("This is expected behavior when a PR is closed - the branch may have been deleted.");
+      core.endGroup();
+
+      // Set output to indicate successful handling of closed PR
+      core.setOutput("checkout_pr_success", "true");
+
+      // Add a brief summary noting this is expected
+      const warningMessage = `## ⚠️ Closed Pull Request
+
+Pull request #${pullRequest.number} is closed. The checkout failed because the branch has likely been deleted, which is expected behavior.
+
+**This is not an error** - workflows targeting closed PRs will continue normally.`;
+
+      await core.summary.addRaw(warningMessage).write();
+
+      // Do NOT call setFailed - this should not fail the step
+      return;
+    }
+
+    // For open PRs, treat checkout failure as an error
     // Log detailed error context
     core.startGroup("❌ Checkout Error Details");
     core.error(`Event type: ${eventName}`);

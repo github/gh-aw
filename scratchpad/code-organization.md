@@ -33,7 +33,7 @@ The codebase exhibits several well-organized patterns that should be emulated:
 - Enables quick location of specific functionality
 - Prevents files from becoming too large
 - Facilitates parallel development
-- Makes testing straightforward
+- Simplifies test organization and coverage
 
 **When to use**:
 - Creating handlers for GitHub API operations
@@ -454,7 +454,7 @@ pkg/workflow/
 
 **When adding a feature**, ask yourself:
 
-1. ✅ Does this fit naturally in an existing file under 500 lines? → Add there
+1. ✅ Does this fit logically in an existing file under 500 lines? → Add there
 2. ✅ Is this a new GitHub entity creation? → `create_<entity>.go`
 3. ✅ Is this a new engine? → `<engine>_engine.go`
 4. ✅ Is this a cohesive, self-contained feature? → `<feature>.go`

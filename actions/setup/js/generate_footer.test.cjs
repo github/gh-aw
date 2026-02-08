@@ -190,6 +190,13 @@ describe("generate_footer.cjs", () => {
       expect(result).toContain("model: gpt-5");
       expect(result).toContain("run: https://github.com/test/repo/actions/runs/123 -->");
     });
+
+    it("should not include blocked domains section when no firewall logs exist", () => {
+      const result = generateFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "", "", undefined, undefined, undefined);
+
+      expect(result).not.toContain("⚠️ Firewall blocked");
+      expect(result).not.toContain("<details>");
+    });
   });
 
   describe("generateXMLMarker", () => {
@@ -345,6 +352,111 @@ describe("generate_footer.cjs", () => {
       const result = getWorkflowIdMarkerContent("");
 
       expect(result).toBe("gh-aw-workflow-id: ");
+    });
+  });
+
+  describe("generateExpiredEntityFooter", () => {
+    let generateExpiredEntityFooter;
+
+    beforeEach(async () => {
+      // Reset modules and import fresh
+      vi.resetModules();
+      const freshModule = await import("./generate_footer.cjs");
+      generateExpiredEntityFooter = freshModule.generateExpiredEntityFooter;
+    });
+
+    it("should generate footer with 'Closed by' wording and workflow link", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("> Closed by [Test Workflow](https://github.com/test/repo/actions/runs/123)");
+    });
+
+    it("should use markdown quote for footer text", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toMatch(/\n\n> Closed by/);
+    });
+
+    it("should include gh-aw-expired-comments marker", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("<!-- gh-aw-expired-comments -->");
+    });
+
+    it("should include workflow ID marker when provided", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("<!-- gh-aw-workflow-id: test-workflow -->");
+    });
+
+    it("should omit workflow ID marker when not provided", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "");
+
+      expect(result).not.toContain("<!-- gh-aw-workflow-id:");
+    });
+
+    it("should include XML marker with workflow metadata", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("<!-- gh-aw-agentic-workflow: Test Workflow");
+      expect(result).toContain("run: https://github.com/test/repo/actions/runs/123");
+    });
+
+    it("should have correct structure with newlines and workflow ID", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      // Should start with double newline and quote
+      expect(result.startsWith("\n\n>")).toBe(true);
+      // Should have proper spacing between sections
+      expect(result).toMatch(/\n\n<!-- gh-aw-expired-comments -->\n<!-- gh-aw-workflow-id: test-workflow -->\n<!-- gh-aw-agentic-workflow:/);
+    });
+
+    it("should include engine metadata when env vars are set", async () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      process.env.GH_AW_ENGINE_VERSION = "2.0.0";
+      process.env.GH_AW_ENGINE_MODEL = "gpt-5";
+
+      vi.resetModules();
+      const freshModule = await import("./generate_footer.cjs");
+      const freshGenerateExpiredEntityFooter = freshModule.generateExpiredEntityFooter;
+
+      const result = freshGenerateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("engine: copilot");
+      expect(result).toContain("version: 2.0.0");
+      expect(result).toContain("model: gpt-5");
+    });
+
+    it("should include tracker-id when env var is set", async () => {
+      process.env.GH_AW_TRACKER_ID = "test-tracker-123";
+
+      vi.resetModules();
+      const freshModule = await import("./generate_footer.cjs");
+      const freshGenerateExpiredEntityFooter = freshModule.generateExpiredEntityFooter;
+
+      const result = freshGenerateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toContain("gh-aw-tracker-id: test-tracker-123");
+    });
+
+    it("should be searchable by gh-aw-expired-comments marker", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      // The marker should be searchable in GitHub
+      expect(result).toContain("<!-- gh-aw-expired-comments -->");
+      // Should be a standalone marker (not embedded in another marker)
+      const markerMatches = result.match(/<!-- gh-aw-expired-comments -->/g);
+      expect(markerMatches?.length).toBe(1);
+    });
+
+    it("should be searchable by workflow ID marker", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "daily-cleanup");
+
+      // The marker should be searchable in GitHub
+      expect(result).toContain("<!-- gh-aw-workflow-id: daily-cleanup -->");
+      // Should be a standalone marker (not embedded in another marker)
+      const markerMatches = result.match(/<!-- gh-aw-workflow-id: daily-cleanup -->/g);
+      expect(markerMatches?.length).toBe(1);
     });
   });
 });

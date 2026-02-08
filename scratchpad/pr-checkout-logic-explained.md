@@ -278,6 +278,31 @@ The enhanced script now logs:
 
 ## Common Issues and Debugging
 
+### Issue: Closed PR with deleted branch
+
+**Cause**: When a PR is closed, the branch is often deleted, causing checkout to fail
+
+**Solution**: The script now detects closed PRs and treats checkout failures as warnings instead of errors. The workflow will continue normally.
+
+**Behavior**:
+- The script detects when `pullRequest.state === "closed"`
+- If checkout fails on a closed PR, it logs a warning instead of failing
+- Sets `checkout_pr_success` output to `"true"` to allow workflow continuation
+- Adds a step summary explaining this is expected behavior
+
+**Log output**:
+```
+⚠️ Closed PR Checkout Warning
+  Event type: issue_comment
+  PR number: 123
+  PR state: closed
+  Checkout failed (expected for closed PR): branch not found
+  Branch likely deleted: feature-branch
+  This is expected behavior when a PR is closed - the branch may have been deleted.
+```
+
+**When it's used**: Workflows that process comments or events on closed PRs won't fail due to the branch being deleted.
+
 ### Issue: "pathspec 'branch-name' did not match any file(s) known to git"
 
 **Cause**: Trying to use `git checkout <branch>` for a fork PR in `pull_request_target` context
@@ -354,6 +379,10 @@ The test suite now covers:
 5. **Strategy logging**: Why each strategy is chosen
 6. **Error logging**: Enhanced diagnostics on failure
 7. **Missing repo handling**: Graceful handling of deleted forks
+8. **Closed PR handling**: Checkout failures on closed PRs treated as warnings, not errors
+   - Tests verify that closed PRs don't fail the workflow
+   - Tests verify that open PRs still fail on checkout errors
+   - Tests verify proper warning messages and step summaries
 
 ## References
 

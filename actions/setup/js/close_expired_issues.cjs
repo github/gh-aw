@@ -2,6 +2,7 @@
 // <reference types="@actions/github-script" />
 
 const { executeExpiredEntityCleanup } = require("./expired_entity_main_flow.cjs");
+const { generateExpiredEntityFooter } = require("./generate_footer.cjs");
 
 /**
  * Add comment to a GitHub Issue using REST API
@@ -47,6 +48,13 @@ async function main() {
   const owner = context.repo.owner;
   const repo = context.repo.repo;
 
+  // Get workflow metadata for footer
+  const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+  const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
+  const runId = context.runId || 0;
+  const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
+  const runUrl = context.payload?.repository ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${owner}/${repo}/actions/runs/${runId}`;
+
   await executeExpiredEntityCleanup(github, owner, repo, {
     entityType: "issues",
     graphqlField: "issues",
@@ -54,7 +62,7 @@ async function main() {
     entityLabel: "Issue",
     summaryHeading: "Expired Issues Cleanup",
     processEntity: async issue => {
-      const closingMessage = `This issue was automatically closed because it expired on ${issue.expirationDate.toISOString()}.`;
+      const closingMessage = `This issue was automatically closed because it expired on ${issue.expirationDate.toISOString()}.` + generateExpiredEntityFooter(workflowName, runUrl, workflowId);
 
       await addIssueComment(github, owner, repo, issue.number, closingMessage);
       core.info(`  ✓ Comment added successfully`);

@@ -78,7 +78,19 @@ func formatCompilerMessage(filePath string, msgType string, message string) stri
 	})
 }
 
-// CompileWorkflow converts a markdown workflow to GitHub Actions YAML
+// CompileWorkflow compiles a workflow markdown file into a GitHub Actions YAML file.
+// It reads the file from disk, parses frontmatter and markdown sections, and generates
+// the corresponding workflow YAML. Returns the compiled workflow data or an error.
+//
+// The compilation process includes:
+//   - Reading and parsing the markdown file
+//   - Extracting frontmatter configuration
+//   - Validating workflow configuration
+//   - Generating GitHub Actions YAML
+//   - Writing the compiled workflow to a .lock.yml file
+//
+// This is the main entry point for compiling workflows from disk. For compiling
+// pre-parsed workflow data, use CompileWorkflowData instead.
 func (c *Compiler) CompileWorkflow(markdownPath string) error {
 	// Store markdownPath for use in dynamic tool generation
 	c.markdownPath = markdownPath
@@ -171,6 +183,12 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	// Validate network allowed domains configuration
 	log.Printf("Validating network allowed domains")
 	if err := c.validateNetworkAllowedDomains(workflowData.NetworkPermissions); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
+	// Validate network firewall configuration
+	log.Printf("Validating network firewall configuration")
+	if err := validateNetworkFirewallConfig(workflowData.NetworkPermissions); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
@@ -419,8 +437,19 @@ func (c *Compiler) writeWorkflowOutput(lockFile, yamlContent string, markdownPat
 	return nil
 }
 
-// CompileWorkflowData compiles a workflow from already-parsed WorkflowData
-// This avoids re-parsing when the data has already been parsed
+// CompileWorkflowData compiles pre-parsed workflow content into GitHub Actions YAML.
+// Unlike CompileWorkflow, this accepts already-parsed frontmatter and markdown content
+// rather than reading from disk. This is useful for testing and programmatic workflow generation.
+//
+// The compilation process includes:
+//   - Validating workflow configuration and features
+//   - Checking permissions and tool configurations
+//   - Generating GitHub Actions YAML structure
+//   - Writing the compiled workflow to a .lock.yml file
+//
+// This function avoids re-parsing when workflow data has already been extracted,
+// making it efficient for scenarios where the same workflow is compiled multiple times
+// or when workflow data comes from a non-file source.
 func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath string) error {
 	// Store markdownPath for use in dynamic tool generation and prompt generation
 	c.markdownPath = markdownPath

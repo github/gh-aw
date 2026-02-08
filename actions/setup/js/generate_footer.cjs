@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const { getMissingInfoSections } = require("./missing_messages_helper.cjs");
+const { getBlockedDomains, generateBlockedDomainsSection } = require("./firewall_blocked_domains.cjs");
 
 /**
  * Generates a standalone workflow-id XML comment marker for searchability.
@@ -118,10 +119,37 @@ function generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL,
     footer += missingInfoSections;
   }
 
+  // Add firewall blocked domains section if any domains were blocked
+  const blockedDomains = getBlockedDomains();
+  const blockedDomainsSection = generateBlockedDomainsSection(blockedDomains);
+  if (blockedDomainsSection) {
+    footer += blockedDomainsSection;
+  }
+
   // Add XML comment marker for traceability
   footer += "\n\n" + generateXMLMarker(workflowName, runUrl);
 
   footer += "\n";
+  return footer;
+}
+
+/**
+ * Generate footer for expired entity closing comments
+ * @param {string} workflowName - Name of the workflow
+ * @param {string} runUrl - URL of the workflow run
+ * @param {string} workflowId - Workflow identifier
+ * @returns {string} Footer text with workflow run link and XML markers
+ */
+function generateExpiredEntityFooter(workflowName, runUrl, workflowId) {
+  let footer = `\n\n> Closed by [${workflowName}](${runUrl})`;
+
+  // Add XML markers for searchability
+  footer += "\n\n<!-- gh-aw-expired-comments -->";
+  if (workflowId) {
+    footer += "\n" + generateWorkflowIdMarker(workflowId);
+  }
+  footer += "\n" + generateXMLMarker(workflowName, runUrl);
+
   return footer;
 }
 
@@ -130,4 +158,5 @@ module.exports = {
   generateXMLMarker,
   generateWorkflowIdMarker,
   getWorkflowIdMarkerContent,
+  generateExpiredEntityFooter,
 };
