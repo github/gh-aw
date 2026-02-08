@@ -146,3 +146,27 @@ func (c *Compiler) validateSingleEngineSpecification(mainEngineSetting string, i
 
 	return "", fmt.Errorf("invalid engine configuration in included file, missing or invalid 'id' field. Expected string or object with 'id' field.\n\nExample (string):\nengine: copilot\n\nExample (object):\nengine:\n  id: copilot\n  model: gpt-4\n\nSee: %s", constants.DocsEnginesURL)
 }
+
+// validatePluginSupport validates that plugins are only used with engines that support them
+func (c *Compiler) validatePluginSupport(pluginInfo *PluginInfo, agenticEngine CodingAgentEngine) error {
+	// No plugins specified, validation passes
+	if pluginInfo == nil || len(pluginInfo.Plugins) == 0 {
+		return nil
+	}
+
+	engineValidationLog.Printf("Validating plugin support for engine: %s", agenticEngine.GetID())
+
+	// Check if the engine supports plugins
+	if !agenticEngine.SupportsPlugins() {
+		// Build error message listing the plugins that were specified
+		pluginsList := strings.Join(pluginInfo.Plugins, ", ")
+
+		return fmt.Errorf("engine '%s' does not support plugins. The following plugins cannot be installed: %s\n\nOnly the 'copilot' engine currently supports plugin installation.\n\nTo fix this, either:\n1. Remove the 'plugins' field from your workflow\n2. Change to an engine that supports plugins (e.g., engine: copilot)\n\nSee: %s",
+			agenticEngine.GetID(),
+			pluginsList,
+			constants.DocsEnginesURL)
+	}
+
+	engineValidationLog.Printf("Engine %s supports plugins: %d plugins to install", agenticEngine.GetID(), len(pluginInfo.Plugins))
+	return nil
+}
