@@ -26,7 +26,7 @@
 #     - ../agents/ci-cleaner.agent.md
 #     - shared/mood.md
 #
-# frontmatter-hash: 914c3b79f91c617707445172be9641b0a830c27b045563dea090498144c4ed85
+# frontmatter-hash: 08ec2dcd7a3c1b47dc9755f406d89bf3f8918399daae8b7d8afb253aa6bc7001
 
 name: "CI Cleaner"
 "on":
@@ -816,6 +816,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Check last CI workflow run status on main branch
         id: ci_check
         run: |
