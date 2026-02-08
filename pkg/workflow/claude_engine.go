@@ -30,7 +30,6 @@ func NewClaudeEngine() *ClaudeEngine {
 			supportsWebFetch:       true, // Claude has built-in WebFetch support
 			supportsWebSearch:      true, // Claude has built-in WebSearch support
 			supportsFirewall:       true, // Claude supports network firewalling via AWF
-			supportsPlugins:        true, // Claude supports plugin installation
 		},
 	}
 }
@@ -125,18 +124,6 @@ func (e *ClaudeEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHub
 	// Add Claude CLI installation step after sandbox installation
 	if len(npmSteps) > 1 {
 		steps = append(steps, npmSteps[1:]...) // Install Claude CLI and subsequent steps
-	}
-
-	// Add plugin installation steps after Claude CLI installation
-	if workflowData.PluginInfo != nil && len(workflowData.PluginInfo.Plugins) > 0 {
-		claudeLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.PluginInfo.Plugins))
-		// Use plugin-specific token if provided, otherwise use top-level github-token
-		tokenToUse := workflowData.PluginInfo.CustomToken
-		if tokenToUse == "" {
-			tokenToUse = workflowData.GitHubToken
-		}
-		pluginSteps := GeneratePluginInstallationSteps(workflowData.PluginInfo.Plugins, "claude", tokenToUse)
-		steps = append(steps, pluginSteps...)
 	}
 
 	return steps

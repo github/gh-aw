@@ -260,7 +260,7 @@ This workflow has duplicate plugins across imports and top-level.
 		"Expected workflow to install top-level-plugin")
 }
 
-func TestCompileWorkflowWithPluginImportsClaudeEngine(t *testing.T) {
+func TestCompileWorkflowWithPluginImportsClaudeEngineRejectsPlugins(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir := testutil.TempDir(t, "test-*")
 
@@ -291,19 +291,10 @@ This workflow uses Claude engine with imported plugins.
 	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
 		"Failed to write workflow file")
 
-	// Compile the workflow
+	// Compile the workflow - should fail because Claude doesn't support plugins
 	compiler := workflow.NewCompiler()
-	require.NoError(t, compiler.CompileWorkflow(workflowPath),
-		"CompileWorkflow should succeed")
-
-	// Read the generated lock file
-	lockFilePath := stringutil.MarkdownToLockFile(workflowPath)
-	lockFileContent, err := os.ReadFile(lockFilePath)
-	require.NoError(t, err, "Failed to read lock file")
-
-	workflowData := string(lockFileContent)
-
-	// Verify that Claude engine installs the plugin
-	assert.Contains(t, workflowData, "claude plugin install anthropic/plugin-one",
-		"Expected Claude engine to install plugin from import")
+	err := compiler.CompileWorkflow(workflowPath)
+	require.Error(t, err, "CompileWorkflow should fail because Claude doesn't support plugins")
+	assert.Contains(t, err.Error(), "does not support plugins",
+		"Error should mention that Claude doesn't support plugins")
 }

@@ -89,25 +89,16 @@ func TestOtherEnginesNoDefaultDetectionModel(t *testing.T) {
 }
 
 func TestOtherEnginesNoPluginSupport(t *testing.T) {
-	// Test that only Copilot, Claude, and Codex engines support plugins
-	// Custom engine should not support plugins
-	customEngine := NewCustomEngine()
-	if customEngine.SupportsPlugins() {
-		t.Errorf("Expected engine '%s' to not support plugins, but it does", customEngine.GetID())
-	}
-}
-
-func TestPluginSupportForMainEngines(t *testing.T) {
-	// Test that Copilot, Claude, and Codex all support plugins
+	// Test that only Copilot engine supports plugins
 	engines := []CodingAgentEngine{
-		NewCopilotEngine(),
 		NewClaudeEngine(),
 		NewCodexEngine(),
+		NewCustomEngine(),
 	}
 
 	for _, engine := range engines {
-		if !engine.SupportsPlugins() {
-			t.Errorf("Expected engine '%s' to support plugins, but it doesn't", engine.GetID())
+		if engine.SupportsPlugins() {
+			t.Errorf("Expected engine '%s' to not support plugins, but it does", engine.GetID())
 		}
 	}
 }

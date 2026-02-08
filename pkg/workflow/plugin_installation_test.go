@@ -182,13 +182,12 @@ func TestExtractPluginsFromFrontmatter(t *testing.T) {
 
 func TestPluginInstallationIntegration(t *testing.T) {
 	// Test that plugins are properly integrated into engine installation steps
+	// Only Copilot supports plugins
 	engines := []struct {
 		engineID string
 		engine   CodingAgentEngine
 	}{
 		{"copilot", NewCopilotEngine()},
-		{"claude", NewClaudeEngine()},
-		{"codex", NewCodexEngine()},
 	}
 
 	for _, e := range engines {
@@ -258,13 +257,12 @@ func TestPluginTokenCascading(t *testing.T) {
 
 func TestPluginObjectFormatWithCustomToken(t *testing.T) {
 	// Test that object format with custom token overrides cascading resolution
+	// Only Copilot supports plugins
 	engines := []struct {
 		engineID string
 		engine   CodingAgentEngine
 	}{
 		{"copilot", NewCopilotEngine()},
-		{"claude", NewClaudeEngine()},
-		{"codex", NewCodexEngine()},
 	}
 
 	for _, e := range engines {

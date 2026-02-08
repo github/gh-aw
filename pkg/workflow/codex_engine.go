@@ -41,7 +41,6 @@ func NewCodexEngine() *CodexEngine {
 			supportsWebFetch:       false, // Codex does not have built-in web-fetch support
 			supportsWebSearch:      true,  // Codex has built-in web-search support
 			supportsFirewall:       true,  // Codex supports network firewalling via AWF
-			supportsPlugins:        true,  // Codex supports plugin installation
 		},
 	}
 }
@@ -100,18 +99,6 @@ func (e *CodexEngine) GetInstallationSteps(workflowData *WorkflowData) []GitHubA
 		if len(awfInstall) > 0 {
 			steps = append(steps, awfInstall)
 		}
-	}
-
-	// Add plugin installation steps after Codex CLI installation
-	if workflowData.PluginInfo != nil && len(workflowData.PluginInfo.Plugins) > 0 {
-		codexEngineLog.Printf("Adding plugin installation steps: %d plugins", len(workflowData.PluginInfo.Plugins))
-		// Use plugin-specific token if provided, otherwise use top-level github-token
-		tokenToUse := workflowData.PluginInfo.CustomToken
-		if tokenToUse == "" {
-			tokenToUse = workflowData.GitHubToken
-		}
-		pluginSteps := GeneratePluginInstallationSteps(workflowData.PluginInfo.Plugins, "codex", tokenToUse)
-		steps = append(steps, pluginSteps...)
 	}
 
 	return steps
