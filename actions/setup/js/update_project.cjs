@@ -6,6 +6,33 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { loadTemporaryIdMap, resolveIssueNumber, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
+ * Normalize agent output keys for update_project.
+ *
+ * Agents sometimes emit camelCase keys even when the schema documents snake_case.
+ * We accept a small set of aliases for backward compatibility and resilience.
+ *
+ * @param {any} value
+ * @returns {any}
+ */
+function normalizeUpdateProjectOutput(value) {
+  if (!value || typeof value !== "object") return value;
+
+  const output = { ...value };
+
+  if (output.content_type === undefined && output.contentType !== undefined) output.content_type = output.contentType;
+  if (output.content_number === undefined && output.contentNumber !== undefined) output.content_number = output.contentNumber;
+
+  if (output.draft_title === undefined && output.draftTitle !== undefined) output.draft_title = output.draftTitle;
+  if (output.draft_body === undefined && output.draftBody !== undefined) output.draft_body = output.draftBody;
+  if (output.draft_issue_id === undefined && output.draftIssueId !== undefined) output.draft_issue_id = output.draftIssueId;
+  if (output.temporary_id === undefined && output.temporaryId !== undefined) output.temporary_id = output.temporaryId;
+
+  if (output.field_definitions === undefined && output.fieldDefinitions !== undefined) output.field_definitions = output.fieldDefinitions;
+
+  return output;
+}
+
+/**
  * Log detailed GraphQL error information
  * @param {Error & { errors?: Array<{ type?: string, message: string, path?: unknown, locations?: unknown }>, request?: unknown, data?: unknown }} error - GraphQL error
  * @param {string} operation - Operation description
@@ -365,6 +392,8 @@ async function findExistingDraftByTitle(github, projectId, targetTitle) {
  * @returns {Promise<void|{temporaryId?: string, draftItemId?: string}>} Returns undefined for most operations, or an object with temporary ID mapping for draft issue creation
  */
 async function updateProject(output, temporaryIdMap = new Map(), githubClient = null) {
+  output = normalizeUpdateProjectOutput(output);
+
   // Use the provided github client, or fall back to the global github object
   // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
@@ -1143,6 +1172,8 @@ async function main(config = {}, githubClient = null) {
    * @returns {Promise<Object>} Result with success/error status, and optionally temporaryId/draftItemId for draft issue creation
    */
   return async function handleUpdateProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
+    message = normalizeUpdateProjectOutput(message);
+
     // Check max limit
     if (processedCount >= maxCount) {
       core.warning(`Skipping update_project: max count of ${maxCount} reached`);

@@ -461,6 +461,33 @@ describe("updateProject", () => {
     expect(mockCore.info).toHaveBeenCalledWith('✓ Created new draft issue "Draft title"');
   });
 
+  it("adds a draft issue when agent emits camelCase keys", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const title = "Test *draft issue* for `smoke-project`";
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      contentType: "draft_issue",
+      draftTitle: title,
+      draftBody: "Body",
+    };
+
+    queueResponses([
+      repoResponse(),
+      viewerResponse(),
+      orgProjectV2Response(projectUrl, 60, "project-draft"),
+      emptyItemsResponse(), // No existing drafts with this title
+      addDraftIssueResponse("draft-item-camel"),
+    ]);
+
+    await updateProject(output);
+
+    expect(mockGithub.graphql.mock.calls.some(([query]) => query.includes("addProjectV2DraftIssue"))).toBe(true);
+    expect(getOutput("item-id")).toBe("draft-item-camel");
+    expect(mockCore.info).toHaveBeenCalledWith(`✓ Created new draft issue "${title}"`);
+  });
+
   it("returns temporary_id when draft issue is created with temporary_id", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const temporaryId = "aw_abc123def456";
