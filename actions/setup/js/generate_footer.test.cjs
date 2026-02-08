@@ -358,10 +358,16 @@ describe("generate_footer.cjs", () => {
       generateExpiredEntityFooter = freshModule.generateExpiredEntityFooter;
     });
 
-    it("should generate footer with workflow run link", () => {
+    it("should generate footer with 'Closed by' wording and workflow link", () => {
       const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
 
-      expect(result).toContain("**Workflow Run:** [View run details](https://github.com/test/repo/actions/runs/123)");
+      expect(result).toContain("> Closed by [Test Workflow](https://github.com/test/repo/actions/runs/123)");
+    });
+
+    it("should use markdown quote for footer text", () => {
+      const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
+
+      expect(result).toMatch(/\n\n> Closed by/);
     });
 
     it("should include gh-aw-expired-comments marker", () => {
@@ -392,8 +398,8 @@ describe("generate_footer.cjs", () => {
     it("should have correct structure with newlines and workflow ID", () => {
       const result = generateExpiredEntityFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "test-workflow");
 
-      // Should start with double newline
-      expect(result.startsWith("\n\n")).toBe(true);
+      // Should start with double newline and quote
+      expect(result.startsWith("\n\n>")).toBe(true);
       // Should have proper spacing between sections
       expect(result).toMatch(/\n\n<!-- gh-aw-expired-comments -->\n<!-- gh-aw-workflow-id: test-workflow -->\n<!-- gh-aw-agentic-workflow:/);
     });

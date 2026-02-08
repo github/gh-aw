@@ -133,7 +133,7 @@ function generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL,
  * @returns {string} Footer text with workflow run link and XML markers
  */
 function generateExpiredEntityFooter(workflowName, runUrl, workflowId) {
-  let footer = `\n\n**Workflow Run:** [View run details](${runUrl})`;
+  let footer = `\n\n> Closed by [${workflowName}](${runUrl})`;
 
   // Add XML markers for searchability
   footer += "\n\n<!-- gh-aw-expired-comments -->";
