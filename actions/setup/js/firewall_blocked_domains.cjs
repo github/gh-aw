@@ -168,9 +168,9 @@ function getBlockedDomains(logsDir) {
 }
 
 /**
- * Generates HTML details/summary section for blocked domains
+ * Generates HTML details/summary section for blocked domains wrapped in a GitHub warning alert
  * @param {string[]} blockedDomains - Array of blocked domain names
- * @returns {string} HTML formatted details section, or empty string if no blocked domains
+ * @returns {string} GitHub warning alert with details section, or empty string if no blocked domains
  */
 function generateBlockedDomainsSection(blockedDomains) {
   if (!blockedDomains || blockedDomains.length === 0) {
@@ -180,16 +180,20 @@ function generateBlockedDomainsSection(blockedDomains) {
   const domainCount = blockedDomains.length;
   const domainWord = domainCount === 1 ? "domain" : "domains";
 
-  let section = "\n\n<details>\n";
-  section += `<summary>⚠️ Firewall blocked ${domainCount} ${domainWord}</summary>\n\n`;
-  section += `> The following ${domainWord} ${domainCount === 1 ? "was" : "were"} blocked by the firewall during workflow execution:\n\n`;
+  let section = "\n\n> [!WARNING]\n";
+  section += `> <details>\n`;
+  section += `> <summary>⚠️ Firewall blocked ${domainCount} ${domainWord}</summary>\n`;
+  section += `>\n`;
+  section += `> The following ${domainWord} ${domainCount === 1 ? "was" : "were"} blocked by the firewall during workflow execution:\n`;
+  section += `>\n`;
 
-  // List domains as bullet points
+  // List domains as bullet points (within the alert)
   for (const domain of blockedDomains) {
-    section += `- \`${domain}\`\n`;
+    section += `> - \`${domain}\`\n`;
   }
 
-  section += "\n</details>";
+  section += `>\n`;
+  section += `> </details>\n`;
 
   return section;
 }

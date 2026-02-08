@@ -257,10 +257,11 @@ describe("firewall_blocked_domains.cjs", () => {
     it("should generate details section for single blocked domain", () => {
       const result = generateBlockedDomainsSection(["blocked.example.com"]);
 
-      expect(result).toContain("<details>");
-      expect(result).toContain("</details>");
-      expect(result).toContain("<summary>⚠️ Firewall blocked 1 domain</summary>");
-      expect(result).toContain("- `blocked.example.com`");
+      expect(result).toContain("> [!WARNING]");
+      expect(result).toContain("> <details>");
+      expect(result).toContain("> </details>");
+      expect(result).toContain("> <summary>⚠️ Firewall blocked 1 domain</summary>");
+      expect(result).toContain("> - `blocked.example.com`");
       expect(result).toContain("> The following domain was blocked by the firewall during workflow execution:");
     });
 
@@ -268,12 +269,13 @@ describe("firewall_blocked_domains.cjs", () => {
       const domains = ["alpha.example.com", "beta.example.com", "gamma.example.com"];
       const result = generateBlockedDomainsSection(domains);
 
-      expect(result).toContain("<details>");
-      expect(result).toContain("</details>");
-      expect(result).toContain("<summary>⚠️ Firewall blocked 3 domains</summary>");
-      expect(result).toContain("- `alpha.example.com`");
-      expect(result).toContain("- `beta.example.com`");
-      expect(result).toContain("- `gamma.example.com`");
+      expect(result).toContain("> [!WARNING]");
+      expect(result).toContain("> <details>");
+      expect(result).toContain("> </details>");
+      expect(result).toContain("> <summary>⚠️ Firewall blocked 3 domains</summary>");
+      expect(result).toContain("> - `alpha.example.com`");
+      expect(result).toContain("> - `beta.example.com`");
+      expect(result).toContain("> - `gamma.example.com`");
     });
 
     it("should use correct singular/plural form", () => {
@@ -288,12 +290,12 @@ describe("firewall_blocked_domains.cjs", () => {
 
     it("should format domains with backticks", () => {
       const result = generateBlockedDomainsSection(["example.com"]);
-      expect(result).toMatch(/- `example\.com`/);
+      expect(result).toMatch(/> - `example\.com`/);
     });
 
-    it("should start with double newline", () => {
+    it("should start with double newline and warning alert", () => {
       const result = generateBlockedDomainsSection(["example.com"]);
-      expect(result).toMatch(/^\n\n<details>/);
+      expect(result).toMatch(/^\n\n> \[!WARNING\]/);
     });
   });
 });
