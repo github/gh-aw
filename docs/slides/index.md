@@ -2,7 +2,7 @@
 marp: true
 ---
 
-<script src="/gh-aw/js/mermaid.min.js"></script>
+<script src="../js/mermaid.min.js"></script>
 <script>
 mermaid.initialize({ startOnLoad: true });
 </script>
