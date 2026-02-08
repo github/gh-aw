@@ -24,9 +24,9 @@ safe-outputs:
     expires: 7d
     title-prefix: "[Dependabot Burner] "
     labels: [dependabot-burner]
-    assignees: []
+    assignees: [copilot]
     max: 20
-    group: true
+    group: false
   update-project:
     project: "https://github.com/orgs/github/projects/24060"
     views:
