@@ -155,7 +155,7 @@ Test object format with custom token
 		{
 			name: "Object format without custom token",
 			workflow: `---
-engine: claude
+engine: copilot
 on: workflow_dispatch
 permissions:
   issues: read
@@ -168,7 +168,7 @@ plugins:
 Test object format without custom token
 `,
 			expectedPlugins: []string{
-				"claude plugin install github/plugin1",
+				"copilot plugin install github/plugin1",
 			},
 			expectedToken:    "secrets.GH_AW_PLUGINS_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN",
 			shouldNotContain: "",

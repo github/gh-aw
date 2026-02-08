@@ -56,7 +56,7 @@ Test plugin with MCP configuration
 		{
 			name: "Multiple plugins with different MCP configs",
 			workflow: `---
-engine: claude
+engine: copilot
 on: workflow_dispatch
 permissions:
   issues: read
@@ -77,8 +77,8 @@ plugins:
 Test multiple plugins with MCP configs
 `,
 			expectedPlugins: []string{
-				"claude plugin install github/plugin1",
-				"claude plugin install github/plugin2",
+				"copilot plugin install github/plugin1",
+				"copilot plugin install github/plugin2",
 			},
 			expectedEnvVars: map[string]string{
 				"PLUGIN1_KEY": "${{ secrets.PLUGIN1_KEY }}",
@@ -90,7 +90,7 @@ Test multiple plugins with MCP configs
 		{
 			name: "Mixed simple and MCP-enabled plugins",
 			workflow: `---
-engine: codex
+engine: copilot
 on: workflow_dispatch
 permissions:
   issues: read
@@ -110,9 +110,9 @@ plugins:
 Test mixed plugin configuration
 `,
 			expectedPlugins: []string{
-				"codex plugin install github/simple1",
-				"codex plugin install github/mcp-enabled",
-				"codex plugin install github/simple2",
+				"copilot plugin install github/simple1",
+				"copilot plugin install github/mcp-enabled",
+				"copilot plugin install github/simple2",
 			},
 			expectedEnvVars: map[string]string{
 				"MCP_SECRET": "${{ secrets.MCP_SECRET }}",
