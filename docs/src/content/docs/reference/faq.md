@@ -14,6 +14,8 @@ sidebar:
 
 We fully embrace the need for deterministic CI/CD, especially in build, release, and test pipelines. Agentic workflows are **100% additive** to your existing CI/CD - they don't replace or modify your deterministic pipelines.
 
+Another way to look at it is that this is about something new and additive: **Continuous AI** in addition to **Continuous Integration** and **Continuous Deployment** - a new leg to make a trifecta. It just happens to run in GitHub Actions because that's where infrastructure for secure execution, permissions, and repository context is found. It's a new addition to your automation toolkit, not a replacement for existing workflows.
+
 Think of it this way: your build, test, and release workflows should remain fully deterministic and reproducible. Agentic workflows complement these by handling tasks that are inherently non-deterministic anyway - like triaging issues, drafting documentation, researching dependencies, or proposing code improvements for human review.
 
 The key insight is that many valuable automation tasks don't require determinism. When a coding agent reviews an issue and suggests a label, or drafts release notes from commits, the exact wording doesn't need to be reproducible - it needs to be helpful. Agentic workflows excel at these judgment-based tasks while your critical CI/CD pipelines remain unchanged.
