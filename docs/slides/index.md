@@ -3,7 +3,7 @@ marp: true
 ---
 
 <script type="module">
-import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.12.2/dist/mermaid.esm.min.mjs';
+import mermaid from '/gh-aw/js/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: true });
 </script>
 
