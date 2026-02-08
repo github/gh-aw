@@ -178,24 +178,102 @@ on:
 
   # Push event trigger that runs the workflow when code is pushed to the repository
   # (optional)
-  # This field supports multiple formats (oneOf):
+  push:
+    # Branches to filter on
+    # (optional)
+    branches: []
+      # Array of strings
 
-  # Option 1: undefined
+    # Branches to ignore
+    # (optional)
+    branches-ignore: []
+      # Array of strings
 
-  # Option 2: undefined
+    # Paths to filter on
+    # (optional)
+    paths: []
+      # Array of strings
 
-  # Option 3: undefined
+    # Paths to ignore
+    # (optional)
+    paths-ignore: []
+      # Array of strings
+
+    # List of git tag names or patterns to include for push events (supports
+    # wildcards)
+    # (optional)
+    tags: []
+      # Array of strings
+
+    # List of git tag names or patterns to exclude from push events (supports
+    # wildcards)
+    # (optional)
+    tags-ignore: []
+      # Array of strings
 
   # Pull request event trigger that runs the workflow when pull requests are
   # created, updated, or closed
   # (optional)
-  # This field supports multiple formats (oneOf):
+  pull_request:
+    # Pull request event types to trigger on. Note: 'converted_to_draft' and
+    # 'ready_for_review' represent state transitions (events) rather than states.
+    # While technically valid to listen for both, consider if you need to handle both
+    # transitions or just one.
+    # (optional)
+    types: []
+      # Array of strings
 
-  # Option 1: undefined
+    # Branches to filter on
+    # (optional)
+    branches: []
+      # Array of strings
 
-  # Option 2: undefined
+    # Branches to ignore
+    # (optional)
+    branches-ignore: []
+      # Array of strings
 
-  # Option 3: undefined
+    # Paths to filter on
+    # (optional)
+    paths: []
+      # Array of strings
+
+    # Paths to ignore
+    # (optional)
+    paths-ignore: []
+      # Array of strings
+
+    # Filter by draft pull request state. Set to false to exclude draft PRs, true to
+    # include only drafts, or omit to include both
+    # (optional)
+    draft: true
+
+    # When true, allows workflow to run on pull requests from forked repositories.
+    # Security consideration: fork PRs have limited permissions.
+    # (optional)
+    # This field supports multiple formats (oneOf):
+
+    # Option 1: Single fork pattern (e.g., '*' for all forks, 'org/*' for org glob,
+    # 'org/repo' for exact match)
+    forks: "example-value"
+
+    # Option 2: List of allowed fork repositories with glob support (e.g., 'org/repo',
+    # 'org/*', '*' for all forks)
+    forks: []
+      # Array items: Repository pattern with optional glob support
+
+    # Array of pull request type names that trigger the workflow. Filters workflow
+    # execution to specific PR categories.
+    # (optional)
+    # This field supports multiple formats (oneOf):
+
+    # Option 1: Single label name to filter labeled/unlabeled events (e.g., 'bug')
+    names: "example-value"
+
+    # Option 2: List of label names to filter labeled/unlabeled events. Only applies
+    # when 'labeled' or 'unlabeled' is in the types array
+    names: []
+      # Array items: Label name
 
   # Issues event trigger that runs when repository issues are created, updated, or
   # managed
@@ -291,13 +369,26 @@ on:
 
   # Workflow run trigger
   # (optional)
-  # This field supports multiple formats (oneOf):
+  workflow_run:
+    # List of workflows to trigger on
+    # (optional)
+    workflows: []
+      # Array of strings
 
-  # Option 1: undefined
+    # Types of workflow run events
+    # (optional)
+    types: []
+      # Array of strings
 
-  # Option 2: undefined
+    # Branches to filter on
+    # (optional)
+    branches: []
+      # Array of strings
 
-  # Option 3: undefined
+    # Branches to ignore
+    # (optional)
+    branches-ignore: []
+      # Array of strings
 
   # Release event trigger
   # (optional)
@@ -459,13 +550,48 @@ on:
   # Pull request target event trigger that runs in the context of the base
   # repository (secure for fork PRs)
   # (optional)
-  # This field supports multiple formats (oneOf):
+  pull_request_target:
+    # List of pull request target event types to trigger on
+    # (optional)
+    types: []
+      # Array of strings
 
-  # Option 1: undefined
+    # Branches to filter on
+    # (optional)
+    branches: []
+      # Array of strings
 
-  # Option 2: undefined
+    # Branches to ignore
+    # (optional)
+    branches-ignore: []
+      # Array of strings
 
-  # Option 3: undefined
+    # Paths to filter on
+    # (optional)
+    paths: []
+      # Array of strings
+
+    # Paths to ignore
+    # (optional)
+    paths-ignore: []
+      # Array of strings
+
+    # Filter by draft pull request state
+    # (optional)
+    draft: true
+
+    # When true, allows workflow to run on pull requests from forked repositories with
+    # write permissions. Security consideration: use cautiously as fork PRs run with
+    # base repository permissions.
+    # (optional)
+    # This field supports multiple formats (oneOf):
+
+    # Option 1: Single fork pattern
+    forks: "example-value"
+
+    # Option 2: List of allowed fork repositories with glob support
+    forks: []
+      # Array items: string
 
   # Pull request review event trigger that runs when a pull request review is
   # submitted, edited, or dismissed
