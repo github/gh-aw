@@ -27,7 +27,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: b32c079c9a3f0098fc4c5c9e6776ee58aa3235aaf0b18037a55e81605ed4adf5
+# frontmatter-hash: f6f3ed85b8cc88a34b75b6b25dc64109e56e188dcafc2b09d8b578783c7cadc5
 #
 # Effective stop-time: 2026-03-03 16:27:58
 
@@ -1268,7 +1268,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_issue\":{\"expires\":24,\"labels\":[\"cookie\"],\"max\":1,\"title_prefix\":\"[CI Failure Doctor] \"},\"missing_data\":{},\"missing_tool\":{},\"update_issue\":{\"max\":1}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1},\"create_issue\":{\"close_older_issues\":true,\"expires\":24,\"labels\":[\"cookie\"],\"max\":1,\"title_prefix\":\"[CI Failure Doctor] \"},\"missing_data\":{},\"missing_tool\":{},\"update_issue\":{\"max\":1}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

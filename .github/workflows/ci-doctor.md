@@ -31,6 +31,7 @@ safe-outputs:
     expires: 1d
     title-prefix: "[CI Failure Doctor] "
     labels: [cookie]
+    close-older-issues: true
   add-comment:
   update-issue:
   noop:
