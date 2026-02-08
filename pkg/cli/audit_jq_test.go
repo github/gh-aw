@@ -43,7 +43,9 @@ func TestAuditJqFilter_BasicFiltering(t *testing.T) {
 				var result map[string]any
 				err := json.Unmarshal([]byte(output), &result)
 				require.NoError(t, err, "Output should be valid JSON")
-				assert.Equal(t, float64(123456), result["run_id"], "Should extract run_id from overview")
+				runID, ok := result["run_id"].(float64)
+				require.True(t, ok, "run_id should be a number")
+				assert.Equal(t, int64(123456), int64(runID), "Should extract run_id from overview")
 				assert.Equal(t, "test-workflow", result["workflow_name"], "Should extract workflow_name from overview")
 			},
 			wantErr: false,
@@ -55,7 +57,9 @@ func TestAuditJqFilter_BasicFiltering(t *testing.T) {
 				var result map[string]any
 				err := json.Unmarshal([]byte(output), &result)
 				require.NoError(t, err, "Output should be valid JSON")
-				assert.Equal(t, float64(1000), result["token_usage"], "Should extract token_usage from metrics")
+				tokenUsage, ok := result["token_usage"].(float64)
+				require.True(t, ok, "token_usage should be a number")
+				assert.Equal(t, int64(1000), int64(tokenUsage), "Should extract token_usage from metrics")
 			},
 			wantErr: false,
 		},
@@ -197,9 +201,15 @@ func TestAuditJqFilter_ComplexFiltering(t *testing.T) {
 				var result map[string]any
 				err := json.Unmarshal([]byte(output), &result)
 				require.NoError(t, err, "Output should be valid JSON")
-				assert.Equal(t, float64(123456), result["run_id"], "Should have run_id")
-				assert.Equal(t, float64(1000), result["token_usage"], "Should have token_usage")
-				assert.Equal(t, float64(2), result["job_count"], "Should have job_count")
+				runID, ok := result["run_id"].(float64)
+				require.True(t, ok, "run_id should be a number")
+				assert.Equal(t, int64(123456), int64(runID), "Should have run_id")
+				tokenUsage, ok := result["token_usage"].(float64)
+				require.True(t, ok, "token_usage should be a number")
+				assert.Equal(t, int64(1000), int64(tokenUsage), "Should have token_usage")
+				jobCount, ok := result["job_count"].(float64)
+				require.True(t, ok, "job_count should be a number")
+				assert.Equal(t, int64(2), int64(jobCount), "Should have job_count")
 			},
 		},
 	}
@@ -335,7 +345,9 @@ func TestAuditJqFilter_RealWorldExample(t *testing.T) {
 				var overview map[string]any
 				err := json.Unmarshal([]byte(output), &overview)
 				require.NoError(t, err, "Should parse overview")
-				assert.Equal(t, float64(21784234145), overview["run_id"], "Should have correct run_id")
+				runID, ok := overview["run_id"].(float64)
+				require.True(t, ok, "run_id should be a number")
+				assert.Equal(t, int64(21784234145), int64(runID), "Should have correct run_id")
 				assert.Equal(t, "Test Workflow", overview["workflow_name"], "Should have workflow name")
 			},
 		},
@@ -346,7 +358,9 @@ func TestAuditJqFilter_RealWorldExample(t *testing.T) {
 				var result map[string]any
 				err := json.Unmarshal([]byte(output), &result)
 				require.NoError(t, err, "Should parse result")
-				assert.Equal(t, float64(15234), result["token_usage"], "Should have token_usage")
+				tokenUsage, ok := result["token_usage"].(float64)
+				require.True(t, ok, "token_usage should be a number")
+				assert.Equal(t, int64(15234), int64(tokenUsage), "Should have token_usage")
 				assert.Equal(t, "$0.23", result["cost"], "Should have cost")
 				assert.Equal(t, "14m0s", result["duration"], "Should have duration")
 			},
@@ -366,9 +380,13 @@ func TestAuditJqFilter_RealWorldExample(t *testing.T) {
 				var result map[string]any
 				err := json.Unmarshal([]byte(output), &result)
 				require.NoError(t, err, "Should parse summary")
-				assert.Equal(t, float64(21784234145), result["run_id"], "Should have run_id")
+				runID, ok := result["run_id"].(float64)
+				require.True(t, ok, "run_id should be a number")
+				assert.Equal(t, int64(21784234145), int64(runID), "Should have run_id")
 				assert.Equal(t, "success", result["status"], "Should have status")
-				assert.Equal(t, float64(1), result["job_count"], "Should have 1 job")
+				jobCount, ok := result["job_count"].(float64)
+				require.True(t, ok, "job_count should be a number")
+				assert.Equal(t, int64(1), int64(jobCount), "Should have 1 job")
 			},
 		},
 	}
