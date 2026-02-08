@@ -190,6 +190,13 @@ describe("generate_footer.cjs", () => {
       expect(result).toContain("model: gpt-5");
       expect(result).toContain("run: https://github.com/test/repo/actions/runs/123 -->");
     });
+
+    it("should not include blocked domains section when no firewall logs exist", () => {
+      const result = generateFooter("Test Workflow", "https://github.com/test/repo/actions/runs/123", "", "", undefined, undefined, undefined);
+
+      expect(result).not.toContain("⚠️ Firewall blocked");
+      expect(result).not.toContain("<details>");
+    });
   });
 
   describe("generateXMLMarker", () => {

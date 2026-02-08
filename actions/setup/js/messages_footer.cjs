@@ -10,6 +10,7 @@
 
 const { getMessages, renderTemplate, toSnakeCase } = require("./messages_core.cjs");
 const { getMissingInfoSections } = require("./missing_messages_helper.cjs");
+const { getBlockedDomains, generateBlockedDomainsSection } = require("./firewall_blocked_domains.cjs");
 
 /**
  * @typedef {Object} FooterContext
@@ -248,6 +249,13 @@ function generateFooterWithMessages(workflowName, runUrl, workflowSource, workfl
   const missingInfoSections = getMissingInfoSections();
   if (missingInfoSections) {
     footer += missingInfoSections;
+  }
+
+  // Add firewall blocked domains section if any domains were blocked
+  const blockedDomains = getBlockedDomains();
+  const blockedDomainsSection = generateBlockedDomainsSection(blockedDomains);
+  if (blockedDomainsSection) {
+    footer += blockedDomainsSection;
   }
 
   // Add XML comment marker for traceability

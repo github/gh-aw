@@ -3,6 +3,7 @@
 
 const fs = require("fs");
 const { getMissingInfoSections } = require("./missing_messages_helper.cjs");
+const { getBlockedDomains, generateBlockedDomainsSection } = require("./firewall_blocked_domains.cjs");
 
 /**
  * Generates a standalone workflow-id XML comment marker for searchability.
@@ -116,6 +117,13 @@ function generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL,
   const missingInfoSections = getMissingInfoSections();
   if (missingInfoSections) {
     footer += missingInfoSections;
+  }
+
+  // Add firewall blocked domains section if any domains were blocked
+  const blockedDomains = getBlockedDomains();
+  const blockedDomainsSection = generateBlockedDomainsSection(blockedDomains);
+  if (blockedDomainsSection) {
+    footer += blockedDomainsSection;
   }
 
   // Add XML comment marker for traceability
