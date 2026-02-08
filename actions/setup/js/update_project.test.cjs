@@ -658,6 +658,31 @@ describe("updateProject", () => {
     expect(mockCore.info).toHaveBeenCalledWith('✓ Resolved draft_issue_id "aw_abc123def456" to item draft-item-ref');
   });
 
+  it("returns temporaryId and draftItemId when updating draft issue via draft_issue_id", async () => {
+    const projectUrl = "https://github.com/orgs/testowner/projects/60";
+    const draftIssueId = "aw_9f11121ed7df";
+    const temporaryIdMap = new Map();
+    temporaryIdMap.set(draftIssueId, { draftItemId: "draft-item-existing" });
+
+    const output = {
+      type: "update_project",
+      project: projectUrl,
+      content_type: "draft_issue",
+      draft_issue_id: draftIssueId,
+      fields: { Status: "In Progress" },
+    };
+
+    queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft"), fieldsResponse([{ id: "field-status", name: "Status" }]), updateFieldValueResponse()]);
+
+    const result = await updateProject(output, temporaryIdMap);
+
+    // Verify the function returns the temporary ID mapping for the handler manager
+    expect(result).toBeDefined();
+    expect(result.temporaryId).toBe(draftIssueId);
+    expect(result.draftItemId).toBe("draft-item-existing");
+    expect(getOutput("temporary-id")).toBe(draftIssueId);
+  });
+
   it("falls back to title lookup when draft_issue_id not in map but title provided", async () => {
     const projectUrl = "https://github.com/orgs/testowner/projects/60";
     const temporaryIdMap = new Map(); // Empty map

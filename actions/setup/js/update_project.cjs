@@ -714,6 +714,10 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
 
       // Mode 1: Update existing draft via draft_issue_id
       if (draftIssueId) {
+        // Use draft_issue_id as the temporary ID for the return value
+        // This ensures the mapping is preserved when updating existing drafts
+        resolvedTemporaryId = draftIssueId;
+
         // Try to resolve draft_issue_id from temporaryIdMap using normalized ID
         const normalized = normalizeTemporaryId(draftIssueId);
         const resolved = temporaryIdMap.get(normalized);
