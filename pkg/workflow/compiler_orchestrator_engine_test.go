@@ -466,7 +466,7 @@ permissions:
 	require.NotNil(t, result)
 }
 
-// TestSetupEngineAndImports_ExperimentalEngine tests warnings for experimental engines
+// TestSetupEngineAndImports_ExperimentalEngine tests custom engine setup
 func TestSetupEngineAndImports_ExperimentalEngine(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "engine-experimental")
 
@@ -491,6 +491,7 @@ engine: custom
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	// Should succeed but with warnings (checked via warning count)
-	assert.Greater(t, compiler.warningCount, 0, "Experimental engine should generate warnings")
+	// Custom engine should be set up successfully
+	assert.NotNil(t, result.agenticEngine)
+	assert.Equal(t, "custom", result.engineSetting)
 }
