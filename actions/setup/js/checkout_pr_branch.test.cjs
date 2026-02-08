@@ -100,6 +100,28 @@ describe("checkout_pr_branch.cjs", () => {
           },
         };
       }
+      if (module === "./pr_helpers.cjs") {
+        return {
+          detectForkPR: pullRequest => {
+            // Replicate the actual logic for testing
+            let isFork = false;
+            let reason = "same repository";
+
+            if (!pullRequest.head?.repo) {
+              isFork = true;
+              reason = "head repository deleted (was likely a fork)";
+            } else if (pullRequest.head.repo.fork === true) {
+              isFork = true;
+              reason = "head.repo.fork flag is true";
+            } else if (pullRequest.head.repo.full_name !== pullRequest.base?.repo?.full_name) {
+              isFork = true;
+              reason = "different repository names";
+            }
+
+            return { isFork, reason };
+          },
+        };
+      }
       if (module === "fs") {
         return {
           readFileSync: (path, encoding) => {
