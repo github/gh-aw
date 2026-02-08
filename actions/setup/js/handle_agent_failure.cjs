@@ -357,6 +357,7 @@ async function main() {
 
     // Check if agent succeeded but produced no safe outputs
     let hasMissingSafeOutputs = false;
+    let hasOnlyNoopOutputs = false;
     if (agentConclusion === "success") {
       const { loadAgentOutput } = require("./load_agent_output.cjs");
       const agentOutputResult = loadAgentOutput();
@@ -364,12 +365,26 @@ async function main() {
       if (!agentOutputResult.success || !agentOutputResult.items || agentOutputResult.items.length === 0) {
         hasMissingSafeOutputs = true;
         core.info("Agent succeeded but produced no safe outputs");
+      } else {
+        // Check if all outputs are noop types
+        const nonNoopItems = agentOutputResult.items.filter(item => item.type !== "noop");
+        if (nonNoopItems.length === 0) {
+          hasOnlyNoopOutputs = true;
+          core.info("Agent succeeded with only noop outputs - this is not a failure");
+        }
       }
     }
 
     // Only proceed if the agent job actually failed OR there are assignment errors OR create_discussion errors OR missing safe outputs
+    // BUT skip if we only have noop outputs (that's a successful no-action scenario)
     if (agentConclusion !== "failure" && !hasAssignmentErrors && !hasCreateDiscussionErrors && !hasMissingSafeOutputs) {
       core.info(`Agent job did not fail and no assignment/discussion errors and has safe outputs (conclusion: ${agentConclusion}), skipping failure handling`);
+      return;
+    }
+
+    // If we only have noop outputs, skip failure handling - this is a successful no-action scenario
+    if (hasOnlyNoopOutputs) {
+      core.info("Agent completed with only noop outputs - skipping failure handling");
       return;
     }
 

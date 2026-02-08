@@ -202,6 +202,29 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	})
 	steps = append(steps, agentFailureSteps...)
 
+	// Add noop message handling step - posts noop messages to the "agent runs" issue
+	// This step runs when the agent succeeded with only noop outputs (no other safe-outputs)
+	// Build environment variables for the noop message handler
+	var noopMessageEnvVars []string
+	noopMessageEnvVars = append(noopMessageEnvVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID)...)
+	noopMessageEnvVars = append(noopMessageEnvVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
+	// Pass the noop message from the noop processing step
+	if data.SafeOutputs.NoOp != nil {
+		noopMessageEnvVars = append(noopMessageEnvVars, "          GH_AW_NOOP_MESSAGE: ${{ steps.noop.outputs.noop_message }}\n")
+	}
+
+	// Build the noop message handling step
+	noopMessageSteps := c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
+		StepName:      "Handle No-Op Message",
+		StepID:        "handle_noop_message",
+		MainJobName:   mainJobName,
+		CustomEnvVars: noopMessageEnvVars,
+		Script:        "const { main } = require('/opt/gh-aw/actions/handle_noop_message.cjs'); await main();",
+		ScriptFile:    "handle_noop_message.cjs",
+		Token:         "", // Will use default GITHUB_TOKEN
+	})
+	steps = append(steps, noopMessageSteps...)
+
 	// Add create_pull_request error handling step if create-pull-request is configured
 	if data.SafeOutputs != nil && data.SafeOutputs.CreatePullRequests != nil {
 		// Build environment variables for the create PR error handler
