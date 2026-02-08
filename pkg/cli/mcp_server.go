@@ -613,6 +613,13 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 		JqFilter   string `json:"jq,omitempty" jsonschema:"Optional jq filter to apply to JSON output"`
 	}
 
+	// Generate schema for audit tool
+	auditSchema, err := GenerateOutputSchema[auditArgs]()
+	if err != nil {
+		mcpLog.Printf("Failed to generate audit tool schema: %v", err)
+		return server
+	}
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "audit",
 		Description: `Investigate a workflow run, job, or specific step and generate a concise report.
@@ -641,6 +648,7 @@ Returns JSON with the following structure:
 - firewall_analysis: Network firewall analysis if available (total_requests, allowed_requests, blocked_requests, allowed_domains, blocked_domains)
 
 Note: Output can be filtered using the jq parameter.`,
+		InputSchema: auditSchema,
 		Icons: []mcp.Icon{
 			{Source: "🔍"},
 		},
