@@ -101,6 +101,11 @@ function extractAndSanitizeDomain(domainWithPort) {
 
 /**
  * Reads firewall logs and extracts blocked domains
+ *
+ * This function checks two possible locations for firewall logs:
+ * 1. /tmp/gh-aw/sandbox/firewall/logs/ (original location during agent execution)
+ * 2. Path specified by logsDir parameter (for safe-outputs jobs with downloaded artifacts)
+ *
  * @param {string} [logsDir] - Path to firewall logs directory. Defaults to /tmp/gh-aw/sandbox/firewall/logs
  * @returns {string[]} Array of unique blocked domains (sanitized, sorted)
  */
@@ -177,7 +182,7 @@ function generateBlockedDomainsSection(blockedDomains) {
 
   let section = "\n\n<details>\n";
   section += `<summary>⚠️ Firewall blocked ${domainCount} ${domainWord}</summary>\n\n`;
-  section += `The following ${domainWord} ${domainCount === 1 ? "was" : "were"} blocked by the firewall during workflow execution:\n\n`;
+  section += `> The following ${domainWord} ${domainCount === 1 ? "was" : "were"} blocked by the firewall during workflow execution:\n\n`;
 
   // List domains as bullet points
   for (const domain of blockedDomains) {

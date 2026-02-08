@@ -261,7 +261,7 @@ describe("firewall_blocked_domains.cjs", () => {
       expect(result).toContain("</details>");
       expect(result).toContain("<summary>⚠️ Firewall blocked 1 domain</summary>");
       expect(result).toContain("- `blocked.example.com`");
-      expect(result).toContain("The following domain was blocked by the firewall during workflow execution:");
+      expect(result).toContain("> The following domain was blocked by the firewall during workflow execution:");
     });
 
     it("should generate details section for multiple blocked domains", () => {
