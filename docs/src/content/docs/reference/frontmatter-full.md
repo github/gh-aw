@@ -1095,9 +1095,10 @@ sandbox:
     # (optional)
     domain: "localhost"
 
-# Plugin configuration for installing plugins before workflow execution. Supports
-# array format (list of repos/plugin configs) and object format (repos + custom
-# token).
+# ⚠️  EXPERIMENTAL: Plugin configuration for installing plugins before workflow 
+# execution. Supports array format (list of repos/plugin configs) and object format 
+# (repos + custom token). Note: Plugin support is experimental and may change in 
+# future releases.
 # (optional)
 # This field supports multiple formats (oneOf):
 

@@ -100,6 +100,10 @@ See [GitHub Tokens](/gh-aw/reference/tokens/) for complete documentation.
 
 ### Plugins (`plugins:`)
 
+:::caution[Experimental Feature]
+Plugin support is experimental and may change in future releases. Using plugins will emit a compilation warning.
+:::
+
 Specifies plugins to install before workflow execution. Plugins are installed using engine-specific CLI commands (`copilot plugin install`, `claude plugin install`, `codex plugin install`).
 
 **Array format** (simple):
