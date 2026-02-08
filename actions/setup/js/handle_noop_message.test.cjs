@@ -1,6 +1,6 @@
 // @ts-check
 
-const { describe, it, expect, beforeEach, vi } = require("vitest");
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 describe("handle_noop_message", () => {
   let mockCore;
@@ -57,7 +57,7 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
     process.env.GH_AW_NOOP_MESSAGE = "";
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No no-op message found, skipping"));
@@ -94,7 +94,7 @@ describe("handle_noop_message", () => {
       },
     });
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify search was performed
@@ -144,7 +144,7 @@ describe("handle_noop_message", () => {
       },
     });
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify issue was not created
@@ -173,7 +173,7 @@ describe("handle_noop_message", () => {
     // Mock comment creation failure
     mockGithub.rest.issues.createComment.mockRejectedValue(new Error("API rate limit exceeded"));
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify warning was logged but workflow didn't fail
@@ -193,7 +193,7 @@ describe("handle_noop_message", () => {
     // Mock issue creation failure
     mockGithub.rest.issues.create.mockRejectedValue(new Error("Insufficient permissions"));
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify warning was logged but workflow didn't fail
@@ -211,7 +211,7 @@ describe("handle_noop_message", () => {
 
     mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
@@ -229,7 +229,7 @@ describe("handle_noop_message", () => {
 
     mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
 
-    const { main } = require("./handle_noop_message.cjs");
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
