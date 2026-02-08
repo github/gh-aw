@@ -81,8 +81,12 @@ issues:
   exclude-rules:
     - linters:
         - staticcheck
-      text: "ST1005:" # Allow multiline user-facing error messages with formatting
+      text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
       path: pkg/workflow/compiler_orchestrator\.go
+    - linters:
+        - staticcheck
+      text: "ST1005: error strings should not end with punctuation or newlines" # Allow multiline user-facing error messages with formatting
+      path: pkg/workflow/dispatch_workflow_validation\.go
     - linters:
         - gosec
       text: "^G304:" # Ignore "file inclusion via variable" - validated file paths
