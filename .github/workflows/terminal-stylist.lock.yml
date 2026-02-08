@@ -34,7 +34,8 @@ name: "Terminal Stylist"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

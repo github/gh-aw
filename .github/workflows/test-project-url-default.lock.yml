@@ -30,7 +30,8 @@ name: "Test Project URL Explicit Requirement"
 "on":
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

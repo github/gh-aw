@@ -34,7 +34,11 @@ name: "Super Linter Report"
   - cron: "0 14 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

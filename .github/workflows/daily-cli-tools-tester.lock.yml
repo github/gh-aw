@@ -34,7 +34,11 @@ name: "Daily CLI Tools Exploratory Tester"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

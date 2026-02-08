@@ -35,7 +35,10 @@ name: "Repository Tree Map Generator"
     # Friendly format: weekly on monday around 15:00 (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

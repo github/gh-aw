@@ -32,7 +32,10 @@ name: "Example: Custom Error Patterns"
     types:
     - opened
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"

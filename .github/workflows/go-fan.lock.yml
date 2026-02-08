@@ -34,7 +34,11 @@ name: "Go Fan"
   - cron: "0 7 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

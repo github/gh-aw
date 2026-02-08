@@ -34,7 +34,9 @@ name: "Draft PR Cleanup"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

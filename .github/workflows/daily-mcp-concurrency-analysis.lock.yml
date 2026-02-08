@@ -35,7 +35,10 @@ name: "Daily MCP Tool Concurrency Analysis"
   - cron: "0 9 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

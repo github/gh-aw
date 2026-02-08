@@ -33,7 +33,12 @@ name: "Dependabot Dependency Checker"
   - cron: "0 9 * * 1,3,5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+      security-events: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

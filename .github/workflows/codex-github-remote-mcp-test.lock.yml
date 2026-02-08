@@ -31,7 +31,9 @@ name: "Codex GitHub Remote MCP Test"
 "on":
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

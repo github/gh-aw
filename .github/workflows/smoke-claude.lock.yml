@@ -45,7 +45,12 @@ name: "Smoke Claude"
   - cron: "18 */12 * * *"
   workflow_dispatch: null
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"

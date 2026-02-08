@@ -37,7 +37,11 @@ name: "CI Optimization Coach"
   - cron: "0 13 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

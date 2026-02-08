@@ -35,7 +35,11 @@ name: "Weekly Workflow Analysis"
     # Friendly format: weekly on monday around 09:00 (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

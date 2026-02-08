@@ -36,7 +36,11 @@ name: "Discussion Task Miner - Code Quality Improvement Agent"
     # Friendly format: every 4h (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

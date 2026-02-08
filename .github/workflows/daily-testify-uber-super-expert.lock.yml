@@ -37,7 +37,10 @@ name: "Daily Testify Uber Super Expert"
   # skip-if-match: is:issue is:open in:title "[testify-expert]" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

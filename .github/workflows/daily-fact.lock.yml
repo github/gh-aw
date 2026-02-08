@@ -33,7 +33,12 @@ name: "Daily Fact About gh-aw"
   - cron: "0 11 * * 1-5"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

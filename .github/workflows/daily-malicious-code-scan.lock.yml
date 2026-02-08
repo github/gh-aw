@@ -35,7 +35,10 @@ name: "Daily Malicious Code Scan Agent"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      security-events: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

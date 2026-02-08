@@ -38,7 +38,11 @@ name: "Repository Audit & Agentic Workflow Opportunity Analyzer"
         required: false
         type: string
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

@@ -33,7 +33,10 @@ name: "PR Triage Agent"
   - cron: "0 */6 * * *"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

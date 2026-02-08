@@ -35,7 +35,9 @@ name: "Breaking Change Checker"
   # skip-if-match: is:issue is:open in:title "[breaking-change]" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

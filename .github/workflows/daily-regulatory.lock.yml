@@ -36,7 +36,12 @@ name: "Daily Regulatory Report Generator"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      actions: read
+      contents: read
+      discussions: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

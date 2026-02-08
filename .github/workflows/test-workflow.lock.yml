@@ -35,7 +35,8 @@ name: "Test Workflow"
         required: true
         type: string
 
-permissions: {}
+permissions:
+      contents: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

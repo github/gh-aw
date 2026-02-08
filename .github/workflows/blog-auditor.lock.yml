@@ -35,7 +35,10 @@ name: "Blog Auditor"
     # Friendly format: weekly on wednesday around 12:00 (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

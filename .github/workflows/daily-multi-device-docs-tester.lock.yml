@@ -41,7 +41,10 @@ name: "Multi-Device Docs Tester"
         description: "Device types to test (comma-separated: mobile,tablet,desktop)"
         required: false
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

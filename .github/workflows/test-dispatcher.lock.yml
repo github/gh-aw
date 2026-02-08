@@ -29,7 +29,9 @@
 name: "Test Dispatcher Workflow"
 "on": issues
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"

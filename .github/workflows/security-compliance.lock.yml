@@ -43,7 +43,9 @@ name: "Security Compliance Campaign"
         description: Minimum severity to fix (critical, high, medium)
         required: false
 
-permissions: {}
+permissions:
+      contents: read
+      security-events: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"

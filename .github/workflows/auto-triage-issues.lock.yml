@@ -39,7 +39,9 @@ name: "Auto-Triage Issues"
     # Friendly format: every 6h (scattered)
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"

@@ -33,7 +33,9 @@ name: "Chroma Issue Indexer"
   - cron: "0 */4 * * *"
   workflow_dispatch:
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

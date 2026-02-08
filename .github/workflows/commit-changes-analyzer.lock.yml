@@ -37,7 +37,10 @@ name: "Commit Changes Analyzer"
         required: true
         type: string
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}"

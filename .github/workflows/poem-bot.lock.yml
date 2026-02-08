@@ -42,7 +42,10 @@ name: "Poem Bot - A Creative Agentic Workflow"
         description: Theme for the generated poem
         required: false
 
-permissions: {}
+permissions:
+      contents: read
+      issues: read
+      pull-requests: read
 
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"
