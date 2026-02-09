@@ -5587,6 +5587,11 @@
                 "github-token": {
                   "$ref": "#/$defs/github_token",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                },
+                "report-as-issue": {
+                  "type": "boolean",
+                  "description": "Controls whether noop runs are reported as issue comments (default: true). Set to false to disable posting to the no-op runs issue.",
+                  "default": true
                 }
               },
               "additionalProperties": false

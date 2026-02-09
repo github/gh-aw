@@ -88,14 +88,22 @@ async function main() {
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const noopMessage = process.env.GH_AW_NOOP_MESSAGE || "";
     const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
+    const reportAsIssue = process.env.GH_AW_NOOP_REPORT_AS_ISSUE !== "false"; // Default to true
 
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Run URL: ${runUrl}`);
     core.info(`No-op message: ${noopMessage}`);
     core.info(`Agent conclusion: ${agentConclusion}`);
+    core.info(`Report as issue: ${reportAsIssue}`);
 
     if (!noopMessage) {
       core.info("No no-op message found, skipping");
+      return;
+    }
+
+    // Check if report-as-issue is disabled
+    if (!reportAsIssue) {
+      core.info("report-as-issue is disabled (set to false), skipping no-op message posting to issue");
       return;
     }
 

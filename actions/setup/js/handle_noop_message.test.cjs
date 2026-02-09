@@ -137,6 +137,124 @@ This issue helps you:
     expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
   });
 
+  it("should skip if report-as-issue is set to false", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
+    process.env.GH_AW_NOOP_MESSAGE = "Some message";
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_NOOP_REPORT_AS_ISSUE = "false";
+
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Some message" }],
+      })
+    );
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("report-as-issue is disabled"));
+    expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
+  });
+
+  it("should proceed if report-as-issue is set to true", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
+    process.env.GH_AW_NOOP_MESSAGE = "Some message";
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_NOOP_REPORT_AS_ISSUE = "true";
+
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Some message" }],
+      })
+    );
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+    // Mock search to return existing issue
+    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+      data: {
+        total_count: 1,
+        items: [
+          {
+            number: 42,
+            node_id: "MDU6SXNzdWU0Mg==",
+            html_url: "https://github.com/test-owner/test-repo/issues/42",
+          },
+        ],
+      },
+    });
+
+    // Mock comment creation
+    mockGithub.rest.issues.createComment.mockResolvedValue({
+      data: {
+        id: 1,
+        html_url: "https://github.com/test-owner/test-repo/issues/42#issuecomment-1",
+      },
+    });
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Report as issue: true"));
+    expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalled();
+    expect(mockGithub.rest.issues.createComment).toHaveBeenCalled();
+  });
+
+  it("should default to true if report-as-issue is not set", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
+    process.env.GH_AW_NOOP_MESSAGE = "Some message";
+    process.env.GH_AW_AGENT_CONCLUSION = "success";
+    // Don't set GH_AW_NOOP_REPORT_AS_ISSUE at all
+
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Some message" }],
+      })
+    );
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
+
+    // Mock search to return existing issue
+    mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
+      data: {
+        total_count: 1,
+        items: [
+          {
+            number: 42,
+            node_id: "MDU6SXNzdWU0Mg==",
+            html_url: "https://github.com/test-owner/test-repo/issues/42",
+          },
+        ],
+      },
+    });
+
+    // Mock comment creation
+    mockGithub.rest.issues.createComment.mockResolvedValue({
+      data: {
+        id: 1,
+        html_url: "https://github.com/test-owner/test-repo/issues/42#issuecomment-1",
+      },
+    });
+
+    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    await main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Report as issue: true"));
+    expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalled();
+    expect(mockGithub.rest.issues.createComment).toHaveBeenCalled();
+  });
+
   it("should skip if agent did not succeed", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
