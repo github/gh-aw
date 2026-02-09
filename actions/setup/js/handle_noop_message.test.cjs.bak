@@ -68,7 +68,7 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("No no-op message found, skipping"));
@@ -81,7 +81,7 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "Some message";
     process.env.GH_AW_AGENT_CONCLUSION = "failure";
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Agent did not succeed"));
@@ -93,21 +93,31 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
     process.env.GH_AW_NOOP_MESSAGE = "Some message";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return noop + other outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [
-        { type: "noop", message: "No action needed" },
-        { type: "create_issue", title: "Some issue" },
-      ],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [
+            { type: "noop", message: "No action needed" },
+            { type: "create_issue", title: "Some issue" },
+          ],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Found 1 non-noop output(s)"));
     expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should create agent runs issue if it doesn't exist", async () => {
@@ -115,11 +125,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123456";
     process.env.GH_AW_NOOP_MESSAGE = "No updates needed";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "No updates needed" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "No updates needed" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     // Mock search to return no results
@@ -147,7 +164,7 @@ describe("handle_noop_message", () => {
       },
     });
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify search was performed
@@ -168,6 +185,9 @@ describe("handle_noop_message", () => {
     expect(commentCall.body).toContain("Test Workflow");
     expect(commentCall.body).toContain("No updates needed");
     expect(commentCall.body).toContain("123456");
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should use existing agent runs issue if it exists", async () => {
@@ -175,11 +195,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/789";
     process.env.GH_AW_NOOP_MESSAGE = "Everything is up to date";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "Everything is up to date" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "Everything is up to date" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     // Mock search to return existing issue
@@ -204,7 +231,7 @@ describe("handle_noop_message", () => {
       },
     });
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify issue was not created
@@ -215,6 +242,9 @@ describe("handle_noop_message", () => {
     expect(commentCall.issue_number).toBe(99);
     expect(commentCall.body).toContain("Another Workflow");
     expect(commentCall.body).toContain("Everything is up to date");
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should handle comment creation failure gracefully", async () => {
@@ -222,11 +252,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/456";
     process.env.GH_AW_NOOP_MESSAGE = "No action required";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "No action required" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "No action required" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     // Mock existing issue
@@ -240,11 +277,14 @@ describe("handle_noop_message", () => {
     // Mock comment creation failure
     mockGithub.rest.issues.createComment.mockRejectedValue(new Error("API rate limit exceeded"));
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify warning was logged but workflow didn't fail
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to post comment"));
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should handle issue creation failure gracefully", async () => {
@@ -252,11 +292,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/789";
     process.env.GH_AW_NOOP_MESSAGE = "All checks passed";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "All checks passed" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "All checks passed" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     // Mock no existing issue
@@ -267,11 +314,14 @@ describe("handle_noop_message", () => {
     // Mock issue creation failure
     mockGithub.rest.issues.create.mockRejectedValue(new Error("Insufficient permissions"));
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     // Verify warning was logged but workflow didn't fail
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not create agent runs issue"));
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should extract run ID from URL correctly", async () => {
@@ -279,11 +329,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/owner/repo/actions/runs/987654321";
     process.env.GH_AW_NOOP_MESSAGE = "Done";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "Done" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "Done" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -292,11 +349,14 @@ describe("handle_noop_message", () => {
 
     mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
     expect(commentCall.body).toContain("987654321");
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 
   it("should sanitize workflow name in comment", async () => {
@@ -304,11 +364,18 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_RUN_URL = "https://github.com/test/test/actions/runs/123";
     process.env.GH_AW_NOOP_MESSAGE = "Clean";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
+    process.env.GH_AW_AGENT_OUTPUT = "/tmp/agent_output.json";
 
     // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
-      items: [{ type: "noop", message: "Clean" }],
+    const fs = require("fs");
+    const originalReadFileSync = fs.readFileSync;
+    fs.readFileSync = vi.fn(filePath => {
+      if (filePath === "/tmp/agent_output.json") {
+        return JSON.stringify({
+          items: [{ type: "noop", message: "Clean" }],
+        });
+      }
+      return originalReadFileSync(filePath);
     });
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -317,11 +384,14 @@ describe("handle_noop_message", () => {
 
     mockGithub.rest.issues.createComment.mockResolvedValue({ data: {} });
 
-    const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
+    const { main } = await import("./handle_noop_message.cjs");
     await main();
 
     const commentCall = mockGithub.rest.issues.createComment.mock.calls[0][0];
     // Verify XSS attempt was sanitized (specific behavior depends on sanitizeContent implementation)
     expect(commentCall.body).not.toContain("<script>");
+
+    // Restore
+    fs.readFileSync = originalReadFileSync;
   });
 });

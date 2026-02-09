@@ -208,6 +208,8 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	var noopMessageEnvVars []string
 	noopMessageEnvVars = append(noopMessageEnvVars, buildWorkflowMetadataEnvVarsWithTrackerID(data.Name, data.Source, data.TrackerID)...)
 	noopMessageEnvVars = append(noopMessageEnvVars, "          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n")
+	// Pass the agent conclusion to check if the agent succeeded
+	noopMessageEnvVars = append(noopMessageEnvVars, fmt.Sprintf("          GH_AW_AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
 	// Pass the noop message from the noop processing step
 	if data.SafeOutputs.NoOp != nil {
 		noopMessageEnvVars = append(noopMessageEnvVars, "          GH_AW_NOOP_MESSAGE: ${{ steps.noop.outputs.noop_message }}\n")

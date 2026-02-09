@@ -99,6 +99,9 @@ These are successful outcomes, not failures, and help provide transparency into 
 /**
  * Handle posting a no-op message to the agent runs issue
  * This script is called from the conclusion job when the agent produced only a noop safe-output
+ * It only posts the message when:
+ * 1. The agent succeeded (no failures)
+ * 2. There are no safe-outputs other than noop
  */
 async function main() {
   try {
@@ -106,15 +109,41 @@ async function main() {
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "unknown";
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const noopMessage = process.env.GH_AW_NOOP_MESSAGE || "";
+    const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
 
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Run URL: ${runUrl}`);
     core.info(`No-op message: ${noopMessage}`);
+    core.info(`Agent conclusion: ${agentConclusion}`);
 
     if (!noopMessage) {
       core.info("No no-op message found, skipping");
       return;
     }
+
+    // Only post to "agent runs" issue if the agent succeeded (no failures)
+    if (agentConclusion !== "success") {
+      core.info(`Agent did not succeed (conclusion: ${agentConclusion}), skipping no-op message posting`);
+      return;
+    }
+
+    // Check that there are no safe-outputs other than noop
+    const { loadAgentOutput } = require("./load_agent_output.cjs");
+    const agentOutputResult = loadAgentOutput();
+
+    if (!agentOutputResult.success || !agentOutputResult.items) {
+      core.info("No agent output found, skipping");
+      return;
+    }
+
+    // Check if there are any non-noop outputs
+    const nonNoopItems = agentOutputResult.items.filter(item => item.type !== "noop");
+    if (nonNoopItems.length > 0) {
+      core.info(`Found ${nonNoopItems.length} non-noop output(s), skipping no-op message posting`);
+      return;
+    }
+
+    core.info("Agent succeeded with only noop outputs - posting to agent runs issue");
 
     const { owner, repo } = context.repo;
 

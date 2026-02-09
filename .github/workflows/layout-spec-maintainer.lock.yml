@@ -891,6 +891,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Layout Specification Maintainer"
           GH_AW_TRACKER_ID: "layout-spec-maintainer"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
           GH_AW_NOOP_MESSAGE: ${{ steps.noop.outputs.noop_message }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
