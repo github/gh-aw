@@ -191,7 +191,10 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		return err
 	}
 
-	// Add engine-specific installation steps (includes Node.js setup for npm-based engines)
+	// Generate aw_info.json with agentic run metadata (must run before secret validation and workflow overview)
+	c.generateCreateAwInfo(yaml, data, engine)
+
+	// Add engine-specific installation steps (includes Node.js setup and secret validation for npm-based engines)
 	installSteps := engine.GetInstallationSteps(data)
 	compilerYamlLog.Printf("Adding %d engine installation steps for %s", len(installSteps), engine.GetID())
 	for _, step := range installSteps {
@@ -213,9 +216,6 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 
 	// Stop-time safety checks are now handled by a dedicated job (stop_time_check)
 	// No longer generated in the main job steps
-
-	// Generate aw_info.json with agentic run metadata (must run before workflow overview)
-	c.generateCreateAwInfo(yaml, data, engine)
 
 	// Generate workflow overview to step summary early, before prompts
 	// This reads from aw_info.json for consistent data

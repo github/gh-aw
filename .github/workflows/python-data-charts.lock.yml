@@ -203,6 +203,50 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/checkout_pr_branch.cjs');
             await main();
+      - name: Generate agentic run info
+        id: generate_aw_info
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            
+            const awInfo = {
+              engine_id: "copilot",
+              engine_name: "GitHub Copilot CLI",
+              model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
+              version: "",
+              agent_version: "0.0.405",
+              workflow_name: "Python Data Visualization Generator",
+              experimental: false,
+              supports_tools_allowlist: true,
+              supports_http_transport: true,
+              run_id: context.runId,
+              run_number: context.runNumber,
+              run_attempt: process.env.GITHUB_RUN_ATTEMPT,
+              repository: context.repo.owner + '/' + context.repo.repo,
+              ref: context.ref,
+              sha: context.sha,
+              actor: context.actor,
+              event_name: context.eventName,
+              staged: false,
+              allowed_domains: ["defaults","python"],
+              firewall_enabled: true,
+              awf_version: "v0.13.12",
+              awmg_version: "",
+              steps: {
+                firewall: "squid"
+              },
+              created_at: new Date().toISOString()
+            };
+            
+            // Write to /tmp/gh-aw directory to avoid inclusion in PR
+            const tmpPath = '/tmp/gh-aw/aw_info.json';
+            fs.writeFileSync(tmpPath, JSON.stringify(awInfo, null, 2));
+            console.log('Generated aw_info.json at:', tmpPath);
+            console.log(JSON.stringify(awInfo, null, 2));
+            
+            // Set model as output for reuse in other steps/jobs
+            core.setOutput('model', awInfo.model);
       - name: Validate COPILOT_GITHUB_TOKEN secret
         id: validate-secret
         run: /opt/gh-aw/actions/validate_multi_secret.sh COPILOT_GITHUB_TOKEN 'GitHub Copilot CLI' https://github.github.com/gh-aw/reference/engines/#github-copilot-default
@@ -553,50 +597,6 @@ jobs:
             }
           }
           MCPCONFIG_EOF
-      - name: Generate agentic run info
-        id: generate_aw_info
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
-        with:
-          script: |
-            const fs = require('fs');
-            
-            const awInfo = {
-              engine_id: "copilot",
-              engine_name: "GitHub Copilot CLI",
-              model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
-              version: "",
-              agent_version: "0.0.405",
-              workflow_name: "Python Data Visualization Generator",
-              experimental: false,
-              supports_tools_allowlist: true,
-              supports_http_transport: true,
-              run_id: context.runId,
-              run_number: context.runNumber,
-              run_attempt: process.env.GITHUB_RUN_ATTEMPT,
-              repository: context.repo.owner + '/' + context.repo.repo,
-              ref: context.ref,
-              sha: context.sha,
-              actor: context.actor,
-              event_name: context.eventName,
-              staged: false,
-              allowed_domains: ["defaults","python"],
-              firewall_enabled: true,
-              awf_version: "v0.13.12",
-              awmg_version: "v0.0.113",
-              steps: {
-                firewall: "squid"
-              },
-              created_at: new Date().toISOString()
-            };
-            
-            // Write to /tmp/gh-aw directory to avoid inclusion in PR
-            const tmpPath = '/tmp/gh-aw/aw_info.json';
-            fs.writeFileSync(tmpPath, JSON.stringify(awInfo, null, 2));
-            console.log('Generated aw_info.json at:', tmpPath);
-            console.log(JSON.stringify(awInfo, null, 2));
-            
-            // Set model as output for reuse in other steps/jobs
-            core.setOutput('model', awInfo.model);
       - name: Generate workflow overview
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
