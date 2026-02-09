@@ -81,10 +81,12 @@ safe-outputs:
               if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
                 MESSAGE=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "send_slack_message") | .message')
                 echo "Would send to Slack: $MESSAGE"
-                echo "### 📨 Slack Message Stub" >> "$GITHUB_STEP_SUMMARY"
-                echo "**Message:** $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
-                echo "" >> "$GITHUB_STEP_SUMMARY"
-                echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent." >> "$GITHUB_STEP_SUMMARY"
+                {
+                  echo "### 📨 Slack Message Stub"
+                  echo "**Message:** $MESSAGE"
+                  echo ""
+                  echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent."
+                } >> "$GITHUB_STEP_SUMMARY"
               else
                 echo "No agent output found"
               fi

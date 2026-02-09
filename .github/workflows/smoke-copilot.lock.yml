@@ -28,7 +28,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: b81319e0683d2730b59ce3601546860e0914e8a155eb123d3c913de9f7737264
+# frontmatter-hash: 24b427e228d6b9a69d577543015dbe0e20f80d81eaab1b82369b712bc40a5315
 
 name: "Smoke Copilot"
 "on":
@@ -1916,10 +1916,12 @@ jobs:
           if [ -f "$GH_AW_AGENT_OUTPUT" ]; then
             MESSAGE=$(cat "$GH_AW_AGENT_OUTPUT" | jq -r '.items[] | select(.type == "send_slack_message") | .message')
             echo "Would send to Slack: $MESSAGE"
-            echo "### 📨 Slack Message Stub" >> "$GITHUB_STEP_SUMMARY"
-            echo "**Message:** $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### 📨 Slack Message Stub"
+              echo "**Message:** $MESSAGE"
+              echo ""
+              echo "> ℹ️ This is a stub for testing purposes. No actual Slack message is sent."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No agent output found"
           fi
