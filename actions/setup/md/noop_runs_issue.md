@@ -23,3 +23,7 @@ These are successful outcomes, not failures, and help provide transparency into 
 ---
 
 > This issue is automatically managed by GitHub Agentic Workflows. Do not close this issue manually.
+> 
+> **No action to take** - Do not assign to an agent.
+
+<!-- gh-aw-noop-runs -->
