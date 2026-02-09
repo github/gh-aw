@@ -5,7 +5,6 @@ package workflow
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/stringutil"
@@ -38,7 +37,7 @@ Create an issue.
 	require.NoError(t, err, "Failed to write workflow file")
 
 	compiler := NewCompiler()
-	// Set to dev mode to trigger checkout
+	// Set to dev mode to trigger checkout (dev is also the default)
 	compiler.actionMode = ActionModeDev
 
 	err = compiler.CompileWorkflow(workflowPath)
@@ -56,42 +55,9 @@ Create an issue.
 	// Check that detection job has checkout step
 	assert.Contains(t, yaml, "Checkout actions folder", "Detection job should have checkout step in dev mode")
 
-	// Extract detection job section
-	detectionStart := strings.Index(yaml, "  detection:")
-	require.Greater(t, detectionStart, 0, "Detection job not found")
-
-	// Find the next job by looking for a line that starts with "  " followed by a lowercase letter and ":"
-	// This matches job definitions like "  agent:", "  safe_outputs:", etc.
-	searchStart := detectionStart + len("  detection:")
-	nextJobPattern := "\n  "
-	var detectionSection string
-
-	// Search for the next job
-	remaining := yaml[searchStart:]
-	for {
-		nextPos := strings.Index(remaining, nextJobPattern)
-		if nextPos == -1 {
-			// No more jobs, use rest of file
-			detectionSection = yaml[detectionStart:]
-			break
-		}
-
-		// Check if this is actually a job (starts with lowercase letter and has colon)
-		lineStart := searchStart + nextPos + len(nextJobPattern)
-		if lineStart < len(yaml) {
-			nextChar := yaml[lineStart]
-			// Check if it looks like a job name (lowercase letter)
-			if nextChar >= 'a' && nextChar <= 'z' {
-				// Found next job
-				detectionSection = yaml[detectionStart : searchStart+nextPos]
-				break
-			}
-		}
-
-		// Keep searching
-		remaining = remaining[nextPos+1:]
-		searchStart += nextPos + 1
-	}
+	// Extract detection job section using existing helper
+	detectionSection := extractJobSection(yaml, "detection")
+	require.NotEmpty(t, detectionSection, "Detection job section should not be empty")
 
 	// Verify that detection job has contents: read permission
 	assert.Contains(t, detectionSection, "permissions:", "Detection job should have permissions field")
@@ -125,7 +91,7 @@ Create an issue.
 	require.NoError(t, err, "Failed to write workflow file")
 
 	compiler := NewCompiler()
-	// Set to release mode (default) - no checkout needed
+	// Set to release mode - no checkout needed
 	compiler.actionMode = ActionModeRelease
 
 	err = compiler.CompileWorkflow(workflowPath)
@@ -140,41 +106,9 @@ Create an issue.
 	// Check that detection job exists
 	assert.Contains(t, yaml, "detection:", "Detection job not found in compiled YAML")
 
-	// Check that detection job does NOT have checkout step in release mode
-	detectionStart := strings.Index(yaml, "  detection:")
-	require.Greater(t, detectionStart, 0, "Detection job not found")
-
-	// Find the next job by looking for a line that starts with "  " followed by a lowercase letter and ":"
-	searchStart := detectionStart + len("  detection:")
-	nextJobPattern := "\n  "
-	var detectionSection string
-
-	// Search for the next job
-	remaining := yaml[searchStart:]
-	for {
-		nextPos := strings.Index(remaining, nextJobPattern)
-		if nextPos == -1 {
-			// No more jobs, use rest of file
-			detectionSection = yaml[detectionStart:]
-			break
-		}
-
-		// Check if this is actually a job (starts with lowercase letter and has colon)
-		lineStart := searchStart + nextPos + len(nextJobPattern)
-		if lineStart < len(yaml) {
-			nextChar := yaml[lineStart]
-			// Check if it looks like a job name (lowercase letter)
-			if nextChar >= 'a' && nextChar <= 'z' {
-				// Found next job
-				detectionSection = yaml[detectionStart : searchStart+nextPos]
-				break
-			}
-		}
-
-		// Keep searching
-		remaining = remaining[nextPos+1:]
-		searchStart += nextPos + 1
-	}
+	// Extract detection job section using existing helper
+	detectionSection := extractJobSection(yaml, "detection")
+	require.NotEmpty(t, detectionSection, "Detection job section should not be empty")
 
 	// In release mode, checkout should not be present in detection job
 	assert.NotContains(t, detectionSection, "Checkout actions folder", "Detection job should not have checkout step in release mode")
