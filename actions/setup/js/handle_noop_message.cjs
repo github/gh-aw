@@ -165,19 +165,15 @@ async function main() {
     }
 
     // Build the comment body
-    const timestamp = new Date().toISOString();
     let commentBody = `### No-Op Run: ${sanitizeContent(workflowName)}
 
-**Run ID:** [${runId}](${runUrl})  
-**Timestamp:** ${timestamp}  
+**Run ID:** [${runId}](${runUrl})
 
 **Message:**
 
 ${sanitizeContent(noopMessage)}
 
----
-
-*This workflow completed successfully with no action required.*`;
+> Generated from [${sanitizeContent(workflowName)}](${runUrl})`;
 
     // Sanitize the full comment body
     const fullCommentBody = sanitizeContent(commentBody, { maxLength: 65000 });
