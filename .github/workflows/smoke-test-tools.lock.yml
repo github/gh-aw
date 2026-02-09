@@ -21,11 +21,7 @@
 #
 # Smoke test to validate common development tools are available in the agent container
 #
-# Resolved workflow manifest:
-#   Imports:
-#     - shared/mood.md
-#
-# frontmatter-hash: 7d3e13ff178d7cd42b27a1498d76b1ba1b3ecda4d8027c84c8b6611647084fba
+# frontmatter-hash: 798e01a94a89407a4b4102b0551de2d8376a5c3b5ef4a3622ab601229694cf78
 
 name: "Agent Container Smoke Test"
 "on":
@@ -555,9 +551,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/smoke-test-tools.md}}

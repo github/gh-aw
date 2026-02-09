@@ -25,10 +25,9 @@
 #   Imports:
 #     - shared/gh.md
 #     - shared/github-queries-safe-input.md
-#     - shared/mood.md
 #     - shared/opencode.md
 #
-# frontmatter-hash: 1378f6a6cfb514d196a1e4788301ea292d9944fa5fb9cd9b1750bdd2b19bc278
+# frontmatter-hash: 8048975ef16e92f9381b252166bb75b0c5bba9faf07e18bf69d7c2404edc0168
 
 name: "Smoke OpenCode"
 "on":
@@ -1166,9 +1165,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/shared/opencode.md}}

@@ -29,10 +29,9 @@
 #     - shared/go-make.md
 #     - shared/mcp-pagination.md
 #     - shared/mcp/tavily.md
-#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 0837bbb92b5a6973ee2770c91b853a91e6e5113d590fd52ff842d31d1a8bcfd5
+# frontmatter-hash: 78071d0b5aa3dd18c2e0a148703429c5c3859fc89d33b92309116cbbfdcd314c
 
 name: "Smoke Claude"
 "on":
@@ -1361,9 +1360,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/shared/mcp-pagination.md}}

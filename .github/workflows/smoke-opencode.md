@@ -15,7 +15,6 @@ permissions:
   
 name: Smoke OpenCode
 imports:
-  - shared/mood.md
   - shared/opencode.md
   - shared/gh.md
   - shared/github-queries-safe-input.md

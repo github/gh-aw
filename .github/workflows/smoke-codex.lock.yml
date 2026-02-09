@@ -24,10 +24,9 @@
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/gh.md
-#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 3854250bdfed2a509135850e0617de23d37184ebc8395ab1c19e997046734794
+# frontmatter-hash: d14eb1ef5a6b53f5e4b7776732d82a9ed8cf879ec0961523225d34b5dec423a0
 
 name: "Smoke Codex"
 "on":
@@ -942,9 +941,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/shared/gh.md}}

@@ -25,10 +25,9 @@
 #   Imports:
 #     - shared/gh.md
 #     - shared/github-queries-safe-input.md
-#     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 24b427e228d6b9a69d577543015dbe0e20f80d81eaab1b82369b712bc40a5315
+# frontmatter-hash: 1d773c2bb30e40025c0c1216fdb5d51d00dfa0505f14af0d63b3f48529cbca64
 
 name: "Smoke Copilot"
 "on":
@@ -1326,9 +1325,6 @@ jobs:
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/shared/gh.md}}

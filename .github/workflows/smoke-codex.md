@@ -15,7 +15,6 @@ name: Smoke Codex
 engine: codex
 strict: true
 imports:
-  - shared/mood.md
   - shared/gh.md
   - shared/reporting.md
 network:
