@@ -267,7 +267,8 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				// This ensures there's always a fallback for transparency
 				if _, exists := outputMap["noop"]; !exists {
 					config.NoOp = &NoOpConfig{}
-					config.NoOp.Max = 1 // Default max
+					config.NoOp.Max = 1              // Default max
+					config.NoOp.ReportAsIssue = true // Default to reporting to issue
 				}
 			}
 
