@@ -116,7 +116,7 @@ function buildIssueUpdateData(item, config) {
   });
 
   // Type assertion: Since requireUpdates is not set, result will never have skipped
-  return /** @type {{success: true, data: Object}} */ result;
+  return /** @type {{success: true, data: Object}} */ (result);
 }
 
 /**

@@ -132,7 +132,7 @@ function buildDiscussionUpdateData(item, config) {
   });
 
   // Type assertion: Since requireUpdates is not set, result will never have skipped
-  const typedResult = /** @type {{success: true, data: Object}} */ result;
+  const typedResult = /** @type {{success: true, data: Object}} */ (result);
 
   // Discussion handler also sets updateData.body = item.body for the GraphQL mutation
   if (typedResult.data._rawBody !== undefined) {
