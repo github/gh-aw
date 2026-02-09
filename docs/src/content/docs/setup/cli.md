@@ -249,6 +249,8 @@ gh aw compile --purge                      # Remove orphaned .lock.yml files
 
 **Options:** `--validate`, `--strict`, `--fix`, `--zizmor`, `--dependabot`, `--json`, `--watch`, `--purge`
 
+**Dependabot Integration (`--dependabot`):** Automatically generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`) and `.github/dependabot.yml` configuration by analyzing runtime tools (`npx`, `pip install`, `go install`) used across all workflows. This enables Dependabot to detect and update outdated dependencies. See [Dependabot Support reference](/gh-aw/reference/dependabot/) for details on handling Dependabot PRs.
+
 **Strict Mode (`--strict`):** Enforces security best practices: no write permissions (use [safe-outputs](/gh-aw/reference/safe-outputs/)), explicit `network` config, no wildcard domains, pinned Actions, no deprecated fields. See [Strict Mode reference](/gh-aw/reference/frontmatter/#strict-mode-strict).
 
 **Shared Workflows:** Workflows without an `on` field are automatically detected as shared workflow components intended for import by other workflows. These files are validated using a relaxed schema that permits optional markdown content and skip compilation with an informative message. To use a shared workflow, import it in another workflow's frontmatter or with markdown directives. See [Imports reference](/gh-aw/reference/imports/).
