@@ -225,8 +225,14 @@ func TestBuildThreatDetectionJob(t *testing.T) {
 				if job.RunsOn != "runs-on: ubuntu-latest" {
 					t.Errorf("Expected ubuntu-latest runner, got %q", job.RunsOn)
 				}
-				if job.Permissions != "permissions: {}" {
-					t.Errorf("Expected 'permissions: {}', got %q", job.Permissions)
+				// In dev mode (default), detection job should have contents: read permission for checkout
+				// In release mode, it should have empty permissions
+				expectedPerms := "permissions:\n      contents: read"
+				if compiler.actionMode.IsRelease() {
+					expectedPerms = "permissions: {}"
+				}
+				if job.Permissions != expectedPerms {
+					t.Errorf("Expected %q, got %q", expectedPerms, job.Permissions)
 				}
 				if len(job.Needs) != 1 || job.Needs[0] != tt.mainJobName {
 					t.Errorf("Expected job to depend on %q, got %v", tt.mainJobName, job.Needs)

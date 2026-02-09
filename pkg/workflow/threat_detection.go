@@ -106,6 +106,20 @@ func (c *Compiler) buildThreatDetectionJob(data *WorkflowData, mainJobName strin
 	steps := c.buildThreatDetectionSteps(data, mainJobName)
 	threatLog.Printf("Generated %d steps for threat detection job", len(steps))
 
+	// Determine if checkout is needed (dev or script mode with actions checkout)
+	needsContentsRead := (c.actionMode.IsDev() || c.actionMode.IsScript()) && len(c.generateCheckoutActionsFolder(data)) > 0
+	if needsContentsRead {
+		threatLog.Print("Detection job needs contents:read permission for checkout")
+	}
+
+	// Set permissions based on whether checkout is needed
+	var permissions string
+	if needsContentsRead {
+		permissions = NewPermissionsContentsRead().RenderToYAML()
+	} else {
+		permissions = NewPermissionsEmpty().RenderToYAML()
+	}
+
 	// Generate agent concurrency configuration (same as main agent job)
 	agentConcurrency := GenerateJobConcurrencyConfig(data)
 
@@ -127,7 +141,7 @@ func (c *Compiler) buildThreatDetectionJob(data *WorkflowData, mainJobName strin
 		Name:           string(constants.DetectionJobName),
 		If:             condition.Render(),
 		RunsOn:         "runs-on: ubuntu-latest",
-		Permissions:    NewPermissionsEmpty().RenderToYAML(),
+		Permissions:    permissions,
 		Concurrency:    c.indentYAMLLines(agentConcurrency, "    "),
 		TimeoutMinutes: 10,
 		Steps:          steps,
