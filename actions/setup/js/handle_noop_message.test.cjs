@@ -117,7 +117,7 @@ describe("handle_noop_message", () => {
     expect(mockGithub.rest.search.issuesAndPullRequests).not.toHaveBeenCalled();
   });
 
-  it("should create agent runs issue if it doesn't exist", async () => {
+  it("should create no-op runs issue if it doesn't exist", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123456";
     process.env.GH_AW_NOOP_MESSAGE = "No updates needed";
@@ -163,13 +163,13 @@ describe("handle_noop_message", () => {
 
     // Verify search was performed
     expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
-      q: expect.stringContaining("[agentic-workflows] Agent runs"),
+      q: expect.stringContaining("[agentic-workflows] No-Op Runs"),
       per_page: 1,
     });
 
     // Verify issue was created with correct title
     const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
-    expect(createCall.title).toBe("[agentic-workflows] Agent runs");
+    expect(createCall.title).toBe("[agentic-workflows] No-Op Runs");
     expect(createCall.labels).toContain("agentic-workflows");
     expect(createCall.body).toContain("tracks all no-op runs");
 
@@ -181,7 +181,7 @@ describe("handle_noop_message", () => {
     expect(commentCall.body).toContain("123456");
   });
 
-  it("should use existing agent runs issue if it exists", async () => {
+  it("should use existing no-op runs issue if it exists", async () => {
     process.env.GH_AW_WORKFLOW_NAME = "Another Workflow";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/789";
     process.env.GH_AW_NOOP_MESSAGE = "Everything is up to date";
@@ -294,7 +294,7 @@ describe("handle_noop_message", () => {
     await main();
 
     // Verify warning was logged but workflow didn't fail
-    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not create agent runs issue"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not create no-op runs issue"));
   });
 
   it("should extract run ID from URL correctly", async () => {

@@ -12,12 +12,12 @@ const { renderTemplate } = require("./messages_core.cjs");
  */
 async function ensureAgentRunsIssue() {
   const { owner, repo } = context.repo;
-  const parentTitle = "[agentic-workflows] Agent runs";
+  const parentTitle = "[agentic-workflows] No-Op Runs";
   const parentLabel = "agentic-workflows";
 
-  core.info(`Searching for agent runs issue: "${parentTitle}"`);
+  core.info(`Searching for no-op runs issue: "${parentTitle}"`);
 
-  // Search for existing agent runs issue
+  // Search for existing no-op runs issue
   const searchQuery = `repo:${owner}/${repo} is:issue is:open label:${parentLabel} in:title "${parentTitle}"`;
 
   try {
@@ -28,7 +28,7 @@ async function ensureAgentRunsIssue() {
 
     if (searchResult.data.total_count > 0) {
       const existingIssue = searchResult.data.items[0];
-      core.info(`Found existing agent runs issue #${existingIssue.number}: ${existingIssue.html_url}`);
+      core.info(`Found existing no-op runs issue #${existingIssue.number}: ${existingIssue.html_url}`);
 
       return {
         number: existingIssue.number,
@@ -36,11 +36,11 @@ async function ensureAgentRunsIssue() {
       };
     }
   } catch (error) {
-    core.warning(`Error searching for agent runs issue: ${getErrorMessage(error)}`);
+    core.warning(`Error searching for no-op runs issue: ${getErrorMessage(error)}`);
   }
 
-  // Create agent runs issue if it doesn't exist
-  core.info(`No agent runs issue found, creating one`);
+  // Create no-op runs issue if it doesn't exist
+  core.info(`No no-op runs issue found, creating one`);
 
   let parentBodyContent = `This issue tracks all no-op runs from agentic workflows in this repository. Each workflow run that completes with a no-op message (indicating no action was needed) posts a comment here.
 
@@ -85,13 +85,13 @@ These are successful outcomes, not failures, and help provide transparency into 
       labels: [parentLabel],
     });
 
-    core.info(`✓ Created agent runs issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
+    core.info(`✓ Created no-op runs issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
     return {
       number: newIssue.data.number,
       node_id: newIssue.data.node_id,
     };
   } catch (error) {
-    core.error(`Failed to create agent runs issue: ${getErrorMessage(error)}`);
+    core.error(`Failed to create no-op runs issue: ${getErrorMessage(error)}`);
     throw error;
   }
 }
@@ -143,16 +143,16 @@ async function main() {
       return;
     }
 
-    core.info("Agent succeeded with only noop outputs - posting to agent runs issue");
+    core.info("Agent succeeded with only noop outputs - posting to no-op runs issue");
 
     const { owner, repo } = context.repo;
 
-    // Ensure agent runs issue exists
-    let agentRunsIssue;
+    // Ensure no-op runs issue exists
+    let noopRunsIssue;
     try {
-      agentRunsIssue = await ensureAgentRunsIssue();
+      noopRunsIssue = await ensureAgentRunsIssue();
     } catch (error) {
-      core.warning(`Could not create agent runs issue: ${getErrorMessage(error)}`);
+      core.warning(`Could not create no-op runs issue: ${getErrorMessage(error)}`);
       // Don't fail the workflow if we can't create the issue
       return;
     }
@@ -186,13 +186,13 @@ ${sanitizeContent(noopMessage)}
       await github.rest.issues.createComment({
         owner,
         repo,
-        issue_number: agentRunsIssue.number,
+        issue_number: noopRunsIssue.number,
         body: fullCommentBody,
       });
 
-      core.info(`✓ Posted no-op message to agent runs issue #${agentRunsIssue.number}`);
+      core.info(`✓ Posted no-op message to no-op runs issue #${noopRunsIssue.number}`);
     } catch (error) {
-      core.warning(`Failed to post comment to agent runs issue: ${getErrorMessage(error)}`);
+      core.warning(`Failed to post comment to no-op runs issue: ${getErrorMessage(error)}`);
       // Don't fail the workflow
     }
   } catch (error) {
