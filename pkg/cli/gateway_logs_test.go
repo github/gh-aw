@@ -454,34 +454,34 @@ func TestGatewayLogsParsingIntegration(t *testing.T) {
 }
 
 func TestParseGatewayLogsFromMCPLogsSubdirectory(t *testing.T) {
-// Create temp directory for test
-tmpDir := t.TempDir()
+	// Create temp directory for test
+	tmpDir := t.TempDir()
 
-// Create mcp-logs subdirectory (path after artifact download)
-mcpLogsDir := filepath.Join(tmpDir, "mcp-logs")
-err := os.MkdirAll(mcpLogsDir, 0755)
-require.NoError(t, err, "should create mcp-logs directory")
+	// Create mcp-logs subdirectory (path after artifact download)
+	mcpLogsDir := filepath.Join(tmpDir, "mcp-logs")
+	err := os.MkdirAll(mcpLogsDir, 0755)
+	require.NoError(t, err, "should create mcp-logs directory")
 
-// Create test gateway.jsonl in mcp-logs subdirectory
-testLogContent := `{"timestamp":"2024-01-15T10:00:00Z","level":"info","event":"tool_call","server_name":"github","tool_name":"search_code","duration":250}
+	// Create test gateway.jsonl in mcp-logs subdirectory
+	testLogContent := `{"timestamp":"2024-01-15T10:00:00Z","level":"info","event":"tool_call","server_name":"github","tool_name":"search_code","duration":250}
 {"timestamp":"2024-01-15T10:00:01Z","level":"info","event":"tool_call","server_name":"github","tool_name":"list_issues","duration":180}
 {"timestamp":"2024-01-15T10:00:02Z","level":"error","event":"tool_call","server_name":"github","tool_name":"create_issue","duration":100}
 `
-gatewayLogPath := filepath.Join(mcpLogsDir, "gateway.jsonl")
-err = os.WriteFile(gatewayLogPath, []byte(testLogContent), 0644)
-require.NoError(t, err, "should write test gateway.jsonl in mcp-logs")
+	gatewayLogPath := filepath.Join(mcpLogsDir, "gateway.jsonl")
+	err = os.WriteFile(gatewayLogPath, []byte(testLogContent), 0644)
+	require.NoError(t, err, "should write test gateway.jsonl in mcp-logs")
 
-// Test parsing from mcp-logs subdirectory
-metrics, err := parseGatewayLogs(tmpDir, false)
-require.NoError(t, err, "should parse gateway logs from mcp-logs subdirectory")
-require.NotNil(t, metrics, "metrics should not be nil")
+	// Test parsing from mcp-logs subdirectory
+	metrics, err := parseGatewayLogs(tmpDir, false)
+	require.NoError(t, err, "should parse gateway logs from mcp-logs subdirectory")
+	require.NotNil(t, metrics, "metrics should not be nil")
 
-// Verify results
-assert.Equal(t, 3, metrics.TotalRequests, "should have 3 total requests")
-assert.Len(t, metrics.Servers, 1, "should have 1 server")
+	// Verify results
+	assert.Equal(t, 3, metrics.TotalRequests, "should have 3 total requests")
+	assert.Len(t, metrics.Servers, 1, "should have 1 server")
 
-// Verify server metrics
-githubMetrics, ok := metrics.Servers["github"]
-require.True(t, ok, "should have github server metrics")
-assert.Equal(t, 3, githubMetrics.RequestCount, "should have 3 total calls for github server")
+	// Verify server metrics
+	githubMetrics, ok := metrics.Servers["github"]
+	require.True(t, ok, "should have github server metrics")
+	assert.Equal(t, 3, githubMetrics.RequestCount, "should have 3 total calls for github server")
 }
