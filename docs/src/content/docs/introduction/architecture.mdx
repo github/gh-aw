@@ -28,7 +28,7 @@ We assume the adversary does not compromise the underlying hardware or cryptogra
 
 ### Layer 1: Substrate-Level Trust
 
-AWs run on a GitHub Actions runner virtual machine (VM) and trust Actions' hardware and kernel-level enforcement mechanisms, including the CPU, MMU, kernel, and container runtime. AW also relies on two privileged containers: (1) a network firewall that is trusted to configure connectivity for other components via `iptables`, and (2) an MCP Gateway that is trusted to configure and spawn isolated containers, e.g., local MCP servers. Collectively, the substrate level ensures memory isolation between components, CPU and resource isolation, mediation of privileged operations and system calls, and explicit, kernel-enforced communication boundaries. These guarantees hold even if an untrusted user-level component is fully compromised and executes arbitrary code. Trust violations at the substrate level require vulnerabilities in the firewall, MCP Gateway, container runtime, kernel, hypervisor, or hardware. If this layer fails, higher-level security guarantees may not hold.
+AWs run on a GitHub Actions runner virtual machine (VM) and trust Actions' hardware and kernel-level enforcement mechanisms, including the CPU, MMU, kernel, and container runtime. AWs also rely on two privileged containers: (1) a network firewall that is trusted to configure connectivity for other components via 'iptables' and launch the agent container, and (2) an MCP Gateway that is trusted to configure and spawn isolated MCP-server containers. Collectively, the substrate level ensures memory isolation between components, CPU and resource isolation, mediation of privileged operations and system calls, and explicit, kernel-enforced communication boundaries. These guarantees hold even if an untrusted user-level component is fully compromised and executes arbitrary code. Trust violations at the substrate level require vulnerabilities in the firewall, MCP Gateway, container runtime, kernel, hypervisor, or hardware. If this layer fails, higher-level security guarantees may not hold.
 
 ---
 
@@ -160,10 +160,12 @@ The SafeOutputs subsystem provides security by design: the agent never requires 
 
 ## Agent Workflow Firewall (AWF)
 
-The Agent Workflow Firewall (AWF) enforces network egress control via a domain allowlist, preventing data exfiltration and containing compromised agents to permitted domains.
+The Agent Workflow Firewall (AWF) containerizes the agent, binds it to a Docker network, and uses iptables to redirect HTTP/HTTPS traffic through a Squid proxy container. The Squid proxy controls the agent's egress traffic via a configurable domain allowlist to prevent data exfiltration and restrict compromised agents to permitted domains. The AWF setup process drops its iptables capabilities before launching the agent. 
 
-AWF separates two concerns:
-- **Filesystem**: All host binaries and runtimes accessible; setup actions work transparently
+Containerizing an agent improves security by limiting its access to the host, but this may come at a cost. In particular, many coding agents expect full access to the host and break if containerized naively. To support agents that need more access to the host, AWF provides a more permissive 'chroot mode' that mounts a subset of host system directories read-only under '/host', mounts the host's HOME and '/tmp' directories read-write, imports a subset of host environment variables like USER and PATH, and then launches the agent in a '/host' chroot jail. This allows the agent to safely use host-installed binaries (Python, Node.js, Go, etc.) from their normal paths, while controlling access to the host network, environment variables, and other sensitive resources.
+
+Thus, AWF separates two concerns:
+- **Filesystem**: Controlled access to host binaries and runtimes via chroot
 - **Network**: All traffic routed through proxy enforcing the domain allowlist
 
 ```mermaid
