@@ -1,26 +1,23 @@
 // @ts-check
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-
-// Mock load_agent_output at the module level
-vi.mock("./load_agent_output.cjs", () => ({
-  loadAgentOutput: vi.fn(),
-}));
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 describe("handle_noop_message", () => {
   let mockCore;
   let mockGithub;
   let mockContext;
   let originalEnv;
-  let mockLoadAgentOutput;
+  let tempDir;
 
   beforeEach(async () => {
     // Save original environment
     originalEnv = { ...process.env };
 
-    // Get the mocked loadAgentOutput
-    const loadModule = await import("./load_agent_output.cjs");
-    mockLoadAgentOutput = loadModule.loadAgentOutput;
+    // Create temp directory for test files
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "handle-noop-test-"));
 
     // Mock core
     mockCore = {
@@ -59,6 +56,12 @@ describe("handle_noop_message", () => {
   afterEach(() => {
     // Restore environment
     process.env = originalEnv;
+    
+    // Clean up temp directory
+    if (tempDir && fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    
     vi.clearAllMocks();
   });
 
@@ -94,14 +97,15 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "Some message";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return noop + other outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with noop + other outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [
         { type: "noop", message: "No action needed" },
         { type: "create_issue", title: "Some issue" },
       ],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
     await main();
@@ -116,11 +120,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "No updates needed";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "No updates needed" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock search to return no results
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -176,11 +181,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "Everything is up to date";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "Everything is up to date" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock search to return existing issue
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -223,11 +229,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "No action required";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "No action required" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock existing issue
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -253,11 +260,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "All checks passed";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "All checks passed" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock no existing issue
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -280,11 +288,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "Done";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "Done" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
       data: { total_count: 1, items: [{ number: 1, node_id: "ID", html_url: "url" }] },
@@ -305,11 +314,12 @@ describe("handle_noop_message", () => {
     process.env.GH_AW_NOOP_MESSAGE = "Clean";
     process.env.GH_AW_AGENT_CONCLUSION = "success";
 
-    // Mock loadAgentOutput to return only noop outputs
-    mockLoadAgentOutput.mockReturnValue({
-      success: true,
+    // Create agent output file with only noop outputs
+    const outputFile = path.join(tempDir, "agent_output.json");
+    fs.writeFileSync(outputFile, JSON.stringify({
       items: [{ type: "noop", message: "Clean" }],
-    });
+    }));
+    process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
       data: { total_count: 1, items: [{ number: 1, node_id: "ID", html_url: "url" }] },
