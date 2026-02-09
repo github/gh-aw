@@ -55,7 +55,7 @@ These are successful outcomes, not failures, and help provide transparency into 
 <!-- gh-aw-noop-runs -->`;
       }
       if (filePath.includes("noop_comment.md")) {
-        return `{workflow_name}
+        return `### {workflow_name}
 
 {message}
 
