@@ -146,6 +146,30 @@ func TestParseFrontmatterConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("parses labels array", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"name":   "test-workflow",
+			"engine": "copilot",
+			"labels": []any{"automation", "ci", "diagnostics"},
+		}
+
+		config, err := ParseFrontmatterConfig(frontmatter)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(config.Labels) != 3 {
+			t.Fatalf("expected 3 labels, got %d", len(config.Labels))
+		}
+
+		expectedLabels := []string{"automation", "ci", "diagnostics"}
+		for i, expected := range expectedLabels {
+			if config.Labels[i] != expected {
+				t.Errorf("Labels[%d] = %q, want %q", i, config.Labels[i], expected)
+			}
+		}
+	})
+
 	t.Run("parses complete workflow config", func(t *testing.T) {
 		frontmatter := map[string]any{
 			"name":        "full-workflow",
@@ -522,6 +546,40 @@ func TestFrontmatterConfigBackwardCompatibility(t *testing.T) {
 		}
 		if reconstructed["env"] == nil {
 			t.Error("env should not be nil")
+		}
+	})
+
+	t.Run("round-trip preserves labels", func(t *testing.T) {
+		frontmatter := map[string]any{
+			"name":   "test-workflow",
+			"engine": "copilot",
+			"labels": []any{"automation", "ci", "security"},
+		}
+
+		// Parse to struct
+		config, err := ParseFrontmatterConfig(frontmatter)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		// Convert back to map
+		reconstructed := config.ToMap()
+
+		// Verify labels are preserved
+		labels, ok := reconstructed["labels"].([]string)
+		if !ok {
+			t.Fatalf("labels should be []string, got %T", reconstructed["labels"])
+		}
+
+		if len(labels) != 3 {
+			t.Fatalf("expected 3 labels, got %d", len(labels))
+		}
+
+		expectedLabels := []string{"automation", "ci", "security"}
+		for i, expected := range expectedLabels {
+			if labels[i] != expected {
+				t.Errorf("labels[%d] = %q, want %q", i, labels[i], expected)
+			}
 		}
 	})
 

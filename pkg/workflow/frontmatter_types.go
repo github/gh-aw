@@ -80,14 +80,15 @@ type PluginsConfig struct {
 // This provides compile-time type safety and clearer error messages compared to map[string]any
 type FrontmatterConfig struct {
 	// Core workflow fields
-	Name           string `json:"name,omitempty"`
-	Description    string `json:"description,omitempty"`
-	Engine         string `json:"engine,omitempty"`
-	Source         string `json:"source,omitempty"`
-	TrackerID      string `json:"tracker-id,omitempty"`
-	Version        string `json:"version,omitempty"`
-	TimeoutMinutes int    `json:"timeout-minutes,omitempty"`
-	Strict         *bool  `json:"strict,omitempty"` // Pointer to distinguish unset from false
+	Name           string   `json:"name,omitempty"`
+	Description    string   `json:"description,omitempty"`
+	Engine         string   `json:"engine,omitempty"`
+	Source         string   `json:"source,omitempty"`
+	TrackerID      string   `json:"tracker-id,omitempty"`
+	Version        string   `json:"version,omitempty"`
+	TimeoutMinutes int      `json:"timeout-minutes,omitempty"`
+	Strict         *bool    `json:"strict,omitempty"` // Pointer to distinguish unset from false
+	Labels         []string `json:"labels,omitempty"`
 
 	// Configuration sections - using strongly-typed structs
 	Tools            *ToolsConfig       `json:"tools,omitempty"`
@@ -504,6 +505,9 @@ func (fc *FrontmatterConfig) ToMap() map[string]any {
 	}
 	if fc.Strict != nil {
 		result["strict"] = *fc.Strict
+	}
+	if len(fc.Labels) > 0 {
+		result["labels"] = fc.Labels
 	}
 
 	// Configuration sections
