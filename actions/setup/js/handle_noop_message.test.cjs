@@ -54,6 +54,13 @@ These are successful outcomes, not failures, and help provide transparency into 
 
 <!-- gh-aw-noop-runs -->`;
       }
+      if (filePath.includes("noop_comment.md")) {
+        return `{workflow_name}
+
+{message}
+
+> Generated from [{workflow_name}]({run_url})`;
+      }
       return originalReadFileSync.call(fs, filePath, encoding);
     });
 
@@ -221,7 +228,8 @@ These are successful outcomes, not failures, and help provide transparency into 
     expect(commentCall.issue_number).toBe(42);
     expect(commentCall.body).toContain("Test Workflow");
     expect(commentCall.body).toContain("No updates needed");
-    expect(commentCall.body).toContain("123456");
+    // The new format doesn't have a separate Run ID line, but the URL is still in the footer
+    expect(commentCall.body).toContain("https://github.com/test-owner/test-repo/actions/runs/123456");
   });
 
   it("should use existing no-op runs issue if it exists", async () => {

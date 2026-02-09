@@ -135,23 +135,16 @@ async function main() {
       return;
     }
 
-    // Extract run ID from URL (e.g., https://github.com/owner/repo/actions/runs/123 -> "123")
-    let runId = "";
-    const runIdMatch = runUrl.match(/\/actions\/runs\/(\d+)/);
-    if (runIdMatch) {
-      runId = runIdMatch[1];
-    }
+    // Load comment template from file
+    const commentTemplatePath = "/opt/gh-aw/prompts/noop_comment.md";
+    const commentTemplate = fs.readFileSync(commentTemplatePath, "utf8");
 
-    // Build the comment body
-    let commentBody = `### No-Op Run: ${sanitizeContent(workflowName)}
-
-**Run ID:** [${runId}](${runUrl})
-
-**Message:**
-
-${sanitizeContent(noopMessage)}
-
-> Generated from [${sanitizeContent(workflowName)}](${runUrl})`;
+    // Build the comment body by replacing template variables
+    const commentBody = renderTemplate(commentTemplate, {
+      workflow_name: workflowName,
+      message: noopMessage,
+      run_url: runUrl,
+    });
 
     // Sanitize the full comment body
     const fullCommentBody = sanitizeContent(commentBody, { maxLength: 65000 });
