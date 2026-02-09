@@ -475,6 +475,29 @@ These resources contain workflow patterns, best practices, safe outputs, and per
 
 ## Best Practices
 
+### Writing Effective Agent Instructions
+
+**Ideal State**: All instructions in your workflow prompt should be followed equally by the AI agent, regardless of their position, formatting, or complexity.
+
+**Current Reality**: In practice, current AI models may exhibit varying compliance rates based on instruction characteristics. This is a model limitation we work around, not intended behavior.
+
+**Practical Guidelines for Workflow Prompts**:
+
+1. **Write all instructions clearly and directly** - Assume the agent will follow them all
+2. **For critical security or validation steps**: If you observe skipped instructions in practice, you can:
+   - Position them closer to where they're needed (near decision points)
+   - Add emphasis (bold, emojis like 🚨, XML tags like `<critical>`)
+   - Use gating language: "Do not proceed until X is complete"
+   - Provide explicit checklists with success criteria
+3. **Use concrete templates** - Provide copy-pastable examples for complex outputs
+4. **Be consistent with terminology** - Use the same term for the same concept throughout
+
+**Remember**: These emphasis techniques are temporary workarounds for current model limitations. The goal is for all instructions to be followed reliably without special formatting.
+
+**Analysis Tool**: If you notice instructions being skipped in workflow runs, users can run the [Instruction Salience Analyzer](https://github.com/github/gh-aw/blob/main/.github/workflows/instruction-salience-analyzer.md) workflow to identify at-risk instructions and get specific workaround recommendations.
+
+See the [Instruction Salience guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/guides/instruction-salience.md) for more details on working around current model limitations.
+
 ### Improver Coding Agents in Large Repositories
 
 When creating workflows that involve coding agents operating in large repositories, follow these best practices to ensure efficiency and manageability:

@@ -157,6 +157,7 @@ gh aw compile --validate
 - **Shared Components**: Reusable workflow building blocks
 - **Repo Memory**: Persistent git-backed storage for agents
 - **Sandboxed Execution**: All workflows run in the Agent Workflow Firewall (AWF) sandbox, enabling full `bash` and `edit` tools by default
+- **Instruction Analysis**: Tools to identify where current model limitations may cause instructions to be skipped ([Instruction Salience Analyzer](https://github.com/github/gh-aw/blob/main/.github/workflows/instruction-salience-analyzer.md))
 
 ## Important Notes
 
@@ -165,3 +166,4 @@ gh aw compile --validate
 - Workflows must be compiled to `.lock.yml` files before running in GitHub Actions
 - **Bash tools are enabled by default** - Don't restrict bash commands unnecessarily since workflows are sandboxed by the AWF
 - Follow security best practices: minimal permissions, explicit network access, no template injection
+- **Writing workflow prompts**: Ideally, AI agents should follow ALL instructions equally. In practice, if you observe instructions being skipped, see the [Instruction Salience guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/guides/instruction-salience.md) for workarounds

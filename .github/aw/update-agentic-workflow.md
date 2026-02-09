@@ -472,6 +472,10 @@ edit .github/workflows/<workflow-id>.md
   - Only proceed with relaxed security if the user explicitly confirms after understanding the risks
 - Always follow security best practices (least privilege, safe outputs, constrained network)
 - Skip verbose summaries at the end, keep it concise
+- **Writing workflow prompts**: When updating agent instructions in the markdown body:
+  - **Ideal**: All instructions should be followed equally by the AI agent
+  - **Practice**: If you observe certain instructions being skipped in workflow runs, you can apply workarounds like emphasis (bold, emojis), gating language, or position optimization
+  - See the [Instruction Salience guide](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/guides/instruction-salience.md) for details on working around current model limitations
 
 ## Prompt Editing Without Recompilation
 
