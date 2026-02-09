@@ -161,7 +161,7 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 
 	// Build all jobs and validate dependencies
 	if err := c.buildJobsAndValidate(data, markdownPath); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to build and validate jobs: %w", err)
 	}
 
 	// Compute frontmatter hash before generating YAML
