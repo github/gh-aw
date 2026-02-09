@@ -1,0 +1,26 @@
+This issue tracks all no-op runs from agentic workflows in this repository. Each workflow run that completes with a no-op message (indicating no action was needed) posts a comment here.
+
+### Purpose
+
+This issue helps you:
+- Track workflows that ran but determined no action was needed
+- Distinguish between failures and intentional no-ops
+- Monitor workflow health by seeing when workflows decide not to act
+
+### What is a No-Op?
+
+A no-op (no operation) occurs when an agentic workflow runs successfully but determines that no action is required. For example:
+- A security scanner that finds no issues
+- An update checker that finds nothing to update
+- A monitoring workflow that finds everything is healthy
+
+These are successful outcomes, not failures, and help provide transparency into workflow behavior.
+
+### Resources
+
+- [GitHub Agentic Workflows Documentation](https://github.com/github/gh-aw)
+- [Safe Outputs Reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/safe-outputs.md)
+
+---
+
+> This issue is automatically managed by GitHub Agentic Workflows. Do not close this issue manually.
