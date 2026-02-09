@@ -126,5 +126,7 @@ for i in {1..10}; do
 done
 
 # Output the configuration for the MCP client
-echo "port=$GH_AW_SAFE_INPUTS_PORT" >> "$GITHUB_OUTPUT"
-echo "api_key=$GH_AW_SAFE_INPUTS_API_KEY" >> "$GITHUB_OUTPUT"
+{
+  echo "port=$GH_AW_SAFE_INPUTS_PORT"
+  echo "api_key=$GH_AW_SAFE_INPUTS_API_KEY"
+} >> "$GITHUB_OUTPUT"

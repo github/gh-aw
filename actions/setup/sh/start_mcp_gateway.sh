@@ -422,7 +422,9 @@ print_timing $SCRIPT_START_TIME "Overall gateway startup"
 echo ""
 
 # Output PID as GitHub Actions step output for use in cleanup
-echo "gateway-pid=$GATEWAY_PID" >> $GITHUB_OUTPUT
 # Output port and API key for use in stop script (per MCP Gateway Specification v1.1.0)
-echo "gateway-port=${MCP_GATEWAY_PORT}" >> $GITHUB_OUTPUT
-echo "gateway-api-key=${MCP_GATEWAY_API_KEY}" >> $GITHUB_OUTPUT
+{
+  echo "gateway-pid=$GATEWAY_PID"
+  echo "gateway-port=${MCP_GATEWAY_PORT}"
+  echo "gateway-api-key=${MCP_GATEWAY_API_KEY}"
+} >> $GITHUB_OUTPUT

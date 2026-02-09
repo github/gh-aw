@@ -781,9 +781,11 @@ echo "result=success" >> $GITHUB_OUTPUT
       fs.writeFileSync(
         handlerPath,
         `#!/bin/bash
-echo "first=value1" >> $GITHUB_OUTPUT
-echo "second=value2" >> $GITHUB_OUTPUT
-echo "third=value with spaces" >> $GITHUB_OUTPUT
+{
+  echo "first=value1"
+  echo "second=value2"
+  echo "third=value with spaces"
+} >> $GITHUB_OUTPUT
 `,
         { mode: 0o755 }
       );
