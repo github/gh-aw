@@ -23,11 +23,11 @@
 #
 # Resolved workflow manifest:
 #   Imports:
-#     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
+#     - ../skills/documentation/SKILL.md
 #     - shared/mood.md
 #
-# frontmatter-hash: e67da591070d85fc2bc01ce3e60211bcadde61ba21e9411373d44e219dd85394
+# frontmatter-hash: eb15f692ca7f8cb8dc12726dc7754ae9e7ad1b4fb42bd0f320f636308a1fb9ef
 
 name: "Rebuild the documentation after making changes"
 "on":
@@ -664,7 +664,7 @@ jobs:
           {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import ../../skills/documentation/SKILL.md}}
+          {{#runtime-import .github/skills/documentation/SKILL.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/agents/technical-doc-writer.agent.md}}

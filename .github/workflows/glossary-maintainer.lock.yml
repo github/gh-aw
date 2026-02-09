@@ -23,11 +23,11 @@
 #
 # Resolved workflow manifest:
 #   Imports:
-#     - ../../skills/documentation/SKILL.md
 #     - ../agents/technical-doc-writer.agent.md
+#     - ../skills/documentation/SKILL.md
 #     - shared/mood.md
 #
-# frontmatter-hash: 4f6735e2bc6d4b4e88d81999ae42343c625b64ddcbb50b01e31c6560edb6e0e4
+# frontmatter-hash: ffaf5fe2097cf064c34bf0a5efdb15aa61ce166274cffffaac6dfa655034750c
 
 name: "Glossary Maintainer"
 "on":
@@ -588,7 +588,7 @@ jobs:
           {{#runtime-import .github/workflows/shared/mood.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
-          {{#runtime-import ../../skills/documentation/SKILL.md}}
+          {{#runtime-import .github/skills/documentation/SKILL.md}}
           PROMPT_EOF
           cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/agents/technical-doc-writer.agent.md}}
