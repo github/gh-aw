@@ -77,7 +77,7 @@ jobs:
 			for unwrappedErr = err; errors.Unwrap(unwrappedErr) != nil; unwrappedErr = errors.Unwrap(unwrappedErr) {
 				// Walk the error chain
 			}
-			assert.NotNil(t, unwrappedErr, "Should have an unwrapped error at the end of the chain")
+			assert.Error(t, unwrappedErr, "Should have an unwrapped error at the end of the chain")
 		})
 	}
 }
@@ -195,7 +195,7 @@ jobs:
 
 			// Error should be wrapped (errors.Unwrap should return non-nil)
 			unwrapped := errors.Unwrap(err)
-			assert.NotNil(t, unwrapped, "Error should be wrapped")
+			assert.Error(t, unwrapped, "Error should be wrapped")
 		})
 	}
 }
