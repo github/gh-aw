@@ -3202,6 +3202,11 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+    # Controls whether noop runs are reported as issue comments (default: true). Set
+    # to false to disable posting to the no-op runs issue.
+    # (optional)
+    report-as-issue: true
+
   # Option 2: Enable noop output with default configuration (max: 1)
   noop: null
 
