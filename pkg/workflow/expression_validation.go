@@ -412,6 +412,16 @@ func validateRuntimeImportFiles(markdownContent string, workspaceDir string) err
 		githubFolder := filepath.Join(workspaceDir, ".github")
 		absolutePath := filepath.Join(githubFolder, normalizedPath)
 
+		// Security check: ensure the resolved path is within the .github folder
+		// Use filepath.Rel to check if the path escapes the .github folder
+		normalizedGithubFolder := filepath.Clean(githubFolder)
+		normalizedAbsolutePath := filepath.Clean(absolutePath)
+		relativePath, err := filepath.Rel(normalizedGithubFolder, normalizedAbsolutePath)
+		if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || filepath.IsAbs(relativePath) {
+			validationErrors = append(validationErrors, fmt.Sprintf("%s: Security: Path must be within .github folder (resolves to: %s)", filePath, relativePath))
+			continue
+		}
+
 		// Check if file exists
 		if _, err := os.Stat(absolutePath); os.IsNotExist(err) {
 			// Skip validation for optional imports ({{#runtime-import? ...}})
