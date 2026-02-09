@@ -114,9 +114,11 @@ output_file="/tmp/gh-aw/benchmarks/current_metrics.json"
 
 # Initialize JSON
 echo "{" > "$output_file"
-echo '  "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",' >> "$output_file"
-echo '  "date": "'$(date -u +%Y-%m-%d)'",' >> "$output_file"
-echo '  "benchmarks": {' >> "$output_file"
+{
+  echo '  "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",'
+  echo '  "date": "'$(date -u +%Y-%m-%d)'",'
+  echo '  "benchmarks": {'
+} >> "$output_file"
 
 first=true
 while IFS= read -r line; do
@@ -135,18 +137,22 @@ while IFS= read -r line; do
     fi
     
     # Write benchmark entry
-    echo -n "    \"$name\": {" >> "$output_file"
-    echo -n "\"ns_per_op\": $ns_per_op, " >> "$output_file"
-    echo -n "\"bytes_per_op\": $bytes_per_op, " >> "$output_file"
-    echo -n "\"allocs_per_op\": $allocs_per_op, " >> "$output_file"
-    echo -n "\"iterations\": $iterations" >> "$output_file"
-    echo -n "}" >> "$output_file"
+    {
+      echo -n "    \"$name\": {"
+      echo -n "\"ns_per_op\": $ns_per_op, "
+      echo -n "\"bytes_per_op\": $bytes_per_op, "
+      echo -n "\"allocs_per_op\": $allocs_per_op, "
+      echo -n "\"iterations\": $iterations"
+      echo -n "}"
+    } >> "$output_file"
   fi
 done < "$results_file"
 
-echo "" >> "$output_file"
-echo "  }" >> "$output_file"
-echo "}" >> "$output_file"
+{
+  echo ""
+  echo "  }"
+  echo "}"
+} >> "$output_file"
 
 echo "Parsed benchmark results to $output_file"
 cat "$output_file"
@@ -173,8 +179,10 @@ if [ ! -f /tmp/gh-aw/repo-memory/default/benchmark_history.jsonl ]; then
 fi
 
 # Append current results to history
-cat /tmp/gh-aw/benchmarks/current_metrics.json >> /tmp/gh-aw/repo-memory/default/benchmark_history.jsonl
-echo "" >> /tmp/gh-aw/repo-memory/default/benchmark_history.jsonl
+{
+  cat /tmp/gh-aw/benchmarks/current_metrics.json
+  echo ""
+} >> /tmp/gh-aw/repo-memory/default/benchmark_history.jsonl
 
 echo "Historical data updated"
 ```

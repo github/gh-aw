@@ -26,7 +26,7 @@
 #     - ../agents/ci-cleaner.agent.md
 #     - shared/mood.md
 #
-# frontmatter-hash: 08ec2dcd7a3c1b47dc9755f406d89bf3f8918399daae8b7d8afb253aa6bc7001
+# frontmatter-hash: f60801622060d7cacab089e0ca676982313e9776e33dcd85aa1b544c52196b73
 
 name: "CI Cleaner"
 "on":
@@ -832,15 +832,19 @@ jobs:
           echo "Run ID: ${RUN_ID}"
 
           # Set outputs for use in other jobs
-          echo "ci_status=${CONCLUSION}" >> "$GITHUB_OUTPUT"
-          echo "ci_run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          {
+            echo "ci_status=${CONCLUSION}"
+            echo "ci_run_id=${RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "$CONCLUSION" = "success" ]; then
             echo "✅ CI is passing on main branch - no action needed" >> "$GITHUB_STEP_SUMMARY"
             echo "ci_needs_fix=false" >> "$GITHUB_OUTPUT"
           else
-            echo "❌ CI is failing on main branch - agent will attempt to fix" >> "$GITHUB_STEP_SUMMARY"
-            echo "Run ID: ${RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "❌ CI is failing on main branch - agent will attempt to fix"
+              echo "Run ID: ${RUN_ID}"
+            } >> "$GITHUB_STEP_SUMMARY"
             echo "ci_needs_fix=true" >> "$GITHUB_OUTPUT"
           fi
         env:

@@ -69,15 +69,19 @@ jobs:
           echo "Run ID: ${RUN_ID}"
           
           # Set outputs for use in other jobs
-          echo "ci_status=${CONCLUSION}" >> "$GITHUB_OUTPUT"
-          echo "ci_run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          {
+            echo "ci_status=${CONCLUSION}"
+            echo "ci_run_id=${RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
           
           if [ "$CONCLUSION" = "success" ]; then
             echo "✅ CI is passing on main branch - no action needed" >> "$GITHUB_STEP_SUMMARY"
             echo "ci_needs_fix=false" >> "$GITHUB_OUTPUT"
           else
-            echo "❌ CI is failing on main branch - agent will attempt to fix" >> "$GITHUB_STEP_SUMMARY"
-            echo "Run ID: ${RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "❌ CI is failing on main branch - agent will attempt to fix"
+              echo "Run ID: ${RUN_ID}"
+            } >> "$GITHUB_STEP_SUMMARY"
             echo "ci_needs_fix=true" >> "$GITHUB_OUTPUT"
           fi
 steps:
