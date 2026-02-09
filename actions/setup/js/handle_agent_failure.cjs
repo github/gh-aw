@@ -162,7 +162,7 @@ gh aw audit <run-id>
 ### Resources
 
 - [GitHub Agentic Workflows Documentation](https://github.com/github/gh-aw)
-- [Troubleshooting Guide](https://github.com/github/gh-aw/blob/main/docs/troubleshooting.md)
+- [Troubleshooting Guide](https://github.github.io/gh-aw/troubleshooting/common-issues/)
 
 ---
 
