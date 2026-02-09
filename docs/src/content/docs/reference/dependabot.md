@@ -49,6 +49,29 @@ git commit -m "chore: update @playwright/test to 1.42.0"
 git push
 ```
 
+### Handling Transitive Dependencies (MCP Servers)
+
+When Dependabot flags transitive dependencies (e.g., `@modelcontextprotocol/sdk`, `hono` from `@sentry/mcp-server`), update the **shared MCP configuration** instead:
+
+```bash
+# Locate the shared MCP config (e.g., .github/workflows/shared/mcp/sentry.md)
+# Update the version in the args array:
+# args: ["@sentry/mcp-server@0.27.0"] → args: ["@sentry/mcp-server@0.29.0"]
+
+# Regenerate manifests
+gh aw compile --dependabot
+
+# Regenerate package-lock.json to pick up transitive dependency updates
+cd .github/workflows && npm install --package-lock-only
+
+# Commit changes
+git add .github/workflows/
+git commit -m "chore: update @sentry/mcp-server to 0.29.0"
+git push
+```
+
+**Why?** The compiler generates `package.json` from MCP server configurations in workflow files. Directly editing `package.json` will be overwritten on next compilation.
+
 ## AI Agent Prompt Template
 
 ```markdown
