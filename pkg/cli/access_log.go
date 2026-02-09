@@ -157,11 +157,20 @@ func parseSquidLogLine(line string) (*AccessLogEntry, error) {
 func analyzeAccessLogs(runDir string, verbose bool) (*DomainAnalysis, error) {
 	accessLogLog.Printf("Analyzing access logs in: %s", runDir)
 
-	// Check for access log files in access.log directory
+	// Check for access log files in access.log directory (legacy path)
 	accessLogsDir := filepath.Join(runDir, "access.log")
 	if _, err := os.Stat(accessLogsDir); err == nil {
 		accessLogLog.Printf("Found access logs directory: %s", accessLogsDir)
 		return analyzeMultipleAccessLogs(accessLogsDir, verbose)
+	}
+
+	// Check for access logs in sandbox/firewall/logs/ directory (new path after artifact download)
+	// Firewall logs are uploaded from /tmp/gh-aw/sandbox/firewall/logs/ and the common parent
+	// /tmp/gh-aw/ is stripped during artifact upload, resulting in sandbox/firewall/logs/ after download
+	sandboxFirewallLogsDir := filepath.Join(runDir, "sandbox", "firewall", "logs")
+	if _, err := os.Stat(sandboxFirewallLogsDir); err == nil {
+		accessLogLog.Printf("Found firewall logs directory: %s", sandboxFirewallLogsDir)
+		return analyzeMultipleAccessLogs(sandboxFirewallLogsDir, verbose)
 	}
 
 	// No access logs found

@@ -237,3 +237,50 @@ func TestFirewallLogSummaryBuilding(t *testing.T) {
 		t.Error("workflow-1 not found in ByWorkflow")
 	}
 }
+
+// TestAnalyzeFirewallLogsFromSandboxPath tests that firewall logs can be found
+// in sandbox/firewall/logs/ directory (the path after artifact download)
+func TestAnalyzeFirewallLogsFromSandboxPath(t *testing.T) {
+// Create temp directory for test
+runDir := testutil.TempDir(t, "firewall-test-*")
+
+// Create sandbox/firewall/logs directory (path after artifact download)
+firewallLogsDir := filepath.Join(runDir, "sandbox", "firewall", "logs")
+err := os.MkdirAll(firewallLogsDir, 0755)
+if err != nil {
+t.Fatalf("should create sandbox/firewall/logs directory: %v", err)
+}
+
+// Create test firewall log file
+logContent := `# Firewall access log
+1701234567.123 172.30.0.20:35288 api.github.com:443 140.82.112.22:443 1.1 CONNECT 200 TCP_TUNNEL:HIER_DIRECT api.github.com:443 "-"
+1701234568.456 172.30.0.20:35289 api.npmjs.org:443 151.101.0.162:443 1.1 CONNECT 200 TCP_TUNNEL:HIER_DIRECT api.npmjs.org:443 "-"
+1701234569.789 172.30.0.20:35290 blocked.example.com:443 0.0.0.0:0 1.1 CONNECT 403 NONE_NONE:HIER_NONE blocked.example.com:443 "-"
+1701234570.012 172.30.0.20:35291 blocked.test.com:443 0.0.0.0:0 1.1 CONNECT 403 NONE_NONE:HIER_NONE blocked.test.com:443 "-"
+`
+logPath := filepath.Join(firewallLogsDir, "firewall-access.log")
+err = os.WriteFile(logPath, []byte(logContent), 0644)
+if err != nil {
+t.Fatalf("should write test firewall log: %v", err)
+}
+
+// Test the analysis
+analysis, err := analyzeFirewallLogs(runDir, true)
+if err != nil {
+t.Fatalf("analyzeFirewallLogs should succeed: %v", err)
+}
+if analysis == nil {
+t.Fatal("Analysis should not be nil")
+}
+
+// Verify results
+if analysis.TotalRequests != 4 {
+t.Errorf("TotalRequests: got %d, want 4", analysis.TotalRequests)
+}
+if analysis.AllowedRequests != 2 {
+t.Errorf("AllowedRequests: got %d, want 2", analysis.AllowedRequests)
+}
+if analysis.BlockedRequests != 2 {
+t.Errorf("BlockedRequests: got %d, want 2", analysis.BlockedRequests)
+}
+}

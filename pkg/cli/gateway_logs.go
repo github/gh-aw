@@ -80,12 +80,21 @@ type GatewayMetrics struct {
 
 // parseGatewayLogs parses a gateway.jsonl file and extracts metrics
 func parseGatewayLogs(logDir string, verbose bool) (*GatewayMetrics, error) {
+	// Try root directory first (for older logs where gateway.jsonl was in the root)
 	gatewayLogPath := filepath.Join(logDir, "gateway.jsonl")
 
-	// Check if gateway.jsonl exists
+	// Check if gateway.jsonl exists in root
 	if _, err := os.Stat(gatewayLogPath); os.IsNotExist(err) {
-		gatewayLogsLog.Printf("gateway.jsonl not found at: %s", gatewayLogPath)
-		return nil, fmt.Errorf("gateway.jsonl not found")
+		// Try mcp-logs subdirectory (new path after artifact download)
+		// Gateway logs are uploaded from /tmp/gh-aw/mcp-logs/gateway.jsonl and the common parent
+		// /tmp/gh-aw/ is stripped during artifact upload, resulting in mcp-logs/gateway.jsonl after download
+		mcpLogsPath := filepath.Join(logDir, "mcp-logs", "gateway.jsonl")
+		if _, err := os.Stat(mcpLogsPath); os.IsNotExist(err) {
+			gatewayLogsLog.Printf("gateway.jsonl not found at: %s or %s", gatewayLogPath, mcpLogsPath)
+			return nil, fmt.Errorf("gateway.jsonl not found")
+		}
+		gatewayLogPath = mcpLogsPath
+		gatewayLogsLog.Printf("Found gateway.jsonl in mcp-logs subdirectory")
 	}
 
 	gatewayLogsLog.Printf("Parsing gateway.jsonl from: %s", gatewayLogPath)
@@ -399,7 +408,19 @@ func extractMCPToolUsageData(logDir string, verbose bool) (*MCPToolUsageData, er
 	}
 
 	// Read gateway.jsonl again to get individual tool call records
+	// Try root directory first (for older logs where gateway.jsonl was in the root)
 	gatewayLogPath := filepath.Join(logDir, "gateway.jsonl")
+
+	// Check if gateway.jsonl exists in root
+	if _, err := os.Stat(gatewayLogPath); os.IsNotExist(err) {
+		// Try mcp-logs subdirectory (new path after artifact download)
+		mcpLogsPath := filepath.Join(logDir, "mcp-logs", "gateway.jsonl")
+		if _, err := os.Stat(mcpLogsPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("gateway.jsonl not found")
+		}
+		gatewayLogPath = mcpLogsPath
+	}
+
 	file, err := os.Open(gatewayLogPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open gateway.jsonl: %w", err)

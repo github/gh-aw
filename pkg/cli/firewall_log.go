@@ -311,7 +311,19 @@ func analyzeFirewallLogs(runDir string, verbose bool) (*FirewallAnalysis, error)
 	// Look for firewall logs in the run directory
 	// The logs could be in several locations depending on how they were uploaded
 
-	// First, check for directories starting with squid-logs or firewall-logs
+	// First, check for sandbox/firewall/logs/ directory (new path after artifact download)
+	// Firewall logs are uploaded from /tmp/gh-aw/sandbox/firewall/logs/ and the common parent
+	// /tmp/gh-aw/ is stripped during artifact upload, resulting in sandbox/firewall/logs/ after download
+	sandboxFirewallLogsDir := filepath.Join(runDir, "sandbox", "firewall", "logs")
+	if _, err := os.Stat(sandboxFirewallLogsDir); err == nil {
+		firewallLogLog.Printf("Found firewall logs directory: sandbox/firewall/logs")
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Found firewall logs directory: sandbox/firewall/logs"))
+		}
+		return analyzeMultipleFirewallLogs(sandboxFirewallLogsDir, verbose)
+	}
+
+	// Second, check for directories starting with squid-logs or firewall-logs (legacy paths)
 	// The actual directories may have workflow-specific suffixes like:
 	// - squid-logs-smoke-copilot-firewall
 	// - squid-logs-changeset-generator

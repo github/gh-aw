@@ -116,6 +116,24 @@ func TestAnalyzeAccessLogsDirectory(t *testing.T) {
 		require.NoError(t, err, "should not error when no logs present")
 		assert.Nil(t, analysis, "should return nil when no logs found")
 	})
+
+	t.Run("access logs in sandbox/firewall/logs/ (new path)", func(t *testing.T) {
+		// Test case 3: Access logs in sandbox/firewall/logs/ directory after artifact download
+		sandboxLogsDir := filepath.Join(tempDir, "run3", "sandbox", "firewall", "logs")
+		err := os.MkdirAll(sandboxLogsDir, 0755)
+		require.NoError(t, err, "should create sandbox/firewall/logs directory")
+
+		fetchLogContent := `1701234567.123    180 192.168.1.100 TCP_MISS/200 1234 GET http://example.com/api/data - HIER_DIRECT/93.184.216.34 text/html
+1701234568.456    250 192.168.1.100 TCP_HIT/200 5678 GET http://api.github.com/repos - HIER_DIRECT/140.82.112.6 application/json`
+		fetchLogPath := filepath.Join(sandboxLogsDir, "access-1.log")
+		err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0644)
+		require.NoError(t, err, "should create test access log in sandbox path")
+
+		analysis, err := analyzeAccessLogs(filepath.Join(tempDir, "run3"), false)
+		require.NoError(t, err, "should analyze access logs from sandbox path")
+		require.NotNil(t, analysis, "should return analysis for logs in sandbox path")
+		assert.Equal(t, 2, analysis.TotalRequests, "should count requests from sandbox path")
+	})
 }
 
 func TestExtractDomainFromURL(t *testing.T) {
