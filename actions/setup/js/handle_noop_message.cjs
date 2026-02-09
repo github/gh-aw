@@ -13,7 +13,7 @@ const { renderTemplate } = require("./messages_core.cjs");
  */
 async function ensureAgentRunsIssue() {
   const { owner, repo } = context.repo;
-  const parentTitle = "[agentic-workflows] No-Op Runs";
+  const parentTitle = "[agentics] No-Op Runs";
   const parentLabel = "agentic-workflows";
 
   core.info(`Searching for no-op runs issue: "${parentTitle}"`);

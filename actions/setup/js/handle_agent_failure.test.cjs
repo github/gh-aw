@@ -151,7 +151,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
 
       // Verify parent issue was searched for
       expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
-        q: expect.stringContaining('repo:test-owner/test-repo is:issue is:open label:agentic-workflows in:title "[agentic-workflows] Failed runs"'),
+        q: expect.stringContaining('repo:test-owner/test-repo is:issue is:open label:agentic-workflows in:title "[agentics] Failed runs"'),
         per_page: 1,
       });
 
@@ -159,7 +159,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(mockGithub.rest.issues.create).toHaveBeenCalledWith({
         owner: "test-owner",
         repo: "test-repo",
-        title: "[agentic-workflows] Failed runs",
+        title: "[agentics] Failed runs",
         body: expect.stringContaining("This issue tracks all failures from agentic workflows"),
         labels: ["agentic-workflows"],
       });
@@ -955,7 +955,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
 
       // Verify new parent issue was created with reference to old parent
       const newParentCall = mockGithub.rest.issues.create.mock.calls[0][0];
-      expect(newParentCall.title).toBe("[agentic-workflows] Failed runs");
+      expect(newParentCall.title).toBe("[agentics] Failed runs");
       expect(newParentCall.labels).toEqual(["agentic-workflows"]);
       expect(newParentCall.body).toContain("continuation parent issue");
       expect(newParentCall.body).toContain("previous parent issue #1");

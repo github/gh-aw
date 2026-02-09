@@ -169,13 +169,13 @@ describe("handle_noop_message", () => {
 
     // Verify search was performed
     expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
-      q: expect.stringContaining("[agentic-workflows] Agent runs"),
+      q: expect.stringContaining("[agentics] Agent runs"),
       per_page: 1,
     });
 
     // Verify issue was created with correct title
     const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
-    expect(createCall.title).toBe("[agentic-workflows] Agent runs");
+    expect(createCall.title).toBe("[agentics] Agent runs");
     expect(createCall.labels).toContain("agentic-workflows");
     expect(createCall.body).toContain("tracks all no-op runs");
 

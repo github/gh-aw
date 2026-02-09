@@ -28,7 +28,7 @@ async function main() {
   const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
   const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
 
-  const issueTitle = "[agentic-workflows] GitHub Actions needs permission to create pull requests";
+  const issueTitle = "[agentics] GitHub Actions needs permission to create pull requests";
 
   const issueBody =
     "## GitHub Actions Permission Required\n\n" +

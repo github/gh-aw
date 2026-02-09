@@ -213,13 +213,13 @@ These are successful outcomes, not failures, and help provide transparency into 
 
     // Verify search was performed
     expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
-      q: expect.stringContaining("[agentic-workflows] No-Op Runs"),
+      q: expect.stringContaining("[agentics] No-Op Runs"),
       per_page: 1,
     });
 
     // Verify issue was created with correct title
     const createCall = mockGithub.rest.issues.create.mock.calls[0][0];
-    expect(createCall.title).toBe("[agentic-workflows] No-Op Runs");
+    expect(createCall.title).toBe("[agentics] No-Op Runs");
     expect(createCall.labels).toContain("agentic-workflows");
     expect(createCall.body).toContain("tracks all no-op runs");
 

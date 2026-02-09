@@ -54,7 +54,7 @@ async function findPullRequestForCurrentBranch() {
  */
 async function ensureParentIssue(previousParentNumber = null) {
   const { owner, repo } = context.repo;
-  const parentTitle = "[agentic-workflows] Failed runs";
+  const parentTitle = "[agentics] Failed runs";
   const parentLabel = "agentic-workflows";
 
   core.info(`Searching for parent issue: "${parentTitle}"`);
