@@ -296,11 +296,6 @@ async function main(config = {}) {
     core.info("Append-only-comments is enabled - will not hide older comments");
   }
 
-  // Track state
-  let processedCount = 0;
-  const temporaryIdMap = new Map();
-  const createdComments = [];
-
   // Get workflow ID for hiding older comments
   const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
 
@@ -308,11 +303,22 @@ async function main(config = {}) {
    * Message handler function
    * @param {Object} message - The add_comment message
    * @param {Object} resolvedTemporaryIds - Resolved temporary IDs
+   * @param {Object} batchContext - Context object shared across all messages in a batch
    * @returns {Promise<Object>} Result
    */
-  return async function handleAddComment(message, resolvedTemporaryIds) {
-    // Check max limit
-    if (processedCount >= maxCount) {
+  return async function handleAddComment(message, resolvedTemporaryIds, batchContext = {}) {
+    // Initialize batch-local state on first access
+    if (!batchContext._addCommentState) {
+      batchContext._addCommentState = {
+        processedCount: 0,
+        temporaryIdMap: new Map(),
+        createdComments: [],
+      };
+    }
+    const state = batchContext._addCommentState;
+
+    // Check max limit using batch-local state
+    if (state.processedCount >= maxCount) {
       core.warning(`Skipping add_comment: max count of ${maxCount} reached`);
       return {
         success: false,
@@ -320,15 +326,15 @@ async function main(config = {}) {
       };
     }
 
-    processedCount++;
+    state.processedCount++;
 
     const item = message;
 
-    // Merge resolved temp IDs
+    // Merge resolved temp IDs into batch-local state
     if (resolvedTemporaryIds) {
       for (const [tempId, resolved] of Object.entries(resolvedTemporaryIds)) {
-        if (!temporaryIdMap.has(tempId)) {
-          temporaryIdMap.set(tempId, resolved);
+        if (!state.temporaryIdMap.has(tempId)) {
+          state.temporaryIdMap.set(tempId, resolved);
         }
       }
     }
@@ -405,8 +411,8 @@ async function main(config = {}) {
       }
     }
 
-    // Replace temporary ID references in body
-    let processedBody = replaceTemporaryIdReferences(item.body || "", temporaryIdMap, itemRepo);
+    // Replace temporary ID references in body using batch-local state
+    let processedBody = replaceTemporaryIdReferences(item.body || "", state.temporaryIdMap, itemRepo);
 
     // Add tracker ID and footer
     const trackerIDComment = getTrackerID("markdown");
@@ -486,7 +492,7 @@ async function main(config = {}) {
         },
       };
 
-      createdComments.push(commentResult);
+      state.createdComments.push(commentResult);
 
       return {
         success: true,
@@ -547,7 +553,7 @@ async function main(config = {}) {
             },
           };
 
-          createdComments.push(commentResult);
+          state.createdComments.push(commentResult);
 
           return {
             success: true,

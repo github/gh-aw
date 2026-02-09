@@ -212,6 +212,12 @@ async function processMessages(messageHandlers, messages) {
   /** @type {Array<{type: string, message: any, messageIndex: number, handler: Function}>} */
   const deferredMessages = [];
 
+  // Initialize batch context for per-batch state isolation
+  // This allows handlers to maintain state across all messages in a single batch
+  // while ensuring isolation between different workflow runs
+  /** @type {Object} */
+  const batchContext = {};
+
   core.info(`Processing ${messages.length} message(s) in order of appearance...`);
 
   // Process messages in order of appearance
@@ -263,8 +269,8 @@ async function processMessages(messageHandlers, messages) {
       // Record the temp ID map size before processing to detect new IDs
       const tempIdMapSizeBefore = temporaryIdMap.size;
 
-      // Call the message handler with the individual message and resolved temp IDs
-      const result = await messageHandler(message, resolvedTemporaryIds);
+      // Call the message handler with the individual message, resolved temp IDs, and batch context
+      const result = await messageHandler(message, resolvedTemporaryIds, batchContext);
 
       // Check if the handler explicitly returned a failure
       if (result && result.success === false && !result.deferred) {
@@ -385,8 +391,8 @@ async function processMessages(messageHandlers, messages) {
         // Record the temp ID map size before processing to detect new IDs
         const tempIdMapSizeBefore = temporaryIdMap.size;
 
-        // Call the handler again with updated temp ID map
-        const result = await deferred.handler(deferred.message, resolvedTemporaryIds);
+        // Call the handler again with updated temp ID map and batch context
+        const result = await deferred.handler(deferred.message, resolvedTemporaryIds, batchContext);
 
         // Check if the handler explicitly returned a failure
         if (result && result.success === false && !result.deferred) {
