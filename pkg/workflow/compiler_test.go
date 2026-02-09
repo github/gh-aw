@@ -242,7 +242,7 @@ engine: copilot
 			errorContains: "markdown content",
 		},
 		{
-			name: "workflow with mixed line endings",
+			name:        "workflow with mixed line endings",
 			fileContent: "---\r\non: push\r\nengine: copilot\r\n---\r\n\r\n# Test Workflow\r\n\r\nContent here.\r\n",
 			shouldError: false, // Should handle different line endings
 		},

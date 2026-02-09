@@ -117,7 +117,7 @@ func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, e
 	remoteLog.Printf("Using local file resolution for: %s", filePath)
 	// Regular path, resolve relative to base directory
 	fullPath := filepath.Join(baseDir, filePath)
-	
+
 	// Security check: ensure the resolved path is within the .github folder
 	// baseDir should be .github or a subdirectory within it
 	githubFolder := baseDir
@@ -130,18 +130,18 @@ func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, e
 			break
 		}
 	}
-	
+
 	// Normalize paths for comparison
 	normalizedGithubFolder := filepath.Clean(githubFolder)
 	normalizedFullPath := filepath.Clean(fullPath)
-	
+
 	// Check if fullPath is within githubFolder
 	relativePath, err := filepath.Rel(normalizedGithubFolder, normalizedFullPath)
 	if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || filepath.IsAbs(relativePath) {
 		remoteLog.Printf("Security: Path escapes .github folder: %s (resolves to: %s)", filePath, relativePath)
-		return "", fmt.Errorf("Security: Path %s must be within .github folder (resolves to: %s)", filePath, relativePath)
+		return "", fmt.Errorf("security: path %s must be within .github folder (resolves to: %s)", filePath, relativePath)
 	}
-	
+
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		remoteLog.Printf("Local file not found: %s", fullPath)
 		// Return a simple error that will be wrapped with source location by the caller
