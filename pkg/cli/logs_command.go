@@ -10,12 +10,10 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/sliceutil"
@@ -128,22 +126,11 @@ Examples:
 						workflowName = args[0]
 					} else {
 						// Neither workflow ID nor valid GitHub Actions workflow name
-						suggestions := []string{
-							fmt.Sprintf("Run '%s status' to see all available workflows", string(constants.CLIExtensionPrefix)),
-							"Check for typos in the workflow name",
-							"Use the workflow ID (e.g., 'test-claude') or GitHub Actions workflow name (e.g., 'Test Claude')",
-						}
-
-						// Add fuzzy match suggestions
-						similarNames := suggestWorkflowNames(args[0])
-						if len(similarNames) > 0 {
-							suggestions = append([]string{fmt.Sprintf("Did you mean: %s?", strings.Join(similarNames, ", "))}, suggestions...)
-						}
-
-						return errors.New(console.FormatErrorWithSuggestions(
-							fmt.Sprintf("workflow '%s' not found", args[0]),
-							suggestions,
-						))
+						// Don't error out - let the GitHub API call proceed
+						// If the workflow doesn't exist, GitHub will return 0 runs
+						// which results in a clean empty result (total_runs: 0)
+						logsCommandLog.Printf("Workflow name '%s' not found locally, proceeding with GitHub API query", args[0])
+						workflowName = args[0]
 					}
 				} else {
 					workflowName = resolvedName
