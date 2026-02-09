@@ -19,7 +19,6 @@ These are successful outcomes, not failures, and help provide transparency into 
 ### Resources
 
 - [GitHub Agentic Workflows Documentation](https://github.com/github/gh-aw)
-- [Safe Outputs Reference](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/safe-outputs.md)
 
 ---
 
