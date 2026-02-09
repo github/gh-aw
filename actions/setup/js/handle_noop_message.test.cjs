@@ -56,12 +56,12 @@ describe("handle_noop_message", () => {
   afterEach(() => {
     // Restore environment
     process.env = originalEnv;
-    
+
     // Clean up temp directory
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    
+
     vi.clearAllMocks();
   });
 
@@ -99,12 +99,15 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with noop + other outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [
-        { type: "noop", message: "No action needed" },
-        { type: "create_issue", title: "Some issue" },
-      ],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [
+          { type: "noop", message: "No action needed" },
+          { type: "create_issue", title: "Some issue" },
+        ],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     const { main } = await import("./handle_noop_message.cjs?t=" + Date.now());
@@ -122,9 +125,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "No updates needed" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "No updates needed" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock search to return no results
@@ -183,9 +189,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "Everything is up to date" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Everything is up to date" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock search to return existing issue
@@ -231,9 +240,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "No action required" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "No action required" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock existing issue
@@ -262,9 +274,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "All checks passed" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "All checks passed" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     // Mock no existing issue
@@ -290,9 +305,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "Done" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Done" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
@@ -316,9 +334,12 @@ describe("handle_noop_message", () => {
 
     // Create agent output file with only noop outputs
     const outputFile = path.join(tempDir, "agent_output.json");
-    fs.writeFileSync(outputFile, JSON.stringify({
-      items: [{ type: "noop", message: "Clean" }],
-    }));
+    fs.writeFileSync(
+      outputFile,
+      JSON.stringify({
+        items: [{ type: "noop", message: "Clean" }],
+      })
+    );
     process.env.GH_AW_AGENT_OUTPUT = outputFile;
 
     mockGithub.rest.search.issuesAndPullRequests.mockResolvedValue({
