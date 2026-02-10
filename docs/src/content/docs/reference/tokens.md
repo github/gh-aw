@@ -7,6 +7,34 @@ sidebar:
 
 GitHub Agentic Workflows authenticate using multiple tokens depending on the operation. This reference explains which token to use, when it's required, and how precedence works across different operations.
 
+## User vs. Org Ownership
+
+Ownership affects token requirements for repositories and Projects (v2). If the owner is your personal username, it is user-owned. If the owner is an organization, it is org-owned and managed with shared roles and access controls.
+
+To confirm ownership, check the owner name and avatar at the top of the page or in the URL (`github.com/owner-name/...`). Clicking the owner takes you to a personal profile or an organization page, which confirms it instantly.
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 1.5rem; margin: 2rem 0;">
+  <div class="gh-aw-video-wrapper">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/user-owned_dark.png">
+      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png">
+    </picture>
+    <div class="gh-aw-video-caption" role="note">
+      User-owned repository: avatar shows a personal profile icon, URL includes username
+    </div>
+  </div>
+
+  <div class="gh-aw-video-wrapper">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/org-owned_dark.png">
+      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png">
+    </picture>
+    <div class="gh-aw-video-caption" role="note">
+      Organization-owned repository: avatar shows organization icon, URL includes org name
+    </div>
+  </div>
+</div>
+
 ## Quick start: tokens you actually configure
 
 GitHub Actions always provides `GITHUB_TOKEN` for you automatically.
@@ -66,6 +94,19 @@ jobs:
 ```
 
 - For very sensitive tokens, prefer GitHub Environments or organization-level secrets with required reviewers so only trusted workflows can use them.
+
+### Distinguish user-owned vs organization-owned repos and Projects
+
+Token requirements often depend on who owns the repository or Project. You can tell by the URL:
+
+- User-owned repositories use a URL like `https://github.com/<username>/<repo>`
+- Organization-owned repositories use a URL like `https://github.com/<org>/<repo>`
+- User-owned Projects use a URL like `https://github.com/users/<username>/projects/<number>`
+- Organization-owned Projects use a URL like `https://github.com/orgs/<org>/projects/<number>`
+
+If the URL includes `/users/`, treat it as user-owned; `/orgs/` means organization-owned. In the UI, the avatar next to the repo or Project name matches the owner (person vs org), and the repo path (for example, `owner/repo`) shows whether the owner is a user or organization.
+
+
 
 ## Token Overview
 
