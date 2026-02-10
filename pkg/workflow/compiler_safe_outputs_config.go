@@ -102,6 +102,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.CreateIssues
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("allowed_labels", c.AllowedLabels).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfPositive("expires", c.Expires).
@@ -120,6 +121,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.AddComments
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddIfTrue("hide_older_comments", c.HideOlderComments).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
@@ -133,6 +135,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.CreateDiscussions
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("category", c.Category).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
 			AddStringSlice("labels", c.Labels).
@@ -152,6 +155,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.CloseIssues
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddStringSlice("required_labels", c.RequiredLabels).
 			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).
@@ -166,6 +170,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.CloseDiscussions
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddStringSlice("required_labels", c.RequiredLabels).
 			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).
@@ -180,6 +185,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.AddLabels
 		config := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("allowed", c.Allowed).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
@@ -201,6 +207,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.RemoveLabels
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("allowed", c.Allowed).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
@@ -214,6 +221,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateIssues
 		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target)
 		// Boolean pointer fields indicate which fields can be updated
 		if c.Status != nil {
@@ -237,6 +245,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateDiscussions
 		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target)
 		// Boolean pointer fields indicate which fields can be updated
 		if c.Title != nil {
@@ -261,6 +270,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.LinkSubIssue
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("parent_required_labels", c.ParentRequiredLabels).
 			AddIfNotEmpty("parent_title_prefix", c.ParentTitlePrefix).
 			AddStringSlice("sub_required_labels", c.SubRequiredLabels).
@@ -276,6 +286,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateRelease
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			Build()
 	},
 	"create_pull_request_review_comment": func(cfg *SafeOutputsConfig) map[string]any {
@@ -285,6 +296,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.CreatePullRequestReviewComments
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("side", c.Side).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
@@ -302,6 +314,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		}
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
 			AddStringSlice("labels", c.Labels).
 			AddBoolPtr("draft", c.Draft).
@@ -326,6 +339,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		}
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
 			AddStringSlice("labels", c.Labels).
@@ -342,6 +356,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdatePullRequests
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddBoolPtrOrDefault("allow_title", c.Title, true).
 			AddBoolPtrOrDefault("allow_body", c.Body, true).
@@ -357,6 +372,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.ClosePullRequests
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddIfNotEmpty("target", c.Target).
 			AddStringSlice("required_labels", c.RequiredLabels).
 			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).
@@ -371,6 +387,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.HideComment
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("allowed_reasons", c.AllowedReasons).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
@@ -383,6 +400,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.DispatchWorkflow
 		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			AddStringSlice("workflows", c.Workflows)
 
 		// Add workflow_files map if it has entries
@@ -399,6 +417,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.MissingTool
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			Build()
 	},
 	"missing_data": func(cfg *SafeOutputsConfig) map[string]any {
@@ -408,6 +427,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.MissingData
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("github-token", c.GitHubToken).
 			Build()
 	},
 	// Note: "noop" is intentionally NOT included here because it is always processed
