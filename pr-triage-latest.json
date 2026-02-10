@@ -1,34 +1,47 @@
 {
-  "run_date": "2026-02-09T18:25:23Z",
-  "run_id": "21836303013",
-  "total_prs_triaged": 2,
+  "run_date": "2026-02-10T00:45:00Z",
+  "run_id": "21846903380",
+  "total_prs_triaged": 4,
   "results": [
     {
-      "number": 14685,
-      "title": "[WIP] Create agentic workflow to address Dependabot Node.js issues",
-      "url": "https://github.com/github/gh-aw/pull/14685",
+      "number": 14701,
+      "title": "Fix API key masking timing vulnerability in MCP setup generation",
+      "url": "https://github.com/github/gh-aw/pull/14701",
       "author": "Copilot",
       "workflow": "manual",
       "draft": true,
-      "category": "chore",
-      "risk": "low",
-      "priority_score": 25,
-      "impact_score": 15,
-      "urgency_score": 5,
-      "quality_score": 5,
-      "action": "defer",
-      "rationale": {
-        "category": "Chore - Creating workflow automation for Dependabot",
-        "risk": "Low - WIP with 0 files changed yet, just planning phase",
-        "impact": "Low - Workflow automation for dependency management, indirect quality improvement",
-        "urgency": "Low - WIP created 1.5 hours ago, still in planning, no code changes yet",
-        "quality": "Poor - Draft with no code changes, minimal description, CI pending"
-      },
+      "category": "bug",
+      "risk": "high",
+      "priority_score": 82,
+      "impact_score": 48,
+      "urgency_score": 28,
+      "quality_score": 6,
+      "action": "fast_track",
       "ci_status": "pending",
-      "age_hours": 1.5,
-      "files_changed": 0,
-      "lines_changed": 0,
+      "age_hours": 0.4,
+      "files_changed": 100,
+      "lines_changed": 1093,
       "batch_id": null
+    },
+    {
+      "number": 14702,
+      "title": "[WIP] Add strict regex matching to slash commands",
+      "url": "https://github.com/github/gh-aw/pull/14702",
+      "author": "Copilot",
+      "workflow": "manual",
+      "draft": true,
+      "category": "test",
+      "risk": "low",
+      "priority_score": 41,
+      "impact_score": 25,
+      "urgency_score": 8,
+      "quality_score": 8,
+      "action": "batch_review",
+      "ci_status": "pending",
+      "age_hours": 0.3,
+      "files_changed": 20,
+      "lines_changed": 360,
+      "batch_id": "batch-test-001"
     },
     {
       "number": 14682,
@@ -38,57 +51,74 @@
       "workflow": "manual",
       "draft": true,
       "category": "test",
-      "risk": "low",
-      "priority_score": 55,
-      "impact_score": 30,
-      "urgency_score": 10,
-      "quality_score": 15,
+      "risk": "medium",
+      "priority_score": 39,
+      "impact_score": 25,
+      "urgency_score": 8,
+      "quality_score": 6,
       "action": "batch_review",
-      "rationale": {
-        "category": "Test - Adds test workflow for token failure validation",
-        "risk": "Low - Only adds test files, no production code changes",
-        "impact": "Medium - Quality improvement through better test coverage of failure paths (token validation for Projects v2)",
-        "urgency": "Medium - Test coverage gap for 2.5 hours, quality-focused change aligns with release mode",
-        "quality": "Good - Detailed description, comprehensive test cases documented, CI pending"
-      },
       "ci_status": "pending",
-      "age_hours": 2.5,
+      "age_hours": 8.8,
       "files_changed": 2,
       "lines_changed": 1471,
+      "batch_id": "batch-test-001"
+    },
+    {
+      "number": 14700,
+      "title": "Add git credentials cleanup step before agent execution",
+      "url": "https://github.com/github/gh-aw/pull/14700",
+      "author": "Copilot",
+      "workflow": "manual",
+      "draft": true,
+      "category": "chore",
+      "risk": "high",
+      "priority_score": 29,
+      "impact_score": 18,
+      "urgency_score": 5,
+      "quality_score": 6,
+      "action": "defer",
+      "ci_status": "pending",
+      "age_hours": 0.4,
+      "files_changed": 100,
+      "lines_changed": 200,
       "batch_id": null
     }
   ],
   "statistics": {
     "by_category": {
-      "test": 1,
-      "chore": 1,
-      "bug": 0,
-      "feature": 0,
-      "docs": 0,
-      "formatting": 0,
-      "refactor": 0
+      "test": 2,
+      "bug": 1,
+      "chore": 1
     },
     "by_risk": {
-      "low": 2,
-      "medium": 0,
-      "high": 0
+      "low": 1,
+      "medium": 1,
+      "high": 2
     },
     "by_priority": {
-      "high": 0,
-      "medium": 1,
+      "high": 1,
+      "medium": 2,
       "low": 1
     },
     "by_action": {
-      "auto_merge": 0,
-      "fast_track": 0,
-      "batch_review": 1,
+      "fast_track": 1,
+      "batch_review": 2,
       "defer": 1,
+      "auto_merge": 0,
       "close": 0
     }
   },
   "auto_merge_candidates": [],
-  "fast_track_needed": [],
-  "batches": {},
+  "fast_track_needed": [14701],
+  "batches": {
+    "batch-test-001": {
+      "pr_numbers": [14702, 14682],
+      "category": "test",
+      "risk": "low-medium",
+      "count": 2,
+      "description": "Test workflow additions - can be reviewed together"
+    }
+  },
   "close_candidates": [],
-  "notes": "Release mode: 2 PRs triaged. PR #14682 (test workflow) aligns with release mode quality focus - recommended for batch review. PR #14685 (WIP with no code) can be deferred. Excellent backlog health maintained."
+  "notes": "Release mode: 4 PRs triaged. PR #14701 (security fix) requires immediate fast-track review. PRs #14702 and #14682 batched for efficient review. PR #14700 deferred due to high risk/low priority combination."
 }
