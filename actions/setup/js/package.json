@@ -1,7 +1,7 @@
 {
   "devDependencies": {
     "@actions/core": "^3.0.0",
-    "@actions/exec": "^2.0.0",
+    "@actions/exec": "^3.0.0",
     "@actions/github": "^9.0.0",
     "@actions/github-script": "github:actions/github-script",
     "@actions/glob": "^0.6.1",
