@@ -22,6 +22,7 @@ timeout-minutes: 30
 
 tools:
   github:
+    lockdown: true
     toolsets: [default, pull_requests]
 
 if: needs.search_issues.outputs.has_issues == 'true'

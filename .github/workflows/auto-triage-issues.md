@@ -19,6 +19,7 @@ imports:
   - shared/reporting.md
 tools:
   github:
+    lockdown: true
     toolsets:
       - issues
   bash:
