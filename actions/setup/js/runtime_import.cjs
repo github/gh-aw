@@ -116,18 +116,52 @@ const ALLOWED_EXPRESSIONS = [
 function isSafeExpression(expr) {
   const trimmed = expr.trim();
 
+  // Block dangerous JavaScript built-in property names
+  const DANGEROUS_PROPS = [
+    "constructor",
+    "__proto__",
+    "prototype",
+    "__defineGetter__",
+    "__defineSetter__",
+    "__lookupGetter__",
+    "__lookupSetter__",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+    "toString",
+    "valueOf",
+    "toLocaleString",
+  ];
+
+  // Split expression into parts and check each for dangerous properties
+  // Handle both dot notation (e.g., "github.event.issue") and bracket notation (e.g., "release.assets[0].id")
+  const parts = trimmed.split(/[.\[\]]+/).filter(p => p && !/^\d+$/.test(p));
+
+  for (const part of parts) {
+    if (DANGEROUS_PROPS.includes(part)) {
+      return false; // Block dangerous property
+    }
+  }
+
   // Check exact match in allowed list
   if (ALLOWED_EXPRESSIONS.includes(trimmed)) {
     return true;
   }
 
   // Check if it matches dynamic patterns:
-  // - needs.* and steps.* (job dependencies and step outputs)
+  // - needs.* and steps.* (job dependencies and step outputs) - max depth 5 levels
   // - github.event.inputs.* (workflow_dispatch inputs)
   // - github.aw.inputs.* (shared workflow inputs)
   // - inputs.* (workflow_call inputs)
   // - env.* (environment variables)
-  const dynamicPatterns = [/^(needs|steps)\.[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)*$/, /^github\.event\.inputs\.[a-zA-Z0-9_-]+$/, /^github\.aw\.inputs\.[a-zA-Z0-9_-]+$/, /^inputs\.[a-zA-Z0-9_-]+$/, /^env\.[a-zA-Z0-9_-]+$/];
+  // Limit nesting depth to max 5 levels to prevent deep traversal attacks
+  const dynamicPatterns = [
+    /^(needs|steps)\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+){0,2}$/, // Max depth: needs.job.outputs.foo.bar (5 levels)
+    /^github\.event\.inputs\.[a-zA-Z0-9_-]+$/,
+    /^github\.aw\.inputs\.[a-zA-Z0-9_-]+$/,
+    /^inputs\.[a-zA-Z0-9_-]+$/,
+    /^env\.[a-zA-Z0-9_-]+$/,
+  ];
 
   for (const pattern of dynamicPatterns) {
     if (pattern.test(trimmed)) {
@@ -245,8 +279,13 @@ function evaluateExpression(expr) {
         inputs: context.payload?.inputs || {},
       };
 
+      // Freeze the evaluation context to prevent modification
+      Object.freeze(evalContext);
+      Object.freeze(evalContext.github);
+
       // Parse property access (e.g., "github.actor" -> ["github", "actor"])
       const parts = trimmed.split(".");
+      /** @type {any} */
       let value = evalContext;
 
       for (const part of parts) {
@@ -255,9 +294,27 @@ function evaluateExpression(expr) {
         if (arrayMatch) {
           const key = arrayMatch[1];
           const index = parseInt(arrayMatch[2], 10);
-          value = value?.[key]?.[index];
+          // Use Object.prototype.hasOwnProperty.call() to prevent prototype chain access
+          if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, key)) {
+            const arrayValue = value[key];
+            if (Array.isArray(arrayValue) && index >= 0 && index < arrayValue.length) {
+              value = arrayValue[index];
+            } else {
+              value = undefined;
+              break;
+            }
+          } else {
+            value = undefined;
+            break;
+          }
         } else {
-          value = value?.[part];
+          // Use Object.prototype.hasOwnProperty.call() to prevent prototype chain access
+          if (value && typeof value === "object" && Object.prototype.hasOwnProperty.call(value, part)) {
+            value = value[part];
+          } else {
+            value = undefined;
+            break;
+          }
         }
 
         if (value === undefined || value === null) {
