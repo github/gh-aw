@@ -995,7 +995,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Stale Repository Identifier"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "stale-repo-identifier"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🔍 *Analysis by [{workflow_name}]({run_url})*\",\"runStarted\":\"🔍 Stale Repository Identifier starting! [{workflow_name}]({run_url}) is analyzing repository activity...\",\"runSuccess\":\"✅ Analysis complete! [{workflow_name}]({run_url}) has finished analyzing stale repositories.\",\"runFailure\":\"⚠️ Analysis interrupted! [{workflow_name}]({run_url}) {status}.\"}"

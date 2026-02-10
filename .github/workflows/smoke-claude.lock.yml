@@ -1771,7 +1771,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Smoke Claude"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "smoke-claude"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 💥 *[THE END] — Illustrated by [{workflow_name}]({run_url})*\",\"runStarted\":\"💥 **WHOOSH!** [{workflow_name}]({run_url}) springs into action on this {event_type}! *[Panel 1 begins...]*\",\"runSuccess\":\"🎬 **THE END** — [{workflow_name}]({run_url}) **MISSION: ACCOMPLISHED!** The hero saves the day! ✨\",\"runFailure\":\"💫 **TO BE CONTINUED...** [{workflow_name}]({run_url}) {status}! Our hero faces unexpected challenges...\"}"

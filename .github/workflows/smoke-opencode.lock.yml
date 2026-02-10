@@ -1507,7 +1507,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Smoke OpenCode"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "smoke-opencode"
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🚀 *[Liftoff Complete] — Powered by [{workflow_name}]({run_url})*\",\"runStarted\":\"🚀 **IGNITION!** [{workflow_name}]({run_url}) launching for this {event_type}! *[T-minus counting...]*\",\"runSuccess\":\"🎯 **MISSION SUCCESS** — [{workflow_name}]({run_url}) **TARGET ACQUIRED!** All systems nominal! ✨\",\"runFailure\":\"⚠️ **MISSION ABORT...** [{workflow_name}]({run_url}) {status}! Houston, we have a problem...\"}"
         with:

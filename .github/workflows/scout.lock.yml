@@ -1059,7 +1059,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Scout"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "scout"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🔭 *Intelligence gathered by [{workflow_name}]({run_url})*\",\"runStarted\":\"🏕️ Scout on patrol! [{workflow_name}]({run_url}) is blazing trails through this {event_type}...\",\"runSuccess\":\"🔭 Recon complete! [{workflow_name}]({run_url}) has charted the territory. Map ready! 🗺️\",\"runFailure\":\"🏕️ Lost in the wilderness! [{workflow_name}]({run_url}) {status}. Sending search party...\"}"

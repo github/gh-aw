@@ -932,7 +932,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Dev Hawk"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "dev-hawk"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🦅 *Observed from above by [{workflow_name}]({run_url})*\",\"runStarted\":\"🦅 Dev Hawk circles the sky! [{workflow_name}]({run_url}) is monitoring this {event_type} from above...\",\"runSuccess\":\"🦅 Hawk eyes report! [{workflow_name}]({run_url}) has completed reconnaissance. Intel delivered! 🎯\",\"runFailure\":\"🦅 Hawk down! [{workflow_name}]({run_url}) {status}. The skies grow quiet...\"}"

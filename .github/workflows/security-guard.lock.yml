@@ -826,7 +826,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Security Guard Agent 🛡️"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "security-guard"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 🛡️ *Security posture analysis by [{workflow_name}]({run_url})*\",\"runStarted\":\"🔒 [{workflow_name}]({run_url}) is analyzing this pull request for security posture changes...\",\"runSuccess\":\"🛡️ [{workflow_name}]({run_url}) completed security posture analysis.\",\"runFailure\":\"⚠️ [{workflow_name}]({run_url}) {status} during security analysis.\"}"
