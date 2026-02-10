@@ -9,6 +9,7 @@ const { updateActivationComment } = require("./update_activation_comment.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { addExpirationComment } = require("./expiration_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
+const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
@@ -350,10 +351,11 @@ async function main(config = {}) {
       title = "Agent Output";
     }
 
-    // Apply title prefix from config
-    if (titlePrefix && !title.startsWith(titlePrefix)) {
-      title = titlePrefix + title;
-    }
+    // Sanitize title for Unicode security and remove any duplicate prefixes
+    title = sanitizeTitle(title, titlePrefix);
+
+    // Apply title prefix (only if it doesn't already exist)
+    title = applyTitlePrefix(title, titlePrefix);
 
     // Add AI disclaimer with workflow name and run url
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";

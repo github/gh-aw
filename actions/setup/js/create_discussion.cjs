@@ -9,6 +9,7 @@
 const HANDLER_TYPE = "create_discussion";
 
 const { getTrackerID } = require("./get_tracker_id.cjs");
+const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { parseAllowedRepos, getDefaultTargetRepo, validateRepo, parseRepoSlug } = require("./repo_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
@@ -343,9 +344,11 @@ async function main(config = {}) {
       title = item.body || "Discussion";
     }
 
-    if (titlePrefix && !title.startsWith(titlePrefix)) {
-      title = titlePrefix + title;
-    }
+    // Sanitize title for Unicode security and remove any duplicate prefixes
+    title = sanitizeTitle(title, titlePrefix);
+
+    // Apply title prefix (only if it doesn't already exist)
+    title = applyTitlePrefix(title, titlePrefix);
 
     // Build body
     let bodyLines = processedBody.split("\n");

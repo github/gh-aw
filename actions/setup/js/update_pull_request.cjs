@@ -11,6 +11,7 @@ const HANDLER_TYPE = "update_pull_request";
 const { updateBody } = require("./update_pr_description_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { createUpdateHandlerFactory } = require("./update_handler_factory.cjs");
+const { sanitizeTitle } = require("./sanitize_title.cjs");
 
 /**
  * Execute the pull request update API call
@@ -103,7 +104,8 @@ function buildPRUpdateData(item, config) {
   let hasUpdates = false;
 
   if (canUpdateTitle && item.title !== undefined) {
-    updateData.title = item.title;
+    // Sanitize title for Unicode security (no prefix handling needed for updates)
+    updateData.title = sanitizeTitle(item.title);
     hasUpdates = true;
   }
 

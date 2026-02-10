@@ -7,6 +7,7 @@
 
 const { isDiscussionContext, getDiscussionNumber } = require("./update_context_helpers.cjs");
 const { createUpdateHandlerFactory } = require("./update_handler_factory.cjs");
+const { sanitizeTitle } = require("./sanitize_title.cjs");
 
 /**
  * Execute the discussion update API call using GraphQL
@@ -126,7 +127,8 @@ function buildDiscussionUpdateData(item, config) {
   const updateData = {};
 
   if (item.title !== undefined) {
-    updateData.title = item.title;
+    // Sanitize title for Unicode security (no prefix handling needed for updates)
+    updateData.title = sanitizeTitle(item.title);
   }
   if (item.body !== undefined) {
     updateData.body = item.body;
