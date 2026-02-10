@@ -217,10 +217,10 @@ This test validates that command conditions are applied correctly based on event
 				// Check for strict matching patterns: startsWith or exact equality
 				startsWithPattern := "startsWith(github.event.issue.body, '/"
 				exactMatchPattern := "github.event.issue.body == '/"
-				
+
 				hasStartsWith := strings.Contains(lockContentStr, startsWithPattern)
 				hasExactMatch := strings.Contains(lockContentStr, exactMatchPattern)
-				
+
 				if !hasStartsWith && !hasExactMatch {
 					t.Errorf("Expected simple command condition with either startsWith or exact match, but found neither")
 				}
