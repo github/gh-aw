@@ -3,6 +3,7 @@ title: GitHub Tokens
 description: Comprehensive reference for all GitHub tokens used in gh-aw, including authentication, token precedence, and security best practices
 sidebar:
   order: 650
+disable-agentic-editing: true
 ---
 
 GitHub Agentic Workflows authenticate using multiple tokens depending on the operation. This reference explains which token to use, when it's required, and how precedence works across different operations.

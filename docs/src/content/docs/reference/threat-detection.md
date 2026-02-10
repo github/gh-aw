@@ -3,6 +3,7 @@ title: Threat Detection
 description: Configure automated threat detection to analyze agent output and code changes for security issues before they are applied.
 sidebar:
   order: 40
+disable-agentic-editing: true
 ---
 
 GitHub Agentic Workflows includes automatic threat detection to analyze agent output and code changes for potential security issues before they are applied. When safe outputs are configured, a threat detection job automatically runs to identify prompt injection attempts, secret leaks, and malicious code patches.
