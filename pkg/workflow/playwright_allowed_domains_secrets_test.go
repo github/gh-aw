@@ -131,15 +131,16 @@ Test no secrets in allowed_domains.
 					t.Errorf("Expected MCP config to contain %s but it didn't", tt.expectMCPConfigValue)
 				}
 
-				// Ensure the secret expression itself is NOT in the MCP config JSON
+				// Ensure the secret expression itself is NOT in the MCP gateway input
 				// (it should only be in env vars and redaction step)
-				mcpConfigStart := strings.Index(yamlContent, "cat > /home/runner/.copilot/mcp-config.json << EOF")
+				// The MCP config is now passed to start_mcp_gateway.sh via heredoc
+				mcpConfigStart := strings.Index(yamlContent, "cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh")
 				if mcpConfigStart != -1 {
-					mcpConfigEnd := strings.Index(yamlContent[mcpConfigStart:], "EOF\n")
+					mcpConfigEnd := strings.Index(yamlContent[mcpConfigStart:], "MCPCONFIG_EOF\n")
 					if mcpConfigEnd != -1 {
 						mcpConfig := yamlContent[mcpConfigStart : mcpConfigStart+mcpConfigEnd]
 						if strings.Contains(mcpConfig, "${{ secrets.") {
-							t.Errorf("MCP config should not contain secret expressions, found secret in config")
+							t.Errorf("MCP gateway input should not contain secret expressions, found secret in config")
 						}
 					}
 				}
