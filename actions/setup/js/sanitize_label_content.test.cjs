@@ -87,4 +87,38 @@ describe("sanitize_label_content.cjs", () => {
         expect(sanitizeLabelContent('  [31m@user[0m says <hello> & "goodbye"  ')).toBe("`@user` says hello  goodbye");
       }));
   });
+
+  describe("Unicode hardening for labels", () => {
+    it("should remove zero-width characters", () => {
+      expect(sanitizeLabelContent("bug\u200Blabel")).toBe("buglabel");
+      expect(sanitizeLabelContent("test\u200C\u200D\u2060label")).toBe("testlabel");
+    });
+
+    it("should convert full-width ASCII to normal ASCII", () => {
+      expect(sanitizeLabelContent("\uFF21\uFF22\uFF23")).toBe("ABC");
+      expect(sanitizeLabelContent("bug\uFF01")).toBe("bug!");
+    });
+
+    it("should remove directional override characters", () => {
+      expect(sanitizeLabelContent("label\u202Etest")).toBe("labeltest");
+      expect(sanitizeLabelContent("bug\u202A\u202B\u202Cfix")).toBe("bugfix");
+    });
+
+    it("should normalize Unicode characters (NFC)", () => {
+      const labelWithCombining = "cafe\u0301"; // café with combining accent
+      const result = sanitizeLabelContent(labelWithCombining);
+      expect(result).toBe("café");
+      expect(result.charCodeAt(3)).toBe(0x00e9); // Precomposed é
+    });
+
+    it("should handle combination of Unicode attacks in labels", () => {
+      const maliciousLabel = "\uFF42\u200Bug\u202E\uFEFF";
+      expect(sanitizeLabelContent(maliciousLabel)).toBe("bug");
+    });
+
+    it("should preserve emoji in labels", () => {
+      expect(sanitizeLabelContent("🐛 bug")).toBe("🐛 bug");
+      expect(sanitizeLabelContent("✨ enhancement")).toBe("✨ enhancement");
+    });
+  });
 });
