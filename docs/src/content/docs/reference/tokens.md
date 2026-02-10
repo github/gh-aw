@@ -97,17 +97,7 @@ jobs:
 
 ### Distinguish user-owned vs organization-owned repos and Projects
 
-Token requirements often depend on who owns the repository or Project. You can tell by the URL:
-
-- User-owned repositories use a URL like `https://github.com/<username>/<repo>`
-- Organization-owned repositories use a URL like `https://github.com/<org>/<repo>`
-- User-owned Projects use a URL like `https://github.com/users/<username>/projects/<number>`
-- Organization-owned Projects use a URL like `https://github.com/orgs/<org>/projects/<number>`
-
-If the URL includes `/users/`, treat it as user-owned; `/orgs/` means organization-owned. In the UI, the avatar next to the repo or Project name matches the owner (person vs org), and the repo path (for example, `owner/repo`) shows whether the owner is a user or organization.
-
-
-
+Token requirements often depend on who owns the repository or Project. See [User vs. Org Ownership](#user-vs-org-ownership) for how to tell whether a repo or Project is user-owned or organization-owned.
 ## Token Overview
 
 | Token | Type | Purpose | User Configurable |
