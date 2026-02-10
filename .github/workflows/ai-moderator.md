@@ -19,7 +19,6 @@ engine:
   model: gpt-5.1-codex-mini
 tools:
   github:
-    lockdown: true
     mode: local
     read-only: true
     toolsets: [default]
