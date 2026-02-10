@@ -399,9 +399,9 @@ Test workflow with script mode.
 		t.Error("Expected 'path: /tmp/gh-aw/actions-source' in checkout step for script mode")
 	}
 
-	// 3. Checkout should use shallow clone (depth: 1)
-	if !strings.Contains(lockStr, "depth: 1") {
-		t.Error("Expected 'depth: 1' in checkout step for script mode (shallow checkout)")
+	// 3. Checkout should use shallow clone (fetch-depth: 1)
+	if !strings.Contains(lockStr, "fetch-depth: 1") {
+		t.Error("Expected 'fetch-depth: 1' in checkout step for script mode (shallow checkout)")
 	}
 
 	// 4. Setup step should run bash script instead of using "uses:"
