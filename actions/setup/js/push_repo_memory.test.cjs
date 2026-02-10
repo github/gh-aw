@@ -998,9 +998,9 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
 
 describe("push_repo_memory.cjs - shell injection security tests", () => {
   describe("safe git command execution", () => {
-    it("should use spawnSync with args array instead of execSync with template strings", () => {
+    it("should use execGitSync helper from git_helpers.cjs", () => {
       // This test verifies the security fix for shell injection vulnerability
-      // The file should use spawnSync with command-args array, not execSync with string interpolation
+      // The file should use execGitSync helper which uses spawnSync with command-args array
 
       const fs = require("fs");
       const path = require("path");
@@ -1008,13 +1008,16 @@ describe("push_repo_memory.cjs - shell injection security tests", () => {
       const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
       const scriptContent = fs.readFileSync(scriptPath, "utf8");
 
-      // Should import spawnSync, not execSync
-      expect(scriptContent).toContain('const { spawnSync } = require("child_process")');
+      // Should import execGitSync from git_helpers, not use execSync or spawnSync directly
+      expect(scriptContent).toContain('const { execGitSync } = require("./git_helpers.cjs")');
       expect(scriptContent).not.toContain('const { execSync } = require("child_process")');
+      expect(scriptContent).not.toContain('const { spawnSync } = require("child_process")');
 
-      // Should have execGitSync helper function
-      expect(scriptContent).toContain("function execGitSync(args, options = {})");
-      expect(scriptContent).toContain('spawnSync("git", args,');
+      // Should NOT have local execGitSync function (moved to git_helpers.cjs)
+      expect(scriptContent).not.toContain("function execGitSync(args, options = {})");
+
+      // Should use execGitSync function calls
+      expect(scriptContent).toContain("execGitSync([");
     });
 
     it("should safely handle malicious branch names", () => {

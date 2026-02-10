@@ -3,34 +3,10 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 
 const { getBaseBranch } = require("./get_base_branch.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-
-/**
- * Safely execute git command using spawnSync with args array to prevent shell injection
- * @param {string[]} args - Git command arguments
- * @param {Object} options - Spawn options
- * @returns {string} Command output
- * @throws {Error} If command fails
- */
-function execGitSync(args, options = {}) {
-  const result = spawnSync("git", args, {
-    encoding: "utf8",
-    ...options,
-  });
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status !== 0) {
-    throw new Error(result.stderr || `Git command failed with status ${result.status}`);
-  }
-
-  return result.stdout;
-}
+const { execGitSync } = require("./git_helpers.cjs");
 
 /**
  * Generates a git patch file for the current changes
