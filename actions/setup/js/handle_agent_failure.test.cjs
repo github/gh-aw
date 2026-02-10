@@ -33,10 +33,8 @@ describe("handle_agent_failure.cjs", () => {
 Debug this workflow failure using the \`agentic-workflows\` agent:
 
 \`\`\`
-/agent agentic-workflows
-\`\`\`
-
-When prompted, instruct the agent to debug this workflow failure.`;
+/agent agentic-workflows debug the agentic workflow {workflow_id} failure in {run_id}
+\`\`\``;
       } else if (filePath.includes("agent_failure_comment.md")) {
         return `Agent job [{run_id}]({run_url}) failed.
 
@@ -81,6 +79,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
 
     // Set up environment
     process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+    process.env.GH_AW_WORKFLOW_ID = "agent";
     process.env.GH_AW_AGENT_CONCLUSION = "failure";
     process.env.GH_AW_RUN_URL = "https://github.com/test-owner/test-repo/actions/runs/123";
     process.env.GH_AW_WORKFLOW_SOURCE = "test-owner/test-repo/.github/workflows/test.md@main";
@@ -426,6 +425,7 @@ When prompted, instruct the agent to debug this workflow failure.`;
       expect(failureIssueCreateCall.body).not.toContain("## Root Cause");
       expect(failureIssueCreateCall.body).not.toContain("## Expected Outcome");
       expect(failureIssueCreateCall.body).toContain("Generated from [Test Workflow](https://github.com/test-owner/test-repo/actions/runs/123)");
+      expect(failureIssueCreateCall.body).toContain("debug the agentic workflow agent failure in 123");
 
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Created new issue #42"));
     });
