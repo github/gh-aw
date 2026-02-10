@@ -116,7 +116,8 @@ async function main() {
       // Branch doesn't exist, create orphan branch
       core.info(`Branch ${branchName} does not exist, creating orphan branch...`);
       execGitSync(["checkout", "--orphan", branchName], { stdio: "inherit" });
-      execGitSync(["rm", "-rf", "."], { stdio: "pipe" });
+      // Use --ignore-unmatch to avoid failure when directory is empty
+      execGitSync(["rm", "-r", "-f", "--ignore-unmatch", "."], { stdio: "pipe" });
       core.info(`Created orphan branch: ${branchName}`);
     }
   } catch (error) {

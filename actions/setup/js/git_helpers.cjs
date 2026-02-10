@@ -11,8 +11,17 @@ const { spawnSync } = require("child_process");
  * @throws {Error} If command fails
  */
 function execGitSync(args, options = {}) {
-  // Log the git command being executed for debugging
-  const gitCommand = `git ${args.join(" ")}`;
+  // Log the git command being executed for debugging (but redact credentials)
+  const gitCommand = `git ${args
+    .map(arg => {
+      // Redact credentials in URLs
+      if (typeof arg === "string" && arg.includes("://") && arg.includes("@")) {
+        return arg.replace(/(https?:\/\/)[^@]+@/, "$1***@");
+      }
+      return arg;
+    })
+    .join(" ")}`;
+
   if (typeof core !== "undefined" && core.debug) {
     core.debug(`Executing git command: ${gitCommand}`);
   }

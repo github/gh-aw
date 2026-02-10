@@ -62,9 +62,39 @@ describe("git_helpers.cjs", () => {
     it("should return stdout from successful commands", async () => {
       const { execGitSync } = await import("./git_helpers.cjs");
 
-      const result = execGitSync(["config", "--get-regexp", "^user\\."]);
+      // Use git --version which always succeeds
+      const result = execGitSync(["--version"]);
       expect(typeof result).toBe("string");
-      // Output should be a string (may be empty if no user config is set)
+      expect(result).toContain("git version");
+    });
+
+    it("should redact credentials from logged commands", async () => {
+      const { execGitSync } = await import("./git_helpers.cjs");
+
+      // Mock core.debug to capture logged output
+      const debugLogs = [];
+      const originalCore = global.core;
+      global.core = {
+        debug: msg => debugLogs.push(msg),
+        error: () => {},
+      };
+
+      try {
+        // Try a git command with a URL containing credentials (will fail but that's ok)
+        try {
+          execGitSync(["fetch", "https://user:token@github.com/repo.git", "main"]);
+        } catch (e) {
+          // Expected to fail, we're just checking the logging
+        }
+
+        // Check that credentials were redacted in the log
+        const fetchLog = debugLogs.find(log => log.includes("git fetch"));
+        expect(fetchLog).toBeDefined();
+        expect(fetchLog).toContain("https://***@github.com/repo.git");
+        expect(fetchLog).not.toContain("user:token");
+      } finally {
+        global.core = originalCore;
+      }
     });
   });
 });
