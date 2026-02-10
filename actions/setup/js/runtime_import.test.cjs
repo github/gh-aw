@@ -8,8 +8,9 @@ const { processRuntimeImports, processRuntimeImport, hasFrontMatter, removeXMLCo
 describe("runtime_import", () => {
   let tempDir;
   let githubDir;
+  let workflowsDir;
   (beforeEach(() => {
-    ((tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-import-test-"))), (githubDir = path.join(tempDir, ".github")), fs.mkdirSync(githubDir, { recursive: true }), vi.clearAllMocks());
+    ((tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-import-test-"))), (githubDir = path.join(tempDir, ".github")), (workflowsDir = path.join(githubDir, "workflows")), fs.mkdirSync(workflowsDir, { recursive: true }), vi.clearAllMocks());
   }),
     afterEach(() => {
       tempDir && fs.existsSync(tempDir) && fs.rmSync(tempDir, { recursive: !0, force: !0 });
@@ -293,7 +294,7 @@ describe("runtime_import", () => {
     describe("processRuntimeImport", () => {
       (it("should read and return file content", async () => {
         const content = "# Test Content\n\nThis is a test.";
-        fs.writeFileSync(path.join(githubDir, "test.md"), content);
+        fs.writeFileSync(path.join(workflowsDir, "test.md"), content);
         const result = await processRuntimeImport("test.md", !1, tempDir);
         expect(result).toBe(content);
       }),
@@ -306,7 +307,7 @@ describe("runtime_import", () => {
         }),
         it("should remove front matter and warn", async () => {
           const filepath = "with-frontmatter.md";
-          fs.writeFileSync(path.join(githubDir, filepath), "---\ntitle: Test\nkey: value\n---\n\n# Content\n\nActual content.");
+          fs.writeFileSync(path.join(workflowsDir, filepath), "---\ntitle: Test\nkey: value\n---\n\n# Content\n\nActual content.");
           const result = await processRuntimeImport(filepath, !1, tempDir);
           (expect(result).toContain("# Content"),
             expect(result).toContain("Actual content."),
@@ -314,7 +315,7 @@ describe("runtime_import", () => {
             expect(core.warning).toHaveBeenCalledWith(`File ${filepath} contains front matter which will be ignored in runtime import`));
         }),
         it("should remove XML comments", async () => {
-          fs.writeFileSync(path.join(githubDir, "with-comments.md"), "# Title\n\n\x3c!-- This is a comment --\x3e\n\nContent here.");
+          fs.writeFileSync(path.join(workflowsDir, "with-comments.md"), "# Title\n\n\x3c!-- This is a comment --\x3e\n\nContent here.");
           const result = await processRuntimeImport("with-comments.md", !1, tempDir);
           (expect(result).toContain("# Title"), expect(result).toContain("Content here."), expect(result).not.toContain("\x3c!-- This is a comment --\x3e"));
         }),
@@ -329,48 +330,56 @@ describe("runtime_import", () => {
             workflow: "test-workflow",
             payload: {},
           };
-          fs.writeFileSync(path.join(githubDir, "with-macros.md"), "# Title\n\nActor: ${{ github.actor }}\n");
+          fs.writeFileSync(path.join(workflowsDir, "with-macros.md"), "# Title\n\nActor: ${{ github.actor }}\n");
           const result = await processRuntimeImport("with-macros.md", !1, tempDir);
           expect(result).toContain("# Title");
           expect(result).toContain("Actor: testuser");
           delete global.context;
         }),
         it("should reject unsafe GitHub Actions expressions", async () => {
-          fs.writeFileSync(path.join(githubDir, "unsafe-macros.md"), "Secret: ${{ secrets.TOKEN }}\n");
+          fs.writeFileSync(path.join(workflowsDir, "unsafe-macros.md"), "Secret: ${{ secrets.TOKEN }}\n");
           await expect(processRuntimeImport("unsafe-macros.md", !1, tempDir)).rejects.toThrow("unauthorized GitHub Actions expressions");
         }),
         it("should handle file in subdirectory", async () => {
-          const subdir = path.join(githubDir, "subdir");
-          (fs.mkdirSync(subdir), fs.writeFileSync(path.join(githubDir, "subdir/test.md"), "Subdirectory content"));
+          const subdir = path.join(workflowsDir, "subdir");
+          (fs.mkdirSync(subdir), fs.writeFileSync(path.join(workflowsDir, "subdir/test.md"), "Subdirectory content"));
           const result = await processRuntimeImport("subdir/test.md", !1, tempDir);
           expect(result).toBe("Subdirectory content");
         }),
         it("should handle empty file", async () => {
-          fs.writeFileSync(path.join(githubDir, "empty.md"), "");
+          fs.writeFileSync(path.join(workflowsDir, "empty.md"), "");
           const result = await processRuntimeImport("empty.md", !1, tempDir);
           expect(result).toBe("");
         }),
         it("should handle file with only front matter", async () => {
-          fs.writeFileSync(path.join(githubDir, "only-frontmatter.md"), "---\ntitle: Test\n---\n");
+          fs.writeFileSync(path.join(workflowsDir, "only-frontmatter.md"), "---\ntitle: Test\n---\n");
           const result = await processRuntimeImport("only-frontmatter.md", !1, tempDir);
           expect(result.trim()).toBe("");
         }),
         it("should allow template conditionals", async () => {
           const content = "{{#if condition}}content{{/if}}";
-          fs.writeFileSync(path.join(githubDir, "with-conditionals.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "with-conditionals.md"), content);
           const result = await processRuntimeImport("with-conditionals.md", !1, tempDir);
           expect(result).toBe(content);
         }),
-        it("should support .github/ prefix in path", async () => {
-          const content = "Test with .github prefix";
-          fs.writeFileSync(path.join(githubDir, "test-prefix.md"), content);
-          const result = await processRuntimeImport(".github/test-prefix.md", !1, tempDir);
+        it("should support .github/workflows/ prefix in path", async () => {
+          const content = "Test with .github/workflows prefix";
+          fs.writeFileSync(path.join(workflowsDir, "test-prefix.md"), content);
+          const result = await processRuntimeImport(".github/workflows/test-prefix.md", !1, tempDir);
           expect(result).toBe(content);
         }),
-        it("should work without .github/ prefix", async () => {
+        it("should work without prefix (resolves to workflows/)", async () => {
           const content = "Test without prefix";
-          fs.writeFileSync(path.join(githubDir, "test-no-prefix.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test-no-prefix.md"), content);
           const result = await processRuntimeImport("test-no-prefix.md", !1, tempDir);
+          expect(result).toBe(content);
+        }),
+        it("should support .actions/ prefix", async () => {
+          const actionsDir = path.join(githubDir, "actions");
+          fs.mkdirSync(actionsDir, { recursive: true });
+          const content = "Test with .actions prefix";
+          fs.writeFileSync(path.join(actionsDir, "test-action.md"), content);
+          const result = await processRuntimeImport(".actions/test-action.md", !1, tempDir);
           expect(result).toBe(content);
         }),
         it("should reject paths outside .github folder", async () => {
@@ -381,17 +390,17 @@ describe("runtime_import", () => {
     }),
     describe("processRuntimeImports", () => {
       (it("should process single runtime-import macro", async () => {
-        fs.writeFileSync(path.join(githubDir, "import.md"), "Imported content");
+        fs.writeFileSync(path.join(workflowsDir, "import.md"), "Imported content");
         const result = await processRuntimeImports("Before\n{{#runtime-import import.md}}\nAfter", tempDir);
         expect(result).toBe("Before\nImported content\nAfter");
       }),
         it("should process optional runtime-import macro", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Imported content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Imported content");
           const result = await processRuntimeImports("Before\n{{#runtime-import? import.md}}\nAfter", tempDir);
           expect(result).toBe("Before\nImported content\nAfter");
         }),
         it("should process multiple runtime-import macros", async () => {
-          (fs.writeFileSync(path.join(githubDir, "import1.md"), "Content 1"), fs.writeFileSync(path.join(githubDir, "import2.md"), "Content 2"));
+          (fs.writeFileSync(path.join(workflowsDir, "import1.md"), "Content 1"), fs.writeFileSync(path.join(workflowsDir, "import2.md"), "Content 2"));
           const result = await processRuntimeImports("{{#runtime-import import1.md}}\nMiddle\n{{#runtime-import import2.md}}", tempDir);
           expect(result).toBe("Content 1\nMiddle\nContent 2");
         }),
@@ -407,59 +416,59 @@ describe("runtime_import", () => {
           expect(result).toBe("No imports here");
         }),
         it("should reuse cached content for duplicate imports", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content");
           const result = await processRuntimeImports("{{#runtime-import import.md}}\n{{#runtime-import import.md}}", tempDir);
           expect(result).toBe("Content\nContent");
           expect(core.info).toHaveBeenCalledWith("Reusing cached content for import.md");
         }),
         it("should handle macros with extra whitespace", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content");
           const result = await processRuntimeImports("{{#runtime-import    import.md    }}", tempDir);
           expect(result).toBe("Content");
         }),
         it("should handle inline macros", async () => {
-          fs.writeFileSync(path.join(githubDir, "inline.md"), "inline content");
+          fs.writeFileSync(path.join(workflowsDir, "inline.md"), "inline content");
           const result = await processRuntimeImports("Before {{#runtime-import inline.md}} after", tempDir);
           expect(result).toBe("Before inline content after");
         }),
         it("should process imports with files containing special characters", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Content with $pecial ch@racters!");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content with $pecial ch@racters!");
           const result = await processRuntimeImports("{{#runtime-import import.md}}", tempDir);
           expect(result).toBe("Content with $pecial ch@racters!");
         }),
         it("should remove XML comments from imported content", async () => {
-          fs.writeFileSync(path.join(githubDir, "with-comment.md"), "Text \x3c!-- comment --\x3e more text");
+          fs.writeFileSync(path.join(workflowsDir, "with-comment.md"), "Text \x3c!-- comment --\x3e more text");
           const result = await processRuntimeImports("{{#runtime-import with-comment.md}}", tempDir);
           expect(result).toBe("Text  more text");
         }),
         it("should handle path with subdirectories", async () => {
-          const subdir = path.join(githubDir, "docs", "shared");
-          (fs.mkdirSync(subdir, { recursive: !0 }), fs.writeFileSync(path.join(githubDir, "docs/shared/import.md"), "Subdir content"));
+          const subdir = path.join(workflowsDir, "docs", "shared");
+          (fs.mkdirSync(subdir, { recursive: !0 }), fs.writeFileSync(path.join(workflowsDir, "docs/shared/import.md"), "Subdir content"));
           const result = await processRuntimeImports("{{#runtime-import docs/shared/import.md}}", tempDir);
           expect(result).toBe("Subdir content");
         }),
         it("should preserve newlines around imports", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content");
           const result = await processRuntimeImports("Line 1\n\n{{#runtime-import import.md}}\n\nLine 2", tempDir);
           expect(result).toBe("Line 1\n\nContent\n\nLine 2");
         }),
         it("should handle multiple consecutive imports", async () => {
-          (fs.writeFileSync(path.join(githubDir, "import1.md"), "Content 1"), fs.writeFileSync(path.join(githubDir, "import2.md"), "Content 2"));
+          (fs.writeFileSync(path.join(workflowsDir, "import1.md"), "Content 1"), fs.writeFileSync(path.join(workflowsDir, "import2.md"), "Content 2"));
           const result = await processRuntimeImports("{{#runtime-import import1.md}}{{#runtime-import import2.md}}", tempDir);
           expect(result).toBe("Content 1Content 2");
         }),
         it("should handle imports at the start of content", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Start content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Start content");
           const result = await processRuntimeImports("{{#runtime-import import.md}}\nFollowing text", tempDir);
           expect(result).toBe("Start content\nFollowing text");
         }),
         it("should handle imports at the end of content", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "End content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "End content");
           const result = await processRuntimeImports("Preceding text\n{{#runtime-import import.md}}", tempDir);
           expect(result).toBe("Preceding text\nEnd content");
         }),
         it("should handle tab characters in macro", async () => {
-          fs.writeFileSync(path.join(githubDir, "import.md"), "Content");
+          fs.writeFileSync(path.join(workflowsDir, "import.md"), "Content");
           const result = await processRuntimeImports("{{#runtime-import\timport.md}}", tempDir);
           expect(result).toBe("Content");
         }));
@@ -467,18 +476,18 @@ describe("runtime_import", () => {
     describe("Edge Cases", () => {
       (it("should handle very large files", async () => {
         const largeContent = "x".repeat(1e5);
-        fs.writeFileSync(path.join(githubDir, "large.md"), largeContent);
+        fs.writeFileSync(path.join(workflowsDir, "large.md"), largeContent);
         const result = await processRuntimeImports("{{#runtime-import large.md}}", tempDir);
         expect(result).toBe(largeContent);
       }),
         it("should handle files with unicode characters", async () => {
-          fs.writeFileSync(path.join(githubDir, "unicode.md"), "Hello 世界 🌍 café", "utf8");
+          fs.writeFileSync(path.join(workflowsDir, "unicode.md"), "Hello 世界 🌍 café", "utf8");
           const result = await processRuntimeImports("{{#runtime-import unicode.md}}", tempDir);
           expect(result).toBe("Hello 世界 🌍 café");
         }),
         it("should handle files with various line endings", async () => {
           const content = "Line 1\nLine 2\r\nLine 3\rLine 4";
-          fs.writeFileSync(path.join(githubDir, "mixed-lines.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "mixed-lines.md"), content);
           const result = await processRuntimeImports("{{#runtime-import mixed-lines.md}}", tempDir);
           expect(result).toBe(content);
         }),
@@ -488,14 +497,14 @@ describe("runtime_import", () => {
           expect(result).toBe(content);
         }),
         it("should handle front matter with varying formats", async () => {
-          fs.writeFileSync(path.join(githubDir, "yaml-frontmatter.md"), "---\ntitle: Test\narray:\n  - item1\n  - item2\n---\n\nBody content");
+          fs.writeFileSync(path.join(workflowsDir, "yaml-frontmatter.md"), "---\ntitle: Test\narray:\n  - item1\n  - item2\n---\n\nBody content");
           const result = await processRuntimeImport("yaml-frontmatter.md", !1, tempDir);
           (expect(result).toContain("Body content"), expect(result).not.toContain("array:"), expect(result).not.toContain("item1"));
         }));
     }),
     describe("Error Handling", () => {
       (it("should provide clear error for unsafe GitHub Actions expressions", async () => {
-        fs.writeFileSync(path.join(githubDir, "bad.md"), "${{ secrets.TOKEN }}");
+        fs.writeFileSync(path.join(workflowsDir, "bad.md"), "${{ secrets.TOKEN }}");
         await expect(processRuntimeImports("{{#runtime-import bad.md}}", tempDir)).rejects.toThrow("unauthorized GitHub Actions expressions");
       }),
         it("should provide clear error for missing required files", async () => {
@@ -512,8 +521,8 @@ describe("runtime_import", () => {
           await expect(processRuntimeImport("../../etc/passwd", !1, tempDir)).rejects.toThrow("Security: Path ../../etc/passwd must be within .github folder");
         }),
         it("should allow valid path within .github folder", async () => {
-          // Create a subdirectory structure within .github
-          const subdir = path.join(githubDir, "subdir");
+          // Create a subdirectory structure within workflows
+          const subdir = path.join(workflowsDir, "subdir");
           fs.mkdirSync(subdir, { recursive: !0 });
           fs.writeFileSync(path.join(subdir, "subfile.txt"), "Sub content");
 
@@ -521,19 +530,19 @@ describe("runtime_import", () => {
           const result = await processRuntimeImport("subdir/subfile.txt", !1, tempDir);
           expect(result).toBe("Sub content");
         }),
-        it("should allow ./path within .github folder", async () => {
-          fs.writeFileSync(path.join(githubDir, "test.txt"), "Test content");
+        it("should allow ./path within workflows folder", async () => {
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), "Test content");
           const result = await processRuntimeImport("./test.txt", !1, tempDir);
           expect(result).toBe("Test content");
         }),
         it("should normalize paths with redundant separators", async () => {
-          fs.writeFileSync(path.join(githubDir, "test.txt"), "Test content");
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), "Test content");
           const result = await processRuntimeImport("./././test.txt", !1, tempDir);
           expect(result).toBe("Test content");
         }),
-        it("should allow nested paths that stay within .github folder", async () => {
-          // Create nested directory structure within .github
-          const dirA = path.join(githubDir, "a");
+        it("should allow nested paths that stay within workflows folder", async () => {
+          // Create nested directory structure within workflows
+          const dirA = path.join(workflowsDir, "a");
           const dirB = path.join(dirA, "b");
           fs.mkdirSync(dirB, { recursive: !0 });
           fs.writeFileSync(path.join(dirB, "file.txt"), "Nested content");
@@ -552,37 +561,37 @@ describe("runtime_import", () => {
     describe("processRuntimeImport with line ranges", () => {
       (it("should extract specific line range", async () => {
         const content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
-        fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+        fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
         const result = await processRuntimeImport("test.txt", !1, tempDir, 2, 4);
         expect(result).toBe("Line 2\nLine 3\nLine 4");
       }),
         it("should extract single line", async () => {
           const content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
-          fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
           const result = await processRuntimeImport("test.txt", !1, tempDir, 3, 3);
           expect(result).toBe("Line 3");
         }),
         it("should extract from start line to end of file", async () => {
           const content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
-          fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
           const result = await processRuntimeImport("test.txt", !1, tempDir, 3, 5);
           expect(result).toBe("Line 3\nLine 4\nLine 5");
         }),
         it("should throw error for invalid start line", async () => {
           const content = "Line 1\nLine 2\nLine 3";
-          fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
           await expect(processRuntimeImport("test.txt", !1, tempDir, 0, 2)).rejects.toThrow("Invalid start line 0");
           await expect(processRuntimeImport("test.txt", !1, tempDir, 10, 12)).rejects.toThrow("Invalid start line 10");
         }),
         it("should throw error for invalid end line", async () => {
           const content = "Line 1\nLine 2\nLine 3";
-          fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
           await expect(processRuntimeImport("test.txt", !1, tempDir, 1, 0)).rejects.toThrow("Invalid end line 0");
           await expect(processRuntimeImport("test.txt", !1, tempDir, 1, 10)).rejects.toThrow("Invalid end line 10");
         }),
         it("should throw error when start line > end line", async () => {
           const content = "Line 1\nLine 2\nLine 3";
-          fs.writeFileSync(path.join(githubDir, "test.txt"), content);
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), content);
           await expect(processRuntimeImport("test.txt", !1, tempDir, 3, 1)).rejects.toThrow("Start line 3 cannot be greater than end line 1");
         }),
         it("should handle line range with front matter", async () => {
@@ -592,7 +601,7 @@ describe("runtime_import", () => {
           // Line 3: ---
           // Line 4: (empty)
           // Line 5: Line 1
-          fs.writeFileSync(path.join(githubDir, filepath), "---\ntitle: Test\n---\n\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5");
+          fs.writeFileSync(path.join(workflowsDir, filepath), "---\ntitle: Test\n---\n\nLine 1\nLine 2\nLine 3\nLine 4\nLine 5");
           const result = await processRuntimeImport(filepath, !1, tempDir, 2, 4);
           // Lines 2-4 of raw file are: "title: Test", "---", ""
           // After front matter removal, these lines are part of front matter so they get removed
@@ -602,12 +611,12 @@ describe("runtime_import", () => {
     }),
     describe("processRuntimeImports with line ranges from macros", () => {
       (it("should process {{#runtime-import path:line-line}} macro", async () => {
-        fs.writeFileSync(path.join(githubDir, "test.txt"), "Line 1\nLine 2\nLine 3\nLine 4\nLine 5");
+        fs.writeFileSync(path.join(workflowsDir, "test.txt"), "Line 1\nLine 2\nLine 3\nLine 4\nLine 5");
         const result = await processRuntimeImports("Content: {{#runtime-import test.txt:2-4}} end", tempDir);
         expect(result).toBe("Content: Line 2\nLine 3\nLine 4 end");
       }),
         it("should process multiple {{#runtime-import path:line-line}} macros", async () => {
-          fs.writeFileSync(path.join(githubDir, "test.txt"), "Line 1\nLine 2\nLine 3\nLine 4\nLine 5");
+          fs.writeFileSync(path.join(workflowsDir, "test.txt"), "Line 1\nLine 2\nLine 3\nLine 4\nLine 5");
           const result = await processRuntimeImports("First: {{#runtime-import test.txt:1-2}} Second: {{#runtime-import test.txt:4-5}}", tempDir);
           expect(result).toBe("First: Line 1\nLine 2 Second: Line 4\nLine 5");
         }));

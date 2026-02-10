@@ -694,6 +694,10 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     filepath = filepath.substring(8); // Remove ".github/"
   } else if (filepath.startsWith(".github\\")) {
     filepath = filepath.substring(8); // Remove ".github\" (Windows)
+  } else if (!filepath.startsWith(".actions/") && !filepath.startsWith(".actions\\")) {
+    // If path doesn't start with .github or .actions, prefix with workflows/
+    // This makes imports like "a.md" resolve to ".github/workflows/a.md"
+    filepath = path.join("workflows", filepath);
   }
 
   // Remove leading ./ or ../ if present
