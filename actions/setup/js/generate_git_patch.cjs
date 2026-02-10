@@ -5,10 +5,45 @@ const fs = require("fs");
 const path = require("path");
 const { promisify } = require("util");
 const { exec: execCallback } = require("child_process");
-const exec = promisify(execCallback);
 
 const { getBaseBranch } = require("./get_base_branch.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+
+/**
+ * Execute a git command - works in both github-script and MCP server contexts
+ * @param {string} command - The git command to execute
+ * @param {Object} options - Options including cwd
+ * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>} The result
+ */
+async function execGit(command, options = {}) {
+  const { cwd } = options;
+
+  // When running in github-script context, exec is available as a global
+  if (typeof exec !== "undefined" && exec.getExecOutput) {
+    const args = command.split(" ");
+    const cmd = args[0];
+    const cmdArgs = args.slice(1);
+    const result = await exec.getExecOutput(cmd, cmdArgs, { cwd, ignoreReturnCode: true });
+    if (result.exitCode !== 0) {
+      const error = new Error(`Command failed: ${command}`);
+      // @ts-ignore - Adding exitCode property to Error
+      error.exitCode = result.exitCode;
+      throw error;
+    }
+    return result;
+  }
+
+  // Fallback to promisified child_process.exec for MCP server context
+  const execAsync = promisify(execCallback);
+  try {
+    const result = await execAsync(command, { cwd });
+    return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
+  } catch (error) {
+    // @ts-ignore - Adding exitCode property to Error
+    error.exitCode = error.code || 1;
+    throw error;
+  }
+}
 
 /**
  * Generates a git patch file for the current changes
@@ -36,7 +71,7 @@ async function generateGitPatch(branchName) {
       // Check if the branch exists locally
       try {
         try {
-          await exec(`git show-ref --verify --quiet refs/heads/${branchName}`, { cwd });
+          await execGit(`git show-ref --verify --quiet refs/heads/${branchName}`, { cwd });
         } catch (showRefError) {
           // Branch doesn't exist, skip to strategy 2
           throw showRefError;
@@ -46,22 +81,22 @@ async function generateGitPatch(branchName) {
         let baseRef;
         try {
           // Check if origin/branchName exists
-          await exec(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, { cwd });
+          await execGit(`git show-ref --verify --quiet refs/remotes/origin/${branchName}`, { cwd });
           baseRef = `origin/${branchName}`;
         } catch {
           // Use merge-base with default branch
-          await exec(`git fetch origin ${defaultBranch}`, { cwd });
-          const mergeBaseResult = await exec(`git merge-base origin/${defaultBranch} ${branchName}`, { cwd });
+          await execGit(`git fetch origin ${defaultBranch}`, { cwd });
+          const mergeBaseResult = await execGit(`git merge-base origin/${defaultBranch} ${branchName}`, { cwd });
           baseRef = mergeBaseResult.stdout.trim();
         }
 
         // Count commits to be included
-        const commitCountResult = await exec(`git rev-list --count ${baseRef}..${branchName}`, { cwd });
+        const commitCountResult = await execGit(`git rev-list --count ${baseRef}..${branchName}`, { cwd });
         const commitCount = parseInt(commitCountResult.stdout.trim(), 10);
 
         if (commitCount > 0) {
           // Generate patch from the determined base to the branch
-          const patchContentResult = await exec(`git format-patch ${baseRef}..${branchName} --stdout`, { cwd });
+          const patchContentResult = await execGit(`git format-patch ${baseRef}..${branchName} --stdout`, { cwd });
           const patchContent = patchContentResult.stdout;
 
           if (patchContent && patchContent.trim()) {
@@ -76,7 +111,7 @@ async function generateGitPatch(branchName) {
 
     // Strategy 2: Check if commits were made to current HEAD since checkout
     if (!patchGenerated) {
-      const currentHeadResult = await exec("git rev-parse HEAD", { cwd });
+      const currentHeadResult = await execGit("git rev-parse HEAD", { cwd });
       const currentHead = currentHeadResult.stdout.trim();
 
       if (!githubSha) {
@@ -86,15 +121,15 @@ async function generateGitPatch(branchName) {
       } else {
         // Check if GITHUB_SHA is an ancestor of current HEAD
         try {
-          await exec(`git merge-base --is-ancestor ${githubSha} HEAD`, { cwd });
+          await execGit(`git merge-base --is-ancestor ${githubSha} HEAD`, { cwd });
 
           // Count commits between GITHUB_SHA and HEAD
-          const commitCountResult = await exec(`git rev-list --count ${githubSha}..HEAD`, { cwd });
+          const commitCountResult = await execGit(`git rev-list --count ${githubSha}..HEAD`, { cwd });
           const commitCount = parseInt(commitCountResult.stdout.trim(), 10);
 
           if (commitCount > 0) {
             // Generate patch from GITHUB_SHA to HEAD
-            const patchContentResult = await exec(`git format-patch ${githubSha}..HEAD --stdout`, { cwd });
+            const patchContentResult = await execGit(`git format-patch ${githubSha}..HEAD --stdout`, { cwd });
             const patchContent = patchContentResult.stdout;
 
             if (patchContent && patchContent.trim()) {
