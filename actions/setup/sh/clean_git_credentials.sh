@@ -28,11 +28,6 @@ if [ ! -f "${GIT_CONFIG_PATH}" ]; then
   exit 0
 fi
 
-# Create a backup for safety (in case we need to debug)
-BACKUP_PATH="${GIT_CONFIG_PATH}.backup-$(date +%s)"
-cp "${GIT_CONFIG_PATH}" "${BACKUP_PATH}"
-echo "Created backup at ${BACKUP_PATH}"
-
 # Remove credential helper configuration
 # This removes lines like:
 #   [credential]
@@ -75,12 +70,10 @@ if git config --file "${GIT_CONFIG_PATH}" --get-regexp '^remote\..*\.url$' 2>/de
 fi
 
 echo "✓ Git credentials cleaned successfully"
-echo "✓ Backup saved at ${BACKUP_PATH}"
 
 # Verify the file is still valid git config
 if ! git config --file "${GIT_CONFIG_PATH}" --list >/dev/null 2>&1; then
-  echo "ERROR: Git config file is corrupted after cleaning, restoring backup"
-  cp "${BACKUP_PATH}" "${GIT_CONFIG_PATH}"
+  echo "ERROR: Git config file is corrupted after cleaning"
   exit 1
 fi
 
