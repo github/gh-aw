@@ -3,6 +3,7 @@
 package console
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -298,11 +299,28 @@ func TestToRelativePath(t *testing.T) {
 			},
 		},
 		{
-			name: "absolute path converted to relative",
+			name: "absolute path with .. in relative form returns absolute",
 			path: "/tmp/gh-aw/test.md",
 			expectedFunc: func(result, expected string) bool {
-				// Should be a relative path that doesn't start with /
-				return !strings.HasPrefix(result, "/") && strings.HasSuffix(result, "test.md")
+				// When relative path would contain "..", should return absolute path
+				// The relative path from /home/runner/work/gh-aw/gh-aw to /tmp/gh-aw/test.md
+				// would be ../../../../../tmp/gh-aw/test.md (contains ..)
+				// So we should get the absolute path back
+				return result == "/tmp/gh-aw/test.md"
+			},
+		},
+		{
+			name: "absolute path within working directory converted to relative",
+			path: func() string {
+				// Get current working directory and construct a path within it
+				wd, _ := os.Getwd()
+				return filepath.Join(wd, "pkg/console/test.md")
+			}(),
+			expectedFunc: func(result, expected string) bool {
+				// Absolute path within working directory should be converted to relative
+				// without ".." in the path
+				// The result should not start with / and should not contain ..
+				return !strings.HasPrefix(result, "/") && !strings.Contains(result, "..") && strings.HasSuffix(result, "test.md")
 			},
 		},
 	}
