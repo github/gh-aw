@@ -38,14 +38,32 @@ func buildEventAwareCommandCondition(commandNames []string, commandEvents []stri
 	hasDiscussionComment := slices.Contains(eventNames, "discussion_comment")
 
 	// Helper function to build OR condition for multiple command checks
+	// Uses strict matching: command at start of line only
 	buildMultiCommandCheck := func(bodyAccessor string) ConditionNode {
 		var commandOrChecks []ConditionNode
 		for _, commandName := range commandNames {
 			commandText := fmt.Sprintf("/%s", commandName)
-			commandOrChecks = append(commandOrChecks, BuildContains(
+			commandWithSpace := fmt.Sprintf("/%s ", commandName)
+
+			// Check for exact match (command without arguments)
+			exactMatch := BuildEquals(
 				BuildPropertyAccess(bodyAccessor),
 				BuildStringLiteral(commandText),
-			))
+			)
+
+			// Check for command with arguments (starts with "/<command> ")
+			startsWithMatch := BuildFunctionCall("startsWith",
+				BuildPropertyAccess(bodyAccessor),
+				BuildStringLiteral(commandWithSpace),
+			)
+
+			// Combine: exact match OR starts with pattern
+			commandCheck := &OrNode{
+				Left:  startsWithMatch,
+				Right: exactMatch,
+			}
+
+			commandOrChecks = append(commandOrChecks, commandCheck)
 		}
 		// If only one command, return it directly; otherwise combine with OR
 		if len(commandOrChecks) == 1 {

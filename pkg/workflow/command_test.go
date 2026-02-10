@@ -214,29 +214,35 @@ This test validates that command conditions are applied correctly based on event
 
 			if tt.expectedSimpleCondition {
 				// Should contain simple command condition (no complex event_name logic in main job)
-				expectedPattern := "contains(github.event.issue.body, '/"
-				if !strings.Contains(lockContentStr, expectedPattern) {
-					t.Errorf("Expected simple command condition containing '%s' but not found", expectedPattern)
+				// Check for strict matching patterns: startsWith or exact equality
+				startsWithPattern := "startsWith(github.event.issue.body, '/"
+				exactMatchPattern := "github.event.issue.body == '/"
+
+				hasStartsWith := strings.Contains(lockContentStr, startsWithPattern)
+				hasExactMatch := strings.Contains(lockContentStr, exactMatchPattern)
+
+				if !hasStartsWith && !hasExactMatch {
+					t.Errorf("Expected simple command condition with either startsWith or exact match, but found neither")
 				}
 
 				// For simple command workflows, the main job condition should not contain github.event_name logic
-				// We can check this by looking for conditions that use "contains(" without "github.event_name"
+				// We can check this by looking for conditions that use "startsWith(" or equality checks without "github.event_name"
 				// Handle both single-line and multi-line YAML conditions
 				lines := strings.Split(lockContentStr, "\n")
 				foundSimpleCommandCondition := false
 
 				for i, line := range lines {
 					// Check for single-line if condition
-					if strings.Contains(line, "if:") && strings.Contains(line, "contains(") && !strings.Contains(line, "github.event_name") {
+					if strings.Contains(line, "if:") && (strings.Contains(line, "startsWith(") || strings.Contains(line, ".body == '/")) && !strings.Contains(line, "github.event_name") {
 						foundSimpleCommandCondition = true
 						break
 					}
 					// Check for multi-line if condition (if: > or if: | format)
 					if strings.Contains(line, "if:") && (strings.Contains(line, ">") || strings.Contains(line, "|")) {
-						// Check the following lines for contains() without github.event_name
+						// Check the following lines for startsWith() or exact match without github.event_name
 						for j := i + 1; j < len(lines) && strings.TrimSpace(lines[j]) != ""; j++ {
 							nextLine := lines[j]
-							if strings.Contains(nextLine, "contains(") && !strings.Contains(nextLine, "github.event_name") {
+							if (strings.Contains(nextLine, "startsWith(") || strings.Contains(nextLine, ".body == '/")) && !strings.Contains(nextLine, "github.event_name") {
 								foundSimpleCommandCondition = true
 								break
 							}
@@ -251,7 +257,7 @@ This test validates that command conditions are applied correctly based on event
 					}
 				}
 				if !foundSimpleCommandCondition {
-					t.Errorf("Expected to find simple command condition (contains without github.event_name) but not found")
+					t.Errorf("Expected to find simple command condition (startsWith or exact match without github.event_name) but not found")
 				}
 			}
 

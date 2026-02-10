@@ -153,7 +153,7 @@ tools:
 ---`,
 			filename:        "test-bot.md",
 			expectedOn:      "pull_request_review_comment:\n    types:\n    - created\n    - edited",
-			expectedIf:      "contains(github.event.issue.body, '/test-bot')",
+			expectedIf:      "startsWith(github.event.issue.body, '/test-bot ')",
 			expectedCommand: "test-bot",
 		},
 		{
@@ -168,7 +168,7 @@ tools:
 ---`,
 			filename:        "test-new-format.md",
 			expectedOn:      "pull_request_review_comment:\n    types:\n    - created\n    - edited",
-			expectedIf:      "contains(github.event.issue.body, '/new-bot')",
+			expectedIf:      "startsWith(github.event.issue.body, '/new-bot ')",
 			expectedCommand: "new-bot",
 		},
 		{
@@ -182,7 +182,7 @@ tools:
 ---`,
 			filename:        "default-name-bot.md",
 			expectedOn:      "pull_request_review_comment:\n    types:\n    - created\n    - edited",
-			expectedIf:      "contains(github.event.issue.body, '/default-name-bot')",
+			expectedIf:      "startsWith(github.event.issue.body, '/default-name-bot ')",
 			expectedCommand: "default-name-bot",
 		},
 		{
@@ -196,7 +196,7 @@ tools:
 ---`,
 			filename:        "test-string-format.md",
 			expectedOn:      "pull_request_review_comment:\n    types:\n    - created\n    - edited",
-			expectedIf:      "contains(github.event.issue.body, '/customname')",
+			expectedIf:      "startsWith(github.event.issue.body, '/customname ')",
 			expectedCommand: "customname",
 		},
 	}
