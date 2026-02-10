@@ -3,9 +3,33 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { spawnSync } = require("child_process");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
+
+/**
+ * Safely execute git command using spawnSync with args array to prevent shell injection
+ * @param {string[]} args - Git command arguments
+ * @param {Object} options - Spawn options
+ * @returns {string} Command output
+ * @throws {Error} If command fails
+ */
+function execGitSync(args, options = {}) {
+  const result = spawnSync("git", args, {
+    encoding: "utf8",
+    ...options,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `Git command failed with status ${result.status}`);
+  }
+
+  return result.stdout;
+}
 
 /**
  * Push repo-memory changes to git branch
@@ -95,7 +119,7 @@ async function main() {
   // This is necessary because checkout was configured with sparse-checkout
   core.info(`Disabling sparse checkout...`);
   try {
-    execSync("git sparse-checkout disable", { stdio: "pipe" });
+    execGitSync(["sparse-checkout", "disable"], { stdio: "pipe" });
   } catch (error) {
     // Ignore if sparse checkout wasn't enabled
     core.info("Sparse checkout was not enabled or already disabled");
@@ -108,14 +132,14 @@ async function main() {
 
     // Try to fetch the branch
     try {
-      execSync(`git fetch "${repoUrl}" "${branchName}:${branchName}"`, { stdio: "pipe" });
-      execSync(`git checkout "${branchName}"`, { stdio: "inherit" });
+      execGitSync(["fetch", repoUrl, `${branchName}:${branchName}`], { stdio: "pipe" });
+      execGitSync(["checkout", branchName], { stdio: "inherit" });
       core.info(`Checked out existing branch: ${branchName}`);
     } catch (fetchError) {
       // Branch doesn't exist, create orphan branch
       core.info(`Branch ${branchName} does not exist, creating orphan branch...`);
-      execSync(`git checkout --orphan "${branchName}"`, { stdio: "inherit" });
-      execSync("git rm -rf . || true", { stdio: "pipe" });
+      execGitSync(["checkout", "--orphan", branchName], { stdio: "inherit" });
+      execGitSync(["rm", "-rf", "."], { stdio: "pipe" });
       core.info(`Created orphan branch: ${branchName}`);
     }
   } catch (error) {
@@ -270,7 +294,7 @@ async function main() {
   // Check if we have any changes to commit
   let hasChanges = false;
   try {
-    const status = execSync("git status --porcelain", { encoding: "utf8" });
+    const status = execGitSync(["status", "--porcelain"]);
     hasChanges = status.trim().length > 0;
   } catch (error) {
     core.setFailed(`Failed to check git status: ${getErrorMessage(error)}`);
@@ -286,7 +310,7 @@ async function main() {
 
   // Stage all changes
   try {
-    execSync("git add .", { stdio: "inherit" });
+    execGitSync(["add", "."], { stdio: "inherit" });
   } catch (error) {
     core.setFailed(`Failed to stage changes: ${getErrorMessage(error)}`);
     return;
@@ -294,7 +318,7 @@ async function main() {
 
   // Commit changes
   try {
-    execSync(`git commit -m "Update repo memory from workflow run ${githubRunId}"`, { stdio: "inherit" });
+    execGitSync(["commit", "-m", `Update repo memory from workflow run ${githubRunId}`], { stdio: "inherit" });
   } catch (error) {
     core.setFailed(`Failed to commit changes: ${getErrorMessage(error)}`);
     return;
@@ -304,7 +328,7 @@ async function main() {
   core.info(`Pulling latest changes from ${branchName}...`);
   try {
     const repoUrl = `https://x-access-token:${ghToken}@github.com/${targetRepo}.git`;
-    execSync(`git pull --no-rebase -X ours "${repoUrl}" "${branchName}"`, { stdio: "inherit" });
+    execGitSync(["pull", "--no-rebase", "-X", "ours", repoUrl, branchName], { stdio: "inherit" });
   } catch (error) {
     // Pull might fail if branch doesn't exist yet or on conflicts - this is acceptable
     core.warning(`Pull failed (this may be expected): ${getErrorMessage(error)}`);
@@ -314,7 +338,7 @@ async function main() {
   core.info(`Pushing changes to ${branchName}...`);
   try {
     const repoUrl = `https://x-access-token:${ghToken}@github.com/${targetRepo}.git`;
-    execSync(`git push "${repoUrl}" HEAD:"${branchName}"`, { stdio: "inherit" });
+    execGitSync(["push", repoUrl, `HEAD:${branchName}`], { stdio: "inherit" });
     core.info(`Successfully pushed changes to ${branchName} branch`);
   } catch (error) {
     core.setFailed(`Failed to push changes: ${getErrorMessage(error)}`);
