@@ -7,19 +7,11 @@ sidebar:
 
 import Video from '../../../components/Video.astro';
 
-**Agentic workflows** are AI-powered repository automation running in GitHub Actions - you write instructions in markdown, the AI does the work. Unlike regular Actions with fixed rules, agents understand context, make decisions and adapt to situations. [Learn more →](/gh-aw/introduction/overview/)
+## Adding an Automated Daily Status Workflow to Your Repo
 
 **⏱️ Estimated time: 10 minutes**
 
-## Adding an Automated Daily Status Workflow to Your Repo
-
-In this guide you will add an existing, pre-backed workflow to an existing GitHub repository where you are a maintainer - the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md?plain=1), running in GitHub Actions.
-
-The aim here is to become familiar with **automated AI**: to install something that will run **automatically**, **recurringly**, in the context of your repository. In this case the workflow will run daily, though you can also invoke it manually. Every day, the workflow will create or update a fresh status report issue in your repository, without any further manual intervention. If you're familiar with GitHub Actions, you will be aware of the power of automation in repositories; this is simply taking that to the next level with AI.
-
-Alternatively:
-- To add a custom workflow of your own design, see [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/).
-- You can find more examples of pre-baked workflows in [Peli's Agent Factory](https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/).
+In this guide you will add an existing, pre-baked workflow to an existing GitHub repository where you are a maintainer - the automated [**Daily Repo Status Report**](https://github.com/githubnext/agentics/blob/main/workflows/daily-repo-status.md?plain=1), running in GitHub Actions.
 
 <Video
   src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
@@ -28,93 +20,100 @@ Alternatively:
   thumbnail="/gh-aw/videos/install-and-add-workflow-in-cli.png"
 />
 
+The aim here is to become familiar with **automated AI**: to install something that will run **automatically**, **recurringly**, in the context of your repository.
+
 ## Prerequisites
 
 Before installing, ensure you have:
 
-- ✅ **AI Account** - [GitHub Copilot](https://github.com/features/copilot) subscription (recommended), or an [Anthropic Claude](https://www.anthropic.com/) or [OpenAI Codex](https://openai.com/api/) API key. See [Engines](/gh-aw/reference/engines/) for setup details.
-- ✅ **GitHub Repository** - A repository where you have **Write** access or higher
-- ✅ **GitHub Actions** enabled - [Check in Settings → Actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)
-- ✅ **GitHub CLI** (`gh`) v2.0.0+ - [Install here](https://cli.github.com). Check version: `gh --version`
-- ✅ **Operating System**: Linux, macOS, or Windows with WSL
+- **AI Account** - a [GitHub Copilot](https://github.com/features/copilot) subscription, or an [Anthropic Claude](https://www.anthropic.com/) or [OpenAI Codex](https://openai.com/api/) API key
+- **GitHub Repository** - A repository where you have write access or higher
+- **GitHub Actions** enabled - Check in [Settings → Actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)
+- **GitHub CLI** (`gh`) v2.0.0+ - [Install here](https://cli.github.com). Check version: `gh --version`
+- **Operating System**: Linux, macOS, or Windows with WSL
 
 ### Step 1 - Install the extension
 
-Install the [GitHub CLI](https://cli.github.com/), then install the GitHub Agentic Workflows extension:
+Install the GitHub Agentic Workflows extension:
 
-```bash wrap
+```text wrap
 gh extension install github/gh-aw
 ```
 
-> [!TIP]
-> If you are encountering authentication issues, use this script,
-> ```
-> curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
-> ```
+If you are encountering authentication issues, use this script instead:
+
+```text wrap
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+```
 
 ### Step 2 - Add the sample workflow and trigger a run
 
 From your repository root run:
 
-```bash wrap
+```text wrap
 gh aw add-wizard githubnext/agentics/daily-repo-status
 ```
 
 This will take you through an interactive process to:
 
-1. **Check pre-requisttes** - Verify you have the necessary permissions, GitHub Actions enabled, and other requirements of the workflow
+1. **Check pre-requisttes** - Verify repository permissions and GitHub Actions is enabled
 2. **Select an AI Engine** - Choose between Claude, Copilot, or Codex
-3. **Set up required secrets** - Prompts for API keys if needed (stored as [repository secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions))
+3. **Set up required secrets** - e.g. [`COPILOT_GITHUB_TOKEN`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`](/gh-aw/reference/engines/)
 4. **Add the workflow** - Copies the workflow [markdown file](/gh-aw/reference/workflow-structure/) to `.github/workflows/`
 5. **Trigger an initial run** - Starts the workflow immediately
 
 > [!TIP]
-> **Having trouble?** Check [Setting up repository secrets](/gh-aw/reference/engines/) and ask for help in [Community Feedback](https://github.com/orgs/community/discussions/186451).
+> **Having trouble?** Check your [repository secrets](/gh-aw/reference/engines/), see the [FAQ](/gh-aw/reference/faq/) and [Common Issues](/gh-aw/troubleshooting/common-issues/).
+
+## Step 3 - Wait for the workflow to complete
 
 An automated workflow run can take 2-3 minutes.
 
-Once your initial run is complete, a new issue will be created in your repository with a "repo status report". The report will be automatically generated by the AI based on recent activity in your repository, including issues, PRs, discussions, releases, and code changes. It will analyze:
+Once your initial run is complete, a new issue will be created in your repository with a "Daily Repo Report". The report will be automatically generated and will analyze:
 
 - Recent repository activity (issues, PRs, discussions, releases, code changes)
 - Progress tracking, goal reminders and highlights
 - Project status and recommendations
 - Actionable next steps for maintainers
 
-### Going further - Customize your workflow
+The report will look something like this:
 
-Your automated agent is fully customizable. If you like, you can customize it now:
+import { Image } from 'astro:assets';
+import dailyRepoReportResult from '../../../assets/daily-repo-report-result.png';
 
-1. Edit the workflow markdown file located at `.github/workflows/daily-repo-status.md` in your repository.
+<Image src={dailyRepoReportResult} alt="Example of a Daily Repo Status Report issue created by the workflow" />
 
-2. Regenerate the workflow YAML by running:
+### Step 4 - Customize your workflow (optional)
 
-   ```bash
+With GitHub Agentic Workflows, you are in control! Your repository automation is fully customizable. You should shape your repo automation to match your priorities and your needs.
+
+To customize it now:
+
+1. Open the workflow markdown file located at `.github/workflows/daily-repo-status.md` in your repository.
+
+2. Edit the section "What to include" to list things you are having trouble with regularly in your repository: your issue blacklog, your CI setup, your testing, the performance of your software, your roadmap. Any or all of these, or anything else you want to improve. You can also customize the style and process sections to guide the coding agent's behavior.
+
+3. Regenerate the workflow YAML by running:
+
+   ```text
    gh aw compile
    ```
 
-3. Commit and push to your repository.
+4. Commit and push to your repository.
 
-4. You can now optionally trigger another run by running:
+5. Optionally trigger another run by running:
 
-   ```bash
+   ```text
    gh aw run daily-repo-status
    ```
 
-Some ideas for customization:
-
-- Adjust the schedule to run more or less frequently
-- Modify the style or content of the report
-- Adjust the instructions to analyze patterns in failed CI runs or test coverage
-- Request analysis of compliance with organizational standards
-- Request analysis of ways the repository could be modernized or simplified
+After waiting for the workflow to complete, check the new issue created with your updated report!
 
 ## What's next?
 
-**Something not working?** See the [FAQ](/gh-aw/reference/faq/) and [Common Issues](/gh-aw/troubleshooting/common-issues/).
+There are hundreds of other ways to use GitHub Agentic Workflows! Explore some of these in [Peli's Agent Factory](https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/).
 
-There are hundreds of other ways to use GitHub Agentic Workflows. Explore these in [Peli's Agent Factory](https://github.github.com/gh-aw/blog/2026-01-12-welcome-to-pelis-agent-factory/).
-
-Or continue learning with these resources:
+Continue learning with these resources:
 
 - [Creating Agentic Workflows](/gh-aw/setup/creating-workflows/)
 - [How Agentic Workflows Work](/gh-aw/introduction/how-they-work/)

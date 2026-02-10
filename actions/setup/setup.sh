@@ -57,11 +57,16 @@ ls -1 "${JS_SOURCE_DIR}" | head -10 || echo "::warning::Failed to list files in 
 FILE_COUNT_IN_DIR=$(ls -1 "${JS_SOURCE_DIR}" 2>/dev/null | wc -l)
 echo "Found ${FILE_COUNT_IN_DIR} files in ${JS_SOURCE_DIR}"
 
-# Copy all .cjs files from js/ to destination
+# Copy all .cjs files from js/ to destination (excluding test files)
 FILE_COUNT=0
 for file in "${JS_SOURCE_DIR}"/*.cjs; do
   if [ -f "$file" ]; then
     filename=$(basename "$file")
+    # Skip test files
+    if [[ "$filename" == *.test.cjs ]]; then
+      echo "Skipping test file: ${filename}"
+      continue
+    fi
     cp "$file" "${DESTINATION}/${filename}"
     echo "Copied: ${filename}"
     FILE_COUNT=$((FILE_COUNT + 1))
@@ -207,6 +212,7 @@ SAFE_OUTPUTS_FILES=(
   "generate_compact_schema.cjs"
   "setup_globals.cjs"
   "error_helpers.cjs"
+  "git_helpers.cjs"
   "mcp_enhanced_errors.cjs"
 )
 

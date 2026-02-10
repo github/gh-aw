@@ -299,8 +299,11 @@ Test workflow content.`
 		t.Errorf("Expected permission check to be present in command workflow")
 	}
 
-	// Check that it includes command-specific condition logic
-	if !strings.Contains(lockContentStr, "contains(github.event") {
-		t.Errorf("Expected command-specific conditional logic in permission check")
+	// Check that it includes command-specific condition logic (strict matching)
+	hasStartsWith := strings.Contains(lockContentStr, "startsWith(github.event")
+	hasExactMatch := strings.Contains(lockContentStr, ".body == '/")
+
+	if !hasStartsWith && !hasExactMatch {
+		t.Errorf("Expected command-specific conditional logic (startsWith or exact match) in permission check")
 	}
 }

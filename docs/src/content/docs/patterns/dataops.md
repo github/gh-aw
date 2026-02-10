@@ -241,17 +241,6 @@ Analyze the combined data at `/tmp/gh-aw/combined.json` covering:
 
 **Use safe outputs** - Always use `safe-outputs` for agent actions. Discussions are ideal for reports since they support threading and reactions.
 
-## Comparison with Other Patterns
-
-| Pattern | Trigger | Data Source | Output |
-|---------|---------|-------------|--------|
-| **DataOps** | Schedule/manual | External APIs, logs | Reports, discussions |
-| [DailyOps](/gh-aw/patterns/dailyops/) | Schedule | Repository analysis | Incremental PRs |
-| [IssueOps](/gh-aw/patterns/issueops/) | Issue events | Issue content | Issue comments |
-| [ChatOps](/gh-aw/patterns/chatops/) | Comments | User commands | Inline responses |
-
-DataOps is distinguished by its emphasis on **deterministic data preparation** before agentic processing.
-
 ## Additional Resources
 
 - [Steps Reference](/gh-aw/reference/frontmatter/#custom-steps-steps) - Shell step configuration

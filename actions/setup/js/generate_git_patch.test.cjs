@@ -126,4 +126,38 @@ describe("generateGitPatch", () => {
     expect(result).toHaveProperty("success");
     // Should attempt to use master as base branch
   });
+
+  it("should safely handle branch names with special characters", async () => {
+    const { generateGitPatch } = await import("./generate_git_patch.cjs");
+
+    process.env.GITHUB_WORKSPACE = "/tmp/nonexistent-repo";
+    process.env.GITHUB_SHA = "abc123";
+
+    // Test with various special characters that could cause shell injection
+    const maliciousBranchNames = ["feature; rm -rf /", "feature && echo hacked", "feature | cat /etc/passwd", "feature$(whoami)", "feature`whoami`", "feature\nrm -rf /"];
+
+    for (const branchName of maliciousBranchNames) {
+      const result = generateGitPatch(branchName);
+
+      // Should not throw an error and should handle safely
+      expect(result).toHaveProperty("success");
+      expect(result.success).toBe(false);
+      // Should fail gracefully without executing injected commands
+    }
+  });
+
+  it("should safely handle GITHUB_SHA with special characters", async () => {
+    const { generateGitPatch } = await import("./generate_git_patch.cjs");
+
+    process.env.GITHUB_WORKSPACE = "/tmp/nonexistent-repo";
+
+    // Test with malicious SHA that could cause shell injection
+    process.env.GITHUB_SHA = "abc123; echo hacked";
+
+    const result = generateGitPatch("test-branch");
+
+    // Should not throw an error and should handle safely
+    expect(result).toHaveProperty("success");
+    expect(result.success).toBe(false);
+  });
 });

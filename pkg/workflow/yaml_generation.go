@@ -23,3 +23,12 @@ func (c *Compiler) generateGitConfigurationStepsWithToken(token string) []string
 		"          echo \"Git configured with standard GitHub Actions identity\"\n",
 	}
 }
+
+// generateGitCredentialsCleanerStep generates a step that removes git credentials from .git/config
+// This is a security measure to prevent credentials left by injected steps from being accessed by the agent
+func (c *Compiler) generateGitCredentialsCleanerStep() []string {
+	return []string{
+		"      - name: Clean git credentials\n",
+		"        run: bash /opt/gh-aw/actions/clean_git_credentials.sh\n",
+	}
+}

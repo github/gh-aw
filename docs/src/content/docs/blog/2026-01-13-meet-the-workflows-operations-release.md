@@ -26,13 +26,10 @@ In our [previous post](/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analyti
 
 The agents that help us actually ship software:
 
-- **[Release](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/release.md?plain=1)** - Orchestrates builds, tests, and release note generation
 - **[Changeset](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/changeset.md?plain=1)** - Manages version bumps and changelog entries for releases - **22 merged PRs out of 28 proposed (78% merge rate)**
 - **[Daily Workflow Updater](https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/daily-workflow-updater.md?plain=1)** - Keeps GitHub Actions and dependencies current
 
 Shipping software is stressful enough without worrying about whether you formatted your release notes correctly.
-
-The Release workflow handles the entire orchestration - building, testing, generating coherent release notes from commits, and publishing. What's interesting here is the **reliability** requirement: these workflows can't afford to be creative or experimental. They need to be deterministic, well-tested, and boring (in a good way).
 
 Changeset Generator has contributed **22 merged PRs out of 28 proposed (78% merge rate)**, automating version bumps and changelog generation for every release. It analyzes commits since the last release, determines the appropriate version bump (major, minor, patch), and updates the changelog accordingly.
 
@@ -41,12 +38,6 @@ Daily Workflow Updater keeps GitHub Actions and dependencies current, ensuring w
 ## Using These Workflows
 
 You can add these workflows to your own repository and remix them. Get going with our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/), then run one of the following:
-
-**Release:**
-
-```bash
-gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/release.md
-```
 
 **Changeset:**
 

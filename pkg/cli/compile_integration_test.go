@@ -801,3 +801,95 @@ This workflow tests that invalid schedule strings in array format fail compilati
 
 	t.Logf("Integration test passed - invalid schedule in array format correctly failed compilation\nOutput: %s", outputStr)
 }
+
+// TestCompileFromSubdirectoryCreatesActionsLockAtRoot tests that actions-lock.json
+// is created at the repository root when compiling from a subdirectory
+func TestCompileFromSubdirectoryCreatesActionsLockAtRoot(t *testing.T) {
+	setup := setupIntegrationTest(t)
+	defer setup.cleanup()
+
+	// Initialize git repository (required for git root detection)
+	gitInitCmd := exec.Command("git", "init")
+	gitInitCmd.Dir = setup.tempDir
+	if output, err := gitInitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to initialize git repository: %v\nOutput: %s", err, string(output))
+	}
+
+	// Configure git user for the repository
+	gitConfigEmail := exec.Command("git", "config", "user.email", "test@test.com")
+	gitConfigEmail.Dir = setup.tempDir
+	if output, err := gitConfigEmail.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to configure git user email: %v\nOutput: %s", err, string(output))
+	}
+
+	gitConfigName := exec.Command("git", "config", "user.name", "Test User")
+	gitConfigName.Dir = setup.tempDir
+	if output, err := gitConfigName.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to configure git user name: %v\nOutput: %s", err, string(output))
+	}
+
+	// Create a simple test workflow
+	// Note: actions-lock.json is only created when actions need to be pinned,
+	// so it may or may not exist. The test verifies it's NOT created in the wrong location.
+	testWorkflow := `---
+name: Test Workflow
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+engine: copilot
+---
+
+# Test Workflow
+
+Test workflow to verify actions-lock.json path handling when compiling from subdirectory.
+`
+
+	testWorkflowPath := filepath.Join(setup.workflowsDir, "test-action.md")
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+		t.Fatalf("Failed to write test workflow file: %v", err)
+	}
+
+	// Change to the .github/workflows subdirectory
+	if err := os.Chdir(setup.workflowsDir); err != nil {
+		t.Fatalf("Failed to change to workflows subdirectory: %v", err)
+	}
+
+	// Run the compile command from the subdirectory using a relative path
+	cmd := exec.Command(setup.binaryPath, "compile", "test-action.md")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("CLI compile command failed: %v\nOutput: %s", err, string(output))
+	}
+
+	// Change back to the temp directory root
+	if err := os.Chdir(setup.tempDir); err != nil {
+		t.Fatalf("Failed to change back to temp directory: %v", err)
+	}
+
+	// Verify actions-lock.json is created at the repository root (.github/aw/actions-lock.json)
+	// NOT at .github/workflows/.github/aw/actions-lock.json
+	expectedLockPath := filepath.Join(setup.tempDir, ".github", "aw", "actions-lock.json")
+	wrongLockPath := filepath.Join(setup.workflowsDir, ".github", "aw", "actions-lock.json")
+
+	// Check if actions-lock.json exists (it may or may not, depending on whether actions were pinned)
+	// The important part is that if it exists, it's in the right place
+	if _, err := os.Stat(expectedLockPath); err == nil {
+		t.Logf("actions-lock.json correctly created at repo root: %s", expectedLockPath)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("Failed to check for actions-lock.json at expected path: %v", err)
+	}
+
+	// Verify actions-lock.json was NOT created in the wrong location
+	if _, err := os.Stat(wrongLockPath); err == nil {
+		t.Errorf("actions-lock.json incorrectly created at nested path: %s (should be at repo root)", wrongLockPath)
+	}
+
+	// Verify the workflow lock file was created
+	lockFilePath := filepath.Join(setup.workflowsDir, "test-action.lock.yml")
+	if _, err := os.Stat(lockFilePath); os.IsNotExist(err) {
+		t.Fatalf("Expected lock file %s was not created", lockFilePath)
+	}
+
+	t.Logf("Integration test passed - actions-lock.json created at correct location")
+}

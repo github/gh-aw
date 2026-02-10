@@ -72,6 +72,11 @@ func WithRepositorySlug(slug string) CompilerOption {
 	return func(c *Compiler) { c.repositorySlug = slug }
 }
 
+// WithGitRoot sets the git repository root directory for action cache path
+func WithGitRoot(gitRoot string) CompilerOption {
+	return func(c *Compiler) { c.gitRoot = gitRoot }
+}
+
 // FileTracker interface for tracking files created during compilation
 type FileTracker interface {
 	TrackCreated(filePath string)
@@ -125,6 +130,7 @@ type Compiler struct {
 	repositorySlug          string              // Repository slug (owner/repo) used as seed for scattering
 	artifactManager         *ArtifactManager    // Tracks artifact uploads/downloads for validation
 	scheduleFriendlyFormats map[int]string      // Maps schedule item index to friendly format string for current workflow
+	gitRoot                 string              // Git repository root directory (if set, used for action cache path)
 }
 
 // NewCompiler creates a new workflow compiler with functional options.
@@ -133,6 +139,10 @@ type Compiler struct {
 func NewCompiler(opts ...CompilerOption) *Compiler {
 	// Get default version
 	version := defaultVersion
+
+	// Auto-detect git repository root for action cache path resolution
+	// This ensures actions-lock.json is created at repo root regardless of CWD
+	gitRoot := findGitRoot()
 
 	// Create compiler with defaults
 	c := &Compiler{
@@ -146,6 +156,7 @@ func NewCompiler(opts ...CompilerOption) *Compiler {
 		stepOrderTracker:  NewStepOrderTracker(),
 		artifactManager:   NewArtifactManager(),
 		actionPinWarnings: make(map[string]bool), // Initialize warning cache
+		gitRoot:           gitRoot,               // Auto-detected git root
 	}
 
 	// Apply functional options
@@ -283,11 +294,16 @@ func (c *Compiler) GetScheduleWarnings() []string {
 func (c *Compiler) getSharedActionResolver() (*ActionCache, *ActionResolver) {
 	if c.actionCache == nil {
 		// Initialize cache and resolver on first use
-		cwd, err := os.Getwd()
-		if err != nil {
-			cwd = "."
+		// Use git root if provided, otherwise fall back to current working directory
+		baseDir := c.gitRoot
+		if baseDir == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				cwd = "."
+			}
+			baseDir = cwd
 		}
-		c.actionCache = NewActionCache(cwd)
+		c.actionCache = NewActionCache(baseDir)
 
 		// Load existing cache unless force refresh is enabled
 		if !c.forceRefreshActionPins {

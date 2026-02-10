@@ -21,13 +21,16 @@ import FeatureCard from '../../components/FeatureCard.astro';
 import FeatureGrid from '../../components/FeatureGrid.astro';
 import Video from '../../components/Video.astro';
 
-Imagine a world where improvements to your repositories are automatically delivered as pull requests each morning, ready for you to review. Issues are automatically triaged, CI failures analyzed, documentation maintained, test coverage improved and compliance monitored - all defined via simple markdown files.
+Imagine a world where improvements to your repositories are automatically delivered as pull requests each morning, ready for you to review. Issues are automatically triaged, CI failures analyzed, documentation maintained, test coverage improved and compliance monitored. All defined via simple markdown files.
 
 GitHub Agentic Workflows deliver this: repository automation, running the coding agents you know and love, in GitHub Actions, with strong guardrails and security-first design principles.
 
 Use GitHub Copilot, Claude by Anthropic or OpenAI Codex for event-triggered, recurring and scheduled jobs to improve, document and analyze your repository. GitHub Agentic Workflows are designed to [augment](https://github.github.io/gh-aw/reference/faq/#determinism) your existing, deterministic CI/CD with [Continuous AI](https://githubnext.com/projects/continuous-ai) capabilities
 
-GitHub Agentic Workflows has been developed by GitHub Next and Microsoft Research with guardrails in mind. Agentic workflows run with minimal permissions by default, with explicit allowlisting for write operations and sandboxed execution to help keep your repository safe.
+Developed by GitHub Next and Microsoft Research with guardrails in mind, agentic workflows run with minimal permissions by default, with explicit allowlisting for write operations and sandboxed execution to help keep your repository safe.
+
+> [!NOTE]
+> GitHub Agentic Workflows is in early development and may change significantly. Using agentic workflows requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.
 
 ## Key Features
 
@@ -58,11 +61,6 @@ Workflows run with read-only permissions by default. Write operations require ex
 
 ## Example: Daily Issues Report
 
-**How they work:**
-1. **Write** - Create a `.md` file with your automation instructions in natural language
-2. **Compile** - Run `gh aw compile` to transform it into a GitHub Actions workflow with guardrails (`.lock.yml`)
-3. **Run** - GitHub Actions executes your workflow automatically based on your triggers
-
 Here's a simple workflow that runs daily to create an upbeat status report:
 
 ```markdown
@@ -83,32 +81,34 @@ safe-outputs:
 ## Daily Issues Report
 
 Create an upbeat daily status report for the team as a GitHub issue.
+
+## What to include
+
+- Recent repository activity (issues, PRs, discussions, releases, code changes)
+- Progress tracking, goal reminders and highlights
+- Project status and recommendations
+- Actionable next steps for maintainers
+
 ```
 
-The `gh aw` cli converts this into a GitHub Actions Workflow (.yml) that runs an AI agent (Copilot, Claude, Codex, ...) in a containerized environment on a schedule or manually.
+The `gh aw` cli augments this with a [lock file](/gh-aw/reference/faq/#what-is-a-workflow-lock-file) for a GitHub Actions Workflow (.lock.yml) that runs an AI agent (Copilot, Claude, Codex, ...) in a containerized environment on a schedule or manually.
 
-The AI coding agent reads your repository context, analyzes issues, generates visualizations, and creates reports - all defined in natural language rather than complex code.
+The AI coding agent reads your repository context, analyzes issues, generates visualizations, and creates reports. All defined in natural language rather than complex code.
 
 ## Gallery
 
 <FeatureGrid columns={3}>
-  <FeatureCard icon="code-review" title="Continuous Improvement" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/">
-    Daily code simplification, refactoring, and style improvements
-  </FeatureCard>
-  <FeatureCard icon="comment-discussion" title="Continuous Refactoring" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-refactoring/">
-    Slash commands for on-demand analysis and automation
+  <FeatureCard icon="issue-opened" title="Issue & PR Management" href="/gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/">
+    Automated triage, labeling, and project coordination
   </FeatureCard>
   <FeatureCard icon="book" title="Continuous Documentation" href="/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/">
     Continuous documentation maintenance and consistency
   </FeatureCard>
-  <FeatureCard icon="issue-opened" title="Issue & PR Management" href="/gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/">
-    Automated triage, labeling, and project coordination
+  <FeatureCard icon="code-review" title="Continuous Improvement" href="/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-simplicity/">
+    Daily code simplification, refactoring, and style improvements
   </FeatureCard>
   <FeatureCard icon="pulse" title="Metrics & Analytics" href="/gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analytics/">
     Daily reports, trend analysis, and workflow health monitoring
-  </FeatureCard>
-  <FeatureCard icon="shield-check" title="Continuous Scanning & Compliance" href="/gh-aw/blog/2026-01-13-meet-the-workflows-security-compliance/">
-    Scanning, alert triage, and compliance monitoring
   </FeatureCard>
   <FeatureCard icon="tools" title="Quality & Testing" href="/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/">
     CI failure diagnosis, test improvements, and quality checks
@@ -116,29 +116,23 @@ The AI coding agent reads your repository context, analyzes issues, generates vi
   <FeatureCard icon="repo" title="Multi-Repository" href="/gh-aw/examples/multi-repo/">
     Feature sync and cross-repo tracking workflows
   </FeatureCard>
-  <FeatureCard icon="calendar" title="Scheduled Workflows" href="/gh-aw/examples/scheduled/">
-    DailyOps, research, and automated maintenance
-  </FeatureCard>
 </FeatureGrid>
 
 ## Getting Started
+
+Install the extension, add a sample workflow, and trigger your first run - all from the command line in minutes.
 
 <Video
   src="/gh-aw/videos/install-and-add-workflow-in-cli.mp4"
   aspectRatio="16:9"
 />
 
-Install the extension, add a sample workflow, and trigger your first run - all from the command line in minutes.
-
 ## Creating Workflows
+
+Create custom agentic workflows directly from the GitHub web interface using natural language.
 
 <Video
   src="/gh-aw/videos/create-workflow-on-github.mp4"
   aspectRatio="16:9"
 />
-
-Create custom agentic workflows directly from the GitHub web interface using natural language.
-
-> [!NOTE]
-> GitHub Agentic Workflows is in early development and may change significantly. Using agentic workflows requires careful attention to security considerations and careful human supervision, and even then things can still go wrong. Use it with caution, and at your own risk.
 
