@@ -1,23 +1,26 @@
-# PR Triage Summary
+# PR Triage Summary - February 10, 2026
 
-**Last Updated:** 2026-02-10T06:32:00Z  
-**Run ID:** 21854355272
+**Run:** #21864799973  
+**Date:** 2026-02-10 12:30 UTC  
+**Total PRs:** 6
 
 ## Quick Stats
-- **Open Agent PRs:** 1
-- **Backlog Trend:** ⬇️ Down 75% (from 4 to 1)
-- **High Priority:** 0
-- **Auto-merge Ready:** 0
-- **Action Required:** None (batch review scheduled)
+- ✅ Auto-merge: 1 (#14754 - docs)
+- 🔍 Priority Review: 1 (#14743 - high-risk bug)
+- 📦 Batch Review: 4 (including batch-test-low-001 with 2 PRs)
+- 🟡 Drafts: 2 (#14751, #14742)
 
-## Recent Runs
+## Top Priority
+1. #14743 (58/100) - Debug logging in core files - HIGH RISK
+2. #14751 (32/100) - Functional patterns - Draft
+3. #14767 (30/100) - Actions updates
 
-### Run #21854355272 (Current)
-- Date: 2026-02-10 06:32 UTC
-- PRs: 1 (0 new, 1 re-triaged)
-- Status: ✅ Excellent backlog health
+## Agent Activity
+- Most Active: 6 different agents created PRs
+- Highest Quality: `manual` workflow (13/20)
+- Highest Priority: `log` workflow (58/100)
 
-### Run #21846903380 (Previous)
-- Date: 2026-02-10 00:45 UTC
-- PRs: 4 (1 fast-track, 2 batch, 1 defer)
-- Status: ✅ 3 PRs resolved since this run
+## Backlog Health: ✅ Excellent
+Only 6 open PRs, all pending CI. No urgent issues.
+
+**Next triage:** 2026-02-10 18:30 UTC

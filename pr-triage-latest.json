@@ -1,58 +1,219 @@
 {
-  "run_date": "2026-02-10T06:32:00Z",
-  "run_id": "21854355272",
-  "total_prs_triaged": 1,
+  "run_date": "2026-02-10T12:29:40.911436+00:00",
+  "run_id": "21864799973",
+  "total_prs_triaged": 6,
   "results": [
+    {
+      "number": 14743,
+      "title": "[log] Add debug logging to 5 core Go files for better troubleshooting",
+      "url": "https://github.com/github/gh-aw/pull/14743",
+      "author": "github-actions[bot]",
+      "workflow": "log",
+      "draft": false,
+      "category": "bug",
+      "risk": "high",
+      "priority_score": 58,
+      "impact_score": 40,
+      "urgency_score": 8,
+      "quality_score": 10,
+      "action": "batch_review",
+      "ci_status": "pending",
+      "age_hours": 4.7,
+      "files_changed": 5,
+      "lines_changed": 33,
+      "labels": [
+        "enhancement",
+        "automation"
+      ],
+      "files": [
+        "pkg/cli/audit_report_render.go",
+        "pkg/workflow/safe_outputs_config_generation.go",
+        "pkg/workflow/compiler_yaml_main_job.go",
+        "pkg/workflow/compiler_yaml.go",
+        "pkg/workflow/compiler_yaml_inputs.go"
+      ]
+    },
+    {
+      "number": 14751,
+      "title": "[fp-enhancer] Improve pkg/cli with functional patterns",
+      "url": "https://github.com/github/gh-aw/pull/14751",
+      "author": "github-actions[bot]",
+      "workflow": "fp-enhancer",
+      "draft": true,
+      "category": "refactor",
+      "risk": "low",
+      "priority_score": 32,
+      "impact_score": 25,
+      "urgency_score": 0,
+      "quality_score": 7,
+      "action": "batch_review",
+      "ci_status": "pending",
+      "age_hours": 3.0,
+      "files_changed": 3,
+      "lines_changed": 27,
+      "labels": [
+        "code-quality",
+        "refactoring",
+        "functional",
+        "immutability"
+      ],
+      "files": [
+        "pkg/cli/actionlint.go",
+        "pkg/cli/actions_build_command.go",
+        "pkg/cli/add_workflow_pr.go"
+      ]
+    },
+    {
+      "number": 14767,
+      "title": "[actions] Update GitHub Actions versions - 2026-02-10",
+      "url": "https://github.com/github/gh-aw/pull/14767",
+      "author": "github-actions[bot]",
+      "workflow": "actions",
+      "draft": false,
+      "category": "chore",
+      "risk": "low",
+      "priority_score": 30,
+      "impact_score": 20,
+      "urgency_score": 0,
+      "quality_score": 10,
+      "action": "batch_review",
+      "ci_status": "pending",
+      "age_hours": 0.9,
+      "files_changed": 2,
+      "lines_changed": 161,
+      "labels": [
+        "automation",
+        "dependencies"
+      ],
+      "files": [
+        ".github/agents/agentic-workflows.agent.md",
+        ".github/aw/actions-lock.json"
+      ]
+    },
     {
       "number": 14682,
       "title": "Add test workflow for project-related safe output token failure paths",
       "url": "https://github.com/github/gh-aw/pull/14682",
       "author": "Copilot",
       "workflow": "manual",
+      "draft": false,
+      "category": "test",
+      "risk": "low",
+      "priority_score": 28,
+      "impact_score": 15,
+      "urgency_score": 0,
+      "quality_score": 13,
+      "action": "batch_review",
+      "ci_status": "pending",
+      "age_hours": 20.5,
+      "files_changed": 2,
+      "lines_changed": 1482,
+      "labels": [
+        "pr-risk:low",
+        "pr-priority:medium",
+        "pr-action:batch-review",
+        "pr-type:test",
+        "pr-agent:manual",
+        "pr-batch:batch-test-001"
+      ],
+      "files": [
+        ".github/workflows/test-project-token-failure.lock.yml",
+        ".github/workflows/test-project-token-failure.md"
+      ],
+      "batch_id": "batch-test-low-001"
+    },
+    {
+      "number": 14742,
+      "title": "[jsweep] Clean expiration_helpers.cjs",
+      "url": "https://github.com/github/gh-aw/pull/14742",
+      "author": "github-actions[bot]",
+      "workflow": "jsweep",
       "draft": true,
       "category": "test",
       "risk": "low",
-      "priority_score": 41,
-      "impact_score": 25,
-      "urgency_score": 8,
-      "quality_score": 8,
+      "priority_score": 25,
+      "impact_score": 15,
+      "urgency_score": 0,
+      "quality_score": 10,
       "action": "batch_review",
       "ci_status": "pending",
-      "age_hours": 15.0,
-      "files_changed": 2,
-      "lines_changed": 1471,
-      "batch_id": "batch-test-001"
+      "age_hours": 4.7,
+      "files_changed": 1,
+      "lines_changed": 183,
+      "labels": [
+        "automation",
+        "unbloat"
+      ],
+      "files": [
+        "actions/setup/js/expiration_helpers.test.cjs"
+      ],
+      "batch_id": "batch-test-low-001"
+    },
+    {
+      "number": 14754,
+      "title": "[docs] Update glossary - daily scan",
+      "url": "https://github.com/github/gh-aw/pull/14754",
+      "author": "github-actions[bot]",
+      "workflow": "docs",
+      "draft": false,
+      "category": "docs",
+      "risk": "low",
+      "priority_score": 20,
+      "impact_score": 10,
+      "urgency_score": 0,
+      "quality_score": 10,
+      "action": "auto_merge",
+      "ci_status": "pending",
+      "age_hours": 2.1,
+      "files_changed": 1,
+      "lines_changed": 32,
+      "labels": [
+        "documentation",
+        "glossary"
+      ],
+      "files": [
+        "docs/src/content/docs/reference/glossary.md"
+      ]
     }
   ],
   "statistics": {
     "by_category": {
-      "test": 1
+      "bug": 1,
+      "refactor": 1,
+      "chore": 1,
+      "test": 2,
+      "docs": 1
     },
     "by_risk": {
-      "low": 1
+      "high": 1,
+      "low": 5
     },
     "by_priority": {
-      "medium": 1
+      "high": 0,
+      "medium": 1,
+      "low": 5
     },
     "by_action": {
-      "batch_review": 1,
-      "auto_merge": 0,
-      "fast_track": 0,
-      "defer": 0,
-      "close": 0
+      "batch_review": 5,
+      "auto_merge": 1
     }
   },
-  "auto_merge_candidates": [],
+  "auto_merge_candidates": [
+    14754
+  ],
   "fast_track_needed": [],
   "batches": {
-    "batch-test-001": {
-      "pr_numbers": [14682],
+    "batch-test-low-001": {
+      "pr_numbers": [
+        14682,
+        14742
+      ],
       "category": "test",
       "risk": "low",
-      "count": 1,
-      "description": "Test workflow additions - can be reviewed together"
+      "count": 2,
+      "description": "Test (low risk) - can be reviewed together"
     }
   },
   "close_candidates": [],
-  "notes": "Excellent backlog health: Only 1 open agent PR (75% reduction from previous run). No critical issues. All resolved PRs from last run suggest effective triage prioritization."
+  "notes": "Backlog remains healthy with 6 open agent PRs. All PRs have pending CI status. Focus areas: High-risk bug fix (#14743) and documentation updates (#14754)."
 }
