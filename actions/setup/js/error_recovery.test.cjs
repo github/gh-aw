@@ -37,6 +37,11 @@ describe("error_recovery", () => {
       expect(isTransientError(new Error("Abuse detection triggered"))).toBe(true);
     });
 
+    it("should identify GitHub server unavailability as transient", () => {
+      expect(isTransientError(new Error("No server is currently available to service your request"))).toBe(true);
+      expect(isTransientError(new Error("no server is currently available"))).toBe(true);
+    });
+
     it("should not identify validation errors as transient", () => {
       expect(isTransientError(new Error("Invalid input"))).toBe(false);
       expect(isTransientError(new Error("Field is required"))).toBe(false);
