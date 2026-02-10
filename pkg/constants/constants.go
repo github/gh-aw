@@ -304,12 +304,12 @@ const DefaultMCPRegistryURL URL = "https://api.mcp.github.com/v0.1"
 const GitHubCopilotMCPDomain = "api.githubcopilot.com"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.34"
+const DefaultClaudeCodeVersion Version = "2.1.38"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // WARNING: UPGRADING COPILOT CLI REQUIRES A FULL INTEGRATION TEST RUN TO ENSURE COMPATIBILITY.
-const DefaultCopilotVersion Version = "0.0.405"
+const DefaultCopilotVersion Version = "0.0.406"
 
 // DefaultCopilotDetectionModel is the default model for the Copilot engine when used in the detection job
 // Updated to gpt-5.1-codex-mini after gpt-5-mini deprecation on 2026-01-17
@@ -386,7 +386,7 @@ const DefaultSandboxRuntimeVersion Version = "0.0.34"
 const DefaultPlaywrightMCPVersion Version = "0.0.64"
 
 // DefaultPlaywrightBrowserVersion is the default version of the Playwright browser Docker image
-const DefaultPlaywrightBrowserVersion Version = "v1.58.1"
+const DefaultPlaywrightBrowserVersion Version = "v1.58.2"
 
 // DefaultMCPSDKVersion is the default version of the @modelcontextprotocol/sdk package
 const DefaultMCPSDKVersion Version = "1.24.0"
