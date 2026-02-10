@@ -34,7 +34,7 @@ jobs:
             ./...
 
       - name: Upload Gosec SARIF
-        uses: github/codeql-action/upload-sarif@4248455a6f2335bc3b7a8a62932f000050ec8f13 # v3
+        uses: github/codeql-action/upload-sarif@33119e582d3ab4ed79c2610af108cb08ff983917  # v3
         if: always()
         with:
           sarif_file: gosec-results.sarif
@@ -60,7 +60,7 @@ jobs:
           output-file: govulncheck-results.sarif
 
       - name: Upload govulncheck SARIF
-        uses: github/codeql-action/upload-sarif@4248455a6f2335bc3b7a8a62932f000050ec8f13 # v3
+        uses: github/codeql-action/upload-sarif@33119e582d3ab4ed79c2610af108cb08ff983917  # v3
         if: always()
         with:
           sarif_file: govulncheck-results.sarif
@@ -84,7 +84,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@4248455a6f2335bc3b7a8a62932f000050ec8f13 # v3
+        uses: github/codeql-action/upload-sarif@33119e582d3ab4ed79c2610af108cb08ff983917  # v3
         if: always()
         with:
           sarif_file: trivy-results.sarif

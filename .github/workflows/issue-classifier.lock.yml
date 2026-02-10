@@ -602,7 +602,7 @@ jobs:
       - name: Clean git credentials
         run: bash /opt/gh-aw/actions/clean_git_credentials.sh
       - name: Run AI Inference
-        uses: actions/ai-inference@a6101c89c6feaecc585efdd8d461f18bb7896f20 # v2
+        uses: actions/ai-inference@a380166897b5408b8fb7dddd148142794cb5624a  # v2.0.6
         env:
           GH_AW_MCP_CONFIG: /tmp/gh-aw/mcp-config/mcp-servers.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
@@ -895,7 +895,7 @@ jobs:
           mkdir -p /tmp/gh-aw/threat-detection
           touch /tmp/gh-aw/threat-detection/detection.log
       - name: Run AI Inference
-        uses: actions/ai-inference@a6101c89c6feaecc585efdd8d461f18bb7896f20 # v2
+        uses: actions/ai-inference@a380166897b5408b8fb7dddd148142794cb5624a  # v2.0.6
         env:
           GH_AW_MCP_CONFIG: /tmp/gh-aw/mcp-config/mcp-servers.json
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt

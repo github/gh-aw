@@ -1120,7 +1120,7 @@ jobs:
           persist-credentials: false
       - name: Super-linter
         id: super-linter
-        uses: super-linter/super-linter@2bdd90ed3262e023ac84bf8fe35dc480721fc1f2 # v8.2.1
+        uses: super-linter/super-linter@61abc07d755095a68f4987d1c2c3d1d64408f1f9  # v8.5.0
         env:
           CREATE_LOG_FILE: "true"
           DEFAULT_BRANCH: main
