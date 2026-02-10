@@ -43,13 +43,16 @@ func UpdateWorkflows(workflowNames []string, allowMajor, force, verbose bool, en
 
 	// Update each workflow
 	for _, wf := range workflows {
+		updateLog.Printf("Updating workflow: %s (source: %s)", wf.Name, wf.SourceSpec)
 		if err := updateWorkflow(wf, allowMajor, force, verbose, engineOverride, noStopAfter, stopAfter, merge); err != nil {
+			updateLog.Printf("Failed to update workflow %s: %v", wf.Name, err)
 			failedUpdates = append(failedUpdates, updateFailure{
 				Name:  wf.Name,
 				Error: err.Error(),
 			})
 			continue
 		}
+		updateLog.Printf("Successfully updated workflow: %s", wf.Name)
 		successfulUpdates = append(successfulUpdates, wf.Name)
 	}
 
@@ -65,6 +68,7 @@ func UpdateWorkflows(workflowNames []string, allowMajor, force, verbose bool, en
 
 // findWorkflowsWithSource finds all workflows that have a source field
 func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose bool) ([]*workflowWithSource, error) {
+	updateLog.Printf("Finding workflows with source field in %s", workflowsDir)
 	var workflows []*workflowWithSource
 
 	// Read all .md files in workflows directory
@@ -72,6 +76,7 @@ func findWorkflowsWithSource(workflowsDir string, filterNames []string, verbose 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workflows directory: %w", err)
 	}
+	updateLog.Printf("Found %d entries in workflows directory", len(entries))
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {

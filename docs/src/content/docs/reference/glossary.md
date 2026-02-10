@@ -359,6 +359,30 @@ on:
 
 Operational patterns (suffixed with "-Ops") are established workflow architectures for common automation scenarios. Each pattern addresses specific use cases with recommended triggers, tools, and safe outputs.
 
+### ChatOps
+
+Interactive automation triggered by slash commands (`/review`, `/deploy`) in issues and pull requests. Team members trigger workflows by typing commands directly in discussions, enabling human-in-the-loop automation where developers invoke AI assistance on demand.
+
+**Use for:** Interactive code reviews, on-demand deployments, assisted analysis, and team collaboration through shared commands.
+
+See [ChatOps](/gh-aw/patterns/chatops/) for implementation details.
+
+### DailyOps
+
+Scheduled workflows for incremental daily improvements that automate progress toward large goals through small, manageable changes. Work happens automatically on weekday schedules with changes easy to review and integrate.
+
+**Use for:** Continuous code quality improvements, progressive migrations, documentation maintenance, and chipping away at technical debt one small PR at a time.
+
+See [DailyOps](/gh-aw/patterns/dailyops/) for implementation details.
+
+### DataOps
+
+Hybrid pattern combining deterministic data extraction in `steps:` with agentic analysis in the workflow body. Shell commands reliably fetch and structure data, then the AI agent interprets results and produces insights.
+
+**Use for:** Data aggregation from APIs or logs, report generation, trend analysis, and auditing workflows that gather evidence and generate reports.
+
+See [DataOps](/gh-aw/patterns/dataops/) for implementation details.
+
 ### DispatchOps
 
 Manual workflow execution via the GitHub Actions UI or CLI using the `workflow_dispatch` trigger. Enables on-demand tasks, testing, and workflows requiring human judgment about timing. Workflows can accept custom input parameters for runtime customization.
@@ -422,6 +446,14 @@ Maintaining and propagating W3C-style specifications using the `w3c-specificatio
 **Use for:** Maintaining formal technical specifications, keeping specifications synchronized across repositories, and ensuring implementations stay compliant with specification updates.
 
 See the [SpecOps](/gh-aw/patterns/specops/) for implementation details.
+
+### TaskOps
+
+Scaffolded AI-powered code improvement strategy with three phases: research agent investigates and reports findings, developer reviews and invokes planner agent to create actionable issues, then assigns approved issues to Copilot for automated implementation. Keeps developers in control with clear decision points at each phase.
+
+**Use for:** Systematic code improvements requiring investigation before action, work needing breakdown for optimal AI agent execution, and situations where research findings vary in priority and require developer oversight.
+
+See [TaskOps](/gh-aw/patterns/taskops/) for implementation details.
 
 ### TrialOps
 
