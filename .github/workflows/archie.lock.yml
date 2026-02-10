@@ -887,7 +887,7 @@ jobs:
           GH_AW_WORKFLOW_NAME: "Archie"
           GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_AW_AGENT_CONCLUSION: ${{ needs.agent.result }}
-          GH_AW_WORKFLOW_ID: "agent"
+          GH_AW_WORKFLOW_ID: "archie"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 📊 *Diagram rendered by [{workflow_name}]({run_url})*\",\"footerWorkflowRecompile\":\"\\u003e 🔧 *Workflow sync report by [{workflow_name}]({run_url}) for {repository}*\",\"footerWorkflowRecompileComment\":\"\\u003e 🔄 *Update from [{workflow_name}]({run_url}) for {repository}*\",\"runStarted\":\"📐 Archie here! [{workflow_name}]({run_url}) is sketching the architecture on this {event_type}...\",\"runSuccess\":\"🎨 Blueprint complete! [{workflow_name}]({run_url}) has visualized the connections. The architecture speaks for itself! ✅\",\"runFailure\":\"📐 Drafting interrupted! [{workflow_name}]({run_url}) {status}. The diagram remains incomplete...\"}"
