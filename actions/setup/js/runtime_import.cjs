@@ -185,12 +185,36 @@ function isSafeExpression(expr) {
 
     // Check if right side is a literal string (single, double, or backtick quotes)
     const isStringLiteral = /^(['"`]).*\1$/.test(rightExpr);
+    if (isStringLiteral) {
+      // Validate string literal content for security
+      const contentMatch = rightExpr.match(/^(['"`])(.+)\1$/);
+      if (contentMatch) {
+        const content = contentMatch[2];
+
+        // Reject nested expressions
+        if (content.includes("${{") || content.includes("}}")) {
+          return false;
+        }
+
+        // Reject escape sequences that could hide keywords
+        if (/\\[xu][\da-fA-F]/.test(content) || /\\[0-7]{1,3}/.test(content)) {
+          return false;
+        }
+
+        // Reject zero-width characters
+        if (/[\u200B-\u200D\uFEFF]/.test(content)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     // Check if right side is a number literal
     const isNumberLiteral = /^-?\d+(\.\d+)?$/.test(rightExpr);
     // Check if right side is a boolean literal
     const isBooleanLiteral = rightExpr === "true" || rightExpr === "false";
 
-    if (isStringLiteral || isNumberLiteral || isBooleanLiteral) {
+    if (isNumberLiteral || isBooleanLiteral) {
       return true;
     }
 
@@ -230,7 +254,9 @@ function evaluateExpression(expr) {
     // If right side is a literal, extract and return it
     const stringLiteralMatch = rightExpr.match(/^(['"`])(.+)\1$/);
     if (stringLiteralMatch) {
-      return stringLiteralMatch[2]; // Return the literal value without quotes
+      const content = stringLiteralMatch[2];
+      // Neutralize any expression markers
+      return content.replace(/\$/g, "\\$").replace(/\{/g, "\\{");
     }
 
     // If right side is a number or boolean literal, return it
