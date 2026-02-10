@@ -194,13 +194,13 @@ func runActionlintOnFile(lockFiles []string, verbose bool, strict bool) error {
 	}
 
 	// Get relative paths from git root for all files
-	var relPaths []string
-	for _, lockFile := range lockFiles {
+	relPaths := make([]string, len(lockFiles))
+	for i, lockFile := range lockFiles {
 		relPath, err := filepath.Rel(gitRoot, lockFile)
 		if err != nil {
 			return fmt.Errorf("failed to get relative path for %s: %w", lockFile, err)
 		}
-		relPaths = append(relPaths, relPath)
+		relPaths[i] = relPath
 	}
 
 	// Build the Docker command with JSON output for easier parsing
