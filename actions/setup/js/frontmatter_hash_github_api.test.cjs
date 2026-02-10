@@ -5,12 +5,11 @@ const fs = require("fs");
 const { computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
 const { withRetry, isTransientError } = require("./error_recovery.cjs");
 
-// Mock @actions/core for retry logging in test environment
-global.core = {
-  info: vi.fn((...args) => console.log(...args)),
-  warning: vi.fn((...args) => console.warn(...args)),
-  error: vi.fn((...args) => console.error(...args)),
-  debug: vi.fn((...args) => console.log(...args)),
+// Retry configuration for live API tests
+const LIVE_API_RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  shouldRetry: isTransientError,
 };
 
 /**
@@ -20,15 +19,7 @@ global.core = {
  */
 function createRetryableFileReader(fileReader) {
   return async function (filePath) {
-    return withRetry(
-      async () => fileReader(filePath),
-      {
-        maxRetries: 3,
-        initialDelayMs: 1000,
-        shouldRetry: isTransientError,
-      },
-      `fetch file ${filePath}`
-    );
+    return withRetry(async () => fileReader(filePath), LIVE_API_RETRY_CONFIG, `fetch file ${filePath}`);
   };
 }
 
@@ -41,6 +32,14 @@ describe("frontmatter_hash with GitHub API", () => {
   let mockGitHub;
 
   beforeAll(() => {
+    // Mock @actions/core for retry logging in test environment
+    global.core = {
+      info: vi.fn((...args) => console.log(...args)),
+      warning: vi.fn((...args) => console.warn(...args)),
+      error: vi.fn((...args) => console.error(...args)),
+      debug: vi.fn((...args) => console.log(...args)),
+    };
+
     // Create a mock GitHub API client for testing
     // In real scenarios, this would be replaced with @actions/github
     mockGitHub = {
