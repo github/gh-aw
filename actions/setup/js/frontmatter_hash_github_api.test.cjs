@@ -1,8 +1,36 @@
 // @ts-check
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 const path = require("path");
 const fs = require("fs");
 const { computeFrontmatterHash, createGitHubFileReader } = require("./frontmatter_hash_pure.cjs");
+const { withRetry, isTransientError } = require("./error_recovery.cjs");
+
+// Mock @actions/core for retry logging in test environment
+global.core = {
+  info: vi.fn((...args) => console.log(...args)),
+  warning: vi.fn((...args) => console.warn(...args)),
+  error: vi.fn((...args) => console.error(...args)),
+  debug: vi.fn((...args) => console.log(...args)),
+};
+
+/**
+ * Wraps a file reader function with retry logic for transient GitHub API errors
+ * @param {Function} fileReader - The original file reader function
+ * @returns {Function} File reader with retry logic
+ */
+function createRetryableFileReader(fileReader) {
+  return async function (filePath) {
+    return withRetry(
+      async () => fileReader(filePath),
+      {
+        maxRetries: 3,
+        initialDelayMs: 1000,
+        shouldRetry: isTransientError,
+      },
+      `fetch file ${filePath}`
+    );
+  };
+}
 
 /**
  * Tests for frontmatter hash computation using GitHub's API to fetch real workflows.
@@ -354,7 +382,10 @@ describe("frontmatter_hash with GitHub API", () => {
       const ref = "main";
 
       // Create file reader with real GitHub API
-      const fileReader = createGitHubFileReader(octokit, owner, repo, ref);
+      const baseFileReader = createGitHubFileReader(octokit, owner, repo, ref);
+
+      // Wrap with retry logic to handle transient GitHub API errors
+      const fileReader = createRetryableFileReader(baseFileReader);
 
       // Test with a real public agentic workflow
       const workflowPath = ".github/workflows/audit-workflows.md";

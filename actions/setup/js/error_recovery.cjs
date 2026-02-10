@@ -54,6 +54,7 @@ function isTransientError(error) {
     "secondary rate limit", // GitHub secondary rate limits
     "abuse detection", // GitHub abuse detection
     "temporarily unavailable",
+    "no server is currently available", // GitHub API server unavailability
   ];
 
   return transientPatterns.some(pattern => errorMsg.includes(pattern));
