@@ -92,10 +92,8 @@ func (c *Compiler) parseDiscussionsConfig(outputMap map[string]any) *CreateDiscu
 		return nil // Invalid configuration, return nil to cause validation error
 	}
 
-	// Validate category naming convention (lowercase, preferably plural)
-	if validateDiscussionCategory(config.Category, discussionLog, c.markdownPath) {
-		return nil // Invalid configuration, return nil to cause validation error
-	}
+	// Normalize and validate category naming convention
+	config.Category = normalizeDiscussionCategory(config.Category, discussionLog, c.markdownPath)
 
 	// Log configured values
 	if config.TitlePrefix != "" {
@@ -201,18 +199,18 @@ func (c *Compiler) buildCreateOutputDiscussionJob(data *WorkflowData, mainJobNam
 	})
 }
 
-// validateDiscussionCategory validates discussion category naming conventions
-// Categories should be lowercase and preferably plural
-// Returns true if validation fails (invalid), false if valid
-func validateDiscussionCategory(category string, log *logger.Logger, markdownPath string) bool {
+// normalizeDiscussionCategory normalizes discussion category to lowercase
+// and provides warnings about naming conventions
+// Returns normalized category (or original if it's a category ID)
+func normalizeDiscussionCategory(category string, log *logger.Logger, markdownPath string) string {
 	// Empty category is allowed (GitHub Discussions will use default)
 	if category == "" {
-		return false
+		return category
 	}
 
-	// GitHub Discussion category IDs start with "DIC_" - these are valid
+	// GitHub Discussion category IDs start with "DIC_" - don't normalize these
 	if strings.HasPrefix(category, "DIC_") {
-		return false
+		return category
 	}
 
 	// List of known category naming issues and their corrections
@@ -223,26 +221,25 @@ func validateDiscussionCategory(category string, log *logger.Logger, markdownPat
 		"Research": "research",
 	}
 
-	// Check if category has uppercase letters
-	if category != strings.ToLower(category) {
+	// Check if category has uppercase letters and normalize
+	normalizedCategory := strings.ToLower(category)
+	if category != normalizedCategory {
 		var message string
 		// Check if we have a known correction
 		if corrected, exists := categoryCorrections[category]; exists {
-			message = fmt.Sprintf("Discussion category %q should use lowercase: %q", category, corrected)
+			message = fmt.Sprintf("Discussion category %q normalized to lowercase: %q", category, corrected)
 			if log != nil {
-				log.Printf("Invalid discussion category %q: should use lowercase: %q", category, corrected)
+				log.Printf("Normalized discussion category %q to lowercase: %q", category, corrected)
 			}
 		} else {
-			message = fmt.Sprintf("Discussion category %q should use lowercase", category)
+			message = fmt.Sprintf("Discussion category %q normalized to lowercase: %q", category, normalizedCategory)
 			if log != nil {
-				log.Printf("Invalid discussion category %q: should use lowercase", category)
+				log.Printf("Normalized discussion category %q to lowercase: %q", category, normalizedCategory)
 			}
 		}
 
-		// Print formatted warning to stderr
-		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-
-		return true // Validation failed
+		// Print formatted info message to stderr
+		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "info", message))
 	}
 
 	// Warn about singular forms of common categories
@@ -251,11 +248,11 @@ func validateDiscussionCategory(category string, log *logger.Logger, markdownPat
 		"report": "reports",
 	}
 
-	if plural, isSingular := singularToPlural[category]; isSingular {
+	if plural, isSingular := singularToPlural[normalizedCategory]; isSingular {
 		if log != nil {
-			log.Printf("⚠ Discussion category %q is singular; consider using plural form %q for consistency", category, plural)
+			log.Printf("⚠ Discussion category %q is singular; consider using plural form %q for consistency", normalizedCategory, plural)
 		}
 	}
 
-	return false // Validation passed
+	return normalizedCategory
 }

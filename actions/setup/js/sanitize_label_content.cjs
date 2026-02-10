@@ -5,6 +5,8 @@
  * @module sanitize_label_content
  */
 
+const { hardenUnicodeText } = require("./sanitize_content_core.cjs");
+
 /**
  * Sanitizes label content by removing control characters, ANSI escape codes,
  * and neutralizing @mentions to prevent unintended notifications.
@@ -17,6 +19,10 @@ function sanitizeLabelContent(content) {
     return "";
   }
   let sanitized = content.trim();
+
+  // Apply Unicode hardening first
+  sanitized = hardenUnicodeText(sanitized);
+
   // Remove ANSI escape sequences FIRST (before removing control chars)
   sanitized = sanitized.replace(/\x1b\[[0-9;]*[mGKH]/g, "");
   // Then remove control characters (except newlines and tabs)

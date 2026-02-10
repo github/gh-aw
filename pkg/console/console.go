@@ -47,6 +47,7 @@ func applyStyle(style lipgloss.Style, text string) string {
 }
 
 // ToRelativePath converts an absolute path to a relative path from the current working directory
+// If the relative path contains "..", returns the absolute path instead for clarity
 func ToRelativePath(path string) string {
 	if !filepath.IsAbs(path) {
 		return path
@@ -61,6 +62,11 @@ func ToRelativePath(path string) string {
 	relPath, err := filepath.Rel(wd, path)
 	if err != nil {
 		// If we can't get a relative path, return the original path
+		return path
+	}
+
+	// If the relative path contains "..", use absolute path instead for clarity
+	if strings.Contains(relPath, "..") {
 		return path
 	}
 

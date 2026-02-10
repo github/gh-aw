@@ -58,6 +58,7 @@ func populateDispatchWorkflowFiles(data *WorkflowData, markdownPath string) {
 func generateSafeOutputsConfig(data *WorkflowData) string {
 	// Pass the safe-outputs configuration for validation
 	if data.SafeOutputs == nil {
+		safeOutputsConfigLog.Print("No safe outputs configuration found, returning empty config")
 		return ""
 	}
 	safeOutputsConfigLog.Print("Generating safe outputs configuration for workflow")
@@ -341,7 +342,9 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 
 	// Add safe-jobs configuration from SafeOutputs.Jobs
 	if len(data.SafeOutputs.Jobs) > 0 {
+		safeOutputsConfigLog.Printf("Processing %d safe job configurations", len(data.SafeOutputs.Jobs))
 		for jobName, jobConfig := range data.SafeOutputs.Jobs {
+			safeOutputsConfigLog.Printf("Generating config for safe job: %s", jobName)
 			safeJobConfig := map[string]any{}
 
 			// Add description if present
@@ -441,6 +444,7 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 	}
 
 	configJSON, _ := json.Marshal(safeOutputsConfig)
+	safeOutputsConfigLog.Printf("Safe outputs config generation complete: %d tool types configured", len(safeOutputsConfig))
 	return string(configJSON)
 }
 

@@ -9,120 +9,123 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateDiscussionCategory(t *testing.T) {
+func TestNormalizeDiscussionCategory(t *testing.T) {
 	tests := []struct {
-		name          string
-		category      string
-		expectInvalid bool
+		name             string
+		category         string
+		expectedCategory string
 	}{
 		{
-			name:          "empty category is valid",
-			category:      "",
-			expectInvalid: false,
+			name:             "empty category unchanged",
+			category:         "",
+			expectedCategory: "",
 		},
 		{
-			name:          "lowercase category is valid",
-			category:      "audits",
-			expectInvalid: false,
+			name:             "lowercase category unchanged",
+			category:         "audits",
+			expectedCategory: "audits",
 		},
 		{
-			name:          "lowercase plural is valid",
-			category:      "reports",
-			expectInvalid: false,
+			name:             "lowercase plural unchanged",
+			category:         "reports",
+			expectedCategory: "reports",
 		},
 		{
-			name:          "lowercase research is valid",
-			category:      "research",
-			expectInvalid: false,
+			name:             "lowercase research unchanged",
+			category:         "research",
+			expectedCategory: "research",
 		},
 		{
-			name:          "general lowercase is valid",
-			category:      "general",
-			expectInvalid: false,
+			name:             "general lowercase unchanged",
+			category:         "general",
+			expectedCategory: "general",
 		},
 		{
-			name:          "capitalized Audits fails",
-			category:      "Audits",
-			expectInvalid: true,
+			name:             "capitalized Audits normalized to lowercase",
+			category:         "Audits",
+			expectedCategory: "audits",
 		},
 		{
-			name:          "capitalized General fails",
-			category:      "General",
-			expectInvalid: true,
+			name:             "capitalized General normalized to lowercase",
+			category:         "General",
+			expectedCategory: "general",
 		},
 		{
-			name:          "capitalized Reports fails",
-			category:      "Reports",
-			expectInvalid: true,
+			name:             "capitalized Reports normalized to lowercase",
+			category:         "Reports",
+			expectedCategory: "reports",
 		},
 		{
-			name:          "capitalized Research fails",
-			category:      "Research",
-			expectInvalid: true,
+			name:             "capitalized Research normalized to lowercase",
+			category:         "Research",
+			expectedCategory: "research",
 		},
 		{
-			name:          "unknown capitalized category fails",
-			category:      "MyCategory",
-			expectInvalid: true,
+			name:             "unknown capitalized category normalized",
+			category:         "MyCategory",
+			expectedCategory: "mycategory",
 		},
 		{
-			name:          "mixed case fails",
-			category:      "AuDiTs",
-			expectInvalid: true,
+			name:             "mixed case normalized",
+			category:         "AuDiTs",
+			expectedCategory: "audits",
 		},
 		{
-			name:          "singular audit is valid but logged as warning",
-			category:      "audit",
-			expectInvalid: false,
-			// Note: This will log a warning, but not fail
+			name:             "singular audit unchanged (but warns)",
+			category:         "audit",
+			expectedCategory: "audit",
 		},
 		{
-			name:          "singular report is valid but logged as warning",
-			category:      "report",
-			expectInvalid: false,
-			// Note: This will log a warning, but not fail
+			name:             "singular report unchanged (but warns)",
+			category:         "report",
+			expectedCategory: "report",
 		},
 		{
-			name:          "category ID is valid",
-			category:      "DIC_kwDOGFsHUM4BsUn3",
-			expectInvalid: false,
+			name:             "category ID unchanged",
+			category:         "DIC_kwDOGFsHUM4BsUn3",
+			expectedCategory: "DIC_kwDOGFsHUM4BsUn3",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log := logger.New("test:discussion_validation")
-			isInvalid := validateDiscussionCategory(tt.category, log, "test.md")
-
-			if tt.expectInvalid {
-				assert.True(t, isInvalid, "Expected validation to fail for category %q", tt.category)
-			} else {
-				assert.False(t, isInvalid, "Expected validation to pass for category %q", tt.category)
-			}
+			normalized := normalizeDiscussionCategory(tt.category, log, "test.md")
+			assert.Equal(t, tt.expectedCategory, normalized, "Expected category %q to be normalized to %q", tt.category, tt.expectedCategory)
 		})
 	}
 }
 
-func TestParseDiscussionsConfigValidation(t *testing.T) {
+func TestParseDiscussionsConfigNormalization(t *testing.T) {
 	tests := []struct {
-		name            string
-		category        string
-		expectNilResult bool
+		name               string
+		category           string
+		expectedCategory   string
+		expectNonNilResult bool
 	}{
 		{
-			name:            "valid lowercase category returns config",
-			category:        "audits",
-			expectNilResult: false,
+			name:               "valid lowercase category returns config",
+			category:           "audits",
+			expectedCategory:   "audits",
+			expectNonNilResult: true,
 		},
 		{
-			name:            "capitalized category returns nil",
-			category:        "Audits",
-			expectNilResult: true,
+			name:               "capitalized category normalized and returns config",
+			category:           "Audits",
+			expectedCategory:   "audits",
+			expectNonNilResult: true,
 		},
 		{
-			name:            "General category returns nil",
-			category:        "General",
-			expectNilResult: true,
+			name:               "General category normalized and returns config",
+			category:           "General",
+			expectedCategory:   "general",
+			expectNonNilResult: true,
+		},
+		{
+			name:               "mixed case category normalized",
+			category:           "MyCategory",
+			expectedCategory:   "mycategory",
+			expectNonNilResult: true,
 		},
 	}
 
@@ -137,10 +140,11 @@ func TestParseDiscussionsConfigValidation(t *testing.T) {
 
 			result := compiler.parseDiscussionsConfig(outputMap)
 
-			if tt.expectNilResult {
-				assert.Nil(t, result, "Expected nil result for invalid category %q", tt.category)
+			if tt.expectNonNilResult {
+				assert.NotNil(t, result, "Expected non-nil result for category %q", tt.category)
+				assert.Equal(t, tt.expectedCategory, result.Category, "Expected category to be normalized to %q", tt.expectedCategory)
 			} else {
-				assert.NotNil(t, result, "Expected non-nil result for valid category %q", tt.category)
+				assert.Nil(t, result, "Expected nil result for invalid category %q", tt.category)
 			}
 		})
 	}

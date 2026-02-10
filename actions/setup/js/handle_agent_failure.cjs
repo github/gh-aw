@@ -331,6 +331,7 @@ async function main() {
   try {
     // Get workflow context
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "unknown";
+    const workflowID = process.env.GH_AW_WORKFLOW_ID || "unknown";
     const agentConclusion = process.env.GH_AW_AGENT_CONCLUSION || "";
     const runUrl = process.env.GH_AW_RUN_URL || "";
     const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
@@ -344,6 +345,7 @@ async function main() {
 
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Workflow name: ${workflowName}`);
+    core.info(`Workflow ID: ${workflowID}`);
     core.info(`Secret verification result: ${secretVerificationResult}`);
     core.info(`Assignment error count: ${assignmentErrorCount}`);
     core.info(`Create discussion error count: ${createDiscussionErrorCount}`);
@@ -561,6 +563,7 @@ async function main() {
         // Create template context with sanitized workflow name
         const templateContext = {
           workflow_name: sanitizedWorkflowName,
+          workflow_id: workflowID,
           run_url: runUrl,
           workflow_source_url: workflowSourceURL || "#",
           branch: currentBranch,

@@ -12,6 +12,7 @@ const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { createUpdateHandlerFactory } = require("./update_handler_factory.cjs");
 const { updateBody } = require("./update_pr_description_helpers.cjs");
 const { loadTemporaryProjectMap, replaceTemporaryProjectReferences } = require("./temporary_id.cjs");
+const { sanitizeTitle } = require("./sanitize_title.cjs");
 
 /**
  * Execute the issue update API call
@@ -109,7 +110,8 @@ function buildIssueUpdateData(item, config) {
   const updateData = {};
 
   if (item.title !== undefined) {
-    updateData.title = item.title;
+    // Sanitize title for Unicode security (no prefix handling needed for updates)
+    updateData.title = sanitizeTitle(item.title);
   }
   if (item.body !== undefined) {
     // Store operation information for consistent footer/append behavior.

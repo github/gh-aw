@@ -297,9 +297,9 @@ func TestApplyActionPinToStep(t *testing.T) {
 func TestGetActionPinsSorting(t *testing.T) {
 	pins := getActionPins()
 
-	// Verify we got all the pins (43 as of February 2026)
-	if len(pins) != 43 {
-		t.Errorf("getActionPins() returned %d pins, expected 43", len(pins))
+	// Verify we got all the pins (38 as of February 2026)
+	if len(pins) != 38 {
+		t.Errorf("getActionPins() returned %d pins, expected 38", len(pins))
 	}
 
 	// Verify they are sorted by version (descending) then by repository name (ascending)
@@ -339,13 +339,13 @@ func TestGetActionPinByRepo(t *testing.T) {
 			repo:         "actions/checkout",
 			expectExists: true,
 			expectRepo:   "actions/checkout",
-			expectVer:    "v6",
+			expectVer:    "v6.0.2",
 		},
 		{
 			repo:         "actions/setup-node",
 			expectExists: true,
 			expectRepo:   "actions/setup-node",
-			expectVer:    "v6.1.0",
+			expectVer:    "v6.2.0",
 		},
 		{
 			repo:         "unknown/action",
@@ -542,14 +542,14 @@ func TestGetActionPinSemverPreference(t *testing.T) {
 		expectedVersion string
 	}{
 		{
-			name:            "setup-go prefers v6.1.0 over v6",
+			name:            "setup-go prefers v6.2.0 over v6",
 			repo:            "actions/setup-go",
-			expectedVersion: "v6.1.0",
+			expectedVersion: "v6.2.0",
 		},
 		{
-			name:            "setup-node prefers v6.1.0 over v6",
+			name:            "setup-node prefers v6.2.0 over v6",
 			repo:            "actions/setup-node",
-			expectedVersion: "v6.1.0",
+			expectedVersion: "v6.2.0",
 		},
 		{
 			name:            "upload-artifact prefers v6.0.0 over v5 and v4",
@@ -601,18 +601,18 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 		shouldFallback bool // Whether we expect to fall back to highest version
 	}{
 		{
-			name:           "exact match for setup-go v6.1.0",
+			name:           "exact match for setup-go v6.2.0",
 			repo:           "actions/setup-go",
-			requestedVer:   "v6.1.0",
-			expectedVer:    "v6.1.0",
+			requestedVer:   "v6.2.0",
+			expectedVer:    "v6.2.0",
 			strictMode:     false,
 			shouldFallback: false,
 		},
 		{
-			name:           "exact match for setup-go v6 from hardcoded pins",
+			name:           "exact match for setup-go v6.2.0 from hardcoded pins",
 			repo:           "actions/setup-go",
-			requestedVer:   "v6",
-			expectedVer:    "v6", // Should match exactly v6, not v6.1.0
+			requestedVer:   "v6.2.0",
+			expectedVer:    "v6.2.0", // Should match exactly v6.2.0
 			strictMode:     false,
 			shouldFallback: false,
 		},

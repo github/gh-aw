@@ -50,7 +50,7 @@ func downloadAgentFileFromGitHub(verbose bool) (string, error) {
 	currentVersion := GetVersion()
 
 	// If version looks like a release tag (starts with v and contains dots), use it
-	isRelease := strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".")
+	isRelease := strings.HasPrefix(currentVersion, "v") && strings.Contains(currentVersion, ".") && !strings.Contains(currentVersion, "dirty")
 	if isRelease {
 		ref = currentVersion
 		commandsLog.Printf("Using release tag: %s", ref)

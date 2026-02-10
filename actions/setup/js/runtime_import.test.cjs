@@ -127,6 +127,86 @@ describe("runtime_import", () => {
         expect(isSafeExpression("inputs.value || secrets.TOKEN")).toBe(!1);
         expect(isSafeExpression("github.actor || vars.NAME")).toBe(!1);
       });
+      it("should block dangerous property names - constructor", () => {
+        expect(isSafeExpression("github.constructor")).toBe(!1);
+        expect(isSafeExpression("inputs.constructor")).toBe(!1);
+        expect(isSafeExpression("github.event.constructor")).toBe(!1);
+        expect(isSafeExpression("needs.job.constructor")).toBe(!1);
+      });
+      it("should block dangerous property names - __proto__", () => {
+        expect(isSafeExpression("github.__proto__")).toBe(!1);
+        expect(isSafeExpression("inputs.__proto__")).toBe(!1);
+        expect(isSafeExpression("github.event.__proto__")).toBe(!1);
+      });
+      it("should block dangerous property names - prototype", () => {
+        expect(isSafeExpression("github.prototype")).toBe(!1);
+        expect(isSafeExpression("inputs.prototype")).toBe(!1);
+        expect(isSafeExpression("github.event.prototype")).toBe(!1);
+      });
+      it("should block dangerous property names - __defineGetter__", () => {
+        expect(isSafeExpression("github.__defineGetter__")).toBe(!1);
+        expect(isSafeExpression("inputs.__defineGetter__")).toBe(!1);
+      });
+      it("should block dangerous property names - __defineSetter__", () => {
+        expect(isSafeExpression("github.__defineSetter__")).toBe(!1);
+        expect(isSafeExpression("inputs.__defineSetter__")).toBe(!1);
+      });
+      it("should block dangerous property names - __lookupGetter__", () => {
+        expect(isSafeExpression("github.__lookupGetter__")).toBe(!1);
+        expect(isSafeExpression("inputs.__lookupGetter__")).toBe(!1);
+      });
+      it("should block dangerous property names - __lookupSetter__", () => {
+        expect(isSafeExpression("github.__lookupSetter__")).toBe(!1);
+        expect(isSafeExpression("inputs.__lookupSetter__")).toBe(!1);
+      });
+      it("should block dangerous property names - hasOwnProperty", () => {
+        expect(isSafeExpression("github.hasOwnProperty")).toBe(!1);
+        expect(isSafeExpression("inputs.hasOwnProperty")).toBe(!1);
+      });
+      it("should block dangerous property names - isPrototypeOf", () => {
+        expect(isSafeExpression("github.isPrototypeOf")).toBe(!1);
+        expect(isSafeExpression("inputs.isPrototypeOf")).toBe(!1);
+      });
+      it("should block dangerous property names - propertyIsEnumerable", () => {
+        expect(isSafeExpression("github.propertyIsEnumerable")).toBe(!1);
+        expect(isSafeExpression("inputs.propertyIsEnumerable")).toBe(!1);
+      });
+      it("should block dangerous property names - toString", () => {
+        expect(isSafeExpression("github.toString")).toBe(!1);
+        expect(isSafeExpression("inputs.toString")).toBe(!1);
+      });
+      it("should block dangerous property names - valueOf", () => {
+        expect(isSafeExpression("github.valueOf")).toBe(!1);
+        expect(isSafeExpression("inputs.valueOf")).toBe(!1);
+      });
+      it("should block dangerous property names - toLocaleString", () => {
+        expect(isSafeExpression("github.toLocaleString")).toBe(!1);
+        expect(isSafeExpression("inputs.toLocaleString")).toBe(!1);
+      });
+      it("should block dangerous properties in array access", () => {
+        expect(isSafeExpression("github.event.release.assets[0].constructor")).toBe(!1);
+        expect(isSafeExpression("github.event.release.assets[0].__proto__")).toBe(!1);
+      });
+      it("should reject excessive nesting depth (more than 5 levels)", () => {
+        // Valid: max 5 levels (needs.job.outputs.foo.bar)
+        expect(isSafeExpression("needs.job.outputs.foo.bar")).toBe(!0);
+        expect(isSafeExpression("steps.step.outputs.foo.bar")).toBe(!0);
+        // Invalid: 6 levels
+        expect(isSafeExpression("needs.job.outputs.foo.bar.baz")).toBe(!1);
+        expect(isSafeExpression("steps.step.outputs.foo.bar.baz")).toBe(!1);
+        // Invalid: 7+ levels
+        expect(isSafeExpression("needs.job.outputs.foo.bar.baz.qux")).toBe(!1);
+      });
+      it("should allow valid nested expressions within depth limit", () => {
+        // 2 levels
+        expect(isSafeExpression("needs.job.outputs")).toBe(!0);
+        // 3 levels
+        expect(isSafeExpression("needs.job.outputs.result")).toBe(!0);
+        // 4 levels
+        expect(isSafeExpression("needs.job.outputs.foo.value")).toBe(!0);
+        // 5 levels (max)
+        expect(isSafeExpression("needs.job.outputs.foo.bar")).toBe(!0);
+      });
     }),
     describe("evaluateExpression", () => {
       beforeEach(() => {
@@ -171,6 +251,43 @@ describe("runtime_import", () => {
       it("should return wrapped expression for undefined without fallback", () => {
         expect(evaluateExpression("inputs.missing")).toContain("${{");
         expect(evaluateExpression("inputs.missing")).toContain("inputs.missing");
+      });
+      it("should not access prototype chain properties", () => {
+        // These should return undefined (wrapped expression) instead of accessing prototype
+        const result = evaluateExpression("github.constructor");
+        expect(result).toContain("${{");
+        expect(result).toContain("github.constructor");
+      });
+      it("should not access __proto__ property", () => {
+        const result = evaluateExpression("github.__proto__");
+        expect(result).toContain("${{");
+        expect(result).toContain("github.__proto__");
+      });
+      it("should safely handle missing properties without prototype pollution", () => {
+        // These properties don't exist in the context object and should be undefined
+        expect(evaluateExpression("github.nonexistent")).toContain("${{");
+        expect(evaluateExpression("inputs.toString")).toContain("${{");
+      });
+      it("should handle array access safely with bounds checking", () => {
+        // Test with actual array in context
+        global.context = {
+          actor: "testuser",
+          job: "test-job",
+          repo: { owner: "testorg", repo: "testrepo" },
+          runId: 12345,
+          runNumber: 67,
+          workflow: "test-workflow",
+          payload: {
+            inputs: { repository: "testorg/testrepo", name: "test-name" },
+            release: { assets: [{ id: 123 }, { id: 456 }] },
+          },
+        };
+        // Valid array access
+        expect(evaluateExpression("github.event.release.assets[0].id")).toBe("123");
+        expect(evaluateExpression("github.event.release.assets[1].id")).toBe("456");
+        // Out of bounds - should return undefined
+        const outOfBounds = evaluateExpression("github.event.release.assets[999].id");
+        expect(outOfBounds).toContain("${{");
       });
     }),
     describe("processRuntimeImport", () => {

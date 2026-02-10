@@ -17,15 +17,9 @@ Schema validation errors occur when the workflow frontmatter does not conform to
 
 ### Frontmatter Not Properly Closed
 
-**Error Message:**
+`frontmatter not properly closed`
 
-```text
-frontmatter not properly closed
-```text
-
-**Cause:** The YAML frontmatter section lacks a closing `---` delimiter, or the delimiters are malformed.
-
-**Solution:** Ensure the frontmatter is enclosed between two `---` lines:
+The YAML frontmatter section lacks a closing `---` delimiter. Ensure the frontmatter is enclosed between two `---` lines:
 
 ```aw wrap
 ---
@@ -35,80 +29,50 @@ permissions:
 ---
 
 # Workflow content
-```text
+```
 
 ### Failed to Parse Frontmatter
 
-**Error Message:**
+`failed to parse frontmatter: [yaml error details]`
 
-```text
-failed to parse frontmatter: [yaml error details]
-```text
-
-**Cause:** The YAML syntax in the frontmatter is invalid. Common issues include incorrect indentation, missing colons, or invalid characters.
-
-**Solution:** Validate the YAML syntax. Check indentation (use spaces, not tabs), ensure colons are followed by spaces, quote strings with special characters, and verify array/object syntax.
+Invalid YAML syntax in the frontmatter. Check indentation (use spaces, not tabs), ensure colons are followed by spaces, quote strings with special characters, and verify array/object syntax:
 
 ```yaml wrap
 # Correct indentation and spacing
 on:
   issues:
     types: [opened]
-```text
+```
 
 ### Invalid Field Type
 
-**Error Message:**
+`timeout-minutes must be an integer`
 
-```text
-timeout-minutes must be an integer
-```text
-
-**Cause:** A field received a value of the wrong type according to the schema.
-
-**Solution:** Use the correct type as specified in the [frontmatter reference](/gh-aw/reference/frontmatter/). For example, use `timeout-minutes: 10` (integer) not `"10"` (string).
+A field received a value of the wrong type. Use the correct type as specified in the [frontmatter reference](/gh-aw/reference/frontmatter/) (e.g., `timeout-minutes: 10` not `"10"`).
 
 ### Unknown Property
 
-**Error Message:**
+`Unknown property: permisions. Did you mean 'permissions'?`
 
-```text
-Unknown property: permisions. Did you mean 'permissions'?
-```text
-
-**Cause:** A field name in the frontmatter is not recognized by the schema validator, often due to a typo.
-
-**Solution:** Use the suggested field name from the error message. The compiler uses fuzzy matching to suggest corrections for common typos like `permisions` → `permissions`, `engnie` → `engine`, `toolz` → `tools`, `timeout_minute` → `timeout-minutes`, or `runs_on` → `runs-on`.
+Use the suggested field name from the error message. The compiler uses fuzzy matching to suggest corrections for common typos.
 
 ### Imports Field Must Be Array
 
-**Error Message:**
+`imports field must be an array of strings`
 
-```text
-imports field must be an array of strings
-```text
-
-**Cause:** The `imports:` field was provided but is not an array of string paths.
-
-**Solution:** Use array syntax for imports:
+The `imports:` field must use array syntax:
 
 ```yaml wrap
 imports:
   - shared/tools.md
   - shared/security.md
-```text
+```
 
 ### Multiple Agent Files in Imports
 
-**Error Message:**
+`multiple agent files found in imports: 'file1.md' and 'file2.md'. Only one agent file is allowed per workflow`
 
-```text
-multiple agent files found in imports: 'file1.md' and 'file2.md'. Only one agent file is allowed per workflow
-```text
-
-**Cause:** More than one file under `.github/agents/` was included in the imports list.
-
-**Solution:** Import only one agent file per workflow.
+Import only one agent file per workflow from `.github/agents/`.
 
 ## Compilation Errors
 
@@ -116,51 +80,27 @@ Compilation errors occur when the workflow file is being converted to a GitHub A
 
 ### Workflow File Not Found
 
-**Error Message:**
+`workflow file not found: [path]`
 
-```text
-workflow file not found: [path]
-```text
-
-**Cause:** The specified workflow file does not exist at the given path.
-
-**Solution:** Verify the file exists in `.github/workflows/` and the filename is correct. Use `gh aw compile` without arguments to compile all workflows in the directory.
+Verify the file exists in `.github/workflows/` and the filename is correct. Use `gh aw compile` without arguments to compile all workflows in the directory.
 
 ### Failed to Resolve Import
 
-**Error Message:**
+`failed to resolve import 'path': [details]`
 
-```text
-failed to resolve import 'path': [details]
-```text
-
-**Cause:** An imported file specified in the `imports:` field could not be found or accessed.
-
-**Solution:** Ensure the file exists at the specified path (relative to repository root) and has read permissions.
+Ensure the imported file exists at the specified path (relative to repository root) and has read permissions.
 
 ### Invalid Workflow Specification
 
-**Error Message:**
+`invalid workflowspec: must be owner/repo/path[@ref]`
 
-```text
-invalid workflowspec: must be owner/repo/path[@ref]
-```text
-
-**Cause:** When using remote imports, the specification format is incorrect.
-
-**Solution:** Use the correct format: `owner/repo/path[@ref]`, for example `github/gh-aw/.github/workflows/shared/example.md@main`.
+Use the correct format for remote imports: `owner/repo/path[@ref]` (e.g., `github/gh-aw/.github/workflows/shared/example.md@main`).
 
 ### Section Not Found
 
-**Error Message:**
+`section 'name' not found`
 
-```text
-section 'name' not found
-```text
-
-**Cause:** An attempt to extract a specific section from the frontmatter failed because the section doesn't exist.
-
-**Solution:** Verify the referenced section exists in the frontmatter. This typically occurs during internal processing and may indicate a bug.
+Verify the referenced section exists in the frontmatter. This typically occurs during internal processing and may indicate a bug.
 
 ## Runtime Errors
 
@@ -168,175 +108,91 @@ Runtime errors occur when the compiled workflow executes in GitHub Actions.
 
 ### Time Delta Errors
 
-**Error Message:**
+`invalid time delta format: +[value]. Expected format like +25h, +3d, +1w, +1mo, +1d12h30m`
 
-```text
-invalid time delta format: +[value]. Expected format like +25h, +3d, +1w, +1mo, +1d12h30m
-```text
+Use the correct time delta syntax with supported units: `h` (hours, minimum), `d` (days), `w` (weeks), `mo` (months). Example: `stop-after: +24h`.
 
-**Cause:** The `stop-after` field in the `on:` section contains an invalid time delta format.
+`minute unit 'm' is not allowed for stop-after. Minimum unit is hours 'h'. Use +[hours]h instead of +[minutes]m`
 
-**Solution:** Use the correct time delta syntax with supported units: `h` (hours, minimum for stop-after), `d` (days), `w` (weeks), `mo` (months). Example: `stop-after: +24h`.
-
-**Error Message:**
-
-```text
-minute unit 'm' is not allowed for stop-after. Minimum unit is hours 'h'. Use +[hours]h instead of +[minutes]m
-```text
-
-**Cause:** The `stop-after` field uses minutes (`m`), but the minimum allowed unit is hours.
-
-**Solution:** Convert minutes to hours (round up as needed). For example, use `+2h` instead of `+90m`.
+Convert minutes to hours (round up as needed). Use `+2h` instead of `+90m`.
 
 ### Time Delta Too Large
 
-**Error Message:**
+`time delta too large: [value] [unit] exceeds maximum of [max]`
 
-```text
-time delta too large: [value] [unit] exceeds maximum of [max]
-```text
-
-**Cause:** The time delta exceeds the maximum allowed value for the specified unit.
-
-**Solution:** Reduce the time delta or use a larger unit. Maximum values: 12 months, 52 weeks, 365 days, 8760 hours.
+Reduce the time delta or use a larger unit. Maximum values: 12 months, 52 weeks, 365 days, 8760 hours.
 
 ### Duplicate Time Unit
 
-**Error Message:**
+`duplicate unit '[unit]' in time delta: +[value]`
 
-```text
-duplicate unit '[unit]' in time delta: +[value]
-```text
-
-**Cause:** The same time unit appears multiple times in a time delta.
-
-**Solution:** Combine values for the same unit (e.g., `+3d` instead of `+1d2d`).
+Combine values for the same unit (e.g., `+3d` instead of `+1d2d`).
 
 ### Unable to Parse Date-Time
 
-**Error Message:**
+`unable to parse date-time: [value]. Supported formats include: YYYY-MM-DD HH:MM:SS, MM/DD/YYYY, January 2 2006, 1st June 2025, etc`
 
-```text
-unable to parse date-time: [value]. Supported formats include: YYYY-MM-DD HH:MM:SS, MM/DD/YYYY, January 2 2006, 1st June 2025, etc
-```text
-
-**Cause:** The `stop-after` field contains an absolute timestamp that couldn't be parsed.
-
-**Solution:** Use a supported date format like `"2025-12-31 23:59:59"`, `"December 31, 2025"`, or `"12/31/2025"`.
+Use a supported date format like `"2025-12-31 23:59:59"`, `"December 31, 2025"`, or `"12/31/2025"`.
 
 ### JQ Not Found
 
-**Error Message:**
+`jq not found in PATH`
 
-```text
-jq not found in PATH
-```text
-
-**Cause:** The `jq` command-line tool is required but not available in the environment.
-
-**Solution:** Install `jq` (Ubuntu/Debian: `sudo apt-get install jq`, macOS: `brew install jq`).
+Install `jq`: Ubuntu/Debian: `sudo apt-get install jq`, macOS: `brew install jq`.
 
 ### Authentication Errors
 
-**Error Message:**
+`authentication required`
 
-```text
-authentication required
-```text
-
-**Cause:** GitHub CLI authentication is required but not configured.
-
-**Solution:** Authenticate with GitHub CLI (`gh auth login`) or ensure `GITHUB_TOKEN` is available in GitHub Actions environment.
+Authenticate with GitHub CLI (`gh auth login`) or ensure `GITHUB_TOKEN` is available in GitHub Actions.
 
 ## Engine-Specific Errors
 
 ### Manual Approval Invalid Format
 
-**Error Message:**
+`manual-approval value must be a string`
 
-```text
-manual-approval value must be a string
-```text
-
-**Cause:** The `manual-approval:` field in the `on:` section has an incorrect type.
-
-**Solution:** Use a string value, e.g. `manual-approval: "Approve deployment to production"`.
+Use a string value: `manual-approval: "Approve deployment to production"`.
 
 ### Invalid On Section Format
 
-**Error Message:**
+`invalid on: section format`
 
-```text
-invalid on: section format
-```text
-
-**Cause:** The `on:` trigger configuration is malformed or contains unsupported syntax.
-
-**Solution:** Verify the trigger configuration follows [GitHub Actions syntax](/gh-aw/reference/triggers/). Valid formats include `on: push`, `on: push: branches: [main]`, or `on: issues: types: [opened, edited]`.
+Verify the trigger configuration follows [GitHub Actions syntax](/gh-aw/reference/triggers/) (e.g., `on: push`, `on: { push: { branches: [main] } }`).
 
 ## File Processing Errors
 
 ### Failed to Read File
 
-**Error Message:**
+`failed to read file [path]: [details]`
 
-```text
-failed to read file [path]: [details]
-```text
-
-**Cause:** The file cannot be read due to permissions, missing file, or I/O error.
-
-**Solution:** Verify the file exists, has read permissions, and the disk is not full.
+Verify the file exists, has read permissions, and the disk is not full.
 
 ### Failed to Create Directory
 
-**Error Message:**
+`failed to create .github/workflows directory: [details]`
 
-```text
-failed to create .github/workflows directory: [details]
-```text
-
-**Cause:** The required directory structure cannot be created.
-
-**Solution:** Check file system permissions and available disk space.
+Check file system permissions and available disk space.
 
 ### Workflow File Already Exists
 
-**Error Message:**
+`workflow file '[path]' already exists. Use --force to overwrite`
 
-```text
-workflow file '[path]' already exists. Use --force to overwrite
-```text
-
-**Cause:** Attempting to create a workflow that already exists.
-
-**Solution:** Use `gh aw init my-workflow --force` to overwrite.
+Use `gh aw init my-workflow --force` to overwrite.
 
 ## Safe Output Errors
 
-### Failed to Parse Existing Model Context Protocol (MCP) Config
+### Failed to Parse Existing MCP Config
 
-**Error Message:**
+`failed to parse existing mcp.json: [details]`
 
-```text
-failed to parse existing mcp.json: [details]
-```text
-
-**Cause:** The existing `.vscode/mcp.json` file contains invalid JSON.
-
-**Solution:** Fix the JSON syntax (validate with `cat .vscode/mcp.json | jq .`) or delete the file to regenerate.
+Fix the JSON syntax (validate with `cat .vscode/mcp.json | jq .`) or delete the file to regenerate.
 
 ### Failed to Marshal MCP Config
 
-**Error Message:**
+`failed to marshal mcp.json: [details]`
 
-```text
-failed to marshal mcp.json: [details]
-```text
-
-**Cause:** Internal error when generating the MCP configuration.
-
-**Solution:** This typically indicates a bug. Report the issue with reproduction steps.
+Internal error when generating the MCP configuration. Report the issue with reproduction steps.
 
 ## Top User-Facing Errors
 
@@ -344,180 +200,95 @@ This section documents the most common errors you may encounter when working wit
 
 ### Cannot Use Command with Event Trigger
 
-**Error Message:**
+`cannot use 'command' with 'issues' in the same workflow`
 
-```text
-cannot use 'command' with 'issues' in the same workflow
-```text
-
-**Cause:** The workflow specifies both a `command:` trigger and a conflicting event like `issues`, `issue_comment`, `pull_request`, or `pull_request_review_comment`. Command triggers automatically handle these events internally.
-
-**Solution:** Remove the conflicting event trigger. The `command:` configuration automatically handles these events. To restrict to specific events, use the `events:` field within the command configuration.
+Remove the conflicting event trigger (`issues`, `issue_comment`, `pull_request`, or `pull_request_review_comment`). The `command:` configuration automatically handles these events. To restrict to specific events, use the `events:` field within the command configuration.
 
 ### Strict Mode Network Configuration Required
 
-**Error Message:**
+`strict mode: 'network' configuration is required`
 
-```text
-strict mode: 'network' configuration is required
-```text
-
-**Cause:** The workflow is compiled with `--strict` flag but does not include network configuration. Strict mode requires explicit network permissions for security.
-
-**Solution:** Add network configuration: use `network: defaults` (recommended), specify allowed domains explicitly, or deny all network access with `network: {}`.
+Add network configuration: use `network: defaults` (recommended), specify allowed domains explicitly, or deny all network access with `network: {}`.
 
 ### Strict Mode Write Permission Not Allowed
 
-**Error Message:**
+`strict mode: write permission 'contents: write' is not allowed`
 
-```text
-strict mode: write permission 'contents: write' is not allowed
-```text
-
-**Cause:** The workflow is compiled with `--strict` flag but requests write permissions on `contents`, `issues`, or `pull-requests`. Strict mode enforces read-only operations.
-
-**Solution:** Use `safe-outputs` instead of write permissions. Configure safe outputs like `create-issue` or `create-pull-request` with appropriate options.
+Use `safe-outputs` instead of write permissions. Configure safe outputs like `create-issue` or `create-pull-request` with appropriate options.
 
 ### Strict Mode Network Wildcard Not Allowed
 
-**Error Message:**
+`strict mode: wildcard '*' is not allowed in network.allowed domains`
 
-```text
-strict mode: wildcard '*' is not allowed in network.allowed domains
-```
-
-**Cause:** The workflow uses a standalone `*` wildcard in network.allowed domains when compiled with `--strict` flag. Strict mode prohibits unrestricted network access via `*` but does allow specific wildcard patterns like `*.example.com`.
-
-**Solution:** Replace the standalone `*` wildcard with specific domains, wildcard patterns (e.g., `*.cdn.example.com`), or ecosystem identifiers (e.g., `python`, `node`). Alternatively, use `network: defaults` for basic infrastructure access.
+Replace the standalone `*` wildcard with specific domains, wildcard patterns (e.g., `*.cdn.example.com`), or ecosystem identifiers (e.g., `python`, `node`). Alternatively, use `network: defaults`.
 
 ### HTTP MCP Tool Missing Required URL Field
 
-**Error Message:**
+`http MCP tool 'my-tool' missing required 'url' field`
 
-```text
-http MCP tool 'my-tool' missing required 'url' field
-```text
-
-**Cause:** An HTTP-based MCP server configuration is missing the required `url:` field.
-
-**Solution:** Add the required `url:` field to the HTTP MCP server configuration.
+Add the required `url:` field to the HTTP MCP server configuration.
 
 ### Job Name Cannot Be Empty
 
-**Error Message:**
+`job name cannot be empty`
 
-```text
-job name cannot be empty
-```text
-
-**Cause:** A job definition in the workflow has an empty or missing name field.
-
-**Solution:** This is typically an internal error. If you encounter it, report it with your workflow file. The workflow compiler should generate valid job names automatically.
+Internal error. Report it with your workflow file.
 
 ### Unable to Determine MCP Type
 
-**Error Message:**
+`unable to determine MCP type for tool 'my-tool': missing type, url, command, or container`
 
-```text
-unable to determine MCP type for tool 'my-tool': missing type, url, command, or container
-```text
-
-**Cause:** An MCP server configuration is missing the required fields to determine its type.
-
-**Solution:** Specify at least one of: `type`, `url`, `command`, or `container`.
+Specify at least one of: `type`, `url`, `command`, or `container`.
 
 ### Tool MCP Configuration Cannot Specify Both Container and Command
 
-**Error Message:**
+`tool 'my-tool' mcp configuration cannot specify both 'container' and 'command'`
 
-```text
-tool 'my-tool' mcp configuration cannot specify both 'container' and 'command'
-```text
-
-**Cause:** An MCP server configuration includes both `container:` and `command:` fields, which are mutually exclusive.
-
-**Solution:** Use either `container:` OR `command:`, not both.
+Use either `container:` OR `command:`, not both.
 
 ### HTTP MCP Configuration Cannot Use Container
 
-**Error Message:**
+`tool 'my-tool' mcp configuration with type 'http' cannot use 'container' field`
 
-```text
-tool 'my-tool' mcp configuration with type 'http' cannot use 'container' field
-```text
-
-**Cause:** An HTTP MCP server configuration includes the `container:` field, which is only valid for stdio-based servers.
-
-**Solution:** Remove the `container:` field from HTTP MCP server configurations.
+Remove the `container:` field from HTTP MCP server configurations (only valid for stdio-based servers).
 
 ### Strict Mode Custom MCP Server Requires Network Configuration
 
-**Error Message:**
+`strict mode: custom MCP server 'my-server' with container must have network configuration`
 
-```text
-strict mode: custom MCP server 'my-server' with container must have network configuration
-```text
-
-**Cause:** A containerized MCP server lacks network configuration when workflow is compiled with `--strict` flag.
-
-**Solution:** Add network configuration with allowed domains to containerized MCP servers in strict mode.
+Add network configuration with allowed domains to containerized MCP servers in strict mode.
 
 ### Repository Features Not Enabled for Safe Outputs
 
-**Error Message:**
+`workflow uses safe-outputs.create-issue but repository owner/repo does not have issues enabled`
 
-```text
-workflow uses safe-outputs.create-issue but repository owner/repo does not have issues enabled
-```text
-
-**Cause:** The workflow uses `safe-outputs.create-issue` but the target repository has issues disabled.
-
-**Solution:** Enable the required repository feature (Settings → General → Features) or use a different safe output type. Note: `create-discussion` requires discussions enabled, `create-issue` requires issues enabled.
+Enable the required repository feature (Settings → General → Features) or use a different safe output type.
 
 ### Engine Does Not Support Firewall
 
-**Error Message:**
+`strict mode: engine does not support firewall`
 
-```text
-strict mode: engine does not support firewall
-```text
-
-**Cause:** The workflow specifies network restrictions but uses an engine that doesn't support network firewalling, and strict mode is enabled.
-
-**Solution:** Use an engine with firewall support (e.g., `copilot`), compile without `--strict` flag, or use `network: defaults`.
+Use an engine with firewall support (e.g., `copilot`), compile without `--strict` flag, or use `network: defaults`.
 
 ## Toolsets Configuration Issues
 
 ### Tool Not Found After Migrating to Toolsets
 
-**Symptom:** After changing from `allowed:` to `toolsets:`, expected tools are not available.
+After changing from `allowed:` to `toolsets:`, expected tools are not available. The tool may be in a different toolset than expected, or a narrower toolset was chosen.
 
-**Cause:** The tool may be in a different toolset than expected, or a narrower toolset was chosen. Individual tool names may also change between MCP server versions, which is why toolsets are recommended for stability.
-
-**Solution:**
-1. Check the [tool-to-toolset mapping](/gh-aw/guides/mcps/#migration-from-allowed-to-toolsets) to find the correct toolset
-2. Use `gh aw mcp inspect <workflow>` to see available tools
-3. Add the required toolset to your configuration
+Check the [tool-to-toolset mapping](/gh-aw/guides/mcps/#migration-from-allowed-to-toolsets), use `gh aw mcp inspect <workflow>` to see available tools, then add the required toolset.
 
 ### Invalid Toolset Name
 
-**Error Message:**
+`invalid toolset: 'action' is not a valid toolset`
 
-```text
-invalid toolset: 'action' is not a valid toolset
-```text
-
-**Cause:** A toolset name is misspelled or doesn't exist.
-
-**Solution:** Use valid toolset names: `context`, `repos`, `issues`, `pull_requests`, `users`, `actions`, `code_security`, `discussions`, `labels`, `notifications`, `orgs`, `projects`, `gists`, `search`, `dependabot`, `experiments`, `secret_protection`, `security_advisories`, `stargazers`, `default`, `all`.
+Use valid toolset names: `context`, `repos`, `issues`, `pull_requests`, `users`, `actions`, `code_security`, `discussions`, `labels`, `notifications`, `orgs`, `projects`, `gists`, `search`, `dependabot`, `experiments`, `secret_protection`, `security_advisories`, `stargazers`, `default`, `all`.
 
 ### Toolsets and Allowed Conflict
 
-**Symptom:** Unexpected tool availability when using both `toolsets:` and `allowed:`.
+Unexpected tool availability when using both `toolsets:` and `allowed:`. When both are specified, `allowed:` restricts tools to only those listed within the enabled toolsets.
 
-**Cause:** When both are specified, `allowed:` restricts tools to only those listed within the enabled toolsets.
-
-**Solution:** For most use cases, use only `toolsets:` without `allowed:`. If you need fine-grained control, first enable the toolset containing your tools, then use `allowed:` to restrict to specific tools.
+For most use cases, use only `toolsets:` without `allowed:`:
 
 ```yaml wrap
 # Recommended: use only toolsets
@@ -525,12 +296,12 @@ tools:
   github:
     toolsets: [issues]  # Gets all issue-related tools
 
-# Advanced: restrict within toolset (not recommended for new workflows)
+# Advanced: restrict within toolset
 tools:
   github:
     toolsets: [issues]
     allowed: [create_issue]  # Only create_issue from issues toolset
-```text
+```
 
 ## Troubleshooting Tips
 

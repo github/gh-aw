@@ -3,6 +3,7 @@ title: Sandbox Configuration
 description: Configure sandbox environments for AI engines including AWF agent container, mounted tools, runtime environments, and MCP Gateway
 sidebar:
   order: 1350
+disable-agentic-editing: true
 ---
 
 The `sandbox` field configures sandbox environments for AI engines, providing two main capabilities:

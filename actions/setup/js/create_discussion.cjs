@@ -9,6 +9,7 @@
 const HANDLER_TYPE = "create_discussion";
 
 const { getTrackerID } = require("./get_tracker_id.cjs");
+const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { parseAllowedRepos, getDefaultTargetRepo, validateRepo, parseRepoSlug } = require("./repo_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
@@ -63,18 +64,22 @@ function resolveCategoryId(categoryConfig, itemCategory, categories) {
   const categoryToMatch = itemCategory || categoryConfig;
 
   if (categoryToMatch) {
-    // Try to match against category IDs first
+    // Try to match against category IDs first (exact match, case-sensitive)
     const categoryById = categories.find(cat => cat.id === categoryToMatch);
     if (categoryById) {
       return { id: categoryById.id, matchType: "id", name: categoryById.name };
     }
-    // Try to match against category names
-    const categoryByName = categories.find(cat => cat.name === categoryToMatch);
+
+    // Normalize the category to match for case-insensitive comparison
+    const normalizedCategoryToMatch = categoryToMatch.toLowerCase();
+
+    // Try to match against category names (case-insensitive)
+    const categoryByName = categories.find(cat => cat.name.toLowerCase() === normalizedCategoryToMatch);
     if (categoryByName) {
       return { id: categoryByName.id, matchType: "name", name: categoryByName.name };
     }
-    // Try to match against category slugs (routes)
-    const categoryBySlug = categories.find(cat => cat.slug === categoryToMatch);
+    // Try to match against category slugs (routes, case-insensitive)
+    const categoryBySlug = categories.find(cat => cat.slug.toLowerCase() === normalizedCategoryToMatch);
     if (categoryBySlug) {
       return { id: categoryBySlug.id, matchType: "slug", name: categoryBySlug.name };
     }
@@ -339,9 +344,11 @@ async function main(config = {}) {
       title = item.body || "Discussion";
     }
 
-    if (titlePrefix && !title.startsWith(titlePrefix)) {
-      title = titlePrefix + title;
-    }
+    // Sanitize title for Unicode security and remove any duplicate prefixes
+    title = sanitizeTitle(title, titlePrefix);
+
+    // Apply title prefix (only if it doesn't already exist)
+    title = applyTitlePrefix(title, titlePrefix);
 
     // Build body
     let bodyLines = processedBody.split("\n");

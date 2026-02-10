@@ -26,6 +26,7 @@ function resetIssuesToAssignCopilot() {
 }
 
 const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
+const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { generateFooter, generateWorkflowIdMarker } = require("./generate_footer.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
@@ -384,10 +385,11 @@ async function main(config = {}) {
       title = message.body ?? "Agent Output";
     }
 
-    // Apply title prefix
-    if (titlePrefix && !title.startsWith(titlePrefix)) {
-      title = titlePrefix + title;
-    }
+    // Sanitize title for Unicode security and remove any duplicate prefixes
+    title = sanitizeTitle(title, titlePrefix);
+
+    // Apply title prefix (only if it doesn't already exist)
+    title = applyTitlePrefix(title, titlePrefix);
 
     // Add parent reference
     if (effectiveParentIssueNumber) {

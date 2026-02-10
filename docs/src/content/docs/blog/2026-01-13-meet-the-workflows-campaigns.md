@@ -35,8 +35,6 @@ Plan Command has contributed **514 merged PRs out of 761 proposed (67% merge rat
 
 Discussion Task Miner has contributed **60 merged PRs out of 105 proposed (57% merge rate)**, continuously scanning discussions to extract actionable tasks that might otherwise be lost. The workflow demonstrates perfect causal chain attribution: when it creates an issue from a discussion, and Copilot Coding Assistant later fixes that issue, the resulting PR is correctly attributed to Discussion Task Miner. A verified example: [Discussion #13934](https://github.com/github/gh-aw/discussions/13934) → [Issue #14084](https://github.com/github/gh-aw/issues/14084) → [PR #14129](https://github.com/github/gh-aw/pull/14129). Recent merged examples include [fixing firewall SSL-bump field extraction](https://github.com/github/gh-aw/pull/13920) and [adding security rationale to permissions documentation](https://github.com/github/gh-aw/pull/13918).
 
-The Workflow Health Manager acts as a project manager, monitoring progress across campaigns and alerting when things fall behind.
-
 We learned that individual agents are great at focused tasks, but orchestrating multiple agents toward a shared goal requires careful architecture. Project coordination isn't just about breaking down work - it's about discovering work (Task Miner), planning work (Plan Command), and tracking work (Workflow Health Manager).
 
 These workflows implement patterns like epic issues, progress tracking, and deadline management. They prove that AI agents can handle not just individual tasks, but entire projects when given proper coordination infrastructure.
