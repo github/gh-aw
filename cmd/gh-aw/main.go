@@ -319,12 +319,9 @@ Examples:
 			FailFast:               failFast,
 		}
 		if _, err := cli.CompileWorkflows(cmd.Context(), config); err != nil {
-			// Format validation error for better user experience
-			// The main function will detect the ✗ prefix and print it without double formatting
-			if !jsonOutput {
-				// Return a new error with formatted message so main() can print it
-				return fmt.Errorf("%s", cli.FormatValidationError(err))
-			}
+			// Return error as-is without additional formatting
+			// Errors from CompileWorkflows are already formatted with console.FormatError
+			// which provides IDE-parseable location information (file:line:column)
 			return err
 		}
 		return nil
@@ -685,9 +682,15 @@ func main() {
 
 	if err := rootCmd.Execute(); err != nil {
 		errMsg := err.Error()
-		// Check if error is already formatted (contains suggestions or starts with ✗)
-		// to avoid double formatting with FormatErrorMessage
-		if strings.Contains(errMsg, "Suggestions:") || strings.HasPrefix(errMsg, "✗") {
+		// Check if error is already formatted to avoid double formatting:
+		// - Contains suggestions (FormatErrorWithSuggestions)
+		// - Starts with ✗ (FormatErrorMessage)
+		// - Contains file:line:column: pattern (console.FormatError)
+		isAlreadyFormatted := strings.Contains(errMsg, "Suggestions:") ||
+			strings.HasPrefix(errMsg, "✗") ||
+			strings.Contains(errMsg, ":") && (strings.Contains(errMsg, "error:") || strings.Contains(errMsg, "warning:"))
+		
+		if isAlreadyFormatted {
 			fmt.Fprintln(os.Stderr, errMsg)
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))

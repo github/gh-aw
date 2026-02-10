@@ -398,12 +398,12 @@ func findNestedSection(yamlContent string, pathSegments []PathSegment) NestedSec
 			if segment.Type == "key" {
 				// Look for "key:" pattern
 				keyPattern := regexp.MustCompile(`^` + regexp.QuoteMeta(segment.Value) + `\s*:`)
-				if keyPattern.MatchString(trimmedLine) && lineLevel == currentLevel*2 {
+				if keyPattern.MatchString(trimmedLine) && lineLevel == currentLevel {
 					// Found a matching key at the correct indentation level
 					if currentLevel == len(pathSegments)-1 {
 						// This is the final segment - we found our target
 						foundLine = lineNum
-						baseIndentLevel = lineLevel + 2 // Properties inside this object should be indented further
+						baseIndentLevel = lineLevel + 1 // Properties inside this object should be indented one level further
 						break
 					} else {
 						// Move to the next level
@@ -419,8 +419,8 @@ func findNestedSection(yamlContent string, pathSegments []PathSegment) NestedSec
 	}
 
 	// Find the end of this nested section by looking for the next line at the same or lower indentation
-	endLine := len(lines) - 1          // Default to end of file
-	targetLevel := baseIndentLevel - 2 // The level of the key we found
+	endLine := len(lines) - 1        // Default to end of file
+	targetLevel := baseIndentLevel - 1 // The level of the key we found
 
 	for lineNum := foundLine + 1; lineNum < len(lines); lineNum++ {
 		line := lines[lineNum]
