@@ -69,6 +69,12 @@ if git config --file "${GIT_CONFIG_PATH}" --get-regexp '^remote\..*\.url$' 2>/de
   done || true
 fi
 
+# Remove the origin remote entirely to prevent any git operations that might use credentials
+if git -C "${WORKSPACE}" remote get-url origin >/dev/null 2>&1; then
+  git -C "${WORKSPACE}" remote remove origin
+  echo "Removed origin remote"
+fi
+
 echo "✓ Git credentials cleaned successfully"
 
 # Verify the file is still valid git config
