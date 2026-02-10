@@ -200,18 +200,18 @@ type ExpressionValidationOptions struct {
 // Returns an error if dangerous properties are found.
 func validateExpressionForDangerousProps(expression string) error {
 	trimmed := strings.TrimSpace(expression)
-	
+
 	// Split expression into parts handling both dot notation (e.g., "github.event.issue")
 	// and bracket notation (e.g., "release.assets[0].id")
 	// Filter out numeric indices (e.g., "0" in "assets[0]")
 	parts := regexp.MustCompile(`[.\[\]]+`).Split(trimmed, -1)
-	
+
 	for _, part := range parts {
 		// Skip empty parts and numeric indices
 		if part == "" || regexp.MustCompile(`^\d+$`).MatchString(part) {
 			continue
 		}
-		
+
 		// Check if this part is a dangerous property name
 		for _, dangerousProp := range constants.DangerousPropertyNames {
 			if part == dangerousProp {
@@ -224,7 +224,7 @@ func validateExpressionForDangerousProps(expression string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 

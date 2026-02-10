@@ -465,7 +465,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "constructor",
 		},
-		
+
 		// Test __proto__ blocking
 		{
 			name:        "block_proto_simple",
@@ -485,7 +485,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__proto__",
 		},
-		
+
 		// Test prototype blocking
 		{
 			name:        "block_prototype_simple",
@@ -505,7 +505,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "prototype",
 		},
-		
+
 		// Test __defineGetter__ blocking
 		{
 			name:        "block_defineGetter",
@@ -513,7 +513,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__defineGetter__",
 		},
-		
+
 		// Test __defineSetter__ blocking
 		{
 			name:        "block_defineSetter",
@@ -521,7 +521,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__defineSetter__",
 		},
-		
+
 		// Test __lookupGetter__ blocking
 		{
 			name:        "block_lookupGetter",
@@ -529,7 +529,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__lookupGetter__",
 		},
-		
+
 		// Test __lookupSetter__ blocking
 		{
 			name:        "block_lookupSetter",
@@ -537,7 +537,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__lookupSetter__",
 		},
-		
+
 		// Test hasOwnProperty blocking
 		{
 			name:        "block_hasOwnProperty",
@@ -545,7 +545,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "hasOwnProperty",
 		},
-		
+
 		// Test isPrototypeOf blocking
 		{
 			name:        "block_isPrototypeOf",
@@ -553,7 +553,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "isPrototypeOf",
 		},
-		
+
 		// Test propertyIsEnumerable blocking
 		{
 			name:        "block_propertyIsEnumerable",
@@ -561,7 +561,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "propertyIsEnumerable",
 		},
-		
+
 		// Test toString blocking
 		{
 			name:        "block_toString",
@@ -569,7 +569,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "toString",
 		},
-		
+
 		// Test valueOf blocking
 		{
 			name:        "block_valueOf",
@@ -577,7 +577,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "valueOf",
 		},
-		
+
 		// Test toLocaleString blocking
 		{
 			name:        "block_toLocaleString",
@@ -585,7 +585,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "toLocaleString",
 		},
-		
+
 		// Test blocking in array access patterns (bracket notation)
 		{
 			name:        "block_constructor_in_array_access",
@@ -599,7 +599,7 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 			expectError: true,
 			errorProp:   "__proto__",
 		},
-		
+
 		// Test that safe expressions are allowed
 		{
 			name:        "allow_safe_github_actor",
@@ -646,20 +646,20 @@ func TestValidateExpressionForDangerousProps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateExpressionForDangerousProps(tt.expression)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error for expression '%s', but got nil", tt.expression)
 					return
 				}
-				
+
 				// Verify error message contains the dangerous property name
 				errMsg := err.Error()
 				if !strings.Contains(errMsg, tt.errorProp) {
 					t.Errorf("Error message should mention dangerous property '%s', got: %s",
 						tt.errorProp, errMsg)
 				}
-				
+
 				// Verify error message mentions the expression
 				if !strings.Contains(errMsg, tt.expression) {
 					t.Errorf("Error message should mention expression '%s', got: %s",
@@ -724,13 +724,13 @@ func TestValidateExpressionSafetyWithDangerousProps(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateExpressionSafety(tt.content)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error for content with dangerous property, but got nil")
 					return
 				}
-				
+
 				errMsg := err.Error()
 				if !strings.Contains(errMsg, tt.errorProp) {
 					t.Errorf("Error message should mention dangerous property '%s', got: %s",
