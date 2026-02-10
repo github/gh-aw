@@ -158,6 +158,7 @@ find docs/src/content/docs -path 'docs/src/content/docs/blog' -prune -o -name '*
 **IMPORTANT**: Exclude these directories and files:
 - `docs/src/content/docs/blog/` - Blog posts have a different writing style and purpose
 - `frontmatter-full.md` - Automatically generated from the JSON schema by `scripts/generate-schema-docs.js` and should not be manually edited
+- **Files with `disable-agentic-editing: true` in frontmatter** - These files are protected from automated editing
 
 Focus on files that were recently modified or are in the `docs/src/content/docs/` directory (excluding blog).
 
@@ -178,6 +179,14 @@ Focus on markdown files in the `docs/` directory that appear in the PR's changed
 **NEVER select these directories or code-generated files**:
 - `docs/src/content/docs/blog/` - Blog posts have a different writing style and should not be unbloated
 - `docs/src/content/docs/reference/frontmatter-full.md` - Auto-generated from JSON schema
+- **Files with `disable-agentic-editing: true` in frontmatter** - These files are explicitly protected from automated editing
+
+Before selecting a file, check its frontmatter to ensure it doesn't have `disable-agentic-editing: true`:
+```bash
+# Check if a file has disable-agentic-editing set to true
+head -20 <filename> | grep -A1 "^---" | grep "disable-agentic-editing: true"
+# If this returns a match, SKIP this file - it's protected
+```
 
 Choose the file most in need of improvement based on:
 - Recent modification date
@@ -185,10 +194,19 @@ Choose the file most in need of improvement based on:
 - Number of bullet points or repetitive patterns
 - **Files NOT in the cleaned-files.txt cache** (avoid duplicating recent work)
 - **Files NOT in the exclusion list above** (avoid editing generated files)
+- **Files WITHOUT `disable-agentic-editing: true` in frontmatter** (respect protection flag)
 
 ### 4. Analyze the File
 
-Read the selected file and identify bloat:
+**First, verify the file is editable**:
+```bash
+# Check frontmatter for disable-agentic-editing flag
+head -20 <filename> | grep -A1 "^---" | grep "disable-agentic-editing: true"
+```
+
+If this command returns a match, **STOP** - the file is protected. Select a different file.
+
+Once you've confirmed the file is editable, read it and identify bloat:
 - Count bullet points - are there excessive lists?
 - Look for duplicate information
 - Check for repetitive "What it does" / "Why it's valuable" patterns
