@@ -11,5 +11,5 @@
 Debug this workflow failure using the `agentic-workflows` agent:
 
 ```
-/agent agentic-workflows debug the agentic workflow {workflow_id} failure in {run_id}
+/agent agentic-workflows debug the agentic workflow {workflow_id} failure in {run_url}
 ```

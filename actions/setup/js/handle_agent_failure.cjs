@@ -560,19 +560,11 @@ async function main() {
           missingSafeOutputsContext += "- The agent should have called `noop` to explicitly indicate no action was taken\n\n";
         }
 
-        // Extract run ID from URL (e.g., https://github.com/owner/repo/actions/runs/123 -> "123")
-        let runId = "";
-        const runIdMatch = runUrl.match(/\/actions\/runs\/(\d+)/);
-        if (runIdMatch) {
-          runId = runIdMatch[1];
-        }
-
         // Create template context with sanitized workflow name
         const templateContext = {
           workflow_name: sanitizedWorkflowName,
           workflow_id: workflowID,
           run_url: runUrl,
-          run_id: runId,
           workflow_source_url: workflowSourceURL || "#",
           branch: currentBranch,
           pull_request_info: pullRequest ? `  \n**Pull Request:** [#${pullRequest.number}](${pullRequest.html_url})` : "",
