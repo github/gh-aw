@@ -607,6 +607,8 @@ jobs:
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
         run: bash /opt/gh-aw/actions/print_prompt_summary.sh
+      - name: Clean git credentials
+        run: bash /opt/gh-aw/actions/clean_git_credentials.sh
       - name: Execute Claude Code CLI
         id: agentic_execution
         # Allowed tools (sorted):

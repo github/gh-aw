@@ -231,6 +231,14 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 
 	logFileFull := "/tmp/gh-aw/agent-stdio.log"
 
+	// Clean git credentials before executing the agentic engine
+	// This ensures that any credentials left on disk by custom steps are removed
+	// to prevent the agent from accessing or exfiltrating them
+	gitCleanerSteps := c.generateGitCredentialsCleanerStep()
+	for _, line := range gitCleanerSteps {
+		yaml.WriteString(line)
+	}
+
 	// Add AI execution step using the agentic engine
 	c.generateEngineExecutionSteps(yaml, data, engine, logFileFull)
 
