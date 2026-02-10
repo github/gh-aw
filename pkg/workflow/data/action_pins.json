@@ -155,6 +155,11 @@
       "version": "v3.32.2",
       "sha": "46a5d05688af3c0b623936fd3365ef1ae945c1cd"
     },
+    "github/stale-repos@v3": {
+      "repo": "github/stale-repos",
+      "version": "v3",
+      "sha": "3477b6488008d9411aaf22a0924ec7c1f6a69980"
+    },
     "github/stale-repos@v3.0.2": {
       "repo": "github/stale-repos",
       "version": "v3.0.2",
@@ -174,6 +179,11 @@
       "repo": "ruby/setup-ruby",
       "version": "v1.288.0",
       "sha": "09a7688d3b55cf0e976497ff046b70949eeaccfd"
+    },
+    "super-linter/super-linter@v8.2.1": {
+      "repo": "super-linter/super-linter",
+      "version": "v8.2.1",
+      "sha": "2bdd90ed3262e023ac84bf8fe35dc480721fc1f2"
     },
     "super-linter/super-linter@v8.5.0": {
       "repo": "super-linter/super-linter",
