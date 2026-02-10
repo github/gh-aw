@@ -1430,7 +1430,7 @@ describe("sanitize_content.cjs", () => {
     });
 
     it("should decode entities with mixed case hex digits", () => {
-      const result = sanitizeContent("&#x4O; is invalid but &#x4A; is valid"); // Note: O not 0
+      const result = sanitizeContent("&#x4O; is invalid but &#x4A; is valid"); // Note: using letter 'O' not digit '0'
       expect(result).toContain("&#x4O;"); // Invalid should remain
       expect(result).toContain("J"); // Valid 0x4A = J
     });
