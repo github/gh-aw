@@ -299,11 +299,11 @@ describe("runtime_import", () => {
         expect(result).toBe(content);
       }),
         it("should throw error for missing required file", async () => {
-          await expect(processRuntimeImport("missing.md", !1, tempDir)).rejects.toThrow("Runtime import file not found: missing.md");
+          await expect(processRuntimeImport("missing.md", !1, tempDir)).rejects.toThrow("Runtime import file not found: workflows/missing.md");
         }),
         it("should return empty string for missing optional file", async () => {
           const result = await processRuntimeImport("missing.md", !0, tempDir);
-          (expect(result).toBe(""), expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: missing.md"));
+          (expect(result).toBe(""), expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: workflows/missing.md"));
         }),
         it("should remove front matter and warn", async () => {
           const filepath = "with-frontmatter.md";
@@ -312,7 +312,7 @@ describe("runtime_import", () => {
           (expect(result).toContain("# Content"),
             expect(result).toContain("Actual content."),
             expect(result).not.toContain("title: Test"),
-            expect(core.warning).toHaveBeenCalledWith(`File ${filepath} contains front matter which will be ignored in runtime import`));
+            expect(core.warning).toHaveBeenCalledWith(`File workflows/${filepath} contains front matter which will be ignored in runtime import`));
         }),
         it("should remove XML comments", async () => {
           fs.writeFileSync(path.join(workflowsDir, "with-comments.md"), "# Title\n\n\x3c!-- This is a comment --\x3e\n\nContent here.");
@@ -385,7 +385,8 @@ describe("runtime_import", () => {
         it("should reject paths outside .github folder", async () => {
           // Try to access a file in the root (not in .github)
           fs.writeFileSync(path.join(tempDir, "outside.md"), "Outside content");
-          await expect(processRuntimeImport("../outside.md", !1, tempDir)).rejects.toThrow("Security: Path ../outside.md must be within .github folder");
+          // Use ../../ to escape .github/workflows and go up to the temp directory
+          await expect(processRuntimeImport("../../outside.md", !1, tempDir)).rejects.toThrow("Security: Path");
         }));
     }),
     describe("processRuntimeImports", () => {
@@ -554,8 +555,8 @@ describe("runtime_import", () => {
         it("should reject attempts to access files outside .github", async () => {
           // Create a file outside .github
           fs.writeFileSync(path.join(tempDir, "root-file.txt"), "Root content");
-          // Try to access it
-          await expect(processRuntimeImport("../root-file.txt", !1, tempDir)).rejects.toThrow("Security: Path ../root-file.txt must be within .github folder");
+          // Try to access it with a path that truly escapes - using ../../ to go up twice
+          await expect(processRuntimeImport("../../root-file.txt", !1, tempDir)).rejects.toThrow("Security: Path");
         }));
     }),
     describe("processRuntimeImport with line ranges", () => {
@@ -739,14 +740,14 @@ describe("runtime_import", () => {
       describe("runtime import with expressions", () => {
         it("should process file with safe expressions", async () => {
           const content = "Actor: ${{ github.actor }}\nRepo: ${{ github.repository }}";
-          fs.writeFileSync(path.join(githubDir, "with-expr.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "with-expr.md"), content);
           const result = await processRuntimeImport("with-expr.md", false, tempDir);
           expect(result).toBe("Actor: testuser\nRepo: testorg/testrepo");
         });
 
         it("should reject file with unsafe expressions", async () => {
           const content = "Secret: ${{ secrets.TOKEN }}";
-          fs.writeFileSync(path.join(githubDir, "unsafe.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "unsafe.md"), content);
           await expect(processRuntimeImport("unsafe.md", false, tempDir)).rejects.toThrow("unauthorized");
         });
 
@@ -757,7 +758,7 @@ describe("runtime_import", () => {
 
         it("should handle expressions with front matter removal", async () => {
           const content = "---\ntitle: Test\n---\n\nActor: ${{ github.actor }}";
-          fs.writeFileSync(path.join(githubDir, "frontmatter-expr.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "frontmatter-expr.md"), content);
           const result = await processRuntimeImport("frontmatter-expr.md", false, tempDir);
           expect(result).toContain("Actor: testuser");
           expect(result).not.toContain("title: Test");
@@ -765,7 +766,7 @@ describe("runtime_import", () => {
 
         it("should handle expressions with XML comments", async () => {
           const content = "<!-- Comment -->\nActor: ${{ github.actor }}";
-          fs.writeFileSync(path.join(githubDir, "comment-expr.md"), content);
+          fs.writeFileSync(path.join(workflowsDir, "comment-expr.md"), content);
           const result = await processRuntimeImport("comment-expr.md", false, tempDir);
           expect(result).toContain("Actor: testuser");
           expect(result).not.toContain("<!-- Comment -->");
@@ -775,9 +776,9 @@ describe("runtime_import", () => {
       describe("recursive imports", () => {
         it("should recursively process runtime-import macros in imported files", async () => {
           // Create a chain: main.md -> level1.md -> level2.md
-          fs.writeFileSync(path.join(githubDir, "level2.md"), "Level 2 content");
-          fs.writeFileSync(path.join(githubDir, "level1.md"), "Level 1 before\n{{#runtime-import level2.md}}\nLevel 1 after");
-          fs.writeFileSync(path.join(githubDir, "main.md"), "Main before\n{{#runtime-import level1.md}}\nMain after");
+          fs.writeFileSync(path.join(workflowsDir, "level2.md"), "Level 2 content");
+          fs.writeFileSync(path.join(workflowsDir, "level1.md"), "Level 1 before\n{{#runtime-import level2.md}}\nLevel 1 after");
+          fs.writeFileSync(path.join(workflowsDir, "main.md"), "Main before\n{{#runtime-import level1.md}}\nMain after");
 
           const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
           expect(result).toBe("Main before\nLevel 1 before\nLevel 2 content\nLevel 1 after\nMain after");
@@ -787,10 +788,10 @@ describe("runtime_import", () => {
 
         it("should handle multiple recursive imports at different levels", async () => {
           // Create: main.md -> [a.md, b.md] and a.md -> shared.md
-          fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
-          fs.writeFileSync(path.join(githubDir, "a.md"), "A before\n{{#runtime-import shared.md}}\nA after");
-          fs.writeFileSync(path.join(githubDir, "b.md"), "B content");
-          fs.writeFileSync(path.join(githubDir, "main.md"), "{{#runtime-import a.md}}\n---\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "shared.md"), "Shared content");
+          fs.writeFileSync(path.join(workflowsDir, "a.md"), "A before\n{{#runtime-import shared.md}}\nA after");
+          fs.writeFileSync(path.join(workflowsDir, "b.md"), "B content");
+          fs.writeFileSync(path.join(workflowsDir, "main.md"), "{{#runtime-import a.md}}\n---\n{{#runtime-import b.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
           expect(result).toBe("A before\nShared content\nA after\n---\nB content");
@@ -798,10 +799,10 @@ describe("runtime_import", () => {
 
         it("should cache imported files and reuse them in recursive processing", async () => {
           // Create: main.md -> [a.md, b.md] where both import shared.md
-          fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
-          fs.writeFileSync(path.join(githubDir, "a.md"), "A: {{#runtime-import shared.md}}");
-          fs.writeFileSync(path.join(githubDir, "b.md"), "B: {{#runtime-import shared.md}}");
-          fs.writeFileSync(path.join(githubDir, "main.md"), "{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "shared.md"), "Shared content");
+          fs.writeFileSync(path.join(workflowsDir, "a.md"), "A: {{#runtime-import shared.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "b.md"), "B: {{#runtime-import shared.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "main.md"), "{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
           expect(result).toBe("A: Shared content\nB: Shared content");
@@ -811,42 +812,42 @@ describe("runtime_import", () => {
 
         it("should detect circular dependencies", async () => {
           // Create circular dependency: a.md -> b.md -> a.md
-          fs.writeFileSync(path.join(githubDir, "a.md"), "A content\n{{#runtime-import b.md}}");
-          fs.writeFileSync(path.join(githubDir, "b.md"), "B content\n{{#runtime-import a.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "a.md"), "A content\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "b.md"), "B content\n{{#runtime-import a.md}}");
 
           await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> a.md");
         });
 
         it("should detect self-referencing circular dependencies", async () => {
           // Create self-referencing file: self.md -> self.md
-          fs.writeFileSync(path.join(githubDir, "self.md"), "Self content\n{{#runtime-import self.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "self.md"), "Self content\n{{#runtime-import self.md}}");
 
           await expect(processRuntimeImports("{{#runtime-import self.md}}", tempDir)).rejects.toThrow("Circular dependency detected: self.md -> self.md");
         });
 
         it("should detect complex circular dependencies", async () => {
           // Create circular dependency: a.md -> b.md -> c.md -> a.md
-          fs.writeFileSync(path.join(githubDir, "a.md"), "A content\n{{#runtime-import b.md}}");
-          fs.writeFileSync(path.join(githubDir, "b.md"), "B content\n{{#runtime-import c.md}}");
-          fs.writeFileSync(path.join(githubDir, "c.md"), "C content\n{{#runtime-import a.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "a.md"), "A content\n{{#runtime-import b.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "b.md"), "B content\n{{#runtime-import c.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "c.md"), "C content\n{{#runtime-import a.md}}");
 
           await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> c.md -> a.md");
         });
 
         it("should handle recursive imports with optional files", async () => {
           // Create: main.md -> exists.md -> optional-missing.md (optional)
-          fs.writeFileSync(path.join(githubDir, "exists.md"), "Exists before\n{{#runtime-import? optional-missing.md}}\nExists after");
-          fs.writeFileSync(path.join(githubDir, "main.md"), "Main\n{{#runtime-import exists.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "exists.md"), "Exists before\n{{#runtime-import? optional-missing.md}}\nExists after");
+          fs.writeFileSync(path.join(workflowsDir, "main.md"), "Main\n{{#runtime-import exists.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import main.md}}", tempDir);
           expect(result).toBe("Main\nExists before\n\nExists after");
-          expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: optional-missing.md");
+          expect(core.warning).toHaveBeenCalledWith("Optional runtime import file not found: workflows/optional-missing.md");
         });
 
         it("should process expressions in recursively imported files", async () => {
           // Create recursive imports with expressions
-          fs.writeFileSync(path.join(githubDir, "inner.md"), "Actor: ${{ github.actor }}");
-          fs.writeFileSync(path.join(githubDir, "outer.md"), "Outer\n{{#runtime-import inner.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "inner.md"), "Actor: ${{ github.actor }}");
+          fs.writeFileSync(path.join(workflowsDir, "outer.md"), "Outer\n{{#runtime-import inner.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import outer.md}}", tempDir);
           expect(result).toBe("Outer\nActor: testuser");
@@ -854,8 +855,8 @@ describe("runtime_import", () => {
 
         it("should remove XML comments from recursively imported files", async () => {
           // Create recursive imports with XML comments
-          fs.writeFileSync(path.join(githubDir, "inner.md"), "Inner <!-- comment --> text");
-          fs.writeFileSync(path.join(githubDir, "outer.md"), "Outer <!-- comment -->\n{{#runtime-import inner.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "inner.md"), "Inner <!-- comment --> text");
+          fs.writeFileSync(path.join(workflowsDir, "outer.md"), "Outer <!-- comment -->\n{{#runtime-import inner.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import outer.md}}", tempDir);
           expect(result).toBe("Outer \nInner  text");
@@ -863,11 +864,11 @@ describe("runtime_import", () => {
 
         it("should handle deep nesting of imports", async () => {
           // Create a deep chain: level1 -> level2 -> level3 -> level4 -> level5
-          fs.writeFileSync(path.join(githubDir, "level5.md"), "Level 5");
-          fs.writeFileSync(path.join(githubDir, "level4.md"), "Level 4\n{{#runtime-import level5.md}}");
-          fs.writeFileSync(path.join(githubDir, "level3.md"), "Level 3\n{{#runtime-import level4.md}}");
-          fs.writeFileSync(path.join(githubDir, "level2.md"), "Level 2\n{{#runtime-import level3.md}}");
-          fs.writeFileSync(path.join(githubDir, "level1.md"), "Level 1\n{{#runtime-import level2.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "level5.md"), "Level 5");
+          fs.writeFileSync(path.join(workflowsDir, "level4.md"), "Level 4\n{{#runtime-import level5.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "level3.md"), "Level 3\n{{#runtime-import level4.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "level2.md"), "Level 2\n{{#runtime-import level3.md}}");
+          fs.writeFileSync(path.join(workflowsDir, "level1.md"), "Level 1\n{{#runtime-import level2.md}}");
 
           const result = await processRuntimeImports("{{#runtime-import level1.md}}", tempDir);
           expect(result).toBe("Level 1\nLevel 2\nLevel 3\nLevel 4\nLevel 5");
@@ -878,13 +879,13 @@ describe("runtime_import", () => {
         describe("tree topologies", () => {
           it("should handle balanced binary tree (depth 3)", async () => {
             // Root -> [L1, R1], L1 -> [L2, L3], R1 -> [R2, R3]
-            fs.writeFileSync(path.join(githubDir, "leaf-l2.md"), "L2");
-            fs.writeFileSync(path.join(githubDir, "leaf-l3.md"), "L3");
-            fs.writeFileSync(path.join(githubDir, "leaf-r2.md"), "R2");
-            fs.writeFileSync(path.join(githubDir, "leaf-r3.md"), "R3");
-            fs.writeFileSync(path.join(githubDir, "left-branch.md"), "L1-start\n{{#runtime-import leaf-l2.md}}\nL1-mid\n{{#runtime-import leaf-l3.md}}\nL1-end");
-            fs.writeFileSync(path.join(githubDir, "right-branch.md"), "R1-start\n{{#runtime-import leaf-r2.md}}\nR1-mid\n{{#runtime-import leaf-r3.md}}\nR1-end");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import left-branch.md}}\n---\n{{#runtime-import right-branch.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "leaf-l2.md"), "L2");
+            fs.writeFileSync(path.join(workflowsDir, "leaf-l3.md"), "L3");
+            fs.writeFileSync(path.join(workflowsDir, "leaf-r2.md"), "R2");
+            fs.writeFileSync(path.join(workflowsDir, "leaf-r3.md"), "R3");
+            fs.writeFileSync(path.join(workflowsDir, "left-branch.md"), "L1-start\n{{#runtime-import leaf-l2.md}}\nL1-mid\n{{#runtime-import leaf-l3.md}}\nL1-end");
+            fs.writeFileSync(path.join(workflowsDir, "right-branch.md"), "R1-start\n{{#runtime-import leaf-r2.md}}\nR1-mid\n{{#runtime-import leaf-r3.md}}\nR1-end");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import left-branch.md}}\n---\n{{#runtime-import right-branch.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nL1-start\nL2\nL1-mid\nL3\nL1-end\n---\nR1-start\nR2\nR1-mid\nR3\nR1-end");
@@ -893,10 +894,10 @@ describe("runtime_import", () => {
           it("should handle wide tree (one root, many leaves)", async () => {
             // Root -> [leaf1, leaf2, leaf3, ..., leaf10]
             for (let i = 1; i <= 10; i++) {
-              fs.writeFileSync(path.join(githubDir, `leaf${i}.md`), `Leaf ${i}`);
+              fs.writeFileSync(path.join(workflowsDir, `leaf${i}.md`), `Leaf ${i}`);
             }
             const imports = Array.from({ length: 10 }, (_, i) => `{{#runtime-import leaf${i + 1}.md}}`).join("\n");
-            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), `Root\n${imports}`);
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             const expected = "Root\n" + Array.from({ length: 10 }, (_, i) => `Leaf ${i + 1}`).join("\n");
@@ -905,11 +906,11 @@ describe("runtime_import", () => {
 
           it("should handle unbalanced tree (left-skewed)", async () => {
             // Root -> L1, L1 -> L2, L2 -> L3, Root -> R1 (short right branch)
-            fs.writeFileSync(path.join(githubDir, "l3.md"), "L3");
-            fs.writeFileSync(path.join(githubDir, "l2.md"), "L2\n{{#runtime-import l3.md}}");
-            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2.md}}");
-            fs.writeFileSync(path.join(githubDir, "r1.md"), "R1");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import l1.md}}\n{{#runtime-import r1.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3.md"), "L3");
+            fs.writeFileSync(path.join(workflowsDir, "l2.md"), "L2\n{{#runtime-import l3.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l1.md"), "L1\n{{#runtime-import l2.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "r1.md"), "R1");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import l1.md}}\n{{#runtime-import r1.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nL1\nL2\nL3\nR1");
@@ -917,9 +918,9 @@ describe("runtime_import", () => {
 
           it("should handle very deep tree (depth 15)", async () => {
             // Create a chain of 15 levels deep
-            fs.writeFileSync(path.join(githubDir, "d15.md"), "D15");
+            fs.writeFileSync(path.join(workflowsDir, "d15.md"), "D15");
             for (let i = 14; i >= 1; i--) {
-              fs.writeFileSync(path.join(githubDir, `d${i}.md`), `D${i}\n{{#runtime-import d${i + 1}.md}}`);
+              fs.writeFileSync(path.join(workflowsDir, `d${i}.md`), `D${i}\n{{#runtime-import d${i + 1}.md}}`);
             }
 
             const result = await processRuntimeImports("{{#runtime-import d1.md}}", tempDir);
@@ -931,10 +932,10 @@ describe("runtime_import", () => {
         describe("DAG (Directed Acyclic Graph) patterns", () => {
           it("should handle diamond dependency pattern", async () => {
             // Root -> [A, B], A -> Shared, B -> Shared
-            fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared content");
-            fs.writeFileSync(path.join(githubDir, "path-a.md"), "Path A\n{{#runtime-import shared.md}}");
-            fs.writeFileSync(path.join(githubDir, "path-b.md"), "Path B\n{{#runtime-import shared.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import path-a.md}}\n---\n{{#runtime-import path-b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "shared.md"), "Shared content");
+            fs.writeFileSync(path.join(workflowsDir, "path-a.md"), "Path A\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "path-b.md"), "Path B\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import path-a.md}}\n---\n{{#runtime-import path-b.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nPath A\nShared content\n---\nPath B\nShared content");
@@ -944,11 +945,11 @@ describe("runtime_import", () => {
 
           it("should handle multiple diamond patterns", async () => {
             // Root -> [A, B], A -> [S1, S2], B -> [S1, S2]
-            fs.writeFileSync(path.join(githubDir, "s1.md"), "S1");
-            fs.writeFileSync(path.join(githubDir, "s2.md"), "S2");
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "s1.md"), "S1");
+            fs.writeFileSync(path.join(workflowsDir, "s2.md"), "S2");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import s1.md}}\n{{#runtime-import s2.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nA\nS1\nS2\nB\nS1\nS2");
@@ -959,13 +960,13 @@ describe("runtime_import", () => {
 
           it("should handle complex DAG with multiple levels", async () => {
             // L1 -> [L2a, L2b], L2a -> [L3a, L3b], L2b -> [L3b, L3c], L3a -> L4, L3b -> L4, L3c -> L4
-            fs.writeFileSync(path.join(githubDir, "l4.md"), "L4");
-            fs.writeFileSync(path.join(githubDir, "l3a.md"), "L3a\n{{#runtime-import l4.md}}");
-            fs.writeFileSync(path.join(githubDir, "l3b.md"), "L3b\n{{#runtime-import l4.md}}");
-            fs.writeFileSync(path.join(githubDir, "l3c.md"), "L3c\n{{#runtime-import l4.md}}");
-            fs.writeFileSync(path.join(githubDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}");
-            fs.writeFileSync(path.join(githubDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
-            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l4.md"), "L4");
+            fs.writeFileSync(path.join(workflowsDir, "l3a.md"), "L3a\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3b.md"), "L3b\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3c.md"), "L3c\n{{#runtime-import l4.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
             expect(result).toBe("L1\nL2a\nL3a\nL4\nL3b\nL4\nL2b\nL3b\nL4\nL3c\nL4");
@@ -975,12 +976,12 @@ describe("runtime_import", () => {
 
           it("should handle convergent DAG (many nodes converge to one)", async () => {
             // [A, B, C, D] -> Sink
-            fs.writeFileSync(path.join(githubDir, "sink.md"), "Sink");
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import sink.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import sink.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import sink.md}}");
-            fs.writeFileSync(path.join(githubDir, "d.md"), "D\n{{#runtime-import sink.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "sink.md"), "Sink");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "d.md"), "D\n{{#runtime-import sink.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}\n{{#runtime-import d.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nA\nSink\nB\nSink\nC\nSink\nD\nSink");
@@ -994,11 +995,11 @@ describe("runtime_import", () => {
           it("should handle hub-and-spoke (one center, many peripherals)", async () => {
             // Root -> Hub, Hub -> [Spoke1, Spoke2, ..., Spoke8]
             for (let i = 1; i <= 8; i++) {
-              fs.writeFileSync(path.join(githubDir, `spoke${i}.md`), `Spoke ${i}`);
+              fs.writeFileSync(path.join(workflowsDir, `spoke${i}.md`), `Spoke ${i}`);
             }
             const imports = Array.from({ length: 8 }, (_, i) => `{{#runtime-import spoke${i + 1}.md}}`).join("\n");
-            fs.writeFileSync(path.join(githubDir, "hub.md"), `Hub\n${imports}`);
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import hub.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "hub.md"), `Hub\n${imports}`);
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import hub.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             const expected = "Root\nHub\n" + Array.from({ length: 8 }, (_, i) => `Spoke ${i + 1}`).join("\n");
@@ -1007,11 +1008,11 @@ describe("runtime_import", () => {
 
           it("should handle reverse star (many import one common file)", async () => {
             // Root -> [A, B, C], all import Common
-            fs.writeFileSync(path.join(githubDir, "common.md"), "Common");
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import common.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import common.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import common.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "common.md"), "Common");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import common.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nA\nCommon\nB\nCommon\nC\nCommon");
@@ -1023,12 +1024,12 @@ describe("runtime_import", () => {
         describe("complex multi-level patterns", () => {
           it("should handle grid-like dependency pattern", async () => {
             // Row1 -> [C1, C2, C3], Row2 -> [C1, C2, C3], Root -> [Row1, Row2]
-            fs.writeFileSync(path.join(githubDir, "c1.md"), "C1");
-            fs.writeFileSync(path.join(githubDir, "c2.md"), "C2");
-            fs.writeFileSync(path.join(githubDir, "c3.md"), "C3");
-            fs.writeFileSync(path.join(githubDir, "row1.md"), "Row1\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
-            fs.writeFileSync(path.join(githubDir, "row2.md"), "Row2\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import row1.md}}\n---\n{{#runtime-import row2.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c1.md"), "C1");
+            fs.writeFileSync(path.join(workflowsDir, "c2.md"), "C2");
+            fs.writeFileSync(path.join(workflowsDir, "c3.md"), "C3");
+            fs.writeFileSync(path.join(workflowsDir, "row1.md"), "Row1\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "row2.md"), "Row2\n{{#runtime-import c1.md}}\n{{#runtime-import c2.md}}\n{{#runtime-import c3.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import row1.md}}\n---\n{{#runtime-import row2.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nRow1\nC1\nC2\nC3\n---\nRow2\nC1\nC2\nC3");
@@ -1040,14 +1041,14 @@ describe("runtime_import", () => {
 
           it("should handle pyramid pattern (expanding then contracting)", async () => {
             // L1 -> [L2a, L2b], L2a -> [L3a, L3b, L3c], L2b -> [L3b, L3c, L3d], L3a/b/c/d -> Apex
-            fs.writeFileSync(path.join(githubDir, "apex.md"), "Apex");
-            fs.writeFileSync(path.join(githubDir, "l3a.md"), "L3a\n{{#runtime-import apex.md}}");
-            fs.writeFileSync(path.join(githubDir, "l3b.md"), "L3b\n{{#runtime-import apex.md}}");
-            fs.writeFileSync(path.join(githubDir, "l3c.md"), "L3c\n{{#runtime-import apex.md}}");
-            fs.writeFileSync(path.join(githubDir, "l3d.md"), "L3d\n{{#runtime-import apex.md}}");
-            fs.writeFileSync(path.join(githubDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
-            fs.writeFileSync(path.join(githubDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}\n{{#runtime-import l3d.md}}");
-            fs.writeFileSync(path.join(githubDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "apex.md"), "Apex");
+            fs.writeFileSync(path.join(workflowsDir, "l3a.md"), "L3a\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3b.md"), "L3b\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3c.md"), "L3c\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l3d.md"), "L3d\n{{#runtime-import apex.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l2a.md"), "L2a\n{{#runtime-import l3a.md}}\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l2b.md"), "L2b\n{{#runtime-import l3b.md}}\n{{#runtime-import l3c.md}}\n{{#runtime-import l3d.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "l1.md"), "L1\n{{#runtime-import l2a.md}}\n{{#runtime-import l2b.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
             expect(result).toBe("L1\nL2a\nL3a\nApex\nL3b\nApex\nL3c\nApex\nL2b\nL3b\nApex\nL3c\nApex\nL3d\nApex");
@@ -1057,12 +1058,12 @@ describe("runtime_import", () => {
 
           it("should handle layered architecture (strict layer dependencies)", async () => {
             // Layer1 -> [Layer2a, Layer2b], Layer2a -> Layer3a, Layer2b -> Layer3b, Layer3a -> Core, Layer3b -> Core
-            fs.writeFileSync(path.join(githubDir, "core.md"), "Core");
-            fs.writeFileSync(path.join(githubDir, "layer3a.md"), "Layer3a\n{{#runtime-import core.md}}");
-            fs.writeFileSync(path.join(githubDir, "layer3b.md"), "Layer3b\n{{#runtime-import core.md}}");
-            fs.writeFileSync(path.join(githubDir, "layer2a.md"), "Layer2a\n{{#runtime-import layer3a.md}}");
-            fs.writeFileSync(path.join(githubDir, "layer2b.md"), "Layer2b\n{{#runtime-import layer3b.md}}");
-            fs.writeFileSync(path.join(githubDir, "layer1.md"), "Layer1\n{{#runtime-import layer2a.md}}\n{{#runtime-import layer2b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "core.md"), "Core");
+            fs.writeFileSync(path.join(workflowsDir, "layer3a.md"), "Layer3a\n{{#runtime-import core.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "layer3b.md"), "Layer3b\n{{#runtime-import core.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "layer2a.md"), "Layer2a\n{{#runtime-import layer3a.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "layer2b.md"), "Layer2b\n{{#runtime-import layer3b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "layer1.md"), "Layer1\n{{#runtime-import layer2a.md}}\n{{#runtime-import layer2b.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import layer1.md}}", tempDir);
             expect(result).toBe("Layer1\nLayer2a\nLayer3a\nCore\nLayer2b\nLayer3b\nCore");
@@ -1074,12 +1075,12 @@ describe("runtime_import", () => {
         describe("cache efficiency tests", () => {
           it("should efficiently cache heavily reused dependencies", async () => {
             // Create a pattern where one file is imported by many others
-            fs.writeFileSync(path.join(githubDir, "base.md"), "Base content");
+            fs.writeFileSync(path.join(workflowsDir, "base.md"), "Base content");
             for (let i = 1; i <= 20; i++) {
-              fs.writeFileSync(path.join(githubDir, `consumer${i}.md`), `Consumer ${i}\n{{#runtime-import base.md}}`);
+              fs.writeFileSync(path.join(workflowsDir, `consumer${i}.md`), `Consumer ${i}\n{{#runtime-import base.md}}`);
             }
             const imports = Array.from({ length: 20 }, (_, i) => `{{#runtime-import consumer${i + 1}.md}}`).join("\n");
-            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), `Root\n${imports}`);
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
 
@@ -1099,8 +1100,8 @@ describe("runtime_import", () => {
           it("should cache files with line ranges independently", async () => {
             // Create a file that is imported with different line ranges
             const content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5";
-            fs.writeFileSync(path.join(githubDir, "lines.md"), content);
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import lines.md:1-2}}\n---\n{{#runtime-import lines.md:3-5}}\n===\n{{#runtime-import lines.md:1-2}}");
+            fs.writeFileSync(path.join(workflowsDir, "lines.md"), content);
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import lines.md:1-2}}\n---\n{{#runtime-import lines.md:3-5}}\n===\n{{#runtime-import lines.md:1-2}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nLine 1\nLine 2\n---\nLine 3\nLine 4\nLine 5\n===\nLine 1\nLine 2");
@@ -1111,11 +1112,11 @@ describe("runtime_import", () => {
 
           it("should handle mixed optional and required imports with caching", async () => {
             // Create pattern with both optional and required imports of same file
-            fs.writeFileSync(path.join(githubDir, "shared.md"), "Shared");
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import shared.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import? shared.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import shared.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "shared.md"), "Shared");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import? shared.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import shared.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             expect(result).toBe("Root\nA\nShared\nB\nShared\nC\nShared");
@@ -1128,20 +1129,20 @@ describe("runtime_import", () => {
         describe("circular dependency detection in complex graphs", () => {
           it("should detect indirect cycles in DAG-like structures", async () => {
             // A -> B, B -> C, C -> D, D -> A (cycle)
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import b.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import c.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import d.md}}");
-            fs.writeFileSync(path.join(githubDir, "d.md"), "D\n{{#runtime-import a.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "d.md"), "D\n{{#runtime-import a.md}}");
 
             await expect(processRuntimeImports("{{#runtime-import a.md}}", tempDir)).rejects.toThrow("Circular dependency detected: a.md -> b.md -> c.md -> d.md -> a.md");
           });
 
           it("should detect cycles in branching structures", async () => {
             // Root -> [A, B], A -> C, B -> C, C -> A (cycle through A)
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import c.md}}");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import c.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import a.md}}");
-            fs.writeFileSync(path.join(githubDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import a.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), "Root\n{{#runtime-import a.md}}\n{{#runtime-import b.md}}");
 
             await expect(processRuntimeImports("{{#runtime-import root.md}}", tempDir)).rejects.toThrow("Circular dependency detected");
             await expect(processRuntimeImports("{{#runtime-import root.md}}", tempDir)).rejects.toThrow("a.md -> c.md -> a.md");
@@ -1150,9 +1151,9 @@ describe("runtime_import", () => {
           it("should detect long cycles (length 10)", async () => {
             // Create a cycle: f1 -> f2 -> f3 -> ... -> f10 -> f1
             for (let i = 1; i <= 9; i++) {
-              fs.writeFileSync(path.join(githubDir, `f${i}.md`), `F${i}\n{{#runtime-import f${i + 1}.md}}`);
+              fs.writeFileSync(path.join(workflowsDir, `f${i}.md`), `F${i}\n{{#runtime-import f${i + 1}.md}}`);
             }
-            fs.writeFileSync(path.join(githubDir, "f10.md"), "F10\n{{#runtime-import f1.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "f10.md"), "F10\n{{#runtime-import f1.md}}");
 
             await expect(processRuntimeImports("{{#runtime-import f1.md}}", tempDir)).rejects.toThrow("Circular dependency detected");
             await expect(processRuntimeImports("{{#runtime-import f1.md}}", tempDir)).rejects.toThrow("f1.md");
@@ -1161,10 +1162,10 @@ describe("runtime_import", () => {
 
           it("should allow diamond patterns without false positive cycle detection", async () => {
             // Verify that diamond (A -> [B, C], B -> D, C -> D) is NOT detected as a cycle
-            fs.writeFileSync(path.join(githubDir, "d.md"), "D");
-            fs.writeFileSync(path.join(githubDir, "b.md"), "B\n{{#runtime-import d.md}}");
-            fs.writeFileSync(path.join(githubDir, "c.md"), "C\n{{#runtime-import d.md}}");
-            fs.writeFileSync(path.join(githubDir, "a.md"), "A\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "d.md"), "D");
+            fs.writeFileSync(path.join(workflowsDir, "b.md"), "B\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "c.md"), "C\n{{#runtime-import d.md}}");
+            fs.writeFileSync(path.join(workflowsDir, "a.md"), "A\n{{#runtime-import b.md}}\n{{#runtime-import c.md}}");
 
             const result = await processRuntimeImports("{{#runtime-import a.md}}", tempDir);
             expect(result).toBe("A\nB\nD\nC\nD");
@@ -1176,10 +1177,10 @@ describe("runtime_import", () => {
           it("should handle large fan-out (1 root -> 50 direct imports)", async () => {
             // Create 50 leaf files
             for (let i = 1; i <= 50; i++) {
-              fs.writeFileSync(path.join(githubDir, `leaf${i}.md`), `Leaf ${i}`);
+              fs.writeFileSync(path.join(workflowsDir, `leaf${i}.md`), `Leaf ${i}`);
             }
             const imports = Array.from({ length: 50 }, (_, i) => `{{#runtime-import leaf${i + 1}.md}}`).join("\n");
-            fs.writeFileSync(path.join(githubDir, "root.md"), `Root\n${imports}`);
+            fs.writeFileSync(path.join(workflowsDir, "root.md"), `Root\n${imports}`);
 
             const result = await processRuntimeImports("{{#runtime-import root.md}}", tempDir);
             const lines = result.split("\n");
@@ -1190,27 +1191,27 @@ describe("runtime_import", () => {
           it("should handle moderate depth with moderate breadth (depth 5, breadth 4)", async () => {
             // Each level has 4 nodes, each node imports 4 nodes from next level
             // But use a shared pattern to keep file count reasonable
-            fs.writeFileSync(path.join(githubDir, "l5.md"), "L5");
+            fs.writeFileSync(path.join(workflowsDir, "l5.md"), "L5");
 
             // Level 4: 4 nodes each importing l5
             for (let i = 1; i <= 4; i++) {
-              fs.writeFileSync(path.join(githubDir, `l4-${i}.md`), `L4-${i}\n{{#runtime-import l5.md}}`);
+              fs.writeFileSync(path.join(workflowsDir, `l4-${i}.md`), `L4-${i}\n{{#runtime-import l5.md}}`);
             }
 
             // Level 3: 4 nodes each importing all level 4 nodes
             for (let i = 1; i <= 4; i++) {
               const imports = Array.from({ length: 4 }, (_, j) => `{{#runtime-import l4-${j + 1}.md}}`).join("\n");
-              fs.writeFileSync(path.join(githubDir, `l3-${i}.md`), `L3-${i}\n${imports}`);
+              fs.writeFileSync(path.join(workflowsDir, `l3-${i}.md`), `L3-${i}\n${imports}`);
             }
 
             // Level 2: 4 nodes each importing one level 3 node
             for (let i = 1; i <= 4; i++) {
-              fs.writeFileSync(path.join(githubDir, `l2-${i}.md`), `L2-${i}\n{{#runtime-import l3-${i}.md}}`);
+              fs.writeFileSync(path.join(workflowsDir, `l2-${i}.md`), `L2-${i}\n{{#runtime-import l3-${i}.md}}`);
             }
 
             // Level 1: Root imports all level 2 nodes
             const imports = Array.from({ length: 4 }, (_, i) => `{{#runtime-import l2-${i + 1}.md}}`).join("\n");
-            fs.writeFileSync(path.join(githubDir, "l1.md"), `L1\n${imports}`);
+            fs.writeFileSync(path.join(workflowsDir, "l1.md"), `L1\n${imports}`);
 
             const result = await processRuntimeImports("{{#runtime-import l1.md}}", tempDir);
             expect(result).toContain("L1");
