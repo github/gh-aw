@@ -140,6 +140,10 @@ func NewCompiler(opts ...CompilerOption) *Compiler {
 	// Get default version
 	version := defaultVersion
 
+	// Auto-detect git repository root for action cache path resolution
+	// This ensures actions-lock.json is created at repo root regardless of CWD
+	gitRoot := findGitRoot()
+
 	// Create compiler with defaults
 	c := &Compiler{
 		verbose:           false,
@@ -152,6 +156,7 @@ func NewCompiler(opts ...CompilerOption) *Compiler {
 		stepOrderTracker:  NewStepOrderTracker(),
 		artifactManager:   NewArtifactManager(),
 		actionPinWarnings: make(map[string]bool), // Initialize warning cache
+		gitRoot:           gitRoot,               // Auto-detected git root
 	}
 
 	// Apply functional options

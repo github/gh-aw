@@ -89,22 +89,12 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 		}
 	}
 
-	// Find git repository root for action cache path
-	// This ensures actions-lock.json is created at the repo root regardless of CWD
-	gitRoot, err := findGitRoot()
-	if err != nil {
-		compileCompilerSetupLog.Printf("Could not find git root: %v, using current directory", err)
-		gitRoot = "" // Will fall back to cwd in compiler
-	} else {
-		compileCompilerSetupLog.Printf("Using git root for action cache: %s", gitRoot)
-	}
-
 	// Create compiler with auto-detected version and action mode
+	// Git root is now auto-detected in NewCompiler() for all compiler instances
 	compiler := workflow.NewCompiler(
 		workflow.WithVerbose(config.Verbose),
 		workflow.WithEngineOverride(config.EngineOverride),
 		workflow.WithFailFast(config.FailFast),
-		workflow.WithGitRoot(gitRoot),
 	)
 	compileCompilerSetupLog.Print("Created compiler instance")
 

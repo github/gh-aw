@@ -39,6 +39,22 @@ import (
 
 var gitHelpersLog = logger.New("workflow:git_helpers")
 
+// findGitRoot attempts to find the git repository root directory.
+// Returns empty string if not in a git repository or if git command fails.
+// This function is safe to call from any context and won't cause errors if git is not available.
+func findGitRoot() string {
+	gitHelpersLog.Print("Attempting to find git root directory")
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		gitHelpersLog.Printf("Could not find git root (not a git repo or git not available): %v", err)
+		return ""
+	}
+	gitRoot := strings.TrimSpace(string(output))
+	gitHelpersLog.Printf("Found git root: %s", gitRoot)
+	return gitRoot
+}
+
 // GetCurrentGitTag returns the current git tag if available.
 // Returns empty string if not on a tag.
 func GetCurrentGitTag() string {
