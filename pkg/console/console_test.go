@@ -354,13 +354,14 @@ func TestFormatErrorWithAbsolutePaths(t *testing.T) {
 
 	// The output should contain test.md and line:column information
 	if !strings.Contains(output, "test.md:5:10:") {
-		t.Errorf("Expected output to contain relative file path with line:column, got: %s", output)
+		t.Errorf("Expected output to contain file path with line:column, got: %s", output)
 	}
 
-	// The output should not start with an absolute path (no leading /)
+	// Since tmpDir is outside the working directory (in /tmp), the path should be absolute
+	// to avoid confusing relative paths with ".." components
 	lines := strings.Split(output, "\n")
-	if strings.HasPrefix(lines[0], "/") {
-		t.Errorf("Expected output to start with relative path, but found absolute path: %s", lines[0])
+	if !strings.HasPrefix(lines[0], "/") {
+		t.Errorf("Expected output to start with absolute path for files outside working directory, got: %s", lines[0])
 	}
 
 	// Should contain error message
