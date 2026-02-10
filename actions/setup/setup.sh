@@ -212,6 +212,7 @@ SAFE_OUTPUTS_FILES=(
   "generate_compact_schema.cjs"
   "setup_globals.cjs"
   "error_helpers.cjs"
+  "git_helpers.cjs"
   "mcp_enhanced_errors.cjs"
 )
 
