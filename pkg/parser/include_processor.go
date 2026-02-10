@@ -10,12 +10,15 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/logger"
 )
+
+var includeLog = logger.New("parser:include_processor")
 
 // ProcessIncludes processes @include, @import (deprecated), and {{#import: directives in markdown content
 // This matches the bash process_includes function behavior
 func ProcessIncludes(content, baseDir string, extractTools bool) (string, error) {
-	log.Printf("Processing includes: baseDir=%s, extractTools=%t, content_size=%d", baseDir, extractTools, len(content))
+	includeLog.Printf("Processing includes: baseDir=%s, extractTools=%t, content_size=%d", baseDir, extractTools, len(content))
 	visited := make(map[string]bool)
 	return processIncludesWithVisited(content, baseDir, extractTools, visited)
 }
@@ -61,7 +64,7 @@ func processIncludesWithVisited(content, baseDir string, extractTools bool, visi
 			// Resolve file path first to get the canonical path
 			fullPath, err := ResolveIncludePath(filePath, baseDir, nil)
 			if err != nil {
-				log.Printf("Failed to resolve include path '%s': %v", filePath, err)
+				includeLog.Printf("Failed to resolve include path '%s': %v", filePath, err)
 				if isOptional {
 					// For optional includes, show a friendly informational message to stdout
 					if !extractTools {
@@ -75,7 +78,7 @@ func processIncludesWithVisited(content, baseDir string, extractTools bool, visi
 
 			// Check for repeated imports using the resolved full path
 			if visited[fullPath] {
-				log.Printf("Skipping already included file: %s", fullPath)
+				includeLog.Printf("Skipping already included file: %s", fullPath)
 				if !extractTools {
 					fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Already included: %s, skipping", filePath)))
 				}
@@ -83,7 +86,7 @@ func processIncludesWithVisited(content, baseDir string, extractTools bool, visi
 			}
 
 			// Mark as visited using the resolved full path
-			log.Printf("Processing include file: %s", fullPath)
+			includeLog.Printf("Processing include file: %s", fullPath)
 			visited[fullPath] = true
 
 			// Process the included file
@@ -113,10 +116,12 @@ func processIncludesWithVisited(content, baseDir string, extractTools bool, visi
 // processIncludedFile processes a single included file, optionally extracting a section
 // processIncludedFileWithVisited processes a single included file with cycle detection for nested includes
 func processIncludedFileWithVisited(filePath, sectionName string, extractTools bool, visited map[string]bool) (string, error) {
+	includeLog.Printf("Reading included file: %s (extractTools=%t, section=%s)", filePath, extractTools, sectionName)
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read included file %s: %w", filePath, err)
 	}
+	includeLog.Printf("Read %d bytes from included file: %s", len(content), filePath)
 
 	// Validate included file frontmatter based on file location
 	result, err := ExtractFrontmatterFromContent(string(content))
@@ -140,8 +145,10 @@ func processIncludedFileWithVisited(filePath, sectionName string, extractTools b
 	if validationErr != nil {
 		if isWorkflowFile {
 			// For workflow files, strict validation must pass
+			includeLog.Printf("Validation failed for workflow file %s: %v", filePath, validationErr)
 			return "", fmt.Errorf("invalid frontmatter in included file %s: %w", filePath, validationErr)
 		} else {
+			includeLog.Printf("Validation failed for non-workflow file %s, applying relaxed validation", filePath)
 			// For non-workflow files, fall back to relaxed validation with warnings
 			if len(result.Frontmatter) > 0 {
 				// Valid fields for non-workflow frontmatter (fields that are allowed in shared workflows)
