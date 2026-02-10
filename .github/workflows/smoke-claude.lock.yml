@@ -1559,6 +1559,9 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           MCP_TIMEOUT: 120000
           MCP_TOOL_TIMEOUT: 60000
+      - name: Restore git credentials
+        if: always()
+        run: bash /opt/gh-aw/actions/restore_git_credentials.sh
       - name: Stop MCP gateway
         if: always()
         continue-on-error: true

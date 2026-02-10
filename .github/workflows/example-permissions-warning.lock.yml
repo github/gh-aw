@@ -365,6 +365,9 @@ jobs:
           GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
           GITHUB_WORKSPACE: ${{ github.workspace }}
           XDG_CONFIG_HOME: /home/runner
+      - name: Restore git credentials
+        if: always()
+        run: bash /opt/gh-aw/actions/restore_git_credentials.sh
       - name: Copy Copilot session state files to logs
         if: always()
         continue-on-error: true

@@ -646,6 +646,9 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           XDG_CONFIG_HOME: /home/runner
+      - name: Restore git credentials
+        if: always()
+        run: bash /opt/gh-aw/actions/restore_git_credentials.sh
       - name: Copy Copilot session state files to logs
         if: always()
         continue-on-error: true

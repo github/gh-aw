@@ -32,13 +32,3 @@ func (c *Compiler) generateGitCredentialsCleanerStep() []string {
 		"        run: bash /opt/gh-aw/actions/clean_git_credentials.sh\n",
 	}
 }
-
-// generateGitCredentialsRestoreStep generates a step that restores git credentials from backup
-// This allows safe-outputs operations that need git to work after agent execution
-func (c *Compiler) generateGitCredentialsRestoreStep() []string {
-	return []string{
-		"      - name: Restore git credentials\n",
-		"        if: always()\n",
-		"        run: bash /opt/gh-aw/actions/restore_git_credentials.sh\n",
-	}
-}

@@ -245,10 +245,11 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	// Mark that we've completed agent execution - step order validation starts from here
 	c.stepOrderTracker.MarkAgentExecutionComplete()
 
-	// Restore git credentials after agent execution
+	// Regenerate git credentials after agent execution
 	// This allows safe-outputs operations (like create_pull_request) to work properly
-	gitRestoreSteps := c.generateGitCredentialsRestoreStep()
-	for _, line := range gitRestoreSteps {
+	// We regenerate the credentials rather than restoring from backup
+	gitConfigStepsAfterAgent := c.generateGitConfigurationSteps()
+	for _, line := range gitConfigStepsAfterAgent {
 		yaml.WriteString(line)
 	}
 

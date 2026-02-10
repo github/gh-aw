@@ -616,6 +616,9 @@ jobs:
         run: |
           echo "Custom steps execution completed" >> /tmp/gh-aw/agent-stdio.log
           touch /tmp/gh-aw/agent-stdio.log
+      - name: Restore git credentials
+        if: always()
+        run: bash /opt/gh-aw/actions/restore_git_credentials.sh
       - name: Stop MCP gateway
         if: always()
         continue-on-error: true
