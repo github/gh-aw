@@ -284,7 +284,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 1,
 			checkContent: []string{
 				"Setup Bun",
-				"oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76",
+				"oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3",
 				"bun-version: '1.1'",
 			},
 		},
@@ -296,7 +296,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 1,
 			checkContent: []string{
 				"Setup Node.js",
-				"actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f",
+				"actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
 				"node-version: '20'",
 			},
 		},
@@ -368,7 +368,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 1,
 			checkContent: []string{
 				"Setup Haskell",
-				"haskell-actions/setup@55073cbd0e96181a9abd6ff4e7d289867dffc98d",
+				"haskell-actions/setup@9cd1b7bf3f36d5a3c3b17abc3545bfb5481912ea",
 				"ghc-version: '9.10'",
 			},
 		},
@@ -402,7 +402,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
-				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
+				"actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5",
 				"go-version: '1.22'",
 				"Capture GOROOT for AWF chroot mode",
 			},
@@ -415,7 +415,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
-				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
+				"actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5",
 				"go-version: '1.25'",
 				"Capture GOROOT for AWF chroot mode",
 			},
@@ -428,7 +428,7 @@ func TestGenerateRuntimeSetupSteps(t *testing.T) {
 			expectSteps: 2, // setup + GOROOT capture for AWF chroot mode
 			checkContent: []string{
 				"Setup Go",
-				"actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
+				"actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5",
 				"go-version-file: custom/go.mod",
 				"cache: true",
 				"Capture GOROOT for AWF chroot mode",

@@ -1069,4 +1069,253 @@ describe("sanitize_content.cjs", () => {
       });
     });
   });
+
+  describe("Unicode hardening transformations", () => {
+    describe("zero-width character removal", () => {
+      it("should remove zero-width space (U+200B)", () => {
+        const input = "Hello\u200BWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove zero-width non-joiner (U+200C)", () => {
+        const input = "Test\u200CText";
+        const expected = "TestText";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove zero-width joiner (U+200D)", () => {
+        const input = "Hello\u200DWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove word joiner (U+2060)", () => {
+        const input = "Word\u2060Joiner";
+        const expected = "WordJoiner";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove byte order mark (U+FEFF)", () => {
+        const input = "\uFEFFHello World";
+        const expected = "Hello World";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove multiple zero-width characters", () => {
+        const input = "A\u200BB\u200CC\u200DD\u2060E\uFEFFF";
+        const expected = "ABCDEF";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should handle text with only zero-width characters", () => {
+        const input = "\u200B\u200C\u200D";
+        const expected = "";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+    });
+
+    describe("Unicode normalization (NFC)", () => {
+      it("should normalize composed characters", () => {
+        // e + combining acute accent -> precomposed é
+        const input = "cafe\u0301"; // café with combining accent
+        const result = sanitizeContent(input);
+        // After NFC normalization, should be composed form
+        expect(result).toBe("café");
+        // Verify it's the precomposed character (U+00E9)
+        expect(result.charCodeAt(3)).toBe(0x00e9);
+      });
+
+      it("should normalize multiple combining characters", () => {
+        const input = "n\u0303"; // ñ with combining tilde
+        const result = sanitizeContent(input);
+        expect(result).toBe("ñ");
+      });
+
+      it("should handle already normalized text", () => {
+        const input = "Hello World";
+        const expected = "Hello World";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+    });
+
+    describe("full-width ASCII conversion", () => {
+      it("should convert full-width exclamation mark", () => {
+        const input = "Hello\uFF01"; // Full-width !
+        const expected = "Hello!";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should convert full-width letters", () => {
+        const input = "\uFF21\uFF22\uFF23"; // Full-width ABC
+        const expected = "ABC";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should convert full-width digits", () => {
+        const input = "\uFF11\uFF12\uFF13"; // Full-width 123
+        const expected = "123";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should convert full-width parentheses", () => {
+        const input = "\uFF08test\uFF09"; // Full-width (test)
+        const expected = "(test)";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should convert mixed full-width and normal text", () => {
+        const input = "Hello\uFF01 \uFF37orld"; // Hello! World with full-width ! and W
+        const expected = "Hello! World";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should convert full-width at sign", () => {
+        const input = "\uFF20user"; // Full-width @user
+        // Note: @ mention will also be neutralized
+        const result = sanitizeContent(input);
+        expect(result).toBe("`@user`");
+      });
+
+      it("should handle entire sentence in full-width", () => {
+        const input = "\uFF28\uFF45\uFF4C\uFF4C\uFF4F"; // Full-width Hello
+        const expected = "Hello";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+    });
+
+    describe("directional override removal", () => {
+      it("should remove left-to-right embedding (U+202A)", () => {
+        const input = "Hello\u202AWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove right-to-left embedding (U+202B)", () => {
+        const input = "Hello\u202BWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove pop directional formatting (U+202C)", () => {
+        const input = "Hello\u202CWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove left-to-right override (U+202D)", () => {
+        const input = "Hello\u202DWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove right-to-left override (U+202E)", () => {
+        const input = "Hello\u202EWorld";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove left-to-right isolate (U+2066)", () => {
+        const input = "Hello\u2066World";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove right-to-left isolate (U+2067)", () => {
+        const input = "Hello\u2067World";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove first strong isolate (U+2068)", () => {
+        const input = "Hello\u2068World";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove pop directional isolate (U+2069)", () => {
+        const input = "Hello\u2069World";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should remove multiple directional controls", () => {
+        const input = "A\u202AB\u202BC\u202CD\u202DE\u202EF\u2066G\u2067H\u2068I\u2069J";
+        const expected = "ABCDEFGHIJ";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+    });
+
+    describe("combined Unicode attacks", () => {
+      it("should handle combination of zero-width and directional controls", () => {
+        const input = "Hello\u200B\u202EWorld\u200C";
+        const expected = "HelloWorld";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should handle combination of full-width and zero-width", () => {
+        const input = "\uFF28\u200Bello"; // Full-width H + zero-width space + ello
+        const expected = "Hello";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should handle all transformations together", () => {
+        // Full-width H, zero-width space, combining accent, RTL override, normal text
+        const input = "\uFF28\u200Be\u0301\u202Ello";
+        const expected = "Héllo";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should prevent visual spoofing with mixed scripts", () => {
+        // Example: trying to hide malicious text with RTL override
+        const input = "filename\u202E.txt.exe";
+        // Should remove the RTL override
+        const expected = "filename.txt.exe";
+        expect(sanitizeContent(input)).toBe(expected);
+      });
+
+      it("should handle deeply nested Unicode attacks", () => {
+        const input = "\uFEFF\u200B\uFF21\u202E\u0301\u200C";
+        // BOM + ZWS + full-width A + RTL + combining + ZWNJ
+        const result = sanitizeContent(input);
+        // Should result in just "A" with the combining accent normalized
+        expect(result.replace(/\u0301/g, "")).toBe("A");
+      });
+    });
+
+    describe("edge cases and boundary conditions", () => {
+      it("should handle empty string", () => {
+        expect(sanitizeContent("")).toBe("");
+      });
+
+      it("should handle string with only invisible characters", () => {
+        const input = "\u200B\u202E\uFEFF";
+        expect(sanitizeContent(input)).toBe("");
+      });
+
+      it("should preserve regular whitespace", () => {
+        const input = "Hello   World\t\nTest";
+        const result = sanitizeContent(input);
+        // Should preserve spaces, tabs, and newlines (though trimmed at end)
+        expect(result).toContain("Hello");
+        expect(result).toContain("World");
+      });
+
+      it("should not affect emoji", () => {
+        const input = "Hello 👋 World 🌍";
+        const result = sanitizeContent(input);
+        expect(result).toContain("👋");
+        expect(result).toContain("🌍");
+      });
+
+      it("should handle long text with scattered Unicode attacks", () => {
+        const longText = "A".repeat(100) + "\u200B" + "B".repeat(100) + "\u202E" + "C".repeat(100);
+        const result = sanitizeContent(longText);
+        // Should remove the invisible characters
+        expect(result.length).toBe(300); // 100 + 100 + 100
+        expect(result.includes("\u200B")).toBe(false);
+        expect(result.includes("\u202E")).toBe(false);
+      });
+    });
+  });
 });

@@ -486,6 +486,46 @@ function applyTruncation(content, maxLength) {
 }
 
 /**
+ * Performs text hardening to protect against Unicode-based attacks.
+ * This applies multiple layers of character normalization and filtering
+ * to ensure consistent text processing and prevent visual spoofing.
+ *
+ * @param {string} text - Input text to harden
+ * @returns {string} Hardened text with Unicode security applied
+ */
+function hardenUnicodeText(text) {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+
+  let result = text;
+
+  // Step 1: Normalize Unicode to canonical composition (NFC)
+  // This ensures consistent character representation across different encodings
+  result = result.normalize("NFC");
+
+  // Step 2: Strip invisible zero-width characters that can hide content
+  // These include: zero-width space, zero-width non-joiner, zero-width joiner,
+  // word joiner, and byte order mark
+  result = result.replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, "");
+
+  // Step 3: Remove bidirectional text override controls
+  // These can be used to reverse text direction and create visual spoofs
+  result = result.replace(/[\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069]/g, "");
+
+  // Step 4: Convert full-width ASCII characters to standard ASCII
+  // Full-width characters (U+FF01-FF5E) can be used to bypass filters
+  result = result.replace(/[\uFF01-\uFF5E]/g, char => {
+    const code = char.charCodeAt(0);
+    // Map full-width to half-width by subtracting offset
+    const standardCode = code - 0xfee0;
+    return String.fromCharCode(standardCode);
+  });
+
+  return result;
+}
+
+/**
  * Core sanitization function without mention filtering
  * @param {string} content - The content to sanitize
  * @param {number} [maxLength] - Maximum length of content (default: 524288)
@@ -503,6 +543,10 @@ function sanitizeContentCore(content, maxLength) {
   const allowedGitHubRefs = buildAllowedGitHubReferences();
 
   let sanitized = content;
+
+  // Apply Unicode hardening first to normalize text representation
+  // This prevents Unicode-based attacks and ensures consistent processing
+  sanitized = hardenUnicodeText(sanitized);
 
   // Remove ANSI escape sequences and control characters early
   // This must happen before mention neutralization to avoid creating bare mentions
@@ -566,4 +610,5 @@ module.exports = {
   convertXmlTags,
   neutralizeBotTriggers,
   applyTruncation,
+  hardenUnicodeText,
 };
