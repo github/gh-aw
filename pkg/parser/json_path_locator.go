@@ -419,7 +419,7 @@ func findNestedSection(yamlContent string, pathSegments []PathSegment) NestedSec
 	}
 
 	// Find the end of this nested section by looking for the next line at the same or lower indentation
-	endLine := len(lines) - 1        // Default to end of file
+	endLine := len(lines) - 1          // Default to end of file
 	targetLevel := baseIndentLevel - 1 // The level of the key we found
 
 	for lineNum := foundLine + 1; lineNum < len(lines); lineNum++ {

@@ -689,7 +689,7 @@ func main() {
 		isAlreadyFormatted := strings.Contains(errMsg, "Suggestions:") ||
 			strings.HasPrefix(errMsg, "✗") ||
 			strings.Contains(errMsg, ":") && (strings.Contains(errMsg, "error:") || strings.Contains(errMsg, "warning:"))
-		
+
 		if isAlreadyFormatted {
 			fmt.Fprintln(os.Stderr, errMsg)
 		} else {
