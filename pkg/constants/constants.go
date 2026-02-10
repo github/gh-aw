@@ -547,6 +547,26 @@ var AllowedExpressions = []string{
 	"github.workspace",
 } // needs., steps. already allowed
 
+// DangerousPropertyNames contains JavaScript built-in property names that are blocked
+// in GitHub Actions expressions to prevent prototype pollution and traversal attacks.
+// This list matches the DANGEROUS_PROPS list in actions/setup/js/runtime_import.cjs
+// See PR #14826 for context on these security measures.
+var DangerousPropertyNames = []string{
+	"constructor",
+	"__proto__",
+	"prototype",
+	"__defineGetter__",
+	"__defineSetter__",
+	"__lookupGetter__",
+	"__lookupSetter__",
+	"hasOwnProperty",
+	"isPrototypeOf",
+	"propertyIsEnumerable",
+	"toString",
+	"valueOf",
+	"toLocaleString",
+}
+
 const AgentJobName JobName = "agent"
 const ActivationJobName JobName = "activation"
 const PreActivationJobName JobName = "pre_activation"

@@ -430,3 +430,317 @@ func TestUnauthorizedExpressionFuzzyMatchSuggestions(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateExpressionForDangerousProps tests that dangerous JavaScript property names
+// are blocked at compile time to prevent prototype pollution attacks (PR #14826)
+func TestValidateExpressionForDangerousProps(t *testing.T) {
+	tests := []struct {
+		name        string
+		expression  string
+		expectError bool
+		errorProp   string // The dangerous property that should be mentioned in error
+	}{
+		// Test constructor blocking
+		{
+			name:        "block_constructor_simple",
+			expression:  "github.constructor",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		{
+			name:        "block_constructor_in_chain",
+			expression:  "github.event.constructor",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		{
+			name:        "block_constructor_with_inputs",
+			expression:  "inputs.constructor",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		{
+			name:        "block_constructor_with_needs",
+			expression:  "needs.job.constructor",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		
+		// Test __proto__ blocking
+		{
+			name:        "block_proto_simple",
+			expression:  "github.__proto__",
+			expectError: true,
+			errorProp:   "__proto__",
+		},
+		{
+			name:        "block_proto_in_chain",
+			expression:  "github.event.__proto__",
+			expectError: true,
+			errorProp:   "__proto__",
+		},
+		{
+			name:        "block_proto_with_inputs",
+			expression:  "inputs.__proto__",
+			expectError: true,
+			errorProp:   "__proto__",
+		},
+		
+		// Test prototype blocking
+		{
+			name:        "block_prototype_simple",
+			expression:  "github.prototype",
+			expectError: true,
+			errorProp:   "prototype",
+		},
+		{
+			name:        "block_prototype_in_chain",
+			expression:  "github.event.prototype",
+			expectError: true,
+			errorProp:   "prototype",
+		},
+		{
+			name:        "block_prototype_with_inputs",
+			expression:  "inputs.prototype",
+			expectError: true,
+			errorProp:   "prototype",
+		},
+		
+		// Test __defineGetter__ blocking
+		{
+			name:        "block_defineGetter",
+			expression:  "github.__defineGetter__",
+			expectError: true,
+			errorProp:   "__defineGetter__",
+		},
+		
+		// Test __defineSetter__ blocking
+		{
+			name:        "block_defineSetter",
+			expression:  "github.__defineSetter__",
+			expectError: true,
+			errorProp:   "__defineSetter__",
+		},
+		
+		// Test __lookupGetter__ blocking
+		{
+			name:        "block_lookupGetter",
+			expression:  "github.__lookupGetter__",
+			expectError: true,
+			errorProp:   "__lookupGetter__",
+		},
+		
+		// Test __lookupSetter__ blocking
+		{
+			name:        "block_lookupSetter",
+			expression:  "github.__lookupSetter__",
+			expectError: true,
+			errorProp:   "__lookupSetter__",
+		},
+		
+		// Test hasOwnProperty blocking
+		{
+			name:        "block_hasOwnProperty",
+			expression:  "github.hasOwnProperty",
+			expectError: true,
+			errorProp:   "hasOwnProperty",
+		},
+		
+		// Test isPrototypeOf blocking
+		{
+			name:        "block_isPrototypeOf",
+			expression:  "github.isPrototypeOf",
+			expectError: true,
+			errorProp:   "isPrototypeOf",
+		},
+		
+		// Test propertyIsEnumerable blocking
+		{
+			name:        "block_propertyIsEnumerable",
+			expression:  "github.propertyIsEnumerable",
+			expectError: true,
+			errorProp:   "propertyIsEnumerable",
+		},
+		
+		// Test toString blocking
+		{
+			name:        "block_toString",
+			expression:  "github.toString",
+			expectError: true,
+			errorProp:   "toString",
+		},
+		
+		// Test valueOf blocking
+		{
+			name:        "block_valueOf",
+			expression:  "github.valueOf",
+			expectError: true,
+			errorProp:   "valueOf",
+		},
+		
+		// Test toLocaleString blocking
+		{
+			name:        "block_toLocaleString",
+			expression:  "github.toLocaleString",
+			expectError: true,
+			errorProp:   "toLocaleString",
+		},
+		
+		// Test blocking in array access patterns (bracket notation)
+		{
+			name:        "block_constructor_in_array_access",
+			expression:  "github.event.release.assets[0].constructor",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		{
+			name:        "block_proto_in_array_access",
+			expression:  "github.event.release.assets[0].__proto__",
+			expectError: true,
+			errorProp:   "__proto__",
+		},
+		
+		// Test that safe expressions are allowed
+		{
+			name:        "allow_safe_github_actor",
+			expression:  "github.actor",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_github_repository",
+			expression:  "github.repository",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_github_event_issue_number",
+			expression:  "github.event.issue.number",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_needs_outputs",
+			expression:  "needs.job-id.outputs.result",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_steps_outputs",
+			expression:  "steps.step-id.outputs.value",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_inputs",
+			expression:  "inputs.repository",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_env",
+			expression:  "env.MY_VAR",
+			expectError: false,
+		},
+		{
+			name:        "allow_safe_array_access",
+			expression:  "github.event.release.assets[0].id",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateExpressionForDangerousProps(tt.expression)
+			
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error for expression '%s', but got nil", tt.expression)
+					return
+				}
+				
+				// Verify error message contains the dangerous property name
+				errMsg := err.Error()
+				if !strings.Contains(errMsg, tt.errorProp) {
+					t.Errorf("Error message should mention dangerous property '%s', got: %s",
+						tt.errorProp, errMsg)
+				}
+				
+				// Verify error message mentions the expression
+				if !strings.Contains(errMsg, tt.expression) {
+					t.Errorf("Error message should mention expression '%s', got: %s",
+						tt.expression, errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error for safe expression '%s', but got: %v",
+						tt.expression, err)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateExpressionSafetyWithDangerousProps tests that dangerous properties
+// are blocked in full workflow markdown content
+func TestValidateExpressionSafetyWithDangerousProps(t *testing.T) {
+	tests := []struct {
+		name        string
+		content     string
+		expectError bool
+		errorProp   string
+	}{
+		{
+			name:        "block_constructor_in_markdown",
+			content:     "The value is ${{ github.constructor }}",
+			expectError: true,
+			errorProp:   "constructor",
+		},
+		{
+			name:        "block_proto_in_markdown",
+			content:     "The value is ${{ inputs.__proto__ }}",
+			expectError: true,
+			errorProp:   "__proto__",
+		},
+		{
+			name:        "block_prototype_in_markdown",
+			content:     "The value is ${{ github.event.prototype }}",
+			expectError: true,
+			errorProp:   "prototype",
+		},
+		{
+			name:        "block_toString_in_markdown",
+			content:     "The value is ${{ github.toString }}",
+			expectError: true,
+			errorProp:   "toString",
+		},
+		{
+			name:        "allow_safe_expressions_in_markdown",
+			content:     "Issue number: ${{ github.event.issue.number }}, Actor: ${{ github.actor }}",
+			expectError: false,
+		},
+		{
+			name:        "block_multiple_dangerous_props",
+			content:     "First: ${{ github.constructor }}, Second: ${{ inputs.__proto__ }}",
+			expectError: true,
+			errorProp:   "constructor", // Should catch at least one
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateExpressionSafety(tt.content)
+			
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error for content with dangerous property, but got nil")
+					return
+				}
+				
+				errMsg := err.Error()
+				if !strings.Contains(errMsg, tt.errorProp) {
+					t.Errorf("Error message should mention dangerous property '%s', got: %s",
+						tt.errorProp, errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error for safe content, but got: %v", err)
+				}
+			}
+		})
+	}
+}

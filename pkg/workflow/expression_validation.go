@@ -194,9 +194,49 @@ type ExpressionValidationOptions struct {
 	UnauthorizedExpressions *[]string
 }
 
+// validateExpressionForDangerousProps checks if an expression contains dangerous JavaScript
+// property names that could be used for prototype pollution or traversal attacks.
+// This matches the JavaScript runtime validation in actions/setup/js/runtime_import.cjs
+// Returns an error if dangerous properties are found.
+func validateExpressionForDangerousProps(expression string) error {
+	trimmed := strings.TrimSpace(expression)
+	
+	// Split expression into parts handling both dot notation (e.g., "github.event.issue")
+	// and bracket notation (e.g., "release.assets[0].id")
+	// Filter out numeric indices (e.g., "0" in "assets[0]")
+	parts := regexp.MustCompile(`[.\[\]]+`).Split(trimmed, -1)
+	
+	for _, part := range parts {
+		// Skip empty parts and numeric indices
+		if part == "" || regexp.MustCompile(`^\d+$`).MatchString(part) {
+			continue
+		}
+		
+		// Check if this part is a dangerous property name
+		for _, dangerousProp := range constants.DangerousPropertyNames {
+			if part == dangerousProp {
+				return NewValidationError(
+					"expressions",
+					fmt.Sprintf("dangerous property name '%s' found in expression", dangerousProp),
+					fmt.Sprintf("expression '%s' contains the dangerous property name '%s'", expression, dangerousProp),
+					fmt.Sprintf("Remove the dangerous property '%s' from the expression. Property names like constructor, __proto__, prototype, and similar JavaScript built-ins are blocked to prevent prototype pollution attacks. See PR #14826 for more details.", dangerousProp),
+				)
+			}
+		}
+	}
+	
+	return nil
+}
+
 // validateSingleExpression validates a single literal expression
 func validateSingleExpression(expression string, opts ExpressionValidationOptions) error {
 	expression = strings.TrimSpace(expression)
+
+	// First, check for dangerous JavaScript property names that could be used for
+	// prototype pollution or traversal attacks (PR #14826)
+	if err := validateExpressionForDangerousProps(expression); err != nil {
+		return err
+	}
 
 	// Check if this expression is in the allowed list
 	allowed := false
