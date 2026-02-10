@@ -31,6 +31,7 @@ func renderConsole(data AuditData, logsPath string) {
 
 	// Key Findings Section - NEW
 	if len(data.KeyFindings) > 0 {
+		auditReportLog.Printf("Rendering %d key findings", len(data.KeyFindings))
 		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Key Findings"))
 		fmt.Fprintln(os.Stderr)
 		renderKeyFindings(data.KeyFindings)
@@ -38,6 +39,7 @@ func renderConsole(data AuditData, logsPath string) {
 
 	// Recommendations Section - NEW
 	if len(data.Recommendations) > 0 {
+		auditReportLog.Printf("Rendering %d recommendations", len(data.Recommendations))
 		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Recommendations"))
 		fmt.Fprintln(os.Stderr)
 		renderRecommendations(data.Recommendations)
@@ -45,6 +47,7 @@ func renderConsole(data AuditData, logsPath string) {
 
 	// Failure Analysis Section - NEW
 	if data.FailureAnalysis != nil {
+		auditReportLog.Print("Rendering failure analysis")
 		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Failure Analysis"))
 		fmt.Fprintln(os.Stderr)
 		renderFailureAnalysis(data.FailureAnalysis)
@@ -64,6 +67,7 @@ func renderConsole(data AuditData, logsPath string) {
 
 	// Jobs Section - use new table rendering
 	if len(data.Jobs) > 0 {
+		auditReportLog.Printf("Rendering jobs table with %d jobs", len(data.Jobs))
 		fmt.Fprintln(os.Stderr, console.FormatSectionHeader("Jobs"))
 		fmt.Fprintln(os.Stderr)
 		renderJobsTable(data.Jobs)

@@ -239,7 +239,7 @@ Test workflow with runtime overrides applied to steps.
 	lockStr := string(lockContent)
 
 	// Verify that Node.js setup step is included with version 22
-	if !strings.Contains(lockStr, "actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f") {
+	if !strings.Contains(lockStr, "actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238") {
 		t.Error("Expected setup-node action in lock file")
 	}
 	if !strings.Contains(lockStr, "node-version: '22'") {
@@ -355,7 +355,7 @@ Test workflow that uses Go without go.mod file.
 	if !strings.Contains(lockStr, "Setup Go") {
 		t.Error("Expected 'Setup Go' step in lock file")
 	}
-	if !strings.Contains(lockStr, "actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c") {
+	if !strings.Contains(lockStr, "actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5") {
 		t.Error("Expected actions/setup-go action in lock file")
 	}
 	if !strings.Contains(lockStr, "go-version: '1.25'") {
