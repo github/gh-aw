@@ -245,6 +245,13 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	// Mark that we've completed agent execution - step order validation starts from here
 	c.stepOrderTracker.MarkAgentExecutionComplete()
 
+	// Restore git credentials after agent execution
+	// This allows safe-outputs operations (like create_pull_request) to work properly
+	gitRestoreSteps := c.generateGitCredentialsRestoreStep()
+	for _, line := range gitRestoreSteps {
+		yaml.WriteString(line)
+	}
+
 	// Collect firewall logs BEFORE secret redaction so secrets in logs can be redacted
 	if copilotEngine, ok := engine.(*CopilotEngine); ok {
 		collectionSteps := copilotEngine.GetFirewallLogsCollectionStep(data)

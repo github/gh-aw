@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 #
-# clean_git_credentials.sh - Remove git credentials from .git/config
+# clean_git_credentials.sh - Temporarily remove git credentials from .git/config
 #
-# This script removes any git credentials that may have been left on disk
-# accidentally by an injected step. It specifically targets the credentials
-# in $GITHUB_WORKSPACE/.git/config to prevent credential leakage.
-#
-# This is a security measure to ensure that git credentials configured by
-# custom steps or other workflow steps are removed before the agentic engine
-# executes, preventing the agent from accessing or exfiltrating credentials.
+# This script temporarily removes any git credentials that may have been left on disk
+# accidentally by an injected step. It backs up the configuration so it can be restored
+# after agent execution. This prevents the agent from accessing or exfiltrating credentials
+# while still allowing safe-outputs operations that need git to work after agent execution.
 #
 # Exit codes:
 #   0 - Success (credentials cleaned or no .git/config found)
@@ -19,14 +16,21 @@ set -euo pipefail
 # Get the workspace directory (defaults to current GITHUB_WORKSPACE)
 WORKSPACE="${GITHUB_WORKSPACE:-.}"
 GIT_CONFIG_PATH="${WORKSPACE}/.git/config"
+BACKUP_DIR="/tmp/gh-aw/git-credentials-backup"
+BACKUP_PATH="${BACKUP_DIR}/config.backup"
 
-echo "Cleaning git credentials from ${GIT_CONFIG_PATH}"
+echo "Backing up and cleaning git credentials from ${GIT_CONFIG_PATH}"
 
 # Check if .git/config exists
 if [ ! -f "${GIT_CONFIG_PATH}" ]; then
   echo "No .git/config found at ${GIT_CONFIG_PATH}, nothing to clean"
   exit 0
 fi
+
+# Create backup directory and save current config
+mkdir -p "${BACKUP_DIR}"
+cp "${GIT_CONFIG_PATH}" "${BACKUP_PATH}"
+echo "Backed up git config to ${BACKUP_PATH}"
 
 # Remove credential helper configuration
 # This removes lines like:
@@ -69,13 +73,7 @@ if git config --file "${GIT_CONFIG_PATH}" --get-regexp '^remote\..*\.url$' 2>/de
   done || true
 fi
 
-# Remove the origin remote entirely to prevent any git operations that might use credentials
-if git -C "${WORKSPACE}" remote get-url origin >/dev/null 2>&1; then
-  git -C "${WORKSPACE}" remote remove origin
-  echo "Removed origin remote"
-fi
-
-echo "✓ Git credentials cleaned successfully"
+echo "✓ Git credentials cleaned successfully (backed up for restoration)"
 
 # Verify the file is still valid git config
 if ! git config --file "${GIT_CONFIG_PATH}" --list >/dev/null 2>&1; then
