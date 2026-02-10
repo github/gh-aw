@@ -17,10 +17,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * @returns {string} - The interpolated content
  */
 function interpolateVariables(content, variables) {
-  if (typeof core !== "undefined") {
-    core.info(`[interpolateVariables] Starting interpolation with ${Object.keys(variables).length} variables`);
-    core.info(`[interpolateVariables] Content length: ${content.length} characters`);
-  }
+  core.info(`[interpolateVariables] Starting interpolation with ${Object.keys(variables).length} variables`);
+  core.info(`[interpolateVariables] Content length: ${content.length} characters`);
 
   let result = content;
   let totalReplacements = 0;
@@ -31,23 +29,17 @@ function interpolateVariables(content, variables) {
     const matches = (content.match(pattern) || []).length;
 
     if (matches > 0) {
-      if (typeof core !== "undefined") {
-        core.info(`[interpolateVariables] Replacing ${varName} (${matches} occurrence(s))`);
-        core.info(`[interpolateVariables]   Value: ${value.substring(0, 100)}${value.length > 100 ? "..." : ""}`);
-      }
+      core.info(`[interpolateVariables] Replacing ${varName} (${matches} occurrence(s))`);
+      core.info(`[interpolateVariables]   Value: ${value.substring(0, 100)}${value.length > 100 ? "..." : ""}`);
       result = result.replace(pattern, value);
       totalReplacements += matches;
     } else {
-      if (typeof core !== "undefined") {
-        core.info(`[interpolateVariables] Variable ${varName} not found in content (unused)`);
-      }
+      core.info(`[interpolateVariables] Variable ${varName} not found in content (unused)`);
     }
   }
 
-  if (typeof core !== "undefined") {
-    core.info(`[interpolateVariables] Completed: ${totalReplacements} total replacement(s)`);
-    core.info(`[interpolateVariables] Result length: ${result.length} characters`);
-  }
+  core.info(`[interpolateVariables] Completed: ${totalReplacements} total replacement(s)`);
+  core.info(`[interpolateVariables] Result length: ${result.length} characters`);
   return result;
 }
 
@@ -60,16 +52,14 @@ function interpolateVariables(content, variables) {
  * @returns {string} - The processed markdown content
  */
 function renderMarkdownTemplate(markdown) {
-  if (typeof core !== "undefined") {
-    core.info(`[renderMarkdownTemplate] Starting template rendering`);
-    core.info(`[renderMarkdownTemplate] Input length: ${markdown.length} characters`);
+  core.info(`[renderMarkdownTemplate] Starting template rendering`);
+  core.info(`[renderMarkdownTemplate] Input length: ${markdown.length} characters`);
 
-    // Count conditionals before processing
-    const blockConditionals = (markdown.match(/(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*{{\/if}}[ \t]*)(\n?)/g) || []).length;
-    const inlineConditionals = (markdown.match(/{{#if\s+([^}]*)}}([\s\S]*?){{\/if}}/g) || []).length - blockConditionals;
+  // Count conditionals before processing
+  const blockConditionals = (markdown.match(/(\n?)([ \t]*{{#if\s+([^}]*)}}[ \t]*\n)([\s\S]*?)([ \t]*{{\/if}}[ \t]*)(\n?)/g) || []).length;
+  const inlineConditionals = (markdown.match(/{{#if\s+([^}]*)}}([\s\S]*?){{\/if}}/g) || []).length - blockConditionals;
 
-    core.info(`[renderMarkdownTemplate] Found ${blockConditionals} block conditional(s) and ${inlineConditionals} inline conditional(s)`);
-  }
+  core.info(`[renderMarkdownTemplate] Found ${blockConditionals} block conditional(s) and ${inlineConditionals} inline conditional(s)`);
 
   let blockCount = 0;
   let keptBlocks = 0;
@@ -81,33 +71,25 @@ function renderMarkdownTemplate(markdown) {
     blockCount++;
     const condTrimmed = cond.trim();
     const truthyResult = isTruthy(cond);
+    const bodyPreview = body.substring(0, 60).replace(/\n/g, "\\n");
 
-    if (typeof core !== "undefined") {
-      const bodyPreview = body.substring(0, 60).replace(/\n/g, "\\n");
-      core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> ${truthyResult ? "KEEP" : "REMOVE"}`);
-      core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > 60 ? "..." : ""}"`);
-    }
+    core.info(`[renderMarkdownTemplate] Block ${blockCount}: condition="${condTrimmed}" -> ${truthyResult ? "KEEP" : "REMOVE"}`);
+    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > 60 ? "..." : ""}"`);
 
     if (truthyResult) {
       // Keep body with leading newline if there was one before the opening tag
       keptBlocks++;
-      if (typeof core !== "undefined") {
-        core.info(`[renderMarkdownTemplate]   Action: Keeping body with leading newline=${!!leadNL}`);
-      }
+      core.info(`[renderMarkdownTemplate]   Action: Keeping body with leading newline=${!!leadNL}`);
       return leadNL + body;
     } else {
       // Remove entire block completely - the line containing the template is removed
       removedBlocks++;
-      if (typeof core !== "undefined") {
-        core.info(`[renderMarkdownTemplate]   Action: Removing entire block`);
-      }
+      core.info(`[renderMarkdownTemplate]   Action: Removing entire block`);
       return "";
     }
   });
 
-  if (typeof core !== "undefined") {
-    core.info(`[renderMarkdownTemplate] First pass complete: ${keptBlocks} kept, ${removedBlocks} removed`);
-  }
+  core.info(`[renderMarkdownTemplate] First pass complete: ${keptBlocks} kept, ${removedBlocks} removed`);
 
   let inlineCount = 0;
   let keptInline = 0;
@@ -118,12 +100,10 @@ function renderMarkdownTemplate(markdown) {
     inlineCount++;
     const condTrimmed = cond.trim();
     const truthyResult = isTruthy(cond);
+    const bodyPreview = body.substring(0, 40).replace(/\n/g, "\\n");
 
-    if (typeof core !== "undefined") {
-      const bodyPreview = body.substring(0, 40).replace(/\n/g, "\\n");
-      core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${truthyResult ? "KEEP" : "REMOVE"}`);
-      core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > 40 ? "..." : ""}"`);
-    }
+    core.info(`[renderMarkdownTemplate] Inline ${inlineCount}: condition="${condTrimmed}" -> ${truthyResult ? "KEEP" : "REMOVE"}`);
+    core.info(`[renderMarkdownTemplate]   Body preview: "${bodyPreview}${body.length > 40 ? "..." : ""}"`);
 
     if (truthyResult) {
       keptInline++;
@@ -134,22 +114,18 @@ function renderMarkdownTemplate(markdown) {
     }
   });
 
-  if (typeof core !== "undefined") {
-    core.info(`[renderMarkdownTemplate] Second pass complete: ${keptInline} kept, ${removedInline} removed`);
-  }
+  core.info(`[renderMarkdownTemplate] Second pass complete: ${keptInline} kept, ${removedInline} removed`);
 
   // Clean up excessive blank lines (more than one blank line = 2 newlines)
   const beforeCleanup = result.length;
   const excessiveLines = (result.match(/\n{3,}/g) || []).length;
   result = result.replace(/\n{3,}/g, "\n\n");
 
-  if (typeof core !== "undefined") {
-    if (excessiveLines > 0) {
-      core.info(`[renderMarkdownTemplate] Cleaned up ${excessiveLines} excessive blank line sequence(s)`);
-      core.info(`[renderMarkdownTemplate] Length change from cleanup: ${beforeCleanup} -> ${result.length} characters`);
-    }
-    core.info(`[renderMarkdownTemplate] Final output length: ${result.length} characters`);
+  if (excessiveLines > 0) {
+    core.info(`[renderMarkdownTemplate] Cleaned up ${excessiveLines} excessive blank line sequence(s)`);
+    core.info(`[renderMarkdownTemplate] Length change from cleanup: ${beforeCleanup} -> ${result.length} characters`);
   }
+  core.info(`[renderMarkdownTemplate] Final output length: ${result.length} characters`);
 
   return result;
 }
