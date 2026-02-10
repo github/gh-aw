@@ -63,18 +63,22 @@ function resolveCategoryId(categoryConfig, itemCategory, categories) {
   const categoryToMatch = itemCategory || categoryConfig;
 
   if (categoryToMatch) {
-    // Try to match against category IDs first
+    // Try to match against category IDs first (exact match, case-sensitive)
     const categoryById = categories.find(cat => cat.id === categoryToMatch);
     if (categoryById) {
       return { id: categoryById.id, matchType: "id", name: categoryById.name };
     }
-    // Try to match against category names
-    const categoryByName = categories.find(cat => cat.name === categoryToMatch);
+
+    // Normalize the category to match for case-insensitive comparison
+    const normalizedCategoryToMatch = categoryToMatch.toLowerCase();
+
+    // Try to match against category names (case-insensitive)
+    const categoryByName = categories.find(cat => cat.name.toLowerCase() === normalizedCategoryToMatch);
     if (categoryByName) {
       return { id: categoryByName.id, matchType: "name", name: categoryByName.name };
     }
-    // Try to match against category slugs (routes)
-    const categoryBySlug = categories.find(cat => cat.slug === categoryToMatch);
+    // Try to match against category slugs (routes, case-insensitive)
+    const categoryBySlug = categories.find(cat => cat.slug.toLowerCase() === normalizedCategoryToMatch);
     if (categoryBySlug) {
       return { id: categoryBySlug.id, matchType: "slug", name: categoryBySlug.name };
     }
