@@ -51,8 +51,8 @@ jobs:
     needs: pre_activation
     if: >
       (needs.pre_activation.outputs.activated == 'true') && (((github.event_name == 'issue_comment') && ((github.event_name == 'issue_comment') &&
-      ((contains(github.event.comment.body, '/unbloat')) && (github.event.issue.pull_request != null)))) ||
-      (!(github.event_name == 'issue_comment')))
+      (((startsWith(github.event.comment.body, '/unbloat ')) || (github.event.comment.body == '/unbloat')) &&
+      (github.event.issue.pull_request != null)))) || (!(github.event_name == 'issue_comment')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1302,8 +1302,8 @@ jobs:
 
   pre_activation:
     if: >
-      ((github.event_name == 'issue_comment') && ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/unbloat')) &&
-      (github.event.issue.pull_request != null)))) || (!(github.event_name == 'issue_comment'))
+      ((github.event_name == 'issue_comment') && ((github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/unbloat ')) ||
+      (github.event.comment.body == '/unbloat')) && (github.event.issue.pull_request != null)))) || (!(github.event_name == 'issue_comment'))
     runs-on: ubuntu-slim
     permissions:
       contents: read

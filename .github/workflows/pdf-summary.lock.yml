@@ -63,9 +63,10 @@ jobs:
     needs: pre_activation
     if: >
       (needs.pre_activation.outputs.activated == 'true') && (((github.event_name == 'issue_comment' || github.event_name == 'issues') &&
-      ((github.event_name == 'issues') && (contains(github.event.issue.body, '/summarize')) || (github.event_name == 'issue_comment') &&
-      ((contains(github.event.comment.body, '/summarize')) && (github.event.issue.pull_request == null)))) ||
-      (!(github.event_name == 'issue_comment' || github.event_name == 'issues')))
+      ((github.event_name == 'issues') && ((startsWith(github.event.issue.body, '/summarize ')) || (github.event.issue.body == '/summarize')) ||
+      (github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/summarize ')) ||
+      (github.event.comment.body == '/summarize')) && (github.event.issue.pull_request == null)))) || (!(github.event_name == 'issue_comment' ||
+      github.event_name == 'issues')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1124,9 +1125,10 @@ jobs:
   pre_activation:
     if: >
       ((github.event_name == 'issue_comment' || github.event_name == 'issues') && ((github.event_name == 'issues') &&
-      (contains(github.event.issue.body, '/summarize')) || (github.event_name == 'issue_comment') &&
-      ((contains(github.event.comment.body, '/summarize')) &&
-      (github.event.issue.pull_request == null)))) || (!(github.event_name == 'issue_comment' || github.event_name == 'issues'))
+      ((startsWith(github.event.issue.body, '/summarize ')) || (github.event.issue.body == '/summarize')) ||
+      (github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/summarize ')) ||
+      (github.event.comment.body == '/summarize')) && (github.event.issue.pull_request == null)))) || (!(github.event_name == 'issue_comment' ||
+      github.event_name == 'issues'))
     runs-on: ubuntu-slim
     permissions:
       contents: read

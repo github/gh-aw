@@ -45,8 +45,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/mergefest')) &&
-      (github.event.issue.pull_request != null)))
+      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/mergefest ')) ||
+      (github.event.comment.body == '/mergefest')) && (github.event.issue.pull_request != null)))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1044,7 +1044,8 @@ jobs:
 
   pre_activation:
     if: >
-      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/mergefest')) && (github.event.issue.pull_request != null))
+      (github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/mergefest ')) ||
+      (github.event.comment.body == '/mergefest')) && (github.event.issue.pull_request != null))
     runs-on: ubuntu-slim
     permissions:
       contents: read

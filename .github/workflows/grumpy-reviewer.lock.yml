@@ -49,9 +49,9 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/grumpy')) &&
-      (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
-      (contains(github.event.comment.body, '/grumpy')))
+      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/grumpy ')) ||
+      (github.event.comment.body == '/grumpy')) && (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
+      ((startsWith(github.event.comment.body, '/grumpy ')) || (github.event.comment.body == '/grumpy')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1106,8 +1106,9 @@ jobs:
 
   pre_activation:
     if: >
-      (github.event_name == 'issue_comment') && ((contains(github.event.comment.body, '/grumpy')) && (github.event.issue.pull_request != null)) ||
-      (github.event_name == 'pull_request_review_comment') && (contains(github.event.comment.body, '/grumpy'))
+      (github.event_name == 'issue_comment') && (((startsWith(github.event.comment.body, '/grumpy ')) || (github.event.comment.body == '/grumpy')) &&
+      (github.event.issue.pull_request != null)) || (github.event_name == 'pull_request_review_comment') &&
+      ((startsWith(github.event.comment.body, '/grumpy ')) || (github.event.comment.body == '/grumpy'))
     runs-on: ubuntu-slim
     permissions:
       contents: read
