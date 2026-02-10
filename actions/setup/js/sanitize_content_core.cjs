@@ -486,6 +486,54 @@ function applyTruncation(content, maxLength) {
 }
 
 /**
+ * Decodes HTML entities to prevent bypass of @mention detection.
+ * Handles named entities (e.g., &commat;), decimal entities (e.g., &#64;),
+ * and hex entities (e.g., &#x40;), including double-encoded variants (e.g., &amp;commat;).
+ *
+ * @param {string} text - Input text that may contain HTML entities
+ * @returns {string} Text with HTML entities decoded
+ */
+function decodeHtmlEntities(text) {
+  if (!text || typeof text !== "string") {
+    return "";
+  }
+
+  let result = text;
+
+  // Decode named entity for @ symbol (including double-encoded variants)
+  // &commat; and &amp;commat; → @
+  result = result.replace(/&(?:amp;)?commat;/gi, "@");
+
+  // Decode decimal entities (including double-encoded variants)
+  // &#64; and &amp;#64; → @
+  // &#NNN; and &amp;#NNN; → corresponding character
+  result = result.replace(/&(?:amp;)?#(\d+);/g, (match, code) => {
+    const codePoint = parseInt(code, 10);
+    // Validate code point is in valid Unicode range
+    if (codePoint >= 0 && codePoint <= 0x10ffff) {
+      return String.fromCodePoint(codePoint);
+    }
+    // Return original match if invalid
+    return match;
+  });
+
+  // Decode hex entities (including double-encoded variants)
+  // &#x40;, &#X40;, &amp;#x40;, &amp;#X40; → @
+  // &#xHHH;, &#XHHH;, &amp;#xHHH;, &amp;#XHHH; → corresponding character
+  result = result.replace(/&(?:amp;)?#[xX]([0-9a-fA-F]+);/g, (match, code) => {
+    const codePoint = parseInt(code, 16);
+    // Validate code point is in valid Unicode range
+    if (codePoint >= 0 && codePoint <= 0x10ffff) {
+      return String.fromCodePoint(codePoint);
+    }
+    // Return original match if invalid
+    return match;
+  });
+
+  return result;
+}
+
+/**
  * Performs text hardening to protect against Unicode-based attacks.
  * This applies multiple layers of character normalization and filtering
  * to ensure consistent text processing and prevent visual spoofing.
@@ -504,16 +552,21 @@ function hardenUnicodeText(text) {
   // This ensures consistent character representation across different encodings
   result = result.normalize("NFC");
 
-  // Step 2: Strip invisible zero-width characters that can hide content
+  // Step 2: Decode HTML entities to prevent @mention bypass
+  // This MUST happen early, before any other processing, to ensure entities
+  // are converted to their actual characters for proper sanitization
+  result = decodeHtmlEntities(result);
+
+  // Step 3: Strip invisible zero-width characters that can hide content
   // These include: zero-width space, zero-width non-joiner, zero-width joiner,
   // word joiner, and byte order mark
   result = result.replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, "");
 
-  // Step 3: Remove bidirectional text override controls
+  // Step 4: Remove bidirectional text override controls
   // These can be used to reverse text direction and create visual spoofs
   result = result.replace(/[\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069]/g, "");
 
-  // Step 4: Convert full-width ASCII characters to standard ASCII
+  // Step 5: Convert full-width ASCII characters to standard ASCII
   // Full-width characters (U+FF01-FF5E) can be used to bypass filters
   result = result.replace(/[\uFF01-\uFF5E]/g, char => {
     const code = char.charCodeAt(0);
@@ -611,4 +664,5 @@ module.exports = {
   neutralizeBotTriggers,
   applyTruncation,
   hardenUnicodeText,
+  decodeHtmlEntities,
 };

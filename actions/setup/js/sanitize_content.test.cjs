@@ -1318,4 +1318,132 @@ describe("sanitize_content.cjs", () => {
       });
     });
   });
+
+  describe("HTML entity decoding for @mention bypass prevention", () => {
+    it("should decode &commat; and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &commat;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode double-encoded &amp;commat; and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &amp;commat;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode &#64; (decimal) and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &#64;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode double-encoded &amp;#64; and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &amp;#64;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode &#x40; (hex lowercase) and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &#x40;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode &#X40; (hex uppercase) and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &#X40;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode double-encoded &amp;#x40; and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &amp;#x40;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode double-encoded &amp;#X40; and neutralize resulting @mention", () => {
+      const result = sanitizeContent("Please review &amp;#X40;pelikhan");
+      expect(result).toBe("Please review `@pelikhan`");
+    });
+
+    it("should decode multiple HTML-encoded @mentions", () => {
+      const result = sanitizeContent("&commat;user1 and &#64;user2 and &#x40;user3");
+      expect(result).toBe("`@user1` and `@user2` and `@user3`");
+    });
+
+    it("should decode mixed HTML entities and normal @mentions", () => {
+      const result = sanitizeContent("&commat;user1 and @user2");
+      expect(result).toBe("`@user1` and `@user2`");
+    });
+
+    it("should decode HTML entities in org/team mentions", () => {
+      const result = sanitizeContent("&commat;myorg/myteam should review");
+      expect(result).toBe("`@myorg/myteam` should review");
+    });
+
+    it("should decode general decimal entities correctly", () => {
+      const result = sanitizeContent("&#72;&#101;&#108;&#108;&#111;"); // "Hello"
+      expect(result).toBe("Hello");
+    });
+
+    it("should decode general hex entities correctly", () => {
+      const result = sanitizeContent("&#x48;&#x65;&#x6C;&#x6C;&#x6F;"); // "Hello"
+      expect(result).toBe("Hello");
+    });
+
+    it("should decode double-encoded general entities correctly", () => {
+      const result = sanitizeContent("&amp;#72;ello"); // "&Hello"
+      expect(result).toBe("Hello");
+    });
+
+    it("should handle invalid code points gracefully", () => {
+      const result = sanitizeContent("Invalid &#999999999; entity");
+      expect(result).toBe("Invalid &#999999999; entity"); // Keep original if invalid
+    });
+
+    it("should handle malformed HTML entities without crashing", () => {
+      const result = sanitizeContent("Malformed &# or &#x entity");
+      expect(result).toBe("Malformed &# or &#x entity");
+    });
+
+    it("should decode entities before Unicode hardening", () => {
+      // Ensure entity decoding happens as part of hardenUnicodeText
+      const result = sanitizeContent("&#xFF01;"); // Full-width exclamation (U+FF01)
+      expect(result).toBe("!"); // Should become ASCII !
+    });
+
+    it("should decode entities in combination with other sanitization", () => {
+      const result = sanitizeContent("&commat;user <!-- comment --> text");
+      expect(result).toBe("`@user`  text");
+    });
+
+    it("should decode entities even in backticks (security-first approach)", () => {
+      // Entities are decoded during Unicode hardening, which happens before
+      // mention neutralization. This is intentional - we decode entities early
+      // to prevent bypasses, then the @mention gets neutralized properly.
+      const result = sanitizeContent("`&commat;user`");
+      expect(result).toBe("`@user`");
+    });
+
+    it("should preserve legitimate URLs after entity decoding", () => {
+      const result = sanitizeContent("Visit https://github.com/user");
+      expect(result).toBe("Visit https://github.com/user");
+    });
+
+    it("should decode case-insensitive named entities", () => {
+      const result = sanitizeContent("&COMMAT;user and &CoMmAt;user2");
+      expect(result).toBe("`@user` and `@user2`");
+    });
+
+    it("should decode entities with mixed case hex digits", () => {
+      const result = sanitizeContent("&#x4O; is invalid but &#x4A; is valid"); // Note: O not 0
+      expect(result).toContain("&#x4O;"); // Invalid should remain
+      expect(result).toContain("J"); // Valid 0x4A = J
+    });
+
+    it("should handle zero code point", () => {
+      const result = sanitizeContent("&#0;text");
+      // Code point 0 is valid but typically removed as control character
+      expect(result).toContain("text");
+    });
+
+    it("should respect allowed aliases even with HTML-encoded mentions", () => {
+      const result = sanitizeContent("&commat;author is allowed", { allowedAliases: ["author"] });
+      expect(result).toBe("@author is allowed");
+    });
+  });
 });
