@@ -828,9 +828,11 @@ func TestCompileFromSubdirectoryCreatesActionsLockAtRoot(t *testing.T) {
 		t.Fatalf("Failed to configure git user name: %v\nOutput: %s", err, string(output))
 	}
 
-	// Create a simple test workflow that uses an action (to trigger actions-lock.json creation)
+	// Create a simple test workflow
+	// Note: actions-lock.json is only created when actions need to be pinned,
+	// so it may or may not exist. The test verifies it's NOT created in the wrong location.
 	testWorkflow := `---
-name: Test Workflow with Action
+name: Test Workflow
 on:
   workflow_dispatch:
 permissions:
@@ -840,7 +842,7 @@ engine: copilot
 
 # Test Workflow
 
-Test workflow to verify actions-lock.json creation.
+Test workflow to verify actions-lock.json path handling when compiling from subdirectory.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "test-action.md")
