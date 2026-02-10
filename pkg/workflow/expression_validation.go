@@ -204,11 +204,11 @@ func validateExpressionForDangerousProps(expression string) error {
 	// Split expression into parts handling both dot notation (e.g., "github.event.issue")
 	// and bracket notation (e.g., "release.assets[0].id")
 	// Filter out numeric indices (e.g., "0" in "assets[0]")
-	parts := dangerousPropSplitRe.Split(trimmed, -1)
+	parts := regexp.MustCompile(`[.\[\]]+`).Split(trimmed, -1)
 
 	for _, part := range parts {
 		// Skip empty parts and numeric indices
-		if part == "" || numericIndexRe.MatchString(part) {
+		if part == "" || regexp.MustCompile(`^\d+$`).MatchString(part) {
 			continue
 		}
 
