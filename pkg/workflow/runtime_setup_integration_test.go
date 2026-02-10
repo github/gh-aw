@@ -50,7 +50,7 @@ steps:
 # Test workflow`,
 			expectSetup: []string{
 				"Setup Node.js",
-				"actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f",
+				"actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238",
 				"node-version: '24'",
 			},
 		},
