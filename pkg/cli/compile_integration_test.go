@@ -891,4 +891,3 @@ Test workflow to verify actions-lock.json creation.
 
 	t.Logf("Integration test passed - actions-lock.json created at correct location")
 }
-
