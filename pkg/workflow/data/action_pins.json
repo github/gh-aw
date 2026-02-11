@@ -125,6 +125,11 @@
       "version": "v2.0.3",
       "sha": "e95548e56dfa95d4e1a28d6f422fafe75c4c26fb"
     },
+    "docker/build-push-action@v6": {
+      "repo": "docker/build-push-action",
+      "version": "v6",
+      "sha": "ee4ca427a2f43b6a16632044ca514c076267da23"
+    },
     "docker/build-push-action@v6.18.0": {
       "repo": "docker/build-push-action",
       "version": "v6.18.0",

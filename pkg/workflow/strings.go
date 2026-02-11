@@ -278,7 +278,7 @@ func ShortenCommand(command string) string {
 //
 // Parameters:
 //   - name: A descriptive identifier for the heredoc content (e.g., "PROMPT", "MCP_CONFIG", "TOOLS_JSON")
-//          The name should use SCREAMING_SNAKE_CASE without the _EOF suffix.
+//     The name should use SCREAMING_SNAKE_CASE without the _EOF suffix.
 //
 // Returns a delimiter string in the format "GH_AW_<NAME>_EOF"
 //
