@@ -128,5 +128,5 @@ done
 # Output the configuration for the MCP client
 {
   echo "port=$GH_AW_SAFE_INPUTS_PORT"
-  echo "api_key=$GH_AW_SAFE_INPUTS_API_KEY"
+  echo "api_key=${GH_AW_SAFE_INPUTS_API_KEY@Q}"
 } >> "$GITHUB_OUTPUT"

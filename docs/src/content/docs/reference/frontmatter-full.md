@@ -3513,11 +3513,11 @@ bots: []
 # (optional)
 rate-limit:
   # Maximum number of workflow runs allowed per user within the time window.
-  # Defaults to 5.
-  # (optional)
+  # Required field.
   max: 1
 
-  # Time window in minutes for rate limiting. Defaults to 60 (1 hour).
+  # Time window in minutes for rate limiting. Defaults to 60 (1 hour). Maximum: 180
+  # (3 hours).
   # (optional)
   window: 1
 

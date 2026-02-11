@@ -20,11 +20,11 @@ set -euo pipefail
 WORKSPACE="${GITHUB_WORKSPACE:-.}"
 GIT_CONFIG_PATH="${WORKSPACE}/.git/config"
 
-echo "Cleaning git credentials from ${GIT_CONFIG_PATH}"
+echo "Cleaning git credentials from ${GIT_CONFIG_PATH@Q}"
 
 # Check if .git/config exists
 if [ ! -f "${GIT_CONFIG_PATH}" ]; then
-  echo "No .git/config found at ${GIT_CONFIG_PATH}, nothing to clean"
+  echo "No .git/config found at ${GIT_CONFIG_PATH@Q}, nothing to clean"
   exit 0
 fi
 

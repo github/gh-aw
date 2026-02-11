@@ -41,10 +41,10 @@ TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Download binary and checksums
-echo "Downloading binary from ${BINARY_URL}..."
+echo "Downloading binary from ${BINARY_URL@Q}..."
 curl -fsSL -o "${TEMP_DIR}/${AWF_BINARY}" "${BINARY_URL}"
 
-echo "Downloading checksums from ${CHECKSUMS_URL}..."
+echo "Downloading checksums from ${CHECKSUMS_URL@Q}..."
 curl -fsSL -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
 
 # Verify checksum
