@@ -694,14 +694,15 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
     filepath = filepath.substring(8); // Remove ".github/"
   } else if (filepath.startsWith(".github\\")) {
     filepath = filepath.substring(8); // Remove ".github\" (Windows)
-  } else if (filepath.startsWith(".actions/")) {
-    // Remove the leading dot from .actions/ -> actions/
+  } else if (filepath.startsWith(".agents/")) {
+    // Remove the leading dot from .agents/ -> agents/
+    // This is the common folder location for skills
     filepath = filepath.substring(1); // Remove the leading "."
-  } else if (filepath.startsWith(".actions\\")) {
-    // Remove the leading dot from .actions\ -> actions\ (Windows)
+  } else if (filepath.startsWith(".agents\\")) {
+    // Remove the leading dot from .agents\ -> agents\ (Windows)
     filepath = filepath.substring(1); // Remove the leading "."
   } else {
-    // If path doesn't start with .github or .actions, prefix with workflows/
+    // If path doesn't start with .github or .agents, prefix with workflows/
     // This makes imports like "a.md" resolve to ".github/workflows/a.md"
     filepath = path.join("workflows", filepath);
   }

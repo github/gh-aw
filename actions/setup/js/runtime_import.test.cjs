@@ -378,12 +378,12 @@ describe("runtime_import", () => {
           const result = await processRuntimeImport("test-no-prefix.md", !1, tempDir);
           expect(result).toBe(content);
         }),
-        it("should support .actions/ prefix", async () => {
-          const actionsDir = path.join(githubDir, "actions");
-          fs.mkdirSync(actionsDir, { recursive: true });
-          const content = "Test with .actions prefix";
-          fs.writeFileSync(path.join(actionsDir, "test-action.md"), content);
-          const result = await processRuntimeImport(".actions/test-action.md", !1, tempDir);
+        it("should support .agents/ prefix", async () => {
+          const agentsDir = path.join(githubDir, "agents");
+          fs.mkdirSync(agentsDir, { recursive: true });
+          const content = "Test with .agents prefix";
+          fs.writeFileSync(path.join(agentsDir, "test-skill.md"), content);
+          const result = await processRuntimeImport(".agents/test-skill.md", !1, tempDir);
           expect(result).toBe(content);
         }),
         it("should reject paths outside .github folder", async () => {
