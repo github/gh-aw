@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { resolveIssueNumber, loadTemporaryIdMapFromResolved } = require("./temporary_id.cjs");
+const { normalizeTemporaryId, isTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -351,22 +351,19 @@ async function main(config = {}, githubClient = null) {
           const tempIdStr = (urlMatch && urlMatch[1]) || (plainMatch && plainMatch[1]) || "";
           const tempIdWithoutHash = tempIdStr.startsWith("#") ? tempIdStr.substring(1) : tempIdStr;
 
-          // Build a normalized temporary ID map from the unified temporaryIdMap
-          const normalizedMap = loadTemporaryIdMapFromResolved(temporaryIdMap);
+          // Check if it's a valid temporary ID
+          if (isTemporaryId(tempIdWithoutHash)) {
+            // Look up in the unified temporaryIdMap
+            const resolved = temporaryIdMap.get(normalizeTemporaryId(tempIdWithoutHash));
 
-          // Resolve the temporary ID to an issue number
-          const resolution = resolveIssueNumber(tempIdWithoutHash, normalizedMap);
-
-          if (resolution.errorMessage) {
-            throw new Error(`Failed to resolve temporary ID in item_url: ${resolution.errorMessage}`);
-          }
-
-          if (resolution.resolved) {
-            // Build the proper GitHub issue URL
-            const resolved = resolution.resolved;
-            const resolvedUrl = `https://github.com/${resolved.repo}/issues/${resolved.number}`;
-            core.info(`Resolved temporary ID ${tempIdStr} in item_url to ${resolvedUrl}`);
-            item_url = resolvedUrl;
+            if (resolved && resolved.repo && resolved.number) {
+              // Build the proper GitHub issue URL
+              const resolvedUrl = `https://github.com/${resolved.repo}/issues/${resolved.number}`;
+              core.info(`Resolved temporary ID ${tempIdStr} in item_url to ${resolvedUrl}`);
+              item_url = resolvedUrl;
+            } else {
+              throw new Error(`Temporary ID '${tempIdStr}' in item_url not found. Ensure create_issue was called before create_project.`);
+            }
           }
         }
       }
