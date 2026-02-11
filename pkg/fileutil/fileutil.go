@@ -1,5 +1,3 @@
-//go:build !integration
-
 // Package fileutil provides utility functions for working with file paths and file operations.
 package fileutil
 
