@@ -10,15 +10,15 @@ disable-agentic-editing: true
 
 GitHub Actions automatically provides a default `GITHUB_TOKEN` that works for most workflows. However, depending on what your workflow needs to do, you may need additional tokens:
 
-- **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#ghawaithubtoken-enhanced-pat-for-cross-repo-and-remote-tools)
-- **Copilot engine and agent operations** – Add [`COPILOT_GITHUB_TOKEN`](#copilotwithubtoken-copilot-authentication)
-- **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#ghawprojectwithubtoken-github-projects-v2)
-- **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#ghawagenttoken-agent-assignment)
-- **MCP server with isolated permissions** (optional) – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#ghawgithubmcpservertoken-github-mcp-server)
+- **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token-enhanced-pat-for-cross-repo-and-remote-tools)
+- **Copilot engine and agent operations** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token-copilot-authentication)
+- **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#gh_aw_project_github_token-github-projects-v2)
+- **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#gh_aw_agent_token-agent-assignment)
+- **MCP server with isolated permissions** (optional) – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token-github-mcp-server)
 
 ## How do I add tokens to my repository?
 
-You can set up your tokens manually in the GitHub UI or use the CLI for a streamlined experience. Note, that the CLI also provides commands to check existing secrets and validate token permissions.
+You can set up your tokens manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
 
 ### Adding tokens using the CLI
 
@@ -90,9 +90,15 @@ To confirm ownership, check the owner name and avatar at the top of the page or 
   </div>
 </div>
 
+## GitHub App tokens for GitHub MCP server
+
+This section previously described how to configure GitHub App tokens for the GitHub MCP server. The guidance has been consolidated into the token reference sections below. Use the token descriptions and configuration details in **Token Reference** to choose and configure the appropriate token(s) for your workflows.
+
+> Note: This stub section exists to preserve existing deep links that reference `#github-app-tokens-for-github-mcp-server`.
 ## Token Reference
 
-### `GITHUB_TOKEN` <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #60a5fa; color: white; font-size: 0.875rem; font-weight: 500;">Automatically provided</span>
+### `GITHUB_TOKEN` {#github-token}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #60a5fa; color: white; font-size: 0.875rem; font-weight: 500;">Automatically provided</span>
 
 <div style="padding-left: 1.5rem;">
 
