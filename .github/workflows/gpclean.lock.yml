@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: aafe3ec8d8d71f5ebd296fb924a841a88c013cfe6de4d129ca25854e409717d5
+# frontmatter-hash: 5bd33f57a833417278fc0221fb727e25d1c8c976e8ebf421df3bf6f7bf084fd6
 
 name: "GPL Dependency Cleaner (gpclean)"
 "on":
@@ -113,6 +113,12 @@ jobs:
           persist-credentials: false
       - name: Create gh-aw temp directory
         run: bash /opt/gh-aw/actions/create_gh_aw_tmp_dir.sh
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Download SBOM from GitHub Dependency Graph API
+        run: "set -e\necho \"📦 Downloading SBOM from GitHub Dependency Graph API...\"\n\n# Download SBOM using gh CLI (requires contents: read permission)\ngh api \\\n  -H \"Accept: application/vnd.github+json\" \\\n  -H \"X-GitHub-Api-Version: 2022-11-28\" \\\n  \"/repos/${{ github.repository }}/dependency-graph/sbom\" \\\n  > /tmp/sbom.json\n\necho \"✅ SBOM downloaded successfully to /tmp/sbom.json\"\n\n# Show SBOM summary\nif command -v jq &> /dev/null; then\n  PACKAGE_COUNT=$(jq '.sbom.packages | length' /tmp/sbom.json 2>/dev/null || echo \"unknown\")\n  echo \"📊 SBOM contains ${PACKAGE_COUNT} packages\"\nfi"
+
       # Cache memory file share configuration from frontmatter processed below
       - name: Create cache-memory directory
         run: bash /opt/gh-aw/actions/create_cache_memory_dir.sh

@@ -10,6 +10,7 @@ const HANDLER_TYPE = "add_labels";
 
 const { validateLabels } = require("./safe_output_validator.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 
 /**
  * Main handler factory for add_labels
@@ -20,10 +21,15 @@ async function main(config = {}) {
   // Extract configuration
   const allowedLabels = config.allowed || [];
   const maxCount = config.max || 10;
+  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
   core.info(`Add labels configuration: max=${maxCount}`);
   if (allowedLabels.length > 0) {
     core.info(`Allowed labels: ${allowedLabels.join(", ")}`);
+  }
+  core.info(`Default target repo: ${defaultTargetRepo}`);
+  if (allowedRepos.size > 0) {
+    core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
   }
 
   // Track how many items we've processed for max limit
@@ -46,6 +52,18 @@ async function main(config = {}) {
     }
 
     processedCount++;
+
+    // Resolve and validate target repository
+    const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "label");
+    if (!repoResult.success) {
+      core.warning(`Skipping add_labels: ${repoResult.error}`);
+      return {
+        success: false,
+        error: repoResult.error,
+      };
+    }
+    const { repo: itemRepo, repoParts } = repoResult;
+    core.info(`Target repository: ${itemRepo}`);
 
     // Determine target issue/PR number
     const itemNumber = message.item_number !== undefined ? parseInt(String(message.item_number), 10) : (context.payload?.issue?.number ?? context.payload?.pull_request?.number);
@@ -102,16 +120,17 @@ async function main(config = {}) {
       };
     }
 
-    core.info(`Adding ${uniqueLabels.length} labels to ${contextType} #${itemNumber}: ${JSON.stringify(uniqueLabels)}`);
+    core.info(`Adding ${uniqueLabels.length} labels to ${contextType} #${itemNumber} in ${itemRepo}: ${JSON.stringify(uniqueLabels)}`);
 
     try {
       await github.rest.issues.addLabels({
-        ...context.repo,
+        owner: repoParts.owner,
+        repo: repoParts.repo,
         issue_number: itemNumber,
         labels: uniqueLabels,
       });
 
-      core.info(`Successfully added ${uniqueLabels.length} labels to ${contextType} #${itemNumber}`);
+      core.info(`Successfully added ${uniqueLabels.length} labels to ${contextType} #${itemNumber} in ${itemRepo}`);
       return {
         success: true,
         number: itemNumber,
