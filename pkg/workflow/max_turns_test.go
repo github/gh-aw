@@ -76,7 +76,7 @@ permissions:
 engine:
   id: claude
   max-turns: 10
-timeout_minutes: 15
+timeout-minutes: 15
 strict: false
 tools:
   github:
