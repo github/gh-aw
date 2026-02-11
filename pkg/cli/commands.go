@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -222,6 +223,13 @@ func NewWorkflow(workflowName string, verbose bool, force bool) error {
 	githubWorkflowsDir := filepath.Join(workingDir, constants.GetWorkflowDir())
 	commandsLog.Printf("Creating workflows directory: %s", githubWorkflowsDir)
 
+	// Validate the directory path
+	githubWorkflowsDir, err = fileutil.ValidateAbsolutePath(githubWorkflowsDir)
+	if err != nil {
+		commandsLog.Printf("Invalid workflows directory path: %v", err)
+		return fmt.Errorf("invalid workflows directory path: %w", err)
+	}
+
 	if err := os.MkdirAll(githubWorkflowsDir, 0755); err != nil {
 		commandsLog.Printf("Failed to create workflows directory: %v", err)
 		return fmt.Errorf("failed to create .github/workflows directory: %w", err)
@@ -230,6 +238,13 @@ func NewWorkflow(workflowName string, verbose bool, force bool) error {
 	// Construct the destination file path
 	destFile := filepath.Join(githubWorkflowsDir, workflowName+".md")
 	commandsLog.Printf("Destination file: %s", destFile)
+
+	// Validate the destination file path
+	destFile, err = fileutil.ValidateAbsolutePath(destFile)
+	if err != nil {
+		commandsLog.Printf("Invalid destination file path: %v", err)
+		return fmt.Errorf("invalid destination file path: %w", err)
+	}
 
 	// Check if destination file already exists
 	if _, err := os.Stat(destFile); err == nil && !force {

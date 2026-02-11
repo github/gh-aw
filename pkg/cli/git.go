@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -41,6 +42,12 @@ func findGitRootForPath(path string) (string, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Validate the absolute path
+	absPath, err = fileutil.ValidateAbsolutePath(absPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Use the directory containing the file
@@ -114,6 +121,13 @@ func getRepositorySlugFromRemoteForPath(path string) string {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		gitLog.Printf("Failed to get absolute path: %v", err)
+		return ""
+	}
+
+	// Validate the absolute path
+	absPath, err = fileutil.ValidateAbsolutePath(absPath)
+	if err != nil {
+		gitLog.Printf("Invalid path: %v", err)
 		return ""
 	}
 
@@ -379,8 +393,12 @@ func ToGitRootRelativePath(path string) string {
 		gitLog.Printf("Converted to absolute path: %s", absPath)
 	}
 
-	// Clean the absolute path
-	absPath = filepath.Clean(absPath)
+	// Validate and clean the absolute path
+	absPath, err := fileutil.ValidateAbsolutePath(absPath)
+	if err != nil {
+		gitLog.Printf("Invalid path: %v", err)
+		return path
+	}
 
 	// Find the git root by looking for .github directory
 	// Walk up the directory tree to find it

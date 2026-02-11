@@ -12,6 +12,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 )
@@ -174,6 +175,12 @@ func cloneTrialHostRepository(repoSlug string, verbose bool) (string, error) {
 	// Create temporary directory
 	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("gh-aw-trial-%x", time.Now().UnixNano()))
 
+	// Validate the temporary directory path
+	tempDir, err := fileutil.ValidateAbsolutePath(tempDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid temporary directory path: %w", err)
+	}
+
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Cloning host repository to: %s", tempDir)))
 	}
@@ -287,6 +294,12 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 	// Construct the source path (relative to original directory)
 	sourcePath := filepath.Join(originalDir, parsedSpec.WorkflowPath)
 
+	// Validate source path
+	sourcePath, err := fileutil.ValidateAbsolutePath(sourcePath)
+	if err != nil {
+		return fmt.Errorf("invalid source path: %w", err)
+	}
+
 	// Check if the source file exists
 	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
 		return fmt.Errorf("local workflow file does not exist: %s", sourcePath)
@@ -294,12 +307,25 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 
 	// Create the workflows directory in the temp directory
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
+
+	// Validate workflows directory path
+	workflowsDir, err = fileutil.ValidateAbsolutePath(workflowsDir)
+	if err != nil {
+		return fmt.Errorf("invalid workflows directory path: %w", err)
+	}
+
 	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workflows directory: %w", err)
 	}
 
 	// Construct the destination path
 	destPath := filepath.Join(workflowsDir, parsedSpec.WorkflowName+".md")
+
+	// Validate destination path
+	destPath, err = fileutil.ValidateAbsolutePath(destPath)
+	if err != nil {
+		return fmt.Errorf("invalid destination path: %w", err)
+	}
 
 	// Read the source file
 	content, err := os.ReadFile(sourcePath)
@@ -338,6 +364,12 @@ func modifyWorkflowForTrialMode(tempDir, workflowName, logicalRepoSlug string, v
 
 	// Find the workflow markdown file
 	workflowPath := filepath.Join(tempDir, constants.GetWorkflowDir(), fmt.Sprintf("%s.md", workflowName))
+
+	// Validate workflow path
+	workflowPath, err := fileutil.ValidateAbsolutePath(workflowPath)
+	if err != nil {
+		return fmt.Errorf("invalid workflow path: %w", err)
+	}
 
 	content, err := os.ReadFile(workflowPath)
 	if err != nil {

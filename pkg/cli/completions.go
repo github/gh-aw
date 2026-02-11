@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/fileutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/github/gh-aw/pkg/workflow"
@@ -16,12 +17,10 @@ var completionsLog = logger.New("cli:completions")
 // getWorkflowDescription extracts the description field from a workflow's frontmatter
 // Returns empty string if the description is not found or if there's an error reading the file
 func getWorkflowDescription(filePath string) string {
-	// Sanitize the filepath to prevent path traversal attacks
-	cleanPath := filepath.Clean(filePath)
-
-	// Verify the path is absolute to prevent relative path traversal
-	if !filepath.IsAbs(cleanPath) {
-		completionsLog.Printf("Invalid workflow file path (not absolute): %s", filePath)
+	// Validate the path for security
+	cleanPath, err := fileutil.ValidateAbsolutePath(filePath)
+	if err != nil {
+		completionsLog.Printf("Invalid workflow file path: %v", err)
 		return ""
 	}
 
