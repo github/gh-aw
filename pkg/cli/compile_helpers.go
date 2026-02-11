@@ -368,21 +368,30 @@ func printCompilationSummary(stats *CompilationStats) {
 	// Use different formatting based on whether there were errors
 	if stats.Errors > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(summary))
-		// Display actual error messages from each failed workflow
-		// Error messages already include workflow path in format: file:line:col: error: message
+
+		// Show agent-friendly list of failed workflow IDs first
 		if len(stats.FailureDetails) > 0 {
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed workflows:"))
 			for _, failure := range stats.FailureDetails {
-				// Display the actual error messages for each failed workflow
+				fmt.Fprintf(os.Stderr, "  ✗ %s\n", filepath.Base(failure.Path))
+			}
+			fmt.Fprintln(os.Stderr)
+
+			// Display the actual error messages for each failed workflow
+			for _, failure := range stats.FailureDetails {
 				for _, errMsg := range failure.ErrorMessages {
 					fmt.Fprintln(os.Stderr, errMsg)
 				}
 			}
 		} else if len(stats.FailedWorkflows) > 0 {
 			// Fallback for backward compatibility if FailureDetails is not populated
+			fmt.Fprintln(os.Stderr)
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed workflows:"))
 			for _, workflow := range stats.FailedWorkflows {
-				fmt.Fprintf(os.Stderr, "  - %s\n", workflow)
+				fmt.Fprintf(os.Stderr, "  ✗ %s\n", workflow)
 			}
+			fmt.Fprintln(os.Stderr)
 		}
 	} else if stats.Warnings > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(summary))
