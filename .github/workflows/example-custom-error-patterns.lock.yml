@@ -509,6 +509,7 @@ jobs:
           GH_AW_RATE_LIMIT_MAX: "5"
           GH_AW_RATE_LIMIT_WINDOW: "60"
           GH_AW_RATE_LIMIT_EVENTS: "issues"
+          GH_AW_RATE_LIMIT_IGNORED_ROLES: "admin,maintain,write"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

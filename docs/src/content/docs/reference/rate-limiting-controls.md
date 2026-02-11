@@ -118,9 +118,12 @@ rate-limit:
   max: 5        # Required: Maximum runs per window (1-10)
   window: 60    # Optional: Time window in minutes (default: 60, max: 180)
   events: [workflow_dispatch, issue_comment]  # Optional: Specific events (auto-inferred if omitted)
+  ignored-roles: [admin, maintain]  # Optional: Roles exempt from rate limiting (default: [admin, maintain, write])
 ```
 
-The pre-activation job checks recent runs and cancels the current run if the limit is exceeded. See [RATE_LIMITING.md](https://github.com/github/gh-aw/blob/main/docs/RATE_LIMITING.md) for complete details including event auto-inference.
+The pre-activation job checks recent runs and cancels the current run if the limit is exceeded.
+
+**Role exemptions**: By default, users with `admin`, `maintain`, or `write` roles are exempt from rate limiting. To apply rate limiting to all users including admins, set `ignored-roles: []`.
 
 ## Example: Multiple Protection Layers
 
