@@ -77,7 +77,12 @@ func (e *CopilotEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]
 		},
 	}
 
-	_ = RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
+	// Check if sandbox is disabled - if so, write config directly to file instead of piping to gateway
+	if isSandboxDisabled(workflowData) {
+		_ = RenderJSONMCPConfigDirect(yaml, tools, mcpTools, workflowData, options)
+	} else {
+		_ = RenderJSONMCPConfig(yaml, tools, mcpTools, workflowData, options)
+	}
 }
 
 // renderCopilotMCPConfigWithContext generates custom MCP server configuration for Copilot CLI

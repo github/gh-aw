@@ -311,7 +311,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("expires", c.Expires).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
-			AddDefault("base_branch", "${{ github.ref_name }}").
+			AddDefault("base_branch", "${{ github.event.pull_request.head.ref || github.ref_name }}").
 			AddDefault("max_patch_size", maxPatchSize).
 			Build()
 	},
@@ -331,7 +331,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddStringSlice("labels", c.Labels).
 			AddIfNotEmpty("if_no_changes", c.IfNoChanges).
 			AddIfNotEmpty("commit_title_suffix", c.CommitTitleSuffix).
-			AddDefault("base_branch", "${{ github.ref_name }}").
+			AddDefault("base_branch", "${{ github.event.pull_request.head.ref || github.ref_name }}").
 			AddDefault("max_patch_size", maxPatchSize).
 			Build()
 	},

@@ -969,3 +969,92 @@ func RenderJSONMCPConfig(
 	// Note: Post-EOF commands are no longer needed since we pipe directly to the gateway script
 	return nil
 }
+
+// RenderJSONMCPConfigDirect renders MCP configuration in JSON format and writes it directly to a file.
+// This is used when sandbox is disabled (sandbox: false) and the gateway is not started.
+// The config file is written so that Copilot CLI can discover MCP servers directly.
+//
+// Parameters:
+//   - yaml: The string builder for YAML output
+//   - tools: Map of tool configurations
+//   - mcpTools: Ordered list of MCP tool names to render
+//   - workflowData: Workflow configuration data
+//   - options: JSON MCP config rendering options
+func RenderJSONMCPConfigDirect(
+	yaml *strings.Builder,
+	tools map[string]any,
+	mcpTools []string,
+	workflowData *WorkflowData,
+	options JSONMCPConfigOptions,
+) error {
+	mcpRendererLog.Printf("Rendering JSON MCP config (direct write): %d tools", len(mcpTools))
+
+	// Build the JSON configuration in a separate builder for validation
+	var configBuilder strings.Builder
+	configBuilder.WriteString("          {\n")
+	configBuilder.WriteString("            \"mcpServers\": {\n")
+
+	// Filter tools if needed (e.g., Copilot filters out cache-memory)
+	var filteredTools []string
+	for _, toolName := range mcpTools {
+		if options.FilterTool != nil && !options.FilterTool(toolName) {
+			mcpRendererLog.Printf("Filtering out MCP tool: %s", toolName)
+			continue
+		}
+		filteredTools = append(filteredTools, toolName)
+	}
+
+	mcpRendererLog.Printf("Rendering %d MCP tools after filtering", len(filteredTools))
+
+	// Process each MCP tool
+	totalServers := len(filteredTools)
+	serverCount := 0
+
+	for _, toolName := range filteredTools {
+		serverCount++
+		isLast := serverCount == totalServers
+
+		switch toolName {
+		case "github":
+			githubTool := tools["github"]
+			options.Renderers.RenderGitHub(&configBuilder, githubTool, isLast, workflowData)
+		case "playwright":
+			playwrightTool := tools["playwright"]
+			options.Renderers.RenderPlaywright(&configBuilder, playwrightTool, isLast)
+		case "serena":
+			serenaTool := tools["serena"]
+			options.Renderers.RenderSerena(&configBuilder, serenaTool, isLast)
+		case "cache-memory":
+			options.Renderers.RenderCacheMemory(&configBuilder, isLast, workflowData)
+		case "agentic-workflows":
+			options.Renderers.RenderAgenticWorkflows(&configBuilder, isLast)
+		case "safe-outputs":
+			options.Renderers.RenderSafeOutputs(&configBuilder, isLast, workflowData)
+		case "safe-inputs":
+			if options.Renderers.RenderSafeInputs != nil {
+				options.Renderers.RenderSafeInputs(&configBuilder, workflowData.SafeInputs, isLast)
+			}
+		case "web-fetch":
+			options.Renderers.RenderWebFetch(&configBuilder, isLast)
+		default:
+			// Handle custom MCP tools using shared helper
+			HandleCustomMCPToolInSwitch(&configBuilder, toolName, tools, isLast, options.Renderers.RenderCustomMCPConfig)
+		}
+	}
+
+	// Write config file footer - no gateway section since sandbox is disabled
+	configBuilder.WriteString("            }\n")
+	configBuilder.WriteString("          }\n")
+
+	// Get the generated configuration
+	generatedConfig := configBuilder.String()
+
+	// Write the configuration directly to the file
+	yaml.WriteString(fmt.Sprintf("          cat << MCPCONFIG_EOF > %s\n", options.ConfigPath))
+	yaml.WriteString(generatedConfig)
+	yaml.WriteString("          MCPCONFIG_EOF\n")
+	yaml.WriteString("          \n")
+	yaml.WriteString(fmt.Sprintf("          echo \"MCP config written to %s\"\n", options.ConfigPath))
+
+	return nil
+}

@@ -114,6 +114,8 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	steps = append(steps, fmt.Sprintf("          token: %s\n", checkoutToken))
 	steps = append(steps, "          persist-credentials: false\n")
 	steps = append(steps, "          fetch-depth: 1\n")
+	// Use PR head ref for pull_request triggers, otherwise use default ref
+	steps = append(steps, "          ref: ${{ github.event.pull_request.head.ref || github.ref }}\n")
 	if c.trialMode {
 		if c.trialLogicalRepoSlug != "" {
 			steps = append(steps, fmt.Sprintf("          repository: %s\n", c.trialLogicalRepoSlug))
