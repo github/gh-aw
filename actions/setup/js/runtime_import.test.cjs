@@ -378,8 +378,9 @@ describe("runtime_import", () => {
           const result = await processRuntimeImport("test-no-prefix.md", !1, tempDir);
           expect(result).toBe(content);
         }),
-        it("should support .agents/ prefix", async () => {
-          const agentsDir = path.join(githubDir, "agents");
+        it("should support .agents/ prefix (top-level folder)", async () => {
+          // .agents is a top-level folder at workspace root, not inside .github
+          const agentsDir = path.join(tempDir, ".agents");
           fs.mkdirSync(agentsDir, { recursive: true });
           const content = "Test with .agents prefix";
           fs.writeFileSync(path.join(agentsDir, "test-skill.md"), content);

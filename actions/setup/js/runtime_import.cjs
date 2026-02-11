@@ -687,45 +687,68 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 
   // Otherwise, process as a file
   let filepath = filepathOrUrl;
+  let isAgentsPath = false;
 
-  // Trim .github/ prefix if provided (support both .github/file and file)
-  // This allows users to use either format
-  if (filepath.startsWith(".github/")) {
+  // Check if this is a .agents/ path (top-level folder for skills)
+  if (filepath.startsWith(".agents/")) {
+    isAgentsPath = true;
+    // Keep .agents/ as is - it's a top-level folder at workspace root
+  } else if (filepath.startsWith(".agents\\")) {
+    isAgentsPath = true;
+    // Keep .agents\ as is - it's a top-level folder at workspace root (Windows)
+  } else if (filepath.startsWith(".github/")) {
+    // Trim .github/ prefix if provided (support both .github/file and file)
     filepath = filepath.substring(8); // Remove ".github/"
   } else if (filepath.startsWith(".github\\")) {
     filepath = filepath.substring(8); // Remove ".github\" (Windows)
-  } else if (filepath.startsWith(".agents/")) {
-    // Remove the leading dot from .agents/ -> agents/
-    // This is the common folder location for skills
-    filepath = filepath.substring(1); // Remove the leading "."
-  } else if (filepath.startsWith(".agents\\")) {
-    // Remove the leading dot from .agents\ -> agents\ (Windows)
-    filepath = filepath.substring(1); // Remove the leading "."
   } else {
     // If path doesn't start with .github or .agents, prefix with workflows/
     // This makes imports like "a.md" resolve to ".github/workflows/a.md"
     filepath = path.join("workflows", filepath);
   }
 
-  // Remove leading ./ or ../ if present
-  if (filepath.startsWith("./")) {
-    filepath = filepath.substring(2);
-  } else if (filepath.startsWith(".\\")) {
-    filepath = filepath.substring(2);
+  // Remove leading ./ or ../ if present (only for non-agents paths)
+  if (!isAgentsPath) {
+    if (filepath.startsWith("./")) {
+      filepath = filepath.substring(2);
+    } else if (filepath.startsWith(".\\")) {
+      filepath = filepath.substring(2);
+    }
   }
-  // Note: We don't allow ../ paths as they would escape .github folder
+  // Note: We don't allow ../ paths as they would escape the base folder
 
-  // Construct the path within .github folder
-  const githubFolder = path.join(workspaceDir, ".github");
-  const absolutePath = path.resolve(githubFolder, filepath);
-  const normalizedPath = path.normalize(absolutePath);
-  const normalizedGithubFolder = path.normalize(githubFolder);
+  // Construct the absolute path - .agents paths are relative to workspace root, others to .github
+  let absolutePath, normalizedPath, baseFolder, normalizedBaseFolder;
+  
+  if (isAgentsPath) {
+    // .agents/ paths resolve to top-level .agents folder at workspace root
+    baseFolder = workspaceDir;
+    absolutePath = path.resolve(workspaceDir, filepath);
+    normalizedPath = path.normalize(absolutePath);
+    normalizedBaseFolder = path.normalize(baseFolder);
+    
+    // Security check: ensure the resolved path is within the workspace
+    const relativePath = path.relative(normalizedBaseFolder, normalizedPath);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+      throw new Error(`Security: Path ${filepathOrUrl} must be within workspace (resolves to: ${relativePath})`);
+    }
+    // Additional check: ensure path stays within .agents folder
+    if (!relativePath.startsWith(".agents" + path.sep) && relativePath !== ".agents") {
+      throw new Error(`Security: Path ${filepathOrUrl} must be within .agents folder`);
+    }
+  } else {
+    // Regular paths resolve within .github folder
+    const githubFolder = path.join(workspaceDir, ".github");
+    baseFolder = githubFolder;
+    absolutePath = path.resolve(githubFolder, filepath);
+    normalizedPath = path.normalize(absolutePath);
+    normalizedBaseFolder = path.normalize(githubFolder);
 
-  // Security check: ensure the resolved path is within the .github folder
-  // Use path.relative to check if the path escapes the .github folder
-  const relativePath = path.relative(normalizedGithubFolder, normalizedPath);
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    throw new Error(`Security: Path ${filepathOrUrl} must be within .github folder (resolves to: ${relativePath})`);
+    // Security check: ensure the resolved path is within the .github folder
+    const relativePath = path.relative(normalizedBaseFolder, normalizedPath);
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+      throw new Error(`Security: Path ${filepathOrUrl} must be within .github folder (resolves to: ${relativePath})`);
+    }
   }
 
   // Check if file exists
