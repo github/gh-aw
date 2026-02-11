@@ -255,8 +255,11 @@ jobs:
                 "additionalProperties": false,
                 "properties": {
                   "content_number": {
-                    "description": "Issue or pull request number to add to the project. This is the numeric ID from the GitHub URL (e.g., 123 in github.com/owner/repo/issues/123 for issue #123, or 456 in github.com/owner/repo/pull/456 for PR #456). Required when content_type is 'issue' or 'pull_request'.",
-                    "type": "number"
+                    "description": "Issue or pull request number to add to the project. This is the numeric ID from the GitHub URL (e.g., 123 in github.com/owner/repo/issues/123 for issue #123, or 456 in github.com/owner/repo/pull/456 for PR #456), or a temporary ID from a recent create_issue call (e.g., 'aw_abc123def456' or '#aw_abc123def456'). Required when content_type is 'issue' or 'pull_request'.",
+                    "type": [
+                      "number",
+                      "string"
+                    ]
                   },
                   "content_type": {
                     "description": "Type of item to add to the project. Use 'issue' or 'pull_request' to add existing repo content, or 'draft_issue' to create a draft item inside the project. Required when operation is not specified.",
@@ -522,7 +525,7 @@ jobs:
               "defaultMax": 10,
               "fields": {
                 "content_number": {
-                  "optionalPositiveInteger": true
+                  "issueNumberOrTemporaryId": true
                 },
                 "content_type": {
                   "type": "string",
