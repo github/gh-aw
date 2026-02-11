@@ -414,6 +414,51 @@ describe("safe_output_topological_sort.cjs", () => {
       expect(sorted.some(m => m.issue_number === "aw_def987654321")).toBe(true);
     });
 
+    it("should handle create_project with item_url dependency on create_issue", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { type: "create_project", title: "My Project", item_url: "aw_abc123def456" },
+        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Issue should come before project since project depends on it
+      expect(sorted[0].type).toBe("create_issue");
+      expect(sorted[1].type).toBe("create_project");
+    });
+
+    it("should handle create_project with item_url dependency (URL format)", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/aw_abc123def456" },
+        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Issue should come before project
+      expect(sorted[0].type).toBe("create_issue");
+      expect(sorted[1].type).toBe("create_project");
+    });
+
+    it("should handle create_project with item_url dependency (URL with # prefix)", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/#aw_abc123def456" },
+        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Issue should come before project
+      expect(sorted[0].type).toBe("create_issue");
+      expect(sorted[1].type).toBe("create_project");
+    });
+
     it("should handle large graphs with many dependencies", async () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 

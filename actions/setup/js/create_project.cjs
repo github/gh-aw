@@ -3,6 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { resolveIssueNumber, loadTemporaryIdMapFromResolved } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -338,6 +339,37 @@ async function main(config = {}, githubClient = null) {
 
     try {
       let { title, owner, owner_type, item_url } = message;
+
+      // Resolve temporary ID in item_url if present
+      if (item_url && typeof item_url === "string") {
+        // Check if item_url contains a temporary ID (either as URL or plain ID)
+        // Format: https://github.com/owner/repo/issues/#aw_XXXXXXXXXXXX or #aw_XXXXXXXXXXXX
+        const urlMatch = item_url.match(/issues\/(#?aw_[0-9a-f]{12})\s*$/i);
+        const plainMatch = item_url.match(/^(#?aw_[0-9a-f]{12})\s*$/i);
+
+        if (urlMatch || plainMatch) {
+          const tempIdStr = (urlMatch && urlMatch[1]) || (plainMatch && plainMatch[1]) || "";
+          const tempIdWithoutHash = tempIdStr.startsWith("#") ? tempIdStr.substring(1) : tempIdStr;
+
+          // Build a normalized temporary ID map from the unified temporaryIdMap
+          const normalizedMap = loadTemporaryIdMapFromResolved(temporaryIdMap);
+
+          // Resolve the temporary ID to an issue number
+          const resolution = resolveIssueNumber(tempIdWithoutHash, normalizedMap);
+
+          if (resolution.errorMessage) {
+            throw new Error(`Failed to resolve temporary ID in item_url: ${resolution.errorMessage}`);
+          }
+
+          if (resolution.resolved) {
+            // Build the proper GitHub issue URL
+            const resolved = resolution.resolved;
+            const resolvedUrl = `https://github.com/${resolved.repo}/issues/${resolved.number}`;
+            core.info(`Resolved temporary ID ${tempIdStr} in item_url to ${resolvedUrl}`);
+            item_url = resolvedUrl;
+          }
+        }
+      }
 
       // Generate a title if not provided by the agent
       if (!title) {

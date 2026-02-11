@@ -574,6 +574,80 @@ describe("temporary_id.cjs", () => {
       expect(refs.size).toBe(0);
     });
 
+    it("should extract temporary IDs from item_url field (full URL format)", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_project",
+        title: "Test Project",
+        item_url: "https://github.com/owner/repo/issues/aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract temporary IDs from item_url field (with # prefix)", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_project",
+        title: "Test Project",
+        item_url: "https://github.com/owner/repo/issues/#aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract temporary IDs from item_url field (plain ID format)", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_project",
+        title: "Test Project",
+        item_url: "aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract temporary IDs from item_url field (plain ID with # prefix)", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_project",
+        title: "Test Project",
+        item_url: "#aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should not extract from item_url with regular issue number", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "create_project",
+        title: "Test Project",
+        item_url: "https://github.com/owner/repo/issues/123",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(0);
+    });
+
     it("should ignore invalid temporary ID formats", async () => {
       const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
 
