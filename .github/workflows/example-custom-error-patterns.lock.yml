@@ -24,7 +24,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 01403571c2bd8d2864e2d8ad6a80c019b48dfaf1ac2b61ee2f35c9a19145fd5d
+# frontmatter-hash: 5fb42e71fdea5fafa3ea342aac01e6373a703bf85c191fe80ab16d873ee25131
 
 name: "Example: Custom Error Patterns"
 "on":

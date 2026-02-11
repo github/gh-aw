@@ -26,7 +26,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 948ba3839d6083bd933117ad41c2410fd690889345d83f761c8c387389deeee8
+# frontmatter-hash: 9c6fbb9920281fff3373c0db01b6a5e5fe93b637d2902977763c0634733725be
 
 name: "Auto-Triage Issues"
 "on":
@@ -1082,7 +1082,7 @@ jobs:
         env:
           GH_AW_RATE_LIMIT_MAX: "5"
           GH_AW_RATE_LIMIT_WINDOW: "60"
-          GH_AW_RATE_LIMIT_EVENTS: "issues"
+          GH_AW_RATE_LIMIT_EVENTS: "issues,workflow_dispatch"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

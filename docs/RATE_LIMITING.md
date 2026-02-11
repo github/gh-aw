@@ -21,11 +21,9 @@ on:
   issue_comment:
     types: [created]
 rate-limit:
-  max: 5          # Maximum runs per time window (default: 5)
-  window: 60      # Time window in minutes (default: 60)
-  events:         # Optional: specific events to limit
-    - workflow_dispatch
-    - issue_comment
+  max: 5          # Required: 1-10 runs
+  window: 60      # Optional: minutes (default 60, max 180)
+  # events field is optional - automatically inferred from 'on:' triggers
 ---
 ```
 
@@ -44,7 +42,9 @@ rate-limit:
 
 ### `events` (array, optional)
 - Specific event types to apply rate limiting to
-- If not specified, applies to all programmatically triggered events
+- **If not specified, automatically inferred from the workflow's `on:` triggers**
+- Only programmatic trigger types are included in the inference
+- Can be explicitly set to override the inference
 - Supported events:
   - `workflow_dispatch`
   - `issue_comment`
@@ -72,30 +72,44 @@ rate-limit:
 
 ## Examples
 
-### Basic Rate Limiting (Default)
+### Automatic Event Inference (Recommended)
+```yaml
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+rate-limit:
+  max: 5
+  window: 60
+  # Events automatically inferred: [issues, issue_comment]
+```
+Events are automatically inferred from the workflow's triggers. Simplest configuration.
+
+### Basic Rate Limiting (Default Window)
 ```yaml
 rate-limit:
   max: 5
   window: 60
 ```
-Allows 5 runs per hour for all programmatic events.
+Allows 5 runs per hour. Events inferred from `on:` section.
 
-### Strict Rate Limiting
+### Explicit Event Filtering
 ```yaml
 rate-limit:
   max: 3
   window: 30
   events: [workflow_dispatch, issue_comment]
 ```
-Allows only 3 runs per 30 minutes for manual triggers and issue comments.
+Explicitly specify events to override inference. Allows only 3 runs per 30 minutes for the specified events.
 
 ### Generous Rate Limiting
 ```yaml
 rate-limit:
-  max: 20
+  max: 10
   window: 120
 ```
-Allows 20 runs per 2 hours for all events.
+Allows 10 runs per 2 hours. Events inferred from triggers.
 
 ## Behavior Details
 

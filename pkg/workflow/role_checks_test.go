@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/github/gh-aw/pkg/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestRoleMembershipUsesGitHubToken tests that the role membership check
@@ -144,5 +145,89 @@ Test that role membership check uses GITHUB_TOKEN with bots.`
 	// Verify that the check_membership step explicitly uses github-token: GITHUB_TOKEN
 	if !strings.Contains(compiledStr, "github-token: ${{ secrets.GITHUB_TOKEN }}") {
 		t.Errorf("Expected check_membership step to explicitly use 'github-token: ${{ secrets.GITHUB_TOKEN }}'")
+	}
+}
+
+func TestInferEventsFromTriggers(t *testing.T) {
+	c := &Compiler{}
+
+	tests := []struct {
+		name        string
+		frontmatter map[string]any
+		expected    []string
+	}{
+		{
+			name: "infer from map with multiple triggers",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"issues":            map[string]any{"types": []any{"opened"}},
+					"issue_comment":     map[string]any{"types": []any{"created"}},
+					"workflow_dispatch": nil,
+				},
+			},
+			expected: []string{"issues", "issue_comment", "workflow_dispatch"},
+		},
+		{
+			name: "infer only programmatic triggers",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"push":     map[string]any{},
+					"issues":   map[string]any{},
+					"schedule": "daily",
+				},
+			},
+			expected: []string{"issues"},
+		},
+		{
+			name: "no triggers",
+			frontmatter: map[string]any{
+				"on": map[string]any{},
+			},
+			expected: nil,
+		},
+		{
+			name:        "missing on section",
+			frontmatter: map[string]any{},
+			expected:    nil,
+		},
+		{
+			name: "all programmatic triggers",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch":           nil,
+					"repository_dispatch":         nil,
+					"issues":                      map[string]any{},
+					"issue_comment":               map[string]any{},
+					"pull_request":                map[string]any{},
+					"pull_request_review":         map[string]any{},
+					"pull_request_review_comment": map[string]any{},
+					"discussion":                  map[string]any{},
+					"discussion_comment":          map[string]any{},
+				},
+			},
+			expected: []string{
+				"workflow_dispatch",
+				"repository_dispatch",
+				"issues",
+				"issue_comment",
+				"pull_request",
+				"pull_request_review",
+				"pull_request_review_comment",
+				"discussion",
+				"discussion_comment",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := c.inferEventsFromTriggers(tt.frontmatter)
+			// Use ElementsMatch since map iteration order is non-deterministic
+			if len(tt.expected) > 0 && len(result) > 0 {
+				assert.ElementsMatch(t, tt.expected, result, "Inferred events should match expected")
+			} else {
+				assert.Equal(t, tt.expected, result, "Inferred events should match expected")
+			}
+		})
 	}
 }

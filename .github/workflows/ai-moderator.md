@@ -17,7 +17,6 @@ on:
 rate-limit:
   max: 5
   window: 60
-  events: [issues, issue_comment]
 engine:
   id: copilot
   model: gpt-5.1-codex-mini

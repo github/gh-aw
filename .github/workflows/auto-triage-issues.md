@@ -8,7 +8,6 @@ on:
 rate-limit:
   max: 5
   window: 60
-  events: [issues]
 permissions:
   contents: read
   issues: read

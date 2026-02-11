@@ -186,6 +186,12 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 				case string:
 					config.Events = []string{events}
 				}
+			} else {
+				// If events not specified, infer from the 'on:' section of frontmatter
+				config.Events = c.inferEventsFromTriggers(frontmatter)
+				if len(config.Events) > 0 {
+					roleLog.Printf("Inferred events from workflow triggers: %v", config.Events)
+				}
 			}
 
 			roleLog.Printf("Extracted rate-limit config: max=%d, window=%d, events=%v", config.Max, config.Window, config.Events)
@@ -194,6 +200,50 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 	}
 	roleLog.Print("No rate-limit configuration specified")
 	return nil
+}
+
+// inferEventsFromTriggers infers rate-limit events from the workflow's 'on:' triggers
+func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string {
+	onValue, exists := frontmatter["on"]
+	if !exists || onValue == nil {
+		return nil
+	}
+
+	var events []string
+	programmaticTriggers := map[string]string{
+		"workflow_dispatch":           "workflow_dispatch",
+		"repository_dispatch":         "repository_dispatch",
+		"issues":                      "issues",
+		"issue_comment":               "issue_comment",
+		"pull_request":                "pull_request",
+		"pull_request_review":         "pull_request_review",
+		"pull_request_review_comment": "pull_request_review_comment",
+		"discussion":                  "discussion",
+		"discussion_comment":          "discussion_comment",
+	}
+
+	switch on := onValue.(type) {
+	case map[string]any:
+		for trigger := range on {
+			if eventName, ok := programmaticTriggers[trigger]; ok {
+				events = append(events, eventName)
+			}
+		}
+	case []any:
+		for _, item := range on {
+			if triggerStr, ok := item.(string); ok {
+				if eventName, ok := programmaticTriggers[triggerStr]; ok {
+					events = append(events, eventName)
+				}
+			}
+		}
+	case string:
+		if eventName, ok := programmaticTriggers[on]; ok {
+			events = []string{eventName}
+		}
+	}
+
+	return events
 }
 
 // needsRoleCheck determines if the workflow needs permission checks with full context
