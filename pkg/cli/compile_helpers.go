@@ -368,7 +368,8 @@ func printCompilationSummary(stats *CompilationStats) {
 	// Use different formatting based on whether there were errors
 	if stats.Errors > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(summary))
-		// List the failed workflows with their error counts and error messages
+		// Display actual error messages from each failed workflow
+		// Error messages already include workflow path in format: file:line:col: error: message
 		if len(stats.FailureDetails) > 0 {
 			for _, failure := range stats.FailureDetails {
 				// Display the actual error messages for each failed workflow

@@ -104,12 +104,14 @@ func compileSpecificFiles(
 		if !fileResult.success {
 			errorCount++
 			stats.Errors++
-			// Collect error messages from validation result
+			// Collect error messages from validation result for display in summary
 			var errMsgs []string
 			for _, verr := range fileResult.validationResult.Errors {
 				errMsgs = append(errMsgs, verr.Message)
 			}
 			trackWorkflowFailure(stats, resolvedFile, 1, errMsgs)
+			// Only append first error to errorMessages for the return error value
+			// (all errors are already displayed in the summary via printCompilationSummary)
 			if len(fileResult.validationResult.Errors) > 0 {
 				errorMessages = append(errorMessages, fileResult.validationResult.Errors[0].Message)
 			}
