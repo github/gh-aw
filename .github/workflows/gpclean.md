@@ -49,28 +49,45 @@ Systematically detect Go dependencies that introduce non-MIT friendly (GPL-type)
 ## Current Context
 - **Repository**: ${{ github.repository }}
 - **Go Module File**: `go.mod` in repository root
+- **SBOM Source**: GitHub Dependency Graph API (SPDX format)
 - **Cache Memory**: `/tmp/gh-aw/cache-memory/gpclean/` for round-robin module tracking
 
 ## Your Tasks
 
-### Phase 0: Round-Robin Module Selection
+### Phase 0: Download SBOM and Round-Robin Module Selection
 
-Use cache-memory to ensure we focus on one dependency per run in a systematic round-robin fashion.
+Use the repository's SBOM (Software Bill of Materials) to get accurate dependency information, then select one module to analyze in a round-robin fashion.
 
-1. **Load tracking state** from `/tmp/gh-aw/cache-memory/gpclean/state.json`:
+1. **Download SBOM from GitHub**:
+   ```bash
+   # Download SBOM using GitHub API
+   curl -L \
+     -H "Accept: application/vnd.github+json" \
+     -H "Authorization: Bearer $GITHUB_TOKEN" \
+     -H "X-GitHub-Api-Version: 2022-11-28" \
+     https://api.github.com/repos/${{ github.repository }}/dependency-graph/sbom \
+     -o /tmp/sbom.json
+   ```
+
+2. **Extract dependencies from SBOM**:
+   - Parse the SBOM JSON file (SPDX format)
+   - Look for packages in `sbom.packages[]` array
+   - Filter for Go packages (those with `purl` starting with `pkg:golang/`)
+   - Extract the package names (module paths) from the `purl` field
+   - Focus on direct dependencies (not dev dependencies or build tools)
+   - Save the list of dependencies to `/tmp/go-dependencies.txt`
+
+3. **Load tracking state** from `/tmp/gh-aw/cache-memory/gpclean/state.json`:
    - If file doesn't exist, create it with initial state: `{"last_checked_module": "", "checked_modules": []}`
    - State tracks which modules have been checked recently
 
-2. **Get all direct dependencies** from `go.mod`:
-   - Extract all `require` statements (excluding indirect dependencies for now)
-   - Create list of direct dependency module paths
-
-3. **Select next module to check**:
+4. **Select next module to check**:
+   - Use the dependencies list from SBOM (`/tmp/go-dependencies.txt`)
    - Find the first module NOT in `checked_modules` list
    - If all modules have been checked, reset `checked_modules` to empty array and start over
    - Update state with selected module and save to cache-memory
 
-4. **Focused analysis**: Analyze only the selected module and its transitive dependencies in this run
+5. **Focused analysis**: Analyze only the selected module and its transitive dependencies in this run
 
 ### Phase 1: License Detection for Selected Module
 
@@ -302,6 +319,15 @@ After creating the issue:
 
 ## Important Guidelines
 
+### SBOM Usage
+
+- **Download SBOM first** at the beginning of each run to get the latest dependency information
+- SBOM is in SPDX format with packages listed in `sbom.packages[]` array
+- Go packages have `purl` (Package URL) in format: `pkg:golang/github.com/org/repo@version`
+- Parse the SBOM to extract all Go dependencies before license checking
+- SBOM provides a comprehensive view including transitive dependencies
+- If SBOM download fails, fall back to parsing `go.mod` directly
+
 ### Focus on One Dependency
 
 - **Only analyze ONE direct dependency per run** (round-robin via cache-memory)
@@ -352,6 +378,7 @@ After creating the issue:
 
 ## Error Handling
 
+- If SBOM download fails, fall back to parsing `go.mod` directly to extract dependencies
 - If `go mod graph` fails, report the error and exit
 - If license detection fails for a module, document it in the issue and recommend manual review
 - If no direct dependencies exist, exit successfully
@@ -359,10 +386,10 @@ After creating the issue:
 
 ## Example Module Selection Flow
 
-**Run 1**: Check `github.com/spf13/cobra` → No GPL found → Add to checked_modules
-**Run 2**: Check `github.com/spf13/viper` → No GPL found → Add to checked_modules
-**Run 3**: Check `github.com/cli/go-gh` → GPL found in transitive dep → Create issue, add to checked_modules
-**Run 4**: Check `gopkg.in/yaml.v3` → No GPL found → Add to checked_modules
-**Run 5**: All modules checked → Reset checked_modules, start from beginning
+**Run 1**: Download SBOM → Extract Go dependencies → Check `github.com/spf13/cobra` → No GPL found → Add to checked_modules
+**Run 2**: Check `github.com/spf13/viper` (from SBOM) → No GPL found → Add to checked_modules
+**Run 3**: Check `github.com/cli/go-gh` (from SBOM) → GPL found in transitive dep → Create issue, add to checked_modules
+**Run 4**: Check `gopkg.in/yaml.v3` (from SBOM) → No GPL found → Add to checked_modules
+**Run 5**: All modules from SBOM checked → Reset checked_modules, start from beginning
 
 This ensures systematic coverage without duplicate work.
