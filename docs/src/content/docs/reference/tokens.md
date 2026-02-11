@@ -218,6 +218,22 @@ You **must** use a **classic PAT** with the `project` scope. Fine-grained PATs d
 
 **For Organization-owned Projects (v2)**:
 
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-org-project.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-org-project.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a fine-grained PAT for organization-owned projects
+  </div>
+</div>
+
 You can use either a classic PAT or a fine-grained PAT:
 
 1. **Option A**: Create a **classic PAT** with `project` and `read:org` scopes:
