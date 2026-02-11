@@ -5,6 +5,21 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { repairJson } = require("./json_repair_helpers.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 
+/**
+ * Sanitizes a value for safe use in shell commands by removing/escaping shell metacharacters
+ * @param {any} value - The value to sanitize
+ * @returns {any} - Sanitized value (strings are processed, other types returned as-is)
+ */
+function sanitizeForShell(value) {
+  if (typeof value !== "string") return value;
+
+  // Remove shell metacharacters
+  return value
+    .replace(/[$`\\]/g, "\\$&") // Escape $, `, \
+    .replace(/[();&|<>]/g, "") // Remove dangerous chars
+    .substring(0, 1000); // Limit length
+}
+
 async function main() {
   try {
     const fs = require("fs");
@@ -299,7 +314,8 @@ async function main() {
     core.setOutput("raw_output", outputContent);
     const outputTypes = Array.from(new Set(parsedItems.map(item => item.type)));
     core.info(`output_types: ${outputTypes.join(", ")}`);
-    core.setOutput("output_types", outputTypes.join(","));
+    const sanitizedOutputTypes = sanitizeForShell(outputTypes.join(","));
+    core.setOutput("output_types", sanitizedOutputTypes);
 
     // Check if patch file exists for detection job conditional
     const patchPath = "/tmp/gh-aw/aw.patch";
@@ -335,4 +351,4 @@ async function main() {
   }
 }
 
-module.exports = { main };
+module.exports = { main, sanitizeForShell };

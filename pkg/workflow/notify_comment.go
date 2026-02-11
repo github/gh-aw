@@ -72,7 +72,7 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 	steps = append(steps, "        run: |\n")
 	steps = append(steps, "          echo \"Comment ID: $COMMENT_ID\"\n")
 	steps = append(steps, "          echo \"Comment Repo: $COMMENT_REPO\"\n")
-	steps = append(steps, "          echo \"Agent Output Types: $AGENT_OUTPUT_TYPES\"\n")
+	steps = append(steps, "          printf 'Agent Output Types: %s\\n' \"$AGENT_OUTPUT_TYPES\"\n")
 	steps = append(steps, "          echo \"Agent Conclusion: $AGENT_CONCLUSION\"\n")
 
 	// Add artifact download steps once (shared by noop and conclusion steps)

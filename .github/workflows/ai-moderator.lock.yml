@@ -885,7 +885,7 @@ jobs:
         run: |
           echo "Comment ID: $COMMENT_ID"
           echo "Comment Repo: $COMMENT_REPO"
-          echo "Agent Output Types: $AGENT_OUTPUT_TYPES"
+          printf 'Agent Output Types: %s\n' "$AGENT_OUTPUT_TYPES"
           echo "Agent Conclusion: $AGENT_CONCLUSION"
       - name: Download agent output artifact
         continue-on-error: true

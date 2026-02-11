@@ -40,7 +40,7 @@ func (c *Compiler) buildCreateOutputAddCommentJob(data *WorkflowData, mainJobNam
 	preSteps = append(preSteps, fmt.Sprintf("          AGENT_OUTPUT_TYPES: ${{ needs.%s.outputs.output_types }}\n", mainJobName))
 	preSteps = append(preSteps, "        run: |\n")
 	preSteps = append(preSteps, "          echo \"Output: $AGENT_OUTPUT\"\n")
-	preSteps = append(preSteps, "          echo \"Output types: $AGENT_OUTPUT_TYPES\"\n")
+	preSteps = append(preSteps, "          printf 'Output types: %s\\n' \"$AGENT_OUTPUT_TYPES\"\n")
 
 	// Build custom environment variables specific to add-comment
 	var customEnvVars []string

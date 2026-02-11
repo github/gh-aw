@@ -895,7 +895,7 @@ jobs:
         run: |
           echo "Comment ID: $COMMENT_ID"
           echo "Comment Repo: $COMMENT_REPO"
-          echo "Agent Output Types: $AGENT_OUTPUT_TYPES"
+          printf 'Agent Output Types: %s\n' "$AGENT_OUTPUT_TYPES"
           echo "Agent Conclusion: $AGENT_CONCLUSION"
       - name: Download agent output artifact
         continue-on-error: true
@@ -1047,7 +1047,7 @@ jobs:
         env:
           AGENT_OUTPUT_TYPES: ${{ needs.agent.outputs.output_types }}
         run: |
-          echo "Agent output-types: $AGENT_OUTPUT_TYPES"
+          printf 'Agent output-types: %s\n' "$AGENT_OUTPUT_TYPES"
       - name: Setup threat detection
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:

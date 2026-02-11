@@ -222,7 +222,7 @@ func (c *Compiler) buildEchoAgentOutputsStep(mainJobName string) []string {
 		"        env:\n",
 		fmt.Sprintf("          AGENT_OUTPUT_TYPES: ${{ needs.%s.outputs.output_types }}\n", mainJobName),
 		"        run: |\n",
-		"          echo \"Agent output-types: $AGENT_OUTPUT_TYPES\"\n",
+		"          printf 'Agent output-types: %s\\n' \"$AGENT_OUTPUT_TYPES\"\n",
 	}
 }
 
