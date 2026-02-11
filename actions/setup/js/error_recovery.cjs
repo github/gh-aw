@@ -250,6 +250,7 @@ function createOperationError(operation, entityType, cause, entityId, suggestion
 
 module.exports = {
   withRetry,
+  sleep,
   isTransientError,
   enhanceError,
   createValidationError,

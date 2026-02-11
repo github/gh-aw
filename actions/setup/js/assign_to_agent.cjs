@@ -7,15 +7,7 @@ const { AGENT_LOGIN_NAMES, getAvailableAgentLogins, findAgent, getIssueDetails, 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
 const { loadTemporaryIdMap, resolveRepoIssueTarget } = require("./temporary_id.cjs");
-
-/**
- * Sleep for the specified number of milliseconds
- * @param {number} ms - Milliseconds to sleep
- * @returns {Promise<void>}
- */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const { sleep } = require("./error_recovery.cjs");
 
 async function main() {
   const result = loadAgentOutput();
