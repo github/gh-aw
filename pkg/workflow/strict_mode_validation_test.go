@@ -551,3 +551,114 @@ func TestValidateStrictModeEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateStrictCacheMemoryScope tests that cache-memory with scope: repo is rejected in strict mode
+func TestValidateStrictCacheMemoryScope(t *testing.T) {
+	tests := []struct {
+		name        string
+		frontmatter map[string]any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "cache-memory with workflow scope is allowed",
+			frontmatter: map[string]any{
+				"on": "push",
+				"tools": map[string]any{
+					"cache-memory": map[string]any{
+						"key":   "memory-test",
+						"scope": "workflow",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "cache-memory without scope (defaults to workflow) is allowed",
+			frontmatter: map[string]any{
+				"on": "push",
+				"tools": map[string]any{
+					"cache-memory": map[string]any{
+						"key": "memory-test",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "cache-memory with repo scope is rejected",
+			frontmatter: map[string]any{
+				"on": "push",
+				"tools": map[string]any{
+					"cache-memory": map[string]any{
+						"key":   "memory-test",
+						"scope": "repo",
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "strict mode: cache-memory with 'scope: repo' is not allowed for security reasons",
+		},
+		{
+			name: "cache-memory array with repo scope is rejected",
+			frontmatter: map[string]any{
+				"on": "push",
+				"tools": map[string]any{
+					"cache-memory": []any{
+						map[string]any{
+							"id":    "default",
+							"key":   "memory-default",
+							"scope": "workflow",
+						},
+						map[string]any{
+							"id":    "shared",
+							"key":   "memory-shared",
+							"scope": "repo",
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "strict mode: cache-memory with 'scope: repo' is not allowed for security reasons",
+		},
+		{
+			name: "cache-memory array with all workflow scope is allowed",
+			frontmatter: map[string]any{
+				"on": "push",
+				"tools": map[string]any{
+					"cache-memory": []any{
+						map[string]any{
+							"id":    "default",
+							"key":   "memory-default",
+							"scope": "workflow",
+						},
+						map[string]any{
+							"id":  "logs",
+							"key": "memory-logs",
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			compiler.strictMode = true
+
+			err := compiler.validateStrictTools(tt.frontmatter)
+
+			if tt.expectError && err == nil {
+				t.Error("Expected validation to fail but it succeeded")
+			} else if !tt.expectError && err != nil {
+				t.Errorf("Expected validation to succeed but it failed: %v", err)
+			} else if tt.expectError && err != nil && tt.errorMsg != "" {
+				if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+			}
+		})
+	}
+}
