@@ -395,8 +395,9 @@ This is a normal-sized workflow that should compile successfully.`
 	// Long workflow (with imports) should be inlined and chunked
 	// Chunking is implemented by emitting more heredoc blocks for large content,
 	// not by generating old "Append prompt (part N)" steps.
-	normalHeredocCount := strings.Count(normalLockString, "cat << 'PROMPT_EOF'")
-	longHeredocCount := strings.Count(lockString, "cat << 'PROMPT_EOF'")
+	delimiter := GenerateHeredocDelimiter("PROMPT")
+	normalHeredocCount := strings.Count(normalLockString, "cat << '"+delimiter+"'")
+	longHeredocCount := strings.Count(lockString, "cat << '"+delimiter+"'")
 	if longHeredocCount <= normalHeredocCount {
 		t.Errorf("Expected long workflow with imports to have more heredoc blocks than normal (normal=%d, long=%d)", normalHeredocCount, longHeredocCount)
 	}

@@ -548,43 +548,119 @@ The YAML frontmatter supports these fields:
         target-repo: "owner/repo"          # Optional: cross-repository
     ```
     Links issues as sub-issues using GitHub's parent-child relationships. Agent output includes `parent_issue_number` and `sub_issue_number`. Use with `create-issue` temporary IDs or existing issue numbers.
-  - `create-project:` - Create GitHub Projects V2
+  - `create-project:` - Create a new GitHub Project board with optional fields and views
     ```yaml
     safe-outputs:
       create-project:
         max: 1                          # Optional: max projects (default: 1)
-        github-token: ${{ secrets.PROJECTS_PAT }}  # Optional: token with projects:write
+        # github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # Optional: override default PAT (NOT GITHUB_TOKEN)
         target-owner: "org-or-user"     # Optional: owner for created projects
         title-prefix: "[ai] "           # Optional: prefix for project titles
     ```
+    Use this to create new projects for organizing and tracking work across issues and pull requests. Can optionally specify custom fields, project views, and an initial item to add.
+    
+    **⚠️ IMPORTANT**: GitHub Projects requires a **Personal Access Token (PAT)** or GitHub App token with Projects permissions. The default `GITHUB_TOKEN` cannot be used. Ensure `${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` exists and contains a token with:
+    - Classic PAT: `project` and `repo` scopes
+    - Fine-grained PAT: Organization permission `Projects: Read & Write` and repository access
+    
+    Project tools automatically fall back to `${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` when per-output and top-level `github-token` values are omitted, so specifying `github-token` is optional unless you need to override the default token.
     Not supported for cross-repository operations.
-  - `update-project:` - Manage GitHub Projects boards
+  - `update-project:` - Add items to GitHub Projects, update custom fields, manage project structure
     ```yaml
     safe-outputs:
       update-project:
         max: 20                         # Optional: max project operations (default: 10)
-        github-token: ${{ secrets.PROJECTS_PAT }}  # Optional: token with projects:write
+        project: "https://github.com/orgs/myorg/projects/42"  # REQUIRED in agent output (full URL)
+        # github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # Optional here if GH_AW_PROJECT_GITHUB_TOKEN is set; PAT with projects:write (NOT GITHUB_TOKEN) is still required
     ```
-    Agent output includes the `project` field as a **full GitHub project URL** (e.g., `https://github.com/orgs/myorg/projects/42` or `https://github.com/users/username/projects/5`). Project names or numbers alone are NOT accepted.
+    Use this to organize work by adding issues and pull requests to projects, updating field values (status, priority, effort, dates), creating custom fields, and setting up project views.
+    
+    **⚠️ IMPORTANT REQUIREMENTS:**
+    - Agent must include full project URL in **every** call: `project: "https://github.com/orgs/myorg/projects/42"` or `https://github.com/users/username/projects/5`
+    - Project URLs must be full URLs; project numbers alone are NOT accepted
+    - Requires a **PAT or GitHub App token** with Projects permissions (for example via `github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` or the `GH_AW_PROJECT_GITHUB_TOKEN` fallback)
+    - Default `GITHUB_TOKEN` **cannot** access Projects v2 API
+    - Token scopes:
+      - Classic PAT: `project` and `repo` scopes
+      - Fine-grained PAT: Organization `Projects: Read & Write` permission
+    
+    **Three calling modes:**
 
-    For adding existing issues/PRs: Include `content_type` ("issue" or "pull_request") and `content_number`:
+    **Mode 1: Add/update existing issues or PRs**
     ```json
-    {"type": "update_project", "project": "https://github.com/orgs/myorg/projects/42", "content_type": "issue", "content_number": 123, "fields": {"Status": "In Progress"}}
+    {
+      "type": "update_project",
+      "project": "https://github.com/orgs/myorg/projects/42",
+      "content_type": "issue",
+      "content_number": 123,
+      "fields": {"Status": "In Progress", "Priority": "High"}
+    }
     ```
+    - `content_type`: "issue" or "pull_request"
+    - `content_number`: The issue or PR number to add/update
+    - `fields`: Custom field values to set on the item (optional)
 
-    For creating draft issues: Include `content_type` as "draft_issue" with `draft_title` and optional `draft_body`:
+    **Mode 2: Create draft issues in the project**
     ```json
-    {"type": "update_project", "project": "https://github.com/orgs/myorg/projects/42", "content_type": "draft_issue", "draft_title": "Task title", "draft_body": "Task description", "fields": {"Status": "Todo"}}
+    {
+      "type": "update_project",
+      "project": "https://github.com/orgs/myorg/projects/42",
+      "content_type": "draft_issue",
+      "draft_title": "Follow-up: investigate performance",
+      "draft_body": "Check memory usage under load",
+      "temporary_id": "aw_abc123def456",
+      "fields": {"Status": "Backlog"}
+    }
     ```
+    - `content_type`: "draft_issue"
+    - `draft_title`: Title of the draft issue (required when creating new)
+    - `draft_body`: Description in markdown (optional)
+    - `temporary_id`: Unique ID for this draft (format: `aw_` + 12 hex chars) for referencing in future updates (optional)
+    - `draft_issue_id`: Reference an existing draft by its temporary_id to update it (optional)
+    - `fields`: Custom field values (optional)
+
+    **Mode 3: Create custom fields or views** (with `operation` field)
+    ```json
+    {
+      "type": "update_project",
+      "project": "https://github.com/orgs/myorg/projects/42",
+      "operation": "create_fields",
+      "field_definitions": [
+        {"name": "Priority", "data_type": "SINGLE_SELECT", "options": ["High", "Medium", "Low"]},
+        {"name": "Due Date", "data_type": "DATE"}
+      ]
+    }
+    ```
+    - `operation`: "create_fields" or "create_view"
+    - `field_definitions`: Array of field definitions (for create_fields)
+    - `view`: View configuration object with `name`, `layout` (table/board/roadmap), optional `filter` and `visible_fields` (for create_view)
 
     Not supported for cross-repository operations.
-  - `create-project-status-update:` - Create GitHub project status updates
+  - `create-project-status-update:` - Post status updates to GitHub Projects for progress tracking
     ```yaml
     safe-outputs:
       create-project-status-update:
-        max: 10                         # Optional: max status updates (default: 10)
-        github-token: ${{ secrets.PROJECTS_PAT }}  # Optional: token with projects:write
+        max: 1                          # Optional: max status updates (default: 1)
+        project: "https://github.com/orgs/myorg/projects/42"  # REQUIRED in agent output (full URL)
+        github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # REQUIRED: PAT with projects:write (NOT GITHUB_TOKEN)
     ```
+    Use this to provide stakeholders with regular updates on project status (on-track, at-risk, off-track, complete, inactive), timeline information, and progress summaries. Status updates create a historical record of project progress and enable tracking over time.
+    
+    **⚠️ IMPORTANT REQUIREMENTS:**
+    - Agent must include full project URL in **every** call: `project: "https://github.com/orgs/myorg/projects/42"`
+    - Requires a **PAT or GitHub App token** with Projects permissions configured as `github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}`
+    - Default `GITHUB_TOKEN` **cannot** access Projects v2 API
+    - Token scopes:
+      - Classic PAT: `project` and `repo` scopes
+      - Fine-grained PAT: Organization `Projects: Read & Write` permission
+    
+    **Agent output fields:**
+    - `project`: Full project URL (required) - MUST be explicitly included in output
+    - `status`: ON_TRACK, AT_RISK, OFF_TRACK, COMPLETE, or INACTIVE (optional, defaults to ON_TRACK)
+    - `start_date`: Project start date in YYYY-MM-DD format (optional)
+    - `target_date`: Project end date in YYYY-MM-DD format (optional)
+    - `body`: Status summary in markdown (required)
+    
     Not supported for cross-repository operations.
   - `push-to-pull-request-branch:` - Push changes to PR branch
     ```yaml

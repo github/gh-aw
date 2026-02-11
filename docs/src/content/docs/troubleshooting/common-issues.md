@@ -11,42 +11,29 @@ This reference documents frequently encountered issues when working with GitHub 
 
 ### Extension Installation Fails
 
-If `gh extension install github/gh-aw` fails with authentication or permission errors (common in Codespaces outside the githubnext organization), use the standalone installer:
+If `gh extension install github/gh-aw` fails with authentication or permission errors, use the standalone installer:
 
 ```bash wrap
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
 ```
 
-After installation, the binary is installed to `~/.local/share/gh/extensions/gh-aw/gh-aw` and can be used with `gh aw` commands just like the extension installation.
-
-> [!NOTE]
-> The install script works in restricted network environments (like GitHub Copilot agent runtime or corporate networks with MITM proxies) by using GitHub's "latest" release redirect, which doesn't require API access. Simply run the script without specifying a version to install the latest release.
+The installer works in restricted networks (Codespaces, MITM proxies) and installs to `~/.local/share/gh/extensions/gh-aw/gh-aw`.
 
 ### Install Specific Version
 
-To install a specific version, pass the version tag as an argument:
+Install specific versions by passing the version tag as an argument. Find available versions at the [releases page](https://github.com/github/gh-aw/releases).
 
 ```bash wrap
-curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | \
-  bash -s -- v0.40.0
+curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s -- v0.40.0
 ```
-
-Find available versions at the [releases page](https://github.com/github/gh-aw/releases).
 
 ### Extension Not Found After Installation
 
-If you installed the extension but `gh aw` command is not found:
-
-1. Verify installation: `gh extension list`
-2. If not listed, reinstall: `gh extension install github/gh-aw`
-3. If issues persist, use the standalone installer (see above)
+Verify installation with `gh extension list`. If not listed, reinstall with `gh extension install github/gh-aw` or use the standalone installer.
 
 ### Codespace Authentication Issues
 
-GitHub Codespaces may have limited permissions for installing GitHub CLI extensions. If you encounter authentication errors:
-
-1. Try the standalone installer (recommended for Codespaces)
-2. Or grant additional permissions to your Codespace token
+GitHub Codespaces may have limited permissions for installing extensions. Try the standalone installer (recommended) or grant additional permissions to your Codespace token.
 
 ## Organization Policy Issues
 
@@ -58,9 +45,9 @@ GitHub Codespaces may have limited permissions for installing GitHub CLI extensi
 The action github/gh-aw/actions/setup@a933c835b5e2d12ae4dead665a0fdba420a2d421 is not allowed in {ORG} because all actions must be from a repository owned by your enterprise, created by GitHub, or verified in the GitHub Marketplace.
 ```
 
-**Cause:** Your enterprise organization has policies that restrict which GitHub Actions can be used. By default, workflows compiled by gh-aw use the custom action `github/gh-aw/actions/setup` which may not be allowed by your organization's policy.
+**Cause:** Enterprise policies restrict which GitHub Actions can be used. Workflows use `github/gh-aw/actions/setup` which may not be allowed.
 
-**Solution:** Enterprise administrators need to allow the `github/gh-aw` repository in the organization's action policies. There are two approaches:
+**Solution:** Enterprise administrators must allow `github/gh-aw` in the organization's action policies:
 
 #### Option 1: Allow Specific Repositories (Recommended)
 
@@ -74,49 +61,39 @@ Add `github/gh-aw` to your organization's allowed actions list:
    ```
 4. Save the changes
 
-For more details, see GitHub's documentation on [managing GitHub Actions permissions for your organization](https://docs.github.com/en/organizations/managing-organization-settings/disabling-or-limiting-github-actions-for-your-organization#allowing-select-actions-and-reusable-workflows-to-run).
+See GitHub's docs on [managing Actions permissions](https://docs.github.com/en/organizations/managing-organization-settings/disabling-or-limiting-github-actions-for-your-organization#allowing-select-actions-and-reusable-workflows-to-run).
 
 #### Option 2: Configure Organization-Wide Policy File
 
-If your enterprise uses a centralized `policies/actions.yml` file, add the gh-aw repository to the allowlist:
+Add `github/gh-aw@*` to your centralized `policies/actions.yml` and commit to your organization's `.github` repository. See GitHub's docs on [community health files](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file).
 
 ```yaml
-# policies/actions.yml
 allowed_actions:
-  - "actions/*"  # GitHub-created actions
-  - "github/gh-aw@*"  # Allow gh-aw custom actions
+  - "actions/*"
+  - "github/gh-aw@*"
 ```
-
-Commit this file to your organization's `.github` repository. For more information about policy files, see GitHub's documentation on [creating a default community health file](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file).
 
 #### Verification
 
-After updating the policy:
-
-1. Wait a few minutes for the policy to propagate
-2. Re-run your workflow
-3. If issues persist, verify the policy was applied: `https://github.com/organizations/YOUR_ORG/settings/actions`
+Wait a few minutes for policy propagation, then re-run your workflow. If issues persist, verify at `https://github.com/organizations/YOUR_ORG/settings/actions`.
 
 > [!TIP]
-> Security Consideration
-> The gh-aw custom actions are open source and can be audited at [github.com/github/gh-aw/tree/main/actions](https://github.com/github/gh-aw/tree/main/actions). The actions are pinned to specific commit SHAs in compiled workflows for security and reproducibility.
+> The gh-aw actions are open source at [github.com/github/gh-aw/tree/main/actions](https://github.com/github/gh-aw/tree/main/actions) and pinned to specific SHAs for security.
 
 ## Repository Configuration Issues
 
 ### Actions Restrictions Reported During Init
 
-When running `gh aw add-wizard` or `gh aw init`, you may encounter errors about repository Actions configuration. Agentic workflows compile to standard GitHub Actions YAML that depends on infrastructure actions like `actions/checkout`. If your repository blocks these, workflows won't execute.
+The CLI validates three permission layers when running `gh aw init` or `gh aw add-wizard`:
 
-The CLI validates three permission layers:
+**Actions disabled:** Enable in Repository Settings → Actions → General. [Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository).
 
-**Actions completely turned off:** Your repo has Actions disabled entirely. Workflows upload successfully but never trigger. Fix: Repository Settings → Actions → General → toggle Actions on. Reference: [Managing Actions settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository).
+**Local-only restriction:** Switch to "Allow all actions" or "Allow select actions" with GitHub-created actions enabled. Workflows need `actions/checkout`, `actions/setup-node`, etc. [Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository).
 
-**Local-only restriction:** You've configured "Allow [owner] actions only", which blocks external actions including GitHub's own. Agentic workflows need `actions/checkout`, `actions/setup-node`, etc. Fix: Settings → Actions → General → switch to "Allow all actions" or "Allow select actions" with GitHub-created ones enabled. Reference: [Managing Actions permissions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#managing-github-actions-permissions-for-your-repository).
-
-**Selective allowlist without GitHub:** You're using action allowlists but didn't check "Allow actions created by GitHub". Fix: Settings → Actions → General → Actions permissions → enable the GitHub checkbox. Reference: [Allowing specific actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#allowing-select-actions-and-reusable-workflows-to-run).
+**Selective allowlist:** Enable "Allow actions created by GitHub" checkbox in Settings → Actions → General. [Docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#allowing-select-actions-and-reusable-workflows-to-run).
 
 > [!NOTE]
-> Organization-owned repositories inherit org-level Actions policies that override repository settings. If settings appear grayed out, request changes from org admins.
+> Organization-level policies override repository settings. Request changes from org admins if settings are grayed out.
 
 ## Workflow Compilation Issues
 
@@ -136,15 +113,15 @@ Remove old `.lock.yml` files after deleting `.md` files with `gh aw compile --pu
 
 ### Import File Not Found
 
-Import paths are relative to repository root. Verify the file exists and is committed (`git status`). Example paths: `.github/workflows/shared/tools.md` (from repo root) or `shared/security-notice.md` (relative to `.github/workflows/`).
+Import paths are relative to repository root. Verify the file exists with `git status`. Examples: `.github/workflows/shared/tools.md` or `shared/security-notice.md`.
 
 ### Multiple Agent Files Error
 
-Import only one file from `.github/agents/` per workflow. Use other imports for shared content like tools.
+Import only one `.github/agents/` file per workflow. Use other imports for shared content.
 
 ### Circular Import Dependencies
 
-If compilation hangs, check for import files that import each other. Remove circular references by reviewing the import chain.
+If compilation hangs, check for circular import references and remove them.
 
 ## Tool Configuration Issues
 
@@ -160,15 +137,11 @@ tools:
 
 ### Toolset Missing Expected Tools
 
-If tools you expect are not available after configuring toolsets:
-
-1. **Verify the right toolset**: Check the [toolset contents](/gh-aw/reference/tools/#toolset-contents) to find which toolset contains your tool
-2. **Add additional toolsets**: Combine toolsets as needed (e.g., `toolsets: [default, actions]`)
-3. **Inspect configuration**: Run `gh aw mcp inspect <workflow>` to see available tools
+Check [toolset contents](/gh-aw/reference/tools/#toolset-contents) to find your tool, combine toolsets as needed (e.g., `toolsets: [default, actions]`), or run `gh aw mcp inspect <workflow>` to see available tools.
 
 ### MCP Server Connection Failures
 
-Verify the MCP server package is installed and configuration syntax is valid. Ensure required environment variables are set:
+Verify package installation, configuration syntax, and required environment variables:
 
 ```yaml
 mcp-servers:
@@ -225,52 +198,35 @@ safe-outputs:
 
 ### Project Field Type Errors
 
-If you receive errors like "The field of type repository is currently not supported" when using `update-project`:
+**Problem**: GitHub Projects reserves field types like `REPOSITORY` that cannot be updated via API.
 
-**Problem**: GitHub Projects has built-in field types (like REPOSITORY) that are reserved and cannot be created or updated via the API. Using field names that match these reserved types causes errors.
-
-**Solution**: Use different field names to avoid conflicts with GitHub's built-in types:
+**Solution**: Use alternative field names (`repo`, `source_repository`, `linked_repo`) instead of `repository`:
 
 ```yaml wrap
-# ❌ Wrong - "repository" conflicts with REPOSITORY built-in type
+# ❌ Wrong
 safe-outputs:
   update-project:
     fields:
       repository: "myorg/myrepo"
 
-# ✅ Correct - Use alternative field names
+# ✅ Correct
 safe-outputs:
   update-project:
     fields:
-      repo: "myorg/myrepo"              # Short form
-      source_repository: "myorg/myrepo" # Descriptive
-      linked_repo: "myorg/myrepo"       # Clear alternative
+      repo: "myorg/myrepo"
 ```
 
-**Reserved field names to avoid**:
-
-- `repository` (REPOSITORY type - not supported via API)
-
-If a field already exists with an unsupported type, delete it in the GitHub Projects UI and recreate it with a different name.
+Delete conflicting fields in GitHub Projects UI and recreate with different names.
 
 ## Engine-Specific Issues
 
 ### Copilot CLI Not Found
 
-The compiled workflow should automatically include CLI installation steps. If missing, verify compilation succeeded.
+Verify compilation succeeded. The compiled workflow should include CLI installation steps.
 
 ### Model Not Available
 
-Use the default model or specify an available one:
-
-```yaml wrap
-engine: copilot  # Default model
-
-# Or specify model
-engine:
-  id: copilot
-  model: gpt-4
-```
+Use the default model (`engine: copilot`) or specify an available one (`engine: {id: copilot, model: gpt-4}`).
 
 ## Context Expression Issues
 
@@ -309,60 +265,46 @@ make test-unit
 
 ### Firewall Denials for Package Registries
 
-If you're experiencing firewall denials when installing packages from npm, PyPI, Docker Hub, or other registries, add the appropriate ecosystem identifier to your network configuration:
+Add ecosystem identifiers to allow package installations:
 
 ```yaml wrap
 network:
   allowed:
-    - defaults       # Basic infrastructure
-    - python        # For PyPI and pip
-    - node          # For npm, yarn, pnpm
-    - containers    # For Docker Hub, GHCR
-    - go            # For Go modules
+    - defaults    # Basic infrastructure
+    - python      # PyPI, pip
+    - node        # npm, yarn, pnpm
+    - containers  # Docker Hub, GHCR
+    - go          # Go modules
 ```
 
-See the [Network Configuration Guide](/gh-aw/guides/network-configuration/) for complete examples, ecosystem domain lists, and troubleshooting steps.
+See [Network Configuration Guide](/gh-aw/guides/network-configuration/) for details.
 
 ### URLs Appearing as "(redacted)"
 
-If URLs in workflow outputs or sanitized content show as `(redacted)`, the domain is not in the allowed list. Content sanitization automatically filters URLs from untrusted domains to prevent data exfiltration.
-
-Add the domain to your workflow's `network:` configuration:
+URLs are filtered when domains aren't in the allowed list. Add domains to your `network:` configuration:
 
 ```yaml wrap
 network:
   allowed:
-    - defaults              # Basic infrastructure
-    - "api.example.com"     # Add your domain here
+    - defaults
+    - "api.example.com"
 ```
 
-Default allowed domains include GitHub domains (`github.com`, `githubusercontent.com`, etc.). For more configuration options, see [Network Permissions](/gh-aw/reference/network/).
+See [Network Permissions](/gh-aw/reference/network/) for details.
 
 ### Cannot Download Remote Imports
 
-Verify network access and GitHub authentication:
-
-```bash wrap
-curl -I https://raw.githubusercontent.com/github/gh-aw/main/README.md
-gh auth status
-```
+Verify network access with `curl -I https://raw.githubusercontent.com/github/gh-aw/main/README.md` and GitHub authentication with `gh auth status`.
 
 ### MCP Server Connection Timeout
 
-Use a local MCP server if HTTP connections timeout:
-
-```yaml wrap
-mcp-servers:
-  my-server:
-    command: "node"
-    args: ["./server.js"]
-```
+Use local MCP servers if HTTP connections timeout (`command: "node"`, `args: ["./server.js"]`).
 
 ## Cache Issues
 
 ### Cache Not Restoring
 
-Verify cache key patterns match and note that caches expire after 7 days:
+Verify cache key patterns match. Caches expire after 7 days.
 
 ```yaml wrap
 cache:
@@ -372,7 +314,7 @@ cache:
 
 ### Cache Memory Not Persisting
 
-Configure cache properly for the memory MCP server:
+Configure cache for the memory MCP server:
 
 ```yaml wrap
 tools:
@@ -384,36 +326,20 @@ tools:
 
 ### Why Did My Workflow Fail?
 
-Common failure reasons include:
-
-- **Missing or incorrect tokens**: Verify `COPILOT_GITHUB_TOKEN` or engine-specific API keys are configured
-- **Permission mismatches**: Check `permissions:` section matches required operations
-- **Network restrictions**: Verify domains in `network.allowed` include all required endpoints
-- **Disabled tools**: Ensure needed tools are enabled in the `tools:` configuration
-- **AI API rate limits**: Check your AI provider's usage and quotas
-
-Use `gh aw audit <run-id>` to investigate failures in detail.
+Common causes: missing tokens (`COPILOT_GITHUB_TOKEN`), permission mismatches (`permissions:`), network restrictions (`network.allowed`), disabled tools (`tools:`), or AI API rate limits. Use `gh aw audit <run-id>` to investigate.
 
 ### How Do I Debug a Failing Workflow?
 
-1. **Check workflow logs**: View in GitHub Actions UI or use `gh aw logs`
-2. **Audit the run**: Use `gh aw audit <run-id>` for detailed analysis
-3. **Inspect compiled workflow**: Check `.lock.yml` for unexpected configuration
-4. **Use Copilot Chat**: Run `/agent agentic-workflows debug` for guided debugging
-5. **Watch compilation**: Use `gh aw compile --watch` during development
+Check workflow logs (`gh aw logs`), audit the run (`gh aw audit <run-id>`), inspect `.lock.yml`, use Copilot Chat (`/agent agentic-workflows debug`), or watch compilation (`gh aw compile --watch`).
 
 ### Debugging Strategies
 
-Enable verbose compilation (`gh aw compile --verbose`), set `ACTIONS_STEP_DEBUG = true` for debug logging, inspect generated lock files (`cat .github/workflows/my-workflow.lock.yml`), check MCP configuration (`gh aw mcp inspect my-workflow`), and review logs (`gh aw logs my-workflow` or `gh aw audit RUN_ID`).
+Enable verbose compilation (`--verbose`), set `ACTIONS_STEP_DEBUG = true`, inspect lock files, check MCP config (`gh aw mcp inspect`), and review logs.
 
 ## Operational Runbooks
 
-For systematic investigation and resolution of workflow health issues, see:
-
-- [**Workflow Health Monitoring Runbook**](https://github.com/github/gh-aw/blob/main/.github/aw/runbooks/workflow-health.md) - Comprehensive guide for diagnosing missing-tool errors, authentication failures, and configuration issues
-
-The runbook includes step-by-step procedures, case studies from real incidents, and quick reference commands for workflow troubleshooting.
+See [Workflow Health Monitoring Runbook](https://github.com/github/gh-aw/blob/main/.github/aw/runbooks/workflow-health.md) for diagnosing missing-tool errors, authentication failures, and configuration issues.
 
 ## Getting Help
 
-Review [reference docs](/gh-aw/reference/workflow-structure/), search [existing issues](https://github.com/github/gh-aw/issues), enable debugging with verbose flags, or create a new issue with reproduction steps. See also: [Error Reference](/gh-aw/troubleshooting/errors/) and [Frontmatter Reference](/gh-aw/reference/frontmatter/).
+Review [reference docs](/gh-aw/reference/workflow-structure/), search [existing issues](https://github.com/github/gh-aw/issues), enable verbose flags, or create an issue. See [Error Reference](/gh-aw/troubleshooting/errors/) and [Frontmatter Reference](/gh-aw/reference/frontmatter/).
