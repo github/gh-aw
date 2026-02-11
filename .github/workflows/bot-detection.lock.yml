@@ -19,9 +19,9 @@
 #   gh aw compile
 # For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
 #
-# Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns
+# Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns including AI agent orchestration
 #
-# frontmatter-hash: 5cb30c44c38f530ea5358fecf55583124f32c4a4f085b1e78aae71720c74af0b
+# frontmatter-hash: 6df332ad70552a8ccec564025856f3b734505eca88db402c4dda6cc47d28f477
 
 name: "Bot Detection Agent 🔍🤖"
 "on":
@@ -1001,7 +1001,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           WORKFLOW_NAME: "Bot Detection Agent 🔍🤖"
-          WORKFLOW_DESCRIPTION: "Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns"
+          WORKFLOW_DESCRIPTION: "Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns including AI agent orchestration"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
           script: |

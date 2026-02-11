@@ -1,5 +1,5 @@
 ---
-description: Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns
+description: Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns including AI agent orchestration
 on:
   issues:
     types: [opened, edited]
@@ -67,7 +67,7 @@ Use GitHub tools to determine the trigger type and identify the target account:
 
 ## Red Flags to Detect
 
-Analyze the account for these 8 specific red flags:
+Analyze the account for these 9 specific red flags:
 
 ### 1. Age & Activity Mismatch 🕐
 
@@ -194,6 +194,32 @@ Analyze the account for these 8 specific red flags:
 - User type is "Bot" AND not in allowlist: [dependabot, renovate, github-actions]
 - OR username ends with `[bot]` but isn't a known legitimate bot
 
+### 9. AI Agent Orchestration 🤖
+
+**Red Flag**: Activity showing autonomous AI agent orchestration patterns, such as coordinated commits from GitHub Copilot SWE agents or similar automated coding assistants.
+
+**Detection Steps**:
+1. For pull requests: Get commit history and commit messages
+2. Search for AI agent patterns:
+   - `Co-authored-by:` tags in commit messages pointing to AI agent accounts
+   - Multiple commits with bullet-point formatted messages (e.g., "- Add feature X", "- Update schema Y")
+   - Commit message patterns indicating automated generation (technical, structured, procedural)
+   - AI agent usernames in commits (e.g., copilot-swe-agent, github-actions[bot])
+3. Check timing: Multiple commits within short timeframes (<5 minutes apart)
+4. Check commit message similarity: High similarity across multiple commits (>80% structural match)
+5. Analyze PR description for AI-generated patterns:
+   - Technical bullet points with "Co-authored-by:" tags
+   - Structured format with implementation details
+   - References to automated processes
+
+**Threshold**: Flag if:
+- ≥3 commits with `Co-authored-by:` tags pointing to AI agents
+- OR ≥5 commits with bullet-point messages AND posted within 30 minutes
+- OR PR description + commits show clear AI orchestration pattern (multiple commits with procedural messages AND co-authorship with AI agents)
+- OR commit messages from copilot-swe-agent, copilot-agent, or similar AI automation accounts
+
+**Note**: This does NOT flag legitimate Copilot-assisted development. It specifically targets autonomous AI agents creating self-directed PRs with minimal human oversight, like the patterns seen in #15005 and #15003.
+
 ## Analysis Process
 
 ### Step 1: Identify Target Account
@@ -213,7 +239,7 @@ Use GitHub tools to collect:
 
 ### Step 3: Run Red Flag Checks
 
-For each of the 8 red flags:
+For each of the 9 red flags:
 1. Run the detection steps
 2. Record whether threshold is met (true/false)
 3. Collect evidence (timestamps, code snippets, statistics)
@@ -225,7 +251,7 @@ For each of the 8 red flags:
 - Each red flag that triggers = points based on severity
   - 🔴 Critical (Red Flags 4, 7, 8) = 3 points each
   - 🟠 High (Red Flags 1, 3) = 2 points each  
-  - 🟡 Medium (Red Flags 2, 5, 6) = 1 point each
+  - 🟡 Medium (Red Flags 2, 5, 6, 9) = 1 point each
 - **Total Risk Score** = Sum of all triggered red flag points
 - **Risk Level**:
   - Score ≥ 6: 🔴 **High Risk** (likely bot/malicious)
@@ -256,7 +282,7 @@ For each of the 8 red flags:
 
 **Account**: @{username}
 **Risk Level**: {🔴 High / 🟠 Medium}
-**Risk Score**: {score}/12
+**Risk Score**: {score}/15
 **Detected On**: {trigger context - issue/PR/comment number}
 
 ---
@@ -351,7 +377,7 @@ Every red flag that triggers MUST have:
 
 ## Example Analysis Flow
 
-**Scenario: New PR from unknown account**
+**Scenario 1: New PR from unknown account**
 
 1. **Identify**: PR #123 by @suspicious-user
 2. **Gather**: User profile shows account created 3 days ago, 25 repos, 0 followers
@@ -363,6 +389,21 @@ Every red flag that triggers MUST have:
 4. **Calculate**: 2 (Red Flag 1) + 1 (Red Flag 5) = Risk Score 3
 5. **Action**: Create issue with Medium Risk report
 6. **Result**: Issue created for human review
+
+**Scenario 2: PR with AI agent orchestration (similar to #15005/#15003)**
+
+1. **Identify**: PR #15003 by @mnkiefer
+2. **Gather**: PR has 6 commits within 30 minutes, all with bullet-point messages and "Co-authored-by:" tags
+3. **Check Red Flags**:
+   - ✅ Red Flag 9 (AI Agent Orchestration): 
+     - 6 commits with "Co-authored-by: copilot" tags
+     - All commits have bullet-point format ("- Add item_url...", "- Update schema...")
+     - Posted within 38 minutes
+     - PR description shows AI-generated structure = TRIGGER
+   - ❌ Other flags: Account is legitimate user with AI assistance
+4. **Calculate**: 1 (Red Flag 9) = Risk Score 1
+5. **Action**: Call `noop` or add informational comment (Low Risk)
+6. **Result**: PR flagged for awareness but not blocked - AI-assisted development is acceptable
 
 ## Final Reminder
 
