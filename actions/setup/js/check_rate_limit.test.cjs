@@ -294,6 +294,43 @@ describe("check_rate_limit", () => {
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping run 333333 - cancelled"));
   });
 
+  it("should exclude runs that lasted less than 15 seconds", async () => {
+    const recentTime = new Date(Date.now() - 10 * 60 * 1000);
+    const tenSecondsLater = new Date(recentTime.getTime() + 10 * 1000);
+    const twentySecondsLater = new Date(recentTime.getTime() + 20 * 1000);
+
+    mockGithub.rest.actions.listWorkflowRuns.mockResolvedValue({
+      data: {
+        workflow_runs: [
+          {
+            id: 111111,
+            run_number: 1,
+            created_at: recentTime.toISOString(),
+            updated_at: tenSecondsLater.toISOString(), // 10 seconds duration
+            actor: { login: "test-user" },
+            event: "workflow_dispatch",
+            status: "completed",
+          },
+          {
+            id: 222222,
+            run_number: 2,
+            created_at: recentTime.toISOString(),
+            updated_at: twentySecondsLater.toISOString(), // 20 seconds duration
+            actor: { login: "test-user" },
+            event: "workflow_dispatch",
+            status: "completed",
+          },
+        ],
+      },
+    });
+
+    await checkRateLimit.main();
+
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Total recent runs in last 60 minutes: 1"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping run 111111 - ran for less than 15s"));
+  });
+
   it("should only count specified event types when events filter is set", async () => {
     process.env.GH_AW_RATE_LIMIT_EVENTS = "workflow_dispatch,issue_comment";
     const recentTime = new Date(Date.now() - 10 * 60 * 1000);

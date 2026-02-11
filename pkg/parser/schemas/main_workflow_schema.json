@@ -6090,13 +6090,13 @@
     "rate-limit": {
       "type": "object",
       "description": "Rate limiting configuration to restrict how frequently users can trigger the workflow. Helps prevent abuse and resource exhaustion from programmatically triggered events.",
+      "required": ["max"],
       "properties": {
         "max": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 100,
-          "default": 5,
-          "description": "Maximum number of workflow runs allowed per user within the time window. Defaults to 5."
+          "maximum": 10,
+          "description": "Maximum number of workflow runs allowed per user within the time window. Required field."
         },
         "window": {
           "type": "integer",

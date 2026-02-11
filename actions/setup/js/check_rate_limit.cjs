@@ -114,8 +114,8 @@ async function main() {
         if (run.created_at && run.updated_at) {
           const runStart = new Date(run.created_at);
           const runEnd = new Date(run.updated_at);
-          const durationSeconds = (runEnd - runStart) / 1000;
-          
+          const durationSeconds = (runEnd.getTime() - runStart.getTime()) / 1000;
+
           if (durationSeconds < 15) {
             core.info(`   Skipping run ${run.id} - ran for less than 15s (${durationSeconds.toFixed(1)}s)`);
             continue;

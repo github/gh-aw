@@ -31,11 +31,10 @@ rate-limit:
 
 ## Parameters
 
-### `max` (integer, optional)
+### `max` (integer, **required**)
 - Maximum number of workflow runs allowed per user within the time window
-- Default: 5
-- Range: 1-100
-- Example: `max: 10` allows 10 runs per window
+- Range: 1-10
+- Example: `max: 5` allows 5 runs per window
 
 ### `window` (integer, optional)
 - Time window in minutes for rate limiting
@@ -67,6 +66,7 @@ rate-limit:
    - Event type (if `events` is configured)
    - Excludes the current run from the count
    - Excludes cancelled runs (cancelled runs don't count toward the limit)
+   - Excludes runs that completed in less than 15 seconds (treated as failed fast/cancelled)
 5. **Progressive Aggregation**: Uses pagination with short-circuit logic for efficiency
 6. **Automatic Cancellation**: If the limit is exceeded, the current run is automatically cancelled
 
@@ -263,12 +263,12 @@ The rate-limit field is validated against this JSON schema:
 ```json
 {
   "type": "object",
+  "required": ["max"],
   "properties": {
     "max": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 100,
-      "default": 5
+      "maximum": 10
     },
     "window": {
       "type": "integer",
