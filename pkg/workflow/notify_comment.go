@@ -62,19 +62,6 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		steps = append(steps, c.buildGitHubAppTokenMintStep(data.SafeOutputs.App, permissions)...)
 	}
 
-	// Add debug step
-	steps = append(steps, "      - name: Debug job inputs\n")
-	steps = append(steps, "        env:\n")
-	steps = append(steps, fmt.Sprintf("          COMMENT_ID: ${{ needs.%s.outputs.comment_id }}\n", constants.ActivationJobName))
-	steps = append(steps, fmt.Sprintf("          COMMENT_REPO: ${{ needs.%s.outputs.comment_repo }}\n", constants.ActivationJobName))
-	steps = append(steps, fmt.Sprintf("          AGENT_OUTPUT_TYPES: ${{ needs.%s.outputs.output_types }}\n", mainJobName))
-	steps = append(steps, fmt.Sprintf("          AGENT_CONCLUSION: ${{ needs.%s.result }}\n", mainJobName))
-	steps = append(steps, "        run: |\n")
-	steps = append(steps, "          echo \"Comment ID: $COMMENT_ID\"\n")
-	steps = append(steps, "          echo \"Comment Repo: $COMMENT_REPO\"\n")
-	steps = append(steps, "          echo \"Agent Output Types: $AGENT_OUTPUT_TYPES\"\n")
-	steps = append(steps, "          echo \"Agent Conclusion: $AGENT_CONCLUSION\"\n")
-
 	// Add artifact download steps once (shared by noop and conclusion steps)
 	steps = append(steps, buildAgentOutputDownloadSteps()...)
 
