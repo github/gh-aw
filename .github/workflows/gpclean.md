@@ -38,6 +38,31 @@ strict: true
 
 imports:
   - shared/mood.md
+
+# Pre-download SBOM to get accurate dependency information
+steps:
+  - name: Download SBOM from GitHub Dependency Graph API
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    run: |
+      set -e
+      echo "📦 Downloading SBOM from GitHub Dependency Graph API..."
+      
+      # Download SBOM using gh CLI (requires contents: read permission)
+      gh api \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "/repos/${{ github.repository }}/dependency-graph/sbom" \
+        > /tmp/sbom.json
+      
+      echo "✅ SBOM downloaded successfully to /tmp/sbom.json"
+      
+      # Show SBOM summary
+      if command -v jq &> /dev/null; then
+        PACKAGE_COUNT=$(jq '.sbom.packages | length' /tmp/sbom.json 2>/dev/null || echo "unknown")
+        echo "📊 SBOM contains ${PACKAGE_COUNT} packages"
+      fi
 ---
 
 # GPL Dependency Cleaner (gpclean)
