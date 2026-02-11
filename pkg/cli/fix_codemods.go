@@ -26,7 +26,7 @@ func GetAllCodemods() []Codemod {
 		getWritePermissionsCodemod(),
 		getPermissionsReadCodemod(), // Fix permissions: read -> permissions: read-all
 		getAgentTaskToAgentSessionCodemod(),
-		getSandboxAgentFalseRemovalCodemod(),
+		// getSandboxAgentFalseRemovalCodemod(), // REMOVED: sandbox.agent: false is now supported
 		getScheduleAtToAroundCodemod(),
 		getDeleteSchemaFileCodemod(),
 		getGrepToolRemovalCodemod(),

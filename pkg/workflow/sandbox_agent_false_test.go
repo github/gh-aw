@@ -10,7 +10,7 @@ import (
 )
 
 func TestSandboxAgentMandatory(t *testing.T) {
-	t.Run("sandbox.agent: false is rejected", func(t *testing.T) {
+	t.Run("sandbox.agent: false is accepted and disables agent sandbox", func(t *testing.T) {
 		// Create temp directory for test workflows
 		workflowsDir := t.TempDir()
 
@@ -22,10 +22,11 @@ network:
     - github.com
 sandbox:
   agent: false
+strict: false
 on: workflow_dispatch
 ---
 
-Test workflow to verify sandbox.agent: false is rejected.
+Test workflow to verify sandbox.agent: false is accepted and disables agent sandbox.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-false.md")
@@ -36,15 +37,30 @@ Test workflow to verify sandbox.agent: false is rejected.
 
 		// Compile the workflow
 		compiler := NewCompiler()
+		compiler.SetSkipValidation(true)
 
-		// Should fail due to schema validation error
-		if err := compiler.CompileWorkflow(workflowPath); err == nil {
-			t.Fatal("Expected compilation to fail with sandbox.agent: false, but it succeeded")
-		} else {
-			// Verify error message mentions that boolean is not allowed
-			if !strings.Contains(err.Error(), "got boolean") || !strings.Contains(err.Error(), "/sandbox/agent") {
-				t.Errorf("Expected error message to mention boolean value not allowed for sandbox.agent, got: %v", err)
-			}
+		// Should succeed in non-strict mode
+		if err := compiler.CompileWorkflow(workflowPath); err != nil {
+			t.Fatalf("Expected compilation to succeed with sandbox.agent: false in non-strict mode, but got error: %v", err)
+		}
+
+		// Read the compiled workflow
+		lockPath := filepath.Join(workflowsDir, "test-agent-false.lock.yml")
+		lockContent, err := os.ReadFile(lockPath)
+		if err != nil {
+			t.Fatalf("Failed to read compiled workflow: %v", err)
+		}
+
+		lockStr := string(lockContent)
+
+		// Verify that AWF firewall is NOT present (agent sandbox disabled)
+		if strings.Contains(lockStr, "sudo -E awf") {
+			t.Error("Expected AWF firewall to be disabled, but found 'sudo -E awf' command in lock file")
+		}
+
+		// Verify that MCP gateway IS present (gateway always enabled)
+		if !strings.Contains(lockStr, "Start MCP gateway") {
+			t.Error("Expected MCP gateway to be enabled, but did not find 'Start MCP gateway' in lock file")
 		}
 	})
 
@@ -176,23 +192,26 @@ Test workflow to verify network.firewall still works (deprecated).
 }
 
 func TestSandboxAgentFalseExtraction(t *testing.T) {
-	t.Run("extractAgentSandboxConfig rejects false", func(t *testing.T) {
+	t.Run("extractAgentSandboxConfig accepts false", func(t *testing.T) {
 		compiler := NewCompiler()
 
-		// Test with false value - should return nil now (invalid)
+		// Test with false value - should return config with Disabled=true
 		agentConfig := compiler.extractAgentSandboxConfig(false)
-		if agentConfig != nil {
-			t.Error("Expected agentConfig to be nil for false value (no longer supported)")
+		if agentConfig == nil {
+			t.Fatal("Expected agentConfig to be non-nil for false value")
+		}
+		if !agentConfig.Disabled {
+			t.Error("Expected agentConfig.Disabled to be true for false value")
 		}
 	})
 
-	t.Run("extractAgentSandboxConfig rejects true (invalid)", func(t *testing.T) {
+	t.Run("extractAgentSandboxConfig rejects true (meaningless)", func(t *testing.T) {
 		compiler := NewCompiler()
 
-		// Test with true value (should be invalid)
+		// Test with true value (should return nil as it's meaningless)
 		agentConfig := compiler.extractAgentSandboxConfig(true)
 		if agentConfig != nil {
-			t.Error("Expected agentConfig to be nil for true value (invalid)")
+			t.Error("Expected agentConfig to be nil for true value (meaningless)")
 		}
 	})
 
