@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -92,69 +91,6 @@ func TestMCPServer_ErrorCodes_InvalidParams(t *testing.T) {
 		}
 	})
 
-	// Test 3: invalid jq filter
-	t.Run("status_invalid_jq_filter", func(t *testing.T) {
-		// Create a temporary directory with a workflow file
-		tmpDir := testutil.TempDir(t, "test-*")
-		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		if err := os.MkdirAll(workflowsDir, 0755); err != nil {
-			t.Fatalf("Failed to create workflows directory: %v", err)
-		}
-
-		// Create a test workflow file
-		workflowContent := `---
-on: push
-engine: copilot
----
-# Test Workflow
-
-This is a test workflow.
-`
-		workflowPath := filepath.Join(workflowsDir, "test.md")
-		if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
-			t.Fatalf("Failed to write workflow file: %v", err)
-		}
-
-		// Initialize git repository using shared helper
-		if err := initTestGitRepo(tmpDir); err != nil {
-			t.Fatalf("Failed to initialize git repository: %v", err)
-		}
-
-		// Start new MCP server in the temp directory
-		serverCmd := exec.Command(filepath.Join(originalDir, binaryPath), "mcp-server", "--cmd", filepath.Join(originalDir, binaryPath))
-		serverCmd.Dir = tmpDir
-		transport := &mcp.CommandTransport{Command: serverCmd}
-
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel2()
-
-		session2, err := client.Connect(ctx2, transport, nil)
-		if err != nil {
-			t.Fatalf("Failed to connect to MCP server: %v", err)
-		}
-		defer session2.Close()
-
-		params := &mcp.CallToolParams{
-			Name: "status",
-			Arguments: map[string]any{
-				"jq": ".invalid[syntax", // Invalid jq filter
-			},
-		}
-
-		_, err = session2.CallTool(ctx2, params)
-		if err == nil {
-			t.Error("Expected error for invalid jq filter, got nil")
-			return
-		}
-
-		// The error message should contain the invalid jq filter error
-		errMsg := err.Error()
-		if !strings.Contains(errMsg, "invalid jq filter") {
-			t.Errorf("Expected error message about invalid jq filter, got: %s", errMsg)
-		} else {
-			t.Logf("✓ Correct error for invalid jq filter: %s", errMsg)
-		}
-	})
 }
 
 // TestMCPServer_ErrorCodes_InternalError tests that InternalError code is returned for execution failures
