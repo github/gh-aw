@@ -19,7 +19,7 @@ func hasGenericRestoreKey(lockContent, prefix string) bool {
 	// Look for restore-keys sections
 	restoreKeysPattern := regexp.MustCompile(`restore-keys:\s*\|`)
 	matches := restoreKeysPattern.FindAllStringIndex(lockContent, -1)
-	
+
 	for _, match := range matches {
 		// Get the content after "restore-keys: |"
 		start := match[1]
@@ -48,11 +48,10 @@ func hasGenericRestoreKey(lockContent, prefix string) bool {
 // This prevents cross-workflow cache poisoning attacks.
 func TestCacheMemoryRestoreKeysNoGenericFallback(t *testing.T) {
 	tests := []struct {
-		name              string
-		frontmatter       string
-		expectedInLock    []string
-		notExpectedInLock []string
-		genericFallbacks  []string // Generic restore key prefixes that should NOT be present
+		name             string
+		frontmatter      string
+		expectedInLock   []string
+		genericFallbacks []string // Generic restore key prefixes that should NOT be present
 	}{
 		{
 			name: "default cache-memory should NOT have generic memory- fallback",
@@ -150,6 +149,33 @@ safe-outputs:
 				"memory-${{ github.workflow }}-",
 			},
 			genericFallbacks: []string{"memory-"},
+		},
+		{
+			name: "cache-memory with repo scope should allow generic fallbacks",
+			frontmatter: `---
+name: Test Cache Memory Repo Scope
+on: workflow_dispatch
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+engine: claude
+tools:
+  cache-memory:
+    - id: shared
+      key: shared-cache-${{ github.workflow }}
+      scope: repo
+  github:
+    allowed: [get_repository]
+---`,
+			expectedInLock: []string{
+				// Should have multiple restore keys for repo scope
+				"restore-keys: |",
+				"shared-cache-${{ github.workflow }}-",
+				"shared-cache-",
+				"shared-",
+			},
+			genericFallbacks: []string{}, // No checks - repo scope intentionally allows generic fallbacks
 		},
 	}
 
