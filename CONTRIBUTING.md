@@ -169,6 +169,36 @@ The agent places validation logic appropriately:
 
 See [Validation Architecture](scratchpad/validation-architecture.md) for the complete decision tree.
 
+#### File Path Security
+
+All file operations must validate paths to prevent path traversal attacks:
+
+**Use `fileutil.ValidateAbsolutePath` before file operations:**
+
+```go
+import "github.com/github/gh-aw/pkg/fileutil"
+
+// Validate path before reading/writing files
+cleanPath, err := fileutil.ValidateAbsolutePath(userInputPath)
+if err != nil {
+    return fmt.Errorf("invalid path: %w", err)
+}
+content, err := os.ReadFile(cleanPath)
+```
+
+**Security checks performed:**
+- Normalizes path using `filepath.Clean` (removes `.` and `..` components)
+- Verifies path is absolute (blocks relative path traversal)
+- Returns descriptive errors for invalid paths
+
+**When to use:**
+- Before `os.ReadFile`, `os.WriteFile`, `os.Stat`, `os.Open`
+- Before `os.MkdirAll` or other directory operations
+- After constructing paths with `filepath.Join`
+- When processing user-provided file paths
+
+This provides defense-in-depth against path traversal vulnerabilities (e.g., `../../../etc/passwd`).
+
 #### CLI Breaking Changes
 
 The agent evaluates whether changes are breaking:

@@ -4,8 +4,8 @@
 package fileutil
 
 import (
-"fmt"
-"path/filepath"
+	"fmt"
+	"path/filepath"
 )
 
 // ValidateAbsolutePath validates that a file path is absolute and safe to use.
@@ -22,24 +22,26 @@ import (
 //
 // Example:
 //
-//cleanPath, err := fileutil.ValidateAbsolutePath(userInputPath)
-//if err != nil {
-//    return fmt.Errorf("invalid path: %w", err)
-//}
-//content, err := os.ReadFile(cleanPath)
+// cleanPath, err := fileutil.ValidateAbsolutePath(userInputPath)
+//
+//	if err != nil {
+//	   return fmt.Errorf("invalid path: %w", err)
+//	}
+//
+// content, err := os.ReadFile(cleanPath)
 func ValidateAbsolutePath(path string) (string, error) {
-// Check for empty path
-if path == "" {
-return "", fmt.Errorf("path cannot be empty")
-}
+	// Check for empty path
+	if path == "" {
+		return "", fmt.Errorf("path cannot be empty")
+	}
 
-// Sanitize the filepath to prevent path traversal attacks
-cleanPath := filepath.Clean(path)
+	// Sanitize the filepath to prevent path traversal attacks
+	cleanPath := filepath.Clean(path)
 
-// Verify the path is absolute to prevent relative path traversal
-if !filepath.IsAbs(cleanPath) {
-return "", fmt.Errorf("path must be absolute, got: %s", path)
-}
+	// Verify the path is absolute to prevent relative path traversal
+	if !filepath.IsAbs(cleanPath) {
+		return "", fmt.Errorf("path must be absolute, got: %s", path)
+	}
 
-return cleanPath, nil
+	return cleanPath, nil
 }
