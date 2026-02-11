@@ -80,7 +80,7 @@ func compileSpecificFiles(
 			errorMessages = append(errorMessages, err.Error())
 			errorCount++
 			stats.Errors++
-			trackWorkflowFailure(stats, markdownFile, 1)
+			trackWorkflowFailure(stats, markdownFile, 1, []string{err.Error()})
 			result.Valid = false
 			result.Errors = append(result.Errors, CompileValidationError{
 				Type:    "resolution_error",
@@ -104,8 +104,17 @@ func compileSpecificFiles(
 		if !fileResult.success {
 			errorCount++
 			stats.Errors++
-			trackWorkflowFailure(stats, resolvedFile, 1)
-			errorMessages = append(errorMessages, fileResult.validationResult.Errors[0].Message)
+			// Collect error messages from validation result for display in summary
+			var errMsgs []string
+			for _, verr := range fileResult.validationResult.Errors {
+				errMsgs = append(errMsgs, verr.Message)
+			}
+			trackWorkflowFailure(stats, resolvedFile, 1, errMsgs)
+			// Only append first error to errorMessages for the return error value
+			// (all errors are already displayed in the summary via printCompilationSummary)
+			if len(fileResult.validationResult.Errors) > 0 {
+				errorMessages = append(errorMessages, fileResult.validationResult.Errors[0].Message)
+			}
 		} else {
 			compiledCount++
 			workflowDataList = append(workflowDataList, fileResult.workflowData)
@@ -259,7 +268,12 @@ func compileAllFilesInDirectory(
 		if !fileResult.success {
 			errorCount++
 			stats.Errors++
-			trackWorkflowFailure(stats, file, 1)
+			// Collect error messages from validation result
+			var errMsgs []string
+			for _, verr := range fileResult.validationResult.Errors {
+				errMsgs = append(errMsgs, verr.Message)
+			}
+			trackWorkflowFailure(stats, file, 1, errMsgs)
 		} else {
 			successCount++
 			workflowDataList = append(workflowDataList, fileResult.workflowData)

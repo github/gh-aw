@@ -41,7 +41,7 @@ and migrate to new syntax. Codemods preserve formatting and comments as much as 
 Available codemods:
   • timeout-minutes-migration: Replaces 'timeout_minutes' with 'timeout-minutes'
   • network-firewall-migration: Removes deprecated 'network.firewall' field
-  • sandbox-agent-false-removal: Removes 'sandbox.agent: false' (firewall now mandatory)
+  • sandbox-false-to-agent-false: Converts 'sandbox: false' to 'sandbox.agent: false'
   • safe-inputs-mode-removal: Removes deprecated 'safe-inputs.mode' field
   • schedule-at-to-around-migration: Converts 'daily at TIME' to 'daily around TIME'
   • delete-schema-file: Deletes deprecated .github/aw/schemas/agentic-workflow.json

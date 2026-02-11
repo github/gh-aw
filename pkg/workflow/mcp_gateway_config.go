@@ -131,10 +131,20 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 }
 
 // isSandboxDisabled checks if sandbox features are completely disabled (sandbox: false)
+// This function is DEPRECATED and will return false now since top-level sandbox: false is no longer supported.
+// Use isAgentSandboxDisabled() to check if the agent sandbox is disabled.
 func isSandboxDisabled(workflowData *WorkflowData) bool {
+	// Top-level sandbox: false is no longer supported, so this always returns false
+	// The MCP gateway is always enabled
+	return false
+}
+
+// isAgentSandboxDisabled checks if the agent sandbox (firewall) is explicitly disabled
+// via sandbox.agent: false. This disables the agent firewall but keeps the MCP gateway enabled.
+func isAgentSandboxDisabled(workflowData *WorkflowData) bool {
 	if workflowData == nil || workflowData.SandboxConfig == nil {
 		return false
 	}
-	// Check if sandbox was explicitly disabled via sandbox: false
+	// Check if agent sandbox was explicitly disabled via sandbox.agent: false
 	return workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled
 }

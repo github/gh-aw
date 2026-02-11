@@ -909,21 +909,17 @@ network:
     # example.com itself) and ecosystem names like 'python', 'node'.
 
 # Sandbox configuration for AI engines. Controls agent sandbox (AWF or Sandbox
-# Runtime) and MCP gateway.
+# Runtime) and MCP gateway. The MCP gateway is always enabled and cannot be
+# disabled.
 # (optional)
 # This field supports multiple formats (oneOf):
 
-# Option 1: Set to false to completely disable sandbox features (firewall and
-# gateway). Warning: This removes important security protections and should only
-# be used in controlled environments. Not allowed in strict mode.
-sandbox: true
-
-# Option 2: Legacy string format for sandbox type: 'default' for no sandbox,
+# Option 1: Legacy string format for sandbox type: 'default' for no sandbox,
 # 'sandbox-runtime' or 'srt' for Anthropic Sandbox Runtime, 'awf' for Agent
 # Workflow Firewall
 sandbox: "default"
 
-# Option 3: Object format for full sandbox configuration with agent and mcp
+# Option 2: Object format for full sandbox configuration with agent and mcp
 # options
 sandbox:
   # Legacy sandbox type field (use agent instead)
@@ -931,15 +927,22 @@ sandbox:
   type: "default"
 
   # Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses
-  # Anthropic Sandbox Runtime. Defaults to 'awf' if not specified.
+  # Anthropic Sandbox Runtime, or false to disable agent sandbox. Defaults to 'awf'
+  # if not specified. Note: Disabling the agent sandbox (false) removes firewall
+  # protection but keeps the MCP gateway enabled.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Sandbox type: 'awf' for Agent Workflow Firewall, 'srt' for Sandbox
+  # Option 1: Set to false to disable the agent sandbox (firewall). Warning: This
+  # removes firewall protection but keeps the MCP gateway enabled. Not allowed in
+  # strict mode.
+  agent: true
+
+  # Option 2: Sandbox type: 'awf' for Agent Workflow Firewall, 'srt' for Sandbox
   # Runtime
   agent: "awf"
 
-  # Option 2: Custom sandbox runtime configuration
+  # Option 3: Custom sandbox runtime configuration
   agent:
     # Agent identifier (replaces 'type' field in new format): 'awf' for Agent Workflow
     # Firewall, 'srt' for Sandbox Runtime

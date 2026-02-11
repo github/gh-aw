@@ -187,7 +187,7 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 			expected:     nil,
 		},
 		{
-			name: "sandbox disabled",
+			name: "agent sandbox disabled - MCP gateway still enabled",
 			workflowData: &WorkflowData{
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -195,7 +195,12 @@ func TestBuildMCPGatewayConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: nil,
+			expected: &MCPGatewayRuntimeConfig{
+				Port:       int(DefaultMCPGatewayPort),
+				Domain:     "${MCP_GATEWAY_DOMAIN}",
+				APIKey:     "${MCP_GATEWAY_API_KEY}",
+				PayloadDir: "${MCP_GATEWAY_PAYLOAD_DIR}",
+			},
 		},
 		{
 			name:         "creates default gateway config",
@@ -258,7 +263,7 @@ func TestIsSandboxDisabled(t *testing.T) {
 			expected:     false,
 		},
 		{
-			name: "sandbox disabled",
+			name: "agent sandbox disabled - isSandboxDisabled always returns false (deprecated)",
 			workflowData: &WorkflowData{
 				SandboxConfig: &SandboxConfig{
 					Agent: &AgentSandboxConfig{
@@ -266,7 +271,7 @@ func TestIsSandboxDisabled(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
+			expected: false, // isSandboxDisabled() always returns false now (deprecated)
 		},
 		{
 			name: "sandbox enabled",
@@ -292,6 +297,61 @@ func TestIsSandboxDisabled(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isSandboxDisabled(tt.workflowData)
 			assert.Equal(t, tt.expected, result, "isSandboxDisabled result should match expected")
+		})
+	}
+}
+
+func TestIsAgentSandboxDisabled(t *testing.T) {
+	tests := []struct {
+		name         string
+		workflowData *WorkflowData
+		expected     bool
+	}{
+		{
+			name:         "nil workflow data",
+			workflowData: nil,
+			expected:     false,
+		},
+		{
+			name:         "nil sandbox config",
+			workflowData: &WorkflowData{},
+			expected:     false,
+		},
+		{
+			name: "agent sandbox disabled",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Disabled: true,
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "agent sandbox enabled",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{
+					Agent: &AgentSandboxConfig{
+						Disabled: false,
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "nil agent config",
+			workflowData: &WorkflowData{
+				SandboxConfig: &SandboxConfig{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isAgentSandboxDisabled(tt.workflowData)
+			assert.Equal(t, tt.expected, result, "isAgentSandboxDisabled result should match expected")
 		})
 	}
 }

@@ -9,23 +9,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetSandboxAgentFalseRemovalCodemod(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestGetSandboxFalseToAgentFalseCodemod(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
-	assert.Equal(t, "sandbox-agent-false-removal", codemod.ID)
-	assert.Equal(t, "Remove deprecated sandbox.agent: false", codemod.Name)
+	assert.Equal(t, "sandbox-false-to-agent-false", codemod.ID)
+	assert.Equal(t, "Convert sandbox: false to sandbox.agent: false", codemod.Name)
 	assert.NotEmpty(t, codemod.Description)
-	assert.Equal(t, "0.5.0", codemod.IntroducedIn)
+	assert.Equal(t, "0.10.0", codemod.IntroducedIn)
 	require.NotNil(t, codemod.Apply)
 }
 
-func TestSandboxAgentCodemod_RemovesAgentFalse(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestSandboxFalseToAgentFalseCodemod_ConvertsBooleanFalse(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
 	content := `---
 on: workflow_dispatch
-sandbox:
-  agent: false
+sandbox: false
 permissions:
   contents: read
 ---
@@ -33,10 +32,8 @@ permissions:
 # Test`
 
 	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"agent": false,
-		},
+		"on":      "workflow_dispatch",
+		"sandbox": false,
 		"permissions": map[string]any{
 			"contents": "read",
 		},
@@ -46,46 +43,43 @@ permissions:
 
 	require.NoError(t, err)
 	assert.True(t, applied)
-	assert.NotContains(t, result, "agent: false")
-	assert.NotContains(t, result, "sandbox:")
-}
-
-func TestSandboxAgentCodemod_PreservesOtherSandboxFields(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
-
-	content := `---
-on: workflow_dispatch
-sandbox:
-  agent: false
-  timeout: 30m
-permissions:
-  contents: read
----
-
-# Test`
-
-	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"agent":   false,
-			"timeout": "30m",
-		},
-		"permissions": map[string]any{
-			"contents": "read",
-		},
-	}
-
-	result, applied, err := codemod.Apply(content, frontmatter)
-
-	require.NoError(t, err)
-	assert.True(t, applied)
-	assert.NotContains(t, result, "agent: false")
+	assert.NotContains(t, result, "sandbox: false")
 	assert.Contains(t, result, "sandbox:")
-	assert.Contains(t, result, "timeout: 30m")
+	assert.Contains(t, result, "  agent: false")
 }
 
-func TestSandboxAgentCodemod_NoSandboxField(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestSandboxFalseToAgentFalseCodemod_PreservesIndentation(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
+
+	content := `---
+on: workflow_dispatch
+sandbox: false
+engine: copilot
+permissions:
+  contents: read
+---
+
+# Test`
+
+	frontmatter := map[string]any{
+		"on":      "workflow_dispatch",
+		"sandbox": false,
+		"engine":  "copilot",
+		"permissions": map[string]any{
+			"contents": "read",
+		},
+	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Contains(t, result, "sandbox:")
+	assert.Contains(t, result, "  agent: false")
+}
+
+func TestSandboxFalseToAgentFalseCodemod_NoSandboxField(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
 	content := `---
 on: workflow_dispatch
@@ -109,22 +103,19 @@ permissions:
 	assert.Equal(t, content, result)
 }
 
-func TestSandboxAgentCodemod_NoAgentField(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestSandboxFalseToAgentFalseCodemod_SandboxTrue(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
 	content := `---
 on: workflow_dispatch
-sandbox:
-  timeout: 30m
+sandbox: true
 ---
 
 # Test`
 
 	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"timeout": "30m",
-		},
+		"on":      "workflow_dispatch",
+		"sandbox": true,
 	}
 
 	result, applied, err := codemod.Apply(content, frontmatter)
@@ -134,33 +125,8 @@ sandbox:
 	assert.Equal(t, content, result)
 }
 
-func TestSandboxAgentCodemod_AgentTrue(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
-
-	content := `---
-on: workflow_dispatch
-sandbox:
-  agent: true
----
-
-# Test`
-
-	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"agent": true,
-		},
-	}
-
-	result, applied, err := codemod.Apply(content, frontmatter)
-
-	require.NoError(t, err)
-	assert.False(t, applied)
-	assert.Equal(t, content, result)
-}
-
-func TestSandboxAgentCodemod_AgentString(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestSandboxFalseToAgentFalseCodemod_SandboxObject(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
 	content := `---
 on: workflow_dispatch
@@ -184,54 +150,21 @@ sandbox:
 	assert.Equal(t, content, result)
 }
 
-func TestSandboxAgentCodemod_RemovesEmptySandboxBlock(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
+func TestSandboxFalseToAgentFalseCodemod_PreservesMarkdown(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
 
 	content := `---
 on: workflow_dispatch
-sandbox:
-  agent: false
-permissions:
-  contents: read
----
-
-# Test`
-
-	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"agent": false,
-		},
-		"permissions": map[string]any{
-			"contents": "read",
-		},
-	}
-
-	result, applied, err := codemod.Apply(content, frontmatter)
-
-	require.NoError(t, err)
-	assert.True(t, applied)
-	assert.NotContains(t, result, "sandbox:")
-}
-
-func TestSandboxAgentCodemod_PreservesMarkdown(t *testing.T) {
-	codemod := getSandboxAgentFalseRemovalCodemod()
-
-	content := `---
-on: workflow_dispatch
-sandbox:
-  agent: false
+sandbox: false
 ---
 
 # Test Workflow
 
-This workflow runs in a sandbox.`
+This workflow runs without a sandbox.`
 
 	frontmatter := map[string]any{
-		"on": "workflow_dispatch",
-		"sandbox": map[string]any{
-			"agent": false,
-		},
+		"on":      "workflow_dispatch",
+		"sandbox": false,
 	}
 
 	result, applied, err := codemod.Apply(content, frontmatter)
@@ -239,5 +172,32 @@ This workflow runs in a sandbox.`
 	require.NoError(t, err)
 	assert.True(t, applied)
 	assert.Contains(t, result, "# Test Workflow")
-	assert.Contains(t, result, "This workflow runs in a sandbox.")
+	assert.Contains(t, result, "This workflow runs without a sandbox.")
+}
+
+func TestSandboxFalseToAgentFalseCodemod_WithStrictFalse(t *testing.T) {
+	codemod := getSandboxFalseToAgentFalseCodemod()
+
+	content := `---
+on: workflow_dispatch
+sandbox: false
+strict: false
+---
+
+# Test`
+
+	frontmatter := map[string]any{
+		"on":      "workflow_dispatch",
+		"sandbox": false,
+		"strict":  false,
+	}
+
+	result, applied, err := codemod.Apply(content, frontmatter)
+
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.NotContains(t, result, "sandbox: false")
+	assert.Contains(t, result, "sandbox:")
+	assert.Contains(t, result, "  agent: false")
+	assert.Contains(t, result, "strict: false")
 }

@@ -344,14 +344,15 @@ func handleFileDeleted(mdFile string, verbose bool) {
 }
 
 // trackWorkflowFailure adds a workflow failure to the compilation statistics
-func trackWorkflowFailure(stats *CompilationStats, workflowPath string, errorCount int) {
+func trackWorkflowFailure(stats *CompilationStats, workflowPath string, errorCount int, errorMessages []string) {
 	// Add to FailedWorkflows for backward compatibility
 	stats.FailedWorkflows = append(stats.FailedWorkflows, filepath.Base(workflowPath))
 
 	// Add detailed failure information
 	stats.FailureDetails = append(stats.FailureDetails, WorkflowFailure{
-		Path:       workflowPath,
-		ErrorCount: errorCount,
+		Path:          workflowPath,
+		ErrorCount:    errorCount,
+		ErrorMessages: errorMessages,
 	})
 }
 
@@ -367,15 +368,14 @@ func printCompilationSummary(stats *CompilationStats) {
 	// Use different formatting based on whether there were errors
 	if stats.Errors > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(summary))
-		// List the failed workflows with their error counts
+		// Display actual error messages from each failed workflow
+		// Error messages already include workflow path in format: file:line:col: error: message
 		if len(stats.FailureDetails) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Failed workflows:"))
 			for _, failure := range stats.FailureDetails {
-				errorWord := "error"
-				if failure.ErrorCount > 1 {
-					errorWord = "errors"
+				// Display the actual error messages for each failed workflow
+				for _, errMsg := range failure.ErrorMessages {
+					fmt.Fprintln(os.Stderr, errMsg)
 				}
-				fmt.Fprintf(os.Stderr, "  - %s (%d %s)\n", failure.Path, failure.ErrorCount, errorWord)
 			}
 		} else if len(stats.FailedWorkflows) > 0 {
 			// Fallback for backward compatibility if FailureDetails is not populated
