@@ -952,6 +952,124 @@ func TestParseBoolFromConfig(t *testing.T) {
 	}
 }
 
+func TestPreprocessExpiresField(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            map[string]any
+		expectedDisabled bool
+		expectedValue    int
+	}{
+		{
+			name: "valid integer days - converted to hours",
+			input: map[string]any{
+				"expires": 7,
+			},
+			expectedDisabled: false,
+			expectedValue:    168, // 7 days * 24 hours
+		},
+		{
+			name: "valid string format - 48h",
+			input: map[string]any{
+				"expires": "48h",
+			},
+			expectedDisabled: false,
+			expectedValue:    48,
+		},
+		{
+			name: "valid string format - 7d",
+			input: map[string]any{
+				"expires": "7d",
+			},
+			expectedDisabled: false,
+			expectedValue:    168,
+		},
+		{
+			name: "explicitly disabled with false",
+			input: map[string]any{
+				"expires": false,
+			},
+			expectedDisabled: true,
+			expectedValue:    0,
+		},
+		{
+			name: "invalid - true boolean",
+			input: map[string]any{
+				"expires": true,
+			},
+			expectedDisabled: false,
+			expectedValue:    0,
+		},
+		{
+			name: "invalid - 1 hour (below minimum)",
+			input: map[string]any{
+				"expires": "1h",
+			},
+			expectedDisabled: false,
+			expectedValue:    0,
+		},
+		{
+			name: "valid - 2 hours (at minimum)",
+			input: map[string]any{
+				"expires": "2h",
+			},
+			expectedDisabled: false,
+			expectedValue:    2,
+		},
+		{
+			name:             "no expires field",
+			input:            map[string]any{},
+			expectedDisabled: false,
+			expectedValue:    0, // configData["expires"] not set when field missing
+		},
+		{
+			name: "invalid string format",
+			input: map[string]any{
+				"expires": "invalid",
+			},
+			expectedDisabled: false,
+			expectedValue:    0,
+		},
+		{
+			name:             "nil configData",
+			input:            nil,
+			expectedDisabled: false,
+			expectedValue:    0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of input to check modification
+			var configData map[string]any
+			if tt.input != nil {
+				configData = make(map[string]any)
+				for k, v := range tt.input {
+					configData[k] = v
+				}
+			}
+
+			disabled := preprocessExpiresField(configData, nil)
+
+			if disabled != tt.expectedDisabled {
+				t.Errorf("expected disabled=%v, got %v", tt.expectedDisabled, disabled)
+			}
+
+			// Check that configData["expires"] was updated (if configData is not nil)
+			if configData != nil && tt.input != nil {
+				if _, exists := tt.input["expires"]; exists {
+					expiresValue, ok := configData["expires"].(int)
+					if !ok && configData["expires"] != nil {
+						t.Errorf("expected expires to be int, got %T", configData["expires"])
+					}
+					if expiresValue != tt.expectedValue {
+						t.Errorf("expected configData[\"expires\"]=%d, got %d", tt.expectedValue, expiresValue)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestUnmarshalConfig(t *testing.T) {
 	tests := []struct {
 		name        string

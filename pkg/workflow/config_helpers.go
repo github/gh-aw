@@ -181,6 +181,40 @@ func parseAllowedLabelsFromConfig(configMap map[string]any) []string {
 // to consolidate all time parsing logic in a single location. These functions are used
 // for parsing expiration configurations in safe output jobs.
 
+// preprocessExpiresField handles the common expires field preprocessing pattern.
+// This function:
+//  1. Parses the expires value through parseExpiresFromConfig (handles integers, strings, and boolean false)
+//  2. Handles explicit disablement when expires=false (returns -1)
+//  3. Normalizes the value to hours and updates configData["expires"] in place
+//  4. Logs the parsed value with the provided logger
+//
+// Returns true if expires was explicitly disabled with false, false otherwise.
+// This helper consolidates duplicate preprocessing logic used in parseIssuesConfig and parseDiscussionsConfig.
+func preprocessExpiresField(configData map[string]any, log *logger.Logger) bool {
+	expiresDisabled := false
+	if configData != nil {
+		if expires, exists := configData["expires"]; exists {
+			// Always parse the expires value through parseExpiresFromConfig
+			// This handles: integers (days), strings (time specs like "48h"), and boolean false
+			expiresInt := parseExpiresFromConfig(configData)
+			if expiresInt == -1 {
+				// Explicitly disabled with false
+				expiresDisabled = true
+				configData["expires"] = 0
+			} else if expiresInt > 0 {
+				configData["expires"] = expiresInt
+			} else {
+				// Invalid or missing - set to 0
+				configData["expires"] = 0
+			}
+			if log != nil {
+				log.Printf("Parsed expires value %v to %d hours (disabled=%t)", expires, expiresInt, expiresDisabled)
+			}
+		}
+	}
+	return expiresDisabled
+}
+
 // ParseIntFromConfig is a generic helper that extracts and validates an integer value from a map.
 // Supports int, int64, float64, and uint64 types.
 // Returns the integer value, or 0 if not present or invalid.

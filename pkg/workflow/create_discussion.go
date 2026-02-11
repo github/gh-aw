@@ -38,25 +38,7 @@ func (c *Compiler) parseDiscussionsConfig(outputMap map[string]any) *CreateDiscu
 	configData, _ := outputMap["create-discussion"].(map[string]any)
 
 	// Pre-process the expires field (convert to hours before unmarshaling)
-	expiresDisabled := false
-	if configData != nil {
-		if expires, exists := configData["expires"]; exists {
-			// Always parse the expires value through parseExpiresFromConfig
-			// This handles: integers (days), strings (time specs like "48h"), and boolean false
-			expiresInt := parseExpiresFromConfig(configData)
-			if expiresInt == -1 {
-				// Explicitly disabled with false
-				expiresDisabled = true
-				configData["expires"] = 0
-			} else if expiresInt > 0 {
-				configData["expires"] = expiresInt
-			} else {
-				// Invalid or missing - set to 0
-				configData["expires"] = 0
-			}
-			discussionLog.Printf("Parsed expires value %v to %d hours (disabled=%t)", expires, expiresInt, expiresDisabled)
-		}
-	}
+	expiresDisabled := preprocessExpiresField(configData, discussionLog)
 
 	// Unmarshal into typed config struct
 	var config CreateDiscussionsConfig
