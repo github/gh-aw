@@ -36,7 +36,8 @@ on:
     types: [completed]
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Workflow Run Without Branches
@@ -45,7 +46,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: true,
-			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox: false
+			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
 		},
 		{
 			name: "workflow_run without branches - strict mode - should error",
@@ -80,7 +81,8 @@ on:
       - develop
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Workflow Run With Branches
@@ -89,7 +91,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox: false
+			warningCount:  1, // 1 for sandbox.agent: false
 		},
 		{
 			name: "workflow_run with branches - strict mode - should pass",
@@ -122,7 +124,8 @@ on:
     branches: [main]
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Push Workflow
@@ -131,7 +134,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox: false
+			warningCount:  1, // 1 for sandbox.agent: false
 		},
 		{
 			name: "mixed triggers with workflow_run without branches - should warn/error",
@@ -145,7 +148,8 @@ on:
     types: [completed]
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Mixed Triggers
@@ -154,7 +158,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: true,
-			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox: false
+			warningCount:  2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
 		},
 		{
 			name: "workflow_run with empty branches array - should warn/error",
@@ -167,7 +171,8 @@ on:
     branches: []
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Workflow Run With Empty Branches
@@ -176,7 +181,7 @@ Test workflow content.`,
 			strictMode:    false,
 			expectError:   false,
 			expectWarning: false,
-			warningCount:  1, // 1 for sandbox: false
+			warningCount:  1, // 1 for sandbox.agent: false
 		},
 	}
 
@@ -236,14 +241,15 @@ strict: false
 on: push
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # No On Field
 Test workflow content.`,
 			filename:     "no-on-field.md",
 			expectError:  false,
-			warningCount: 1, // 1 for sandbox: false
+			warningCount: 1, // 1 for sandbox.agent: false
 		},
 		{
 			name: "multiple workflow_run configs - first without branches - should warn",
@@ -255,14 +261,15 @@ on:
     types: [completed]
 tools:
   github: false
-sandbox: false
+sandbox:
+  agent: false
 ---
 
 # Multiple Workflows
 Test workflow content.`,
 			filename:     "multiple-workflows.md",
 			expectError:  false,
-			warningCount: 2, // 1 for workflow_run without branches + 1 for sandbox: false
+			warningCount: 2, // 1 for workflow_run without branches + 1 for sandbox.agent: false
 		},
 	}
 
