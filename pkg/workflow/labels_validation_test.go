@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateLabels(t *testing.T) {
@@ -73,7 +74,7 @@ func TestValidateLabels(t *testing.T) {
 			err := validateLabels(workflowData)
 
 			if tt.shouldErr {
-				assert.Error(t, err, "Expected validation to fail")
+				require.Error(t, err, "Expected validation to fail")
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg, "Error message should contain expected text")
 				}
