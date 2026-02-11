@@ -110,6 +110,18 @@ async function main() {
           continue;
         }
 
+        // Skip runs that completed in less than 15 seconds (treat as cancelled/failed fast)
+        if (run.created_at && run.updated_at) {
+          const runStart = new Date(run.created_at);
+          const runEnd = new Date(run.updated_at);
+          const durationSeconds = (runEnd - runStart) / 1000;
+          
+          if (durationSeconds < 15) {
+            core.info(`   Skipping run ${run.id} - ran for less than 15s (${durationSeconds.toFixed(1)}s)`);
+            continue;
+          }
+        }
+
         // If specific events are configured, only count matching events
         const runEvent = run.event;
         if (limitedEvents.length > 0 && !limitedEvents.includes(runEvent)) {
