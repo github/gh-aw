@@ -473,6 +473,7 @@ jobs:
   pre_activation:
     runs-on: ubuntu-slim
     permissions:
+      actions: read
       contents: read
     outputs:
       activated: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_rate_limit.outputs.rate_limit_ok == 'true') }}
@@ -505,7 +506,7 @@ jobs:
         env:
           GH_AW_RATE_LIMIT_MAX: "3"
           GH_AW_RATE_LIMIT_WINDOW: "30"
-          GH_AW_RATE_LIMIT_EVENTS: workflow_dispatch,issue_comment
+          GH_AW_RATE_LIMIT_EVENTS: "workflow_dispatch,issue_comment"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

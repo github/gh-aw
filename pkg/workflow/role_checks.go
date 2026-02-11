@@ -62,7 +62,7 @@ func (c *Compiler) generateRateLimitCheck(data *WorkflowData, steps []string) []
 
 	// Set events to check (if specified)
 	if len(data.RateLimit.Events) > 0 {
-		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %s\n", strings.Join(data.RateLimit.Events, ",")))
+		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %q\n", strings.Join(data.RateLimit.Events, ",")))
 	}
 
 	steps = append(steps, "        with:\n")

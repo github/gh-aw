@@ -264,7 +264,8 @@ describe("check_rate_limit", () => {
             created_at: recentTime.toISOString(),
             actor: { login: "test-user" },
             event: "workflow_dispatch",
-            status: "cancelled",
+            status: "completed",
+            conclusion: "cancelled",
           },
           {
             id: 222222,
@@ -273,6 +274,7 @@ describe("check_rate_limit", () => {
             actor: { login: "test-user" },
             event: "workflow_dispatch",
             status: "completed",
+            conclusion: "success",
           },
           {
             id: 333333,
@@ -280,7 +282,8 @@ describe("check_rate_limit", () => {
             created_at: recentTime.toISOString(),
             actor: { login: "test-user" },
             event: "workflow_dispatch",
-            status: "cancelled",
+            status: "completed",
+            conclusion: "cancelled",
           },
         ],
       },
@@ -511,5 +514,48 @@ describe("check_rate_limit", () => {
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Breakdown by event type:"));
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("workflow_dispatch: 2 runs"));
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("issue_comment: 1 runs"));
+  });
+
+  it("should skip rate limiting for non-programmatic events when no events filter is set", async () => {
+    mockContext.eventName = "push";
+
+    await checkRateLimit.main();
+
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Event 'push' is not a programmatic trigger"));
+    expect(mockGithub.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+
+  it("should use workflow file from GITHUB_WORKFLOW_REF when available", async () => {
+    process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/test.lock.yml@refs/heads/main";
+
+    mockGithub.rest.actions.listWorkflowRuns.mockResolvedValue({
+      data: {
+        workflow_runs: [],
+      },
+    });
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using workflow file: test.lock.yml"));
+    expect(mockGithub.rest.actions.listWorkflowRuns).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow_id: "test.lock.yml",
+      })
+    );
+  });
+
+  it("should fall back to workflow name when GITHUB_WORKFLOW_REF is not parseable", async () => {
+    process.env.GITHUB_WORKFLOW_REF = "invalid-format";
+
+    mockGithub.rest.actions.listWorkflowRuns.mockResolvedValue({
+      data: {
+        workflow_runs: [],
+      },
+    });
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using workflow name: test-workflow (fallback"));
   });
 });

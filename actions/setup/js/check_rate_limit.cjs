@@ -10,9 +10,26 @@ async function main() {
   const actor = context.actor;
   const owner = context.repo.owner;
   const repo = context.repo.repo;
-  const workflowId = context.workflow;
   const eventName = context.eventName;
   const runId = context.runId;
+
+  // Get workflow file name from GITHUB_WORKFLOW_REF (format: "owner/repo/.github/workflows/file.yml@ref")
+  // or fall back to GITHUB_WORKFLOW (workflow name)
+  const workflowRef = process.env.GITHUB_WORKFLOW_REF || "";
+  let workflowId = context.workflow; // Default to workflow name
+
+  if (workflowRef) {
+    // Extract workflow file from the ref (e.g., ".github/workflows/test.lock.yml@refs/heads/main")
+    const match = workflowRef.match(/\.github\/workflows\/([^@]+)/);
+    if (match && match[1]) {
+      workflowId = match[1];
+      core.info(`   Using workflow file: ${workflowId} (from GITHUB_WORKFLOW_REF)`);
+    } else {
+      core.info(`   Using workflow name: ${workflowId} (fallback - could not parse GITHUB_WORKFLOW_REF)`);
+    }
+  } else {
+    core.info(`   Using workflow name: ${workflowId} (GITHUB_WORKFLOW_REF not available)`);
+  }
 
   // Get configuration from environment variables
   const maxRuns = parseInt(process.env.GH_AW_RATE_LIMIT_MAX || "5", 10);
@@ -36,7 +53,18 @@ async function main() {
     }
     core.info(`   Event '${eventName}' is subject to rate limiting`);
   } else {
-    core.info(`   Rate limiting applies to all programmatically triggered events`);
+    // When no specific events are configured, apply rate limiting only to
+    // known programmatic triggers. Allow all other events.
+    const programmaticEvents = ["workflow_dispatch", "repository_dispatch", "issue_comment", "pull_request_review", "pull_request_review_comment", "discussion_comment"];
+
+    if (!programmaticEvents.includes(eventName)) {
+      core.info(`✅ Event '${eventName}' is not a programmatic trigger; skipping rate limiting`);
+      core.info(`   Rate limiting applies to: ${programmaticEvents.join(", ")}`);
+      core.setOutput("rate_limit_ok", "true");
+      return;
+    }
+
+    core.info(`   Rate limiting applies to programmatic events: ${programmaticEvents.join(", ")}`);
   }
 
   // Calculate time threshold
@@ -105,8 +133,9 @@ async function main() {
         }
 
         // Skip cancelled workflow runs (they don't count toward the rate limit)
-        if (run.status === "cancelled") {
-          core.info(`   Skipping run ${run.id} - cancelled (status: ${run.status})`);
+        // GitHub uses conclusion: 'cancelled' with status: 'completed' for cancelled runs
+        if (run.conclusion === "cancelled") {
+          core.info(`   Skipping run ${run.id} - cancelled (conclusion: ${run.conclusion})`);
           continue;
         }
 

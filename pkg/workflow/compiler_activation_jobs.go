@@ -56,6 +56,14 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		perms.Set(PermissionDiscussions, PermissionWrite)
 	}
 
+	// Add actions: read permission if rate limiting is configured (needed to query workflow runs)
+	if data.RateLimit != nil {
+		if perms == nil {
+			perms = NewPermissions()
+		}
+		perms.Set(PermissionActions, PermissionRead)
+	}
+
 	// Set permissions if any were configured
 	if perms != nil {
 		permissions = perms.RenderToYAML()
