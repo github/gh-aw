@@ -40,7 +40,7 @@ rate-limit:
 ### `window` (integer, optional)
 - Time window in minutes for rate limiting
 - Default: 60 (1 hour)
-- Range: 1-1440 (up to 24 hours)
+- Range: 1-180 (up to 3 hours)
 - Example: `window: 30` creates a 30-minute window
 
 ### `events` (array, optional)
@@ -273,7 +273,7 @@ The rate-limit field is validated against this JSON schema:
     "window": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 1440,
+      "maximum": 180,
       "default": 60
     },
     "events": {

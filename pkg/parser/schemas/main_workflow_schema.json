@@ -6089,9 +6089,9 @@
         "window": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 1440,
+          "maximum": 180,
           "default": 60,
-          "description": "Time window in minutes for rate limiting. Defaults to 60 (1 hour)."
+          "description": "Time window in minutes for rate limiting. Defaults to 60 (1 hour). Maximum: 180 (3 hours)."
         },
         "events": {
           "type": "array",
