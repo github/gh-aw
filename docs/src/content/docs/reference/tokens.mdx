@@ -6,6 +6,8 @@ sidebar:
 disable-agentic-editing: true
 ---
 
+import Video from '../../../components/Video.astro';
+
 ## Which token(s) do I need?
 
 GitHub Actions automatically provides a default `GITHUB_TOKEN` that works for most workflows. However, depending on what your workflow needs to do, you may need additional tokens:
@@ -50,11 +52,11 @@ gh aw init --tokens --engine <engine>
 2. Click on "Settings" → "Secrets and variables" → "Actions"
 3. Click "New repository secret" and add the token name and value
 
-<div class="gh-aw-video-container" style="max-width: 800px; margin: 1.5rem 0;">
+<div class="gh-aw-video-container" style={{maxWidth: '800px', margin: '1.5rem 0'}}>
   <div class="gh-aw-video-wrapper">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/actions-secrets_dark.png">
-      <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png">
+      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/actions-secrets_dark.png" />
+      <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png" />
     </picture>
   </div>
   <div class="gh-aw-video-caption" role="note">
@@ -70,23 +72,23 @@ Ownership affects token requirements for repositories and Projects (v2). If the 
 
 To confirm ownership, check the owner name and avatar at the top of the page or in the URL (`github.com/owner-name/...`). Clicking the owner takes you to a personal profile or an organization page, which confirms it instantly. Here are examples of both (left: user-owned, right: org-owned):
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0; max-width: 800px;">
+<div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '1.5rem 0', maxWidth: '800px'}}>
   <div>
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/user-owned_dark.png">
-      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png" style="width: 100%; height: auto; display: block;">
+      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/user-owned_dark.png" />
+      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png" style={{width: '100%', height: 'auto', display: 'block'}} />
     </picture>
-    <div class="gh-aw-video-caption" role="note" style="margin-top: 0.5rem;">
+    <div class="gh-aw-video-caption" role="note" style={{marginTop: '0.5rem'}}>
       User-owned repository: avatar shows a personal profile icon, URL includes username
     </div>
   </div>
 
   <div>
-    <picture style="margin: 0 !important;">
-      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/org-owned_dark.png">
-      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png" style="width: 100%; height: auto; display: block; margin: 0 !important;">
+    <picture style={{margin: '0 !important'}}>
+      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/org-owned_dark.png" />
+      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png" style={{width: '100%', height: 'auto', display: 'block', margin: '0 !important'}} />
     </picture>
-    <div class="gh-aw-video-caption" role="note" style="margin-top: 0.5rem;">
+    <div class="gh-aw-video-caption" role="note" style={{marginTop: '0.5rem'}}>
       Organization-owned repository: avatar shows organization icon, URL includes org name
     </div>
   </div>
@@ -297,21 +299,12 @@ The required token type depends on whether you're working with **user-owned** or
 
 **For User-owned Projects**:
 
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-user-project.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-user-project.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a classic PAT for user-owned private projects
-  </div>
-</div>
+<Video
+  src="/gh-aw/videos/create-pat-user-project.mp4"
+  caption="Creating a classic PAT for user-owned private projects"
+  aspectRatio="16:9"
+  silenced={true}
+/>
 
 You **must** use a **classic PAT** with the `project` scope. Fine-grained PATs do **not** work with user-owned Projects.
 
@@ -321,21 +314,12 @@ You **must** use a **classic PAT** with the `project` scope. Fine-grained PATs d
 
 **For Organization-owned Projects (v2)**:
 
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-org-project.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-org-project.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a fine-grained PAT for organization-owned projects
-  </div>
-</div>
+<Video
+  src="/gh-aw/videos/create-pat-org-project.mp4"
+  caption="Creating a fine-grained PAT for organization-owned projects"
+  aspectRatio="16:9"
+  silenced={true}
+/>
 
 You can use either a classic PAT or a fine-grained PAT:
 
@@ -430,21 +414,12 @@ The required token type depends on whether you own the repository or an organiza
 
 **For User-owned Repositories**:
 
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-user-copilot.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-user-copilot.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a fine-grained PAT for user-owned repositories with Copilot permissions
-  </div>
-</div>
+<Video
+  src="/gh-aw/videos/create-pat-user-copilot.mp4"
+  caption="Creating a fine-grained PAT for user-owned repositories with Copilot permissions"
+  aspectRatio="16:9"
+  silenced={true}
+/>
 
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
    - **Resource owner**: Your user account
@@ -455,21 +430,12 @@ The required token type depends on whether you own the repository or an organiza
 
 **For Organization-owned Repositories**:
 
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls 
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-org-copilot.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-org-copilot.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a fine-grained PAT for organization-owned repositories with Copilot permissions
-  </div>
-</div>
+<Video
+  src="/gh-aw/videos/create-pat-org-copilot.mp4"
+  caption="Creating a fine-grained PAT for organization-owned repositories with Copilot permissions"
+  aspectRatio="16:9"
+  silenced={true}
+/>
 
 When an organization owns the repository, you need a fine-grained PAT with organization-level permissions:
 
@@ -535,21 +501,12 @@ The required token type and permissions depend on whether you own the repository
 
 **For Organization-owned Repositories**:
 
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-org-agent.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-org-agent.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a fine-grained PAT for organization-owned repositories with permissions for agent assignment
-  </div>
-</div>
+<Video
+  src="/gh-aw/videos/create-pat-org-agent.mp4"
+  caption="Creating a fine-grained PAT for organization-owned repositories with permissions for agent assignment"
+  aspectRatio="16:9"
+  silenced={true}
+/>
 
 When an organization owns the repository, you need a fine-grained PAT with the resource owner set to the organization:
 
