@@ -382,7 +382,7 @@ function extractTemporaryIdReferences(message) {
   }
 
   // Check direct ID reference fields
-  const idFields = ["parent_issue_number", "sub_issue_number", "issue_number", "discussion_number", "pull_request_number"];
+  const idFields = ["parent_issue_number", "sub_issue_number", "issue_number", "discussion_number", "pull_request_number", "content_number"];
 
   for (const field of idFields) {
     const value = message[field];

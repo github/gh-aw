@@ -648,6 +648,38 @@ describe("temporary_id.cjs", () => {
       expect(refs.size).toBe(0);
     });
 
+    it("should extract temporary IDs from content_number field", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "update_project",
+        project: "https://github.com/orgs/myorg/projects/1",
+        content_type: "issue",
+        content_number: "aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
+    it("should extract temporary IDs from content_number field (with # prefix)", async () => {
+      const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
+
+      const message = {
+        type: "update_project",
+        project: "https://github.com/orgs/myorg/projects/1",
+        content_type: "issue",
+        content_number: "#aw_abc123def456",
+      };
+
+      const refs = extractTemporaryIdReferences(message);
+
+      expect(refs.size).toBe(1);
+      expect(refs.has("aw_abc123def456")).toBe(true);
+    });
+
     it("should ignore invalid temporary ID formats", async () => {
       const { extractTemporaryIdReferences } = await import("./temporary_id.cjs");
 

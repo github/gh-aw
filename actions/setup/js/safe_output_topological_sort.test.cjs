@@ -459,6 +459,21 @@ describe("safe_output_topological_sort.cjs", () => {
       expect(sorted[1].type).toBe("create_project");
     });
 
+    it("should handle update_project with content_number dependency on create_issue", async () => {
+      const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
+
+      const messages = [
+        { type: "update_project", project: "https://github.com/orgs/org/projects/1", content_type: "issue", content_number: "aw_abc123def456" },
+        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+      ];
+
+      const sorted = sortSafeOutputMessages(messages);
+
+      // Issue should come before update_project since update_project depends on it
+      expect(sorted[0].type).toBe("create_issue");
+      expect(sorted[1].type).toBe("update_project");
+    });
+
     it("should handle large graphs with many dependencies", async () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
