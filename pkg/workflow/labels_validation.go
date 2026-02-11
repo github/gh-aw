@@ -13,17 +13,15 @@ var labelsValidationLog = logger.New("workflow:labels_validation")
 // It checks that:
 // 1. Labels is an array (if present)
 // 2. Each label is a non-empty string
-// 3. Labels don't contain invalid characters or excessive whitespace
+// 3. Labels don't have leading or trailing whitespace
 func validateLabels(workflowData *WorkflowData) error {
 	// If ParsedFrontmatter is nil or Labels is empty, nothing to validate
 	if workflowData == nil || workflowData.ParsedFrontmatter == nil {
-		labelsValidationLog.Print("No parsed frontmatter to validate")
 		return nil
 	}
 
 	labels := workflowData.ParsedFrontmatter.Labels
 	if len(labels) == 0 {
-		labelsValidationLog.Print("No labels to validate")
 		return nil
 	}
 
@@ -40,11 +38,6 @@ func validateLabels(workflowData *WorkflowData) error {
 		trimmed := strings.TrimSpace(label)
 		if trimmed != label {
 			return fmt.Errorf("labels[%d] has leading or trailing whitespace: %q. Labels should be trimmed", i, label)
-		}
-
-		// Check for whitespace-only labels (redundant with empty check, but explicit)
-		if trimmed == "" {
-			return fmt.Errorf("labels[%d] contains only whitespace. Each label must contain non-whitespace characters", i)
 		}
 
 		labelsValidationLog.Printf("Label %d validated: %q", i, label)
