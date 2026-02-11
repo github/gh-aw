@@ -46,11 +46,11 @@ func getSandboxFalseToAgentFalseCodemod() Codemod {
 					if strings.Contains(trimmedLine, "sandbox: false") || strings.Contains(trimmedLine, "sandbox:false") {
 						// Get the indentation of the original line
 						indent := getIndentation(line)
-						
+
 						// Replace with sandbox.agent: false format
 						result = append(result, indent+"sandbox:")
 						result = append(result, indent+"  agent: false")
-						
+
 						modified = true
 						sandboxAgentCodemodLog.Printf("Converted sandbox: false to sandbox.agent: false on line %d", i+1)
 						continue

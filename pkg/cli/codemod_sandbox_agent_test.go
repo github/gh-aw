@@ -201,4 +201,3 @@ strict: false
 	assert.Contains(t, result, "  agent: false")
 	assert.Contains(t, result, "strict: false")
 }
-
