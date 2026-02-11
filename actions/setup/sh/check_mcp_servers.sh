@@ -49,7 +49,7 @@ echo ""
 # Validate configuration file exists
 CONFIG_VALIDATION_START=$(date +%s%3N)
 if [ ! -f "$GATEWAY_CONFIG_PATH" ]; then
-  echo "ERROR: Gateway configuration file not found: $GATEWAY_CONFIG_PATH" >&2
+  echo "ERROR: Gateway configuration file not found: ${GATEWAY_CONFIG_PATH@Q}" >&2
   exit 1
 fi
 
@@ -184,8 +184,8 @@ while IFS= read -r SERVER_NAME; do
     SERVERS_SUCCEEDED=$((SERVERS_SUCCEEDED + 1))
   else
     echo "✗ $SERVER_NAME: failed to connect"
-    echo "  URL: $SERVER_URL"
-    echo "  Last error: $LAST_ERROR"
+    echo "  URL: ${SERVER_URL@Q}"
+    echo "  Last error: ${LAST_ERROR@Q}"
     echo "  Retries attempted: $MAX_RETRIES"
     SERVERS_FAILED=$((SERVERS_FAILED + 1))
   fi
