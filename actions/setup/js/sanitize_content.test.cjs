@@ -1540,9 +1540,7 @@ describe("sanitize_content.cjs", () => {
     });
 
     it("should escape template delimiters in multi-line content", () => {
-      const result = sanitizeContent(`Line 1: {{ var }}
-Line 2: <%= erb %>
-Line 3: \${ js }`);
+      const result = sanitizeContent("Line 1: {{ var }}\nLine 2: <%= erb %>\nLine 3: ${ js }");
       expect(result).toContain("\\{\\{ var }}");
       expect(result).toContain("\\<%= erb %>");
       expect(result).toContain("\\$\\{ js }");
