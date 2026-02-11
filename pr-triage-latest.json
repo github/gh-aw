@@ -1,123 +1,43 @@
 {
-  "run_date": "2026-02-10T18:33:07.614884+00:00",
-  "run_id": "21877444406",
-  "total_prs_triaged": 3,
-  "results": [
-    {
-      "number": 14820,
-      "title": "Make discussion categories case-insensitive",
-      "url": "https://github.com/github/gh-aw/pull/14820",
-      "author": "Copilot",
-      "draft": true,
-      "category": "bug",
-      "risk": "high",
-      "priority_score": 73,
-      "impact_score": 50,
-      "urgency_score": 10,
-      "quality_score": 13,
-      "action": "fast_track",
-      "ci_status": "pending",
-      "age_hours": 0.4,
-      "files_changed": 4,
-      "additions": 379,
-      "deletions": 100,
-      "lines_changed": 479,
-      "has_tests": true,
-      "files": [
-        "actions/setup/js/create_discussion.cjs",
-        "actions/setup/js/create_discussion_category_normalization.test.cjs",
-        "pkg/workflow/create_discussion.go",
-        "pkg/workflow/create_discussion_validation_test.go"
-      ],
-      "labels": []
-    },
-    {
-      "number": 14819,
-      "title": "Add github-token support to all safe-output handlers",
-      "url": "https://github.com/github/gh-aw/pull/14819",
-      "author": "Copilot",
-      "draft": true,
-      "category": "bug",
-      "risk": "high",
-      "priority_score": 73,
-      "impact_score": 50,
-      "urgency_score": 10,
-      "quality_score": 13,
-      "action": "fast_track",
-      "ci_status": "pending",
-      "age_hours": 0.4,
-      "files_changed": 4,
-      "additions": 156,
-      "deletions": 12,
-      "lines_changed": 168,
-      "has_tests": true,
-      "files": [
-        "docs/src/content/docs/reference/frontmatter-full.md",
-        "pkg/parser/schemas/main_workflow_schema.json",
-        "pkg/workflow/compiler_safe_outputs_config.go",
-        "pkg/workflow/safe_outputs_handler_manager_token_test.go"
-      ],
-      "labels": []
-    },
-    {
-      "number": 14682,
-      "title": "Add test workflow for project-related safe output token failure paths",
-      "url": "https://github.com/github/gh-aw/pull/14682",
-      "author": "Copilot",
-      "draft": false,
-      "category": "test",
-      "risk": "low",
-      "priority_score": 30,
-      "impact_score": 15,
-      "urgency_score": 2,
-      "quality_score": 13,
-      "action": "batch_review",
-      "ci_status": "pending",
-      "age_hours": 26.6,
-      "files_changed": 2,
-      "additions": 1482,
-      "deletions": 0,
-      "lines_changed": 1482,
-      "has_tests": true,
-      "files": [
-        ".github/workflows/test-project-token-failure.lock.yml",
-        ".github/workflows/test-project-token-failure.md"
-      ],
-      "labels": [
-        "pr-risk:low",
-        "pr-priority:medium",
-        "pr-action:batch-review",
-        "pr-priority:low",
-        "pr-type:test",
-        "pr-agent:manual",
-        "pr-batch:batch-test-001",
-        "pr-batch:batch-test-low-001"
-      ]
-    }
-  ],
+  "run_date": "2026-02-11T00:44:13.341Z",
+  "run_id": "21888181686",
+  "total_prs_triaged": 0,
+  "new_prs": 0,
+  "re_triaged": 0,
+  "results": [],
   "statistics": {
-    "by_category": {
-      "bug": 2,
-      "test": 1
-    },
-    "by_risk": {
-      "high": 2,
-      "low": 1
-    },
-    "by_priority": {
-      "high": 2,
-      "low": 1
-    },
-    "by_action": {
-      "fast_track": 2,
-      "batch_review": 1
-    }
+    "by_category": {},
+    "by_risk": {},
+    "by_priority": {},
+    "by_action": {}
   },
   "auto_merge_candidates": [],
-  "fast_track_needed": [
-    14820,
-    14819
-  ],
+  "fast_track_needed": [],
   "batches": {},
-  "close_candidates": []
+  "close_candidates": [],
+  "previous_run": {
+    "run_date": "2026-02-10T18:33:07.614884+00:00",
+    "run_id": "21877444406",
+    "total_prs_triaged": 3,
+    "prs_resolved": [
+      {
+        "number": 14820,
+        "title": "Make discussion categories case-insensitive",
+        "status": "merged",
+        "closed_at": "2026-02-10T18:47:43Z"
+      },
+      {
+        "number": 14819,
+        "title": "Add github-token support to all safe-output handlers",
+        "status": "merged"
+      },
+      {
+        "number": 14682,
+        "title": "Add test workflow for project-related safe output token failure paths",
+        "status": "closed"
+      }
+    ]
+  },
+  "backlog_status": "clear",
+  "notes": "All PRs from previous triage run have been resolved. No open agent-created PRs remaining."
 }
