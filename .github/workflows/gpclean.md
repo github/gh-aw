@@ -60,14 +60,14 @@ Use the repository's SBOM (Software Bill of Materials) to get accurate dependenc
 
 1. **Download SBOM from GitHub**:
    ```bash
-   # Download SBOM using GitHub API
-   curl -L \
+   # Download SBOM using gh CLI (requires contents: read permission)
+   gh api "repos/${{ github.repository }}/dependency-graph/sbom" \
      -H "Accept: application/vnd.github+json" \
-     -H "Authorization: Bearer $GITHUB_TOKEN" \
      -H "X-GitHub-Api-Version: 2022-11-28" \
-     https://api.github.com/repos/${{ github.repository }}/dependency-graph/sbom \
-     -o /tmp/sbom.json
+     > /tmp/sbom.json
    ```
+   
+   **Note**: The workflow already has `contents: read` permission which is required to access the dependency graph SBOM API.
 
 2. **Extract dependencies from SBOM**:
    - Parse the SBOM JSON file (SPDX format)
@@ -322,6 +322,7 @@ After creating the issue:
 ### SBOM Usage
 
 - **Download SBOM first** at the beginning of each run to get the latest dependency information
+- **Use `gh api`** to download SBOM - the workflow has `contents: read` permission which is required for the dependency graph API
 - SBOM is in SPDX format with packages listed in `sbom.packages[]` array
 - Go packages have `purl` (Package URL) in format: `pkg:golang/github.com/org/repo@version`
 - Parse the SBOM to extract all Go dependencies before license checking
