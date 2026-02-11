@@ -33,7 +33,7 @@ GATEWAY_URL="$3"
 # Validate that MCP config file exists
 validate_config_file_exists() {
   if [ ! -f "$MCP_CONFIG_PATH" ]; then
-    echo "ERROR: MCP config file not found: $MCP_CONFIG_PATH" >&2
+    echo "ERROR: MCP config file not found: ${MCP_CONFIG_PATH@Q}" >&2
     return 1
   fi
   return 0
@@ -104,8 +104,8 @@ validate_gateway_url() {
   
   if ! echo "$server_url" | grep -q "$GATEWAY_URL"; then
     echo "ERROR: ${SERVER_NAME} server URL does not point to gateway" >&2
-    echo "Expected gateway URL: $GATEWAY_URL" >&2
-    echo "Actual URL: $server_url" >&2
+    echo "Expected gateway URL: ${GATEWAY_URL@Q}" >&2
+    echo "Actual URL: ${server_url@Q}" >&2
     return 1
   fi
   

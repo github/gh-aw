@@ -70,14 +70,14 @@ if [ "$all_empty" = true ]; then
     echo "❌ Error: $error_msg"
     echo "$requirement_msg"
     echo "Please configure one of these secrets in your repository settings."
-    echo "Documentation: $DOCS_URL"
+    echo "Documentation: ${DOCS_URL@Q}"
   } >> "$GITHUB_STEP_SUMMARY"
   
   # Print to stderr
   echo "Error: $error_msg" >&2
   echo "$requirement_msg" >&2
   echo "Please configure one of these secrets in your repository settings." >&2
-  echo "Documentation: $DOCS_URL" >&2
+  echo "Documentation: ${DOCS_URL@Q}" >&2
   
   # Set step output to indicate verification failed
   if [ -n "$GITHUB_OUTPUT" ]; then
