@@ -373,11 +373,14 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		}
 
 		// Generate restore keys automatically by splitting the cache key on '-'
+		// Stop at workflow level to prevent cross-workflow cache poisoning
 		var restoreKeys []string
 		keyParts := strings.Split(cacheKey, "-")
-		for i := len(keyParts) - 1; i > 0; i-- {
-			restoreKey := strings.Join(keyParts[:i], "-") + "-"
-			restoreKeys = append(restoreKeys, restoreKey)
+		// Only generate restore key for workflow level (remove run_id only)
+		// This prevents generic fallbacks like "memory-" that would match any workflow
+		if len(keyParts) >= 2 {
+			workflowLevelKey := strings.Join(keyParts[:len(keyParts)-1], "-") + "-"
+			restoreKeys = append(restoreKeys, workflowLevelKey)
 		}
 
 		// Step name and action
