@@ -306,6 +306,8 @@ The recommended token for all Copilot-related operations including the Copilot e
 - Assigning `copilot` as issue assignee
 - Adding `copilot` as PR reviewer
 
+
+
 **Setup**:
 
 The required token type depends on whether you own the repository or an organization owns it:
@@ -334,6 +336,23 @@ When an organization owns the repository, you need a fine-grained PAT with organ
      - Members: Read-only (required)
      - GitHub Copilot Business: Read-only (required)
    - **Important**: You must explicitly grant organization access during token creation
+
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls 
+    loop 
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-org-copilot.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-org-copilot.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a fine-grained PAT for organization-owned repositories with Copilot permissions
+  </div>
+</div>
 
 2. Add to repository secrets:
 
