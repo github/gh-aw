@@ -32,7 +32,7 @@ name: "Test Dispatcher Workflow"
 permissions: {}
 
 concurrency:
-  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number }}"
+  group: "gh-aw-${{ github.workflow }}"
 
 run-name: "Test Dispatcher Workflow"
 
