@@ -151,10 +151,11 @@ safe-outputs:
 			genericFallbacks: []string{"memory-"},
 		},
 		{
-			name: "cache-memory with repo scope should allow generic fallbacks",
+			name: "cache-memory with repo scope should have same restore key as workflow scope",
 			frontmatter: `---
 name: Test Cache Memory Repo Scope
 on: workflow_dispatch
+strict: false
 permissions:
   contents: read
   issues: read
@@ -169,13 +170,12 @@ tools:
     allowed: [get_repository]
 ---`,
 			expectedInLock: []string{
-				// Should have multiple restore keys for repo scope
+				// Repo scope now generates the same single restore key as workflow scope
+				// The difference is semantic (intent) and enforced in strict mode
 				"restore-keys: |",
 				"shared-cache-${{ github.workflow }}-",
-				"shared-cache-",
-				"shared-",
 			},
-			genericFallbacks: []string{}, // No checks - repo scope intentionally allows generic fallbacks
+			genericFallbacks: []string{"shared-cache-", "shared-"}, // Should NOT have these fallbacks
 		},
 	}
 

@@ -396,9 +396,10 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		}
 
 		// Generate restore keys based on scope
-		// - "workflow" (default): Removes only run_id suffix, keeping workflow identifier
-		// - "repo": Removes only run_id suffix, allowing repo-wide cache sharing
+		// - "workflow" (default): Removes only run_id, keeping workflow identifier
+		// - "repo": Generates generic prefix that matches across all workflows in the repo
 		var restoreKeys []string
+		keyParts := strings.Split(cacheKey, "-")
 
 		// Determine scope (default to "workflow" for safety)
 		scope := cache.Scope
@@ -406,25 +407,23 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 			scope = "workflow"
 		}
 
-		// For both scopes, remove the run_id suffix as a single unit (don't split the key)
-		// The cacheKey always ends with "-${{ github.run_id }}" (ensured by code above)
-		if strings.HasSuffix(cacheKey, runIdSuffix) {
-			// Remove the run_id suffix to create the restore key
-			restoreKey := strings.TrimSuffix(cacheKey, "${{ github.run_id }}") // Keep the trailing "-"
-			restoreKeys = append(restoreKeys, restoreKey)
+		if scope == "repo" {
+			// For repo scope, generate progressively shorter restore keys
+			// This allows cache sharing across workflows in the same repository
+			for i := len(keyParts) - 1; i > 0; i-- {
+				restoreKey := strings.Join(keyParts[:i], "-") + "-"
+				restoreKeys = append(restoreKeys, restoreKey)
+			}
 		} else {
-			// Fallback: split on last dash if run_id suffix not found
-			// This handles edge cases where the key format might be different
-			keyParts := strings.Split(cacheKey, "-")
+			// For workflow scope (default), only remove run_id to prevent cross-workflow cache access
+			// This prevents generic fallbacks like "memory-" that would match any workflow
+			// Security: Custom keys without ${{ github.workflow }} will still be workflow-scoped
+			// by only removing the final run_id segment
 			if len(keyParts) >= 2 {
 				workflowLevelKey := strings.Join(keyParts[:len(keyParts)-1], "-") + "-"
 				restoreKeys = append(restoreKeys, workflowLevelKey)
 			}
 		}
-
-		// Note: The difference between "workflow" and "repo" scope is semantic
-		// Both generate the same restore key pattern, but "repo" scope indicates
-		// the user's intent to share caches across workflows (and is rejected in strict mode)
 
 		// Step name and action
 		// Use actions/cache/restore for restore-only caches or when threat detection is enabled
