@@ -947,8 +947,8 @@
         },
         "item_url": {
           "type": "string",
-          "pattern": "^https://github\\\\.com/[^/]+/[^/]+/issues/\\\\d+$",
-          "description": "Optional GitHub issue URL to add as the first item to the project (e.g., 'https://github.com/owner/repo/issues/123')."
+          "pattern": "^(https://github\\\\.com/[^/]+/[^/]+/issues/(\\\\d+|#?aw_[0-9a-f]{12})|#?aw_[0-9a-f]{12})$",
+          "description": "Optional GitHub issue URL or temporary ID to add as the first item to the project. Accepts either a full URL (e.g., 'https://github.com/owner/repo/issues/123'), a URL with temporary ID (e.g., 'https://github.com/owner/repo/issues/aw_abc123def456'), or a plain temporary ID (e.g., 'aw_abc123def456' or '#aw_abc123def456') from a previously created issue in the same workflow run."
         },
         "temporary_id": {
           "type": "string",
