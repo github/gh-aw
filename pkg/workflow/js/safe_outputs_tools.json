@@ -783,8 +783,8 @@
       "properties": {
         "project": {
           "type": "string",
-          "pattern": "^https://github\\.com/(orgs|users)/[^/]+/projects/\\d+$",
-          "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'). Project names or numbers alone are NOT accepted."
+          "pattern": "^(https://github\\.com/(orgs|users)/[^/]+/projects/\\d+|#?aw_[0-9a-f]{12})$",
+          "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'), or a temporary project ID from a recent create_project call (e.g., '#aw_abc123def456' or 'aw_abc123def456'). Project names or numbers alone are NOT accepted."
         },
         "operation": {
           "type": "string",
@@ -949,6 +949,11 @@
           "type": "string",
           "pattern": "^https://github\\\\.com/[^/]+/[^/]+/issues/\\\\d+$",
           "description": "Optional GitHub issue URL to add as the first item to the project (e.g., 'https://github.com/owner/repo/issues/123')."
+        },
+        "temporary_id": {
+          "type": "string",
+          "pattern": "^aw_[0-9a-f]{12}$",
+          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
         }
       },
       "additionalProperties": false
