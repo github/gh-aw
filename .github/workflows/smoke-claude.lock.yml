@@ -317,10 +317,10 @@ jobs:
           mkdir -p /opt/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
-          cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
+          cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
           {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-claude"],"max":3},"create_issue":{"expires":2,"group":true,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
-          EOF
-          cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
+          GH_AW_SAFE_OUTPUTS_CONFIG_EOF
+          cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
             {
               "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created.",
@@ -474,8 +474,8 @@ jobs:
               "name": "missing_data"
             }
           ]
-          EOF
-          cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
+          GH_AW_SAFE_OUTPUTS_TOOLS_EOF
+          cat > /opt/gh-aw/safeoutputs/validation.json << 'GH_AW_SAFE_OUTPUTS_VALIDATION_EOF'
           {
             "add_comment": {
               "defaultMax": 1,
@@ -572,7 +572,7 @@ jobs:
               }
             }
           }
-          EOF
+          GH_AW_SAFE_OUTPUTS_VALIDATION_EOF
       - name: Generate Safe Outputs MCP Server Config
         id: safe-outputs-config
         run: |
@@ -614,7 +614,7 @@ jobs:
       - name: Setup Safe Inputs Config
         run: |
           mkdir -p /opt/gh-aw/safe-inputs/logs
-          cat > /opt/gh-aw/safe-inputs/tools.json << 'EOF_TOOLS_JSON'
+          cat > /opt/gh-aw/safe-inputs/tools.json << 'GH_AW_SAFE_INPUTS_TOOLS_EOF'
           {
             "serverName": "safeinputs",
             "version": "1.0.0",
@@ -766,8 +766,8 @@ jobs:
               }
             ]
           }
-          EOF_TOOLS_JSON
-          cat > /opt/gh-aw/safe-inputs/mcp-server.cjs << 'EOFSI'
+          GH_AW_SAFE_INPUTS_TOOLS_EOF
+          cat > /opt/gh-aw/safe-inputs/mcp-server.cjs << 'GH_AW_SAFE_INPUTS_SERVER_EOF'
             const path = require("path");
             const { startHttpServer } = require("./safe_inputs_mcp_server_http.cjs");
             const configPath = path.join(__dirname, "tools.json");
@@ -781,12 +781,12 @@ jobs:
               console.error("Failed to start safe-inputs HTTP server:", error);
               process.exit(1);
             });
-          EOFSI
+          GH_AW_SAFE_INPUTS_SERVER_EOF
           chmod +x /opt/gh-aw/safe-inputs/mcp-server.cjs
           
       - name: Setup Safe Inputs Tool Files
         run: |
-          cat > /opt/gh-aw/safe-inputs/gh.sh << 'EOFSH_gh'
+          cat > /opt/gh-aw/safe-inputs/gh.sh << 'GH_AW_SAFE_INPUTS_SH_GH_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: gh
           # Execute any gh CLI command. This tool is accessible as 'safeinputs-gh'. Provide the full command after 'gh' (e.g., args: 'pr list --limit 5'). The tool will run: gh <args>. Use single quotes ' for complex args to avoid shell interpretation issues.
@@ -797,9 +797,9 @@ jobs:
           echo "  token: ${GH_AW_GH_TOKEN:0:6}..."
           GH_TOKEN="$GH_AW_GH_TOKEN" gh $INPUT_ARGS
           
-          EOFSH_gh
+          GH_AW_SAFE_INPUTS_SH_GH_EOF
           chmod +x /opt/gh-aw/safe-inputs/gh.sh
-          cat > /opt/gh-aw/safe-inputs/github-discussion-query.sh << 'EOFSH_github-discussion-query'
+          cat > /opt/gh-aw/safe-inputs/github-discussion-query.sh << 'GH_AW_SAFE_INPUTS_SH_GITHUB-DISCUSSION-QUERY_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: github-discussion-query
           # Query GitHub discussions with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter.
@@ -934,9 +934,9 @@ jobs:
           EOF
           fi
           
-          EOFSH_github-discussion-query
+          GH_AW_SAFE_INPUTS_SH_GITHUB-DISCUSSION-QUERY_EOF
           chmod +x /opt/gh-aw/safe-inputs/github-discussion-query.sh
-          cat > /opt/gh-aw/safe-inputs/github-issue-query.sh << 'EOFSH_github-issue-query'
+          cat > /opt/gh-aw/safe-inputs/github-issue-query.sh << 'GH_AW_SAFE_INPUTS_SH_GITHUB-ISSUE-QUERY_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: github-issue-query
           # Query GitHub issues with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter.
@@ -1015,9 +1015,9 @@ jobs:
           fi
           
           
-          EOFSH_github-issue-query
+          GH_AW_SAFE_INPUTS_SH_GITHUB-ISSUE-QUERY_EOF
           chmod +x /opt/gh-aw/safe-inputs/github-issue-query.sh
-          cat > /opt/gh-aw/safe-inputs/github-pr-query.sh << 'EOFSH_github-pr-query'
+          cat > /opt/gh-aw/safe-inputs/github-pr-query.sh << 'GH_AW_SAFE_INPUTS_SH_GITHUB-PR-QUERY_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: github-pr-query
           # Query GitHub pull requests with jq filtering support. Without --jq, returns schema and data size info. Use --jq '.' to get all data, or specific jq expressions to filter.
@@ -1102,9 +1102,9 @@ jobs:
           fi
           
           
-          EOFSH_github-pr-query
+          GH_AW_SAFE_INPUTS_SH_GITHUB-PR-QUERY_EOF
           chmod +x /opt/gh-aw/safe-inputs/github-pr-query.sh
-          cat > /opt/gh-aw/safe-inputs/go.sh << 'EOFSH_go'
+          cat > /opt/gh-aw/safe-inputs/go.sh << 'GH_AW_SAFE_INPUTS_SH_GO_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: go
           # Execute any Go command. This tool is accessible as 'safeinputs-go'. Provide the full command after 'go' (e.g., args: 'test ./...'). The tool will run: go <args>. Use single quotes ' for complex args to avoid shell interpretation issues.
@@ -1115,9 +1115,9 @@ jobs:
           go $INPUT_ARGS
           
           
-          EOFSH_go
+          GH_AW_SAFE_INPUTS_SH_GO_EOF
           chmod +x /opt/gh-aw/safe-inputs/go.sh
-          cat > /opt/gh-aw/safe-inputs/make.sh << 'EOFSH_make'
+          cat > /opt/gh-aw/safe-inputs/make.sh << 'GH_AW_SAFE_INPUTS_SH_MAKE_EOF'
           #!/bin/bash
           # Auto-generated safe-input tool: make
           # Execute any Make target. This tool is accessible as 'safeinputs-make'. Provide the target name(s) (e.g., args: 'build'). The tool will run: make <args>. Use single quotes ' for complex args to avoid shell interpretation issues.
@@ -1127,7 +1127,7 @@ jobs:
           echo "make $INPUT_ARGS"
           make $INPUT_ARGS
           
-          EOFSH_make
+          GH_AW_SAFE_INPUTS_SH_MAKE_EOF
           chmod +x /opt/gh-aw/safe-inputs/make.sh
           
       - name: Generate Safe Inputs MCP Server Config
@@ -1197,7 +1197,7 @@ jobs:
           export GH_AW_ENGINE="claude"
           export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_API_KEY -e MCP_GATEWAY_PAYLOAD_DIR -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_LOCKDOWN -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e GH_AW_SAFE_INPUTS_PORT -e GH_AW_SAFE_INPUTS_API_KEY -e GH_AW_SAFE_OUTPUTS_PORT -e GH_AW_SAFE_OUTPUTS_API_KEY -e GH_AW_GH_TOKEN -e GH_DEBUG -e GH_TOKEN -e TAVILY_API_KEY -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw ghcr.io/github/gh-aw-mcpg:v0.1.0'
           
-          cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
+          cat << GH_AW_MCP_CONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
               "agenticworkflows": {
@@ -1280,7 +1280,7 @@ jobs:
               "payloadDir": "${MCP_GATEWAY_PAYLOAD_DIR}"
             }
           }
-          MCPCONFIG_EOF
+          GH_AW_MCP_CONFIG_EOF
       - name: Generate workflow overview
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
