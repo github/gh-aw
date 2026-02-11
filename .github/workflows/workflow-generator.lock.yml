@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 58c77cd81e7e92b1fc2d3567bb89fbef3ad96bb57cb7b2def1a4c66744f67a99
+# frontmatter-hash: 2c2bf31df99a83c301214912d0cbe9e07f12cd4a8f188b2852bc94dc403d40d2
 
 name: "Workflow Generator"
 "on":
@@ -226,10 +226,10 @@ jobs:
           mkdir -p /opt/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
-          cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'
+          cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
           {"assign_to_agent":{"allowed":["copilot"],"max":1,"target":"triggering"},"missing_data":{},"missing_tool":{},"noop":{"max":1},"update_issue":{"max":1}}
-          EOF
-          cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'
+          GH_AW_SAFE_OUTPUTS_CONFIG_EOF
+          cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
             {
               "description": "Assign the GitHub Copilot coding agent to work on an issue or pull request. The agent will analyze the issue/PR and attempt to implement a solution, creating a pull request when complete. Use this to delegate coding tasks to Copilot. Example usage: assign_to_agent(issue_number=123, agent=\"copilot\") or assign_to_agent(pull_number=456, agent=\"copilot\") CONSTRAINTS: Maximum 1 issue(s) can be assigned to agent.",
@@ -260,7 +260,7 @@ jobs:
               "name": "assign_to_agent"
             },
             {
-              "description": "Update an existing GitHub issue's status, title, labels, assignees, milestone, or body. Body updates support replacing, appending to, prepending content, or updating a per-run \"island\" section. CONSTRAINTS: Maximum 1 issue(s) can be updated. Target: ${{ github.event.issue.number }}.",
+              "description": "Update an existing GitHub issue's status, title, labels, assignees, milestone, or body. Body updates support replacing, appending to, prepending content, or updating a per-run \"island\" section. CONSTRAINTS: Maximum 1 issue(s) can be updated.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -393,8 +393,8 @@ jobs:
               "name": "missing_data"
             }
           ]
-          EOF
-          cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'
+          GH_AW_SAFE_OUTPUTS_TOOLS_EOF
+          cat > /opt/gh-aw/safeoutputs/validation.json << 'GH_AW_SAFE_OUTPUTS_VALIDATION_EOF'
           {
             "assign_to_agent": {
               "defaultMax": 1,
@@ -472,7 +472,7 @@ jobs:
               "customValidation": "requiresOneOf:status,title,body"
             }
           }
-          EOF
+          GH_AW_SAFE_OUTPUTS_VALIDATION_EOF
       - name: Generate Safe Outputs MCP Server Config
         id: safe-outputs-config
         run: |
@@ -536,7 +536,7 @@ jobs:
           export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_API_KEY -e MCP_GATEWAY_PAYLOAD_DIR -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_LOCKDOWN -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e GH_AW_SAFE_OUTPUTS_PORT -e GH_AW_SAFE_OUTPUTS_API_KEY -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw ghcr.io/github/gh-aw-mcpg:v0.1.0'
           
           mkdir -p /home/runner/.copilot
-          cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
+          cat << GH_AW_MCP_CONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
               "github": {
@@ -564,7 +564,7 @@ jobs:
               "payloadDir": "${MCP_GATEWAY_PAYLOAD_DIR}"
             }
           }
-          MCPCONFIG_EOF
+          GH_AW_MCP_CONFIG_EOF
       - name: Generate workflow overview
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
@@ -678,7 +678,6 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
@@ -1205,7 +1204,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1,\"target\":\"${{ github.event.issue.number }}\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"max\":1}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
