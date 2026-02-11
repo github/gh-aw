@@ -23,10 +23,8 @@ on:
 rate-limit:
   max: 5             # Required: 1-10 runs
   window: 60         # Optional: minutes (default 60, max 180)
-  ignored-roles:     # Optional: roles exempt from rate limiting
-    - admin
-    - maintain
-  # events field is optional - automatically inferred from 'on:' triggers
+  # ignored-roles is optional and defaults to ["admin", "maintain", "write"]
+  # Only triage and read users are rate limited by default
 ---
 ```
 
@@ -45,6 +43,7 @@ rate-limit:
 
 ### `ignored-roles` (array, optional)
 - List of repository roles that are exempt from rate limiting
+- **Default**: `["admin", "maintain", "write"]` - by default, users with admin, maintain, or write permissions are exempt from rate limiting
 - Users with any of these roles will not be subject to rate limiting checks
 - Supported roles:
   - `admin` - Repository administrators
@@ -52,8 +51,9 @@ rate-limit:
   - `write` - Users with write access
   - `triage` - Users with triage access
   - `read` - Users with read access
-- Example: `ignored-roles: [admin, maintain]` exempts admins and maintainers
-- If not specified, rate limiting applies to all users
+- Example: `ignored-roles: [admin, maintain]` exempts only admins and maintainers (write users will be rate limited)
+- To apply rate limiting to all users, set to an empty array: `ignored-roles: []`
+- To exempt only admins: `ignored-roles: [admin]`
 
 ### `events` (array, optional)
 - Specific event types to apply rate limiting to
@@ -102,13 +102,22 @@ rate-limit:
 ```
 Events are automatically inferred from the workflow's triggers. Simplest configuration.
 
-### Basic Rate Limiting (Default Window)
+### Basic Rate Limiting (Default Ignored Roles)
 ```yaml
 rate-limit:
   max: 5
   window: 60
 ```
-Allows 5 runs per hour. Events inferred from `on:` section.
+Allows 5 runs per hour. Events inferred from `on:` section. By default, admin, maintain, and write users are exempt; only triage and read users are rate limited.
+
+### Rate Limiting All Users (No Exemptions)
+```yaml
+rate-limit:
+  max: 5
+  window: 60
+  ignored-roles: []
+```
+Applies rate limiting to all users including admins. Set `ignored-roles` to an empty array to disable the default exemptions.
 
 ### Explicit Event Filtering
 ```yaml
@@ -119,25 +128,24 @@ rate-limit:
 ```
 Explicitly specify events to override inference. Allows only 3 runs per 30 minutes for the specified events.
 
-### Rate Limiting with Role Exemptions
+### Rate Limiting with Custom Role Exemptions
 ```yaml
 rate-limit:
   max: 5
   window: 60
   ignored-roles:
     - admin
-    - maintain
 ```
-Allows 5 runs per hour, but admins and maintainers are exempt from rate limiting entirely.
+Only admins are exempt. Maintainers and write users are rate limited (overrides the default).
 
 ### Strict Rate Limiting for Contributors
 ```yaml
 rate-limit:
   max: 3
   window: 30
-  ignored-roles: [admin]
+  ignored-roles: [admin, maintain]
 ```
-Strict rate limiting (3 runs per 30 minutes) for all users except repository admins.
+Strict rate limiting (3 runs per 30 minutes) for write, triage, and read users. Admins and maintainers are exempt.
 
 ### Generous Rate Limiting
 ```yaml

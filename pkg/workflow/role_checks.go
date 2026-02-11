@@ -222,6 +222,10 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 				case string:
 					config.IgnoredRoles = []string{ignoredRoles}
 				}
+			} else {
+				// Default: admin, maintain, and write roles are exempt from rate limiting
+				config.IgnoredRoles = []string{"admin", "maintain", "write"}
+				roleLog.Print("No ignored-roles specified, using defaults: admin, maintain, write")
 			}
 
 			roleLog.Printf("Extracted rate-limit config: max=%d, window=%d, events=%v, ignored-roles=%v", config.Max, config.Window, config.Events, config.IgnoredRoles)
