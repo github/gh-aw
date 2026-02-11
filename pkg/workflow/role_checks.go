@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -62,7 +63,11 @@ func (c *Compiler) generateRateLimitCheck(data *WorkflowData, steps []string) []
 
 	// Set events to check (if specified)
 	if len(data.RateLimit.Events) > 0 {
-		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %q\n", strings.Join(data.RateLimit.Events, ",")))
+		// Sort events alphabetically for consistent output
+		events := make([]string, len(data.RateLimit.Events))
+		copy(events, data.RateLimit.Events)
+		sort.Strings(events)
+		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %q\n", strings.Join(events, ",")))
 	}
 
 	steps = append(steps, "        with:\n")
@@ -243,6 +248,8 @@ func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string 
 		}
 	}
 
+	// Sort events alphabetically for consistent output
+	sort.Strings(events)
 	return events
 }
 
