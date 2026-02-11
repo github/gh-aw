@@ -210,6 +210,22 @@ The required token type depends on whether you're working with **user-owned** or
 
 **For User-owned Projects (v2)**:
 
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-user-project.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-user-project.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a classic PAT for user-owned private projects
+  </div>
+</div>
+
 You **must** use a **classic PAT** with the `project` scope. Fine-grained PATs do **not** work with user-owned Projects.
 
 1. Create a [classic PAT](https://github.com/settings/tokens/new) with scopes:

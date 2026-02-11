@@ -41,6 +41,10 @@ run-*/
 ehthumbs.db
 Thumbs.db
 
+# PNG files (except docs/public/ and subfolders)
+*.png
+!docs/public/**/*.png
+
 # Go binary for this project
 /gh-aw
 /gh-aw-darwin-amd64
