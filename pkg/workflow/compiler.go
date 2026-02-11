@@ -255,6 +255,22 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		}
 	}
 
+	// Emit warning if id-token: write permission is detected
+	log.Printf("Checking for id-token: write permission")
+	if workflowData.Permissions != "" {
+		permissions := NewPermissionsParser(workflowData.Permissions).ToPermissions()
+		if permissions != nil {
+			level, exists := permissions.Get(PermissionIdToken)
+			if exists && level == PermissionWrite {
+				warningMsg := `This workflow grants id-token: write permission
+OIDC tokens can authenticate to cloud providers (AWS, Azure, GCP).
+Ensure proper audience validation and trust policies are configured.`
+				fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", warningMsg))
+				c.IncrementWarningCount()
+			}
+		}
+	}
+
 	// Validate GitHub tools against enabled toolsets
 	log.Printf("Validating GitHub tools against enabled toolsets")
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil {
