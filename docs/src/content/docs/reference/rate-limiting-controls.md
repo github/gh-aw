@@ -54,12 +54,14 @@ Each workflow execution is placed in a concurrency group based on its context:
 
 ```yaml wrap
 concurrency:
-  group: gh-aw-${{ github.workflow }}-${{ issue.number }}
+  group: gh-aw-${{ github.workflow }}
   cancel-in-progress: false
 ```
 
+The actual concurrency group pattern varies based on trigger type (includes issue numbers, PR numbers, or branch refs). See [Concurrency Control](/gh-aw/reference/concurrency/) for specific patterns.
+
 **Benefits:**
-- Prevents multiple simultaneous runs for the same issue/PR
+- Prevents multiple simultaneous runs for the same context
 - Queues work sequentially instead of running in parallel
 - Avoids race conditions and duplicate operations
 
