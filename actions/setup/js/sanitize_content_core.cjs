@@ -369,6 +369,88 @@ function neutralizeBotTriggers(s) {
 }
 
 /**
+ * Neutralizes template syntax delimiters to prevent potential template injection
+ * if content is processed by downstream template engines.
+ *
+ * This is a defense-in-depth measure. GitHub's markdown rendering doesn't evaluate
+ * template syntax, but this prevents issues if content is later processed by
+ * template engines (Jinja2, Liquid, ERB, JavaScript template literals).
+ *
+ * @param {string} s - The string to process
+ * @returns {string} The string with escaped template delimiters
+ */
+function neutralizeTemplateDelimiters(s) {
+  if (!s || typeof s !== "string") {
+    return "";
+  }
+
+  let result = s;
+  let templatesDetected = false;
+
+  // Escape Jinja2/Liquid double curly braces: {{ ... }}
+  // Replace {{ with \{\{ to prevent template evaluation
+  if (/\{\{/.test(result)) {
+    templatesDetected = true;
+    if (typeof core !== "undefined" && core.info) {
+      core.info("Template syntax detected: Jinja2/Liquid double braces {{");
+    }
+    result = result.replace(/\{\{/g, "\\{\\{");
+  }
+
+  // Escape ERB delimiters: <%= ... %>
+  // Replace <%= with \<%= to prevent ERB evaluation
+  if (/<%=/.test(result)) {
+    templatesDetected = true;
+    if (typeof core !== "undefined" && core.info) {
+      core.info("Template syntax detected: ERB delimiter <%=");
+    }
+    result = result.replace(/<%=/g, "\\<%=");
+  }
+
+  // Escape JavaScript template literal delimiters: ${ ... }
+  // Replace ${ with \$\{ to prevent template literal evaluation
+  if (/\$\{/.test(result)) {
+    templatesDetected = true;
+    if (typeof core !== "undefined" && core.info) {
+      core.info("Template syntax detected: JavaScript template literal ${");
+    }
+    result = result.replace(/\$\{/g, "\\$\\{");
+  }
+
+  // Escape Jinja2 comment delimiters: {# ... #}
+  // Replace {# with \{\# to prevent Jinja2 comment evaluation
+  if (/\{#/.test(result)) {
+    templatesDetected = true;
+    if (typeof core !== "undefined" && core.info) {
+      core.info("Template syntax detected: Jinja2 comment {#");
+    }
+    result = result.replace(/\{#/g, "\\{\\#");
+  }
+
+  // Escape Jekyll raw blocks: {% raw %} and {% endraw %}
+  // Replace {% with \{\% to prevent Jekyll directive evaluation
+  if (/\{%/.test(result)) {
+    templatesDetected = true;
+    if (typeof core !== "undefined" && core.info) {
+      core.info("Template syntax detected: Jekyll/Liquid directive {%");
+    }
+    result = result.replace(/\{%/g, "\\{\\%");
+  }
+
+  // Log a summary warning if any template patterns were detected
+  if (templatesDetected && typeof core !== "undefined" && core.warning) {
+    core.warning(
+      "Template-like syntax detected and escaped. " +
+        "This is a defense-in-depth measure to prevent potential template injection " +
+        "if content is processed by downstream template engines. " +
+        "GitHub's markdown rendering does not evaluate template syntax."
+    );
+  }
+
+  return result;
+}
+
+/**
  * Builds the list of allowed repositories for GitHub reference filtering
  * Returns null if all references should be allowed (default behavior)
  * Returns empty array if no references should be allowed (escape all)
@@ -635,6 +717,10 @@ function sanitizeContentCore(content, maxLength) {
   // Neutralize common bot trigger phrases
   sanitized = neutralizeBotTriggers(sanitized);
 
+  // Neutralize template syntax delimiters (defense-in-depth)
+  // This prevents potential issues if content is processed by downstream template engines
+  sanitized = neutralizeTemplateDelimiters(sanitized);
+
   // Balance markdown code regions to fix improperly nested fences
   // This repairs markdown where AI models generate nested code blocks at the same indentation
   const { balanceCodeRegions } = require("./markdown_code_region_balancer.cjs");
@@ -662,6 +748,7 @@ module.exports = {
   removeXmlComments,
   convertXmlTags,
   neutralizeBotTriggers,
+  neutralizeTemplateDelimiters,
   applyTruncation,
   hardenUnicodeText,
   decodeHtmlEntities,

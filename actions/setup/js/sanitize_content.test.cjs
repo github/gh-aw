@@ -1481,4 +1481,114 @@ describe("sanitize_content.cjs", () => {
       expect(result).toBe("@author is allowed");
     });
   });
+
+  describe("template delimiter neutralization (T24)", () => {
+    it("should escape Jinja2/Liquid double curly braces", () => {
+      const result = sanitizeContent("{{ secrets.TOKEN }}");
+      expect(result).toBe("\\{\\{ secrets.TOKEN }}");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jinja2/Liquid double braces {{");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected and escaped"));
+    });
+
+    it("should escape ERB delimiters", () => {
+      const result = sanitizeContent("<%= config %>");
+      expect(result).toBe("\\<%= config %>");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: ERB delimiter <%=");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected and escaped"));
+    });
+
+    it("should escape JavaScript template literals", () => {
+      const result = sanitizeContent("${ expression }");
+      expect(result).toBe("\\$\\{ expression }");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: JavaScript template literal ${");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected and escaped"));
+    });
+
+    it("should escape Jinja2 comment delimiters", () => {
+      const result = sanitizeContent("{# comment #}");
+      expect(result).toBe("\\{\\# comment #}");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jinja2 comment {#");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected and escaped"));
+    });
+
+    it("should escape Jekyll raw blocks", () => {
+      const result = sanitizeContent("{% raw %}{{code}}{% endraw %}");
+      expect(result).toBe("\\{\\% raw %}\\{\\{code}}\\{\\% endraw %}");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jekyll/Liquid directive {%");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jinja2/Liquid double braces {{");
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected and escaped"));
+    });
+
+    it("should escape multiple template patterns in the same text", () => {
+      const result = sanitizeContent("Mix: {{ var }}, <%= erb %>, ${ js }");
+      expect(result).toBe("Mix: \\{\\{ var }}, \\<%= erb %>, \\$\\{ js }");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jinja2/Liquid double braces {{");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: ERB delimiter <%=");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: JavaScript template literal ${");
+    });
+
+    it("should not log when no template delimiters are present", () => {
+      const result = sanitizeContent("Normal text without templates");
+      expect(result).toBe("Normal text without templates");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected"));
+    });
+
+    it("should handle multiple occurrences of the same template type", () => {
+      const result = sanitizeContent("{{ var1 }} and {{ var2 }} and {{ var3 }}");
+      expect(result).toBe("\\{\\{ var1 }} and \\{\\{ var2 }} and \\{\\{ var3 }}");
+      expect(mockCore.info).toHaveBeenCalledWith("Template syntax detected: Jinja2/Liquid double braces {{");
+    });
+
+    it("should escape template delimiters in multi-line content", () => {
+      const result = sanitizeContent("Line 1: {{ var }}\nLine 2: <%= erb %>\nLine 3: ${ js }");
+      expect(result).toContain("\\{\\{ var }}");
+      expect(result).toContain("\\<%= erb %>");
+      expect(result).toContain("\\$\\{ js }");
+    });
+
+    it("should not double-escape already escaped template delimiters", () => {
+      // If content already has backslashes, we still escape (it's safer to escape again)
+      const result = sanitizeContent("\\{{ already }}");
+      expect(result).toBe("\\\\{\\{ already }}");
+    });
+
+    it("should preserve normal curly braces that are not template delimiters", () => {
+      const result = sanitizeContent("{ single brace }");
+      expect(result).toBe("{ single brace }");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected"));
+    });
+
+    it("should preserve dollar sign without curly brace", () => {
+      const result = sanitizeContent("Price: $100");
+      expect(result).toBe("Price: $100");
+      expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("Template-like syntax detected"));
+    });
+
+    it("should escape template delimiters in code blocks", () => {
+      // Template delimiters should still be escaped even in code blocks
+      // This is defense-in-depth - we escape everywhere
+      const result = sanitizeContent("`code with {{ var }}`");
+      expect(result).toBe("`code with \\{\\{ var }}`");
+    });
+
+    it("should handle real-world GitHub Actions template expressions", () => {
+      const result = sanitizeContent("${{ github.event.issue.title }}");
+      // Note: ${{ is NOT the same as ${ followed by {
+      // ${{ only matches the {{ pattern, not the ${ pattern
+      // So only {{ gets escaped
+      expect(result).toBe("$\\{\\{ github.event.issue.title }}");
+    });
+
+    it("should handle nested template patterns", () => {
+      const result = sanitizeContent("{% if {{ condition }} %}");
+      expect(result).toBe("\\{\\% if \\{\\{ condition }} %}");
+    });
+
+    it("should escape templates combined with other content", () => {
+      const result = sanitizeContent("Hello @user, check {{ secret }} at https://example.com");
+      expect(result).toContain("`@user`"); // mention escaped
+      expect(result).toContain("\\{\\{"); // template escaped
+      expect(result).toContain("(example.com/redacted)"); // URL redacted (not in allowed domains)
+    });
+  });
 });
