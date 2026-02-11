@@ -5,6 +5,10 @@ on:
   issues:
     types: [opened, edited]
   schedule: every 6h
+rate-limit:
+  max: 5
+  window: 60
+  events: [issues]
 permissions:
   contents: read
   issues: read

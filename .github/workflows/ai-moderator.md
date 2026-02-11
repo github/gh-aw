@@ -14,6 +14,10 @@ on:
         description: 'Issue URL to moderate (e.g., https://github.com/owner/repo/issues/123)'
         required: true
         type: string
+rate-limit:
+  max: 5
+  window: 60
+  events: [issues, issue_comment]
 engine:
   id: copilot
   model: gpt-5.1-codex-mini
