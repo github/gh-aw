@@ -376,10 +376,12 @@ Standard GitHub Actions properties:
 ```yaml wrap
 run-name: "Custom workflow run name"  # Defaults to workflow name
 runs-on: ubuntu-latest               # Defaults to ubuntu-latest (main job only)
-timeout-minutes: 30                  # Defaults to 20 minutes (timeout_minutes deprecated)
+timeout-minutes: 30                  # Defaults to 20 minutes
 ```
 
-**Note**: The `timeout_minutes` field is deprecated. Use `timeout-minutes` instead to follow GitHub Actions naming convention.
+> [!CAUTION]
+> Breaking Change: `timeout_minutes` Removed
+> The underscore variant `timeout_minutes` has been removed and is no longer supported. Use `timeout-minutes` (with hyphen) instead. Workflows using `timeout_minutes` will fail compilation with an "Unknown property" error.
 
 ### Workflow Concurrency Control (`concurrency:`)
 
