@@ -523,12 +523,12 @@ jobs:
           GH_AW_IS_PR_COMMENT: ${{ github.event.issue.pull_request && 'true' || '' }}
         run: |
           bash /opt/gh-aw/actions/create_prompt_first.sh
-          cat << 'PROMPT_EOF' > "$GH_AW_PROMPT"
+          cat << 'GH_AW_PROMPT_EOF' > "$GH_AW_PROMPT"
           <system>
-          PROMPT_EOF
+          GH_AW_PROMPT_EOF
           cat "/opt/gh-aw/prompts/temp_folder_prompt.md" >> "$GH_AW_PROMPT"
           cat "/opt/gh-aw/prompts/markdown.md" >> "$GH_AW_PROMPT"
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           <safe-outputs>
           <description>GitHub API Access Instructions</description>
           <important>
@@ -572,19 +572,19 @@ jobs:
           {{/if}}
           </github-context>
           
-          PROMPT_EOF
+          GH_AW_PROMPT_EOF
           if [ "$GITHUB_EVENT_NAME" = "issue_comment" ] && [ -n "$GH_AW_IS_PR_COMMENT" ] || [ "$GITHUB_EVENT_NAME" = "pull_request_review_comment" ] || [ "$GITHUB_EVENT_NAME" = "pull_request_review" ]; then
             cat "/opt/gh-aw/prompts/pr_context_prompt.md" >> "$GH_AW_PROMPT"
           fi
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          GH_AW_PROMPT_EOF
+          cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/shared/mood.md}}
-          PROMPT_EOF
-          cat << 'PROMPT_EOF' >> "$GH_AW_PROMPT"
+          GH_AW_PROMPT_EOF
+          cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/ai-moderator.md}}
-          PROMPT_EOF
+          GH_AW_PROMPT_EOF
       - name: Substitute placeholders
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:

@@ -57,13 +57,14 @@ Run ID: ${{ github.run_id }}
 	// Debug: print the compiled YAML section we care about
 	lines := strings.Split(compiledStr, "\n")
 	inPromptStep := false
+	delimiter := GenerateHeredocDelimiter("PROMPT")
 	for i, line := range lines {
 		if strings.Contains(line, "name: Create prompt") {
 			inPromptStep = true
 		}
 		if inPromptStep {
 			t.Logf("Line %d: %s", i, line)
-			if i > 0 && strings.Contains(lines[i-1], "PROMPT_EOF") && strings.Contains(line, "name:") && !strings.Contains(line, "Create prompt") {
+			if i > 0 && strings.Contains(lines[i-1], delimiter) && strings.Contains(line, "name:") && !strings.Contains(line, "Create prompt") {
 				break
 			}
 		}
@@ -77,12 +78,12 @@ Run ID: ${{ github.run_id }}
 
 	// Verify the original expressions have been replaced in the prompt heredoc content
 	// Find the heredoc section by looking for the "cat " line
-	heredocStart := strings.Index(compiledStr, "cat << 'PROMPT_EOF' > \"$GH_AW_PROMPT\"")
+	heredocStart := strings.Index(compiledStr, "cat << '"+delimiter+"' > \"$GH_AW_PROMPT\"")
 	if heredocStart == -1 {
 		t.Error("Could not find prompt heredoc section")
 	} else {
 		// Find the end of the heredoc
-		heredocEnd := strings.Index(compiledStr[heredocStart:], "\n          PROMPT_EOF\n")
+		heredocEnd := strings.Index(compiledStr[heredocStart:], "\n          "+delimiter+"\n")
 		if heredocEnd == -1 {
 			t.Error("Could not find end of prompt heredoc")
 		} else {

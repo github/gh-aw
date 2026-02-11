@@ -167,14 +167,15 @@ func TestGenerateUnifiedPromptCreationStep_MultipleUserChunks(t *testing.T) {
 
 	output := yaml.String()
 
-	// Count PROMPT_EOF markers
+	// Count GH_AW_PROMPT_EOF markers
 	// With system tags:
 	// - 2 for opening <system> tag
 	// - 2 for closing </system> tag
 	// - 2 per user chunk
-	eofCount := strings.Count(output, "PROMPT_EOF")
+	delimiter := GenerateHeredocDelimiter("PROMPT")
+	eofCount := strings.Count(output, delimiter)
 	expectedEOFCount := 4 + (len(userPromptChunks) * 2) // 4 for system tags, 2 per user chunk
-	assert.Equal(t, expectedEOFCount, eofCount, "Should have correct number of PROMPT_EOF markers")
+	assert.Equal(t, expectedEOFCount, eofCount, "Should have correct number of %s markers", delimiter)
 
 	// Verify all user chunks are present and in order
 	part1Pos := strings.Index(output, "# Part 1")
@@ -345,8 +346,9 @@ func TestGenerateUnifiedPromptCreationStep_FirstContentUsesCreate(t *testing.T) 
 		"First content should use > (create mode): %s", firstCatLine)
 
 	// Find subsequent cat commands (should use >> for append)
+	delimiter := GenerateHeredocDelimiter("PROMPT")
 	remainingOutput := output[firstCatPos+len(firstCatLine):]
-	if strings.Contains(remainingOutput, `cat "`) || strings.Contains(remainingOutput, "cat << 'PROMPT_EOF'") {
+	if strings.Contains(remainingOutput, `cat "`) || strings.Contains(remainingOutput, "cat << '"+delimiter+"'") {
 		// Verify subsequent operations use >> (append mode)
 		assert.Contains(t, remainingOutput, `>> "$GH_AW_PROMPT"`,
 			"Subsequent content should use >> (append mode)")
