@@ -26,12 +26,20 @@ sandbox:
 sandbox:
   agent: srt
 
+# Disable agent sandbox (firewall only) - use with caution
+sandbox:
+  agent: false
+
 # Or omit sandbox entirely to use the default (awf)
 ```
 
 > [!NOTE]
 > Default Behavior
-> If `sandbox` is not specified in your workflow, it defaults to `sandbox.agent: awf`. The agent sandbox is now mandatory for all workflows.
+> If `sandbox` is not specified in your workflow, it defaults to `sandbox.agent: awf`. The agent sandbox is recommended for all workflows.
+
+> [!CAUTION]
+> Disabling Agent Sandbox
+> Setting `sandbox.agent: false` disables only the agent firewall while keeping the MCP gateway enabled. This reduces security isolation and should only be used when necessary. The MCP gateway cannot be disabled and remains active in all workflows.
 
 ### MCP Gateway (Experimental)
 

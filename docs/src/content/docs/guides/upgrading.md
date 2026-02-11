@@ -85,9 +85,8 @@ The upgrade automatically applies codemods to fix deprecated fields in all workf
 
 | Codemod | What It Fixes | Example |
 |---------|---------------|---------|
-| **timeout-minutes-migration** | Replaces `timeout_minutes` with `timeout-minutes` | `timeout_minutes: 30` → `timeout-minutes: 30` |
+| **sandbox-false-to-agent-false** | Converts `sandbox: false` to `sandbox.agent: false` | `sandbox: false` → `sandbox: { agent: false }` |
 | **network-firewall-migration** | Removes deprecated `network.firewall` field | Deletes `firewall: mandatory` |
-| **sandbox-agent-false-removal** | Removes `sandbox.agent: false` (firewall now mandatory) | Deletes `agent: false` |
 | **safe-inputs-mode-removal** | Removes deprecated `safe-inputs.mode` field | Deletes `mode: auto` |
 | **schedule-at-to-around-migration** | Converts `daily at TIME` to `daily around TIME` | `daily at 10:00` → `daily around 10:00` |
 | **delete-schema-file** | Deletes deprecated schema file | Removes `.github/aw/schemas/agentic-workflow.json` |
@@ -147,7 +146,14 @@ Review changes with `git diff .github/workflows/` to verify that deprecated fiel
 
 ### Common Changes
 
-Typical migrations include `timeout_minutes` → `timeout-minutes`, `daily at` → `daily around`, and removal of deprecated `network.firewall` and `safe-inputs.mode` fields. Use `git diff --word-diff` for detailed comparison.
+Typical migrations include `sandbox: false` → `sandbox.agent: false`, `daily at` → `daily around`, and removal of deprecated `network.firewall` and `safe-inputs.mode` fields. Use `git diff --word-diff` for detailed comparison.
+
+> [!CAUTION]
+> Breaking Changes
+>
+> **`timeout_minutes` Removed:** The underscore variant `timeout_minutes` has been completely removed from the schema. Workflows using this field will fail compilation. Use `timeout-minutes` (with hyphen) instead.
+>
+> **`sandbox: false` Changed:** Top-level `sandbox: false` is no longer supported. Use `sandbox.agent: false` instead to disable only the agent firewall. The MCP gateway remains enabled and cannot be disabled. The `gh aw fix` command includes a codemod to automatically migrate this change.
 
 ## Step 5: Verify Compilation
 

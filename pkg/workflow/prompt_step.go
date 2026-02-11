@@ -49,15 +49,16 @@ func appendPromptStep(yaml *strings.Builder, stepName string, renderer func(*str
 func appendPromptStepWithHeredoc(yaml *strings.Builder, stepName string, renderer func(*strings.Builder)) {
 	promptStepLog.Printf("Appending prompt step with heredoc: name=%s", stepName)
 
+	delimiter := GenerateHeredocDelimiter("PROMPT")
 	yaml.WriteString("      - name: " + stepName + "\n")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
 	yaml.WriteString("        run: |\n")
-	yaml.WriteString("          cat << 'PROMPT_EOF' >> \"$GH_AW_PROMPT\"\n")
+	yaml.WriteString("          cat << '" + delimiter + "' >> \"$GH_AW_PROMPT\"\n")
 
 	// Call the renderer to write the content
 	renderer(yaml)
 
-	yaml.WriteString("          PROMPT_EOF\n")
+	yaml.WriteString("          " + delimiter + "\n")
 	promptStepLog.Print("Heredoc prompt step appended successfully")
 }

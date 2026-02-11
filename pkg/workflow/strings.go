@@ -270,3 +270,35 @@ func ShortenCommand(command string) string {
 	}
 	return shortened
 }
+
+// GenerateHeredocDelimiter creates a standardized heredoc delimiter with the GH_AW prefix.
+// All heredoc delimiters in compiled lock.yml files should use this format for consistency.
+//
+// The function generates delimiters in the format: GH_AW_<NAME>_EOF
+//
+// Parameters:
+//   - name: A descriptive identifier for the heredoc content (e.g., "PROMPT", "MCP_CONFIG", "TOOLS_JSON")
+//     The name should use SCREAMING_SNAKE_CASE without the _EOF suffix.
+//
+// Returns a delimiter string in the format "GH_AW_<NAME>_EOF"
+//
+// Example:
+//
+//	GenerateHeredocDelimiter("PROMPT")          // returns "GH_AW_PROMPT_EOF"
+//	GenerateHeredocDelimiter("MCP_CONFIG")      // returns "GH_AW_MCP_CONFIG_EOF"
+//	GenerateHeredocDelimiter("TOOLS_JSON")      // returns "GH_AW_TOOLS_JSON_EOF"
+//	GenerateHeredocDelimiter("SRT_CONFIG")      // returns "GH_AW_SRT_CONFIG_EOF"
+//	GenerateHeredocDelimiter("FILE_123ABC")     // returns "GH_AW_FILE_123ABC_EOF"
+//
+// Usage in heredoc generation:
+//
+//	delimiter := GenerateHeredocDelimiter("PROMPT")
+//	yaml.WriteString(fmt.Sprintf("cat << '%s' >> \"$GH_AW_PROMPT\"\n", delimiter))
+//	yaml.WriteString("content here\n")
+//	yaml.WriteString(delimiter + "\n")
+func GenerateHeredocDelimiter(name string) string {
+	if name == "" {
+		return "GH_AW_EOF"
+	}
+	return "GH_AW_" + strings.ToUpper(name) + "_EOF"
+}

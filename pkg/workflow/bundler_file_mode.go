@@ -288,9 +288,10 @@ func GenerateWriteScriptsStep(files []ScriptFile) []string {
 			steps = append(steps, fmt.Sprintf("          mkdir -p %s\n", dir))
 		}
 
-		// Use base64 encoding to handle special characters safely
-		// This is more reliable than heredoc for arbitrary JavaScript content
-		steps = append(steps, fmt.Sprintf("          cat > %s << 'EOF_%s'\n", filePath, file.Hash))
+		// Use heredoc to write file content safely
+		// Generate unique delimiter using file hash to avoid conflicts
+		delimiter := GenerateHeredocDelimiter(fmt.Sprintf("FILE_%s", file.Hash))
+		steps = append(steps, fmt.Sprintf("          cat > %s << '%s'\n", filePath, delimiter))
 
 		// Write content line by line
 		lines := strings.Split(file.Content, "\n")
@@ -298,7 +299,7 @@ func GenerateWriteScriptsStep(files []ScriptFile) []string {
 			steps = append(steps, fmt.Sprintf("          %s\n", line))
 		}
 
-		steps = append(steps, fmt.Sprintf("          EOF_%s\n", file.Hash))
+		steps = append(steps, fmt.Sprintf("          %s\n", delimiter))
 	}
 
 	return steps

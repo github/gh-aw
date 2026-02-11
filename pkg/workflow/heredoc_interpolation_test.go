@@ -13,7 +13,7 @@ import (
 	"github.com/github/gh-aw/pkg/testutil"
 )
 
-// TestHeredocInterpolation verifies that PROMPT_EOF heredoc delimiter is quoted
+// TestHeredocInterpolation verifies that GH_AW_PROMPT_EOF heredoc delimiter is quoted
 // to prevent bash variable interpolation. Variables are interpolated using github-script instead.
 func TestHeredocInterpolation(t *testing.T) {
 	// Create temporary directory for test files
@@ -56,15 +56,15 @@ Actor: ${{ github.actor }}
 
 	compiledStr := string(compiledYAML)
 
-	// Verify that heredoc delimiters ARE quoted (should be 'PROMPT_EOF' not PROMPT_EOF)
+	// Verify that heredoc delimiters ARE quoted (should be 'GH_AW_PROMPT_EOF' not GH_AW_PROMPT_EOF)
 	// This prevents shell variable interpolation
-	if !strings.Contains(compiledStr, "<< 'PROMPT_EOF'") {
-		t.Error("PROMPT_EOF delimiter should be quoted to prevent shell variable interpolation")
+	if !strings.Contains(compiledStr, "<< 'GH_AW_PROMPT_EOF'") {
+		t.Error("GH_AW_PROMPT_EOF delimiter should be quoted to prevent shell variable interpolation")
 
 		// Show the problematic lines
 		lines := strings.Split(compiledStr, "\n")
 		for i, line := range lines {
-			if strings.Contains(line, "<< PROMPT_EOF") && !strings.Contains(line, "'PROMPT_EOF'") {
+			if strings.Contains(line, "<< GH_AW_PROMPT_EOF") && !strings.Contains(line, "'GH_AW_PROMPT_EOF'") {
 				t.Logf("Line %d with unquoted delimiter: %s", i, line)
 			}
 		}
@@ -78,13 +78,13 @@ Actor: ${{ github.actor }}
 	}
 
 	// Verify the original expressions have been replaced in the prompt heredoc content
-	// Find the heredoc section by looking for the "cat " line and the PROMPT_EOF delimiter
-	heredocStart := strings.Index(compiledStr, "cat << 'PROMPT_EOF' > \"$GH_AW_PROMPT\"")
+	// Find the heredoc section by looking for the "cat " line and the GH_AW_PROMPT_EOF delimiter
+	heredocStart := strings.Index(compiledStr, "cat << 'GH_AW_PROMPT_EOF' > \"$GH_AW_PROMPT\"")
 	if heredocStart == -1 {
 		t.Error("Could not find prompt heredoc section")
 	} else {
-		// Find the end of the heredoc (PROMPT_EOF on its own line)
-		heredocEnd := strings.Index(compiledStr[heredocStart:], "\n          PROMPT_EOF\n")
+		// Find the end of the heredoc (GH_AW_PROMPT_EOF on its own line)
+		heredocEnd := strings.Index(compiledStr[heredocStart:], "\n          GH_AW_PROMPT_EOF\n")
 		if heredocEnd == -1 {
 			t.Error("Could not find end of prompt heredoc")
 		} else {
@@ -149,9 +149,9 @@ Actor: ${{ github.actor }}
 	compiledStr := string(compiledYAML)
 
 	// All heredoc delimiters should be quoted to prevent shell expansion
-	quotedCount := strings.Count(compiledStr, "<< 'PROMPT_EOF'")
+	quotedCount := strings.Count(compiledStr, "<< 'GH_AW_PROMPT_EOF'")
 	if quotedCount == 0 {
-		t.Error("Expected quoted PROMPT_EOF delimiters to prevent shell variable interpolation")
+		t.Error("Expected quoted GH_AW_PROMPT_EOF delimiters to prevent shell variable interpolation")
 	}
 
 	// Verify interpolation and template rendering step exists

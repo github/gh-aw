@@ -23,6 +23,7 @@ type CacheMemoryEntry struct {
 	Description   string `yaml:"description,omitempty"`    // optional description for this cache
 	RetentionDays *int   `yaml:"retention-days,omitempty"` // retention days for upload-artifact action
 	RestoreOnly   bool   `yaml:"restore-only,omitempty"`   // if true, only restore cache without saving
+	Scope         string `yaml:"scope,omitempty"`          // scope for restore keys: "workflow" (default) or "repo"
 }
 
 // generateDefaultCacheKey generates a default cache key for a given cache ID
@@ -141,6 +142,17 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 					}
 				}
 
+				// Parse scope field
+				if scope, exists := cacheMap["scope"]; exists {
+					if scopeStr, ok := scope.(string); ok {
+						entry.Scope = scopeStr
+					}
+				}
+				// Default to "workflow" scope if not specified
+				if entry.Scope == "" {
+					entry.Scope = "workflow"
+				}
+
 				config.Caches = append(config.Caches, entry)
 			}
 		}
@@ -204,6 +216,17 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 			if restoreOnlyBool, ok := restoreOnly.(bool); ok {
 				entry.RestoreOnly = restoreOnlyBool
 			}
+		}
+
+		// Parse scope field
+		if scope, exists := configMap["scope"]; exists {
+			if scopeStr, ok := scope.(string); ok {
+				entry.Scope = scopeStr
+			}
+		}
+		// Default to "workflow" scope if not specified
+		if entry.Scope == "" {
+			entry.Scope = "workflow"
 		}
 
 		config.Caches = []CacheMemoryEntry{entry}
@@ -372,12 +395,42 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 			cacheKey = cacheKey + runIdSuffix
 		}
 
-		// Generate restore keys automatically by splitting the cache key on '-'
+		// Generate restore keys based on scope
+		// - "workflow" (default): Single restore key with workflow ID (secure)
+		// - "repo": Two restore keys - with and without workflow ID (allows cross-workflow sharing)
 		var restoreKeys []string
-		keyParts := strings.Split(cacheKey, "-")
-		for i := len(keyParts) - 1; i > 0; i-- {
-			restoreKey := strings.Join(keyParts[:i], "-") + "-"
+
+		// Determine scope (default to "workflow" for safety)
+		scope := cache.Scope
+		if scope == "" {
+			scope = "workflow"
+		}
+
+		// First restore key: remove the run_id suffix as a single unit (don't split the key)
+		// The cacheKey always ends with "-${{ github.run_id }}" (ensured by code above)
+		if strings.HasSuffix(cacheKey, runIdSuffix) {
+			// Remove the run_id suffix to create the restore key
+			restoreKey := strings.TrimSuffix(cacheKey, "${{ github.run_id }}") // Keep the trailing "-"
 			restoreKeys = append(restoreKeys, restoreKey)
+		} else {
+			// Fallback: split on last dash if run_id suffix not found
+			// This handles edge cases where the key format might be different
+			keyParts := strings.Split(cacheKey, "-")
+			if len(keyParts) >= 2 {
+				workflowLevelKey := strings.Join(keyParts[:len(keyParts)-1], "-") + "-"
+				restoreKeys = append(restoreKeys, workflowLevelKey)
+			}
+		}
+
+		// For repo scope, add an additional restore key without the workflow ID
+		// This allows cache sharing across all workflows in the repository
+		if scope == "repo" {
+			// Remove both workflow and run_id to create a repo-wide restore key
+			// For example: "memory-chroma-${{ github.workflow }}-${{ github.run_id }}" -> "memory-chroma-"
+			repoKey := strings.TrimSuffix(cacheKey, "${{ github.workflow }}-${{ github.run_id }}")
+			if repoKey != cacheKey && repoKey != "" {
+				restoreKeys = append(restoreKeys, repoKey)
+			}
 		}
 
 		// Step name and action

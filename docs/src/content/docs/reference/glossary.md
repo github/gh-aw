@@ -78,7 +78,7 @@ The process of translating Markdown workflows (`.md` files) into GitHub Actions 
 
 ### Workflow Lock File (.lock.yml)
 
-The compiled GitHub Actions workflow file generated from a workflow markdown file (`.md`). Contains complete GitHub Actions YAML with security hardening applied. Both the `.md` source file and `.lock.yml` compiled file should be committed to version control. GitHub Actions runs the lock file, while the `.md` file remains easy to read and edit.
+The traditional GitHub Actions workflow file corresponding from a workflow markdown file (`.md`). Contains complete GitHub Actions YAML to execute the instructions as a prompt using a coding agent, with security hardening applied. Both the `.md` source file and `.lock.yml` compiled file should be committed to version control. At runtime GitHub Actions runs the lock file using a coding agent, referring to the markdown for instructions, while the `.md` file remains easy to read and edit.
 
 ## Tools and Integration
 

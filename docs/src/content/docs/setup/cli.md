@@ -229,7 +229,7 @@ gh aw fix --list-codemods              # List available codemods
 
 **Options:** `--write`, `--list-codemods`
 
-Available codemods: `timeout_minutes` → `timeout-minutes`, `network.firewall` → `sandbox.agent`, `on.command` → `on.slash_command`
+Available codemods: `sandbox: false` → `sandbox.agent: false`, `network.firewall` removal, `on.command` → `on.slash_command`, and more. Use `--list-codemods` to see all available fixes.
 
 #### `compile`
 
@@ -248,6 +248,22 @@ gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
 **Options:** `--validate`, `--strict`, `--fix`, `--zizmor`, `--dependabot`, `--json`, `--watch`, `--purge`
+
+**Error Reporting:** The compile command displays detailed error messages with the exact location and context of compilation failures:
+
+```text
+✗ Compiled 1 workflow(s): 1 error(s), 0 warning(s)
+.github/workflows/example.md:6:1: error: Unknown property: bad_field...
+3 |   workflow_dispatch:
+4 |
+5 | # Comment
+6 | bad_field: value
+    ^^^^^^^^^
+7 | ---
+✗ compilation failed
+```
+
+Error messages include file paths, line numbers, column positions, and contextual code snippets to help identify and resolve issues quickly.
 
 **Dependabot Integration (`--dependabot`):** Automatically generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`) and `.github/dependabot.yml` configuration by analyzing runtime tools (`npx`, `pip install`, `go install`) used across all workflows. This enables Dependabot to detect and update outdated dependencies. See [Dependabot Support reference](/gh-aw/reference/dependabot/) for details on handling Dependabot PRs.
 

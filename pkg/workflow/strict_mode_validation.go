@@ -178,6 +178,39 @@ func (c *Compiler) validateStrictTools(frontmatter map[string]any) error {
 		}
 	}
 
+	// Check if cache-memory is configured with scope: repo
+	cacheMemoryValue, hasCacheMemory := toolsMap["cache-memory"]
+	if hasCacheMemory {
+		// Helper function to check scope in a cache entry
+		checkScope := func(cacheMap map[string]any) error {
+			if scope, hasScope := cacheMap["scope"]; hasScope {
+				if scopeStr, ok := scope.(string); ok && scopeStr == "repo" {
+					strictModeValidationLog.Printf("Cache-memory repo scope validation failed")
+					return fmt.Errorf("strict mode: cache-memory with 'scope: repo' is not allowed for security reasons. Repo scope allows cache sharing across all workflows in the repository, which can enable cross-workflow cache poisoning attacks. Use 'scope: workflow' (default) instead, which isolates caches to individual workflows. See: https://github.github.com/gh-aw/reference/tools/#cache-memory")
+				}
+			}
+			return nil
+		}
+
+		// Check if cache-memory is a map (object notation)
+		if cacheMemoryConfig, ok := cacheMemoryValue.(map[string]any); ok {
+			if err := checkScope(cacheMemoryConfig); err != nil {
+				return err
+			}
+		}
+
+		// Check if cache-memory is an array (array notation)
+		if cacheMemoryArray, ok := cacheMemoryValue.([]any); ok {
+			for _, item := range cacheMemoryArray {
+				if cacheMap, ok := item.(map[string]any); ok {
+					if err := checkScope(cacheMap); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

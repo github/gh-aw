@@ -3121,6 +3121,12 @@
                 "restore-only": {
                   "type": "boolean",
                   "description": "If true, only restore the cache without saving it back. Uses actions/cache/restore instead of actions/cache. No artifact upload step will be generated."
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": ["workflow", "repo"],
+                  "default": "workflow",
+                  "description": "Cache restore key scope: 'workflow' (default, only restores from same workflow) or 'repo' (restores from any workflow in the repository). Use 'repo' with caution as it allows cross-workflow cache sharing."
                 }
               },
               "additionalProperties": false,
@@ -3161,6 +3167,12 @@
                   "restore-only": {
                     "type": "boolean",
                     "description": "If true, only restore the cache without saving it back. Uses actions/cache/restore instead of actions/cache. No artifact upload step will be generated."
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": ["workflow", "repo"],
+                    "default": "workflow",
+                    "description": "Cache restore key scope: 'workflow' (default, only restores from same workflow) or 'repo' (restores from any workflow in the repository). Use 'repo' with caution as it allows cross-workflow cache sharing."
                   }
                 },
                 "required": ["id", "key"],
