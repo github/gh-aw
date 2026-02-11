@@ -553,16 +553,17 @@ The YAML frontmatter supports these fields:
     safe-outputs:
       create-project:
         max: 1                          # Optional: max projects (default: 1)
-        github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # REQUIRED: PAT with projects:write (NOT GITHUB_TOKEN)
+        # github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # Optional: override default PAT (NOT GITHUB_TOKEN)
         target-owner: "org-or-user"     # Optional: owner for created projects
         title-prefix: "[ai] "           # Optional: prefix for project titles
     ```
     Use this to create new projects for organizing and tracking work across issues and pull requests. Can optionally specify custom fields, project views, and an initial item to add.
     
-    **⚠️ IMPORTANT**: GitHub Projects requires a **Personal Access Token (PAT)** or GitHub App token with Projects permissions. The default `GITHUB_TOKEN` cannot be used. Always configure `github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` with a PAT that has:
+    **⚠️ IMPORTANT**: GitHub Projects requires a **Personal Access Token (PAT)** or GitHub App token with Projects permissions. The default `GITHUB_TOKEN` cannot be used. Ensure `${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` exists and contains a token with:
     - Classic PAT: `project` and `repo` scopes
     - Fine-grained PAT: Organization permission `Projects: Read & Write` and repository access
     
+    Project tools automatically fall back to `${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` when per-output and top-level `github-token` values are omitted, so specifying `github-token` is optional unless you need to override the default token.
     Not supported for cross-repository operations.
   - `update-project:` - Add items to GitHub Projects, update custom fields, manage project structure
     ```yaml
