@@ -432,6 +432,22 @@ The required token type and permissions depend on whether you own the repository
 
 **For Organization-owned Repositories**:
 
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-org-agent.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-org-agent.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a fine-grained PAT for organization-owned repositories with permissions for agent assignment
+  </div>
+</div>
+
 When an organization owns the repository, you need a fine-grained PAT with the resource owner set to the organization:
 
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
