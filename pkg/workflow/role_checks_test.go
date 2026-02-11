@@ -165,7 +165,7 @@ func TestInferEventsFromTriggers(t *testing.T) {
 					"workflow_dispatch": nil,
 				},
 			},
-			expected: []string{"issues", "issue_comment", "workflow_dispatch"},
+			expected: []string{"issue_comment", "issues", "workflow_dispatch"},
 		},
 		{
 			name: "infer only programmatic triggers",
@@ -206,15 +206,15 @@ func TestInferEventsFromTriggers(t *testing.T) {
 				},
 			},
 			expected: []string{
-				"workflow_dispatch",
-				"repository_dispatch",
-				"issues",
+				"discussion",
+				"discussion_comment",
 				"issue_comment",
+				"issues",
 				"pull_request",
 				"pull_request_review",
 				"pull_request_review_comment",
-				"discussion",
-				"discussion_comment",
+				"repository_dispatch",
+				"workflow_dispatch",
 			},
 		},
 	}
@@ -222,12 +222,8 @@ func TestInferEventsFromTriggers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := c.inferEventsFromTriggers(tt.frontmatter)
-			// Use ElementsMatch since map iteration order is non-deterministic
-			if len(tt.expected) > 0 && len(result) > 0 {
-				assert.ElementsMatch(t, tt.expected, result, "Inferred events should match expected")
-			} else {
-				assert.Equal(t, tt.expected, result, "Inferred events should match expected")
-			}
+			// Events should be sorted alphabetically
+			assert.Equal(t, tt.expected, result, "Inferred events should match expected (in sorted order)")
 		})
 	}
 }

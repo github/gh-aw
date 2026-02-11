@@ -1,7 +1,7 @@
 # Diagnostic logging: Show environment information
 echo "=== Diagnostic: Environment Information ==="
-echo "GITHUB_SHA: ${GITHUB_SHA}"
-echo "DEFAULT_BRANCH: ${DEFAULT_BRANCH}"
+echo "GITHUB_SHA: ${GITHUB_SHA@Q}"
+echo "DEFAULT_BRANCH: ${DEFAULT_BRANCH@Q}"
 echo "Current HEAD: $(git rev-parse HEAD 2>/dev/null || echo 'unknown')"
 echo "Current branch: $(git branch --show-current 2>/dev/null || echo 'detached HEAD')"
 
@@ -30,7 +30,7 @@ if [ -f "$GH_AW_SAFE_OUTPUTS" ]; then
         # Extract branch value using sed
         BRANCH_NAME="$(echo "$line" | sed -n 's/.*"branch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
         if [ -n "$BRANCH_NAME" ]; then
-          echo "Extracted branch name from create_pull_request: $BRANCH_NAME"
+          echo "Extracted branch name from create_pull_request: ${BRANCH_NAME@Q}"
           break
         fi
       # Extract branch from push_to_pull_request_branch line using simple grep and sed
@@ -40,7 +40,7 @@ if [ -f "$GH_AW_SAFE_OUTPUTS" ]; then
         # Extract branch value using sed
         BRANCH_NAME="$(echo "$line" | sed -n 's/.*"branch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
         if [ -n "$BRANCH_NAME" ]; then
-          echo "Extracted branch name from push_to_pull_request_branch: $BRANCH_NAME"
+          echo "Extracted branch name from push_to_pull_request_branch: ${BRANCH_NAME@Q}"
           break
         fi
       fi
@@ -48,7 +48,7 @@ if [ -f "$GH_AW_SAFE_OUTPUTS" ]; then
   done < "$GH_AW_SAFE_OUTPUTS"
 else
   echo ""
-  echo "GH_AW_SAFE_OUTPUTS file not found at: $GH_AW_SAFE_OUTPUTS"
+  echo "GH_AW_SAFE_OUTPUTS file not found at: ${GH_AW_SAFE_OUTPUTS@Q}"
 fi
 
 # If no branch found in JSONL, log it but don't give up yet
@@ -63,30 +63,30 @@ PATCH_GENERATED=false
 if [ -n "$BRANCH_NAME" ]; then
   echo ""
   echo "=== Strategy 1: Using named branch from JSONL ==="
-  echo "Looking for branch: $BRANCH_NAME"
+  echo "Looking for branch: ${BRANCH_NAME@Q}"
   # Check if the branch exists
   if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
-    echo "Branch $BRANCH_NAME exists, generating patch from branch changes"
+    echo "Branch ${BRANCH_NAME@Q} exists, generating patch from branch changes"
     
     # Check if origin/$BRANCH_NAME exists to use as base
     if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
-      echo "Using origin/$BRANCH_NAME as base for patch generation"
+      echo "Using origin/${BRANCH_NAME@Q} as base for patch generation"
       BASE_REF="origin/$BRANCH_NAME"
     else
-      echo "origin/$BRANCH_NAME does not exist, using merge-base with default branch"
+      echo "origin/${BRANCH_NAME@Q} does not exist, using merge-base with default branch"
       # Use the default branch name from environment variable
-      echo "Default branch: $DEFAULT_BRANCH"
+      echo "Default branch: ${DEFAULT_BRANCH@Q}"
       # Fetch the default branch to ensure it's available locally
       git fetch origin "$DEFAULT_BRANCH"
       # Find merge base between default branch and current branch
       BASE_REF="$(git merge-base "origin/$DEFAULT_BRANCH" "$BRANCH_NAME")"
-      echo "Using merge-base as base: $BASE_REF"
+      echo "Using merge-base as base: ${BASE_REF@Q}"
     fi
     
     # Diagnostic logging: Show diff stats before generating patch
     echo ""
     echo "=== Diagnostic: Diff stats for patch generation ==="
-    echo "Command: git diff --stat $BASE_REF..$BRANCH_NAME"
+    echo "Command: git diff --stat ${BASE_REF@Q}..${BRANCH_NAME@Q}"
     git diff --stat "$BASE_REF".."$BRANCH_NAME" || echo "Failed to show diff stats"
     
     # Diagnostic logging: Count commits to be included
@@ -102,14 +102,14 @@ if [ -n "$BRANCH_NAME" ]; then
     # Diagnostic logging: Show the exact command being used
     echo ""
     echo "=== Diagnostic: Generating patch ==="
-    echo "Command: git format-patch $BASE_REF..$BRANCH_NAME --stdout > /tmp/gh-aw/aw.patch"
+    echo "Command: git format-patch ${BASE_REF@Q}..${BRANCH_NAME@Q} --stdout > /tmp/gh-aw/aw.patch"
     
     # Generate patch from the determined base to the branch
     git format-patch "$BASE_REF".."$BRANCH_NAME" --stdout > /tmp/gh-aw/aw.patch || echo "Failed to generate patch from branch" > /tmp/gh-aw/aw.patch
-    echo "Patch file created from branch: $BRANCH_NAME (base: $BASE_REF)"
+    echo "Patch file created from branch: ${BRANCH_NAME@Q} (base: ${BASE_REF@Q})"
     PATCH_GENERATED=true
   else
-    echo "Branch $BRANCH_NAME does not exist locally"
+    echo "Branch ${BRANCH_NAME@Q} does not exist locally"
   fi
 fi
 
@@ -120,8 +120,8 @@ if [ "$PATCH_GENERATED" = false ]; then
   
   # Get current HEAD SHA
   CURRENT_HEAD="$(git rev-parse HEAD 2>/dev/null || echo '')"
-  echo "Current HEAD: $CURRENT_HEAD"
-  echo "Checkout SHA (GITHUB_SHA): $GITHUB_SHA"
+  echo "Current HEAD: ${CURRENT_HEAD@Q}"
+  echo "Checkout SHA (GITHUB_SHA): ${GITHUB_SHA@Q}"
   
   if [ -z "$CURRENT_HEAD" ]; then
     echo "ERROR: Could not determine current HEAD SHA"
@@ -150,15 +150,15 @@ if [ "$PATCH_GENERATED" = false ]; then
         # Show diff stats
         echo ""
         echo "=== Diagnostic: Diff stats for patch generation ==="
-        echo "Command: git diff --stat ${GITHUB_SHA}..HEAD"
+        echo "Command: git diff --stat ${GITHUB_SHA@Q}..HEAD"
         git diff --stat "${GITHUB_SHA}..HEAD" || echo "Failed to show diff stats"
         
         # Generate patch from GITHUB_SHA to HEAD
         echo ""
         echo "=== Diagnostic: Generating patch ==="
-        echo "Command: git format-patch ${GITHUB_SHA}..HEAD --stdout > /tmp/gh-aw/aw.patch"
+        echo "Command: git format-patch ${GITHUB_SHA@Q}..HEAD --stdout > /tmp/gh-aw/aw.patch"
         git format-patch "${GITHUB_SHA}..HEAD" --stdout > /tmp/gh-aw/aw.patch || echo "Failed to generate patch from HEAD" > /tmp/gh-aw/aw.patch
-        echo "Patch file created from commits on HEAD (base: $GITHUB_SHA)"
+        echo "Patch file created from commits on HEAD (base: ${GITHUB_SHA@Q})"
         PATCH_GENERATED=true
       else
         echo "No commits found between GITHUB_SHA and HEAD"

@@ -426,5 +426,5 @@ echo ""
 {
   echo "gateway-pid=$GATEWAY_PID"
   echo "gateway-port=${MCP_GATEWAY_PORT}"
-  echo "gateway-api-key=${MCP_GATEWAY_API_KEY}"
+  echo "gateway-api-key=${MCP_GATEWAY_API_KEY@Q}"
 } >> $GITHUB_OUTPUT
