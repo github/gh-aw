@@ -396,8 +396,8 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		}
 
 		// Generate restore keys based on scope
-		// - "workflow" (default): Removes only run_id suffix, keeping workflow identifier
-		// - "repo": Removes only run_id suffix, allowing repo-wide cache sharing
+		// - "workflow" (default): Single restore key with workflow ID (secure)
+		// - "repo": Two restore keys - with and without workflow ID (allows cross-workflow sharing)
 		var restoreKeys []string
 
 		// Determine scope (default to "workflow" for safety)
@@ -406,7 +406,7 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 			scope = "workflow"
 		}
 
-		// For both scopes, remove the run_id suffix as a single unit (don't split the key)
+		// First restore key: remove the run_id suffix as a single unit (don't split the key)
 		// The cacheKey always ends with "-${{ github.run_id }}" (ensured by code above)
 		if strings.HasSuffix(cacheKey, runIdSuffix) {
 			// Remove the run_id suffix to create the restore key
@@ -422,9 +422,16 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 			}
 		}
 
-		// Note: The difference between "workflow" and "repo" scope is semantic
-		// Both generate the same restore key pattern, but "repo" scope indicates
-		// the user's intent to share caches across workflows (and is rejected in strict mode)
+		// For repo scope, add an additional restore key without the workflow ID
+		// This allows cache sharing across all workflows in the repository
+		if scope == "repo" {
+			// Remove both workflow and run_id to create a repo-wide restore key
+			// For example: "memory-chroma-${{ github.workflow }}-${{ github.run_id }}" -> "memory-chroma-"
+			repoKey := strings.TrimSuffix(cacheKey, "${{ github.workflow }}-${{ github.run_id }}")
+			if repoKey != cacheKey && repoKey != "" {
+				restoreKeys = append(restoreKeys, repoKey)
+			}
+		}
 
 		// Step name and action
 		// Use actions/cache/restore for restore-only caches or when threat detection is enabled
