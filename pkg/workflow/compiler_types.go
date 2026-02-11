@@ -431,6 +431,7 @@ type WorkflowData struct {
 	SafeInputs           *SafeInputsConfig    // safe-inputs configuration for custom MCP tools
 	Roles                []string             // permission levels required to trigger workflow
 	Bots                 []string             // allow list of bot identifiers that can trigger workflow
+	RateLimit            *RateLimitConfig     // rate limiting configuration for workflow triggers
 	CacheMemoryConfig    *CacheMemoryConfig   // parsed cache-memory configuration
 	RepoMemoryConfig     *RepoMemoryConfig    // parsed repo-memory configuration
 	Runtimes             map[string]any       // runtime version overrides from frontmatter

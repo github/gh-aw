@@ -419,6 +419,7 @@ func (c *Compiler) extractAdditionalConfigurations(
 
 	workflowData.Roles = c.extractRoles(frontmatter)
 	workflowData.Bots = c.extractBots(frontmatter)
+	workflowData.RateLimit = c.extractRateLimitConfig(frontmatter)
 
 	// Use the already extracted output configuration
 	workflowData.SafeOutputs = safeOutputs

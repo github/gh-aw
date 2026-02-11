@@ -76,6 +76,14 @@ type PluginsConfig struct {
 	GitHubToken string   `json:"github-token,omitempty"` // Custom GitHub token for plugin installation
 }
 
+// RateLimitConfig represents rate limiting configuration for workflow triggers
+// Limits how many times a user can trigger a workflow within a time window
+type RateLimitConfig struct {
+	Max    int      `json:"max,omitempty"`    // Maximum number of runs allowed per time window (default: 5)
+	Window int      `json:"window,omitempty"` // Time window in minutes (default: 60)
+	Events []string `json:"events,omitempty"` // Event types to apply rate limiting to (e.g., ["workflow_dispatch", "issue_comment"])
+}
+
 // FrontmatterConfig represents the structured configuration from workflow frontmatter
 // This provides compile-time type safety and clearer error messages compared to map[string]any
 type FrontmatterConfig struct {
@@ -143,8 +151,9 @@ type FrontmatterConfig struct {
 	GithubToken   string               `json:"github-token,omitempty"`
 
 	// Command/bot configuration
-	Roles []string `json:"roles,omitempty"`
-	Bots  []string `json:"bots,omitempty"`
+	Roles     []string         `json:"roles,omitempty"`
+	Bots      []string         `json:"bots,omitempty"`
+	RateLimit *RateLimitConfig `json:"rate-limit,omitempty"`
 }
 
 // unmarshalFromMap converts a value from a map[string]any to a destination variable

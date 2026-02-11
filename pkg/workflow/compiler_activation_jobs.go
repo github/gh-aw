@@ -56,6 +56,14 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 		perms.Set(PermissionDiscussions, PermissionWrite)
 	}
 
+	// Add actions: read permission if rate limiting is configured (needed to query workflow runs)
+	if data.RateLimit != nil {
+		if perms == nil {
+			perms = NewPermissions()
+		}
+		perms.Set(PermissionActions, PermissionRead)
+	}
+
 	// Set permissions if any were configured
 	if perms != nil {
 		permissions = perms.RenderToYAML()
@@ -87,6 +95,11 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	// Add team member check if permission checks are needed
 	if needsPermissionCheck {
 		steps = c.generateMembershipCheck(data, steps)
+	}
+
+	// Add rate limit check if configured
+	if data.RateLimit != nil {
+		steps = c.generateRateLimitCheck(data, steps)
 	}
 
 	// Add stop-time check if configured
@@ -205,6 +218,16 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 			BuildStringLiteral("true"),
 		)
 		conditions = append(conditions, skipNoMatchCheckOk)
+	}
+
+	if data.RateLimit != nil {
+		// Add rate limit check condition
+		rateLimitCheck := BuildComparison(
+			BuildPropertyAccess(fmt.Sprintf("steps.%s.outputs.%s", constants.CheckRateLimitStepID, constants.RateLimitOkOutput)),
+			"==",
+			BuildStringLiteral("true"),
+		)
+		conditions = append(conditions, rateLimitCheck)
 	}
 
 	if len(data.Command) > 0 {

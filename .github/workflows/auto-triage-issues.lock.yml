@@ -26,7 +26,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e45aaf413ad8d0b82e2190a8aab5711d2c9842f2a68dae9334a386ceae611752
+# frontmatter-hash: 9c6fbb9920281fff3373c0db01b6a5e5fe93b637d2902977763c0634733725be
 
 name: "Auto-Triage Issues"
 "on":
@@ -1049,9 +1049,10 @@ jobs:
   pre_activation:
     runs-on: ubuntu-slim
     permissions:
+      actions: read
       contents: read
     outputs:
-      activated: ${{ steps.check_membership.outputs.is_team_member == 'true' }}
+      activated: ${{ (steps.check_membership.outputs.is_team_member == 'true') && (steps.check_rate_limit.outputs.rate_limit_ok == 'true') }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -1074,6 +1075,20 @@ jobs:
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/check_membership.cjs');
+            await main();
+      - name: Check user rate limit
+        id: check_rate_limit
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GH_AW_RATE_LIMIT_MAX: "5"
+          GH_AW_RATE_LIMIT_WINDOW: "60"
+          GH_AW_RATE_LIMIT_EVENTS: "issues,workflow_dispatch"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/check_rate_limit.cjs');
             await main();
 
   safe_outputs:

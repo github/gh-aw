@@ -5,6 +5,9 @@ on:
     types: [opened]
     lock-for-agent: true
   reaction: "eyes"
+rate-limit:
+  max: 5
+  window: 60
 permissions:
   contents: read
   issues: read

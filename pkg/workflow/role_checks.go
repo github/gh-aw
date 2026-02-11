@@ -37,6 +37,42 @@ func (c *Compiler) generateMembershipCheck(data *WorkflowData, steps []string) [
 	return steps
 }
 
+// generateRateLimitCheck generates steps for rate limiting check
+func (c *Compiler) generateRateLimitCheck(data *WorkflowData, steps []string) []string {
+	steps = append(steps, "      - name: Check user rate limit\n")
+	steps = append(steps, fmt.Sprintf("        id: %s\n", constants.CheckRateLimitStepID))
+	steps = append(steps, fmt.Sprintf("        uses: %s\n", GetActionPin("actions/github-script")))
+
+	// Add environment variables for rate limit check
+	steps = append(steps, "        env:\n")
+
+	// Set max (default: 5)
+	max := constants.DefaultRateLimitMax
+	if data.RateLimit.Max > 0 {
+		max = data.RateLimit.Max
+	}
+	steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_MAX: \"%d\"\n", max))
+
+	// Set window (default: 60 minutes)
+	window := constants.DefaultRateLimitWindow
+	if data.RateLimit.Window > 0 {
+		window = data.RateLimit.Window
+	}
+	steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_WINDOW: \"%d\"\n", window))
+
+	// Set events to check (if specified)
+	if len(data.RateLimit.Events) > 0 {
+		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %q\n", strings.Join(data.RateLimit.Events, ",")))
+	}
+
+	steps = append(steps, "        with:\n")
+	steps = append(steps, "          github-token: ${{ secrets.GITHUB_TOKEN }}\n")
+	steps = append(steps, "          script: |\n")
+	steps = append(steps, generateGitHubScriptWithRequire("check_rate_limit.cjs"))
+
+	return steps
+}
+
 // extractRoles extracts the 'roles' field from frontmatter to determine permission requirements
 func (c *Compiler) extractRoles(frontmatter map[string]any) []string {
 	if rolesValue, exists := frontmatter["roles"]; exists {
@@ -99,6 +135,115 @@ func (c *Compiler) extractBots(frontmatter map[string]any) []string {
 	// No bots specified, return empty array
 	roleLog.Print("No bots specified")
 	return []string{}
+}
+
+// extractRateLimitConfig extracts the 'rate-limit' field from frontmatter
+func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimitConfig {
+	if rateLimitValue, exists := frontmatter["rate-limit"]; exists && rateLimitValue != nil {
+		switch v := rateLimitValue.(type) {
+		case map[string]any:
+			config := &RateLimitConfig{}
+
+			// Extract max (default: 5)
+			if maxValue, ok := v["max"]; ok {
+				switch max := maxValue.(type) {
+				case int:
+					config.Max = max
+				case int64:
+					config.Max = int(max)
+				case uint64:
+					config.Max = int(max)
+				case float64:
+					config.Max = int(max)
+				}
+			}
+
+			// Extract window (default: 60 minutes)
+			if windowValue, ok := v["window"]; ok {
+				switch window := windowValue.(type) {
+				case int:
+					config.Window = window
+				case int64:
+					config.Window = int(window)
+				case uint64:
+					config.Window = int(window)
+				case float64:
+					config.Window = int(window)
+				}
+			}
+
+			// Extract events
+			if eventsValue, ok := v["events"]; ok {
+				switch events := eventsValue.(type) {
+				case []any:
+					for _, item := range events {
+						if str, ok := item.(string); ok {
+							config.Events = append(config.Events, str)
+						}
+					}
+				case []string:
+					config.Events = events
+				case string:
+					config.Events = []string{events}
+				}
+			} else {
+				// If events not specified, infer from the 'on:' section of frontmatter
+				config.Events = c.inferEventsFromTriggers(frontmatter)
+				if len(config.Events) > 0 {
+					roleLog.Printf("Inferred events from workflow triggers: %v", config.Events)
+				}
+			}
+
+			roleLog.Printf("Extracted rate-limit config: max=%d, window=%d, events=%v", config.Max, config.Window, config.Events)
+			return config
+		}
+	}
+	roleLog.Print("No rate-limit configuration specified")
+	return nil
+}
+
+// inferEventsFromTriggers infers rate-limit events from the workflow's 'on:' triggers
+func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string {
+	onValue, exists := frontmatter["on"]
+	if !exists || onValue == nil {
+		return nil
+	}
+
+	var events []string
+	programmaticTriggers := map[string]string{
+		"workflow_dispatch":           "workflow_dispatch",
+		"repository_dispatch":         "repository_dispatch",
+		"issues":                      "issues",
+		"issue_comment":               "issue_comment",
+		"pull_request":                "pull_request",
+		"pull_request_review":         "pull_request_review",
+		"pull_request_review_comment": "pull_request_review_comment",
+		"discussion":                  "discussion",
+		"discussion_comment":          "discussion_comment",
+	}
+
+	switch on := onValue.(type) {
+	case map[string]any:
+		for trigger := range on {
+			if eventName, ok := programmaticTriggers[trigger]; ok {
+				events = append(events, eventName)
+			}
+		}
+	case []any:
+		for _, item := range on {
+			if triggerStr, ok := item.(string); ok {
+				if eventName, ok := programmaticTriggers[triggerStr]; ok {
+					events = append(events, eventName)
+				}
+			}
+		}
+	case string:
+		if eventName, ok := programmaticTriggers[on]; ok {
+			events = []string{eventName}
+		}
+	}
+
+	return events
 }
 
 // needsRoleCheck determines if the workflow needs permission checks with full context

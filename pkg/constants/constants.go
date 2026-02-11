@@ -607,6 +607,7 @@ const CheckStopTimeStepID StepID = "check_stop_time"
 const CheckSkipIfMatchStepID StepID = "check_skip_if_match"
 const CheckSkipIfNoMatchStepID StepID = "check_skip_if_no_match"
 const CheckCommandPositionStepID StepID = "check_command_position"
+const CheckRateLimitStepID StepID = "check_rate_limit"
 
 // Output names for pre-activation job steps
 const IsTeamMemberOutput = "is_team_member"
@@ -615,7 +616,12 @@ const SkipCheckOkOutput = "skip_check_ok"
 const SkipNoMatchCheckOkOutput = "skip_no_match_check_ok"
 const CommandPositionOkOutput = "command_position_ok"
 const MatchedCommandOutput = "matched_command"
+const RateLimitOkOutput = "rate_limit_ok"
 const ActivatedOutput = "activated"
+
+// Rate limit defaults
+const DefaultRateLimitMax = 5     // Default maximum runs per time window
+const DefaultRateLimitWindow = 60 // Default time window in minutes (1 hour)
 
 // Agentic engine name constants using EngineName type for type safety
 const (

@@ -2,7 +2,9 @@
 on:
   issues:
     types: [opened]
-    
+rate-limit:
+  max: 5
+  window: 60
 permissions:
   contents: read
   issues: read

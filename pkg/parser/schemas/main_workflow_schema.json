@@ -6087,6 +6087,47 @@
         "description": "Bot identifier/name (e.g., 'dependabot[bot]', 'renovate[bot]', 'github-actions[bot]')"
       }
     },
+    "rate-limit": {
+      "type": "object",
+      "description": "Rate limiting configuration to restrict how frequently users can trigger the workflow. Helps prevent abuse and resource exhaustion from programmatically triggered events.",
+      "required": ["max"],
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum number of workflow runs allowed per user within the time window. Required field."
+        },
+        "window": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 180,
+          "default": 60,
+          "description": "Time window in minutes for rate limiting. Defaults to 60 (1 hour). Maximum: 180 (3 hours)."
+        },
+        "events": {
+          "type": "array",
+          "description": "Optional list of event types to apply rate limiting to. If not specified, rate limiting applies to all programmatically triggered events (e.g., workflow_dispatch, issue_comment, pull_request_review).",
+          "items": {
+            "type": "string",
+            "enum": ["workflow_dispatch", "issue_comment", "pull_request_review", "pull_request_review_comment", "issues", "pull_request", "discussion_comment", "discussion"]
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "max": 5,
+          "window": 60
+        },
+        {
+          "max": 10,
+          "window": 30,
+          "events": ["workflow_dispatch", "issue_comment"]
+        }
+      ]
+    },
     "strict": {
       "type": "boolean",
       "default": true,
