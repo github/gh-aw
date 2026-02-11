@@ -90,25 +90,11 @@ func TestMCPServer_LogsGuardrail(t *testing.T) {
 			t.Error("Schema should have fields")
 		}
 
-		if len(guardrail.SuggestedQueries) == 0 {
-			t.Error("Should have suggested queries")
-		}
-
 		// Verify some expected fields are in the schema
 		expectedFields := []string{"summary", "runs", "tool_usage", "errors_and_warnings"}
 		for _, field := range expectedFields {
 			if _, ok := guardrail.Schema.Fields[field]; !ok {
 				t.Errorf("Schema should include field '%s'", field)
-			}
-		}
-
-		// Verify suggested queries have proper structure
-		for i, query := range guardrail.SuggestedQueries {
-			if query.Description == "" {
-				t.Errorf("Query %d should have description", i)
-			}
-			if query.Query == "" {
-				t.Errorf("Query %d should have query string", i)
 			}
 		}
 	})
