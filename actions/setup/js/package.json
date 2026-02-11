@@ -1,12 +1,12 @@
 {
   "devDependencies": {
     "@actions/core": "^3.0.0",
-    "@actions/exec": "^2.0.0",
+    "@actions/exec": "^3.0.0",
     "@actions/github": "^9.0.0",
     "@actions/github-script": "github:actions/github-script",
     "@actions/glob": "^0.6.1",
     "@actions/io": "^3.0.2",
-    "@types/node": "^25.0.9",
+    "@types/node": "^25.2.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "prettier": "^3.8.0",
