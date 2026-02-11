@@ -398,7 +398,7 @@ function neutralizeTemplateDelimiters(s) {
   }
 
   // Escape ERB delimiters: <%= ... %>
-  // Replace <%= with \<%= to prevent ERB evaluation (only escape the opening bracket)
+  // Replace <%= with \<%= to prevent ERB evaluation
   if (/<%=/.test(result)) {
     templatesDetected = true;
     if (typeof core !== "undefined" && core.info) {
