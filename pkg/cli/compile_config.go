@@ -37,8 +37,9 @@ type CompileConfig struct {
 
 // WorkflowFailure represents a failed workflow with its error count
 type WorkflowFailure struct {
-	Path       string // File path of the workflow
-	ErrorCount int    // Number of errors in this workflow
+	Path          string   // File path of the workflow
+	ErrorCount    int      // Number of errors in this workflow
+	ErrorMessages []string // Actual error messages to display to the user
 }
 
 // CompilationStats tracks the results of workflow compilation

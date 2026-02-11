@@ -152,24 +152,29 @@ func TestTrackWorkflowFailure(t *testing.T) {
 		name            string
 		workflowPath    string
 		errorCount      int
+		errorMessages   []string
 		expectedDetails WorkflowFailure
 	}{
 		{
-			name:         "single error",
-			workflowPath: ".github/workflows/test.md",
-			errorCount:   1,
+			name:          "single error",
+			workflowPath:  ".github/workflows/test.md",
+			errorCount:    1,
+			errorMessages: []string{"test error message"},
 			expectedDetails: WorkflowFailure{
-				Path:       ".github/workflows/test.md",
-				ErrorCount: 1,
+				Path:          ".github/workflows/test.md",
+				ErrorCount:    1,
+				ErrorMessages: []string{"test error message"},
 			},
 		},
 		{
-			name:         "multiple errors",
-			workflowPath: ".github/workflows/complex.md",
-			errorCount:   5,
+			name:          "multiple errors",
+			workflowPath:  ".github/workflows/complex.md",
+			errorCount:    5,
+			errorMessages: []string{"error 1", "error 2"},
 			expectedDetails: WorkflowFailure{
-				Path:       ".github/workflows/complex.md",
-				ErrorCount: 5,
+				Path:          ".github/workflows/complex.md",
+				ErrorCount:    5,
+				ErrorMessages: []string{"error 1", "error 2"},
 			},
 		},
 	}
@@ -177,7 +182,7 @@ func TestTrackWorkflowFailure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stats := &CompilationStats{}
-			trackWorkflowFailure(stats, tt.workflowPath, tt.errorCount)
+			trackWorkflowFailure(stats, tt.workflowPath, tt.errorCount, tt.errorMessages)
 
 			// Check that FailedWorkflows was updated
 			if len(stats.FailedWorkflows) != 1 {
@@ -195,6 +200,14 @@ func TestTrackWorkflowFailure(t *testing.T) {
 			}
 			if detail.ErrorCount != tt.expectedDetails.ErrorCount {
 				t.Errorf("Expected error count %d, got %d", tt.expectedDetails.ErrorCount, detail.ErrorCount)
+			}
+			if len(detail.ErrorMessages) != len(tt.expectedDetails.ErrorMessages) {
+				t.Errorf("Expected %d error messages, got %d", len(tt.expectedDetails.ErrorMessages), len(detail.ErrorMessages))
+			}
+			for i, msg := range detail.ErrorMessages {
+				if i < len(tt.expectedDetails.ErrorMessages) && msg != tt.expectedDetails.ErrorMessages[i] {
+					t.Errorf("Expected error message %q, got %q", tt.expectedDetails.ErrorMessages[i], msg)
+				}
 			}
 		})
 	}
