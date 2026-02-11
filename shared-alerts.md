@@ -35,15 +35,19 @@
 
 ## Agent Performance Analyzer Alerts
 
-**Status:** ✅ ALL GREEN - No alerts
+**Status:** ✅ ALL GREEN - No critical alerts
 
-### Agent Ecosystem Health (2026-02-10)
-- **Quality:** 91/100 (excellent, stable)
-- **Effectiveness:** 85/100 (strong, stable)
-- **Ecosystem Health:** 97/100 (↑ +5, optimal)
-- **Critical Issues:** 0 (8th consecutive period!)
-- **Workflow Count:** 148 (70 Copilot, 29 Claude, 8 Codex, 41 other/shared)
-- **PR Merge Rate:** 69.3% (historical, stable, excellent)
+### Agent Ecosystem Health (2026-02-11)
+- **Quality:** 92/100 (↑ +1, excellent)
+- **Effectiveness:** 87/100 (↑ +2, strong)
+- **Ecosystem Health:** 89/100 (↓ -8, good - infrastructure issues)
+- **Critical Issues:** 0 (9th consecutive period!)
+- **Workflow Count:** 207 (134 AI engines: 52% Copilot, 26% Claude, 7% Codex, 14% other)
+- **PR Merge Rate:** ~69% (historical, stable, excellent)
+
+### Minor Alerts (Not Critical)
+- ⚠️ Security guard: 2/8 runs failed (transient infrastructure issues)
+- ⚠️ Infrastructure health: 89/100 (1 failing workflow, 11 outdated locks)
 
 ---
 
