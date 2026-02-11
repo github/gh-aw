@@ -735,7 +735,7 @@
   },
   {
     "name": "create_project",
-    "description": "Create a new GitHub Project board with optional fields and views. Use this to create a new project for organizing and tracking work across issues and pull requests. Can optionally specify custom fields, project views, and an initial item to add. Returns a temporary project ID that can be referenced in subsequent update_project calls.",
+    "description": "Create a new GitHub Project for organizing and tracking work across issues and pull requests. You can optionally provide a title, owner, owner_type, and an initial issue item_url to add to the project. You may also provide a temporary_id to reference this project before it is created; if not provided, a temporary_id will be auto-generated and returned, and can be used in subsequent update_project calls via the '#aw_ID' syntax.",
     "inputSchema": {
       "type": "object",
       "required": [],
