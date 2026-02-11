@@ -729,6 +729,56 @@ EOF`,
 			hasExpr:  false,
 			describe: "Indented heredoc should be handled",
 		},
+		{
+			name: "prefixed EOF delimiter - safe outputs config",
+			content: `cat > /tmp/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
+{"target": "${{ github.event.issue.number }}"}
+GH_AW_SAFE_OUTPUTS_CONFIG_EOF
+echo "done"`,
+			want:     "cat > /tmp/config.json # heredoc removed\necho \"done\"",
+			hasExpr:  false,
+			describe: "Prefixed EOF delimiter (GH_AW_SAFE_OUTPUTS_CONFIG_EOF) should be removed",
+		},
+		{
+			name: "prefixed JSON delimiter",
+			content: `cat > /tmp/config.json << 'GH_AW_CONFIG_JSON'
+{"handlers": {"update_issue": {"target": "${{ github.event.issue.number }}"}}}
+GH_AW_CONFIG_JSON`,
+			want:     "cat > /tmp/config.json # heredoc removed",
+			hasExpr:  false,
+			describe: "Prefixed JSON delimiter should be removed",
+		},
+		{
+			name: "prefixed YAML delimiter",
+			content: `cat > /tmp/workflow.yml << 'GH_AW_WORKFLOW_YAML'
+env:
+  TARGET: ${{ github.event.issue.number }}
+GH_AW_WORKFLOW_YAML`,
+			want:     "cat > /tmp/workflow.yml # heredoc removed",
+			hasExpr:  false,
+			describe: "Prefixed YAML delimiter should be removed",
+		},
+		{
+			name: "unquoted prefixed delimiter",
+			content: `cat > file << GH_AW_TOOLS_EOF
+{"value": "${{ github.event.issue.number }}"}
+GH_AW_TOOLS_EOF`,
+			want:     "cat > file # heredoc removed",
+			hasExpr:  false,
+			describe: "Unquoted prefixed delimiter should be removed",
+		},
+		{
+			name: "multiple prefixed delimiters",
+			content: `cat > file1 << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
+{"a": "${{ github.event.issue.number }}"}
+GH_AW_SAFE_OUTPUTS_CONFIG_EOF
+cat > file2 << 'GH_AW_MCP_CONFIG_EOF'
+{"b": "${{ github.event.issue.title }}"}
+GH_AW_MCP_CONFIG_EOF`,
+			want:     "cat > file1 # heredoc removed\ncat > file2 # heredoc removed",
+			hasExpr:  false,
+			describe: "Multiple prefixed delimiters should all be removed",
+		},
 	}
 
 	for _, tt := range tests {
