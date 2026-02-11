@@ -110,8 +110,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory-chroma
           restore-keys: |
             memory-chroma-${{ github.workflow }}-
-            memory-chroma-
-            memory-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

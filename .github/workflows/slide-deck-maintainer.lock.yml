@@ -141,7 +141,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             memory-${{ github.workflow }}-
-            memory-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

@@ -125,9 +125,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             schema-consistency-cache-${{ github.workflow }}-
-            schema-consistency-cache-
-            schema-consistency-
-            schema-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

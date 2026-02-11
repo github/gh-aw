@@ -135,8 +135,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             copilot-pr-data-
-            copilot-pr-
-            copilot-
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
         env:

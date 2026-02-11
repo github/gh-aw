@@ -149,7 +149,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             memory-${{ github.workflow }}-
-            memory-
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
         env:

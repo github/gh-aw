@@ -125,8 +125,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory-focus-areas
           restore-keys: |
             quality-focus-${{ github.workflow }}-
-            quality-focus-
-            quality-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

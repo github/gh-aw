@@ -182,8 +182,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             trending-data-${{ github.workflow }}-
-            trending-data-
-            trending-
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
         env:

@@ -129,8 +129,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory-repo-audits
           restore-keys: |
             repo-audits-${{ github.workflow }}-
-            repo-audits-
-            repo-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

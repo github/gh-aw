@@ -166,8 +166,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             weekly-issues-data-
-            weekly-issues-
-            weekly-
       # Repo memory git-based storage configuration from frontmatter processed below
       - name: Clone repo-memory branch (default)
         env:

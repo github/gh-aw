@@ -162,8 +162,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             poem-memory-${{ github.workflow }}-
-            poem-memory-
-            poem-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}

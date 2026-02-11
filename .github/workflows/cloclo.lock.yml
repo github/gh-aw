@@ -225,8 +225,6 @@ jobs:
           path: /tmp/gh-aw/cache-memory
           restore-keys: |
             cloclo-memory-${{ github.workflow }}-
-            cloclo-memory-
-            cloclo-
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}
