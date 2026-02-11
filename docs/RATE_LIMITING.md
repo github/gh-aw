@@ -66,6 +66,7 @@ rate-limit:
    - Time window (only runs within the configured window)
    - Event type (if `events` is configured)
    - Excludes the current run from the count
+   - Excludes cancelled runs (cancelled runs don't count toward the limit)
 5. **Progressive Aggregation**: Uses pagination with short-circuit logic for efficiency
 6. **Automatic Cancellation**: If the limit is exceeded, the current run is automatically cancelled
 
@@ -116,6 +117,7 @@ The rate limit check provides extensive logging:
 📊 Querying workflow runs for 'workflow-name'...
    Fetching page 1 (up to 100 runs per page)...
    Retrieved 10 runs from page 1
+   Skipping run 123457 - cancelled (status: cancelled)
    ✓ Run #5 (123456) by username - event: workflow_dispatch, created: 2026-02-11T11:15:00.000Z, status: completed
 📈 Rate limit summary for user 'username':
    Total recent runs in last 60 minutes: 3

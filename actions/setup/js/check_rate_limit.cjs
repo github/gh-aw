@@ -104,6 +104,12 @@ async function main() {
           continue;
         }
 
+        // Skip cancelled workflow runs (they don't count toward the rate limit)
+        if (run.status === "cancelled") {
+          core.info(`   Skipping run ${run.id} - cancelled (status: ${run.status})`);
+          continue;
+        }
+
         // If specific events are configured, only count matching events
         const runEvent = run.event;
         if (limitedEvents.length > 0 && !limitedEvents.includes(runEvent)) {
