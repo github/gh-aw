@@ -5,12 +5,43 @@ package workflow
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/stringutil"
 	"github.com/github/gh-aw/pkg/testutil"
 )
+
+// hasGenericRestoreKey checks if the lock file contains a generic restore key pattern
+// that would match caches from other workflows. Returns true if found (which is bad).
+func hasGenericRestoreKey(lockContent, prefix string) bool {
+	// Look for restore-keys sections
+	restoreKeysPattern := regexp.MustCompile(`restore-keys:\s*\|`)
+	matches := restoreKeysPattern.FindAllStringIndex(lockContent, -1)
+	
+	for _, match := range matches {
+		// Get the content after "restore-keys: |"
+		start := match[1]
+		// Find the next non-indented line (which marks the end of restore-keys)
+		lines := strings.Split(lockContent[start:], "\n")
+		for _, line := range lines {
+			// Check if this line is a restore key (starts with whitespace)
+			if strings.HasPrefix(line, "            ") || strings.HasPrefix(line, "          ") {
+				restoreKey := strings.TrimSpace(line)
+				// Check if this is a generic fallback (ends with just the prefix and nothing else)
+				// For example: "memory-" (bad) vs "memory-${{ github.workflow }}-" (good)
+				if restoreKey == prefix {
+					return true
+				}
+			} else if strings.TrimSpace(line) != "" {
+				// We've hit a non-restore-key line, stop checking this section
+				break
+			}
+		}
+	}
+	return false
+}
 
 // TestCacheMemoryRestoreKeysNoGenericFallback verifies that cache-memory restore-keys
 // do NOT include a generic fallback that would match caches from other workflows.
@@ -21,6 +52,7 @@ func TestCacheMemoryRestoreKeysNoGenericFallback(t *testing.T) {
 		frontmatter       string
 		expectedInLock    []string
 		notExpectedInLock []string
+		genericFallbacks  []string // Generic restore key prefixes that should NOT be present
 	}{
 		{
 			name: "default cache-memory should NOT have generic memory- fallback",
@@ -40,11 +72,7 @@ tools:
 				"restore-keys: |",
 				"memory-${{ github.workflow }}-",
 			},
-			notExpectedInLock: []string{
-				// Should NOT have generic fallback that would match other workflows
-				"            memory-\n",
-				// More specific check: "memory-" followed by newline at the right indent level
-			},
+			genericFallbacks: []string{"memory-"},
 		},
 		{
 			name: "cache-memory with custom ID should NOT have generic fallbacks",
@@ -69,11 +97,7 @@ tools:
 				"restore-keys: |",
 				"memory-chroma-${{ github.workflow }}-",
 			},
-			notExpectedInLock: []string{
-				// Should NOT have generic fallbacks that would match other workflows
-				"            memory-chroma-\n",
-				"            memory-\n",
-			},
+			genericFallbacks: []string{"memory-chroma-", "memory-"},
 		},
 		{
 			name: "multiple cache-memory should NOT have generic fallbacks",
@@ -100,12 +124,7 @@ tools:
 				"memory-default-${{ github.workflow }}-",
 				"memory-session-${{ github.workflow }}-",
 			},
-			notExpectedInLock: []string{
-				// Should NOT have generic fallbacks for either cache
-				"            memory-default-\n",
-				"            memory-session-\n",
-				"            memory-\n",
-			},
+			genericFallbacks: []string{"memory-default-", "memory-session-", "memory-"},
 		},
 		{
 			name: "cache-memory with threat detection should NOT have generic fallback",
@@ -130,10 +149,7 @@ safe-outputs:
 				"restore-keys: |",
 				"memory-${{ github.workflow }}-",
 			},
-			notExpectedInLock: []string{
-				// Should NOT have generic fallback
-				"            memory-\n",
-			},
+			genericFallbacks: []string{"memory-"},
 		},
 	}
 
@@ -170,10 +186,10 @@ safe-outputs:
 				}
 			}
 
-			// Check that unexpected strings are NOT present
-			for _, notExpected := range tt.notExpectedInLock {
-				if strings.Contains(lockStr, notExpected) {
-					t.Errorf("Did not expect to find '%s' in lock file but it was present.\nLock file content:\n%s", notExpected, lockStr)
+			// Check that generic fallback restore keys are NOT present using the helper
+			for _, genericFallback := range tt.genericFallbacks {
+				if hasGenericRestoreKey(lockStr, genericFallback) {
+					t.Errorf("Found generic restore key '%s' in lock file, which creates a security vulnerability.\nLock file content:\n%s", genericFallback, lockStr)
 				}
 			}
 		})

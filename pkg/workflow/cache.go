@@ -378,6 +378,8 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		keyParts := strings.Split(cacheKey, "-")
 		// Only generate restore key for workflow level (remove run_id only)
 		// This prevents generic fallbacks like "memory-" that would match any workflow
+		// Note: cacheKey is always constructed with at least 2 parts (prefix + run_id)
+		// Example: "memory-${{ github.workflow }}-${{ github.run_id }}" splits into 3+ parts
 		if len(keyParts) >= 2 {
 			workflowLevelKey := strings.Join(keyParts[:len(keyParts)-1], "-") + "-"
 			restoreKeys = append(restoreKeys, workflowLevelKey)
