@@ -192,6 +192,12 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
+	// Validate labels configuration
+	log.Printf("Validating labels")
+	if err := validateLabels(workflowData); err != nil {
+		return formatCompilerError(markdownPath, "error", err.Error(), err)
+	}
+
 	// Emit experimental warning for sandbox-runtime feature
 	if isSRTEnabled(workflowData) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental feature: sandbox-runtime firewall"))

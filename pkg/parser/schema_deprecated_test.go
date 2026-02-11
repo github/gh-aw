@@ -12,26 +12,16 @@ func TestGetMainWorkflowDeprecatedFields(t *testing.T) {
 		t.Fatalf("GetMainWorkflowDeprecatedFields() error = %v", err)
 	}
 
-	// Check that timeout_minutes IS in the list as a deprecated field
-	// This allows strict mode to properly detect and reject it
-	found := false
-	var timeoutMinutesField *DeprecatedField
+	// Check that timeout_minutes is NOT in the list (it has been removed from the schema)
+	// This field was fully removed per https://github.com/github/gh-aw/issues/14736
 	for _, field := range deprecatedFields {
 		if field.Name == "timeout_minutes" {
-			found = true
-			timeoutMinutesField = &field
-			break
+			t.Errorf("timeout_minutes should not be in the deprecated fields list - it has been completely removed from the schema")
 		}
 	}
 
-	if !found {
-		t.Error("timeout_minutes should be in the deprecated fields list to support strict mode validation")
-	} else {
-		// Verify it has the correct replacement
-		if timeoutMinutesField.Replacement != "timeout-minutes" {
-			t.Errorf("timeout_minutes replacement = %v, want 'timeout-minutes'", timeoutMinutesField.Replacement)
-		}
-	}
+	// The list can be empty or contain other deprecated fields, but timeout_minutes should not be present
+	t.Logf("Found %d deprecated fields in schema (timeout_minutes correctly removed)", len(deprecatedFields))
 }
 
 func TestFindDeprecatedFieldsInFrontmatter(t *testing.T) {
