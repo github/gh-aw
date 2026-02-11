@@ -368,7 +368,7 @@ func printCompilationSummary(stats *CompilationStats) {
 	// Use different formatting based on whether there were errors
 	if stats.Errors > 0 {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(summary))
-		
+
 		// Show agent-friendly list of failed workflow IDs first
 		if len(stats.FailureDetails) > 0 {
 			fmt.Fprintln(os.Stderr)
@@ -377,7 +377,7 @@ func printCompilationSummary(stats *CompilationStats) {
 				fmt.Fprintf(os.Stderr, "  ✗ %s\n", filepath.Base(failure.Path))
 			}
 			fmt.Fprintln(os.Stderr)
-			
+
 			// Display the actual error messages for each failed workflow
 			for _, failure := range stats.FailureDetails {
 				for _, errMsg := range failure.ErrorMessages {
