@@ -70,6 +70,15 @@ func (c *Compiler) generateRateLimitCheck(data *WorkflowData, steps []string) []
 		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_EVENTS: %q\n", strings.Join(events, ",")))
 	}
 
+	// Set ignored roles (if specified)
+	if len(data.RateLimit.IgnoredRoles) > 0 {
+		// Sort roles alphabetically for consistent output
+		ignoredRoles := make([]string, len(data.RateLimit.IgnoredRoles))
+		copy(ignoredRoles, data.RateLimit.IgnoredRoles)
+		sort.Strings(ignoredRoles)
+		steps = append(steps, fmt.Sprintf("          GH_AW_RATE_LIMIT_IGNORED_ROLES: %q\n", strings.Join(ignoredRoles, ",")))
+	}
+
 	steps = append(steps, "        with:\n")
 	steps = append(steps, "          github-token: ${{ secrets.GITHUB_TOKEN }}\n")
 	steps = append(steps, "          script: |\n")
@@ -199,7 +208,27 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 				}
 			}
 
-			roleLog.Printf("Extracted rate-limit config: max=%d, window=%d, events=%v", config.Max, config.Window, config.Events)
+			// Extract ignored-roles
+			if ignoredRolesValue, ok := v["ignored-roles"]; ok {
+				switch ignoredRoles := ignoredRolesValue.(type) {
+				case []any:
+					for _, item := range ignoredRoles {
+						if str, ok := item.(string); ok {
+							config.IgnoredRoles = append(config.IgnoredRoles, str)
+						}
+					}
+				case []string:
+					config.IgnoredRoles = ignoredRoles
+				case string:
+					config.IgnoredRoles = []string{ignoredRoles}
+				}
+			} else {
+				// Default: admin, maintain, and write roles are exempt from rate limiting
+				config.IgnoredRoles = []string{"admin", "maintain", "write"}
+				roleLog.Print("No ignored-roles specified, using defaults: admin, maintain, write")
+			}
+
+			roleLog.Printf("Extracted rate-limit config: max=%d, window=%d, events=%v, ignored-roles=%v", config.Max, config.Window, config.Events, config.IgnoredRoles)
 			return config
 		}
 	}
