@@ -32,7 +32,12 @@ func (c *Compiler) parseAssignToAgentConfig(outputMap map[string]any) *AssignToA
 		return &AssignToAgentConfig{}
 	}
 
-	assignToAgentLog.Printf("Parsed assign-to-agent config: default_agent=%s, allowed_count=%d, target=%s", config.DefaultAgent, len(config.Allowed), config.Target)
+	// Set default max if not specified
+	if config.Max == 0 {
+		config.Max = 1
+	}
+
+	assignToAgentLog.Printf("Parsed assign-to-agent config: default_agent=%s, allowed_count=%d, target=%s, max=%d", config.DefaultAgent, len(config.Allowed), config.Target, config.Max)
 
 	return &config
 }

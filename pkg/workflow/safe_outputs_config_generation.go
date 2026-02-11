@@ -182,6 +182,7 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 		if data.SafeOutputs.AssignToAgent != nil {
 			safeOutputsConfig["assign_to_agent"] = generateAssignToAgentConfig(
 				data.SafeOutputs.AssignToAgent.Max,
+				1, // default max
 				data.SafeOutputs.AssignToAgent.DefaultAgent,
 				data.SafeOutputs.AssignToAgent.Target,
 				data.SafeOutputs.AssignToAgent.Allowed,

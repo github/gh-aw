@@ -97,15 +97,20 @@ func generateMaxWithReviewersConfig(max int, defaultMax int, reviewers []string)
 }
 
 // generateAssignToAgentConfig creates a config with optional max, default_agent, target, and allowed
-func generateAssignToAgentConfig(max int, defaultAgent string, target string, allowed []string) map[string]any {
+func generateAssignToAgentConfig(max int, defaultMax int, defaultAgent string, target string, allowed []string) map[string]any {
 	if safeOutputsConfigGenLog.Enabled() {
-		safeOutputsConfigGenLog.Printf("Generating assign-to-agent config: max=%d, defaultAgent=%s, target=%s, allowed_count=%d",
-			max, defaultAgent, target, len(allowed))
+		safeOutputsConfigGenLog.Printf("Generating assign-to-agent config: max=%d, defaultMax=%d, defaultAgent=%s, target=%s, allowed_count=%d",
+			max, defaultMax, defaultAgent, target, len(allowed))
 	}
 	config := make(map[string]any)
+
+	// Apply default max if max is not specified
+	maxValue := defaultMax
 	if max > 0 {
-		config["max"] = max
+		maxValue = max
 	}
+	config["max"] = maxValue
+
 	if defaultAgent != "" {
 		config["default_agent"] = defaultAgent
 	}
