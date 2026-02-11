@@ -671,9 +671,15 @@ jobs:
           The gh CLI is NOT authenticated. Do NOT use gh commands for GitHub operations.
           </important>
           <instructions>
-          To create or modify GitHub resources (issues, discussions, pull requests, etc.), you MUST call the appropriate safe output tool. Simply writing content will NOT work - the workflow requires actual tool calls.
+          To create or modify GitHub resources, you MUST call the appropriate safe output tool. Simply writing content will NOT work - the workflow requires actual tool calls.
           
           Discover available tools from the safeoutputs MCP server.
+          
+          **Available tool categories:**
+          - **Discussions**: Create, update, and close GitHub discussions
+          - **Comments**: Add and manage comments on issues and pull requests
+          - **Code & Security**: Create code scanning alerts, provide autofixes, add review comments
+          - **Utility**: Report missing data, missing tools, or no-op completion status
           
           **Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
           

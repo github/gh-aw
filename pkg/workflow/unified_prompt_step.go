@@ -273,21 +273,7 @@ func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
 	// 7. Safe outputs instructions (if enabled)
 	if HasSafeOutputsEnabled(data.SafeOutputs) {
 		unifiedPromptLog.Print("Adding safe outputs section")
-		safeOutputsContent := `<safe-outputs>
-<description>GitHub API Access Instructions</description>
-<important>
-The gh CLI is NOT authenticated. Do NOT use gh commands for GitHub operations.
-</important>
-<instructions>
-To create or modify GitHub resources (issues, discussions, pull requests, etc.), you MUST call the appropriate safe output tool. Simply writing content will NOT work - the workflow requires actual tool calls.
-
-Discover available tools from the safeoutputs MCP server.
-
-**Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
-
-**Note**: If you made no other safe output tool calls during this workflow execution, call the "noop" tool to provide a status message indicating completion or that no actions were needed.
-</instructions>
-</safe-outputs>`
+		safeOutputsContent := buildSafeOutputsPrompt(data.SafeOutputs)
 		sections = append(sections, PromptSection{
 			Content: safeOutputsContent,
 			IsFile:  false,
@@ -607,4 +593,100 @@ func (c *Compiler) generateUnifiedPromptCreationStep(yaml *strings.Builder, buil
 	}
 
 	unifiedPromptLog.Print("Unified prompt creation step generated successfully")
+}
+
+// buildSafeOutputsPrompt generates a context-aware safe outputs prompt based on enabled tools.
+// It categorizes tools to help agents understand what's available without listing specific tool names
+// (which can cause premature tool calls before MCP server setup).
+func buildSafeOutputsPrompt(config *SafeOutputsConfig) string {
+	if config == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+
+	sb.WriteString(`<safe-outputs>
+<description>GitHub API Access Instructions</description>
+<important>
+The gh CLI is NOT authenticated. Do NOT use gh commands for GitHub operations.
+</important>
+<instructions>
+To create or modify GitHub resources, you MUST call the appropriate safe output tool. Simply writing content will NOT work - the workflow requires actual tool calls.
+
+Discover available tools from the safeoutputs MCP server.
+
+**Available tool categories:**
+`)
+
+	// Build a list of available tool categories based on enabled safe outputs
+	categories := []string{}
+
+	// Issue and Discussion operations
+	if config.CreateIssues != nil || config.UpdateIssues != nil || config.CloseIssues != nil {
+		categories = append(categories, "- **Issues**: Create, update, and close GitHub issues")
+	}
+	if config.CreateDiscussions != nil || config.UpdateDiscussions != nil || config.CloseDiscussions != nil {
+		categories = append(categories, "- **Discussions**: Create, update, and close GitHub discussions")
+	}
+
+	// Pull Request operations
+	if config.CreatePullRequests != nil || config.UpdatePullRequests != nil || config.ClosePullRequests != nil || config.MarkPullRequestAsReadyForReview != nil {
+		categories = append(categories, "- **Pull Requests**: Create, update, and manage pull requests")
+	}
+
+	// Comment operations
+	if config.AddComments != nil || config.HideComment != nil {
+		categories = append(categories, "- **Comments**: Add and manage comments on issues and pull requests")
+	}
+
+	// Label operations
+	if config.AddLabels != nil || config.RemoveLabels != nil {
+		categories = append(categories, "- **Labels**: Add and remove labels from issues and pull requests")
+	}
+
+	// Project operations (GitHub Projects v2)
+	if config.UpdateProjects != nil || config.CreateProjects != nil || config.CreateProjectStatusUpdates != nil {
+		categories = append(categories, "- **Projects**: Manage GitHub Projects v2 boards - add/update items, create projects, post status updates")
+	}
+
+	// Assignment and review operations
+	if config.AssignToAgent != nil || config.AssignToUser != nil || config.AddReviewer != nil || config.AssignMilestone != nil {
+		categories = append(categories, "- **Assignment**: Assign issues/PRs to users, add reviewers, set milestones")
+	}
+
+	// Code and security operations
+	if config.CreateCodeScanningAlerts != nil || config.AutofixCodeScanningAlert != nil || config.CreatePullRequestReviewComments != nil {
+		categories = append(categories, "- **Code & Security**: Create code scanning alerts, provide autofixes, add review comments")
+	}
+
+	// Agent and workflow operations
+	if config.CreateAgentSessions != nil {
+		categories = append(categories, "- **Agent Sessions**: Create GitHub Copilot agent sessions for delegating coding tasks")
+	}
+	if config.DispatchWorkflow != nil {
+		categories = append(categories, "- **Workflow Dispatch**: Trigger other workflows with custom inputs")
+	}
+
+	// Advanced operations
+	if config.PushToPullRequestBranch != nil || config.UploadAssets != nil || config.UpdateRelease != nil {
+		categories = append(categories, "- **Advanced**: Push to PR branches, upload assets, update releases")
+	}
+
+	// Always add utility tools
+	categories = append(categories, "- **Utility**: Report missing data, missing tools, or no-op completion status")
+
+	// Add all categories to the prompt
+	for _, category := range categories {
+		sb.WriteString(category)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(`
+**Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
+
+**Note**: If you made no other safe output tool calls during this workflow execution, call the "noop" tool to provide a status message indicating completion or that no actions were needed.
+</instructions>
+</safe-outputs>`)
+
+	return sb.String()
 }
