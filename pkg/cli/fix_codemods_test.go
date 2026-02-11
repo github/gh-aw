@@ -75,7 +75,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 		"write-permissions-to-read-migration",
 		"permissions-read-to-read-all",
 		"agent-task-to-agent-session-migration",
-		"sandbox-agent-false-removal",
+		// "sandbox-agent-false-removal", // REMOVED: sandbox.agent: false is now supported
 		"schedule-at-to-around-migration",
 		"delete-schema-file",
 		"grep-tool-removal",
@@ -112,7 +112,7 @@ func TestGetAllCodemods_InExpectedOrder(t *testing.T) {
 		"write-permissions-to-read-migration",
 		"permissions-read-to-read-all",
 		"agent-task-to-agent-session-migration",
-		"sandbox-agent-false-removal",
+		// "sandbox-agent-false-removal", // REMOVED: sandbox.agent: false is now supported
 		"schedule-at-to-around-migration",
 		"delete-schema-file",
 		"grep-tool-removal",
