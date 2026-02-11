@@ -212,6 +212,44 @@ describe("runtime_import", () => {
         // 5 levels (max)
         expect(isSafeExpression("needs.job.outputs.foo.bar")).toBe(!0);
       });
+      it("should reject string literals with nested expressions", () => {
+        // Reject ${{ markers in string literals
+        expect(isSafeExpression("inputs.value || '${{ secrets.TOKEN }}'")).toBe(!1);
+        expect(isSafeExpression("inputs.value || 'text ${{ expr }}'")).toBe(!1);
+        // Reject }} markers in string literals
+        expect(isSafeExpression("inputs.value || 'text }} more'")).toBe(!1);
+        // Reject both markers
+        expect(isSafeExpression("inputs.value || '${{ }} combined'")).toBe(!1);
+      });
+      it("should reject string literals with escape sequences", () => {
+        // Reject hex escape sequences (\x)
+        expect(isSafeExpression("inputs.value || '\\x41'")).toBe(!1);
+        expect(isSafeExpression("inputs.value || 'test\\x20value'")).toBe(!1);
+        // Reject unicode escape sequences (\u)
+        expect(isSafeExpression("inputs.value || '\\u0041'")).toBe(!1);
+        expect(isSafeExpression("inputs.value || 'test\\u0020value'")).toBe(!1);
+        // Reject octal escape sequences
+        expect(isSafeExpression("inputs.value || '\\101'")).toBe(!1);
+        expect(isSafeExpression("inputs.value || 'test\\040value'")).toBe(!1);
+      });
+      it("should reject string literals with zero-width characters", () => {
+        // Reject zero-width space (U+200B)
+        expect(isSafeExpression("inputs.value || 'test\u200Bvalue'")).toBe(!1);
+        // Reject zero-width non-joiner (U+200C)
+        expect(isSafeExpression("inputs.value || 'test\u200Cvalue'")).toBe(!1);
+        // Reject zero-width joiner (U+200D)
+        expect(isSafeExpression("inputs.value || 'test\u200Dvalue'")).toBe(!1);
+        // Reject zero-width no-break space (U+FEFF)
+        expect(isSafeExpression("inputs.value || 'test\uFEFFvalue'")).toBe(!1);
+      });
+      it("should allow safe string literals", () => {
+        // Normal strings should still work
+        expect(isSafeExpression("inputs.value || 'normal string'")).toBe(!0);
+        expect(isSafeExpression("inputs.value || 'with-dashes_and_underscores'")).toBe(!0);
+        // Safe escape sequences like \n, \t should work
+        expect(isSafeExpression("inputs.value || 'line\\nbreak'")).toBe(!0);
+        expect(isSafeExpression("inputs.value || 'tab\\there'")).toBe(!0);
+      });
     }),
     describe("evaluateExpression", () => {
       beforeEach(() => {
@@ -293,6 +331,24 @@ describe("runtime_import", () => {
         // Out of bounds - should return undefined
         const outOfBounds = evaluateExpression("github.event.release.assets[999].id");
         expect(outOfBounds).toContain("${{");
+      });
+      it("should escape $ and { in extracted string literals", () => {
+        // Test escaping of $ character
+        expect(evaluateExpression("inputs.missing || 'test$value'")).toBe("test\\$value");
+        expect(evaluateExpression("inputs.missing || 'multiple$$$signs'")).toBe("multiple\\$\\$\\$signs");
+        // Test escaping of { character
+        expect(evaluateExpression("inputs.missing || 'test{value'")).toBe("test\\{value");
+        expect(evaluateExpression("inputs.missing || 'multiple{{{braces'")).toBe("multiple\\{\\{\\{braces");
+        // Test escaping of both $ and {
+        expect(evaluateExpression("inputs.missing || 'test${value}'")).toBe("test\\$\\{value}");
+        expect(evaluateExpression("inputs.missing || '${combined}'")).toBe("\\$\\{combined}");
+      });
+      it("should not escape characters in non-literal expressions", () => {
+        // When left side is defined, should not escape
+        expect(evaluateExpression("inputs.repository || 'default'")).toBe("testorg/testrepo");
+        // Number and boolean literals don't need escaping
+        expect(evaluateExpression("inputs.missing || 42")).toBe("42");
+        expect(evaluateExpression("inputs.missing || true")).toBe("true");
       });
     }),
     describe("processRuntimeImport", () => {

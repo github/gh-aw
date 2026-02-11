@@ -23,7 +23,7 @@ function extractMentions(text) {
 
   const { getErrorMessage } = require("./error_helpers.cjs");
 
-  const mentionRegex = /(^|[^\w`])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?)/g;
+  const mentionRegex = /(^|[^\w`])@([A-Za-z0-9](?:[A-Za-z0-9_-]{0,37}[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?)/g;
   const mentions = [];
   const seen = new Set();
 

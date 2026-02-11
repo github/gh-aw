@@ -109,6 +109,26 @@ describe("sanitize_content.cjs", () => {
       const result = sanitizeContent("Contact email@example.com");
       expect(result).toBe("Contact email@example.com");
     });
+
+    it("should neutralize @mentions with underscores", () => {
+      const result = sanitizeContent("Hello @user_name");
+      expect(result).toBe("Hello `@user_name`");
+    });
+
+    it("should neutralize @mentions with multiple underscores", () => {
+      const result = sanitizeContent("Hello @user_name_test");
+      expect(result).toBe("Hello `@user_name_test`");
+    });
+
+    it("should neutralize @mentions with underscores and hyphens", () => {
+      const result = sanitizeContent("Hello @user-name_test");
+      expect(result).toBe("Hello `@user-name_test`");
+    });
+
+    it("should neutralize org/team mentions with underscores", () => {
+      const result = sanitizeContent("Hello @my_org/my_team");
+      expect(result).toBe("Hello `@my_org/my_team`");
+    });
   });
 
   describe("@mention allowedAliases", () => {
@@ -160,6 +180,21 @@ describe("sanitize_content.cjs", () => {
     it("should preserve backward compatibility with numeric maxLength parameter", () => {
       const result = sanitizeContent("Hello @user", 524288);
       expect(result).toBe("Hello `@user`");
+    });
+
+    it("should not neutralize allowed mentions with underscores", () => {
+      const result = sanitizeContent("Hello @user_name", { allowedAliases: ["user_name"] });
+      expect(result).toBe("Hello @user_name");
+    });
+
+    it("should neutralize disallowed mentions with underscores", () => {
+      const result = sanitizeContent("Hello @user_name and @other_user", { allowedAliases: ["user_name"] });
+      expect(result).toBe("Hello @user_name and `@other_user`");
+    });
+
+    it("should not neutralize org/team mentions with underscores in allowedAliases", () => {
+      const result = sanitizeContent("Hello @my_org/my_team", { allowedAliases: ["my_org/my_team"] });
+      expect(result).toBe("Hello @my_org/my_team");
     });
 
     it("should log escaped mentions for debugging", () => {

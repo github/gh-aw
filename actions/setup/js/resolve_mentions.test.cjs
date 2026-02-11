@@ -35,6 +35,29 @@ describe("resolve_mentions.cjs", () => {
         it("should preserve original case", () => {
           const mentions = extractMentions("Hello @UserName");
           expect(mentions).toEqual(["UserName"]);
+        }),
+        it("should extract mentions with underscores", () => {
+          const mentions = extractMentions("Hello @user_name");
+          expect(mentions).toEqual(["user_name"]);
+        }),
+        it("should extract mentions with multiple underscores", () => {
+          const mentions = extractMentions("Hello @user_name_test");
+          expect(mentions).toEqual(["user_name_test"]);
+        }),
+        it("should extract mentions with underscores and hyphens", () => {
+          const mentions = extractMentions("Hello @user-name_test");
+          expect(mentions).toEqual(["user-name_test"]);
+        }),
+        it("should extract mentions with underscores at various positions", () => {
+          const mentions = extractMentions("@test_user @_invalid @user_ @valid_user_123");
+          // @_invalid: starts with underscore - not extracted (starts with non-alphanumeric)
+          // @user_: ends with underscore - extracted as "user" (underscore not at end)
+          // Other mentions are valid
+          expect(mentions).toEqual(["test_user", "user", "valid_user_123"]);
+        }),
+        it("should handle org/team mentions with underscores", () => {
+          const mentions = extractMentions("Hello @my_org/my_team");
+          expect(mentions).toEqual(["my_org/my_team"]);
         }));
     }),
     describe("isPayloadUserBot", () => {
