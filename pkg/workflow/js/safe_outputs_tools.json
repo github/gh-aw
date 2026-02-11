@@ -924,7 +924,7 @@
   },
   {
     "name": "create_project",
-    "description": "Create a new GitHub Project board with optional fields and views. Use this to create a new project for organizing and tracking work across issues and pull requests. Can optionally specify custom fields, project views, and an initial item to add. Returns a temporary project ID that can be referenced in subsequent update_project calls.",
+    "description": "Create a new GitHub Project board. Use this to create a new project for organizing and tracking work across issues and pull requests, owned by a specific user or organization. You can optionally provide a custom title and add an initial issue item to the project via item_url.",
     "inputSchema": {
       "type": "object",
       "required": [],
