@@ -961,10 +961,11 @@ func RenderJSONMCPConfig(
 	// Get the generated configuration
 	generatedConfig := configBuilder.String()
 
+	delimiter := GenerateHeredocDelimiter("MCP_CONFIG")
 	// Write the configuration to the YAML output
-	yaml.WriteString("          cat << MCPCONFIG_EOF | bash /opt/gh-aw/actions/start_mcp_gateway.sh\n")
+	yaml.WriteString("          cat << " + delimiter + " | bash /opt/gh-aw/actions/start_mcp_gateway.sh\n")
 	yaml.WriteString(generatedConfig)
-	yaml.WriteString("          MCPCONFIG_EOF\n")
+	yaml.WriteString("          " + delimiter + "\n")
 
 	// Note: Post-EOF commands are no longer needed since we pipe directly to the gateway script
 	return nil
