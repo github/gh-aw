@@ -450,12 +450,17 @@ gh aw secrets set COPILOT_GITHUB_TOKEN --value "YOUR_COPILOT_PAT"
 > [!IMPORTANT]
 > **Required** if you need to programmatically assign Copilot agents to issues or PRs
 
-Specialized token for `assign-to-agent:` safe outputs that programmatically assign GitHub Copilot agents to issues or pull requests. This is distinct from the standard GitHub UI workflow for [assigning issues to Copilot](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot) - this token is used for automated agent assignment through workflow safe outputs.
+Primary token used by `assign-to-agent:` safe outputs to programmatically assign GitHub Copilot agents to issues or pull requests. This is distinct from the standard GitHub UI workflow for [assigning issues to Copilot](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot) and is used specifically for automated agent assignment through workflow safe outputs.
 
 **Required for**:
 
 - `assign-to-agent:` safe outputs
 - Programmatic agent assignment operations
+
+**Token precedence and fallback**:
+
+- If `GH_AW_AGENT_TOKEN` is set, it is always used for agent assignment.
+- If `GH_AW_AGENT_TOKEN` is _not_ set, `gh-aw` falls back to `GH_AW_GITHUB_TOKEN`, and then to `GITHUB_TOKEN`, matching the runtime resolution `GH_AW_AGENT_TOKEN || GH_AW_GITHUB_TOKEN || GITHUB_TOKEN`.
 
 **Setup**:
 
@@ -508,8 +513,6 @@ When an organization owns the repository, you need a fine-grained PAT with the r
 gh aw secrets set GH_AW_AGENT_TOKEN --value "YOUR_AGENT_PAT"
 ```
 
-**Token precedence**: per-output → global safe-outputs → workflow-level → `GH_AW_AGENT_TOKEN` (no further fallback - must be explicitly configured)
-
 > [!NOTE]
 > Two ways to assign Copilot agents
 > 
@@ -534,7 +537,7 @@ gh aw secrets set GH_AW_AGENT_TOKEN --value "YOUR_AGENT_PAT"
 > 
 > Both methods result in the same outcome as [manually assigning issues to Copilot through the GitHub UI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot). Method 2 is simpler when creating issues, while method 1 provides fine-grained control for existing issues.
 > 
-> **Technical Implementation**: Both methods use the GraphQL `replaceActorsForAssignable` mutation to assign the `copilot-swe-agent` bot to issues or PRs. The token precedence for both is: per-output → global safe-outputs → workflow-level → `GH_AW_AGENT_TOKEN` (with fallback to `GH_AW_GITHUB_TOKEN` or `GITHUB_TOKEN` if not set).
+> **Technical Implementation**: Both methods use the GraphQL `replaceActorsForAssignable` mutation to assign the `copilot-swe-agent` bot to issues or PRs. Both follow the token precedence and fallback behavior documented above.
 > 
 > See [GitHub's official documentation on assigning issues to Copilot](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent) for more details on the Copilot coding agent.
 
