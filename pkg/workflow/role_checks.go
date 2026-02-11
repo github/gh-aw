@@ -211,15 +211,15 @@ func (c *Compiler) inferEventsFromTriggers(frontmatter map[string]any) []string 
 
 	var events []string
 	programmaticTriggers := map[string]string{
-		"workflow_dispatch":           "workflow_dispatch",
-		"repository_dispatch":         "repository_dispatch",
-		"issues":                      "issues",
+		"discussion":                  "discussion",
+		"discussion_comment":          "discussion_comment",
 		"issue_comment":               "issue_comment",
+		"issues":                      "issues",
 		"pull_request":                "pull_request",
 		"pull_request_review":         "pull_request_review",
 		"pull_request_review_comment": "pull_request_review_comment",
-		"discussion":                  "discussion",
-		"discussion_comment":          "discussion_comment",
+		"repository_dispatch":         "repository_dispatch",
+		"workflow_dispatch":           "workflow_dispatch",
 	}
 
 	switch on := onValue.(type) {
