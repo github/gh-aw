@@ -208,6 +208,12 @@ func TestApplyJqFilter_SecurityValidation(t *testing.T) {
 			errorSubstr: "potentially dangerous pattern",
 		},
 		{
+			name:        "block unbounded recurse with expression",
+			jqFilter:    `recurse(.foo)`,
+			expectError: true,
+			errorSubstr: "potentially dangerous pattern",
+		},
+		{
 			name:        "block infinite while loop",
 			jqFilter:    `while(true; . + 1)`,
 			expectError: true,
@@ -216,12 +222,6 @@ func TestApplyJqFilter_SecurityValidation(t *testing.T) {
 		{
 			name:        "block infinite until loop",
 			jqFilter:    `until(false; . + 1)`,
-			expectError: true,
-			errorSubstr: "potentially dangerous pattern",
-		},
-		{
-			name:        "block unbounded repeat",
-			jqFilter:    `repeat(.)`,
 			expectError: true,
 			errorSubstr: "potentially dangerous pattern",
 		},

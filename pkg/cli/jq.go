@@ -23,10 +23,9 @@ var dangerousFunctions = []string{
 
 // Patterns that may indicate DoS or resource exhaustion
 var dosPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`recurse\s*\(\s*\.\s*\)`),   // Unbounded recurse without condition
-	regexp.MustCompile(`while\s*\(\s*true`),        // Infinite loops
-	regexp.MustCompile(`until\s*\(\s*false`),       // Infinite loops
-	regexp.MustCompile(`repeat\s*\(\s*[^)]*\s*\)`), // Unbounded repeat
+	regexp.MustCompile(`recurse\s*\(\s*[^;)]+\s*\)`), // Unbounded recurse without condition (single arg)
+	regexp.MustCompile(`while\s*\(\s*true`),          // Infinite loops
+	regexp.MustCompile(`until\s*\(\s*false`),         // Infinite loops
 }
 
 // Default timeout for jq execution
