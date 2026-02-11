@@ -790,3 +790,120 @@ This workflow doesn't have grep.
 		t.Error("Expected file to not be modified when grep is not present")
 	}
 }
+
+func TestFixCommand_SandboxFalseToAgentFalseMigration(t *testing.T) {
+// Create a temporary directory for test files
+tmpDir := t.TempDir()
+workflowFile := filepath.Join(tmpDir, "test-workflow.md")
+
+// Create a workflow with top-level sandbox: false
+content := `---
+on:
+  workflow_dispatch:
+
+engine: copilot
+sandbox: false
+strict: false
+
+network:
+  allowed:
+    - defaults
+
+permissions:
+  contents: read
+---
+
+# Test Workflow
+
+This workflow has sandbox disabled.
+`
+
+if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+t.Fatalf("Failed to create test file: %v", err)
+}
+
+// Get the sandbox migration codemod
+sandboxCodemod := getCodemodByID("sandbox-false-to-agent-false")
+if sandboxCodemod == nil {
+t.Fatal("sandbox-false-to-agent-false codemod not found")
+}
+
+// Process the file
+fixed, err := processWorkflowFile(workflowFile, []Codemod{*sandboxCodemod}, true, false)
+if err != nil {
+t.Fatalf("Failed to process workflow file: %v", err)
+}
+
+if !fixed {
+t.Error("Expected file to be modified")
+}
+
+// Read the updated file
+updated, err := os.ReadFile(workflowFile)
+if err != nil {
+t.Fatalf("Failed to read updated file: %v", err)
+}
+updatedStr := string(updated)
+
+// Verify that sandbox: false was converted to sandbox.agent: false
+if strings.Contains(updatedStr, "sandbox: false") {
+t.Error("Expected 'sandbox: false' to be removed")
+}
+
+if !strings.Contains(updatedStr, "sandbox:") {
+t.Error("Expected 'sandbox:' block to exist")
+}
+
+if !strings.Contains(updatedStr, "agent: false") {
+t.Error("Expected 'agent: false' to be added")
+}
+
+// Verify markdown is preserved
+if !strings.Contains(updatedStr, "# Test Workflow") {
+t.Error("Expected markdown heading to be preserved")
+}
+
+if !strings.Contains(updatedStr, "This workflow has sandbox disabled.") {
+t.Error("Expected markdown body to be preserved")
+}
+}
+
+func TestFixCommand_SandboxFalseToAgentFalseMigration_NoSandbox(t *testing.T) {
+// Create a temporary directory for test files
+tmpDir := t.TempDir()
+workflowFile := filepath.Join(tmpDir, "test-workflow.md")
+
+// Create a workflow without sandbox field
+content := `---
+on:
+  workflow_dispatch:
+
+engine: copilot
+
+permissions:
+  contents: read
+---
+
+# Test Workflow
+`
+
+if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+t.Fatalf("Failed to create test file: %v", err)
+}
+
+// Get the sandbox migration codemod
+sandboxCodemod := getCodemodByID("sandbox-false-to-agent-false")
+if sandboxCodemod == nil {
+t.Fatal("sandbox-false-to-agent-false codemod not found")
+}
+
+// Process the file
+fixed, err := processWorkflowFile(workflowFile, []Codemod{*sandboxCodemod}, true, false)
+if err != nil {
+t.Fatalf("Failed to process workflow file: %v", err)
+}
+
+if fixed {
+t.Error("Expected file to not be modified when sandbox is not present")
+}
+}
