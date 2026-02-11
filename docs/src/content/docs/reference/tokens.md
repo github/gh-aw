@@ -314,6 +314,22 @@ The required token type depends on whether you own the repository or an organiza
 
 **For User-owned Repositories**:
 
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-user-copilot.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-user-copilot.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a fine-grained PAT for user-owned repositories with Copilot permissions
+  </div>
+</div>
+
 1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
    - **Resource owner**: Your user account
    - **Repository access**: "Public repositories" or select specific repos
@@ -322,6 +338,22 @@ The required token type depends on whether you own the repository or an organiza
      - Copilot Requests: Read-only (required)
 
 **For Organization-owned Repositories**:
+
+<div class="gh-aw-video-wrapper">
+  <video 
+    controls 
+    muted 
+    playsinline 
+    poster="/gh-aw/videos/create-pat-org-copilot.png"
+    style="width: 100%; aspect-ratio: 16/9;"
+  >
+    <source src="/gh-aw/videos/create-pat-org-copilot.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <div class="gh-aw-video-caption" role="note">
+    Creating a fine-grained PAT for organization-owned repositories with Copilot permissions
+  </div>
+</div>
 
 When an organization owns the repository, you need a fine-grained PAT with organization-level permissions:
 
@@ -336,23 +368,6 @@ When an organization owns the repository, you need a fine-grained PAT with organ
      - Members: Read-only (required)
      - GitHub Copilot Business: Read-only (required)
    - **Important**: You must explicitly grant organization access during token creation
-
-<div class="gh-aw-video-wrapper">
-  <video 
-    controls 
-    loop 
-    muted 
-    playsinline 
-    poster="/gh-aw/videos/create-pat-org-copilot.png"
-    style="width: 100%; aspect-ratio: 16/9;"
-  >
-    <source src="/gh-aw/videos/create-pat-org-copilot.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-  <div class="gh-aw-video-caption" role="note">
-    Creating a fine-grained PAT for organization-owned repositories with Copilot permissions
-  </div>
-</div>
 
 2. Add to repository secrets:
 
