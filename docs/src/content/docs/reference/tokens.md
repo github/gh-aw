@@ -50,11 +50,13 @@ gh aw init --tokens --engine <engine>
 2. Click on "Settings" → "Secrets and variables" → "Actions"
 3. Click "New repository secret" and add the token name and value
 
-<div class="gh-aw-video-wrapper" style="max-width: 800px; margin: 1.5rem 0;">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/actions-secrets_dark.png">
-    <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png">
-  </picture>
+<div class="gh-aw-video-container" style="max-width: 800px; margin: 1.5rem 0;">
+  <div class="gh-aw-video-wrapper">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/actions-secrets_dark.png">
+      <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png">
+    </picture>
+  </div>
   <div class="gh-aw-video-caption" role="note">
     Repository secrets in GitHub Actions settings showing three configured tokens
   </div>
@@ -69,21 +71,25 @@ Ownership affects token requirements for repositories and Projects (v2). If the 
 To confirm ownership, check the owner name and avatar at the top of the page or in the URL (`github.com/owner-name/...`). Clicking the owner takes you to a personal profile or an organization page, which confirms it instantly. Here are examples of both (left: user-owned, right: org-owned):
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 1rem; margin: 1.5rem 0; max-width: 800px;">
-  <div class="gh-aw-video-wrapper">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/user-owned_dark.png">
-      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png">
-    </picture>
+  <div class="gh-aw-video-container">
+    <div class="gh-aw-video-wrapper">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/user-owned_dark.png">
+        <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png">
+      </picture>
+    </div>
     <div class="gh-aw-video-caption" role="note">
       User-owned repository: avatar shows a personal profile icon, URL includes username
     </div>
   </div>
 
-  <div class="gh-aw-video-wrapper">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/org-owned_dark.png">
-      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png">
-    </picture>
+  <div class="gh-aw-video-container">
+    <div class="gh-aw-video-wrapper">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="/gh-aw/images/org-owned_dark.png">
+        <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png">
+      </picture>
+    </div>
     <div class="gh-aw-video-caption" role="note">
       Organization-owned repository: avatar shows organization icon, URL includes org name
     </div>
@@ -124,7 +130,8 @@ GitHub Actions automatically provides this token with scoped access to the curre
 
 ---
 
-### `GH_AW_GITHUB_TOKEN` <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
+### `GH_AW_GITHUB_TOKEN` {#enhanced-pat-for-cross-repo-and-remote-tools}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
 
 <div style="padding-left: 1.5rem;">
 
@@ -162,7 +169,8 @@ gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_PAT"
 
 ---
 
-### `GH_AW_GITHUB_MCP_SERVER_TOKEN` <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span> (optional override)
+### `GH_AW_GITHUB_MCP_SERVER_TOKEN` {#github-mcp-server}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span> (optional override)
 
 <div style="padding-left: 1.5rem;">
 
@@ -195,7 +203,8 @@ The compiler automatically sets `GITHUB_MCP_SERVER_TOKEN` and passes it as `GITH
 
 ---
 
-### `GH_AW_PROJECT_GITHUB_TOKEN` <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
+### `GH_AW_PROJECT_GITHUB_TOKEN` {#github-projects-v2}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
 
 <div style="padding-left: 1.5rem;">
 
@@ -340,7 +349,8 @@ safe-outputs:
 
 ---
 
-### `COPILOT_GITHUB_TOKEN` (Copilot Authentication) <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
+### `COPILOT_GITHUB_TOKEN` {#copilot-authentication}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
 
 <div style="padding-left: 1.5rem;">
 
@@ -443,7 +453,8 @@ gh aw secrets set COPILOT_GITHUB_TOKEN --value "YOUR_COPILOT_PAT"
 
 ---
 
-### `GH_AW_AGENT_TOKEN` (Agent Assignment) <span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
+### `GH_AW_AGENT_TOKEN` {#agent-assignment}
+<span style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; background-color: #c084fc; color: white; font-size: 0.875rem; font-weight: 500;">Personal Access Token</span>
 
 <div style="padding-left: 1.5rem;">
 
