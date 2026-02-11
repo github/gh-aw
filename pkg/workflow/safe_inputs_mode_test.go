@@ -122,19 +122,25 @@ func extractMCPServerEntryPoint(yamlStr string) string {
 		return ""
 	}
 
+	// Generate the expected heredoc delimiter (same as the generator uses)
+	delimiter := GenerateHeredocDelimiter("SAFE_INPUTS_SERVER")
+	heredocMarker := "<< '" + delimiter + "'"
+
 	// Find the heredoc start marker
-	heredocStart := strings.Index(yamlStr[start:], "<< 'EOFSI'")
+	heredocStart := strings.Index(yamlStr[start:], heredocMarker)
 	if heredocStart == -1 {
 		return ""
 	}
 	// Move past the heredoc start and newline to the actual content
-	contentStart := start + heredocStart + len("<< 'EOFSI'\n")
+	contentStart := start + heredocStart + len(heredocMarker) + 1 // +1 for newline
 
-	// Find the EOFSI marker that ends the heredoc (should be at start of a line)
-	end := strings.Index(yamlStr[contentStart:], "\n          EOFSI")
+	// Find the delimiter marker that ends the heredoc (should be at start of a line)
+	endMarkerWithSpaces := "\n          " + delimiter
+	end := strings.Index(yamlStr[contentStart:], endMarkerWithSpaces)
 	if end == -1 {
 		// Try without the leading spaces (in case formatting is different)
-		end = strings.Index(yamlStr[contentStart:], "\nEOFSI")
+		endMarkerNoSpaces := "\n" + delimiter
+		end = strings.Index(yamlStr[contentStart:], endMarkerNoSpaces)
 		if end == -1 {
 			return ""
 		}

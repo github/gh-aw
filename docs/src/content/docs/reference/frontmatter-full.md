@@ -1511,6 +1511,12 @@ tools:
     # (optional)
     restore-only: true
 
+    # Cache restore key scope: 'workflow' (default, only restores from same workflow)
+    # or 'repo' (restores from any workflow in the repository). Use 'repo' with
+    # caution as it allows cross-workflow cache sharing.
+    # (optional)
+    scope: "workflow"
+
   # Option 4: Array of cache-memory configurations for multiple caches
   cache-memory: []
     # Array items: object
@@ -1953,23 +1959,25 @@ safe-outputs:
   # Option 2: Enable agent session creation with default configuration
   create-agent-session: null
 
-  # Enable AI agents to update GitHub Project items (issues, pull requests) with
-  # status changes, field updates, and metadata modifications.
+  # Enable AI agents to add items to GitHub Projects, update custom fields, and
+  # manage project structure. Use this for organizing work into projects with status
+  # tracking, priority management, and custom metadata.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Configuration for managing GitHub Projects v2 boards. Smart tool that
-  # can add issue/PR items and update custom fields on existing items. By default it
-  # is update-only: if the project does not exist, the job fails with instructions
-  # to create it manually. To allow workflows to create missing projects, explicitly
-  # opt in via the agent output field create_if_missing=true (and/or provide a
-  # github-token override). NOTE: Projects v2 requires a Personal Access Token (PAT)
-  # or GitHub App token with appropriate permissions; the GITHUB_TOKEN cannot be
-  # used for Projects v2. Safe output items produced by the agent use
-  # type=update_project. Configuration also supports an optional views array for
-  # declaring project views to create. Safe output items produced by the agent use
-  # type=update_project and may include: project (board name), content_type
-  # (issue|pull_request), content_number, fields, and create_if_missing.
+  # Option 1: Configuration for managing GitHub Projects boards. Enable agents to
+  # add issues and pull requests to projects, update custom field values (status,
+  # priority, effort, dates), create project fields and views. By default it is
+  # update-only: if the project does not exist, the job fails with instructions to
+  # create it. To allow workflows to create missing projects, explicitly opt in via
+  # agent output field create_if_missing=true. Requires a Personal Access Token
+  # (PAT) or GitHub App token with Projects permissions (default GITHUB_TOKEN cannot
+  # be used). Agent output includes: project (full URL or temporary project ID like
+  # aw_XXXXXXXXXXXX or #aw_XXXXXXXXXXXX from create_project), content_type
+  # (issue|pull_request|draft_issue), content_number, fields, create_if_missing. For
+  # specialized operations, agent can also provide: operation
+  # (create_fields|create_view), field_definitions (array of field configs when
+  # operation=create_fields), view (view config object when operation=create_view).
   update-project:
     # Maximum number of project operations to perform (default: 10). Each operation
     # may add a project item, or update its fields.
@@ -2030,19 +2038,19 @@ safe-outputs:
   # Option 2: Enable project management with default configuration (max=10)
   update-project: null
 
-  # Enable AI agents to create new GitHub Project boards with custom fields, views,
-  # and configurations.
+  # Enable AI agents to create new GitHub Projects for organizing and tracking work
+  # across issues and pull requests.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Configuration for creating new GitHub Projects v2 boards. Creates a
-  # new empty project that can be populated with issues and custom fields. Requires
-  # a Personal Access Token (PAT) or GitHub App token with Projects permissions; the
-  # GITHUB_TOKEN cannot be used. Safe output items use type=create_project and
-  # include: title (project name), owner (org/user login), owner_type ('org' or
-  # 'user', default: 'org'), and optional item_url (GitHub issue URL to add as first
-  # item). The target-owner can be configured in the workflow frontmatter to provide
-  # a default that the agent can use or override.
+  # Option 1: Configuration for creating new GitHub Projects boards. Enables agents
+  # to create new project boards with optional custom fields, views, and an initial
+  # item. Requires a Personal Access Token (PAT) or GitHub App token with Projects
+  # write permission (default GITHUB_TOKEN cannot be used). Agent output includes:
+  # title (project name), owner (org/user login, uses default if omitted),
+  # owner_type ('org' or 'user'), optional item_url (issue to add as first item),
+  # and optional field_definitions. Returns a temporary project ID for use in
+  # subsequent update_project operations.
   create-project:
     # Maximum number of create operations to perform (default: 1).
     # (optional)
@@ -2114,18 +2122,19 @@ safe-outputs:
 
   # Option 3: Alternative null value syntax
 
-  # Enable AI agents to post status updates to GitHub Projects, providing progress
-  # reports and milestone tracking.
+  # Enable AI agents to post status updates to GitHub Projects for progress tracking
+  # and stakeholder communication.
   # (optional)
   # This field supports multiple formats (oneOf):
 
-  # Option 1: Configuration for creating GitHub Project status updates. Status
-  # updates provide stakeholder communication and historical record of project
-  # progress. Requires a Personal Access Token (PAT) or GitHub App token with
-  # Projects: Read+Write permission. The GITHUB_TOKEN cannot be used for Projects
-  # v2. Status updates are created on the specified project board and appear in the
-  # Updates tab. Typically used by orchestrators to post run summaries with
-  # progress, findings, and next steps.
+  # Option 1: Configuration for posting status updates to GitHub Projects. Status
+  # updates provide stakeholder communication about project progress, health, and
+  # timeline. Each update appears in the project's Updates tab and creates a
+  # historical record. Requires a Personal Access Token (PAT) or GitHub App token
+  # with Projects read & write permission (default GITHUB_TOKEN cannot be used).
+  # Typically used by scheduled workflows or orchestrators to post regular progress
+  # summaries with status indicators (on-track, at-risk, off-track, complete,
+  # inactive), dates, and progress details.
   create-project-status-update:
     # Maximum number of status updates to create (default: 1). Typically 1 per
     # orchestrator run.
