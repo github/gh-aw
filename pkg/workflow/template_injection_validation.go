@@ -159,21 +159,24 @@ func extractRunBlocks(data any) []string {
 // Heredocs (e.g., cat > file << 'EOF' ... EOF) are safe for template expressions
 // because the content is written to files, not executed in the shell
 func removeHeredocContent(content string) string {
-	// Match common heredoc patterns with known delimiters
-	// Since Go regex doesn't support backreferences, we match common heredoc delimiters explicitly
-	commonDelimiters := []string{"EOF", "EOL", "END", "HEREDOC", "JSON", "YAML", "SQL"}
+	// Match common heredoc patterns with known delimiter suffixes
+	// Since Go regex doesn't support backreferences, we match common heredoc delimiter suffixes explicitly
+	// Matches both exact delimiters (EOF) and prefixed delimiters (GH_AW_SAFE_OUTPUTS_CONFIG_EOF)
+	commonDelimiterSuffixes := []string{"EOF", "EOL", "END", "HEREDOC", "JSON", "YAML", "SQL"}
 
 	result := content
-	for _, delimiter := range commonDelimiters {
-		// Pattern for quoted delimiter: << 'DELIMITER' or << "DELIMITER"
+	for _, suffix := range commonDelimiterSuffixes {
+		// Pattern for quoted delimiter ending with suffix: << 'PREFIX_SUFFIX' or << "PREFIX_SUFFIX"
+		// The pattern matches any prefix followed by the suffix (e.g., GH_AW_CONFIG_EOF)
+		// \w* matches zero or more word characters (allowing both exact match and prefixes)
 		// (?ms) enables multiline and dotall modes, .*? is non-greedy
-		// \s*%s\s*$ allows for leading/trailing whitespace on the closing delimiter
-		quotedPattern := fmt.Sprintf(`(?ms)<<\s*['"]%s['"].*?\n\s*%s\s*$`, delimiter, delimiter)
+		// \s*\w*%s\s*$ allows for leading/trailing whitespace on the closing delimiter
+		quotedPattern := fmt.Sprintf(`(?ms)<<\s*['"]\w*%s['"].*?\n\s*\w*%s\s*$`, suffix, suffix)
 		quotedRegex := regexp.MustCompile(quotedPattern)
 		result = quotedRegex.ReplaceAllString(result, "# heredoc removed")
 
-		// Pattern for unquoted delimiter: << DELIMITER
-		unquotedPattern := fmt.Sprintf(`(?ms)<<\s*%s.*?\n\s*%s\s*$`, delimiter, delimiter)
+		// Pattern for unquoted delimiter ending with suffix: << PREFIX_SUFFIX
+		unquotedPattern := fmt.Sprintf(`(?ms)<<\s*\w*%s.*?\n\s*\w*%s\s*$`, suffix, suffix)
 		unquotedRegex := regexp.MustCompile(unquotedPattern)
 		result = unquotedRegex.ReplaceAllString(result, "# heredoc removed")
 	}
