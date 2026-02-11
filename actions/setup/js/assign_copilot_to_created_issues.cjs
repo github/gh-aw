@@ -5,6 +5,15 @@ const { AGENT_LOGIN_NAMES, findAgent, getIssueDetails, assignAgentToIssue, gener
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
+ * Sleep for the specified number of milliseconds
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Assign copilot to issues created by create_issue job.
  * This script reads the issues_to_assign_copilot output and assigns copilot to each issue.
  * It uses the agent token (GH_AW_AGENT_TOKEN) for the GraphQL mutation.
@@ -40,7 +49,8 @@ async function main() {
   const results = [];
   let agentId = null;
 
-  for (const entry of issueEntries) {
+  for (let i = 0; i < issueEntries.length; i++) {
+    const entry = issueEntries[i];
     // Parse repo:number format
     const parts = entry.split(":");
     if (parts.length !== 2) {
@@ -121,6 +131,13 @@ async function main() {
         success: false,
         error: errorMessage,
       });
+    }
+
+    // Add 10-second delay between agent assignments to avoid spawning too many agents at once
+    // Skip delay after the last item
+    if (i < issueEntries.length - 1) {
+      core.info("Waiting 10 seconds before processing next agent assignment...");
+      await sleep(10000);
     }
   }
 

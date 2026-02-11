@@ -352,4 +352,54 @@ describe("assign_copilot_to_created_issues.cjs", () => {
     const failureCount = results.length - results.filter(r => r.success).length;
     expect(failureCount).toBe(2);
   });
+
+  it("should add 10-second delay between multiple issue assignments", async () => {
+    process.env.GH_AW_ISSUES_TO_ASSIGN_COPILOT = "owner/repo:1,owner/repo:2,owner/repo:3";
+
+    // Mock GraphQL responses for all three assignments
+    mockGithub.graphql
+      .mockResolvedValueOnce({
+        repository: {
+          suggestedActors: {
+            nodes: [{ login: "copilot-swe-agent", id: "MDQ6VXNlcjE=" }],
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-1", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-2", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-3", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      });
+
+    await eval(`(async () => { ${script}; await main(); })()`);
+
+    // Verify delay message was logged twice (2 delays between 3 items)
+    const delayMessages = mockCore.info.mock.calls.filter(call => call[0].includes("Waiting 10 seconds before processing next agent assignment"));
+    expect(delayMessages).toHaveLength(2);
+  }, 30000); // Increase timeout to 30 seconds to account for 2x10s delays
 });

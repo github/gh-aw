@@ -207,7 +207,7 @@ describe("assign_to_agent", () => {
     await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
 
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Found 3 agent assignments, but max is 2"));
-  });
+  }, 20000); // Increase timeout to 20 seconds to account for the delay
 
   it("should resolve temporary issue IDs (aw_...) using GH_AW_TEMPORARY_ID_MAP", async () => {
     process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({
@@ -485,7 +485,7 @@ describe("assign_to_agent", () => {
     // Should only look up agent once (cached for second assignment)
     const graphqlCalls = mockGithub.graphql.mock.calls.filter(call => call[0].includes("suggestedActors"));
     expect(graphqlCalls).toHaveLength(1);
-  });
+  }, 15000); // Increase timeout to 15 seconds to account for the delay
 
   it("should use target repository when configured", async () => {
     process.env.GH_AW_TARGET_REPO = "other-owner/other-repo";
@@ -973,4 +973,61 @@ describe("assign_to_agent", () => {
     expect(mockCore.error).toHaveBeenCalledWith(expect.stringContaining("Failed to assign agent"));
     expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Failed to assign 1 agent(s)"));
   });
+
+  it("should add 10-second delay between multiple agent assignments", async () => {
+    setAgentOutput({
+      items: [
+        { type: "assign_to_agent", issue_number: 1, agent: "copilot" },
+        { type: "assign_to_agent", issue_number: 2, agent: "copilot" },
+        { type: "assign_to_agent", issue_number: 3, agent: "copilot" },
+      ],
+      errors: [],
+    });
+
+    // Mock GraphQL responses for all three assignments
+    mockGithub.graphql
+      .mockResolvedValueOnce({
+        repository: {
+          suggestedActors: {
+            nodes: [{ login: "copilot-swe-agent", id: "MDQ6VXNlcjE=" }],
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-1", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-2", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        repository: {
+          issue: { id: "issue-id-3", assignees: { nodes: [] } },
+        },
+      })
+      .mockResolvedValueOnce({
+        addAssigneesToAssignable: {
+          assignable: { assignees: { nodes: [{ login: "copilot-swe-agent" }] } },
+        },
+      });
+
+    await eval(`(async () => { ${assignToAgentScript}; await main(); })()`);
+
+    // Verify delay message was logged twice (2 delays between 3 items)
+    const delayMessages = mockCore.info.mock.calls.filter(call => call[0].includes("Waiting 10 seconds before processing next agent assignment"));
+    expect(delayMessages).toHaveLength(2);
+  }, 30000); // Increase timeout to 30 seconds to account for 2x10s delays
 });
