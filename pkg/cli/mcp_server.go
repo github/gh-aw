@@ -180,8 +180,7 @@ func createMCPServer(cmdPath string) *mcp.Server {
 
 	// Add status tool
 	type statusArgs struct {
-		Pattern  string `json:"pattern,omitempty" jsonschema:"Optional pattern to filter workflows by name"`
-		JqFilter string `json:"jq,omitempty" jsonschema:"Optional jq filter to apply to JSON output"`
+		Pattern string `json:"pattern,omitempty" jsonschema:"Optional pattern to filter workflows by name"`
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -193,9 +192,7 @@ Returns a JSON array where each element has the following structure:
 - agent: AI engine used (e.g., "copilot", "claude", "codex")
 - compiled: Whether the workflow is compiled ("Yes", "No", or "N/A")
 - status: GitHub workflow status ("active", "disabled", "Unknown")
-- time_remaining: Time remaining until workflow deadline (if applicable)
-
-Note: Output can be filtered using the jq parameter.`,
+- time_remaining: Time remaining until workflow deadline (if applicable)`,
 		Icons: []mcp.Icon{
 			{Source: "📊"},
 		},
@@ -211,7 +208,7 @@ Note: Output can be filtered using the jq parameter.`,
 		default:
 		}
 
-		mcpLog.Printf("Executing status tool: pattern=%s, jqFilter=%s", args.Pattern, args.JqFilter)
+		mcpLog.Printf("Executing status tool: pattern=%s", args.Pattern)
 
 		// Call GetWorkflowStatuses directly instead of spawning subprocess
 		statuses, err := GetWorkflowStatuses(args.Pattern, "", "", "")
@@ -235,19 +232,6 @@ Note: Output can be filtered using the jq parameter.`,
 
 		outputStr := string(jsonBytes)
 
-		// Apply jq filter if provided
-		if args.JqFilter != "" {
-			filteredOutput, jqErr := ApplyJqFilter(outputStr, args.JqFilter)
-			if jqErr != nil {
-				return nil, nil, &jsonrpc.Error{
-					Code:    jsonrpc.CodeInvalidParams,
-					Message: "invalid jq filter expression",
-					Data:    mcpErrorData(map[string]any{"error": jqErr.Error(), "filter": args.JqFilter}),
-				}
-			}
-			outputStr = filteredOutput
-		}
-
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: outputStr},
@@ -263,7 +247,6 @@ Note: Output can be filtered using the jq parameter.`,
 		Poutine    bool     `json:"poutine,omitempty" jsonschema:"Run poutine security scanner on generated .lock.yml files"`
 		Actionlint bool     `json:"actionlint,omitempty" jsonschema:"Run actionlint linter on generated .lock.yml files"`
 		Fix        bool     `json:"fix,omitempty" jsonschema:"Apply automatic codemod fixes to workflows before compiling"`
-		JqFilter   string   `json:"jq,omitempty" jsonschema:"Optional jq filter to apply to JSON output"`
 	}
 
 	// Generate schema with elicitation defaults
@@ -294,9 +277,7 @@ Returns JSON array with validation results for each workflow:
 - valid: Boolean indicating if compilation was successful
 - errors: Array of error objects with type, message, and optional line number
 - warnings: Array of warning objects
-- compiled_file: Path to the generated .lock.yml file
-
-Note: Output can be filtered using the jq parameter.`,
+- compiled_file: Path to the generated .lock.yml file`,
 		InputSchema: compileSchema,
 		Icons: []mcp.Icon{
 			{Source: "🔨"},
@@ -399,19 +380,6 @@ Note: Output can be filtered using the jq parameter.`,
 			// and return it to the LLM
 		}
 
-		// Apply jq filter if provided
-		if args.JqFilter != "" {
-			filteredOutput, jqErr := ApplyJqFilter(outputStr, args.JqFilter)
-			if jqErr != nil {
-				return nil, nil, &jsonrpc.Error{
-					Code:    jsonrpc.CodeInvalidParams,
-					Message: "invalid jq filter expression",
-					Data:    mcpErrorData(map[string]any{"error": jqErr.Error(), "filter": args.JqFilter}),
-				}
-			}
-			outputStr = filteredOutput
-		}
-
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: outputStr},
@@ -432,7 +400,6 @@ Note: Output can be filtered using the jq parameter.`,
 		AfterRunID   int64  `json:"after_run_id,omitempty" jsonschema:"Filter runs with database ID after this value (exclusive)"`
 		BeforeRunID  int64  `json:"before_run_id,omitempty" jsonschema:"Filter runs with database ID before this value (exclusive)"`
 		Timeout      int    `json:"timeout,omitempty" jsonschema:"Maximum time in seconds to spend downloading logs (default: 50 for MCP server)"`
-		JqFilter     string `json:"jq,omitempty" jsonschema:"Optional jq filter to apply to JSON output"`
 		MaxTokens    int    `json:"max_tokens,omitempty" jsonschema:"Maximum number of tokens in output before triggering guardrail (default: 12000)"`
 	}
 
@@ -465,11 +432,7 @@ The continuation field includes all necessary parameters (before_run_id, etc.) t
 the previous request stopped due to timeout.
 
 ⚠️  Output Size Guardrail: If the output exceeds the token limit (default: 12000 tokens), the tool will 
-return a schema description and suggested jq filters instead of the full output. Use the 'jq' parameter 
-to filter the output to a manageable size, or adjust the 'max_tokens' parameter. Common filters include:
-  - .summary (get only summary statistics)
-  - .runs[:5] (get first 5 runs)
-  - .runs | map(select(.conclusion == "failure")) (get only failed runs)`,
+return a schema description instead of the full output. Adjust the 'max_tokens' parameter to control this behavior.`,
 		InputSchema: logsSchema,
 		Icons: []mcp.Icon{
 			{Source: "📜"},
@@ -584,19 +547,6 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 			}
 		}
 
-		// Apply jq filter if provided
-		if args.JqFilter != "" {
-			filteredOutput, err := ApplyJqFilter(outputStr, args.JqFilter)
-			if err != nil {
-				return nil, nil, &jsonrpc.Error{
-					Code:    jsonrpc.CodeInvalidParams,
-					Message: "invalid jq filter expression",
-					Data:    mcpErrorData(map[string]any{"error": err.Error(), "filter": args.JqFilter}),
-				}
-			}
-			outputStr = filteredOutput
-		}
-
 		// Check output size and apply guardrail if needed
 		finalOutput, _ := checkLogsOutputSize(outputStr, args.MaxTokens)
 
@@ -610,7 +560,6 @@ to filter the output to a manageable size, or adjust the 'max_tokens' parameter.
 	// Add audit tool
 	type auditArgs struct {
 		RunIDOrURL string `json:"run_id_or_url" jsonschema:"GitHub Actions workflow run ID or URL. Accepts: numeric run ID (e.g., 1234567890), run URL (https://github.com/owner/repo/actions/runs/1234567890), job URL (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210), or job URL with step (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)"`
-		JqFilter   string `json:"jq,omitempty" jsonschema:"Optional jq filter to apply to JSON output"`
 	}
 
 	// Generate schema for audit tool
@@ -645,9 +594,7 @@ Returns JSON with the following structure:
 - errors: Error details (file, line, type, message)
 - warnings: Warning details (file, line, type, message)
 - tool_usage: Tool usage statistics (name, call_count, max_output_size, max_duration)
-- firewall_analysis: Network firewall analysis if available (total_requests, allowed_requests, blocked_requests, allowed_domains, blocked_domains)
-
-Note: Output can be filtered using the jq parameter.`,
+- firewall_analysis: Network firewall analysis if available (total_requests, allowed_requests, blocked_requests, allowed_domains, blocked_domains)`,
 		InputSchema: auditSchema,
 		Icons: []mcp.Icon{
 			{Source: "🔍"},
@@ -682,19 +629,7 @@ Note: Output can be filtered using the jq parameter.`,
 			}
 		}
 
-		// Apply jq filter if provided
 		outputStr := string(output)
-		if args.JqFilter != "" {
-			filteredOutput, jqErr := ApplyJqFilter(outputStr, args.JqFilter)
-			if jqErr != nil {
-				return nil, nil, &jsonrpc.Error{
-					Code:    jsonrpc.CodeInvalidParams,
-					Message: "invalid jq filter expression",
-					Data:    mcpErrorData(map[string]any{"error": jqErr.Error(), "filter": args.JqFilter}),
-				}
-			}
-			outputStr = filteredOutput
-		}
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{

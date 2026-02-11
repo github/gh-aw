@@ -367,54 +367,6 @@ func TestMCPServer_LogsToolReturnsValidJSON(t *testing.T) {
 	}
 }
 
-// TestMCPServer_StatusToolWithJqFilter tests that the status tool respects jq filters
-func TestMCPServer_StatusToolWithJqFilter(t *testing.T) {
-	// Skip if the binary doesn't exist
-	binaryPath := "../../gh-aw"
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		t.Skip("Skipping test: gh-aw binary not found. Run 'make build' first.")
-	}
-
-	session, _, ctx, cancel := setupMCPServerTest(t, binaryPath)
-	defer cancel()
-	defer session.Close()
-
-	// Call status tool with jq filter to get only workflow names
-	params := &mcp.CallToolParams{
-		Name: "status",
-		Arguments: map[string]any{
-			"jq": ".[].workflow",
-		},
-	}
-	result, err := session.CallTool(ctx, params)
-	if err != nil {
-		t.Fatalf("Failed to call status tool: %v", err)
-	}
-
-	// Verify result is not empty
-	if len(result.Content) == 0 {
-		t.Fatal("Expected non-empty result from status tool")
-	}
-
-	// Get text content
-	textContent, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		t.Fatal("Expected text content from status tool")
-	}
-
-	if textContent.Text == "" {
-		t.Fatal("Expected non-empty text content from status tool")
-	}
-
-	// The jq filter should return valid JSON (workflow names as strings)
-	jsonOutput := extractJSONFromOutput(textContent.Text)
-	if !isValidJSON(jsonOutput) {
-		t.Errorf("Status tool with jq filter did not return valid JSON. Output: %s", textContent.Text)
-	}
-
-	t.Logf("Status tool with jq filter returned: %s", jsonOutput)
-}
-
 // TestMCPServer_AllToolsReturnContent tests that all tools return non-empty content
 func TestMCPServer_AllToolsReturnContent(t *testing.T) {
 	// Skip if the binary doesn't exist

@@ -59,10 +59,6 @@ func TestCheckLogsOutputSize_LargeOutput(t *testing.T) {
 		t.Errorf("Guardrail should report correct limit: expected %d, got %d", DefaultMaxMCPLogsOutputTokens, guardrail.OutputSizeLimit)
 	}
 
-	if len(guardrail.SuggestedQueries) == 0 {
-		t.Error("Guardrail response should have suggested queries")
-	}
-
 	if len(guardrail.Schema.Fields) == 0 {
 		t.Error("Guardrail response should have schema fields")
 	}
@@ -161,44 +157,12 @@ func TestGetLogsDataSchema(t *testing.T) {
 	}
 }
 
-func TestGetSuggestedJqQueries(t *testing.T) {
-	queries := getSuggestedJqQueries()
-
-	if len(queries) == 0 {
-		t.Error("Should have at least one suggested query")
-	}
-
-	// Verify each query has required fields
-	for i, query := range queries {
-		if query.Description == "" {
-			t.Errorf("Query %d should have a description", i)
-		}
-		if query.Query == "" {
-			t.Errorf("Query %d should have a query string", i)
-		}
-	}
-
-	// Verify we have some common useful queries
-	hasBasicQueries := false
-	for _, query := range queries {
-		if strings.Contains(query.Query, ".summary") {
-			hasBasicQueries = true
-			break
-		}
-	}
-
-	if !hasBasicQueries {
-		t.Error("Should have basic summary query in suggestions")
-	}
-}
-
 func TestFormatGuardrailMessage(t *testing.T) {
 	guardrail := MCPLogsGuardrailResponse{
-		Message:          "Test message",
-		OutputTokens:     15000,
-		OutputSizeLimit:  DefaultMaxMCPLogsOutputTokens,
-		Schema:           getLogsDataSchema(),
-		SuggestedQueries: getSuggestedJqQueries(),
+		Message:         "Test message",
+		OutputTokens:    15000,
+		OutputSizeLimit: DefaultMaxMCPLogsOutputTokens,
+		Schema:          getLogsDataSchema(),
 	}
 
 	message := formatGuardrailMessage(guardrail)
@@ -210,10 +174,6 @@ func TestFormatGuardrailMessage(t *testing.T) {
 
 	if !strings.Contains(message, "Output Schema") {
 		t.Error("Formatted message should contain schema section")
-	}
-
-	if !strings.Contains(message, "Suggested jq Queries") {
-		t.Error("Formatted message should contain suggested queries section")
 	}
 
 	// Verify it mentions some fields
@@ -258,20 +218,6 @@ func TestGuardrailResponseJSON(t *testing.T) {
 
 	if len(guardrail.Schema.Fields) == 0 {
 		t.Error("JSON should have schema.fields")
-	}
-
-	if len(guardrail.SuggestedQueries) == 0 {
-		t.Error("JSON should have suggested_queries")
-	}
-
-	// Verify each suggested query has the expected fields
-	for i, query := range guardrail.SuggestedQueries {
-		if query.Description == "" {
-			t.Errorf("Query %d should have description in JSON", i)
-		}
-		if query.Query == "" {
-			t.Errorf("Query %d should have query in JSON", i)
-		}
 	}
 }
 

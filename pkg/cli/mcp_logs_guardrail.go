@@ -22,11 +22,10 @@ const (
 
 // MCPLogsGuardrailResponse represents the response when output is too large
 type MCPLogsGuardrailResponse struct {
-	Message          string             `json:"message"`
-	OutputTokens     int                `json:"output_tokens"`
-	OutputSizeLimit  int                `json:"output_size_limit"`
-	Schema           LogsDataSchema     `json:"schema"`
-	SuggestedQueries []SuggestedJqQuery `json:"suggested_queries"`
+	Message         string         `json:"message"`
+	OutputTokens    int            `json:"output_tokens"`
+	OutputSizeLimit int            `json:"output_size_limit"`
+	Schema          LogsDataSchema `json:"schema"`
 }
 
 // LogsDataSchema describes the structure of the full logs output
@@ -40,13 +39,6 @@ type LogsDataSchema struct {
 type SchemaField struct {
 	Type        string `json:"type"`
 	Description string `json:"description"`
-}
-
-// SuggestedJqQuery represents a suggested jq filter
-type SuggestedJqQuery struct {
-	Description string `json:"description"`
-	Query       string `json:"query"`
-	Example     string `json:"example,omitempty"`
 }
 
 // estimateTokens estimates the number of tokens in a string
@@ -76,14 +68,13 @@ func checkLogsOutputSize(outputStr string, maxTokens int) (string, bool) {
 	guardrail := MCPLogsGuardrailResponse{
 		Message: fmt.Sprintf(
 			"⚠️  Output size (%d tokens) exceeds the limit (%d tokens). "+
-				"To reduce output size, use the 'jq' parameter with one of the suggested queries below.",
+				"To reduce output size, increase the 'max_tokens' parameter or narrow your query with filters like workflow_name, start_date, end_date, or count.",
 			outputTokens,
 			maxTokens,
 		),
-		OutputTokens:     outputTokens,
-		OutputSizeLimit:  maxTokens,
-		Schema:           getLogsDataSchema(),
-		SuggestedQueries: getSuggestedJqQueries(),
+		OutputTokens:    outputTokens,
+		OutputSizeLimit: maxTokens,
+		Schema:          getLogsDataSchema(),
 	}
 
 	// Marshal to JSON
@@ -93,13 +84,13 @@ func checkLogsOutputSize(outputStr string, maxTokens int) (string, bool) {
 		// Fallback to simple text message if JSON marshaling fails
 		return fmt.Sprintf(
 			"Output size (%d tokens) exceeds the limit (%d tokens). "+
-				"Please use the 'jq' parameter to filter the output.",
+				"Please increase the 'max_tokens' parameter or narrow your query.",
 			outputTokens,
 			maxTokens,
 		), true
 	}
 
-	mcpLogsGuardrailLog.Printf("Generated guardrail response with %d suggested queries", len(guardrail.SuggestedQueries))
+	mcpLogsGuardrailLog.Print("Generated guardrail response")
 	return string(guardrailJSON), true
 }
 
@@ -153,52 +144,6 @@ func getLogsDataSchema() LogsDataSchema {
 	}
 }
 
-// getSuggestedJqQueries returns a list of useful jq queries to reduce output
-func getSuggestedJqQueries() []SuggestedJqQuery {
-	return []SuggestedJqQuery{
-		{
-			Description: "Get only the summary statistics",
-			Query:       ".summary",
-			Example:     "Use jq parameter: \".summary\"",
-		},
-		{
-			Description: "Get list of run IDs and workflow names",
-			Query:       ".runs | map({database_id, workflow_name, status})",
-			Example:     "Use jq parameter: \".runs | map({database_id, workflow_name, status})\"",
-		},
-		{
-			Description: "Get only failed runs",
-			Query:       ".runs | map(select(.conclusion == \"failure\"))",
-			Example:     "Use jq parameter: \".runs | map(select(.conclusion == \\\"failure\\\"))\"",
-		},
-		{
-			Description: "Get summary with first 5 runs",
-			Query:       "{summary, runs: .runs[:5]}",
-			Example:     "Use jq parameter: \"{summary, runs: .runs[:5]}\"",
-		},
-		{
-			Description: "Get only error and warning summaries",
-			Query:       "{errors_and_warnings, missing_tools, mcp_failures}",
-			Example:     "Use jq parameter: \"{errors_and_warnings, missing_tools, mcp_failures}\"",
-		},
-		{
-			Description: "Get tool usage statistics",
-			Query:       ".tool_usage",
-			Example:     "Use jq parameter: \".tool_usage\"",
-		},
-		{
-			Description: "Get runs with high token usage (>10k tokens)",
-			Query:       ".runs | map(select(.token_usage > 10000))",
-			Example:     "Use jq parameter: \".runs | map(select(.token_usage > 10000))\"",
-		},
-		{
-			Description: "Get runs from specific workflow",
-			Query:       ".runs | map(select(.workflow_name == \"YOUR_WORKFLOW_NAME\"))",
-			Example:     "Use jq parameter: \".runs | map(select(.workflow_name == \\\"YOUR_WORKFLOW_NAME\\\"))\"",
-		},
-	}
-}
-
 // formatGuardrailMessage creates a user-friendly text message from the guardrail response
 func formatGuardrailMessage(guardrail MCPLogsGuardrailResponse) string {
 	var builder strings.Builder
@@ -213,16 +158,6 @@ func formatGuardrailMessage(guardrail MCPLogsGuardrailResponse) string {
 	builder.WriteString("Available fields:\n")
 	for field, schema := range guardrail.Schema.Fields {
 		fmt.Fprintf(&builder, "  - %s (%s): %s\n", field, schema.Type, schema.Description)
-	}
-
-	builder.WriteString("\n💡 Suggested jq Queries:\n")
-	for i, query := range guardrail.SuggestedQueries {
-		fmt.Fprintf(&builder, "  %d. %s\n", i+1, query.Description)
-		fmt.Fprintf(&builder, "     Query: %s\n", query.Query)
-		if query.Example != "" {
-			fmt.Fprintf(&builder, "     %s\n", query.Example)
-		}
-		builder.WriteString("\n")
 	}
 
 	return builder.String()
