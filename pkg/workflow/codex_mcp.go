@@ -27,7 +27,8 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		})
 	}
 
-	yaml.WriteString("          cat > /tmp/gh-aw/mcp-config/config.toml << EOF\n")
+	delimiter := GenerateHeredocDelimiter("MCP_CONFIG")
+	yaml.WriteString("          cat > /tmp/gh-aw/mcp-config/config.toml << " + delimiter + "\n")
 
 	// Add history configuration to disable persistence
 	yaml.WriteString("          [history]\n")
@@ -92,7 +93,8 @@ func (e *CodexEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]an
 		}
 	}
 
-	yaml.WriteString("          EOF\n")
+	// End the heredoc for config.toml
+	yaml.WriteString("          " + delimiter + "\n")
 
 	// Also generate JSON config for MCP gateway
 	// Per MCP Gateway Specification v1.0.0 section 4.1, the gateway requires JSON input

@@ -86,6 +86,9 @@ func generateSRTWrapperScript(copilotCommand, srtConfigJSON, logFile, logsFolder
 	escapedCopilotCommand := strings.ReplaceAll(copilotCommand, "\\", "\\\\")
 	escapedCopilotCommand = strings.ReplaceAll(escapedCopilotCommand, "'", "\\'")
 
+	configDelimiter := GenerateHeredocDelimiter("SRT_CONFIG")
+	wrapperDelimiter := GenerateHeredocDelimiter("SRT_WRAPPER")
+
 	script := fmt.Sprintf(`set -o pipefail
 
 # Pre-create required directories for Sandbox Runtime
@@ -93,12 +96,12 @@ mkdir -p /home/runner/.copilot
 mkdir -p /tmp/claude
 
 # Create .srt-settings.json
-cat > .srt-settings.json << 'SRT_CONFIG_EOF'
+cat > .srt-settings.json << '%s'
 %s
-SRT_CONFIG_EOF
+%s
 
 # Create Node.js wrapper script for SRT
-cat > ./.srt-wrapper.js << 'SRT_WRAPPER_EOF'
+cat > ./.srt-wrapper.js << '%s'
 const { SandboxManager } = require('@anthropic-ai/sandbox-runtime');
 const { spawn } = require('child_process');
 const { readFileSync } = require('fs');
@@ -187,7 +190,7 @@ async function main() {
 }
 
 main();
-SRT_WRAPPER_EOF
+%s
 
 # Run the Node.js wrapper script
 node ./.srt-wrapper.js 2>&1 | tee %s
@@ -199,7 +202,7 @@ if [ -n "$COPILOT_LOGS_DIR" ] && [ -d "$COPILOT_LOGS_DIR" ]; then
   mkdir -p %s
   mv "$COPILOT_LOGS_DIR"/* %s || true
   rmdir "$COPILOT_LOGS_DIR" || true
-fi`, escapedConfigJSON, escapedCopilotCommand, shellEscapeArg(logFile), shellEscapeArg(logsFolder), shellEscapeArg(logsFolder), shellEscapeArg(logsFolder))
+fi`, configDelimiter, escapedConfigJSON, configDelimiter, wrapperDelimiter, escapedCopilotCommand, wrapperDelimiter, shellEscapeArg(logFile), shellEscapeArg(logsFolder), shellEscapeArg(logsFolder), shellEscapeArg(logsFolder))
 
 	return script
 }

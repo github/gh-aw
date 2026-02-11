@@ -204,10 +204,11 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		yaml.WriteString("          mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs\n")
 
 		// Write the safe-outputs configuration to config.json
+		delimiter := GenerateHeredocDelimiter("SAFE_OUTPUTS_CONFIG")
 		if safeOutputConfig != "" {
-			yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/config.json << 'EOF'\n")
+			yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/config.json << '" + delimiter + "'\n")
 			yaml.WriteString("          " + safeOutputConfig + "\n")
-			yaml.WriteString("          EOF\n")
+			yaml.WriteString("          " + delimiter + "\n")
 		}
 
 		// Generate and write the filtered tools.json file
@@ -217,12 +218,13 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			// Fall back to empty array on error
 			filteredToolsJSON = "[]"
 		}
-		yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/tools.json << 'EOF'\n")
+		toolsDelimiter := GenerateHeredocDelimiter("SAFE_OUTPUTS_TOOLS")
+		yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/tools.json << '" + toolsDelimiter + "'\n")
 		// Write each line of the indented JSON with proper YAML indentation
 		for _, line := range strings.Split(filteredToolsJSON, "\n") {
 			yaml.WriteString("          " + line + "\n")
 		}
-		yaml.WriteString("          EOF\n")
+		yaml.WriteString("          " + toolsDelimiter + "\n")
 
 		// Generate and write the validation configuration from Go source of truth
 		// Only include validation for activated safe output types to keep validation.json small
@@ -242,12 +244,13 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			mcpSetupGeneratorLog.Printf("CRITICAL: Error generating validation config JSON: %v - validation will not work correctly", err)
 			validationConfigJSON = "{}"
 		}
-		yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/validation.json << 'EOF'\n")
+		validationDelimiter := GenerateHeredocDelimiter("SAFE_OUTPUTS_VALIDATION")
+		yaml.WriteString("          cat > /opt/gh-aw/safeoutputs/validation.json << '" + validationDelimiter + "'\n")
 		// Write each line of the indented JSON with proper YAML indentation
 		for _, line := range strings.Split(validationConfigJSON, "\n") {
 			yaml.WriteString("          " + line + "\n")
 		}
-		yaml.WriteString("          EOF\n")
+		yaml.WriteString("          " + validationDelimiter + "\n")
 
 		// Note: The MCP server entry point (mcp-server.cjs) is now copied by actions/setup
 		// from safe-outputs-mcp-server.cjs - no need to generate it here
@@ -310,19 +313,21 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 
 		// Generate the tools.json configuration file
 		toolsJSON := generateSafeInputsToolsConfig(workflowData.SafeInputs)
-		yaml.WriteString("          cat > /opt/gh-aw/safe-inputs/tools.json << 'EOF_TOOLS_JSON'\n")
+		toolsDelimiter := GenerateHeredocDelimiter("SAFE_INPUTS_TOOLS")
+		yaml.WriteString("          cat > /opt/gh-aw/safe-inputs/tools.json << '" + toolsDelimiter + "'\n")
 		for _, line := range strings.Split(toolsJSON, "\n") {
 			yaml.WriteString("          " + line + "\n")
 		}
-		yaml.WriteString("          EOF_TOOLS_JSON\n")
+		yaml.WriteString("          " + toolsDelimiter + "\n")
 
 		// Generate the MCP server entry point
 		safeInputsMCPServer := generateSafeInputsMCPServerScript(workflowData.SafeInputs)
-		yaml.WriteString("          cat > /opt/gh-aw/safe-inputs/mcp-server.cjs << 'EOFSI'\n")
+		serverDelimiter := GenerateHeredocDelimiter("SAFE_INPUTS_SERVER")
+		yaml.WriteString("          cat > /opt/gh-aw/safe-inputs/mcp-server.cjs << '" + serverDelimiter + "'\n")
 		for _, line := range FormatJavaScriptForYAML(safeInputsMCPServer) {
 			yaml.WriteString(line)
 		}
-		yaml.WriteString("          EOFSI\n")
+		yaml.WriteString("          " + serverDelimiter + "\n")
 		yaml.WriteString("          chmod +x /opt/gh-aw/safe-inputs/mcp-server.cjs\n")
 		yaml.WriteString("          \n")
 
@@ -339,37 +344,41 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 			if toolConfig.Script != "" {
 				// JavaScript tool
 				toolScript := generateSafeInputJavaScriptToolScript(toolConfig)
-				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.cjs << 'EOFJS_%s'\n", toolName, toolName)
+				jsDelimiter := GenerateHeredocDelimiter(fmt.Sprintf("SAFE_INPUTS_JS_%s", strings.ToUpper(toolName)))
+				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.cjs << '%s'\n", toolName, jsDelimiter)
 				for _, line := range FormatJavaScriptForYAML(toolScript) {
 					yaml.WriteString(line)
 				}
-				fmt.Fprintf(yaml, "          EOFJS_%s\n", toolName)
+				fmt.Fprintf(yaml, "          %s\n", jsDelimiter)
 			} else if toolConfig.Run != "" {
 				// Shell script tool
 				toolScript := generateSafeInputShellToolScript(toolConfig)
-				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.sh << 'EOFSH_%s'\n", toolName, toolName)
+				shDelimiter := GenerateHeredocDelimiter(fmt.Sprintf("SAFE_INPUTS_SH_%s", strings.ToUpper(toolName)))
+				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.sh << '%s'\n", toolName, shDelimiter)
 				for _, line := range strings.Split(toolScript, "\n") {
 					yaml.WriteString("          " + line + "\n")
 				}
-				fmt.Fprintf(yaml, "          EOFSH_%s\n", toolName)
+				fmt.Fprintf(yaml, "          %s\n", shDelimiter)
 				fmt.Fprintf(yaml, "          chmod +x /opt/gh-aw/safe-inputs/%s.sh\n", toolName)
 			} else if toolConfig.Py != "" {
 				// Python script tool
 				toolScript := generateSafeInputPythonToolScript(toolConfig)
-				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.py << 'EOFPY_%s'\n", toolName, toolName)
+				pyDelimiter := GenerateHeredocDelimiter(fmt.Sprintf("SAFE_INPUTS_PY_%s", strings.ToUpper(toolName)))
+				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.py << '%s'\n", toolName, pyDelimiter)
 				for _, line := range strings.Split(toolScript, "\n") {
 					yaml.WriteString("          " + line + "\n")
 				}
-				fmt.Fprintf(yaml, "          EOFPY_%s\n", toolName)
+				fmt.Fprintf(yaml, "          %s\n", pyDelimiter)
 				fmt.Fprintf(yaml, "          chmod +x /opt/gh-aw/safe-inputs/%s.py\n", toolName)
 			} else if toolConfig.Go != "" {
 				// Go script tool
 				toolScript := generateSafeInputGoToolScript(toolConfig)
-				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.go << 'EOFGO_%s'\n", toolName, toolName)
+				goDelimiter := GenerateHeredocDelimiter(fmt.Sprintf("SAFE_INPUTS_GO_%s", strings.ToUpper(toolName)))
+				fmt.Fprintf(yaml, "          cat > /opt/gh-aw/safe-inputs/%s.go << '%s'\n", toolName, goDelimiter)
 				for _, line := range strings.Split(toolScript, "\n") {
 					yaml.WriteString("          " + line + "\n")
 				}
-				fmt.Fprintf(yaml, "          EOFGO_%s\n", toolName)
+				fmt.Fprintf(yaml, "          %s\n", goDelimiter)
 			}
 		}
 		yaml.WriteString("          \n")
