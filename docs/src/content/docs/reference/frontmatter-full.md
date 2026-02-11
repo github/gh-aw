@@ -3498,6 +3498,27 @@ bots: []
   # Array of Bot identifier/name (e.g., 'dependabot[bot]', 'renovate[bot]',
   # 'github-actions[bot]')
 
+# Rate limiting configuration to restrict how frequently users can trigger the
+# workflow. Helps prevent abuse and resource exhaustion from programmatically
+# triggered events.
+# (optional)
+rate-limit:
+  # Maximum number of workflow runs allowed per user within the time window.
+  # Defaults to 5.
+  # (optional)
+  max: 1
+
+  # Time window in minutes for rate limiting. Defaults to 60 (1 hour).
+  # (optional)
+  window: 1
+
+  # Optional list of event types to apply rate limiting to. If not specified, rate
+  # limiting applies to all programmatically triggered events (e.g.,
+  # workflow_dispatch, issue_comment, pull_request_review).
+  # (optional)
+  events: []
+    # Array of strings
+
 # Enable strict mode validation for enhanced security and compliance. Strict mode
 # enforces: (1) Write Permissions - refuses contents:write, issues:write,
 # pull-requests:write; requires safe-outputs instead, (2) Network Configuration -
