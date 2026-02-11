@@ -571,14 +571,14 @@ The YAML frontmatter supports these fields:
       update-project:
         max: 20                         # Optional: max project operations (default: 10)
         project: "https://github.com/orgs/myorg/projects/42"  # REQUIRED in agent output (full URL)
-        github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # REQUIRED: PAT with projects:write (NOT GITHUB_TOKEN)
+        # github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}  # Optional here if GH_AW_PROJECT_GITHUB_TOKEN is set; PAT with projects:write (NOT GITHUB_TOKEN) is still required
     ```
     Use this to organize work by adding issues and pull requests to projects, updating field values (status, priority, effort, dates), creating custom fields, and setting up project views.
     
     **⚠️ IMPORTANT REQUIREMENTS:**
     - Agent must include full project URL in **every** call: `project: "https://github.com/orgs/myorg/projects/42"` or `https://github.com/users/username/projects/5`
     - Project URLs must be full URLs; project numbers alone are NOT accepted
-    - Requires a **PAT or GitHub App token** with Projects permissions configured as `github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}`
+    - Requires a **PAT or GitHub App token** with Projects permissions (for example via `github-token: ${{ secrets.GH_AW_PROJECT_GITHUB_TOKEN }}` or the `GH_AW_PROJECT_GITHUB_TOKEN` fallback)
     - Default `GITHUB_TOKEN` **cannot** access Projects v2 API
     - Token scopes:
       - Classic PAT: `project` and `repo` scopes
