@@ -21,8 +21,11 @@ on:
   issue_comment:
     types: [created]
 rate-limit:
-  max: 5          # Required: 1-10 runs
-  window: 60      # Optional: minutes (default 60, max 180)
+  max: 5             # Required: 1-10 runs
+  window: 60         # Optional: minutes (default 60, max 180)
+  ignored-roles:     # Optional: roles exempt from rate limiting
+    - admin
+    - maintain
   # events field is optional - automatically inferred from 'on:' triggers
 ---
 ```
@@ -39,6 +42,18 @@ rate-limit:
 - Default: 60 (1 hour)
 - Range: 1-180 (up to 3 hours)
 - Example: `window: 30` creates a 30-minute window
+
+### `ignored-roles` (array, optional)
+- List of repository roles that are exempt from rate limiting
+- Users with any of these roles will not be subject to rate limiting checks
+- Supported roles:
+  - `admin` - Repository administrators
+  - `maintain` - Users with maintain permissions
+  - `write` - Users with write access
+  - `triage` - Users with triage access
+  - `read` - Users with read access
+- Example: `ignored-roles: [admin, maintain]` exempts admins and maintainers
+- If not specified, rate limiting applies to all users
 
 ### `events` (array, optional)
 - Specific event types to apply rate limiting to
@@ -58,17 +73,18 @@ rate-limit:
 ## How It Works
 
 1. **Pre-Activation Check**: Rate limiting is enforced in the pre-activation job, before the main workflow runs
-2. **Per-User Per-Workflow**: Limits are applied individually for each user and workflow
-3. **Recent Runs Query**: The system queries recent workflow runs from the GitHub API
-4. **Filtering**: Runs are filtered by:
+2. **Role-Based Exemptions**: If `ignored-roles` is configured, the system first checks the user's repository permission level. Users with matching roles skip rate limiting entirely.
+3. **Per-User Per-Workflow**: For non-exempt users, limits are applied individually for each user and workflow
+4. **Recent Runs Query**: The system queries recent workflow runs from the GitHub API
+5. **Filtering**: Runs are filtered by:
    - Actor (user who triggered the workflow)
    - Time window (only runs within the configured window)
    - Event type (if `events` is configured)
    - Excludes the current run from the count
    - Excludes cancelled runs (cancelled runs don't count toward the limit)
    - Excludes runs that completed in less than 15 seconds (treated as failed fast/cancelled)
-5. **Progressive Aggregation**: Uses pagination with short-circuit logic for efficiency
-6. **Automatic Cancellation**: If the limit is exceeded, the current run is automatically cancelled
+6. **Progressive Aggregation**: Uses pagination with short-circuit logic for efficiency
+7. **Automatic Cancellation**: If the limit is exceeded, the current run is automatically cancelled
 
 ## Examples
 
@@ -103,6 +119,26 @@ rate-limit:
 ```
 Explicitly specify events to override inference. Allows only 3 runs per 30 minutes for the specified events.
 
+### Rate Limiting with Role Exemptions
+```yaml
+rate-limit:
+  max: 5
+  window: 60
+  ignored-roles:
+    - admin
+    - maintain
+```
+Allows 5 runs per hour, but admins and maintainers are exempt from rate limiting entirely.
+
+### Strict Rate Limiting for Contributors
+```yaml
+rate-limit:
+  max: 3
+  window: 30
+  ignored-roles: [admin]
+```
+Strict rate limiting (3 runs per 30 minutes) for all users except repository admins.
+
 ### Generous Rate Limiting
 ```yaml
 rate-limit:
@@ -127,6 +163,8 @@ The rate limit check provides extensive logging:
 🔍 Checking rate limit for user 'username' on workflow 'workflow-name'
    Configuration: max=5 runs per 60 minutes
    Current event: workflow_dispatch
+   Ignored roles: admin, maintain
+   User 'username' has permission level: write
    Time window: runs created after 2026-02-11T11:24:33.098Z
 📊 Querying workflow runs for 'workflow-name'...
    Fetching page 1 (up to 100 runs per page)...
@@ -142,6 +180,16 @@ The rate limit check provides extensive logging:
 ✅ Rate limit check passed
    User 'username' has 3 runs in the last 60 minutes
    Remaining quota: 2 runs
+```
+
+When a user has an ignored role:
+```
+🔍 Checking rate limit for user 'admin-user' on workflow 'workflow-name'
+   Configuration: max=5 runs per 60 minutes
+   Current event: workflow_dispatch
+   Ignored roles: admin, maintain
+   User 'admin-user' has permission level: admin
+✅ User 'admin-user' has ignored role 'admin'; skipping rate limit check
 ```
 
 ### Error Handling
@@ -260,15 +308,23 @@ To test:
 - Verify the schema is valid (run `gh aw compile`)
 - Check pre-activation job logs for rate limit check output
 
+### Ignored Roles Not Working
+- Verify the user has the expected repository permission level
+- Check pre-activation job logs for "User 'username' has permission level: X" message
+- Ensure the role name matches exactly (e.g., "maintain" not "maintainer")
+- If permission check fails, rate limiting will still be applied (fail-secure behavior)
+
 ### Unexpected Cancellations
 - Review the rate limit configuration (`max` and `window`)
 - Check if other users are triggering the same workflow
 - Verify event filters are configured correctly
+- Check if the user has an ignored role that should exempt them
 
 ### API Errors
 - Rate limit checks fail-open on API errors
 - Check GitHub API status if issues persist
 - Review workflow run logs for detailed error messages
+- Permission checks fail-secure: if unable to check roles, rate limiting is applied
 
 ## Schema Definition
 
@@ -304,6 +360,14 @@ The rate-limit field is validated against this JSON schema:
           "discussion_comment",
           "discussion"
         ]
+      },
+      "minItems": 1
+    },
+    "ignored-roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["admin", "maintain", "write", "triage", "read"]
       },
       "minItems": 1
     }

@@ -558,4 +558,112 @@ describe("check_rate_limit", () => {
 
     expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Using workflow name: test-workflow (fallback"));
   });
+
+  it("should skip rate limiting for users with ignored roles", async () => {
+    process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES = "admin,maintain";
+
+    // Mock the permission check to return admin
+    mockGithub.rest.repos = {
+      getCollaboratorPermissionLevel: vi.fn().mockResolvedValue({
+        data: {
+          permission: "admin",
+        },
+      }),
+    };
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Ignored roles: admin, maintain"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("User 'test-user' has permission level: admin"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("User 'test-user' has ignored role 'admin'; skipping rate limit check"));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+    expect(mockGithub.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+
+  it("should skip rate limiting for users with maintain permission when in ignored roles", async () => {
+    process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES = "admin,maintain";
+
+    mockGithub.rest.repos = {
+      getCollaboratorPermissionLevel: vi.fn().mockResolvedValue({
+        data: {
+          permission: "maintain",
+        },
+      }),
+    };
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("User 'test-user' has ignored role 'maintain'; skipping rate limit check"));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+    expect(mockGithub.rest.actions.listWorkflowRuns).not.toHaveBeenCalled();
+  });
+
+  it("should apply rate limiting for users without ignored roles", async () => {
+    process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES = "admin,maintain";
+
+    mockGithub.rest.repos = {
+      getCollaboratorPermissionLevel: vi.fn().mockResolvedValue({
+        data: {
+          permission: "write",
+        },
+      }),
+    };
+
+    mockGithub.rest.actions = {
+      listWorkflowRuns: vi.fn().mockResolvedValue({
+        data: {
+          workflow_runs: [],
+        },
+      }),
+      cancelWorkflowRun: vi.fn(),
+    };
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("User 'test-user' has permission level: write"));
+    expect(mockGithub.rest.actions.listWorkflowRuns).toHaveBeenCalled();
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+  });
+
+  it("should continue with rate limiting if permission check fails", async () => {
+    process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES = "admin";
+
+    mockGithub.rest.repos = {
+      getCollaboratorPermissionLevel: vi.fn().mockRejectedValue(new Error("API error")),
+    };
+
+    mockGithub.rest.actions = {
+      listWorkflowRuns: vi.fn().mockResolvedValue({
+        data: {
+          workflow_runs: [],
+        },
+      }),
+      cancelWorkflowRun: vi.fn(),
+    };
+
+    await checkRateLimit.main();
+
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not check user permissions"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Continuing with rate limit check"));
+    expect(mockGithub.rest.actions.listWorkflowRuns).toHaveBeenCalled();
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+  });
+
+  it("should handle single ignored role as string", async () => {
+    process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES = "admin";
+
+    mockGithub.rest.repos = {
+      getCollaboratorPermissionLevel: vi.fn().mockResolvedValue({
+        data: {
+          permission: "admin",
+        },
+      }),
+    };
+
+    await checkRateLimit.main();
+
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Ignored roles: admin"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("User 'test-user' has ignored role 'admin'; skipping rate limit check"));
+    expect(mockCore.setOutput).toHaveBeenCalledWith("rate_limit_ok", "true");
+  });
 });

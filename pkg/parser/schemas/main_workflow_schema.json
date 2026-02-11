@@ -6113,6 +6113,15 @@
             "enum": ["workflow_dispatch", "issue_comment", "pull_request_review", "pull_request_review_comment", "issues", "pull_request", "discussion_comment", "discussion"]
           },
           "minItems": 1
+        },
+        "ignored-roles": {
+          "type": "array",
+          "description": "Optional list of roles that are exempt from rate limiting. Users with any of these roles will not be subject to rate limiting checks. Common roles: 'admin', 'maintain', 'write', 'triage', 'read'.",
+          "items": {
+            "type": "string",
+            "enum": ["admin", "maintain", "write", "triage", "read"]
+          },
+          "minItems": 1
         }
       },
       "additionalProperties": false,
@@ -6125,6 +6134,11 @@
           "max": 10,
           "window": 30,
           "events": ["workflow_dispatch", "issue_comment"]
+        },
+        {
+          "max": 5,
+          "window": 60,
+          "ignored-roles": ["admin", "maintain"]
         }
       ]
     },

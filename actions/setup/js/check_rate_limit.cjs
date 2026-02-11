@@ -35,10 +35,42 @@ async function main() {
   const maxRuns = parseInt(process.env.GH_AW_RATE_LIMIT_MAX || "5", 10);
   const windowMinutes = parseInt(process.env.GH_AW_RATE_LIMIT_WINDOW || "60", 10);
   const eventsList = process.env.GH_AW_RATE_LIMIT_EVENTS || "";
+  const ignoredRolesList = process.env.GH_AW_RATE_LIMIT_IGNORED_ROLES || "";
 
   core.info(`🔍 Checking rate limit for user '${actor}' on workflow '${workflowId}'`);
   core.info(`   Configuration: max=${maxRuns} runs per ${windowMinutes} minutes`);
   core.info(`   Current event: ${eventName}`);
+
+  // Check if user has an ignored role (exempt from rate limiting)
+  if (ignoredRolesList) {
+    const ignoredRoles = ignoredRolesList.split(",").map(r => r.trim());
+    core.info(`   Ignored roles: ${ignoredRoles.join(", ")}`);
+
+    try {
+      // Check user's permission level in the repository
+      const { data: permissionData } = await github.rest.repos.getCollaboratorPermissionLevel({
+        owner,
+        repo,
+        username: actor,
+      });
+
+      const userPermission = permissionData.permission;
+      core.info(`   User '${actor}' has permission level: ${userPermission}`);
+
+      // Map GitHub permission levels to role names
+      // GitHub uses: admin, maintain, write, triage, read
+      if (ignoredRoles.includes(userPermission)) {
+        core.info(`✅ User '${actor}' has ignored role '${userPermission}'; skipping rate limit check`);
+        core.setOutput("rate_limit_ok", "true");
+        return;
+      }
+    } catch (error) {
+      // If we can't check permissions, continue with rate limiting (fail-secure)
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      core.warning(`⚠️ Could not check user permissions: ${errorMsg}`);
+      core.warning(`   Continuing with rate limit check for user '${actor}'`);
+    }
+  }
 
   // Parse events to apply rate limiting to
   const limitedEvents = eventsList ? eventsList.split(",").map(e => e.trim()) : [];
