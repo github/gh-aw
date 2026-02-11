@@ -6,6 +6,7 @@
  */
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 
 /**
  * Get issue details using REST API
@@ -79,6 +80,7 @@ async function main(config = {}) {
   const requiredTitlePrefix = config.required_title_prefix || "";
   const maxCount = config.max || 10;
   const comment = config.comment || "";
+  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
   core.info(`Close issue configuration: max=${maxCount}`);
   if (requiredLabels.length > 0) {
@@ -86,6 +88,10 @@ async function main(config = {}) {
   }
   if (requiredTitlePrefix) {
     core.info(`Required title prefix: ${requiredTitlePrefix}`);
+  }
+  core.info(`Default target repo: ${defaultTargetRepo}`);
+  if (allowedRepos.size > 0) {
+    core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
   }
 
   // Track how many items we've processed for max limit
@@ -110,6 +116,18 @@ async function main(config = {}) {
     processedCount++;
 
     const item = message;
+
+    // Resolve and validate target repository
+    const repoResult = resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, "issue");
+    if (!repoResult.success) {
+      core.warning(`Skipping close_issue: ${repoResult.error}`);
+      return {
+        success: false,
+        error: repoResult.error,
+      };
+    }
+    const { repo: itemRepo, repoParts } = repoResult;
+    core.info(`Target repository: ${itemRepo}`);
 
     // Determine issue number
     let issueNumber;
@@ -137,7 +155,7 @@ async function main(config = {}) {
 
     try {
       // Fetch issue details
-      const issue = await getIssueDetails(github, context.repo.owner, context.repo.repo, issueNumber);
+      const issue = await getIssueDetails(github, repoParts.owner, repoParts.repo, issueNumber);
 
       // Check if already closed
       if (issue.state === "closed") {
@@ -173,13 +191,13 @@ async function main(config = {}) {
 
       // Add comment if configured
       if (comment) {
-        await addIssueComment(github, context.repo.owner, context.repo.repo, issueNumber, comment);
+        await addIssueComment(github, repoParts.owner, repoParts.repo, issueNumber, comment);
         core.info(`Added comment to issue #${issueNumber}`);
       }
 
       // Close the issue
-      const closedIssue = await closeIssue(github, context.repo.owner, context.repo.repo, issueNumber);
-      core.info(`Closed issue #${issueNumber}: ${closedIssue.html_url}`);
+      const closedIssue = await closeIssue(github, repoParts.owner, repoParts.repo, issueNumber);
+      core.info(`Closed issue #${issueNumber} in ${itemRepo}: ${closedIssue.html_url}`);
 
       return {
         success: true,
