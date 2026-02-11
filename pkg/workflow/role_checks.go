@@ -149,6 +149,10 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 				switch max := maxValue.(type) {
 				case int:
 					config.Max = max
+				case int64:
+					config.Max = int(max)
+				case uint64:
+					config.Max = int(max)
 				case float64:
 					config.Max = int(max)
 				}
@@ -159,6 +163,10 @@ func (c *Compiler) extractRateLimitConfig(frontmatter map[string]any) *RateLimit
 				switch window := windowValue.(type) {
 				case int:
 					config.Window = window
+				case int64:
+					config.Window = int(window)
+				case uint64:
+					config.Window = int(window)
 				case float64:
 					config.Window = int(window)
 				}
