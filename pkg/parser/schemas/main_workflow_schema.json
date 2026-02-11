@@ -2190,12 +2190,8 @@
       ]
     },
     "sandbox": {
-      "description": "Sandbox configuration for AI engines. Controls agent sandbox (AWF or Sandbox Runtime) and MCP gateway.",
+      "description": "Sandbox configuration for AI engines. Controls agent sandbox (AWF or Sandbox Runtime) and MCP gateway. The MCP gateway is always enabled and cannot be disabled.",
       "oneOf": [
-        {
-          "type": "boolean",
-          "description": "Set to false to completely disable sandbox features (firewall and gateway). Warning: This removes important security protections and should only be used in controlled environments. Not allowed in strict mode."
-        },
         {
           "type": "string",
           "enum": ["default", "sandbox-runtime", "awf", "srt"],
@@ -2211,9 +2207,14 @@
               "description": "Legacy sandbox type field (use agent instead)"
             },
             "agent": {
-              "description": "Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses Anthropic Sandbox Runtime. Defaults to 'awf' if not specified.",
+              "description": "Agent sandbox type: 'awf' uses AWF (Agent Workflow Firewall), 'srt' uses Anthropic Sandbox Runtime, or false to disable agent sandbox. Defaults to 'awf' if not specified. Note: Disabling the agent sandbox (false) removes firewall protection but keeps the MCP gateway enabled.",
               "default": "awf",
               "oneOf": [
+                {
+                  "type": "boolean",
+                  "const": false,
+                  "description": "Set to false to disable the agent sandbox (firewall). Warning: This removes firewall protection but keeps the MCP gateway enabled. Not allowed in strict mode."
+                },
                 {
                   "type": "string",
                   "enum": ["awf", "srt"],

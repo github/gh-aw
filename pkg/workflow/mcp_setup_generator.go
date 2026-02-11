@@ -434,298 +434,294 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		generateSerenaLocalModeSteps(yaml)
 	}
 
-	// Skip gateway setup if sandbox is disabled
-	// When sandbox: false, MCP servers are configured without the gateway
-	if !isSandboxDisabled(workflowData) {
-		// Use the engine's RenderMCPConfig method
-		yaml.WriteString("      - name: Start MCP gateway\n")
-		yaml.WriteString("        id: start-mcp-gateway\n")
+	// The MCP gateway is always enabled, even when agent sandbox is disabled
+	// Use the engine's RenderMCPConfig method
+	yaml.WriteString("      - name: Start MCP gateway\n")
+	yaml.WriteString("        id: start-mcp-gateway\n")
 
-		// Collect all MCP-related environment variables using centralized helper
-		mcpEnvVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
+	// Collect all MCP-related environment variables using centralized helper
+	mcpEnvVars := collectMCPEnvironmentVariables(tools, mcpTools, workflowData, hasAgenticWorkflows)
 
-		// Add env block if any environment variables are needed
-		if len(mcpEnvVars) > 0 {
-			yaml.WriteString("        env:\n")
+	// Add env block if any environment variables are needed
+	if len(mcpEnvVars) > 0 {
+		yaml.WriteString("        env:\n")
 
-			// Sort environment variable names for consistent output
-			// Using functional helper to extract map keys
-			envVarNames := sliceutil.MapToSlice(mcpEnvVars)
-			sort.Strings(envVarNames)
+		// Sort environment variable names for consistent output
+		// Using functional helper to extract map keys
+		envVarNames := sliceutil.MapToSlice(mcpEnvVars)
+		sort.Strings(envVarNames)
 
-			// Write environment variables in sorted order
-			for _, envVarName := range envVarNames {
-				envVarValue := mcpEnvVars[envVarName]
-				fmt.Fprintf(yaml, "          %s: %s\n", envVarName, envVarValue)
-			}
+		// Write environment variables in sorted order
+		for _, envVarName := range envVarNames {
+			envVarValue := mcpEnvVars[envVarName]
+			fmt.Fprintf(yaml, "          %s: %s\n", envVarName, envVarValue)
 		}
-
-		yaml.WriteString("        run: |\n")
-		yaml.WriteString("          set -eo pipefail\n")
-		yaml.WriteString("          mkdir -p /tmp/gh-aw/mcp-config\n")
-
-		// Export gateway environment variables and build docker command BEFORE rendering MCP config
-		// This allows the config to be piped directly to the gateway script
-		// Per MCP Gateway Specification v1.0.0 section 4.2, variable expressions use "${VARIABLE_NAME}" syntax
-		ensureDefaultMCPGatewayConfig(workflowData)
-		gatewayConfig := workflowData.SandboxConfig.MCP
-
-		port := gatewayConfig.Port
-		if port == 0 {
-			port = int(DefaultMCPGatewayPort)
-		}
-
-		domain := gatewayConfig.Domain
-		if domain == "" {
-			if workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
-				domain = "localhost"
-			} else {
-				domain = "host.docker.internal"
-			}
-		}
-
-		apiKey := gatewayConfig.APIKey
-
-		yaml.WriteString("          \n")
-		yaml.WriteString("          # Export gateway environment variables for MCP config and gateway script\n")
-		yaml.WriteString("          export MCP_GATEWAY_PORT=\"" + fmt.Sprintf("%d", port) + "\"\n")
-		yaml.WriteString("          export MCP_GATEWAY_DOMAIN=\"" + domain + "\"\n")
-
-		// Generate API key with proper error handling (avoid SC2155)
-		// Mask immediately after generation to prevent timing vulnerabilities
-		if apiKey == "" {
-			yaml.WriteString("          MCP_GATEWAY_API_KEY=$(openssl rand -base64 45 | tr -d '/+=')\n")
-			yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
-			yaml.WriteString("          export MCP_GATEWAY_API_KEY\n")
-		} else {
-			yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + apiKey + "\"\n")
-			yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
-		}
-
-		// Export payload directory and ensure it exists
-		payloadDir := gatewayConfig.PayloadDir
-		if payloadDir == "" {
-			payloadDir = constants.DefaultMCPGatewayPayloadDir
-		}
-		yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_DIR=\"" + payloadDir + "\"\n")
-		yaml.WriteString("          mkdir -p \"${MCP_GATEWAY_PAYLOAD_DIR}\"\n")
-
-		yaml.WriteString("          export DEBUG=\"*\"\n")
-		yaml.WriteString("          \n")
-
-		// Export engine type
-		yaml.WriteString("          export GH_AW_ENGINE=\"" + engine.GetID() + "\"\n")
-
-		// For Copilot engine with GitHub remote MCP, export GITHUB_PERSONAL_ACCESS_TOKEN
-		// This is needed because the MCP gateway validates ${VAR} references in headers at config load time
-		// and the Copilot MCP config uses ${GITHUB_PERSONAL_ACCESS_TOKEN} in the Authorization header
-		githubTool, hasGitHub := tools["github"]
-		if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
-			yaml.WriteString("          export GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_MCP_SERVER_TOKEN\"\n")
-		}
-
-		// Add user-configured environment variables
-		if len(gatewayConfig.Env) > 0 {
-			// Using functional helper to extract map keys
-			envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
-			sort.Strings(envVarNames)
-
-			for _, envVarName := range envVarNames {
-				envVarValue := gatewayConfig.Env[envVarName]
-				fmt.Fprintf(yaml, "          export %s=%s\n", envVarName, envVarValue)
-			}
-		}
-
-		// Build container command
-		containerImage := gatewayConfig.Container
-		if gatewayConfig.Version != "" {
-			containerImage += ":" + gatewayConfig.Version
-		} else {
-			containerImage += ":" + string(constants.DefaultMCPGatewayVersion)
-		}
-
-		containerCmd := "docker run -i --rm --network host"
-		containerCmd += " -v /var/run/docker.sock:/var/run/docker.sock" // Enable docker-in-docker for MCP gateway
-		// Pass required gateway environment variables
-		containerCmd += " -e MCP_GATEWAY_PORT"
-		containerCmd += " -e MCP_GATEWAY_DOMAIN"
-		containerCmd += " -e MCP_GATEWAY_API_KEY"
-		containerCmd += " -e MCP_GATEWAY_PAYLOAD_DIR"
-		containerCmd += " -e DEBUG"
-		// Pass environment variables that MCP servers reference in their config
-		// These are needed because awmg v0.0.12+ validates and resolves ${VAR} patterns at config load time
-		// Environment variables used by MCP gateway
-		containerCmd += " -e MCP_GATEWAY_LOG_DIR"
-		// Environment variables used by safeoutputs MCP server
-		containerCmd += " -e GH_AW_MCP_LOG_DIR"
-		containerCmd += " -e GH_AW_SAFE_OUTPUTS"
-		containerCmd += " -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH"
-		containerCmd += " -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH"
-		containerCmd += " -e GH_AW_ASSETS_BRANCH"
-		containerCmd += " -e GH_AW_ASSETS_MAX_SIZE_KB"
-		containerCmd += " -e GH_AW_ASSETS_ALLOWED_EXTS"
-		containerCmd += " -e DEFAULT_BRANCH"
-		// Environment variables used by GitHub MCP server
-		containerCmd += " -e GITHUB_MCP_SERVER_TOKEN"
-		// For Copilot engine with GitHub remote MCP, also pass GITHUB_PERSONAL_ACCESS_TOKEN
-		// This allows the gateway to expand ${GITHUB_PERSONAL_ACCESS_TOKEN} references in headers
-		if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
-			containerCmd += " -e GITHUB_PERSONAL_ACCESS_TOKEN"
-		}
-		containerCmd += " -e GITHUB_MCP_LOCKDOWN"
-		// Standard GitHub Actions environment variables (repository context)
-		containerCmd += " -e GITHUB_REPOSITORY"
-		containerCmd += " -e GITHUB_SERVER_URL"
-		containerCmd += " -e GITHUB_SHA"
-		containerCmd += " -e GITHUB_WORKSPACE"
-		containerCmd += " -e GITHUB_TOKEN"
-		// GitHub Actions run context
-		containerCmd += " -e GITHUB_RUN_ID"
-		containerCmd += " -e GITHUB_RUN_NUMBER"
-		containerCmd += " -e GITHUB_RUN_ATTEMPT"
-		containerCmd += " -e GITHUB_JOB"
-		containerCmd += " -e GITHUB_ACTION"
-		// GitHub Actions event context
-		containerCmd += " -e GITHUB_EVENT_NAME"
-		containerCmd += " -e GITHUB_EVENT_PATH"
-		// GitHub Actions actor context
-		containerCmd += " -e GITHUB_ACTOR"
-		containerCmd += " -e GITHUB_ACTOR_ID"
-		containerCmd += " -e GITHUB_TRIGGERING_ACTOR"
-		// GitHub Actions workflow context
-		containerCmd += " -e GITHUB_WORKFLOW"
-		containerCmd += " -e GITHUB_WORKFLOW_REF"
-		containerCmd += " -e GITHUB_WORKFLOW_SHA"
-		// GitHub Actions ref context
-		containerCmd += " -e GITHUB_REF"
-		containerCmd += " -e GITHUB_REF_NAME"
-		containerCmd += " -e GITHUB_REF_TYPE"
-		containerCmd += " -e GITHUB_HEAD_REF"
-		containerCmd += " -e GITHUB_BASE_REF"
-		// Environment variables used by safeinputs MCP server
-		// Only add if safe-inputs is actually enabled (has tools configured)
-		if IsSafeInputsEnabled(workflowData.SafeInputs, workflowData) {
-			containerCmd += " -e GH_AW_SAFE_INPUTS_PORT"
-			containerCmd += " -e GH_AW_SAFE_INPUTS_API_KEY"
-		}
-		// Environment variables used by safeoutputs MCP server
-		// Only add if safe-outputs is actually enabled (has tools configured)
-		if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
-			containerCmd += " -e GH_AW_SAFE_OUTPUTS_PORT"
-			containerCmd += " -e GH_AW_SAFE_OUTPUTS_API_KEY"
-		}
-		if len(gatewayConfig.Env) > 0 {
-			// Using functional helper to extract map keys
-			envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
-			sort.Strings(envVarNames)
-			for _, envVarName := range envVarNames {
-				containerCmd += " -e " + envVarName
-			}
-		}
-
-		// Add environment variables collected from HTTP MCP servers (e.g., TAVILY_API_KEY)
-		// These are needed for the gateway to resolve ${VAR} references in MCP server configs
-		if len(mcpEnvVars) > 0 {
-			// Get list of environment variable names already added to avoid duplicates
-			addedEnvVars := make(map[string]bool)
-
-			// Mark standard environment variables as already added
-			standardEnvVars := []string{
-				"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_API_KEY", "MCP_GATEWAY_PAYLOAD_DIR", "DEBUG",
-				"MCP_GATEWAY_LOG_DIR", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS",
-				"GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
-				"GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_ASSETS_ALLOWED_EXTS",
-				"DEFAULT_BRANCH", "GITHUB_MCP_SERVER_TOKEN", "GITHUB_MCP_LOCKDOWN",
-				"GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_SHA", "GITHUB_WORKSPACE",
-				"GITHUB_TOKEN", "GITHUB_RUN_ID", "GITHUB_RUN_NUMBER", "GITHUB_RUN_ATTEMPT",
-				"GITHUB_JOB", "GITHUB_ACTION", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH",
-				"GITHUB_ACTOR", "GITHUB_ACTOR_ID", "GITHUB_TRIGGERING_ACTOR",
-				"GITHUB_WORKFLOW", "GITHUB_WORKFLOW_REF", "GITHUB_WORKFLOW_SHA",
-				"GITHUB_REF", "GITHUB_REF_NAME", "GITHUB_REF_TYPE", "GITHUB_HEAD_REF", "GITHUB_BASE_REF",
-			}
-			for _, envVar := range standardEnvVars {
-				addedEnvVars[envVar] = true
-			}
-
-			// Mark conditionally added environment variables
-			if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
-				addedEnvVars["GITHUB_PERSONAL_ACCESS_TOKEN"] = true
-			}
-			if IsSafeInputsEnabled(workflowData.SafeInputs, workflowData) {
-				addedEnvVars["GH_AW_SAFE_INPUTS_PORT"] = true
-				addedEnvVars["GH_AW_SAFE_INPUTS_API_KEY"] = true
-			}
-			if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
-				addedEnvVars["GH_AW_SAFE_OUTPUTS_PORT"] = true
-				addedEnvVars["GH_AW_SAFE_OUTPUTS_API_KEY"] = true
-			}
-
-			// Mark gateway config environment variables as added
-			if len(gatewayConfig.Env) > 0 {
-				for envVarName := range gatewayConfig.Env {
-					addedEnvVars[envVarName] = true
-				}
-			}
-
-			// Add remaining environment variables from mcpEnvVars
-			var envVarNames []string
-			for envVarName := range mcpEnvVars {
-				if !addedEnvVars[envVarName] {
-					envVarNames = append(envVarNames, envVarName)
-				}
-			}
-			sort.Strings(envVarNames)
-
-			for _, envVarName := range envVarNames {
-				containerCmd += " -e " + envVarName
-			}
-
-			if mcpSetupGeneratorLog.Enabled() && len(envVarNames) > 0 {
-				mcpSetupGeneratorLog.Printf("Added %d HTTP MCP environment variables to gateway container: %v", len(envVarNames), envVarNames)
-			}
-		}
-
-		// Add volume mounts
-		// First, add the payload directory mount (rw for both agent and gateway)
-		if payloadDir != "" {
-			containerCmd += " -v " + payloadDir + ":" + payloadDir + ":rw"
-		}
-
-		// Then add user-configured mounts
-		if len(gatewayConfig.Mounts) > 0 {
-			for _, mount := range gatewayConfig.Mounts {
-				containerCmd += " -v " + mount
-			}
-		}
-
-		// Add entrypoint override if specified
-		if gatewayConfig.Entrypoint != "" {
-			containerCmd += " --entrypoint " + shellEscapeArg(gatewayConfig.Entrypoint)
-		}
-
-		containerCmd += " " + containerImage
-
-		if len(gatewayConfig.EntrypointArgs) > 0 {
-			for _, arg := range gatewayConfig.EntrypointArgs {
-				containerCmd += " " + shellEscapeArg(arg)
-			}
-		}
-
-		if len(gatewayConfig.Args) > 0 {
-			for _, arg := range gatewayConfig.Args {
-				containerCmd += " " + shellEscapeArg(arg)
-			}
-		}
-
-		// Build the export command with proper quoting that allows variable expansion
-		// We need to break out of quotes for ${GITHUB_WORKSPACE} variables
-		cmdWithExpandableVars := buildDockerCommandWithExpandableVars(containerCmd)
-		yaml.WriteString("          export MCP_GATEWAY_DOCKER_COMMAND=" + cmdWithExpandableVars + "\n")
-		yaml.WriteString("          \n")
-
-		// Render MCP config - this will pipe directly to the gateway script
-		engine.RenderMCPConfig(yaml, tools, mcpTools, workflowData)
 	}
-	// Note: When sandbox is disabled, gateway config will be nil and MCP config will be generated
-	// without the gateway section. The engine's RenderMCPConfig handles both cases.
+
+	yaml.WriteString("        run: |\n")
+	yaml.WriteString("          set -eo pipefail\n")
+	yaml.WriteString("          mkdir -p /tmp/gh-aw/mcp-config\n")
+
+	// Export gateway environment variables and build docker command BEFORE rendering MCP config
+	// This allows the config to be piped directly to the gateway script
+	// Per MCP Gateway Specification v1.0.0 section 4.2, variable expressions use "${VARIABLE_NAME}" syntax
+	ensureDefaultMCPGatewayConfig(workflowData)
+	gatewayConfig := workflowData.SandboxConfig.MCP
+
+	port := gatewayConfig.Port
+	if port == 0 {
+		port = int(DefaultMCPGatewayPort)
+	}
+
+	domain := gatewayConfig.Domain
+	if domain == "" {
+		if workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
+			domain = "localhost"
+		} else {
+			domain = "host.docker.internal"
+		}
+	}
+
+	apiKey := gatewayConfig.APIKey
+
+	yaml.WriteString("          \n")
+	yaml.WriteString("          # Export gateway environment variables for MCP config and gateway script\n")
+	yaml.WriteString("          export MCP_GATEWAY_PORT=\"" + fmt.Sprintf("%d", port) + "\"\n")
+	yaml.WriteString("          export MCP_GATEWAY_DOMAIN=\"" + domain + "\"\n")
+
+	// Generate API key with proper error handling (avoid SC2155)
+	// Mask immediately after generation to prevent timing vulnerabilities
+	if apiKey == "" {
+		yaml.WriteString("          MCP_GATEWAY_API_KEY=$(openssl rand -base64 45 | tr -d '/+=')\n")
+		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
+		yaml.WriteString("          export MCP_GATEWAY_API_KEY\n")
+	} else {
+		yaml.WriteString("          export MCP_GATEWAY_API_KEY=\"" + apiKey + "\"\n")
+		yaml.WriteString("          echo \"::add-mask::${MCP_GATEWAY_API_KEY}\"\n")
+	}
+
+	// Export payload directory and ensure it exists
+	payloadDir := gatewayConfig.PayloadDir
+	if payloadDir == "" {
+		payloadDir = constants.DefaultMCPGatewayPayloadDir
+	}
+	yaml.WriteString("          export MCP_GATEWAY_PAYLOAD_DIR=\"" + payloadDir + "\"\n")
+	yaml.WriteString("          mkdir -p \"${MCP_GATEWAY_PAYLOAD_DIR}\"\n")
+
+	yaml.WriteString("          export DEBUG=\"*\"\n")
+	yaml.WriteString("          \n")
+
+	// Export engine type
+	yaml.WriteString("          export GH_AW_ENGINE=\"" + engine.GetID() + "\"\n")
+
+	// For Copilot engine with GitHub remote MCP, export GITHUB_PERSONAL_ACCESS_TOKEN
+	// This is needed because the MCP gateway validates ${VAR} references in headers at config load time
+	// and the Copilot MCP config uses ${GITHUB_PERSONAL_ACCESS_TOKEN} in the Authorization header
+	githubTool, hasGitHub := tools["github"]
+	if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
+		yaml.WriteString("          export GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_MCP_SERVER_TOKEN\"\n")
+	}
+
+	// Add user-configured environment variables
+	if len(gatewayConfig.Env) > 0 {
+		// Using functional helper to extract map keys
+		envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
+		sort.Strings(envVarNames)
+
+		for _, envVarName := range envVarNames {
+			envVarValue := gatewayConfig.Env[envVarName]
+			fmt.Fprintf(yaml, "          export %s=%s\n", envVarName, envVarValue)
+		}
+	}
+
+	// Build container command
+	containerImage := gatewayConfig.Container
+	if gatewayConfig.Version != "" {
+		containerImage += ":" + gatewayConfig.Version
+	} else {
+		containerImage += ":" + string(constants.DefaultMCPGatewayVersion)
+	}
+
+	containerCmd := "docker run -i --rm --network host"
+	containerCmd += " -v /var/run/docker.sock:/var/run/docker.sock" // Enable docker-in-docker for MCP gateway
+	// Pass required gateway environment variables
+	containerCmd += " -e MCP_GATEWAY_PORT"
+	containerCmd += " -e MCP_GATEWAY_DOMAIN"
+	containerCmd += " -e MCP_GATEWAY_API_KEY"
+	containerCmd += " -e MCP_GATEWAY_PAYLOAD_DIR"
+	containerCmd += " -e DEBUG"
+	// Pass environment variables that MCP servers reference in their config
+	// These are needed because awmg v0.0.12+ validates and resolves ${VAR} patterns at config load time
+	// Environment variables used by MCP gateway
+	containerCmd += " -e MCP_GATEWAY_LOG_DIR"
+	// Environment variables used by safeoutputs MCP server
+	containerCmd += " -e GH_AW_MCP_LOG_DIR"
+	containerCmd += " -e GH_AW_SAFE_OUTPUTS"
+	containerCmd += " -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH"
+	containerCmd += " -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH"
+	containerCmd += " -e GH_AW_ASSETS_BRANCH"
+	containerCmd += " -e GH_AW_ASSETS_MAX_SIZE_KB"
+	containerCmd += " -e GH_AW_ASSETS_ALLOWED_EXTS"
+	containerCmd += " -e DEFAULT_BRANCH"
+	// Environment variables used by GitHub MCP server
+	containerCmd += " -e GITHUB_MCP_SERVER_TOKEN"
+	// For Copilot engine with GitHub remote MCP, also pass GITHUB_PERSONAL_ACCESS_TOKEN
+	// This allows the gateway to expand ${GITHUB_PERSONAL_ACCESS_TOKEN} references in headers
+	if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
+		containerCmd += " -e GITHUB_PERSONAL_ACCESS_TOKEN"
+	}
+	containerCmd += " -e GITHUB_MCP_LOCKDOWN"
+	// Standard GitHub Actions environment variables (repository context)
+	containerCmd += " -e GITHUB_REPOSITORY"
+	containerCmd += " -e GITHUB_SERVER_URL"
+	containerCmd += " -e GITHUB_SHA"
+	containerCmd += " -e GITHUB_WORKSPACE"
+	containerCmd += " -e GITHUB_TOKEN"
+	// GitHub Actions run context
+	containerCmd += " -e GITHUB_RUN_ID"
+	containerCmd += " -e GITHUB_RUN_NUMBER"
+	containerCmd += " -e GITHUB_RUN_ATTEMPT"
+	containerCmd += " -e GITHUB_JOB"
+	containerCmd += " -e GITHUB_ACTION"
+	// GitHub Actions event context
+	containerCmd += " -e GITHUB_EVENT_NAME"
+	containerCmd += " -e GITHUB_EVENT_PATH"
+	// GitHub Actions actor context
+	containerCmd += " -e GITHUB_ACTOR"
+	containerCmd += " -e GITHUB_ACTOR_ID"
+	containerCmd += " -e GITHUB_TRIGGERING_ACTOR"
+	// GitHub Actions workflow context
+	containerCmd += " -e GITHUB_WORKFLOW"
+	containerCmd += " -e GITHUB_WORKFLOW_REF"
+	containerCmd += " -e GITHUB_WORKFLOW_SHA"
+	// GitHub Actions ref context
+	containerCmd += " -e GITHUB_REF"
+	containerCmd += " -e GITHUB_REF_NAME"
+	containerCmd += " -e GITHUB_REF_TYPE"
+	containerCmd += " -e GITHUB_HEAD_REF"
+	containerCmd += " -e GITHUB_BASE_REF"
+	// Environment variables used by safeinputs MCP server
+	// Only add if safe-inputs is actually enabled (has tools configured)
+	if IsSafeInputsEnabled(workflowData.SafeInputs, workflowData) {
+		containerCmd += " -e GH_AW_SAFE_INPUTS_PORT"
+		containerCmd += " -e GH_AW_SAFE_INPUTS_API_KEY"
+	}
+	// Environment variables used by safeoutputs MCP server
+	// Only add if safe-outputs is actually enabled (has tools configured)
+	if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
+		containerCmd += " -e GH_AW_SAFE_OUTPUTS_PORT"
+		containerCmd += " -e GH_AW_SAFE_OUTPUTS_API_KEY"
+	}
+	if len(gatewayConfig.Env) > 0 {
+		// Using functional helper to extract map keys
+		envVarNames := sliceutil.MapToSlice(gatewayConfig.Env)
+		sort.Strings(envVarNames)
+		for _, envVarName := range envVarNames {
+			containerCmd += " -e " + envVarName
+		}
+	}
+
+	// Add environment variables collected from HTTP MCP servers (e.g., TAVILY_API_KEY)
+	// These are needed for the gateway to resolve ${VAR} references in MCP server configs
+	if len(mcpEnvVars) > 0 {
+		// Get list of environment variable names already added to avoid duplicates
+		addedEnvVars := make(map[string]bool)
+
+		// Mark standard environment variables as already added
+		standardEnvVars := []string{
+			"MCP_GATEWAY_PORT", "MCP_GATEWAY_DOMAIN", "MCP_GATEWAY_API_KEY", "MCP_GATEWAY_PAYLOAD_DIR", "DEBUG",
+			"MCP_GATEWAY_LOG_DIR", "GH_AW_MCP_LOG_DIR", "GH_AW_SAFE_OUTPUTS",
+			"GH_AW_SAFE_OUTPUTS_CONFIG_PATH", "GH_AW_SAFE_OUTPUTS_TOOLS_PATH",
+			"GH_AW_ASSETS_BRANCH", "GH_AW_ASSETS_MAX_SIZE_KB", "GH_AW_ASSETS_ALLOWED_EXTS",
+			"DEFAULT_BRANCH", "GITHUB_MCP_SERVER_TOKEN", "GITHUB_MCP_LOCKDOWN",
+			"GITHUB_REPOSITORY", "GITHUB_SERVER_URL", "GITHUB_SHA", "GITHUB_WORKSPACE",
+			"GITHUB_TOKEN", "GITHUB_RUN_ID", "GITHUB_RUN_NUMBER", "GITHUB_RUN_ATTEMPT",
+			"GITHUB_JOB", "GITHUB_ACTION", "GITHUB_EVENT_NAME", "GITHUB_EVENT_PATH",
+			"GITHUB_ACTOR", "GITHUB_ACTOR_ID", "GITHUB_TRIGGERING_ACTOR",
+			"GITHUB_WORKFLOW", "GITHUB_WORKFLOW_REF", "GITHUB_WORKFLOW_SHA",
+			"GITHUB_REF", "GITHUB_REF_NAME", "GITHUB_REF_TYPE", "GITHUB_HEAD_REF", "GITHUB_BASE_REF",
+		}
+		for _, envVar := range standardEnvVars {
+			addedEnvVars[envVar] = true
+		}
+
+		// Mark conditionally added environment variables
+		if hasGitHub && getGitHubType(githubTool) == "remote" && engine.GetID() == "copilot" {
+			addedEnvVars["GITHUB_PERSONAL_ACCESS_TOKEN"] = true
+		}
+		if IsSafeInputsEnabled(workflowData.SafeInputs, workflowData) {
+			addedEnvVars["GH_AW_SAFE_INPUTS_PORT"] = true
+			addedEnvVars["GH_AW_SAFE_INPUTS_API_KEY"] = true
+		}
+		if HasSafeOutputsEnabled(workflowData.SafeOutputs) {
+			addedEnvVars["GH_AW_SAFE_OUTPUTS_PORT"] = true
+			addedEnvVars["GH_AW_SAFE_OUTPUTS_API_KEY"] = true
+		}
+
+		// Mark gateway config environment variables as added
+		if len(gatewayConfig.Env) > 0 {
+			for envVarName := range gatewayConfig.Env {
+				addedEnvVars[envVarName] = true
+			}
+		}
+
+		// Add remaining environment variables from mcpEnvVars
+		var envVarNames []string
+		for envVarName := range mcpEnvVars {
+			if !addedEnvVars[envVarName] {
+				envVarNames = append(envVarNames, envVarName)
+			}
+		}
+		sort.Strings(envVarNames)
+
+		for _, envVarName := range envVarNames {
+			containerCmd += " -e " + envVarName
+		}
+
+		if mcpSetupGeneratorLog.Enabled() && len(envVarNames) > 0 {
+			mcpSetupGeneratorLog.Printf("Added %d HTTP MCP environment variables to gateway container: %v", len(envVarNames), envVarNames)
+		}
+	}
+
+	// Add volume mounts
+	// First, add the payload directory mount (rw for both agent and gateway)
+	if payloadDir != "" {
+		containerCmd += " -v " + payloadDir + ":" + payloadDir + ":rw"
+	}
+
+	// Then add user-configured mounts
+	if len(gatewayConfig.Mounts) > 0 {
+		for _, mount := range gatewayConfig.Mounts {
+			containerCmd += " -v " + mount
+		}
+	}
+
+	// Add entrypoint override if specified
+	if gatewayConfig.Entrypoint != "" {
+		containerCmd += " --entrypoint " + shellEscapeArg(gatewayConfig.Entrypoint)
+	}
+
+	containerCmd += " " + containerImage
+
+	if len(gatewayConfig.EntrypointArgs) > 0 {
+		for _, arg := range gatewayConfig.EntrypointArgs {
+			containerCmd += " " + shellEscapeArg(arg)
+		}
+	}
+
+	if len(gatewayConfig.Args) > 0 {
+		for _, arg := range gatewayConfig.Args {
+			containerCmd += " " + shellEscapeArg(arg)
+		}
+	}
+
+	// Build the export command with proper quoting that allows variable expansion
+	// We need to break out of quotes for ${GITHUB_WORKSPACE} variables
+	cmdWithExpandableVars := buildDockerCommandWithExpandableVars(containerCmd)
+	yaml.WriteString("          export MCP_GATEWAY_DOCKER_COMMAND=" + cmdWithExpandableVars + "\n")
+	yaml.WriteString("          \n")
+
+	// Render MCP config - this will pipe directly to the gateway script
+	// The MCP gateway is always enabled, even when agent sandbox is disabled
+	engine.RenderMCPConfig(yaml, tools, mcpTools, workflowData)
 }

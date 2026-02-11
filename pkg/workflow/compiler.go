@@ -204,9 +204,9 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		c.IncrementWarningCount()
 	}
 
-	// Emit warning for sandbox: false (disables all sandbox features)
-	if isSandboxDisabled(workflowData) {
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("⚠️  WARNING: Sandbox disabled (sandbox: false). This removes important security protections including the firewall and MCP gateway. The AI agent will have direct network access without any filtering. Only use this for testing or in controlled environments where you trust the AI agent completely."))
+	// Emit warning for sandbox.agent: false (disables agent sandbox firewall)
+	if isAgentSandboxDisabled(workflowData) {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("⚠️  WARNING: Agent sandbox disabled (sandbox.agent: false). This removes firewall protection. The AI agent will have direct network access without firewall filtering. The MCP gateway remains enabled. Only use this for testing or in controlled environments where you trust the AI agent completely."))
 		c.IncrementWarningCount()
 	}
 
