@@ -37,20 +37,19 @@ This prevents parallel execution explosions and AI resource exhaustion. See [Con
 
 ## Timeouts
 
-Jobs have maximum execution times (default: 360 minutes). Agent jobs can configure shorter timeouts:
+Jobs have maximum execution times (default: 360 minutes) controlled by the top-level `timeout-minutes` field:
 
 ```yaml wrap
-engine:
-  timeout: 60  # Minutes
+timeout-minutes: 120  # Apply 120-minute timeout to all jobs
 ```
 
-The `stop-after` field provides additional control:
+The `stop-after` field provides additional control for when workflows should stop running:
 
 ```yaml wrap
 stop-after: +48h  # Stop after 48 hours from trigger
 ```
 
-This evaluates in the agent job's `if:` condition, preventing execution if the time limit is exceeded.
+This evaluates in the agent job's `if:` condition, preventing execution if the time limit is exceeded. Supports absolute dates and relative time deltas (minimum unit is hours).
 
 ## Read-Only Agent Tokens
 
@@ -112,15 +111,16 @@ Configure environments in repository Settings → Environments, add reviewers, t
 
 ## Rate Limiting Per User
 
-Prevent users from triggering workflows too frequently:
+The `rate-limit` frontmatter field prevents users from triggering workflows too frequently:
 
 ```yaml wrap
 rate-limit:
-  max: 5        # Maximum runs per window
-  window: 60    # Time window in minutes
+  max: 5        # Required: Maximum runs per window (1-10)
+  window: 60    # Optional: Time window in minutes (default: 60, max: 180)
+  events: [workflow_dispatch, issue_comment]  # Optional: Specific events (auto-inferred if omitted)
 ```
 
-The pre-activation job checks recent runs and cancels the current run if the limit is exceeded. See [RATE_LIMITING.md](https://github.com/github/gh-aw/blob/main/docs/RATE_LIMITING.md) for details.
+The pre-activation job checks recent runs and cancels the current run if the limit is exceeded. See [RATE_LIMITING.md](https://github.com/github/gh-aw/blob/main/docs/RATE_LIMITING.md) for complete details including event auto-inference.
 
 ## Example: Multiple Protection Layers
 
@@ -129,14 +129,14 @@ The pre-activation job checks recent runs and cancels the current run if the lim
 name: Safe Agent Workflow
 engine:
   id: copilot
-  timeout: 60
+timeout-minutes: 60  # Job timeout
 on:
   issues:
     types: [opened]
 rate-limit:
   max: 5
   window: 60
-stop-after: +2h
+stop-after: +2h  # Workflow time limit
 safe-outputs:
   assign-to-agent:
     max: 1
@@ -144,7 +144,7 @@ safe-outputs:
 ---
 ```
 
-This workflow combines: rate limiting (5/hour per user), concurrency control (one at a time), timeouts (60 min agent, 2h workflow), manual approval (environment), and safe output limits (max 1 agent). The bot non-triggering and built-in delays provide additional protection.
+This workflow combines: rate limiting (5/hour per user), concurrency control (one at a time), timeouts (60 min job, 2h workflow), manual approval (environment), and safe output limits (max 1 agent). The bot non-triggering and built-in delays provide additional protection.
 
 ## Best Practices
 
