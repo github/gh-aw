@@ -745,14 +745,14 @@ async function processRuntimeImport(filepathOrUrl, optional, workspaceDir, start
 
   // Construct the absolute path - .agents paths are relative to workspace root, others to .github
   let absolutePath, normalizedPath, baseFolder, normalizedBaseFolder;
-  
+
   if (isAgentsPath) {
     // .agents/ paths resolve to top-level .agents folder at workspace root
     baseFolder = workspaceDir;
     absolutePath = path.resolve(workspaceDir, filepath);
     normalizedPath = path.normalize(absolutePath);
     normalizedBaseFolder = path.normalize(baseFolder);
-    
+
     // Security check: ensure the resolved path is within the workspace
     const relativePath = path.relative(normalizedBaseFolder, normalizedPath);
     if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
