@@ -3528,6 +3528,13 @@ rate-limit:
   events: []
     # Array of strings
 
+  # Optional list of roles that are exempt from rate limiting. Users with any of
+  # these roles will not be subject to rate limiting checks. Common roles: 'admin',
+  # 'maintain', 'write', 'triage', 'read'.
+  # (optional)
+  ignored-roles: []
+    # Array of strings
+
 # Enable strict mode validation for enhanced security and compliance. Strict mode
 # enforces: (1) Write Permissions - refuses contents:write, issues:write,
 # pull-requests:write; requires safe-outputs instead, (2) Network Configuration -
