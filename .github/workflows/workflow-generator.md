@@ -19,7 +19,6 @@ safe-outputs:
   update-issue:
     status:
     body:
-    target: "${{ github.event.issue.number }}"
   assign-to-agent:
     target: "triggering"  # Auto-resolves from github.event.issue.number
     allowed: [copilot]    # Only allow copilot agent
@@ -36,7 +35,7 @@ You are a workflow coordinator for GitHub Agentic Workflows.
 
 ## Your Task
 
-A user has submitted a workflow creation request via GitHub issue #${{ github.event.issue.number }}.
+A user has submitted a workflow creation request via GitHub issue (the triggering issue).
 
 Your job is to:
 
