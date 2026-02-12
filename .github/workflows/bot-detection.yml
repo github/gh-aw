@@ -32,16 +32,29 @@ jobs:
             }
 
             function buildAccountSummaryTable(sortedAccounts, limit) {
+              const baseRepoURL = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+              function linkCount(count, url) {
+                if (!count) return '0';
+                return `[${count}](${url})`;
+              }
+
               const rows = [];
               const capped = sortedAccounts.slice(0, limit);
               for (const [login, data] of capped) {
+                const encodedLogin = encodeURIComponent(login);
                 const openIssues = (data.issues || []).filter(i => i.state === 'open').length;
                 const closedIssues = (data.issues || []).filter(i => i.state === 'closed').length;
                 const openPRs = (data.prs || []).filter(p => p.state === 'open').length;
                 const closedPRs = (data.prs || []).filter(p => p.state === 'closed').length;
                 const comments = (data.comments || []).length;
 
-                rows.push(`| @${login} | ${data.daysOld}d | ${openIssues} | ${closedIssues} | ${openPRs} | ${closedPRs} | ${comments} |`);
+                const openIssuesLink = linkCount(openIssues, `${baseRepoURL}/issues?q=is%3Aissue+is%3Aopen+author%3A${encodedLogin}`);
+                const closedIssuesLink = linkCount(closedIssues, `${baseRepoURL}/issues?q=is%3Aissue+is%3Aclosed+author%3A${encodedLogin}`);
+                const openPRsLink = linkCount(openPRs, `${baseRepoURL}/pulls?q=is%3Apr+is%3Aopen+author%3A${encodedLogin}`);
+                const closedPRsLink = linkCount(closedPRs, `${baseRepoURL}/pulls?q=is%3Apr+is%3Aclosed+author%3A${encodedLogin}`);
+                const commentsLink = linkCount(comments, `${baseRepoURL}/issues?q=commenter%3A${encodedLogin}`);
+
+                rows.push(`| @${login} | ${data.daysOld}d | ${openIssuesLink} | ${closedIssuesLink} | ${openPRsLink} | ${closedPRsLink} | ${commentsLink} |`);
               }
 
               const header = [
@@ -146,6 +159,27 @@ jobs:
                 reviewComments.push(...data);
               }
 
+              // Review submissions (e.g., "LGTM" reviews) are NOT included in listReviewComments.
+              const reviews = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.pulls.listReviews, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                })) {
+                  reviews.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.pulls.listReviews({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                });
+                reviews.push(...data);
+              }
+
               for (const comment of [...issueComments, ...reviewComments]) {
                 if (new Date(comment.created_at) < cutoff) continue;
                 const login = comment.user?.login;
@@ -160,6 +194,28 @@ jobs:
                   pr: pr.number,
                   url: comment.html_url,
                   timestamp: comment.created_at,
+                });
+              }
+
+              for (const review of reviews) {
+                const submittedAt = review.submitted_at || review.submittedAt;
+                if (!submittedAt) continue;
+                if (new Date(submittedAt) < cutoff) continue;
+
+                const login = review.user?.login;
+                if (!login) continue;
+
+                await ensureUserCreatedDate(login);
+
+                if (!commentsByUser.has(login)) {
+                  commentsByUser.set(login, []);
+                }
+
+                const reviewURL = review.html_url || `${pr.html_url}#pullrequestreview-${review.id}`;
+                commentsByUser.get(login).push({
+                  pr: pr.number,
+                  url: reviewURL,
+                  timestamp: submittedAt,
                 });
               }
             }
