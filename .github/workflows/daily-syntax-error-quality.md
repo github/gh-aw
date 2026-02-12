@@ -31,10 +31,10 @@ safe-outputs:
 timeout-minutes: 20
 strict: true
 steps:
-  - name: Setup Go
+  - name: Set up Go
     uses: actions/setup-go@v5
     with:
-      go-version: "1.23"
+      go-version-file: go.mod
       cache: true
       
   - name: Build gh-aw
