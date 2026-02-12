@@ -103,7 +103,7 @@ safe-outputs:
     target: "*"
     status:
     title:
-    body:
+    body: true
 ---
 
 # Test Update Issue Full Configuration
@@ -152,6 +152,11 @@ This workflow tests the update-issue configuration with all options.
 
 	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
 		t.Fatal("Expected body to be non-nil (updatable)")
+	}
+	
+	// Verify body is set to true
+	if !*workflowData.SafeOutputs.UpdateIssues.Body {
+		t.Fatal("Expected body to be true")
 	}
 }
 
@@ -211,5 +216,154 @@ This workflow tests the update-issue target configuration parsing.
 
 	if workflowData.SafeOutputs.UpdateIssues.Title == nil {
 		t.Fatal("Expected title to be non-nil (updatable)")
+	}
+}
+
+func TestUpdateIssueBodyBooleanTrue(t *testing.T) {
+	// Test that body: true explicitly enables body updates
+	tmpDir := testutil.TempDir(t, "output-update-issue-body-true-test")
+
+	testContent := `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+engine: claude
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  update-issue:
+    body: true
+---
+
+# Test Update Issue Body True
+
+This workflow tests body: true configuration.
+`
+
+	testFile := filepath.Join(tmpDir, "test-update-issue-body-true.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	workflowData, err := compiler.ParseWorkflowFile(testFile)
+	if err != nil {
+		t.Fatalf("Unexpected error parsing workflow: %v", err)
+	}
+
+	if workflowData.SafeOutputs.UpdateIssues == nil {
+		t.Fatal("Expected update-issue configuration to be parsed")
+	}
+
+	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
+		t.Fatal("Expected body to be non-nil")
+	}
+
+	if !*workflowData.SafeOutputs.UpdateIssues.Body {
+		t.Fatal("Expected body to be true")
+	}
+}
+
+func TestUpdateIssueBodyBooleanFalse(t *testing.T) {
+	// Test that body: false explicitly disables body updates
+	tmpDir := testutil.TempDir(t, "output-update-issue-body-false-test")
+
+	testContent := `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+engine: claude
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  update-issue:
+    body: false
+---
+
+# Test Update Issue Body False
+
+This workflow tests body: false configuration.
+`
+
+	testFile := filepath.Join(tmpDir, "test-update-issue-body-false.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	workflowData, err := compiler.ParseWorkflowFile(testFile)
+	if err != nil {
+		t.Fatalf("Unexpected error parsing workflow: %v", err)
+	}
+
+	if workflowData.SafeOutputs.UpdateIssues == nil {
+		t.Fatal("Expected update-issue configuration to be parsed")
+	}
+
+	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
+		t.Fatal("Expected body to be non-nil")
+	}
+
+	if *workflowData.SafeOutputs.UpdateIssues.Body {
+		t.Fatal("Expected body to be false")
+	}
+}
+
+func TestUpdateIssueBodyNullBackwardCompatibility(t *testing.T) {
+	// Test that body: (null) maintains backward compatibility and defaults to true
+	tmpDir := testutil.TempDir(t, "output-update-issue-body-null-test")
+
+	testContent := `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+engine: claude
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  update-issue:
+    body:
+---
+
+# Test Update Issue Body Null
+
+This workflow tests body: (null) for backward compatibility.
+`
+
+	testFile := filepath.Join(tmpDir, "test-update-issue-body-null.md")
+	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	compiler := NewCompiler()
+	workflowData, err := compiler.ParseWorkflowFile(testFile)
+	if err != nil {
+		t.Fatalf("Unexpected error parsing workflow: %v", err)
+	}
+
+	if workflowData.SafeOutputs.UpdateIssues == nil {
+		t.Fatal("Expected update-issue configuration to be parsed")
+	}
+
+	// With FieldParsingBoolValue mode, null values result in nil pointer
+	// The handler will default to true via AddBoolPtrOrDefault
+	// This maintains backward compatibility where body: enables body updates
+	if workflowData.SafeOutputs.UpdateIssues.Body != nil {
+		t.Fatal("Expected body to be nil when set to null (will default to true in handler)")
 	}
 }

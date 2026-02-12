@@ -234,9 +234,8 @@ var handlerRegistry = map[string]handlerBuilder{
 		if c.Title != nil {
 			builder.AddDefault("allow_title", true)
 		}
-		if c.Body != nil {
-			builder.AddDefault("allow_body", true)
-		}
+		// Body uses boolean value mode - add the actual boolean value
+		builder.AddBoolPtrOrDefault("allow_body", c.Body, true)
 		return builder.
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).

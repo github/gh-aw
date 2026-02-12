@@ -5311,8 +5311,9 @@
                   "description": "Allow updating issue title - presence of key indicates field can be updated"
                 },
                 "body": {
-                  "type": "null",
-                  "description": "Allow updating issue body - presence of key indicates field can be updated"
+                  "type": ["boolean", "null"],
+                  "description": "Allow updating issue body. Set to true to enable body updates, false to disable. For backward compatibility, null (body:) also enables body updates.",
+                  "default": true
                 },
                 "footer": {
                   "type": "boolean",

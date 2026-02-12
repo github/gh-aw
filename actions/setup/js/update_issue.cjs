@@ -115,11 +115,16 @@ function buildIssueUpdateData(item, config) {
     // Sanitize title for Unicode security (no prefix handling needed for updates)
     updateData.title = sanitizeTitle(item.title);
   }
-  if (item.body !== undefined) {
+  // Check if body updates are allowed (defaults to true if not specified)
+  const canUpdateBody = config.allow_body !== false;
+  if (item.body !== undefined && canUpdateBody) {
     // Store operation information for consistent footer/append behavior.
     // Default to "append" so we preserve the original issue text.
     updateData._operation = item.operation || "append";
     updateData._rawBody = item.body;
+  } else if (item.body !== undefined && !canUpdateBody) {
+    // Body update attempted but not allowed by configuration
+    core.warning("Body update not allowed by safe-outputs configuration");
   }
   // The safe-outputs schema uses "status" (open/closed), while the GitHub API uses "state".
   // Accept both for compatibility.

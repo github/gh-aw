@@ -486,3 +486,127 @@ describe("update_issue.cjs - footer support", () => {
     });
   });
 });
+
+describe("update_issue.cjs - allow_body configuration", () => {
+  beforeEach(async () => {
+    // Reset all mocks before each test
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it("should allow body updates when allow_body is true", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      body: "New body content",
+    };
+
+    const config = {
+      allow_body: true,
+    };
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data._rawBody).toBe("New body content");
+    expect(result.data._operation).toBe("append");
+  });
+
+  it("should allow body updates when allow_body is not specified (defaults to true)", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      body: "New body content",
+    };
+
+    const config = {};
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data._rawBody).toBe("New body content");
+    expect(result.data._operation).toBe("append");
+  });
+
+  it("should block body updates when allow_body is false", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      body: "New body content",
+    };
+
+    const config = {
+      allow_body: false,
+    };
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data._rawBody).toBeUndefined();
+    expect(result.data._operation).toBeUndefined();
+    expect(mockCore.warning).toHaveBeenCalledWith("Body update not allowed by safe-outputs configuration");
+  });
+
+  it("should still allow other fields when body is blocked", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      title: "New Title",
+      body: "New body content",
+      status: "closed",
+      labels: ["bug", "enhancement"],
+    };
+
+    const config = {
+      allow_body: false,
+    };
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data.title).toBe("New Title");
+    expect(result.data.state).toBe("closed");
+    expect(result.data.labels).toEqual(["bug", "enhancement"]);
+    expect(result.data._rawBody).toBeUndefined();
+    expect(mockCore.warning).toHaveBeenCalledWith("Body update not allowed by safe-outputs configuration");
+  });
+
+  it("should respect allow_body true with explicit operation", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      body: "New body content",
+      operation: "prepend",
+    };
+
+    const config = {
+      allow_body: true,
+    };
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data._rawBody).toBe("New body content");
+    expect(result.data._operation).toBe("prepend");
+  });
+
+  it("should block body update even with explicit operation when allow_body is false", async () => {
+    const { buildIssueUpdateData } = await import("./update_issue.cjs");
+
+    const item = {
+      body: "New body content",
+      operation: "replace",
+    };
+
+    const config = {
+      allow_body: false,
+    };
+
+    const result = buildIssueUpdateData(item, config);
+
+    expect(result.success).toBe(true);
+    expect(result.data._rawBody).toBeUndefined();
+    expect(result.data._operation).toBeUndefined();
+    expect(mockCore.warning).toHaveBeenCalledWith("Body update not allowed by safe-outputs configuration");
+  });
+});
