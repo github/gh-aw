@@ -423,7 +423,7 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 
 	if r.options.ActionMode.IsDev() {
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
-		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--cmd", "gh-aw"]
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--validate-actor"]
 		// So we don't need to specify entrypoint or entrypointArgs
 		containerImage = constants.DevModeGhAwImage
 		entrypoint = ""      // Use container's default ENTRYPOINT
@@ -433,7 +433,7 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	} else {
 		// Release mode: Use minimal Alpine image with mounted binaries
 		entrypoint = "/opt/gh-aw/gh-aw"
-		entrypointArgs = []string{"mcp-server"}
+		entrypointArgs = []string{"mcp-server", "--validate-actor"}
 		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
 		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	}
@@ -449,7 +449,14 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	// Only write entrypointArgs if specified (release mode)
 	// In dev mode, use the container's default CMD
 	if entrypointArgs != nil {
-		yaml.WriteString("          entrypointArgs = [\"mcp-server\"]\n")
+		yaml.WriteString("          entrypointArgs = [")
+		for i, arg := range entrypointArgs {
+			if i > 0 {
+				yaml.WriteString(", ")
+			}
+			yaml.WriteString("\"" + arg + "\"")
+		}
+		yaml.WriteString("]\n")
 	}
 
 	// Write mounts
@@ -462,7 +469,7 @@ func (r *MCPConfigRendererUnified) renderAgenticWorkflowsTOML(yaml *strings.Buil
 	}
 	yaml.WriteString("]\n")
 
-	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\"]\n")
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GH_TOKEN\", \"GITHUB_TOKEN\", \"GITHUB_ACTOR\", \"GITHUB_REPOSITORY\"]\n")
 }
 
 // renderGitHubTOML generates GitHub MCP configuration in TOML format (for Codex engine)

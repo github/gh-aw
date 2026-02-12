@@ -517,7 +517,8 @@ jobs:
                 "env": {
                   "DEBUG": "*",
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}",
-                  "GITHUB_ACTOR": "\${GITHUB_ACTOR}"
+                  "GITHUB_ACTOR": "\${GITHUB_ACTOR}",
+                  "GITHUB_REPOSITORY": "\${GITHUB_REPOSITORY}"
                 }
               },
               "github": {

@@ -569,7 +569,7 @@ jobs:
           [mcp_servers.agenticworkflows]
           container = "localhost/gh-aw:dev"
           mounts = ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"]
-          env_vars = ["DEBUG", "GH_TOKEN", "GITHUB_TOKEN"]
+          env_vars = ["DEBUG", "GH_TOKEN", "GITHUB_TOKEN", "GITHUB_ACTOR", "GITHUB_REPOSITORY"]
           
           [mcp_servers.github]
           user_agent = "daily-observability-report-for-awf-firewall-and-mcp-gateway"
@@ -598,7 +598,8 @@ jobs:
                 "env": {
                   "DEBUG": "*",
                   "GITHUB_TOKEN": "$GITHUB_TOKEN",
-                  "GITHUB_ACTOR": "$GITHUB_ACTOR"
+                  "GITHUB_ACTOR": "$GITHUB_ACTOR",
+                  "GITHUB_REPOSITORY": "$GITHUB_REPOSITORY"
                 }
               },
               "github": {

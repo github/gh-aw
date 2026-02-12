@@ -168,9 +168,10 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 		value     string
 		isLiteral bool
 	}{
-		{"DEBUG", "*", true},                    // Literal value "*"
-		{"GITHUB_TOKEN", "GITHUB_TOKEN", false}, // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
-		{"GITHUB_ACTOR", "GITHUB_ACTOR", false}, // Variable reference for actor-based access control
+		{"DEBUG", "*", true},                              // Literal value "*"
+		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},           // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
+		{"GITHUB_ACTOR", "GITHUB_ACTOR", false},           // Variable reference for actor-based access control
+		{"GITHUB_REPOSITORY", "GITHUB_REPOSITORY", false}, // Variable reference for repository context
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
@@ -189,20 +190,20 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 
 	if actionMode.IsDev() {
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
-		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server"]
+		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server", "--validate-actor"]
 		// Binary path is automatically detected via os.Executable()
 		// So we don't need to specify entrypoint or entrypointArgs
 		containerImage = constants.DevModeGhAwImage
 		entrypoint = ""      // Use container's default entrypoint
-		entrypointArgs = nil // Use container's default CMD (includes mcp-server --actor flag via env var)
+		entrypointArgs = nil // Use container's default CMD
 		// Only mount workspace and temp directory - binary and gh CLI are in the image
 		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
 		// Release mode: Use minimal Alpine image with mounted binaries
 		// The gh-aw binary is mounted from /opt/gh-aw and executed directly
-		// Pass --actor flag to enable role-based access control
+		// Pass --validate-actor flag to enable role-based access control
 		entrypoint = "/opt/gh-aw/gh-aw"
-		entrypointArgs = []string{"mcp-server", "--actor", "\\${GITHUB_ACTOR}"}
+		entrypointArgs = []string{"mcp-server", "--validate-actor"}
 		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
 		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	}
@@ -318,9 +319,9 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 		mounts = []string{constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	} else {
 		// Release mode: Use minimal Alpine image with mounted binaries
-		// Pass --actor flag to enable role-based access control
+		// Pass --validate-actor flag to enable role-based access control
 		entrypoint = "/opt/gh-aw/gh-aw"
-		entrypointArgs = []string{"mcp-server", "--actor", "${GITHUB_ACTOR}"}
+		entrypointArgs = []string{"mcp-server", "--validate-actor"}
 		// Mount gh-aw binary, gh CLI binary, workspace, and temp directory
 		mounts = []string{constants.DefaultGhAwMount, constants.DefaultGhBinaryMount, constants.DefaultWorkspaceMount, constants.DefaultTmpGhAwMount}
 	}
@@ -363,6 +364,6 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	yaml.WriteString("          args = [\"--network\", \"host\", \"-w\", \"${GITHUB_WORKSPACE}\"]\n")
 
 	// Use env_vars array to reference environment variables instead of embedding secrets
-	// Include GITHUB_ACTOR for role-based access control
-	yaml.WriteString("          env_vars = [\"DEBUG\", \"GITHUB_TOKEN\", \"GITHUB_ACTOR\"]\n")
+	// Include GITHUB_ACTOR for role-based access control and GITHUB_REPOSITORY for repository context
+	yaml.WriteString("          env_vars = [\"DEBUG\", \"GITHUB_TOKEN\", \"GITHUB_ACTOR\", \"GITHUB_REPOSITORY\"]\n")
 }
