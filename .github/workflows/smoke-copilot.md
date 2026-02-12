@@ -47,6 +47,7 @@ sandbox:
     container: "ghcr.io/github/gh-aw-mcpg"
 safe-outputs:
     add-comment:
+      allowed-repos: ["github/gh-aw"]
       hide-older-comments: true
       max: 2
     create-issue:
