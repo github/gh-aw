@@ -43,10 +43,63 @@ type actorPermissionCache struct {
 	timestamp  time.Time
 }
 
+// repositoryCache stores cached repository information with TTL
+type repositoryCache struct {
+	repository string
+	timestamp  time.Time
+}
+
 var (
 	permissionCache    = make(map[string]*actorPermissionCache)
 	permissionCacheTTL = 1 * time.Hour
+	repoCache          *repositoryCache
+	repoCacheTTL       = 1 * time.Hour
 )
+
+// getRepository retrieves the current repository name (owner/repo format).
+// Results are cached for 1 hour to avoid repeated queries.
+// Checks GITHUB_REPOSITORY environment variable first, then falls back to gh repo view.
+func getRepository() (string, error) {
+	// Check cache first
+	if repoCache != nil && time.Since(repoCache.timestamp) < repoCacheTTL {
+		mcpLog.Printf("Using cached repository: %s (age: %v)", repoCache.repository, time.Since(repoCache.timestamp))
+		return repoCache.repository, nil
+	}
+
+	// Try GITHUB_REPOSITORY environment variable first
+	repo := os.Getenv("GITHUB_REPOSITORY")
+	if repo != "" {
+		mcpLog.Printf("Got repository from GITHUB_REPOSITORY: %s", repo)
+		// Cache the result
+		repoCache = &repositoryCache{
+			repository: repo,
+			timestamp:  time.Now(),
+		}
+		return repo, nil
+	}
+
+	// Fall back to gh repo view
+	mcpLog.Print("Querying repository using gh repo view")
+	cmd := workflow.ExecGH("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
+	output, err := cmd.Output()
+	if err != nil {
+		mcpLog.Printf("Failed to get repository: %v", err)
+		return "", fmt.Errorf("failed to get repository: %w", err)
+	}
+
+	repo = strings.TrimSpace(string(output))
+	if repo == "" {
+		return "", fmt.Errorf("repository not found")
+	}
+
+	mcpLog.Printf("Got repository from gh repo view: %s", repo)
+	// Cache the result
+	repoCache = &repositoryCache{
+		repository: repo,
+		timestamp:  time.Now(),
+	}
+	return repo, nil
+}
 
 // queryActorRole queries the GitHub API to determine the actor's role in the repository.
 // Returns the permission level (admin, maintain, write, triage, read) or an error.
@@ -283,18 +336,12 @@ func checkActorPermission(actor string, validateActor bool, toolName string) err
 		}
 	}
 
-	// Get repository from environment or git config
-	repo := os.Getenv("GITHUB_REPOSITORY")
-	if repo == "" {
-		// Try to get repository from gh CLI
-		cmd := workflow.ExecGH("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
-		output, err := cmd.Output()
-		if err != nil {
-			mcpLog.Printf("Tool %s: failed to get repository context, allowing access: %v", toolName, err)
-			// If we can't determine the repository, allow access (fail open)
-			return nil
-		}
-		repo = strings.TrimSpace(string(output))
+	// Get repository using cached lookup
+	repo, err := getRepository()
+	if err != nil {
+		mcpLog.Printf("Tool %s: failed to get repository context, allowing access: %v", toolName, err)
+		// If we can't determine the repository, allow access (fail open)
+		return nil
 	}
 
 	if repo == "" {
