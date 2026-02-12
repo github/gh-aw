@@ -161,7 +161,7 @@ jobs:
               if (data.issues && data.issues.length > 0) {
                 body += `### Issues Opened (${data.issues.length})\n`;
                 for (const issue of data.issues) {
-                  body += `- [#${issue.number}: ${issue.title}](${issue.html_url}) (${issue.created_at})\n`;
+                  body += `• ${issue.html_url} (${issue.created_at})\n`;
                 }
                 body += `\n`;
               }
@@ -169,7 +169,7 @@ jobs:
               if (data.prs && data.prs.length > 0) {
                 body += `### Pull Requests Opened (${data.prs.length})\n`;
                 for (const pr of data.prs) {
-                  body += `- [#${pr.number}: ${pr.title}](${pr.html_url}) (${pr.created_at})\n`;
+                  body += `• ${pr.html_url} (${pr.created_at})\n`;
                 }
                 body += `\n`;
               }
@@ -177,7 +177,7 @@ jobs:
               if (data.comments && data.comments.length > 0) {
                 body += `### Comments (${data.comments.length})\n`;
                 for (const comment of data.comments.slice(0, 10)) {
-                  body += `- [PR #${comment.pr}](${comment.url}) (${comment.timestamp})\n`;
+                  body += `• ${comment.url} (${comment.timestamp})\n`;
                 }
                 if (data.comments.length > 10) {
                   body += `- ... and ${data.comments.length - 10} more comments\n`;
