@@ -131,15 +131,17 @@ jobs:
                 const { data: prList } = await github.rest.pulls.list({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  creator: login,
                   state: 'all',
+                  per_page: 100,
                 });
-                data.prs = prList.map(p => ({
-                  number: p.number,
-                  title: p.title,
-                  created_at: p.created_at,
-                  html_url: p.html_url,
-                }));
+                data.prs = prList
+                  .filter(p => p.user?.login === login)
+                  .map(p => ({
+                    number: p.number,
+                    title: p.title,
+                    created_at: p.created_at,
+                    html_url: p.html_url,
+                  }));
               } catch (e) {
                 console.log(`  ⚠️ Could not fetch PRs for ${login}`);
               }
