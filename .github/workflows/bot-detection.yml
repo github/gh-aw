@@ -295,55 +295,95 @@ jobs:
               results.append((author, clusters, len(messages)))
 
           # -----------------------------
-          # Build report
+          # Build report - ONLY for high risk accounts
           # -----------------------------
-          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
-          body = f"# Bot Detection Report — {today}\n\n"
-          body += f"Parameters: eps={EPS}, threshold={BOT_CLUSTER_THRESHOLD}\n\n"
+          # Deduplicate new accounts
+          high_risk_accounts = {}
+          for login, days_old in new_accounts:
+              if login not in high_risk_accounts:
+                  high_risk_accounts[login] = days_old
 
-          body += "## Likely Bots\n"
-          for author, clusters, count in sorted(results, key=lambda x: x[1]):
-              if clusters <= BOT_CLUSTER_THRESHOLD:
-                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(author, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
-
-          body += "\n## Likely Humans\n"
-          for author, clusters, count in sorted(results, key=lambda x: -x[1]):
-              if clusters > BOT_CLUSTER_THRESHOLD:
-                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
-
-          if suspicious_unknowns:
-              body += "\n## Suspicious/Unknown Contributors\n"
-              body += "Accounts with few messages and unusual patterns (may warrant investigation):\n\n"
-              for author, count, avg_dist in sorted(suspicious_unknowns, key=lambda x: x[1]):
-                  body += f"- **{author}** — messages={count}, similarity={avg_dist:.2f}\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(author, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
-
-          if new_accounts:
-              body += "\n## 🚨 HIGH RISK: Brand New Accounts (< 7 days old)\n"
-              body += "Recently-created accounts often indicate bots, spam accounts, or malicious actors:\n\n"
-              # Deduplicate new accounts
-              seen_accounts = {}
-              for login, days_old in sorted(new_accounts, key=lambda x: x[1]):
-                  if login not in seen_accounts:
-                      seen_accounts[login] = days_old
+          # Only post if we have high-risk accounts
+          if not high_risk_accounts:
+              print("No high-risk accounts detected. Skipping report.")
+          else:
+              # Fetch additional activity for high-risk accounts
+              high_risk_activity = {}
               
-              for login, days_old in sorted(seen_accounts.items(), key=lambda x: x[1]):
-                  body += f"- **{login}** — account age: {days_old} days\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(login, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
+              def fetch_user_activity(login):
+                  activity = {
+                      "issues": [],
+                      "prs": [],
+                      "comments": comment_details.get(login, [])
+                  }
+                  try:
+                      # Fetch issues opened by this user
+                      issues = gh_paginated(f"https://api.github.com/repos/{REPO}/issues?creator={login}&state=all")
+                      activity["issues"] = [{"number": i["number"], "title": i["title"], "created_at": i["created_at"], "html_url": i["html_url"]} for i in issues]
+                  except:
+                      pass
+                  
+                  try:
+                      # Fetch PRs opened by this user
+                      prs = gh_paginated(f"https://api.github.com/repos/{REPO}/pulls?creator={login}&state=all")
+                      activity["prs"] = [{"number": p["number"], "title": p["title"], "created_at": p["created_at"], "html_url": p["html_url"]} for p in prs]
+                  except:
+                      pass
+                  
+                  return (login, activity)
 
-          requests.post(
-              f"https://api.github.com/repos/{REPO}/issues",
-              headers=HEADERS,
-              json={
-                  "title": f"Bot Detection Report — {today}",
-                  "body": body
-              }
-          )
+              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                  futures = [executor.submit(fetch_user_activity, login) for login in high_risk_accounts.keys()]
+                  for future in as_completed(futures):
+                      login, activity = future.result()
+                      high_risk_activity[login] = activity
+
+              today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+              body = f"# 🚨 HIGH RISK: Brand New Accounts Detected — {today}\n\n"
+              body += "Recently-created accounts often indicate bots, spam accounts, or coordinate attacks.\n\n"
+              
+              for login, days_old in sorted(high_risk_accounts.items(), key=lambda x: x[1]):
+                  body += f"## @{login}\n"
+                  body += f"**Account age:** {days_old} days old\n\n"
+                  
+                  activity = high_risk_activity.get(login, {})
+                  
+                  # Issues opened
+                  issues = activity.get("issues", [])
+                  if issues:
+                      body += "### Issues Opened\n"
+                      for issue in issues:
+                          body += f"- [#{issue['number']}: {issue['title']}]({issue['html_url']}) ({issue['created_at']})\n"
+                      body += "\n"
+                  
+                  # PRs opened
+                  prs = activity.get("prs", [])
+                  if prs:
+                      body += "### Pull Requests Opened\n"
+                      for pr in prs:
+                          body += f"- [#{pr['number']}: {pr['title']}]({pr['html_url']}) ({pr['created_at']})\n"
+                      body += "\n"
+                  
+                  # Comments
+                  comments = activity.get("comments", [])
+                  if comments:
+                      body += "### Comments\n"
+                      for comment in comments[:10]:  # Limit to 10 most recent
+                          body += f"- [PR #{comment['pr']}]({comment['url']}) ({comment['timestamp']})\n"
+                      if len(comments) > 10:
+                          body += f"- ... and {len(comments) - 10} more comments\n"
+                      body += "\n"
+                  
+                  if not issues and not prs and not comments:
+                      body += "*(No issues, PRs, or comments found in last {DAYS_BACK} days)*\n\n"
+
+              requests.post(
+                  f"https://api.github.com/repos/{REPO}/issues",
+                  headers=HEADERS,
+                  json={
+                      "title": f"🚨 HIGH RISK: Brand New Accounts — {today}",
+                      "body": body,
+                      "labels": ["security", "bot-detection"]
+                  }
+              )
           EOF
