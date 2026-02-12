@@ -202,6 +202,7 @@ func (c *Compiler) generateMCPSetup(yaml *strings.Builder, tools map[string]any,
 		yaml.WriteString("          mkdir -p /opt/gh-aw/safeoutputs\n")
 		yaml.WriteString("          mkdir -p /tmp/gh-aw/safeoutputs\n")
 		yaml.WriteString("          mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs\n")
+		yaml.WriteString("          mkdir -p /tmp/safe-outputs\n")
 
 		// Write the safe-outputs configuration to config.json
 		delimiter := GenerateHeredocDelimiter("SAFE_OUTPUTS_CONFIG")

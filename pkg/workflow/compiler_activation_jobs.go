@@ -778,10 +778,10 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	if data.SafeOutputs != nil {
 		env = make(map[string]string)
 
-		// Set GH_AW_SAFE_OUTPUTS to path in /opt (read-only mount for agent container)
+		// Set GH_AW_SAFE_OUTPUTS to path not mounted to agent container
 		// The MCP server writes agent outputs to this file during execution
-		// This file is in /opt to prevent the agent container from having write access
-		env["GH_AW_SAFE_OUTPUTS"] = "/opt/gh-aw/safeoutputs/outputs.jsonl"
+		// This file is in a host-only path to prevent the agent container from having any access (read or write)
+		env["GH_AW_SAFE_OUTPUTS"] = "/tmp/safe-outputs/outputs.jsonl"
 
 		// Set GH_AW_MCP_LOG_DIR for safe outputs MCP server logging
 		// Store in mcp-logs directory so it's included in mcp-logs artifact

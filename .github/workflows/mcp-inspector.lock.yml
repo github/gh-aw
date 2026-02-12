@@ -102,7 +102,7 @@ jobs:
       GH_AW_ASSETS_BRANCH: ""
       GH_AW_ASSETS_MAX_SIZE_KB: 0
       GH_AW_MCP_LOG_DIR: /tmp/gh-aw/mcp-logs/safeoutputs
-      GH_AW_SAFE_OUTPUTS: /opt/gh-aw/safeoutputs/outputs.jsonl
+      GH_AW_SAFE_OUTPUTS: /tmp/safe-outputs/outputs.jsonl
       GH_AW_SAFE_OUTPUTS_CONFIG_PATH: /opt/gh-aw/safeoutputs/config.json
       GH_AW_SAFE_OUTPUTS_TOOLS_PATH: /opt/gh-aw/safeoutputs/tools.json
     outputs:
@@ -299,6 +299,7 @@ jobs:
           mkdir -p /opt/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
+          mkdir -p /tmp/safe-outputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
           {"create_discussion":{"expires":168,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1},"notion-add-comment":{"description":"Add a comment to a Notion page","inputs":{"comment":{"default":null,"description":"The comment text to add","required":true,"type":"string"}},"output":"Comment added to Notion successfully!"},"post-to-slack-channel":{"description":"Post a message to a Slack channel. Message must be 200 characters or less. Supports basic Slack markdown: *bold*, _italic_, ~strike~, `code`, ```code block```, \u003equote, and links \u003curl|text\u003e. Requires GH_AW_SLACK_CHANNEL_ID environment variable to be set.","inputs":{"message":{"default":null,"description":"The message to post (max 200 characters, supports Slack markdown)","required":true,"type":"string"}},"output":"Message posted to Slack successfully!"}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF

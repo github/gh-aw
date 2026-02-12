@@ -19,7 +19,10 @@ async function main() {
       if (fs.existsSync(validationConfigPath)) {
         const validationConfigContent = fs.readFileSync(validationConfigPath, "utf8");
         process.env.GH_AW_VALIDATION_CONFIG = validationConfigContent;
-        validationConfig = JSON.parse(validationConfigContent);
+        const parsed = JSON.parse(validationConfigContent);
+        // Prototype pollution defense: Use Object.create(null) for all parsed JSON
+        validationConfig = Object.create(null);
+        Object.assign(validationConfig, parsed);
         resetValidationConfigCache(); // Reset cache so it reloads from new env var
         core.info(`Loaded validation config from ${validationConfigPath}`);
       }
@@ -128,11 +131,19 @@ async function main() {
     }
     function parseJsonWithRepair(jsonStr) {
       try {
-        return JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+        // Prototype pollution defense: Use Object.create(null) for all parsed JSON
+        const safe = Object.create(null);
+        Object.assign(safe, parsed);
+        return safe;
       } catch (originalError) {
         try {
           const repairedJson = repairJson(jsonStr);
-          return JSON.parse(repairedJson);
+          const parsed = JSON.parse(repairedJson);
+          // Prototype pollution defense: Use Object.create(null) for all parsed JSON
+          const safe = Object.create(null);
+          Object.assign(safe, parsed);
+          return safe;
         } catch (repairError) {
           core.info(`invalid input json: ${jsonStr}`);
           const originalMsg = originalError instanceof Error ? originalError.message : String(originalError);
@@ -150,7 +161,10 @@ async function main() {
       if (fs.existsSync(configPath)) {
         const configFileContent = fs.readFileSync(configPath, "utf8");
         core.info(`[INGESTION] Raw config content: ${configFileContent}`);
-        safeOutputsConfig = JSON.parse(configFileContent);
+        const parsed = JSON.parse(configFileContent);
+        // Prototype pollution defense: Use Object.create(null) for all parsed JSON
+        safeOutputsConfig = Object.create(null);
+        Object.assign(safeOutputsConfig, parsed);
         core.info(`[INGESTION] Parsed config keys: ${JSON.stringify(Object.keys(safeOutputsConfig))}`);
       } else {
         core.info(`[INGESTION] Config file does not exist at: ${configPath}`);
