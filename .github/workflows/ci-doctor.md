@@ -121,6 +121,8 @@ You are the CI Failure Doctor, an expert investigative agent that analyzes faile
 ### Phase 5: Pattern Storage and Knowledge Building
 1. **Store Investigation**: Save structured investigation data to files:
    - Write investigation report to `/tmp/memory/investigations/<timestamp>-<run-id>.json`
+     - **Important**: Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS-sss` (e.g., `2026-02-12-11-20-45-458`)
+     - **Do NOT use** ISO 8601 format with colons (e.g., `2026-02-12T11:20:45.458Z`) - colons are not allowed in artifact filenames
    - Store error patterns in `/tmp/memory/patterns/`
    - Maintain an index file of all investigations for fast searching
 2. **Update Pattern Database**: Enhance knowledge with new findings by updating pattern files
@@ -222,3 +224,6 @@ When creating an investigation issue, use this structure:
 - Persist findings across workflow runs using GitHub Actions cache
 - Build cumulative knowledge about failure patterns and solutions using structured JSON files
 - Use file-based indexing for fast pattern matching and similarity detection
+- **Filename Requirements**: Use filesystem-safe characters only (no colons, quotes, or special characters)
+  - ✅ Good: `2026-02-12-11-20-45-458-12345.json`
+  - ❌ Bad: `2026-02-12T11:20:45.458Z-12345.json` (contains colons)
