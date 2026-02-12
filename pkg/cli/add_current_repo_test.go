@@ -68,7 +68,8 @@ func TestAddWorkflowsFromCurrentRepository(t *testing.T) {
 			// Clear cache before each test
 			ClearCurrentRepoSlugCache()
 
-			_, err := AddWorkflows(tt.workflowSpecs, 1, false, "", "", false, "", false, false, false, "", false, "", false)
+			opts := AddOptions{Number: 1}
+			_, err := AddWorkflows(tt.workflowSpecs, opts)
 
 			if tt.expectError {
 				if err == nil {
