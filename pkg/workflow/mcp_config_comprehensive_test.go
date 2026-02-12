@@ -627,7 +627,7 @@ func TestRenderSerenaMCPConfigWithOptions(t *testing.T) {
 				`"serena": {`,
 				`"type": "stdio"`,
 				`"container": "ghcr.io/github/serena-mcp-server:latest"`,
-				`"entrypointArgs": ["start-mcp-server", "--context", "codex", "--project", "${{ github.workspace }}"]`,
+				`"entrypointArgs": ["start-mcp-server", "--context", "codex", "--project", "\${GITHUB_WORKSPACE}"]`,
 			},
 			unexpectedContent: []string{},
 		},
