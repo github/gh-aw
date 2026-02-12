@@ -5236,6 +5236,53 @@
           ],
           "description": "Enable AI agents to assign issues or pull requests to specific GitHub users based on workflow logic or expertise matching."
         },
+        "unassign-from-user": {
+          "oneOf": [
+            {
+              "type": "null",
+              "description": "Enable user unassignment with default configuration"
+            },
+            {
+              "type": "object",
+              "description": "Configuration for removing assignees from issues in agentic workflow output",
+              "properties": {
+                "allowed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Optional list of allowed usernames. If specified, only these users can be unassigned."
+                },
+                "max": {
+                  "type": "integer",
+                  "description": "Optional maximum number of unassignment operations (default: 1)",
+                  "minimum": 1
+                },
+                "target": {
+                  "type": ["string", "number"],
+                  "description": "Target issue to unassign users from. Use 'triggering' (default) for the triggering issue, '*' to allow any issue, or a specific issue number."
+                },
+                "target-repo": {
+                  "type": "string",
+                  "description": "Target repository in format 'owner/repo' for cross-repository user unassignment. Takes precedence over trial target repo settings."
+                },
+                "allowed-repos": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of allowed repositories in format 'owner/repo' for cross-repository unassignment operations. Use with 'repo' field in tool calls."
+                },
+                "github-token": {
+                  "$ref": "#/$defs/github_token",
+                  "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "description": "Enable AI agents to unassign users from issues or pull requests. Useful for reassigning work or removing users from issues."
+        },
         "link-sub-issue": {
           "oneOf": [
             {
