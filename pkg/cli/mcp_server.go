@@ -41,6 +41,7 @@ func mcpErrorData(v any) json.RawMessage {
 func NewMCPServerCommand() *cobra.Command {
 	var port int
 	var cmdPath string
+	var validateActor bool
 
 	cmd := &cobra.Command{
 		Use:   "mcp-server",
@@ -67,22 +68,28 @@ Access Control:
   which tools are available. Tools requiring elevated permissions (logs, audit) are only
   mounted for users with at least write access to the repository.
 
+  Use the --validate-actor flag to enforce actor validation. When enabled, the server
+  will not mount logs and audit tools if GITHUB_ACTOR is not set. When disabled (default),
+  the server mounts all tools regardless of actor presence.
+
 By default, the server uses stdio transport. Use the --port flag to run
 an HTTP server with SSE (Server-Sent Events) transport instead.
 
 Examples:
-  gh aw mcp-server                                  # Run with stdio transport (default for MCP clients)
-  gh aw mcp-server --port 8080                      # Run HTTP server on port 8080 (for web-based clients)
-  gh aw mcp-server --cmd ./gh-aw                    # Use custom gh-aw binary path
-  GITHUB_ACTOR=octocat gh aw mcp-server             # Set actor via environment variable for access control
-  DEBUG=mcp:* GITHUB_ACTOR=octocat gh aw mcp-server # Run with verbose logging and actor`,
+  gh aw mcp-server                                     # Run with stdio transport (default for MCP clients)
+  gh aw mcp-server --validate-actor                    # Run with actor validation enforced
+  gh aw mcp-server --port 8080                         # Run HTTP server on port 8080 (for web-based clients)
+  gh aw mcp-server --cmd ./gh-aw                       # Use custom gh-aw binary path
+  GITHUB_ACTOR=octocat gh aw mcp-server                # Set actor via environment variable for access control
+  DEBUG=mcp:* GITHUB_ACTOR=octocat gh aw mcp-server    # Run with verbose logging and actor`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runMCPServer(port, cmdPath)
+			return runMCPServer(port, cmdPath, validateActor)
 		},
 	}
 
 	cmd.Flags().IntVarP(&port, "port", "p", 0, "Port to run HTTP server on (uses stdio if not specified)")
 	cmd.Flags().StringVar(&cmdPath, "cmd", "", "Path to gh aw command to use (defaults to 'gh aw')")
+	cmd.Flags().BoolVar(&validateActor, "validate-actor", false, "Enforce actor validation (requires GITHUB_ACTOR to mount logs and audit tools)")
 
 	return cmd
 }
@@ -108,16 +115,25 @@ func checkAndLogGHVersion() {
 }
 
 // runMCPServer starts the MCP server on stdio or HTTP transport
-func runMCPServer(port int, cmdPath string) error {
+func runMCPServer(port int, cmdPath string, validateActor bool) error {
 	// Get actor from environment variable
 	actor := os.Getenv("GITHUB_ACTOR")
+
+	if validateActor {
+		mcpLog.Printf("Actor validation enabled (--validate-actor flag)")
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Actor validation enabled"))
+	}
 
 	if actor != "" {
 		mcpLog.Printf("Using actor: %s", actor)
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Actor: %s", actor)))
 	} else {
 		mcpLog.Print("No actor specified (GITHUB_ACTOR environment variable)")
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No actor specified - some tools may be unavailable without proper access control"))
+		if validateActor {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No actor specified - logs and audit tools will not be mounted (actor validation enabled)"))
+		} else {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No actor specified - all tools will be mounted (actor validation disabled)"))
+		}
 	}
 
 	if port > 0 {
@@ -159,7 +175,7 @@ func runMCPServer(port int, cmdPath string) error {
 	}
 
 	// Create the server configuration
-	server := createMCPServer(cmdPath, actor)
+	server := createMCPServer(cmdPath, actor, validateActor)
 
 	if port > 0 {
 		// Run HTTP server with SSE transport
@@ -174,9 +190,17 @@ func runMCPServer(port int, cmdPath string) error {
 // shouldMountLogsAndAuditTools determines if the actor has sufficient permissions for logs and audit tools.
 // These tools require at least write access to the repository.
 // Returns true if the actor has write+ access, false otherwise.
-func shouldMountLogsAndAuditTools(actor string) bool {
-	// If no actor is specified, default to allowing all tools (access control disabled)
+// When validateActor is true, requires actor to be specified; otherwise allows all tools when actor is empty.
+func shouldMountLogsAndAuditTools(actor string, validateActor bool) bool {
+	// If actor validation is enabled and no actor is specified, deny access to logs/audit tools
+	if validateActor && actor == "" {
+		mcpLog.Print("Actor validation enabled: denying access to logs and audit tools (no actor specified)")
+		return false
+	}
+
+	// If no actor is specified and validation is disabled, default to allowing all tools
 	if actor == "" {
+		mcpLog.Print("Actor validation disabled: allowing all tools (no actor specified)")
 		return true
 	}
 
@@ -192,7 +216,7 @@ func shouldMountLogsAndAuditTools(actor string) bool {
 }
 
 // createMCPServer creates and configures the MCP server with all tools
-func createMCPServer(cmdPath string, actor string) *mcp.Server {
+func createMCPServer(cmdPath string, actor string, validateActor bool) *mcp.Server {
 	// Helper function to execute command with proper path
 	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
 		if cmdPath != "" {
@@ -205,17 +229,24 @@ func createMCPServer(cmdPath string, actor string) *mcp.Server {
 
 	// Determine if logs and audit tools should be mounted based on actor permissions
 	// These tools require at least write access to the repository
-	mountLogsAndAudit := shouldMountLogsAndAuditTools(actor)
+	mountLogsAndAudit := shouldMountLogsAndAuditTools(actor, validateActor)
 
-	if actor != "" {
-		if mountLogsAndAudit {
-			mcpLog.Printf("Actor %s has sufficient permissions - mounting logs and audit tools", actor)
+	if validateActor {
+		if actor != "" {
+			if mountLogsAndAudit {
+				mcpLog.Printf("Actor %s: mounting logs and audit tools (validation enabled)", actor)
+			} else {
+				mcpLog.Printf("Actor %s: not mounting logs and audit tools (validation enabled)", actor)
+			}
 		} else {
-			mcpLog.Printf("Actor %s does not have write+ access - logs and audit tools will not be mounted", actor)
+			mcpLog.Print("No actor specified: not mounting logs and audit tools (validation enabled)")
 		}
 	} else {
-		mcpLog.Print("No actor specified - mounting all tools (access control disabled)")
-		mountLogsAndAudit = true // Default to mounting all tools when no actor is specified
+		if actor != "" {
+			mcpLog.Printf("Actor %s: mounting logs and audit tools (validation disabled)", actor)
+		} else {
+			mcpLog.Print("No actor specified: mounting all tools (validation disabled)")
+		}
 	}
 
 	// Create MCP server with capabilities and logging
