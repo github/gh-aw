@@ -437,6 +437,7 @@ The YAML frontmatter supports these fields:
         if-no-changes: "warn"           # Optional: "warn" (default), "error", or "ignore"
         expires: 7                      # Optional: auto-close after 7 days (supports: 2h, 7d, 2w, 1m, 1y; min: 2h)
         auto-merge: false               # Optional: enable auto-merge when checks pass (default: false)
+        base-branch: "vnext"            # Optional: base branch for PR (defaults to workflow's branch)
         target-repo: "owner/repo"       # Optional: cross-repository
     ```
 
