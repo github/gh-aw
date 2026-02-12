@@ -2991,7 +2991,8 @@ safe-outputs:
     # (optional)
     title: null
 
-    # Allow updating issue body - presence of key indicates field can be updated
+    # Allow updating issue body. Set to true to enable body updates, false to disable.
+    # For backward compatibility, null (body:) also enables body updates.
     # (optional)
     body: null
 
