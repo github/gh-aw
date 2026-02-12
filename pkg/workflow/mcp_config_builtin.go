@@ -119,6 +119,7 @@ func renderSafeOutputsMCPConfig(yaml *strings.Builder, isLast bool, workflowData
 // Now uses HTTP transport instead of stdio, similar to safe-inputs
 // The server is started in a separate step before the agent job
 func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, workflowData *WorkflowData) {
+	mcpBuiltinLog.Printf("Rendering Safe Outputs MCP config with options: isLast=%v, includeCopilotFields=%v", isLast, includeCopilotFields)
 	yaml.WriteString("              \"" + constants.SafeOutputsMCPServerID + "\": {\n")
 
 	// HTTP transport configuration - server started in separate step
@@ -130,7 +131,9 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 	if workflowData != nil && workflowData.SandboxConfig != nil && workflowData.SandboxConfig.Agent != nil && workflowData.SandboxConfig.Agent.Disabled {
 		// When agent is disabled (no firewall), use localhost instead of host.docker.internal
 		host = "localhost"
+		mcpBuiltinLog.Print("Agent firewall disabled, using localhost instead of host.docker.internal")
 	}
+	mcpBuiltinLog.Printf("Using host: %s", host)
 
 	// HTTP URL using environment variable - NOT escaped so shell expands it before awmg validation
 	// Use host.docker.internal to allow access from firewall container (or localhost if agent disabled)
@@ -162,6 +165,8 @@ func renderSafeOutputsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, i
 // Per MCP Gateway Specification v1.0.0 section 3.2.1, stdio-based MCP servers MUST be containerized.
 // Uses MCP Gateway spec format: container, entrypoint, entrypointArgs, and mounts fields.
 func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bool, includeCopilotFields bool, actionMode ActionMode) {
+	mcpBuiltinLog.Printf("Rendering Agentic Workflows MCP config: isLast=%v, includeCopilotFields=%v, actionMode=%v", isLast, includeCopilotFields, actionMode)
+
 	// Environment variables: map of env var name to value (literal) or source variable (reference)
 	envVars := []struct {
 		name      string
@@ -187,6 +192,7 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	var mounts []string
 
 	if actionMode.IsDev() {
+		mcpBuiltinLog.Print("Using dev mode configuration with locally built Docker image")
 		// Dev mode: Use locally built Docker image which includes gh-aw binary and gh CLI
 		// The Dockerfile sets ENTRYPOINT ["gh-aw"] and CMD ["mcp-server"]
 		// Binary path is automatically detected via os.Executable()

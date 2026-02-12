@@ -23,6 +23,7 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 	switch toolName {
 	case "create_issue":
 		if config := safeOutputs.CreateIssues; config != nil {
+			toolDescriptionEnhancerLog.Printf("Found create_issue config: max=%d, titlePrefix=%s", config.Max, config.TitlePrefix)
 			if config.Max > 0 {
 				constraints = append(constraints, fmt.Sprintf("Maximum %d issue(s) can be created.", config.Max))
 			}
@@ -126,6 +127,7 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 
 	case "create_pull_request":
 		if config := safeOutputs.CreatePullRequests; config != nil {
+			toolDescriptionEnhancerLog.Printf("Found create_pull_request config: max=%d, titlePrefix=%s, draft=%v", config.Max, config.TitlePrefix, config.Draft)
 			if config.Max > 0 {
 				constraints = append(constraints, fmt.Sprintf("Maximum %d pull request(s) can be created.", config.Max))
 			}
@@ -234,6 +236,7 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 
 	case "upload_asset":
 		if config := safeOutputs.UploadAssets; config != nil {
+			toolDescriptionEnhancerLog.Printf("Found upload_asset config: max=%d, maxSizeKB=%d, allowedExts=%v", config.Max, config.MaxSizeKB, config.AllowedExts)
 			if config.Max > 0 {
 				constraints = append(constraints, fmt.Sprintf("Maximum %d asset(s) can be uploaded.", config.Max))
 			}
