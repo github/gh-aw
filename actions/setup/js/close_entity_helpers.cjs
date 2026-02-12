@@ -103,9 +103,8 @@ async function generateCloseEntityStagedPreview(config, items, requiredLabels, r
   let summaryContent = `## 🎭 Staged Mode: Close ${config.displayNameCapitalizedPlural} Preview\n\n`;
   summaryContent += `The following ${config.displayNamePlural} would be closed if staged mode was disabled:\n\n`;
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    summaryContent += `### ${config.displayNameCapitalized} ${i + 1}\n`;
+  items.forEach((item, index) => {
+    summaryContent += `### ${config.displayNameCapitalized} ${index + 1}\n`;
 
     const entityNumber = item[config.numberField];
     if (entityNumber) {
@@ -126,9 +125,8 @@ async function generateCloseEntityStagedPreview(config, items, requiredLabels, r
     }
 
     summaryContent += "---\n\n";
-  }
+  });
 
-  // Write to step summary
   await core.summary.addRaw(summaryContent).write();
   core.info(`📝 ${config.displayNameCapitalized} close preview written to step summary`);
 }
@@ -139,13 +137,10 @@ async function generateCloseEntityStagedPreview(config, items, requiredLabels, r
  * @returns {{requiredLabels: string[], requiredTitlePrefix: string, target: string}}
  */
 function parseEntityConfig(envVarPrefix) {
-  const labelsEnvVar = `${envVarPrefix}_REQUIRED_LABELS`;
-  const titlePrefixEnvVar = `${envVarPrefix}_REQUIRED_TITLE_PREFIX`;
-  const targetEnvVar = `${envVarPrefix}_TARGET`;
-
-  const requiredLabels = process.env[labelsEnvVar] ? process.env[labelsEnvVar].split(",").map(l => l.trim()) : [];
-  const requiredTitlePrefix = process.env[titlePrefixEnvVar] || "";
-  const target = process.env[targetEnvVar] || "triggering";
+  const labelsValue = process.env[`${envVarPrefix}_REQUIRED_LABELS`];
+  const requiredLabels = labelsValue ? labelsValue.split(",").map(l => l.trim()) : [];
+  const requiredTitlePrefix = process.env[`${envVarPrefix}_REQUIRED_TITLE_PREFIX`] || "";
+  const target = process.env[`${envVarPrefix}_TARGET`] || "triggering";
 
   return { requiredLabels, requiredTitlePrefix, target };
 }
@@ -159,51 +154,37 @@ function parseEntityConfig(envVarPrefix) {
  * @returns {{success: true, number: number} | {success: false, message: string}}
  */
 function resolveEntityNumber(config, target, item, isEntityContext) {
+  const { numberField, displayName, itemTypeDisplay, contextPayloadField, displayNameCapitalized } = config;
+
   if (target === "*") {
-    const targetNumber = item[config.numberField];
+    const targetNumber = item[numberField];
     if (targetNumber) {
       const parsed = parseInt(targetNumber, 10);
       if (isNaN(parsed) || parsed <= 0) {
-        return {
-          success: false,
-          message: `Invalid ${config.displayName} number specified: ${targetNumber}`,
-        };
+        return { success: false, message: `Invalid ${displayName} number specified: ${targetNumber}` };
       }
       return { success: true, number: parsed };
     }
-    return {
-      success: false,
-      message: `Target is "*" but no ${config.numberField} specified in ${config.itemTypeDisplay} item`,
-    };
+    return { success: false, message: `Target is "*" but no ${numberField} specified in ${itemTypeDisplay} item` };
   }
 
   if (target !== "triggering") {
     const parsed = parseInt(target, 10);
     if (isNaN(parsed) || parsed <= 0) {
-      return {
-        success: false,
-        message: `Invalid ${config.displayName} number in target configuration: ${target}`,
-      };
+      return { success: false, message: `Invalid ${displayName} number in target configuration: ${target}` };
     }
     return { success: true, number: parsed };
   }
 
-  // Default behavior: use triggering entity
   if (isEntityContext) {
-    const number = context.payload[config.contextPayloadField]?.number;
+    const number = context.payload[contextPayloadField]?.number;
     if (!number) {
-      return {
-        success: false,
-        message: `${config.displayNameCapitalized} context detected but no ${config.displayName} found in payload`,
-      };
+      return { success: false, message: `${displayNameCapitalized} context detected but no ${displayName} found in payload` };
     }
     return { success: true, number };
   }
 
-  return {
-    success: false,
-    message: `Not in ${config.displayName} context and no explicit target specified`,
-  };
+  return { success: false, message: `Not in ${displayName} context and no explicit target specified` };
 }
 
 /**
@@ -223,16 +204,12 @@ function escapeMarkdownTitle(title) {
  * @returns {Promise<Array<{entity: {number: number, html_url: string, title: string}, comment: {id: number, html_url: string}}>|undefined>}
  */
 async function processCloseEntityItems(config, callbacks, handlerConfig = {}) {
-  // Check if we're in staged mode
   const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
-
   const result = loadAgentOutput();
-  if (!result.success) {
-    return;
-  }
 
-  // Find all items of this type
-  const items = result.items.filter(/** @param {any} item */ item => item.type === config.itemType);
+  if (!result.success) return;
+
+  const items = result.items.filter(item => item.type === config.itemType);
   if (items.length === 0) {
     core.info(`No ${config.itemTypeDisplay} items found in agent output`);
     return;
@@ -240,40 +217,32 @@ async function processCloseEntityItems(config, callbacks, handlerConfig = {}) {
 
   core.info(`Found ${items.length} ${config.itemTypeDisplay} item(s)`);
 
-  // Get configuration from handlerConfig object (not environment variables)
   const requiredLabels = handlerConfig.required_labels || [];
   const requiredTitlePrefix = handlerConfig.required_title_prefix || "";
   const target = handlerConfig.target || "triggering";
 
   core.info(`Configuration: requiredLabels=${requiredLabels.join(",")}, requiredTitlePrefix=${requiredTitlePrefix}, target=${target}`);
 
-  // Check if we're in the correct entity context
   const isEntityContext = config.contextEvents.some(event => context.eventName === event);
 
-  // If in staged mode, emit step summary instead of closing entities
   if (isStaged) {
     await generateCloseEntityStagedPreview(config, items, requiredLabels, requiredTitlePrefix);
     return;
   }
 
-  // Validate context based on target configuration
   if (target === "triggering" && !isEntityContext) {
     core.info(`Target is "triggering" but not running in ${config.displayName} context, skipping ${config.displayName} close`);
     return;
   }
 
-  // Extract triggering context for footer generation
   const triggeringIssueNumber = context.payload?.issue?.number;
   const triggeringPRNumber = context.payload?.pull_request?.number;
-
   const closedEntities = [];
+  const { owner, repo } = context.repo;
 
-  // Process each item
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    core.info(`Processing ${config.itemTypeDisplay} item ${i + 1}/${items.length}: bodyLength=${item.body.length}`);
+  for (const [index, item] of items.entries()) {
+    core.info(`Processing ${config.itemTypeDisplay} item ${index + 1}/${items.length}: bodyLength=${item.body.length}`);
 
-    // Resolve entity number
     const resolved = resolveEntityNumber(config, target, item, isEntityContext);
     if (!resolved.success) {
       core.info(resolved.message);
@@ -282,45 +251,33 @@ async function processCloseEntityItems(config, callbacks, handlerConfig = {}) {
     const entityNumber = resolved.number;
 
     try {
-      // Fetch entity details to check filters
-      const entity = await callbacks.getDetails(github, context.repo.owner, context.repo.repo, entityNumber);
+      const entity = await callbacks.getDetails(github, owner, repo, entityNumber);
 
-      // Apply label filter
       if (!checkLabelFilter(entity.labels, requiredLabels)) {
         core.info(`${config.displayNameCapitalized} #${entityNumber} does not have required labels: ${requiredLabels.join(", ")}`);
         continue;
       }
 
-      // Apply title prefix filter
       if (!checkTitlePrefixFilter(entity.title, requiredTitlePrefix)) {
         core.info(`${config.displayNameCapitalized} #${entityNumber} does not have required title prefix: ${requiredTitlePrefix}`);
         continue;
       }
 
-      // Check if already closed
       if (entity.state === "closed") {
         core.info(`${config.displayNameCapitalized} #${entityNumber} is already closed, skipping`);
         continue;
       }
 
-      // Build comment body
       const commentBody = buildCommentBody(item.body, triggeringIssueNumber, triggeringPRNumber);
-
-      // Add comment before closing
-      const comment = await callbacks.addComment(github, context.repo.owner, context.repo.repo, entityNumber, commentBody);
+      const comment = await callbacks.addComment(github, owner, repo, entityNumber, commentBody);
       core.info(`✓ Added comment to ${config.displayName} #${entityNumber}: ${comment.html_url}`);
 
-      // Close the entity
-      const closedEntity = await callbacks.closeEntity(github, context.repo.owner, context.repo.repo, entityNumber);
+      const closedEntity = await callbacks.closeEntity(github, owner, repo, entityNumber);
       core.info(`✓ Closed ${config.displayName} #${entityNumber}: ${closedEntity.html_url}`);
 
-      closedEntities.push({
-        entity: closedEntity,
-        comment,
-      });
+      closedEntities.push({ entity: closedEntity, comment });
 
-      // Set outputs for the last closed entity (for backward compatibility)
-      if (i === items.length - 1) {
+      if (index === items.length - 1) {
         const numberOutputName = config.entityType === "issue" ? "issue_number" : "pull_request_number";
         const urlOutputName = config.entityType === "issue" ? "issue_url" : "pull_request_url";
         core.setOutput(numberOutputName, closedEntity.number);
@@ -333,7 +290,6 @@ async function processCloseEntityItems(config, callbacks, handlerConfig = {}) {
     }
   }
 
-  // Write summary for all closed entities
   if (closedEntities.length > 0) {
     let summaryContent = `\n\n## Closed ${config.displayNameCapitalizedPlural}\n`;
     for (const { entity, comment } of closedEntities) {
