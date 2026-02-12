@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -119,7 +120,7 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 				MaxFileSize:       10240, // 10KB
 				MaxFileCount:      100,
 				CreateOrphan:      true,
-				AllowedExtensions: getDefaultAllowedExtensions(),
+				AllowedExtensions: constants.DefaultAllowedMemoryExtensions,
 			},
 		}
 		return config, nil
@@ -137,7 +138,7 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 					MaxFileSize:       10240, // 10KB
 					MaxFileCount:      100,
 					CreateOrphan:      true,
-					AllowedExtensions: getDefaultAllowedExtensions(),
+					AllowedExtensions: constants.DefaultAllowedMemoryExtensions,
 				},
 			}
 		} else {
@@ -277,7 +278,7 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 				}
 				// Default to standard allowed extensions if not specified
 				if len(entry.AllowedExtensions) == 0 {
-					entry.AllowedExtensions = getDefaultAllowedExtensions()
+					entry.AllowedExtensions = constants.DefaultAllowedMemoryExtensions
 				}
 
 				config.Memories = append(config.Memories, entry)
@@ -402,7 +403,7 @@ func (c *Compiler) extractRepoMemoryConfig(toolsConfig *ToolsConfig) (*RepoMemor
 		}
 		// Default to standard allowed extensions if not specified
 		if len(entry.AllowedExtensions) == 0 {
-			entry.AllowedExtensions = getDefaultAllowedExtensions()
+			entry.AllowedExtensions = constants.DefaultAllowedMemoryExtensions
 		}
 
 		config.Memories = []RepoMemoryEntry{entry}

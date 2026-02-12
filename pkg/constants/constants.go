@@ -824,3 +824,7 @@ var SharedWorkflowForbiddenFields = []string{
 func GetWorkflowDir() string {
 	return filepath.Join(".github", "workflows")
 }
+
+// DefaultAllowedMemoryExtensions is the default list of allowed file extensions for cache-memory and repo-memory storage.
+// These file types are considered safe for AI agent memory storage.
+var DefaultAllowedMemoryExtensions = []string{".json", ".jsonl", ".txt", ".md", ".csv"}

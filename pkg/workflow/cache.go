@@ -6,16 +6,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/goccy/go-yaml"
 )
 
 var cacheLog = logger.New("workflow:cache")
-
-// getDefaultAllowedExtensions returns the default list of allowed file extensions for memory storage
-func getDefaultAllowedExtensions() []string {
-	return []string{".json", ".jsonl", ".txt", ".md", ".csv"}
-}
 
 // CacheMemoryConfig holds configuration for cache-memory functionality
 type CacheMemoryConfig struct {
@@ -41,6 +37,99 @@ func generateDefaultCacheKey(cacheID string) string {
 	return fmt.Sprintf("memory-%s-${{ github.workflow }}-${{ github.run_id }}", cacheID)
 }
 
+// parseCacheMemoryEntry parses a single cache-memory entry from a map
+func parseCacheMemoryEntry(cacheMap map[string]any, defaultID string) (CacheMemoryEntry, error) {
+	entry := CacheMemoryEntry{
+		ID:  defaultID,
+		Key: generateDefaultCacheKey(defaultID),
+	}
+
+	// Parse ID (for array notation)
+	if id, exists := cacheMap["id"]; exists {
+		if idStr, ok := id.(string); ok {
+			entry.ID = idStr
+		}
+	}
+	// Update key if ID changed
+	if entry.ID != defaultID {
+		entry.Key = generateDefaultCacheKey(entry.ID)
+	}
+
+	// Parse custom key
+	if key, exists := cacheMap["key"]; exists {
+		if keyStr, ok := key.(string); ok {
+			entry.Key = keyStr
+			// Automatically append -${{ github.run_id }} if the key doesn't already end with it
+			runIdSuffix := "-${{ github.run_id }}"
+			if !strings.HasSuffix(entry.Key, runIdSuffix) {
+				entry.Key = entry.Key + runIdSuffix
+			}
+		}
+	}
+
+	// Parse description
+	if description, exists := cacheMap["description"]; exists {
+		if descStr, ok := description.(string); ok {
+			entry.Description = descStr
+		}
+	}
+
+	// Parse retention days
+	if retentionDays, exists := cacheMap["retention-days"]; exists {
+		if retentionDaysInt, ok := retentionDays.(int); ok {
+			entry.RetentionDays = &retentionDaysInt
+		} else if retentionDaysFloat, ok := retentionDays.(float64); ok {
+			retentionDaysIntValue := int(retentionDaysFloat)
+			entry.RetentionDays = &retentionDaysIntValue
+		} else if retentionDaysUint64, ok := retentionDays.(uint64); ok {
+			retentionDaysIntValue := int(retentionDaysUint64)
+			entry.RetentionDays = &retentionDaysIntValue
+		}
+		// Validate retention-days bounds
+		if entry.RetentionDays != nil {
+			if err := validateIntRange(*entry.RetentionDays, 1, 90, "retention-days"); err != nil {
+				return entry, err
+			}
+		}
+	}
+
+	// Parse restore-only flag
+	if restoreOnly, exists := cacheMap["restore-only"]; exists {
+		if restoreOnlyBool, ok := restoreOnly.(bool); ok {
+			entry.RestoreOnly = restoreOnlyBool
+		}
+	}
+
+	// Parse scope field
+	if scope, exists := cacheMap["scope"]; exists {
+		if scopeStr, ok := scope.(string); ok {
+			entry.Scope = scopeStr
+		}
+	}
+	// Default to "workflow" scope if not specified
+	if entry.Scope == "" {
+		entry.Scope = "workflow"
+	}
+
+	// Parse allowed-extensions field
+	if allowedExts, exists := cacheMap["allowed-extensions"]; exists {
+		if extArray, ok := allowedExts.([]any); ok {
+			entry.AllowedExtensions = make([]string, 0, len(extArray))
+			for _, ext := range extArray {
+				if extStr, ok := ext.(string); ok {
+					entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
+				}
+			}
+		}
+	}
+	// Default to standard allowed extensions if not specified
+	if len(entry.AllowedExtensions) == 0 {
+		entry.AllowedExtensions = constants.DefaultAllowedMemoryExtensions
+	}
+
+	return entry, nil
+}
+
 // extractCacheMemoryConfig extracts cache-memory configuration from tools section
 // Updated to use ToolsConfig instead of map[string]any
 func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMemoryConfig, error) {
@@ -61,7 +150,7 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 			{
 				ID:                "default",
 				Key:               generateDefaultCacheKey("default"),
-				AllowedExtensions: getDefaultAllowedExtensions(),
+				AllowedExtensions: constants.DefaultAllowedMemoryExtensions,
 			},
 		}
 		return config, nil
@@ -75,7 +164,7 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 				{
 					ID:                "default",
 					Key:               generateDefaultCacheKey("default"),
-					AllowedExtensions: getDefaultAllowedExtensions(),
+					AllowedExtensions: constants.DefaultAllowedMemoryExtensions,
 				},
 			}
 		}
@@ -89,95 +178,10 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 		config.Caches = make([]CacheMemoryEntry, 0, len(cacheArray))
 		for _, item := range cacheArray {
 			if cacheMap, ok := item.(map[string]any); ok {
-				entry := CacheMemoryEntry{}
-
-				// ID is required for array notation
-				if id, exists := cacheMap["id"]; exists {
-					if idStr, ok := id.(string); ok {
-						entry.ID = idStr
-					}
+				entry, err := parseCacheMemoryEntry(cacheMap, "default")
+				if err != nil {
+					return nil, err
 				}
-				// Use "default" if no ID specified
-				if entry.ID == "" {
-					entry.ID = "default"
-				}
-
-				// Parse custom key
-				if key, exists := cacheMap["key"]; exists {
-					if keyStr, ok := key.(string); ok {
-						entry.Key = keyStr
-						// Automatically append -${{ github.run_id }} if the key doesn't already end with it
-						runIdSuffix := "-${{ github.run_id }}"
-						if !strings.HasSuffix(entry.Key, runIdSuffix) {
-							entry.Key = entry.Key + runIdSuffix
-						}
-					}
-				}
-				// Set default key if not specified
-				if entry.Key == "" {
-					entry.Key = generateDefaultCacheKey(entry.ID)
-				}
-
-				// Parse description
-				if description, exists := cacheMap["description"]; exists {
-					if descStr, ok := description.(string); ok {
-						entry.Description = descStr
-					}
-				}
-
-				// Parse retention days
-				if retentionDays, exists := cacheMap["retention-days"]; exists {
-					if retentionDaysInt, ok := retentionDays.(int); ok {
-						entry.RetentionDays = &retentionDaysInt
-					} else if retentionDaysFloat, ok := retentionDays.(float64); ok {
-						retentionDaysIntValue := int(retentionDaysFloat)
-						entry.RetentionDays = &retentionDaysIntValue
-					} else if retentionDaysUint64, ok := retentionDays.(uint64); ok {
-						retentionDaysIntValue := int(retentionDaysUint64)
-						entry.RetentionDays = &retentionDaysIntValue
-					}
-					// Validate retention-days bounds
-					if entry.RetentionDays != nil {
-						if err := validateIntRange(*entry.RetentionDays, 1, 90, "retention-days"); err != nil {
-							return nil, err
-						}
-					}
-				}
-
-				// Parse restore-only flag
-				if restoreOnly, exists := cacheMap["restore-only"]; exists {
-					if restoreOnlyBool, ok := restoreOnly.(bool); ok {
-						entry.RestoreOnly = restoreOnlyBool
-					}
-				}
-
-				// Parse scope field
-				if scope, exists := cacheMap["scope"]; exists {
-					if scopeStr, ok := scope.(string); ok {
-						entry.Scope = scopeStr
-					}
-				}
-				// Default to "workflow" scope if not specified
-				if entry.Scope == "" {
-					entry.Scope = "workflow"
-				}
-
-				// Parse allowed-extensions field
-				if allowedExts, exists := cacheMap["allowed-extensions"]; exists {
-					if extArray, ok := allowedExts.([]any); ok {
-						entry.AllowedExtensions = make([]string, 0, len(extArray))
-						for _, ext := range extArray {
-							if extStr, ok := ext.(string); ok {
-								entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
-							}
-						}
-					}
-				}
-				// Default to standard allowed extensions if not specified
-				if len(entry.AllowedExtensions) == 0 {
-					entry.AllowedExtensions = getDefaultAllowedExtensions()
-				}
-
 				config.Caches = append(config.Caches, entry)
 			}
 		}
@@ -193,83 +197,10 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 	// Handle object configuration (single cache, backward compatible)
 	// Convert to array with single entry
 	if configMap, ok := cacheMemoryValue.(map[string]any); ok {
-		entry := CacheMemoryEntry{
-			ID:  "default",
-			Key: generateDefaultCacheKey("default"),
+		entry, err := parseCacheMemoryEntry(configMap, "default")
+		if err != nil {
+			return nil, err
 		}
-
-		// Parse custom key
-		if key, exists := configMap["key"]; exists {
-			if keyStr, ok := key.(string); ok {
-				entry.Key = keyStr
-				// Automatically append -${{ github.run_id }} if the key doesn't already end with it
-				runIdSuffix := "-${{ github.run_id }}"
-				if !strings.HasSuffix(entry.Key, runIdSuffix) {
-					entry.Key = entry.Key + runIdSuffix
-				}
-			}
-		}
-
-		// Parse description
-		if description, exists := configMap["description"]; exists {
-			if descStr, ok := description.(string); ok {
-				entry.Description = descStr
-			}
-		}
-
-		// Parse retention days
-		if retentionDays, exists := configMap["retention-days"]; exists {
-			if retentionDaysInt, ok := retentionDays.(int); ok {
-				entry.RetentionDays = &retentionDaysInt
-			} else if retentionDaysFloat, ok := retentionDays.(float64); ok {
-				retentionDaysIntValue := int(retentionDaysFloat)
-				entry.RetentionDays = &retentionDaysIntValue
-			} else if retentionDaysUint64, ok := retentionDays.(uint64); ok {
-				retentionDaysIntValue := int(retentionDaysUint64)
-				entry.RetentionDays = &retentionDaysIntValue
-			}
-			// Validate retention-days bounds
-			if entry.RetentionDays != nil {
-				if err := validateIntRange(*entry.RetentionDays, 1, 90, "retention-days"); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		// Parse restore-only flag
-		if restoreOnly, exists := configMap["restore-only"]; exists {
-			if restoreOnlyBool, ok := restoreOnly.(bool); ok {
-				entry.RestoreOnly = restoreOnlyBool
-			}
-		}
-
-		// Parse scope field
-		if scope, exists := configMap["scope"]; exists {
-			if scopeStr, ok := scope.(string); ok {
-				entry.Scope = scopeStr
-			}
-		}
-		// Default to "workflow" scope if not specified
-		if entry.Scope == "" {
-			entry.Scope = "workflow"
-		}
-
-		// Parse allowed-extensions field
-		if allowedExts, exists := configMap["allowed-extensions"]; exists {
-			if extArray, ok := allowedExts.([]any); ok {
-				entry.AllowedExtensions = make([]string, 0, len(extArray))
-				for _, ext := range extArray {
-					if extStr, ok := ext.(string); ok {
-						entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
-					}
-				}
-			}
-		}
-		// Default to standard allowed extensions if not specified
-		if len(entry.AllowedExtensions) == 0 {
-			entry.AllowedExtensions = getDefaultAllowedExtensions()
-		}
-
 		config.Caches = []CacheMemoryEntry{entry}
 		return config, nil
 	}
@@ -277,6 +208,7 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 	return nil, nil
 }
 
+// extractCacheMemoryConfigFromMap is a backward compatibility wrapper for extractCacheMemoryConfig
 // extractCacheMemoryConfigFromMap is a backward compatibility wrapper for extractCacheMemoryConfig
 // that accepts map[string]any instead of *ToolsConfig. This allows gradual migration of calling code.
 func (c *Compiler) extractCacheMemoryConfigFromMap(tools map[string]any) (*CacheMemoryConfig, error) {
