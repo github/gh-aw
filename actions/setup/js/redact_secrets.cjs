@@ -85,11 +85,9 @@ function redactBuiltInPatterns(content) {
   for (const { name, pattern } of BUILT_IN_PATTERNS) {
     const matches = redacted.match(pattern);
     if (matches && matches.length > 0) {
-      // Redact each match
+      // Redact each match with fixed-length string
+      const replacement = "***REDACTED***";
       for (const match of matches) {
-        const prefix = match.substring(0, 3);
-        const asterisks = "*".repeat(Math.max(0, match.length - 3));
-        const replacement = prefix + asterisks;
         redacted = redacted.split(match).join(replacement);
       }
       redactionCount += matches.length;
@@ -120,10 +118,8 @@ function redactSecrets(content, secretValues) {
     // Count occurrences before replacement
     // Use split and join for exact string matching (not regex)
     // This is safer than regex as it doesn't interpret special characters
-    // Show first 3 letters followed by asterisks for the remaining length
-    const prefix = secretValue.substring(0, 3);
-    const asterisks = "*".repeat(Math.max(0, secretValue.length - 3));
-    const replacement = prefix + asterisks;
+    // Use fixed-length redaction string without prefix preservation
+    const replacement = "***REDACTED***";
     const parts = redacted.split(secretValue);
     const occurrences = parts.length - 1;
     if (occurrences > 0) {

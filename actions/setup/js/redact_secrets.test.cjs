@@ -56,7 +56,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redactedContent = fs.readFileSync(testFile, "utf8");
-          (expect(redactedContent).toBe("Secret: ghp************************************* and another ghp*************************************"),
+          (expect(redactedContent).toBe("Secret: ***REDACTED*** and another ***REDACTED***"),
             expect(mockCore.info).toHaveBeenCalledWith("Starting secret redaction in /tmp/gh-aw and /opt/gh-aw directories"),
             expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Secret redaction complete")));
         }),
@@ -70,9 +70,9 @@ describe("redact_secrets.cjs", () => {
             (process.env.SECRET_API_KEY3 = "api-key-789"));
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           (await eval(`(async () => { ${modifiedScript}; await main(); })()`),
-            expect(fs.readFileSync(path.join(tempDir, "test1.txt"), "utf8")).toBe("Secret: api********"),
-            expect(fs.readFileSync(path.join(tempDir, "test2.json"), "utf8")).toBe('{"key": "api********"}'),
-            expect(fs.readFileSync(path.join(tempDir, "test3.log"), "utf8")).toBe("Log: api********"));
+            expect(fs.readFileSync(path.join(tempDir, "test1.txt"), "utf8")).toBe("Secret: ***REDACTED***"),
+            expect(fs.readFileSync(path.join(tempDir, "test2.json"), "utf8")).toBe('{"key": "***REDACTED***"}'),
+            expect(fs.readFileSync(path.join(tempDir, "test3.log"), "utf8")).toBe("Log: ***REDACTED***"));
         }),
         it("should use core.info for logging hits", async () => {
           const testFile = path.join(tempDir, "test.txt"),
@@ -109,7 +109,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Token1: ghp*************************************\nToken2: sk-*********************\nToken1 again: ghp*************************************");
+          expect(redacted).toBe("Token1: ***REDACTED***\nToken2: ***REDACTED***\nToken1 again: ***REDACTED***");
         }),
         it("should handle empty secret values gracefully", async () => {
           const testFile = path.join(tempDir, "test.txt");
@@ -131,10 +131,10 @@ describe("redact_secrets.cjs", () => {
             (process.env.SECRET_API_JSONL = "api-key-jsonl123"));
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           (await eval(`(async () => { ${modifiedScript}; await main(); })()`),
-            expect(fs.readFileSync(path.join(tempDir, "test.md"), "utf8")).toBe("# Markdown\nSecret: api**********"),
-            expect(fs.readFileSync(path.join(tempDir, "test.mdx"), "utf8")).toBe("# MDX\nSecret: api***********"),
-            expect(fs.readFileSync(path.join(tempDir, "test.yml"), "utf8")).toBe("# YAML\nkey: api***********"),
-            expect(fs.readFileSync(path.join(tempDir, "test.jsonl"), "utf8")).toBe('{"key": "api*************"}'));
+            expect(fs.readFileSync(path.join(tempDir, "test.md"), "utf8")).toBe("# Markdown\nSecret: ***REDACTED***"),
+            expect(fs.readFileSync(path.join(tempDir, "test.mdx"), "utf8")).toBe("# MDX\nSecret: ***REDACTED***"),
+            expect(fs.readFileSync(path.join(tempDir, "test.yml"), "utf8")).toBe("# YAML\nkey: ***REDACTED***"),
+            expect(fs.readFileSync(path.join(tempDir, "test.jsonl"), "utf8")).toBe('{"key": "***REDACTED***"}'));
         }));
     }),
     describe("built-in pattern detection", () => {
@@ -147,7 +147,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Using token: ghp************************************* in this file");
+          expect(redacted).toBe("Using token: ***REDACTED*** in this file");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub Personal Access Token"));
         });
 
@@ -159,7 +159,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Server token: ghs*************************************");
+          expect(redacted).toBe("Server token: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub Server-to-Server Token"));
         });
 
@@ -171,7 +171,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("OAuth: gho*************************************");
+          expect(redacted).toBe("OAuth: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub OAuth Access Token"));
         });
 
@@ -183,7 +183,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("User token: ghu*************************************");
+          expect(redacted).toBe("User token: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub User Access Token"));
         });
 
@@ -195,7 +195,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Fine-grained PAT: git******************************************************************************************");
+          expect(redacted).toBe("Fine-grained PAT: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub Fine-grained PAT"));
         });
 
@@ -207,7 +207,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Refresh: ghr*************************************");
+          expect(redacted).toBe("Refresh: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub Refresh Token"));
         });
 
@@ -221,7 +221,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("PAT: ghp*************************************\nServer: ghs*************************************\nOAuth: gho*************************************");
+          expect(redacted).toBe("PAT: ***REDACTED***\nServer: ***REDACTED***\nOAuth: ***REDACTED***");
         });
       });
 
@@ -234,7 +234,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Azure Key: ABC***************************************************************************************");
+          expect(redacted).toBe("Azure Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Azure Storage Account Key"));
         });
 
@@ -260,7 +260,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Google API Key: AIz************************************");
+          expect(redacted).toBe("Google API Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Google API Key"));
         });
 
@@ -272,7 +272,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("OAuth Token: ya2********************************************");
+          expect(redacted).toBe("OAuth Token: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Google OAuth Access Token"));
         });
       });
@@ -286,7 +286,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("AWS Key: AKI*****************");
+          expect(redacted).toBe("AWS Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("AWS Access Key ID"));
         });
       });
@@ -300,7 +300,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("OpenAI Key: sk-************************************************");
+          expect(redacted).toBe("OpenAI Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("OpenAI API Key"));
         });
 
@@ -312,7 +312,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("OpenAI Project Key: sk-************************************************************");
+          expect(redacted).toBe("OpenAI Project Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("OpenAI Project API Key"));
         });
       });
@@ -326,7 +326,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("Anthropic Key: sk-*********************************************************************************************************");
+          expect(redacted).toBe("Anthropic Key: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Anthropic API Key"));
         });
       });
@@ -342,7 +342,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("GitHub: ghp*************************************\nCustom: my-**************************");
+          expect(redacted).toBe("GitHub: ***REDACTED***\nCustom: ***REDACTED***");
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("GitHub Personal Access Token"));
           expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("occurrence(s) of a secret"));
         });
@@ -357,7 +357,7 @@ describe("redact_secrets.cjs", () => {
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
           // Built-in pattern should redact it first
-          expect(redacted).toBe("Token: ghp************************************* repeated: ghp*************************************");
+          expect(redacted).toBe("Token: ***REDACTED*** repeated: ***REDACTED***");
         });
       });
 
@@ -380,7 +380,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("First: ghp*************************************\nSecond: ghp*************************************\nThird: ghp*************************************");
+          expect(redacted).toBe("First: ***REDACTED***\nSecond: ***REDACTED***\nThird: ***REDACTED***");
         });
 
         it("should handle secrets in JSON content", async () => {
@@ -392,8 +392,8 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toContain("ghp*************************************");
-          expect(redacted).toContain("AIz************************************");
+          expect(redacted).toContain("***REDACTED***");
+          expect(redacted).toContain("***REDACTED***");
         });
 
         it("should handle secrets in log files with timestamps", async () => {
@@ -404,7 +404,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("[2024-01-01 12:00:00] INFO: Using token ghp************************************* for authentication");
+          expect(redacted).toBe("[2024-01-01 12:00:00] INFO: Using token ***REDACTED*** for authentication");
         });
 
         it("should not redact partial matches", async () => {
@@ -427,7 +427,7 @@ describe("redact_secrets.cjs", () => {
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toBe("https://api.github.com?token=ghp*************************************");
+          expect(redacted).toBe("https://api.github.com?token=***REDACTED***");
         });
 
         it("should handle multiline content with various token types", async () => {
@@ -446,11 +446,11 @@ Custom secret: my-secret-123456789012`;
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
           await eval(`(async () => { ${modifiedScript}; await main(); })()`);
           const redacted = fs.readFileSync(testFile, "utf8");
-          expect(redacted).toContain("ghp*************************************");
-          expect(redacted).toContain("ABC***************************************************************************************");
-          expect(redacted).toContain("AIz************************************");
-          expect(redacted).toContain("AKI*****************");
-          expect(redacted).toContain("my-*******************");
+          expect(redacted).toContain("***REDACTED***");
+          expect(redacted).toContain("***REDACTED***");
+          expect(redacted).toContain("***REDACTED***");
+          expect(redacted).toContain("***REDACTED***");
+          expect(redacted).toContain("***REDACTED***");
         });
       });
     }));
