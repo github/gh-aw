@@ -43,6 +43,7 @@ const HANDLER_MAP = {
   add_reviewer: "./add_reviewer.cjs",
   assign_milestone: "./assign_milestone.cjs",
   assign_to_user: "./assign_to_user.cjs",
+  unassign_from_user: "./unassign_from_user.cjs",
   create_code_scanning_alert: "./create_code_scanning_alert.cjs",
   autofix_code_scanning_alert: "./autofix_code_scanning_alert.cjs",
   dispatch_workflow: "./dispatch_workflow.cjs",

@@ -406,6 +406,35 @@
     }
   },
   {
+    "name": "unassign_from_user",
+    "description": "Remove one or more assignees from an issue. Use this to unassign users when work is being reassigned or removed from their queue.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "issue_number": {
+          "type": ["number", "string"],
+          "description": "Issue number to unassign users from. This is the numeric ID from the GitHub URL (e.g., 543 in github.com/owner/repo/issues/543). If omitted, uses the issue that triggered this workflow."
+        },
+        "assignees": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "GitHub usernames to unassign from the issue (e.g., ['octocat', 'mona'])."
+        },
+        "assignee": {
+          "type": "string",
+          "description": "Single GitHub username to unassign. Use 'assignees' array for multiple users."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Target repository in 'owner/repo' format. If omitted, uses the current repository. Must be in allowed-repos list if specified."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "update_issue",
     "description": "Update an existing GitHub issue's status, title, or body. Use this to modify issue properties after creation. Only the fields you specify will be updated; other fields remain unchanged.",
     "inputSchema": {
