@@ -257,9 +257,61 @@ function loadCustomSafeOutputJobTypes() {
   }
 }
 
+/**
+ * Determine issue number from message or context
+ * @param {Object} message - Message object that may contain issue_number
+ * @returns {{success: true, issueNumber: number} | {success: false, error: string}}
+ */
+function resolveIssueNumber(message) {
+  // Determine issue number
+  let issueNumber;
+  if (message.issue_number !== undefined) {
+    issueNumber = parseInt(String(message.issue_number), 10);
+    if (isNaN(issueNumber)) {
+      return {
+        success: false,
+        error: `Invalid issue_number: ${message.issue_number}`,
+      };
+    }
+  } else {
+    // Use context issue if available
+    const contextIssue = context.payload?.issue?.number;
+    if (!contextIssue) {
+      return {
+        success: false,
+        error: "No issue number available",
+      };
+    }
+    issueNumber = contextIssue;
+  }
+
+  return {
+    success: true,
+    issueNumber: issueNumber,
+  };
+}
+
+/**
+ * Extract assignees from message supporting both singular and plural forms
+ * @param {Object} message - Message object that may contain assignee or assignees
+ * @returns {string[]} Array of assignee usernames
+ */
+function extractAssignees(message) {
+  // Support both singular "assignee" and plural "assignees" for flexibility
+  let requestedAssignees = [];
+  if (message.assignees && Array.isArray(message.assignees)) {
+    requestedAssignees = message.assignees;
+  } else if (message.assignee) {
+    requestedAssignees = [message.assignee];
+  }
+  return requestedAssignees;
+}
+
 module.exports = {
   parseAllowedItems,
   parseMaxCount,
   resolveTarget,
   loadCustomSafeOutputJobTypes,
+  resolveIssueNumber,
+  extractAssignees,
 };

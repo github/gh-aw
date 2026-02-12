@@ -11,6 +11,8 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 
 async function main() {
   let text = "";
+  let title = "";
+  let body = "";
 
   const actor = context.actor;
   const { owner, repo } = context.repo;
@@ -27,6 +29,8 @@ async function main() {
 
   if (permission !== "admin" && permission !== "maintain") {
     core.setOutput("text", "");
+    core.setOutput("title", "");
+    core.setOutput("body", "");
     return;
   }
 
@@ -35,8 +39,8 @@ async function main() {
     case "issues":
       // For issues: title + body
       if (context.payload.issue) {
-        const title = context.payload.issue.title || "";
-        const body = context.payload.issue.body || "";
+        title = context.payload.issue.title || "";
+        body = context.payload.issue.body || "";
         text = `${title}\n\n${body}`;
       }
       break;
@@ -44,8 +48,8 @@ async function main() {
     case "pull_request":
       // For pull requests: title + body
       if (context.payload.pull_request) {
-        const title = context.payload.pull_request.title || "";
-        const body = context.payload.pull_request.body || "";
+        title = context.payload.pull_request.title || "";
+        body = context.payload.pull_request.body || "";
         text = `${title}\n\n${body}`;
       }
       break;
@@ -53,55 +57,59 @@ async function main() {
     case "pull_request_target":
       // For pull request target events: title + body
       if (context.payload.pull_request) {
-        const title = context.payload.pull_request.title || "";
-        const body = context.payload.pull_request.body || "";
+        title = context.payload.pull_request.title || "";
+        body = context.payload.pull_request.body || "";
         text = `${title}\n\n${body}`;
       }
       break;
 
     case "issue_comment":
-      // For issue comments: comment body
+      // For issue comments: comment body (no title)
       if (context.payload.comment) {
-        text = context.payload.comment.body || "";
+        body = context.payload.comment.body || "";
+        text = body;
       }
       break;
 
     case "pull_request_review_comment":
-      // For PR review comments: comment body
+      // For PR review comments: comment body (no title)
       if (context.payload.comment) {
-        text = context.payload.comment.body || "";
+        body = context.payload.comment.body || "";
+        text = body;
       }
       break;
 
     case "pull_request_review":
-      // For PR reviews: review body
+      // For PR reviews: review body (no title)
       if (context.payload.review) {
-        text = context.payload.review.body || "";
+        body = context.payload.review.body || "";
+        text = body;
       }
       break;
 
     case "discussion":
       // For discussions: title + body
       if (context.payload.discussion) {
-        const title = context.payload.discussion.title || "";
-        const body = context.payload.discussion.body || "";
+        title = context.payload.discussion.title || "";
+        body = context.payload.discussion.body || "";
         text = `${title}\n\n${body}`;
       }
       break;
 
     case "discussion_comment":
-      // For discussion comments: comment body
+      // For discussion comments: comment body (no title)
       if (context.payload.comment) {
-        text = context.payload.comment.body || "";
+        body = context.payload.comment.body || "";
+        text = body;
       }
       break;
 
     case "release":
       // For releases: name + body
       if (context.payload.release) {
-        const name = context.payload.release.name || context.payload.release.tag_name || "";
-        const body = context.payload.release.body || "";
-        text = `${name}\n\n${body}`;
+        title = context.payload.release.name || context.payload.release.tag_name || "";
+        body = context.payload.release.body || "";
+        text = `${title}\n\n${body}`;
       }
       break;
 
@@ -122,9 +130,9 @@ async function main() {
                 repo: urlRepo,
                 tag: tag,
               });
-              const name = release.name || release.tag_name || "";
-              const body = release.body || "";
-              text = `${name}\n\n${body}`;
+              title = release.name || release.tag_name || "";
+              body = release.body || "";
+              text = `${title}\n\n${body}`;
             } catch (error) {
               core.warning(`Failed to fetch release from URL: ${getErrorMessage(error)}`);
             }
@@ -137,9 +145,9 @@ async function main() {
               repo: repo,
               release_id: parseInt(releaseId, 10),
             });
-            const name = release.name || release.tag_name || "";
-            const body = release.body || "";
-            text = `${name}\n\n${body}`;
+            title = release.name || release.tag_name || "";
+            body = release.body || "";
+            text = `${title}\n\n${body}`;
           } catch (error) {
             core.warning(`Failed to fetch release by ID: ${getErrorMessage(error)}`);
           }
@@ -153,16 +161,22 @@ async function main() {
       break;
   }
 
-  // Sanitize the text before output
+  // Sanitize the text, title, and body before output
   // All mentions are escaped (wrapped in backticks) to prevent unintended notifications
   // Mention filtering will be applied by the agent output collector
   const sanitizedText = sanitizeIncomingText(text);
+  const sanitizedTitle = sanitizeIncomingText(title);
+  const sanitizedBody = sanitizeIncomingText(body);
 
-  // Display sanitized text in logs
+  // Display sanitized outputs in logs
   core.info(`text: ${sanitizedText}`);
+  core.info(`title: ${sanitizedTitle}`);
+  core.info(`body: ${sanitizedBody}`);
 
-  // Set the sanitized text as output
+  // Set the sanitized outputs
   core.setOutput("text", sanitizedText);
+  core.setOutput("title", sanitizedTitle);
+  core.setOutput("body", sanitizedBody);
 
   // Write redacted URL domains to log file if any were collected
   const logPath = writeRedactedDomainsLog();

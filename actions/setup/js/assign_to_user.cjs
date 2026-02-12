@@ -7,6 +7,8 @@
 
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveIssueNumber, extractAssignees } = require("./safe_output_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "assign_to_user";
@@ -20,10 +22,15 @@ async function main(config = {}) {
   // Extract configuration
   const allowedAssignees = config.allowed || [];
   const maxCount = config.max || 10;
+  const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
   core.info(`Assign to user configuration: max=${maxCount}`);
   if (allowedAssignees.length > 0) {
     core.info(`Allowed assignees: ${allowedAssignees.join(", ")}`);
+  }
+  core.info(`Default target repo: ${defaultTargetRepo}`);
+  if (allowedRepos.size > 0) {
+    core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
   }
 
   // Track how many items we've processed for max limit
@@ -47,39 +54,33 @@ async function main(config = {}) {
 
     processedCount++;
 
+    // Resolve and validate target repository
+    const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "assignee");
+    if (!repoResult.success) {
+      core.warning(`Skipping assign_to_user: ${repoResult.error}`);
+      return {
+        success: false,
+        error: repoResult.error,
+      };
+    }
+    const { repo: itemRepo, repoParts } = repoResult;
+    core.info(`Target repository: ${itemRepo}`);
+
     const assignItem = message;
 
-    // Determine issue number
-    let issueNumber;
-    if (assignItem.issue_number !== undefined) {
-      issueNumber = parseInt(String(assignItem.issue_number), 10);
-      if (isNaN(issueNumber)) {
-        core.warning(`Invalid issue_number: ${assignItem.issue_number}`);
-        return {
-          success: false,
-          error: `Invalid issue_number: ${assignItem.issue_number}`,
-        };
-      }
-    } else {
-      // Use context issue if available
-      const contextIssue = context.payload?.issue?.number;
-      if (!contextIssue) {
-        core.warning("No issue_number provided and not in issue context");
-        return {
-          success: false,
-          error: "No issue number available",
-        };
-      }
-      issueNumber = contextIssue;
+    // Determine issue number using shared helper
+    const issueResult = resolveIssueNumber(assignItem);
+    if (!issueResult.success) {
+      core.warning(`Skipping assign_to_user: ${issueResult.error}`);
+      return {
+        success: false,
+        error: issueResult.error,
+      };
     }
+    const issueNumber = issueResult.issueNumber;
 
-    // Support both singular "assignee" and plural "assignees" for flexibility
-    let requestedAssignees = [];
-    if (assignItem.assignees && Array.isArray(assignItem.assignees)) {
-      requestedAssignees = assignItem.assignees;
-    } else if (assignItem.assignee) {
-      requestedAssignees = [assignItem.assignee];
-    }
+    // Extract assignees using shared helper
+    const requestedAssignees = extractAssignees(assignItem);
 
     core.info(`Requested assignees: ${JSON.stringify(requestedAssignees)}`);
 
@@ -96,18 +97,18 @@ async function main(config = {}) {
       };
     }
 
-    core.info(`Assigning ${uniqueAssignees.length} users to issue #${issueNumber}: ${JSON.stringify(uniqueAssignees)}`);
+    core.info(`Assigning ${uniqueAssignees.length} users to issue #${issueNumber} in ${itemRepo}: ${JSON.stringify(uniqueAssignees)}`);
 
     try {
       // Add assignees to the issue
       await github.rest.issues.addAssignees({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner: repoParts.owner,
+        repo: repoParts.repo,
         issue_number: issueNumber,
         assignees: uniqueAssignees,
       });
 
-      core.info(`Successfully assigned ${uniqueAssignees.length} user(s) to issue #${issueNumber}`);
+      core.info(`Successfully assigned ${uniqueAssignees.length} user(s) to issue #${issueNumber} in ${itemRepo}`);
 
       return {
         success: true,

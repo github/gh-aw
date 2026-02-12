@@ -50,12 +50,14 @@ safe-outputs:
       allowed-repos: ["github/gh-aw"]
       hide-older-comments: true
       max: 2
+      allowed-repos: ["github/gh-aw"]
     create-issue:
       expires: 2h
       group: true
       close-older-issues: true
     add-labels:
       allowed: [smoke-copilot]
+      allowed-repos: ["github/gh-aw"]
     remove-labels:
       allowed: [smoke]
     dispatch-workflow:

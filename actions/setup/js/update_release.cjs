@@ -83,6 +83,7 @@ async function main(config = {}) {
 
       // Get workflow run URL for AI attribution
       const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+      const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
 
       // Use shared helper to update body based on operation
       const newBody = updateBody({
@@ -91,7 +92,7 @@ async function main(config = {}) {
         operation: message.operation || "append",
         workflowName,
         runUrl,
-        runId: context.runId,
+        workflowId,
         includeFooter, // Pass footer flag to helper
       });
 
