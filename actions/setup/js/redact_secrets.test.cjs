@@ -106,7 +106,7 @@ describe("redact_secrets.cjs", () => {
           const secretValue = "abc123";
           (fs.writeFileSync(testFile, `Secret: ${secretValue} test`), (process.env.GH_AW_SECRET_NAMES = "SIX_CHAR_SECRET"), (process.env.SECRET_SIX_CHAR_SECRET = secretValue));
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
-          (await eval(`(async () => { ${modifiedScript}; await main(); })()`), expect(fs.readFileSync(testFile, "utf8")).toBe("Secret: abc*** test"));
+          (await eval(`(async () => { ${modifiedScript}; await main(); })()`), expect(fs.readFileSync(testFile, "utf8")).toBe("Secret: ***REDACTED*** test"));
         }),
         it("should handle multiple secrets in same file", async () => {
           const testFile = path.join(tempDir, "test.txt"),
@@ -500,12 +500,10 @@ Custom secret: my-secret-123456789012`;
 
             // The pattern should match up to 800 chars and redact it
             const content = fs.readFileSync(testFile, "utf8");
-            expect(content).toContain("ya2");
+            expect(content).toContain("***REDACTED***");
             expect(content).not.toBe(`Token: ${pathological}`);
-            // Should contain asterisks from redaction
-            expect(content).toContain("*");
             // Should still have unredacted 'A' chars at the end beyond 800 char limit
-            expect(content).toMatch(/\*+A+$/);
+            expect(content).toMatch(/\*\*\*REDACTED\*\*\*A+$/);
           });
 
           it("should still match valid Azure SAS tokens within bounds", async () => {
@@ -518,8 +516,7 @@ Custom secret: my-secret-123456789012`;
             await eval(`(async () => { ${modifiedScript}; await main(); })()`);
             const redacted = fs.readFileSync(testFile, "utf8");
             // Should be redacted since it's a valid pattern within bounds
-            expect(redacted).toContain("?sv");
-            expect(redacted).not.toBe(`SAS: ${validSAS}`);
+            expect(redacted).toBe("SAS: ***REDACTED***");
           });
 
           it("should still match valid Google OAuth tokens within bounds", async () => {
@@ -532,8 +529,7 @@ Custom secret: my-secret-123456789012`;
             await eval(`(async () => { ${modifiedScript}; await main(); })()`);
             const redacted = fs.readFileSync(testFile, "utf8");
             // Should be redacted since it's a valid pattern within bounds
-            expect(redacted).toContain("ya2");
-            expect(redacted).not.toBe(`Token: ${validToken}`);
+            expect(redacted).toBe("Token: ***REDACTED***");
             expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Google OAuth Access Token"));
           });
         });
