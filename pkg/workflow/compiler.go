@@ -198,6 +198,32 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}
 
+	// Validate workflow-level concurrency group expression
+	log.Printf("Validating workflow-level concurrency configuration")
+	if workflowData.Concurrency != "" {
+		// Extract the group expression from the concurrency YAML
+		// The Concurrency field contains the full YAML (e.g., "concurrency:\n  group: \"...\"")
+		// We need to extract just the group value
+		groupExpr := extractConcurrencyGroupFromYAML(workflowData.Concurrency)
+		if groupExpr != "" {
+			if err := validateConcurrencyGroupExpression(groupExpr); err != nil {
+				return formatCompilerError(markdownPath, "error", fmt.Sprintf("workflow-level concurrency validation failed: %s", err.Error()), err)
+			}
+		}
+	}
+
+	// Validate engine-level concurrency group expression
+	log.Printf("Validating engine-level concurrency configuration")
+	if workflowData.EngineConfig != nil && workflowData.EngineConfig.Concurrency != "" {
+		// Extract the group expression from the engine concurrency YAML
+		groupExpr := extractConcurrencyGroupFromYAML(workflowData.EngineConfig.Concurrency)
+		if groupExpr != "" {
+			if err := validateConcurrencyGroupExpression(groupExpr); err != nil {
+				return formatCompilerError(markdownPath, "error", fmt.Sprintf("engine.concurrency validation failed: %s", err.Error()), err)
+			}
+		}
+	}
+
 	// Emit experimental warning for sandbox-runtime feature
 	if isSRTEnabled(workflowData) {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Using experimental feature: sandbox-runtime firewall"))
