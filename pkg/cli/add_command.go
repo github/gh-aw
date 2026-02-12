@@ -318,14 +318,7 @@ func addWorkflowsNormal(workflows []*WorkflowSpec, opts AddOptions) error {
 			fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Adding workflow %d/%d: %s", i+1, len(workflows), workflow.WorkflowName)))
 		}
 
-		// For multiple workflows, only use the name flag for the first one
-		currentOpts := opts
-		if i == 0 && opts.Name != "" {
-			currentOpts.Name = opts.Name
-		}
-		currentOpts.Name = ""
-
-		if err := addWorkflowWithTracking(workflow, tracker, currentOpts); err != nil {
+		if err := addWorkflowWithTracking(workflow, tracker, opts); err != nil {
 			return fmt.Errorf("failed to add workflow '%s': %w", workflow.String(), err)
 		}
 	}
