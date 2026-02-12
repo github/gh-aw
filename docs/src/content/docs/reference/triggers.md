@@ -45,6 +45,11 @@ on:
           - medium
           - high
         default: medium
+      deploy_env:
+        description: 'Target environment'
+        required: false
+        type: environment
+        default: staging
 ```
 
 #### Accessing Inputs in Markdown
@@ -77,7 +82,9 @@ Provide a comprehensive summary with key findings and recommendations.
 - `string` - Free-form text input
 - `boolean` - True/false checkbox
 - `choice` - Dropdown selection with predefined options
-- `environment` - Repository environment selector
+- `environment` - Dropdown selection of GitHub environments configured in the repository
+
+The `environment` input type automatically populates a dropdown with environments configured in repository Settings → Environments. It returns the environment name as a string and supports a `default` value. Unlike the `manual-approval:` field, using an `environment` input does not enforce environment protection rules—it only provides the environment name as a string value for use in your workflow logic.
 
 ### Scheduled Triggers (`schedule:`)
 

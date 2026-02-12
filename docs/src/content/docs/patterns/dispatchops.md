@@ -43,13 +43,50 @@ on:
           - medium
           - high
         default: medium
+      deploy_target:
+        description: 'Deployment environment'
+        required: false
+        type: environment
+        default: staging
 ```
 
 **Supported input types:**
 - **`string`** - Free-form text input
 - **`boolean`** - True/false checkbox
 - **`choice`** - Dropdown selection with predefined options
-- **`environment`** - Repository environment selector
+- **`environment`** - Dropdown selection of GitHub environments configured in the repository
+
+### Environment Input Type
+
+The `environment` input type provides a dropdown selector populated with environments configured in your repository. This is useful for workflows that need to target specific deployment environments or use environment-specific secrets and protection rules.
+
+**Key characteristics:**
+- Automatically populated from environments configured in repository Settings → Environments
+- Returns the environment name as a string value
+- Can specify a `default` value (must match an existing environment name)
+- Does not require an `options` list (populated automatically from repository configuration)
+- Does not enforce environment protection rules (see [Environment Approval Gates](#environment-approval-gates) below for that)
+
+**Example usage:**
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Deployment target'
+        required: true
+        type: environment
+        default: staging
+```
+
+Access the selected environment in your workflow markdown:
+
+```markdown
+Deploy to the ${{ github.event.inputs.target_env }} environment.
+```
+
+**Note:** The `environment` input type only provides a selector for environment names. To enforce environment protection rules (approval gates, required reviewers, wait timers), use the `manual-approval:` field in your workflow frontmatter (see [Environment Approval Gates](#environment-approval-gates) below).
 
 ## Security Model
 
