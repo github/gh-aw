@@ -49,7 +49,7 @@ tools:
 			notExpectedInLock: []string{
 				// Should NOT upload artifact when detection is disabled
 				"- name: Upload cache-memory data as artifact",
-				"## Cache Folders Available",
+				"cache_memory_prompt_multi.md", // Should not use multi template for default-only cache
 				"cache-memory/default/",
 				"cache-memory/session/",
 			},
@@ -85,7 +85,7 @@ tools:
 				"- name: Cache cache-memory file share data (session)",
 				"key: memory-session-${{ github.run_id }}",
 				"path: /tmp/gh-aw/cache-memory-session",
-				"## Cache Folders Available",
+				"cache_memory_prompt_multi.md", // Template file reference for multiple caches
 				"- **default**: `/tmp/gh-aw/cache-memory/`",
 				"- **session**: `/tmp/gh-aw/cache-memory-session/`",
 			},
@@ -124,7 +124,7 @@ tools:
 				"mkdir -p /tmp/gh-aw/cache-memory-logs",
 				"key: memory-logs-${{ github.workflow }}-${{ github.run_id }}",
 				"path: /tmp/gh-aw/cache-memory-logs",
-				"## Cache Folders Available",
+				"cache_memory_prompt_multi.md", // Template file reference for multiple caches
 				"- **data**: `/tmp/gh-aw/cache-memory-data/`",
 				"- **logs**: `/tmp/gh-aw/cache-memory-logs/`",
 			},

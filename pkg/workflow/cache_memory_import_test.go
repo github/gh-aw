@@ -87,7 +87,7 @@ Test cache-memory import without local definition.
 		"- name: Create cache-memory directory (logs)",
 		"path: /tmp/gh-aw/cache-memory-logs",
 		"key: shared-logs-${{ github.run_id }}",
-		"## Cache Folders Available",
+		"cache_memory_prompt_multi.md", // Template file reference instead of literal content
 		"- **session**: `/tmp/gh-aw/cache-memory-session/`",
 		"- **logs**: `/tmp/gh-aw/cache-memory-logs/`",
 	}
