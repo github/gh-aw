@@ -63,9 +63,13 @@ async function runLogParser(options) {
             logEntries: [],
           };
 
-          // Write to step summary directly
+          // Write to step summary, wrapped in details/summary section
           if (result.markdown) {
-            core.summary.addRaw(result.markdown);
+            const wrappedMarkdown = wrapAgentLogInSection(result.markdown, {
+              parserName,
+              open: true,
+            });
+            core.summary.addRaw(wrappedMarkdown);
             await core.summary.write();
             core.info(`Wrote conversation markdown to step summary (${Buffer.byteLength(result.markdown, "utf8")} bytes)`);
           }

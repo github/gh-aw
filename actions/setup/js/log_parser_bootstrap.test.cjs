@@ -223,14 +223,17 @@ More content.`;
           const mockParseLog = vi.fn();
           runLogParser({ parseLog: mockParseLog, parserName: "Copilot", supportsDirectories: true });
 
-          // Should transform headers (# to ##, ## to ###, etc.)
+          // Should transform headers (# to ##, ## to ###, etc.) and wrap in details/summary
           const summaryCall = mockCore.summary.addRaw.mock.calls[0];
           expect(summaryCall).toBeDefined();
+          // Content should be wrapped in details/summary with "Agentic Conversation" title
+          expect(summaryCall[0]).toContain("<details open>");
+          expect(summaryCall[0]).toContain("<summary>Agentic Conversation</summary>");
+          expect(summaryCall[0]).toContain("</details>");
+          // Should transform headers (# to ##, ## to ###, etc.)
           expect(summaryCall[0]).toContain("## Main Title");
           expect(summaryCall[0]).toContain("### Section 1");
           expect(summaryCall[0]).toContain("#### Subsection");
-          // Verify the original header level was transformed (check start of line)
-          expect(summaryCall[0].split("\n")[0]).toBe("## Main Title");
 
           // Parser should not be called since conversation.md is used directly
           expect(mockParseLog).not.toHaveBeenCalled();
