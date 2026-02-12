@@ -116,7 +116,7 @@ async function writeSafeOutputSummaries(results, messages) {
         if (truncated) {
           core.info(`Preview (first ${maxPreviewLength} chars):`);
           core.info(preview);
-          core.info(`\n[Content truncated - showing first ${maxPreviewLength} of ${contentSize} bytes]`);
+          core.info(`[Content truncated - showing first ${maxPreviewLength} of ${contentSize} bytes]`);
         } else {
           core.info(preview);
         }
