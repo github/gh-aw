@@ -2,6 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
+const { safeInfo } = require("./sanitized_logging.cjs");
 
 /**
  * Main function to handle noop safe output
@@ -49,7 +50,7 @@ async function main() {
 
   for (let i = 0; i < noopItems.length; i++) {
     const item = noopItems[i];
-    core.info(`No-op message ${i + 1}: ${item.message}`);
+    safeInfo(`No-op message ${i + 1}: ${item.message}`);
     summaryContent += `- ${item.message}\n`;
   }
 

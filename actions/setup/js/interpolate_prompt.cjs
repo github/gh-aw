@@ -242,7 +242,7 @@ async function main() {
 
     fs.writeFileSync(promptPath, content, "utf8");
 
-    core.info(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);
+    safeInfo(`Last 200 characters: ${content.substring(Math.max(0, content.length - 200)).replace(/\n/g, "\\n")}`);
     core.info("========================================");
     core.info("[main] Processing complete - SUCCESS");
     core.info("========================================");
@@ -251,10 +251,10 @@ async function main() {
     core.info("[main] Processing failed - ERROR");
     core.info("========================================");
     const err = error instanceof Error ? error : new Error(String(error));
-    core.info(`[main] Error type: ${err.constructor.name}`);
-    core.info(`[main] Error message: ${err.message}`);
+    safeInfo(`[main] Error type: ${err.constructor.name}`);
+    safeInfo(`[main] Error message: ${err.message}`);
     if (err.stack) {
-      core.info(`[main] Stack trace:\n${err.stack}`);
+      safeInfo(`[main] Stack trace:\n${err.stack}`);
     }
     core.setFailed(getErrorMessage(error));
   }

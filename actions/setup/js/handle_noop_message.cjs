@@ -6,6 +6,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { generateFooterWithExpiration } = require("./ephemerals.cjs");
 const { renderTemplate } = require("./messages_core.cjs");
+const { safeInfo } = require("./sanitized_logging.cjs");
 
 /**
  * Search for or create the parent issue for all agentic workflow no-op runs
@@ -92,7 +93,7 @@ async function main() {
 
     core.info(`Workflow name: ${workflowName}`);
     core.info(`Run URL: ${runUrl}`);
-    core.info(`No-op message: ${noopMessage}`);
+    safeInfo(`No-op message: ${noopMessage}`);
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Report as issue: ${reportAsIssue}`);
 

@@ -37,6 +37,7 @@ const { renderTemplate } = require("./messages_core.cjs");
 const { createExpirationLine, addExpirationToFooter } = require("./ephemerals.cjs");
 const { MAX_SUB_ISSUES, getSubIssueCount } = require("./sub_issue_helpers.cjs");
 const { closeOlderIssues } = require("./close_older_issues.cjs");
+const { safeInfo } = require("./sanitized_logging.cjs");
 const fs = require("fs");
 
 /**
@@ -75,7 +76,7 @@ async function searchForExistingParent(owner, repo, markerComment) {
 
     // Check each found issue to see if it can accept more sub-issues
     for (const issue of searchResults.data.items) {
-      core.info(`Found potential parent issue #${issue.number}: ${issue.title}`);
+      safeInfo(`Found potential parent issue #${issue.number}: ${issue.title}`);
 
       if (issue.state !== "open") {
         core.info(`Parent issue #${issue.number} is ${issue.state}, skipping`);
@@ -306,7 +307,7 @@ async function main(config = {}) {
 
     // Get or generate the temporary ID for this issue
     const temporaryId = message.temporary_id ?? generateTemporaryId();
-    core.info(`Processing create_issue: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
+    safeInfo(`Processing create_issue: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
 
     // Resolve parent: check if it's a temporary ID reference
     let effectiveParentIssueNumber;
@@ -433,7 +434,7 @@ async function main(config = {}) {
     bodyLines.push("");
     const body = bodyLines.join("\n").trim();
 
-    core.info(`Creating issue in ${qualifiedItemRepo} with title: ${title}`);
+    safeInfo(`Creating issue in ${qualifiedItemRepo} with title: ${title}`);
     core.info(`Labels: ${labels.join(", ")}`);
     if (assignees.length > 0) {
       core.info(`Assignees: ${assignees.join(", ")}`);
@@ -610,7 +611,7 @@ async function main(config = {}) {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       if (errorMessage.includes("Issues has been disabled in this repository")) {
-        core.info(`⚠ Cannot create issue "${title}" in ${qualifiedItemRepo}: Issues are disabled for this repository`);
+        safeInfo(`⚠ Cannot create issue "${title}" in ${qualifiedItemRepo}: Issues are disabled for this repository`);
         core.info("Consider enabling issues in repository settings if you want to create issues automatically");
         return {
           success: false,
