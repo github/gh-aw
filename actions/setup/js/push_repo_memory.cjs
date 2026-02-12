@@ -241,6 +241,14 @@ async function main() {
     return;
   }
 
+  // Validate file types before copying
+  const { validateMemoryFiles } = require("./validate_memory_files.cjs");
+  const validation = validateMemoryFiles(sourceMemoryPath, "repo");
+  if (!validation.valid) {
+    core.setFailed(`File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+    return;
+  }
+
   core.info(`Copying ${filesToCopy.length} validated file(s)...`);
 
   // Copy files to destination (preserving directory structure)

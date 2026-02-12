@@ -473,6 +473,53 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 	}
 }
 
+// generateCacheMemoryValidation generates validation steps for cache-memory file types
+// This should be called after agent execution to validate files before upload/save
+func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData) {
+	if data.CacheMemoryConfig == nil || len(data.CacheMemoryConfig.Caches) == 0 {
+		return
+	}
+
+	cacheLog.Printf("Generating cache-memory validation steps for %d caches", len(data.CacheMemoryConfig.Caches))
+
+	// Use backward-compatible paths only when there's a single cache with ID "default"
+	useBackwardCompatiblePaths := len(data.CacheMemoryConfig.Caches) == 1 && data.CacheMemoryConfig.Caches[0].ID == "default"
+
+	for _, cache := range data.CacheMemoryConfig.Caches {
+		// Skip restore-only caches
+		if cache.RestoreOnly {
+			continue
+		}
+
+		// Default cache uses /tmp/gh-aw/cache-memory/ for backward compatibility
+		// Other caches use /tmp/gh-aw/cache-memory-{id}/ to prevent overlaps
+		var cacheDir string
+		if cache.ID == "default" {
+			cacheDir = "/tmp/gh-aw/cache-memory"
+		} else {
+			cacheDir = fmt.Sprintf("/tmp/gh-aw/cache-memory-%s", cache.ID)
+		}
+
+		// Add validation step
+		if useBackwardCompatiblePaths {
+			builder.WriteString("      - name: Validate cache-memory file types\n")
+		} else {
+			fmt.Fprintf(builder, "      - name: Validate cache-memory file types (%s)\n", cache.ID)
+		}
+		builder.WriteString("        if: always()\n")
+		builder.WriteString("        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8\n")
+		builder.WriteString("        with:\n")
+		builder.WriteString("          script: |\n")
+		builder.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
+		builder.WriteString("            setupGlobals(core, github, context, exec, io);\n")
+		builder.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
+		fmt.Fprintf(builder, "            const result = validateMemoryFiles('%s', 'cache');\n", cacheDir)
+		builder.WriteString("            if (!result.valid) {\n")
+		builder.WriteString("              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);\n")
+		builder.WriteString("            }\n")
+	}
+}
+
 // generateCacheMemoryArtifactUpload generates artifact upload steps for cache-memory
 // This should be called after agent execution steps to ensure cache is uploaded after the agent has finished
 func generateCacheMemoryArtifactUpload(builder *strings.Builder, data *WorkflowData) {
@@ -592,6 +639,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	content.WriteString("- **Persistence**: Files in these folders persist across workflow runs via GitHub Actions cache\n")
 	content.WriteString("- **Last Write Wins**: If multiple processes write to the same file, the last write will be preserved\n")
 	content.WriteString("- **File Share**: Use these as simple file shares - organize files as you see fit\n")
+	content.WriteString("- **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.\n")
 	content.WriteString("\n")
 	content.WriteString("Examples of what you can store:\n")
 
@@ -604,12 +652,15 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 			cacheDir = fmt.Sprintf("/tmp/gh-aw/cache-memory-%s", cache.ID)
 		}
 		fmt.Fprintf(&content, "- `%s/notes.txt` - general notes and observations\n", cacheDir)
+		fmt.Fprintf(&content, "- `%s/notes.md` - markdown formatted notes\n", cacheDir)
 		fmt.Fprintf(&content, "- `%s/preferences.json` - user preferences and settings\n", cacheDir)
-		fmt.Fprintf(&content, "- `%s/state/` - organized state files in subdirectories\n", cacheDir)
+		fmt.Fprintf(&content, "- `%s/history.jsonl` - activity history in JSON Lines format\n", cacheDir)
+		fmt.Fprintf(&content, "- `%s/data.csv` - tabular data\n", cacheDir)
+		fmt.Fprintf(&content, "- `%s/state/` - organized state files in subdirectories (with allowed file types)\n", cacheDir)
 	}
 
 	content.WriteString("\n")
-	content.WriteString("Feel free to create, read, update, and organize files in these folders as needed for your tasks.\n")
+	content.WriteString("Feel free to create, read, update, and organize files in these folders as needed for your tasks, using only the allowed file types.\n")
 
 	return &PromptSection{
 		Content: content.String(),
@@ -660,6 +711,21 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		fmt.Fprintf(&downloadStep, "          name: %s\n", artifactName)
 		fmt.Fprintf(&downloadStep, "          path: %s\n", cacheDir)
 		steps = append(steps, downloadStep.String())
+
+		// Validate cache-memory file types step
+		var validateStep strings.Builder
+		fmt.Fprintf(&validateStep, "      - name: Validate cache-memory file types (%s)\n", cache.ID)
+		validateStep.WriteString("        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8\n")
+		validateStep.WriteString("        with:\n")
+		validateStep.WriteString("          script: |\n")
+		validateStep.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
+		validateStep.WriteString("            setupGlobals(core, github, context, exec, io);\n")
+		validateStep.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
+		fmt.Fprintf(&validateStep, "            const result = validateMemoryFiles('%s', 'cache');\n", cacheDir)
+		validateStep.WriteString("            if (!result.valid) {\n")
+		validateStep.WriteString("              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);\n")
+		validateStep.WriteString("            }\n")
+		steps = append(steps, validateStep.String())
 
 		// Generate cache key (same logic as in generateCacheMemorySteps)
 		cacheKey := cache.Key
