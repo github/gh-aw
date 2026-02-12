@@ -10,6 +10,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/tty"
+	workflowpkg "github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -393,6 +394,16 @@ func addWorkflowWithTracking(workflow *WorkflowSpec, number int, verbose bool, q
 
 	if verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Read workflow content (%d bytes)", len(sourceContent))))
+	}
+
+	// Security scan: reject workflows containing malicious or dangerous content
+	if findings := workflowpkg.ScanMarkdownSecurity(string(sourceContent)); len(findings) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for workflow"))
+		fmt.Fprintln(os.Stderr, workflowpkg.FormatSecurityFindings(findings))
+		return fmt.Errorf("workflow '%s' failed security scan: %d issue(s) detected", workflowPath, len(findings))
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
 	}
 
 	// Find git root to ensure consistent placement

@@ -98,6 +98,10 @@ Agentic markdown supports GitHub Actions expression substitutions and conditiona
 
 This design enables rapid iteration on AI instructions while maintaining strict compilation requirements for security-sensitive frontmatter configuration. See [Editing Workflows](/gh-aw/guides/editing-workflows/) for complete guidance on when recompilation is needed versus when you can edit directly.
 
+## Security Scanning
+
+The markdown body of workflows (excluding frontmatter) is automatically scanned for malicious content when added via `gh aw add`, during trial mode, and at compile time for imported files. The scanner rejects workflows containing: Unicode abuse (zero-width characters, bidirectional overrides), hidden content (suspicious HTML comments, CSS-hidden elements), obfuscated links (data URIs, `javascript:` URLs, IP-based URLs, URL shorteners), dangerous HTML tags (`<script>`, `<iframe>`, `<object>`, `<form>`, event handlers), embedded executable content (SVG scripts, executable MIME data URIs), and social engineering patterns (prompt injection, base64-encoded commands, pipe-to-shell patterns). These checks cannot be overridden.
+
 ## Related Documentation
 
 - [Editing Workflows](/gh-aw/guides/editing-workflows/) - When to recompile vs edit directly

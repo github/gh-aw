@@ -333,6 +333,16 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 		return fmt.Errorf("failed to read local workflow file: %w", err)
 	}
 
+	// Security scan: reject workflows containing malicious or dangerous content
+	if findings := workflow.ScanMarkdownSecurity(string(content)); len(findings) > 0 {
+		fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for local workflow"))
+		fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings))
+		return fmt.Errorf("local workflow '%s' failed security scan: %d issue(s) detected", parsedSpec.WorkflowName, len(findings))
+	}
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
+	}
+
 	// Append text if provided
 	if appendText != "" {
 		contentStr := string(content)
