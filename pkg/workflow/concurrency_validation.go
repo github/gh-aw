@@ -268,6 +268,10 @@ func validateBalancedQuotes(expr string) error {
 }
 
 // containsLogicalOperators checks if an expression contains logical operators (&&, ||, !)
+// Note: This is a simple string-based check that may return true for expressions containing
+// '!=' (not equals) since it includes the '!' character. This is acceptable because the
+// function is used to decide whether to parse the expression with the expression parser,
+// and expressions with '!=' will be successfully parsed by the parser.
 func containsLogicalOperators(expr string) bool {
 	return strings.Contains(expr, "&&") || strings.Contains(expr, "||") || strings.Contains(expr, "!")
 }
@@ -309,6 +313,11 @@ func extractGroupExpression(concurrency any) string {
 //	  cancel-in-progress: true  # optional
 //
 // Returns the group value string or empty string if not found.
+//
+// Note: This function uses a simple regex pattern that matches values up to the first newline
+// or quote character. Group values containing embedded quotes or newlines may not be fully
+// captured, but such cases are rare in concurrency group expressions and will be caught by
+// the expression validation if they cause syntax errors.
 func extractConcurrencyGroupFromYAML(concurrencyYAML string) string {
 	// First, check if it's object format with explicit "group:" field
 	// Pattern: group: "value" or group: 'value' or group: value (at start of line or after spaces)
