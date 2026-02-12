@@ -123,47 +123,82 @@ const mockCore = {
             ((mockContext.eventName = "issues"),
               (mockContext.payload = { issue: { title: "Test Issue", body: "Issue description" } }),
               await testMain(),
-              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test Issue\n\nIssue description"));
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test Issue\n\nIssue description"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", "Test Issue"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "Issue description"));
           }),
           it("should extract text from pull request payload", async () => {
             ((mockContext.eventName = "pull_request"),
               (mockContext.payload = { pull_request: { title: "Test PR", body: "PR description" } }),
               await testMain(),
-              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test PR\n\nPR description"));
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test PR\n\nPR description"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", "Test PR"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "PR description"));
           }),
           it("should extract text from issue comment payload", async () => {
-            ((mockContext.eventName = "issue_comment"), (mockContext.payload = { comment: { body: "This is a comment" } }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", "This is a comment"));
+            ((mockContext.eventName = "issue_comment"),
+              (mockContext.payload = { comment: { body: "This is a comment" } }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "This is a comment"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "This is a comment"));
           }),
           it("should extract text from pull request target payload", async () => {
             ((mockContext.eventName = "pull_request_target"),
               (mockContext.payload = { pull_request: { title: "Test PR Target", body: "PR target description" } }),
               await testMain(),
-              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test PR Target\n\nPR target description"));
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test PR Target\n\nPR target description"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", "Test PR Target"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "PR target description"));
           }),
           it("should extract text from pull request review comment payload", async () => {
-            ((mockContext.eventName = "pull_request_review_comment"), (mockContext.payload = { comment: { body: "Review comment" } }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Review comment"));
+            ((mockContext.eventName = "pull_request_review_comment"),
+              (mockContext.payload = { comment: { body: "Review comment" } }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Review comment"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "Review comment"));
           }),
           it("should extract text from pull request review payload", async () => {
-            ((mockContext.eventName = "pull_request_review"), (mockContext.payload = { review: { body: "Review body" } }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Review body"));
+            ((mockContext.eventName = "pull_request_review"),
+              (mockContext.payload = { review: { body: "Review body" } }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Review body"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "Review body"));
           }),
           it("should extract text from discussion payload", async () => {
             ((mockContext.eventName = "discussion"),
               (mockContext.payload = { discussion: { title: "Test Discussion", body: "Discussion description" } }),
               await testMain(),
-              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test Discussion\n\nDiscussion description"));
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Test Discussion\n\nDiscussion description"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", "Test Discussion"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "Discussion description"));
           }),
           it("should extract text from discussion comment payload", async () => {
-            ((mockContext.eventName = "discussion_comment"), (mockContext.payload = { comment: { body: "Discussion comment text" } }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Discussion comment text"));
+            ((mockContext.eventName = "discussion_comment"),
+              (mockContext.payload = { comment: { body: "Discussion comment text" } }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", "Discussion comment text"),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", "Discussion comment text"));
           }),
           it("should handle unknown event types", async () => {
-            ((mockContext.eventName = "unknown_event"), (mockContext.payload = {}), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""));
+            ((mockContext.eventName = "unknown_event"),
+              (mockContext.payload = {}),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", ""));
           }),
           it("should deny access for non-admin/maintain users", async () => {
             (mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "read" } }),
               (mockContext.eventName = "issues"),
               (mockContext.payload = { issue: { title: "Test Issue", body: "Issue description" } }),
               await testMain(),
-              expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""));
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", ""));
           }),
           it("should sanitize extracted text before output", async () => {
             ((mockContext.eventName = "issues"), (mockContext.payload = { issue: { title: "Test @user fixes #123", body: "Visit https://evil.com" } }), await testMain());
@@ -171,10 +206,20 @@ const mockCore = {
             (expect(outputCall[1]).toContain("`@user`"), expect(outputCall[1]).toContain("`fixes #123`"), expect(outputCall[1]).toContain("/redacted"));
           }),
           it("should handle missing title and body gracefully", async () => {
-            ((mockContext.eventName = "issues"), (mockContext.payload = { issue: {} }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""));
+            ((mockContext.eventName = "issues"),
+              (mockContext.payload = { issue: {} }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", ""));
           }),
           it("should handle null values in payload", async () => {
-            ((mockContext.eventName = "issue_comment"), (mockContext.payload = { comment: { body: null } }), await testMain(), expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""));
+            ((mockContext.eventName = "issue_comment"),
+              (mockContext.payload = { comment: { body: null } }),
+              await testMain(),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("text", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("title", ""),
+              expect(mockCore.setOutput).toHaveBeenCalledWith("body", ""));
           }),
           it("should neutralize all mentions including issue author", async () => {
             ((mockContext.eventName = "issues"), (mockContext.payload = { issue: { title: "Test Issue by @issueAuthor", body: "Body mentioning @issueAuthor and @other", user: { login: "issueAuthor" } } }), await testMain());
