@@ -53,7 +53,7 @@ jobs:
                 issue_number: pr.number,
               });
 
-              const { data: reviewComments } = await github.rest.pulls.listComments({
+              const { data: reviewComments } = await github.rest.pulls.listReviewComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pr.number,
