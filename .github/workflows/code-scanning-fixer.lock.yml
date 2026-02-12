@@ -954,6 +954,8 @@ jobs:
           GH_AW_WORKFLOW_ID: "code-scanning-fixer"
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.agent.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
+          GH_AW_REPO_MEMORY_VALIDATION_FAILED_campaigns: ${{ needs.push_repo_memory.outputs.validation_failed_campaigns }}
+          GH_AW_REPO_MEMORY_VALIDATION_ERROR_campaigns: ${{ needs.push_repo_memory.outputs.validation_error_campaigns }}
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
@@ -1170,6 +1172,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      validation_error_campaigns: ${{ steps.push_repo_memory_campaigns.outputs.validation_error }}
+      validation_failed_campaigns: ${{ steps.push_repo_memory_campaigns.outputs.validation_failed }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -1204,6 +1209,7 @@ jobs:
           name: repo-memory-campaigns
           path: /tmp/gh-aw/repo-memory/campaigns
       - name: Push repo-memory changes (campaigns)
+        id: push_repo_memory_campaigns
         if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
