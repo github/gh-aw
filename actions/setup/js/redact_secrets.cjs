@@ -114,7 +114,7 @@ function redactSecrets(content, secretValues) {
   const sortedSecrets = secretValues.slice().sort((a, b) => b.length - a.length);
   for (const secretValue of sortedSecrets) {
     // Skip empty or very short values (likely not actual secrets)
-    if (!secretValue || secretValue.length < 8) {
+    if (!secretValue || secretValue.length < 6) {
       continue;
     }
     // Count occurrences before replacement

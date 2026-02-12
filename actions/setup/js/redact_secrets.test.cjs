@@ -95,11 +95,18 @@ describe("redact_secrets.cjs", () => {
             expect(callString).not.toContain(secretValue);
           }
         }),
-        it("should skip very short values", async () => {
+        it("should skip very short values (less than 6 characters)", async () => {
           const testFile = path.join(tempDir, "test.txt");
-          (fs.writeFileSync(testFile, "Short: abc123"), (process.env.GH_AW_SECRET_NAMES = "SHORT_SECRET"), (process.env.SECRET_SHORT_SECRET = "abc"));
+          (fs.writeFileSync(testFile, "Short: 12345"), (process.env.GH_AW_SECRET_NAMES = "SHORT_SECRET"), (process.env.SECRET_SHORT_SECRET = "12345"));
           const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
-          (await eval(`(async () => { ${modifiedScript}; await main(); })()`), expect(fs.readFileSync(testFile, "utf8")).toBe("Short: abc123"));
+          (await eval(`(async () => { ${modifiedScript}; await main(); })()`), expect(fs.readFileSync(testFile, "utf8")).toBe("Short: 12345"));
+        }),
+        it("should redact 6-character secrets", async () => {
+          const testFile = path.join(tempDir, "test.txt");
+          const secretValue = "abc123";
+          (fs.writeFileSync(testFile, `Secret: ${secretValue} test`), (process.env.GH_AW_SECRET_NAMES = "SIX_CHAR_SECRET"), (process.env.SECRET_SIX_CHAR_SECRET = secretValue));
+          const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+          (await eval(`(async () => { ${modifiedScript}; await main(); })()`), expect(fs.readFileSync(testFile, "utf8")).toBe("Secret: abc*** test"));
         }),
         it("should handle multiple secrets in same file", async () => {
           const testFile = path.join(tempDir, "test.txt"),
