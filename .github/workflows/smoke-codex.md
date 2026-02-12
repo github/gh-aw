@@ -51,6 +51,9 @@ safe-outputs:
       allowed: [smoke-codex]
     remove-labels:
       allowed: [smoke]
+    unassign-from-user:
+      allowed: [githubactionagent]
+      max: 1
     hide-comment:
     messages:
       footer: "> 🔮 *The oracle has spoken through [{workflow_name}]({run_url})*"
@@ -89,3 +92,4 @@ Add a **very brief** comment (max 5-10 lines) to the current pull request with:
 If all tests pass:
 - Use the `add_labels` safe-output tool to add the label `smoke-codex` to the pull request
 - Use the `remove_labels` safe-output tool to remove the label `smoke` from the pull request
+- Use the `unassign_from_user` safe-output tool to unassign the user `githubactionagent` from the pull request (this is a fictitious user used for testing)

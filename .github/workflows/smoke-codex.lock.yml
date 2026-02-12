@@ -26,7 +26,7 @@
 #     - shared/gh.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: d14eb1ef5a6b53f5e4b7776732d82a9ed8cf879ec0961523225d34b5dec423a0
+# frontmatter-hash: aba13da089edf9a0eb1467c6f2263a22a1b81e717fe0482fd8ddd72d3f592069
 
 name: "Smoke Codex"
 "on":
@@ -256,7 +256,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-codex"],"max":3},"create_issue":{"expires":2,"max":1},"hide_comment":{"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3}}
+          {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-codex"],"max":3},"create_issue":{"expires":2,"max":1},"hide_comment":{"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3},"unassign_from_user":{"allowed":["githubactionagent"],"max":1}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
