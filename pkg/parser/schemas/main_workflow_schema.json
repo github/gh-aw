@@ -6058,6 +6058,12 @@
             }
           ]
         },
+        "footer": {
+          "type": "boolean",
+          "description": "Global footer control for all safe outputs. When false, omits visible AI-generated footer content from all created/updated entities (issues, PRs, discussions, releases) while still including XML markers for searchability. Individual safe-output types (create-issue, update-issue, etc.) can override this by specifying their own footer field. Defaults to true.",
+          "default": true,
+          "examples": [false, true]
+        },
         "runs-on": {
           "type": "string",
           "description": "Runner specification for all safe-outputs jobs (activation, create-issue, add-comment, etc.). Single runner label (e.g., 'ubuntu-slim', 'ubuntu-latest', 'windows-latest', 'self-hosted'). Defaults to 'ubuntu-slim'. See https://github.blog/changelog/2025-10-28-1-vcpu-linux-runner-now-available-in-github-actions-in-public-preview/"

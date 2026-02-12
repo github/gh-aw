@@ -355,6 +355,14 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.Mentions = parseMentionsConfig(mentions)
 			}
 
+			// Handle global footer flag
+			if footer, exists := outputMap["footer"]; exists {
+				if footerBool, ok := footer.(bool); ok {
+					config.Footer = &footerBool
+					safeOutputsConfigLog.Printf("Global footer control: %t", footerBool)
+				}
+			}
+
 			// Handle jobs (safe-jobs must be under safe-outputs)
 			if jobs, exists := outputMap["jobs"]; exists {
 				if jobsMap, ok := jobs.(map[string]any); ok {
