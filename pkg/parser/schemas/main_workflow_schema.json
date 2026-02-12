@@ -3127,6 +3127,13 @@
                   "enum": ["workflow", "repo"],
                   "default": "workflow",
                   "description": "Cache restore key scope: 'workflow' (default, only restores from same workflow) or 'repo' (restores from any workflow in the repository). Use 'repo' with caution as it allows cross-workflow cache sharing."
+                },
+                "allowed-extensions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of allowed file extensions (e.g., [\".json\", \".txt\"]). Default: [\".json\", \".jsonl\", \".txt\", \".md\", \".csv\"]"
                 }
               },
               "additionalProperties": false,
@@ -3173,6 +3180,13 @@
                     "enum": ["workflow", "repo"],
                     "default": "workflow",
                     "description": "Cache restore key scope: 'workflow' (default, only restores from same workflow) or 'repo' (restores from any workflow in the repository). Use 'repo' with caution as it allows cross-workflow cache sharing."
+                  },
+                  "allowed-extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of allowed file extensions (e.g., [\".json\", \".txt\"]). Default: [\".json\", \".jsonl\", \".txt\", \".md\", \".csv\"]"
                   }
                 },
                 "required": ["id", "key"],
@@ -3459,6 +3473,13 @@
                 "create-orphan": {
                   "type": "boolean",
                   "description": "Create orphaned branch if it doesn't exist (default: true)"
+                },
+                "allowed-extensions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of allowed file extensions (e.g., [\".json\", \".txt\"]). Default: [\".json\", \".jsonl\", \".txt\", \".md\", \".csv\"]"
                 }
               },
               "additionalProperties": false,
@@ -3533,6 +3554,13 @@
                   "create-orphan": {
                     "type": "boolean",
                     "description": "Create orphaned branch if it doesn't exist (default: true)"
+                  },
+                  "allowed-extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of allowed file extensions (e.g., [\".json\", \".txt\"]). Default: [\".json\", \".jsonl\", \".txt\", \".md\", \".csv\"]"
                   }
                 },
                 "additionalProperties": false

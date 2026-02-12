@@ -174,4 +174,29 @@ describe("validateMemoryFiles", () => {
     expect(result.invalidFiles).toContain(path.join("invalid-files", "app.log"));
     expect(result.invalidFiles).toContain(path.join("invalid-files", "config.ini"));
   });
+
+  it("accepts custom allowed extensions", () => {
+    fs.writeFileSync(path.join(tempDir, "config.yaml"), "key: value");
+    fs.writeFileSync(path.join(tempDir, "data.xml"), "<root></root>");
+    const customExts = [".yaml", ".xml"];
+    const result = validateMemoryFiles(tempDir, "cache", customExts);
+    expect(result.valid).toBe(true);
+    expect(result.invalidFiles).toEqual([]);
+  });
+
+  it("rejects files not in custom allowed extensions", () => {
+    fs.writeFileSync(path.join(tempDir, "data.json"), "{}");
+    const customExts = [".yaml", ".xml"];
+    const result = validateMemoryFiles(tempDir, "cache", customExts);
+    expect(result.valid).toBe(false);
+    expect(result.invalidFiles).toEqual(["data.json"]);
+  });
+
+  it("uses default extensions when custom array is empty", () => {
+    fs.writeFileSync(path.join(tempDir, "data.json"), "{}");
+    fs.writeFileSync(path.join(tempDir, "notes.txt"), "text");
+    const result = validateMemoryFiles(tempDir, "cache", []);
+    expect(result.valid).toBe(true); // Empty array falls back to defaults
+    expect(result.invalidFiles).toEqual([]);
+  });
 });

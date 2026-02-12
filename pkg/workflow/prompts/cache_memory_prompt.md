@@ -8,7 +8,7 @@ You have access to a persistent cache folder at `__CACHE_DIR__` where you can re
 - **Persistence**: Files in this folder persist across workflow runs via GitHub Actions cache
 - **Last Write Wins**: If multiple processes write to the same file, the last write will be preserved
 - **File Share**: Use this as a simple file share - organize files as you see fit
-- **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.
+- **Allowed File Types**: Only the following file extensions are allowed: `__ALLOWED_EXTENSIONS__`. Files with other extensions will be rejected during validation.
 
 Examples of what you can store:
 - `__CACHE_DIR__notes.txt` - general notes and observations

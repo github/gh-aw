@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -11,6 +12,11 @@ import (
 
 var cacheLog = logger.New("workflow:cache")
 
+// getDefaultAllowedExtensions returns the default list of allowed file extensions for memory storage
+func getDefaultAllowedExtensions() []string {
+	return []string{".json", ".jsonl", ".txt", ".md", ".csv"}
+}
+
 // CacheMemoryConfig holds configuration for cache-memory functionality
 type CacheMemoryConfig struct {
 	Caches []CacheMemoryEntry `yaml:"caches,omitempty"` // cache configurations
@@ -18,12 +24,13 @@ type CacheMemoryConfig struct {
 
 // CacheMemoryEntry represents a single cache-memory configuration
 type CacheMemoryEntry struct {
-	ID            string `yaml:"id"`                       // cache identifier (required for array notation)
-	Key           string `yaml:"key,omitempty"`            // custom cache key
-	Description   string `yaml:"description,omitempty"`    // optional description for this cache
-	RetentionDays *int   `yaml:"retention-days,omitempty"` // retention days for upload-artifact action
-	RestoreOnly   bool   `yaml:"restore-only,omitempty"`   // if true, only restore cache without saving
-	Scope         string `yaml:"scope,omitempty"`          // scope for restore keys: "workflow" (default) or "repo"
+	ID                string   `yaml:"id"`                           // cache identifier (required for array notation)
+	Key               string   `yaml:"key,omitempty"`                // custom cache key
+	Description       string   `yaml:"description,omitempty"`        // optional description for this cache
+	RetentionDays     *int     `yaml:"retention-days,omitempty"`     // retention days for upload-artifact action
+	RestoreOnly       bool     `yaml:"restore-only,omitempty"`       // if true, only restore cache without saving
+	Scope             string   `yaml:"scope,omitempty"`              // scope for restore keys: "workflow" (default) or "repo"
+	AllowedExtensions []string `yaml:"allowed-extensions,omitempty"` // allowed file extensions (default: [".json", ".jsonl", ".txt", ".md", ".csv"])
 }
 
 // generateDefaultCacheKey generates a default cache key for a given cache ID
@@ -52,8 +59,9 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 	if cacheMemoryValue == nil {
 		config.Caches = []CacheMemoryEntry{
 			{
-				ID:  "default",
-				Key: generateDefaultCacheKey("default"),
+				ID:                "default",
+				Key:               generateDefaultCacheKey("default"),
+				AllowedExtensions: getDefaultAllowedExtensions(),
 			},
 		}
 		return config, nil
@@ -65,8 +73,9 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 			// Create a single default cache entry
 			config.Caches = []CacheMemoryEntry{
 				{
-					ID:  "default",
-					Key: generateDefaultCacheKey("default"),
+					ID:                "default",
+					Key:               generateDefaultCacheKey("default"),
+					AllowedExtensions: getDefaultAllowedExtensions(),
 				},
 			}
 		}
@@ -153,6 +162,22 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 					entry.Scope = "workflow"
 				}
 
+				// Parse allowed-extensions field
+				if allowedExts, exists := cacheMap["allowed-extensions"]; exists {
+					if extArray, ok := allowedExts.([]any); ok {
+						entry.AllowedExtensions = make([]string, 0, len(extArray))
+						for _, ext := range extArray {
+							if extStr, ok := ext.(string); ok {
+								entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
+							}
+						}
+					}
+				}
+				// Default to standard allowed extensions if not specified
+				if len(entry.AllowedExtensions) == 0 {
+					entry.AllowedExtensions = getDefaultAllowedExtensions()
+				}
+
 				config.Caches = append(config.Caches, entry)
 			}
 		}
@@ -227,6 +252,22 @@ func (c *Compiler) extractCacheMemoryConfig(toolsConfig *ToolsConfig) (*CacheMem
 		// Default to "workflow" scope if not specified
 		if entry.Scope == "" {
 			entry.Scope = "workflow"
+		}
+
+		// Parse allowed-extensions field
+		if allowedExts, exists := configMap["allowed-extensions"]; exists {
+			if extArray, ok := allowedExts.([]any); ok {
+				entry.AllowedExtensions = make([]string, 0, len(extArray))
+				for _, ext := range extArray {
+					if extStr, ok := ext.(string); ok {
+						entry.AllowedExtensions = append(entry.AllowedExtensions, extStr)
+					}
+				}
+			}
+		}
+		// Default to standard allowed extensions if not specified
+		if len(entry.AllowedExtensions) == 0 {
+			entry.AllowedExtensions = getDefaultAllowedExtensions()
 		}
 
 		config.Caches = []CacheMemoryEntry{entry}
@@ -500,6 +541,9 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 			cacheDir = fmt.Sprintf("/tmp/gh-aw/cache-memory-%s", cache.ID)
 		}
 
+		// Prepare allowed extensions array for JavaScript
+		allowedExtsJSON, _ := json.Marshal(cache.AllowedExtensions)
+
 		// Add validation step
 		if useBackwardCompatiblePaths {
 			builder.WriteString("      - name: Validate cache-memory file types\n")
@@ -513,9 +557,10 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 		builder.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
 		builder.WriteString("            setupGlobals(core, github, context, exec, io);\n")
 		builder.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
-		fmt.Fprintf(builder, "            const result = validateMemoryFiles('%s', 'cache');\n", cacheDir)
+		fmt.Fprintf(builder, "            const allowedExtensions = %s;\n", allowedExtsJSON)
+		fmt.Fprintf(builder, "            const result = validateMemoryFiles('%s', 'cache', allowedExtensions);\n", cacheDir)
 		builder.WriteString("            if (!result.valid) {\n")
-		builder.WriteString("              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);\n")
+		fmt.Fprintf(builder, "              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
 		builder.WriteString("            }\n")
 	}
 }
@@ -596,15 +641,19 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 			descriptionText = " " + cache.Description
 		}
 
-		cacheLog.Printf("Building cache memory prompt section with env vars: cache_dir=%s, description=%s", cacheDir, descriptionText)
+		// Build allowed extensions text
+		allowedExtsText := strings.Join(cache.AllowedExtensions, "`, `")
+
+		cacheLog.Printf("Building cache memory prompt section with env vars: cache_dir=%s, description=%s, allowed_extensions=%v", cacheDir, descriptionText, cache.AllowedExtensions)
 
 		// Return prompt section with template file and environment variables for substitution
 		return &PromptSection{
 			Content: cacheMemoryPromptFile,
 			IsFile:  true,
 			EnvVars: map[string]string{
-				"GH_AW_CACHE_DIR":         cacheDir,
-				"GH_AW_CACHE_DESCRIPTION": descriptionText,
+				"GH_AW_CACHE_DIR":          cacheDir,
+				"GH_AW_CACHE_DESCRIPTION":  descriptionText,
+				"GH_AW_ALLOWED_EXTENSIONS": allowedExtsText,
 			},
 		}
 	}
@@ -639,7 +688,10 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	content.WriteString("- **Persistence**: Files in these folders persist across workflow runs via GitHub Actions cache\n")
 	content.WriteString("- **Last Write Wins**: If multiple processes write to the same file, the last write will be preserved\n")
 	content.WriteString("- **File Share**: Use these as simple file shares - organize files as you see fit\n")
-	content.WriteString("- **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.\n")
+
+	// Build allowed extensions text (use the first cache's extensions as they should all be the same for the group)
+	allowedExtsText := strings.Join(config.Caches[0].AllowedExtensions, "`, `")
+	fmt.Fprintf(&content, "- **Allowed File Types**: Only the following file extensions are allowed: `%s`. Files with other extensions will be rejected during validation.\n", allowedExtsText)
 	content.WriteString("\n")
 	content.WriteString("Examples of what you can store:\n")
 
@@ -712,6 +764,9 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		fmt.Fprintf(&downloadStep, "          path: %s\n", cacheDir)
 		steps = append(steps, downloadStep.String())
 
+		// Prepare allowed extensions array for JavaScript
+		allowedExtsJSON, _ := json.Marshal(cache.AllowedExtensions)
+
 		// Validate cache-memory file types step
 		var validateStep strings.Builder
 		fmt.Fprintf(&validateStep, "      - name: Validate cache-memory file types (%s)\n", cache.ID)
@@ -721,9 +776,10 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		validateStep.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
 		validateStep.WriteString("            setupGlobals(core, github, context, exec, io);\n")
 		validateStep.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
-		fmt.Fprintf(&validateStep, "            const result = validateMemoryFiles('%s', 'cache');\n", cacheDir)
+		fmt.Fprintf(&validateStep, "            const allowedExtensions = %s;\n", allowedExtsJSON)
+		fmt.Fprintf(&validateStep, "            const result = validateMemoryFiles('%s', 'cache', allowedExtensions);\n", cacheDir)
 		validateStep.WriteString("            if (!result.valid) {\n")
-		validateStep.WriteString("              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);\n")
+		fmt.Fprintf(&validateStep, "              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
 		validateStep.WriteString("            }\n")
 		steps = append(steps, validateStep.String())
 

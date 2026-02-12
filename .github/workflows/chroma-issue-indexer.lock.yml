@@ -527,9 +527,10 @@ jobs:
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');
-            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory-chroma', 'cache');
+            const allowedExtensions = [".json",".jsonl",".txt",".md",".csv"];
+            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory-chroma', 'cache', allowedExtensions);
             if (!result.valid) {
-              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
             }
       - name: Upload agent artifacts
         if: always()

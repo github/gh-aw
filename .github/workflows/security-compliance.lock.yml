@@ -1115,6 +1115,7 @@ jobs:
           BRANCH_NAME: memory/campaigns
           MAX_FILE_SIZE: 10240
           MAX_FILE_COUNT: 100
+          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
           FILE_GLOB_FILTER: "memory/campaigns/security-compliance-*/**"
         with:
           script: |

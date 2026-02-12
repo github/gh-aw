@@ -6,14 +6,16 @@ const path = require("path");
 
 /**
  * Validate that all files in a memory directory have allowed file extensions
- * Allowed extensions: .json, .jsonl, .txt, .md, .csv
+ * Default allowed extensions: .json, .jsonl, .txt, .md, .csv
  *
  * @param {string} memoryDir - Path to the memory directory to validate
  * @param {string} memoryType - Type of memory ("cache" or "repo") for error messages
+ * @param {string[]} [allowedExtensions] - Optional custom list of allowed extensions (defaults to [".json", ".jsonl", ".txt", ".md", ".csv"])
  * @returns {{valid: boolean, invalidFiles: string[]}} Validation result with list of invalid files
  */
-function validateMemoryFiles(memoryDir, memoryType = "cache") {
-  const allowedExtensions = [".json", ".jsonl", ".txt", ".md", ".csv"];
+function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions) {
+  // Use default extensions if not provided or if empty array
+  const extensions = allowedExtensions && allowedExtensions.length > 0 ? allowedExtensions : [".json", ".jsonl", ".txt", ".md", ".csv"];
   const invalidFiles = [];
 
   // Check if directory exists
@@ -40,7 +42,7 @@ function validateMemoryFiles(memoryDir, memoryType = "cache") {
       } else if (entry.isFile()) {
         // Check file extension
         const ext = path.extname(entry.name).toLowerCase();
-        if (!allowedExtensions.includes(ext)) {
+        if (!extensions.includes(ext)) {
           invalidFiles.push(relativeFilePath);
         }
       }
@@ -60,7 +62,7 @@ function validateMemoryFiles(memoryDir, memoryType = "cache") {
       const ext = path.extname(file).toLowerCase();
       core.error(`  - ${file} (extension: ${ext || "(no extension)"})`);
     });
-    core.error(`Allowed extensions: ${allowedExtensions.join(", ")}`);
+    core.error(`Allowed extensions: ${extensions.join(", ")}`);
     return { valid: false, invalidFiles };
   }
 

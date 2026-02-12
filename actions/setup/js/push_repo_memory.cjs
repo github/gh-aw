@@ -17,6 +17,7 @@ const { execGitSync } = require("./git_helpers.cjs");
  *   BRANCH_NAME: Branch name to push to
  *   MAX_FILE_SIZE: Maximum file size in bytes
  *   MAX_FILE_COUNT: Maximum number of files per commit
+ *   ALLOWED_EXTENSIONS: JSON array of allowed file extensions (e.g., '[".json",".txt"]')
  *   FILE_GLOB_FILTER: Optional space-separated list of file patterns (e.g., "*.md metrics/** data/**")
  *                     Supports * (matches any chars except /) and ** (matches any chars including /)
  *
@@ -43,6 +44,7 @@ async function main() {
   const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || "10240", 10);
   const maxFileCount = parseInt(process.env.MAX_FILE_COUNT || "100", 10);
   const fileGlobFilter = process.env.FILE_GLOB_FILTER || "";
+  const allowedExtensions = process.env.ALLOWED_EXTENSIONS ? JSON.parse(process.env.ALLOWED_EXTENSIONS) : [".json", ".jsonl", ".txt", ".md", ".csv"];
   const ghToken = process.env.GH_TOKEN;
   const githubRunId = process.env.GITHUB_RUN_ID || "unknown";
 
@@ -51,6 +53,7 @@ async function main() {
   core.info(`  MEMORY_ID: ${memoryId}`);
   core.info(`  MAX_FILE_SIZE: ${maxFileSize}`);
   core.info(`  MAX_FILE_COUNT: ${maxFileCount}`);
+  core.info(`  ALLOWED_EXTENSIONS: ${JSON.stringify(allowedExtensions)}`);
   core.info(`  FILE_GLOB_FILTER: ${fileGlobFilter ? `"${fileGlobFilter}"` : "(empty - all files accepted)"}`);
   core.info(`  FILE_GLOB_FILTER length: ${fileGlobFilter.length}`);
 
@@ -243,9 +246,9 @@ async function main() {
 
   // Validate file types before copying
   const { validateMemoryFiles } = require("./validate_memory_files.cjs");
-  const validation = validateMemoryFiles(sourceMemoryPath, "repo");
+  const validation = validateMemoryFiles(sourceMemoryPath, "repo", allowedExtensions);
   if (!validation.valid) {
-    core.setFailed(`File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+    core.setFailed(`File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only ${allowedExtensions.join(", ")} are allowed.`);
     return;
   }
 

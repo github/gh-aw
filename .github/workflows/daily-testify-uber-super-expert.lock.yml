@@ -1187,6 +1187,7 @@ jobs:
           BRANCH_NAME: memory/testify-expert
           MAX_FILE_SIZE: 51200
           MAX_FILE_COUNT: 100
+          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
           FILE_GLOB_FILTER: "memory/testify-expert/*.json memory/testify-expert/*.txt"
         with:
           script: |

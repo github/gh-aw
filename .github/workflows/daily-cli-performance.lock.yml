@@ -1296,6 +1296,7 @@ jobs:
           BRANCH_NAME: memory/cli-performance
           MAX_FILE_SIZE: 512000
           MAX_FILE_COUNT: 100
+          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
           FILE_GLOB_FILTER: "memory/cli-performance/*.json memory/cli-performance/*.jsonl memory/cli-performance/*.txt"
         with:
           script: |

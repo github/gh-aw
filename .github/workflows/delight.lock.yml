@@ -1195,6 +1195,7 @@ jobs:
           BRANCH_NAME: memory/delight
           MAX_FILE_SIZE: 102400
           MAX_FILE_COUNT: 100
+          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
           FILE_GLOB_FILTER: "memory/delight/*.json memory/delight/*.md"
         with:
           script: |
