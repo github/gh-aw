@@ -32,6 +32,12 @@ func TestMCPValidateWorkflowName(t *testing.T) {
 			shouldSucceed: false,
 			errorContains: "Run 'gh aw status' to see all available workflows",
 		},
+		{
+			name:          "error includes fuzzy matched suggestions for similar names",
+			workflowName:  "brave-test", // Similar to "brave" workflow
+			shouldSucceed: false,
+			errorContains: "workflow 'brave-test' not found",
+		},
 	}
 
 	for _, tt := range tests {
