@@ -3,6 +3,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { getMessages } = require("./messages_core.cjs");
+const { safeInfo, safeDebug, safeWarning, safeError } = require("./sanitized_logging.cjs");
 
 /**
  * Update the activation comment with a link to the created pull request or issue
@@ -13,7 +14,6 @@ const { getMessages } = require("./messages_core.cjs");
  * @param {number} itemNumber - Number of the item (pull request or issue)
  * @param {string} itemType - Type of item: "pull_request" or "issue" (defaults to "pull_request")
  */
-const { safeInfo, safeDebug, safeWarning, safeError } = require("./sanitized_logging.cjs");
 async function updateActivationComment(github, context, core, itemUrl, itemNumber, itemType = "pull_request") {
   const itemLabel = itemType === "issue" ? "issue" : "pull request";
   const linkMessage = itemType === "issue" ? `\n\n✅ Issue created: [#${itemNumber}](${itemUrl})` : `\n\n✅ Pull request created: [#${itemNumber}](${itemUrl})`;

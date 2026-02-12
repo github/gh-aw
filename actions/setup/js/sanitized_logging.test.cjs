@@ -174,10 +174,10 @@ describe("Integration tests", () => {
   });
 
   it("should prevent workflow command injection in user-generated noop message", () => {
-    const userMessage = 'No changes needed ::set-output name=hack::compromised';
+    const userMessage = "No changes needed ::set-output name=hack::compromised";
     safeInfo(`No-op message: ${userMessage}`);
     const callArg = core.info.mock.calls[0][0];
-    
+
     // Verify :: is neutralized
     expect(callArg).toContain(":\u200B:");
     expect(callArg).not.toContain("::");
@@ -187,7 +187,7 @@ describe("Integration tests", () => {
     const title = "Bug report ::add-mask::secret123";
     safeInfo(`Created issue: ${title}`);
     const callArg = core.info.mock.calls[0][0];
-    
+
     expect(callArg).toContain(":\u200B:");
     expect(callArg).not.toContain("::");
   });
@@ -196,7 +196,7 @@ describe("Integration tests", () => {
     const body = "This is a comment\n::warning file=x.js::injected";
     safeInfo(`Comment body: ${body}`);
     const callArg = core.info.mock.calls[0][0];
-    
+
     expect(callArg).toContain(":\u200B:");
     expect(callArg).not.toContain("::");
   });
