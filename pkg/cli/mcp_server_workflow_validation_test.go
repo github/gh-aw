@@ -1,0 +1,51 @@
+//go:build !integration
+
+package cli
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestMCPValidateWorkflowName(t *testing.T) {
+	tests := []struct {
+		name          string
+		workflowName  string
+		shouldSucceed bool
+		errorContains string
+	}{
+		{
+			name:          "empty workflow name is valid (all workflows)",
+			workflowName:  "",
+			shouldSucceed: true,
+		},
+		{
+			name:          "non-existent workflow returns error",
+			workflowName:  "nonexistent-workflow-xyz-12345",
+			shouldSucceed: false,
+			errorContains: "workflow 'nonexistent-workflow-xyz-12345' not found",
+		},
+		{
+			name:          "error includes suggestions",
+			workflowName:  "invalid-name",
+			shouldSucceed: false,
+			errorContains: "Run 'gh aw status' to see all available workflows",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateWorkflowName(tt.workflowName)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err, "Validation should succeed for workflow: %s", tt.workflowName)
+			} else {
+				assert.Error(t, err, "Validation should fail for workflow: %s", tt.workflowName)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains, "Error message should contain expected text")
+				}
+			}
+		})
+	}
+}
