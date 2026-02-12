@@ -41,7 +41,6 @@ func mcpErrorData(v any) json.RawMessage {
 func NewMCPServerCommand() *cobra.Command {
 	var port int
 	var cmdPath string
-	var actor string
 
 	cmd := &cobra.Command{
 		Use:   "mcp-server",
@@ -63,10 +62,9 @@ The server provides the following tools:
   - fix         - Apply automatic codemod-style fixes to workflow files
 
 Access Control:
-  The --actor flag specifies the GitHub username for role-based access control.
-  If not provided, it defaults to the GITHUB_ACTOR environment variable.
-  The actor's repository role (admin, maintain, write, etc.) determines which
-  tools are available. Tools requiring elevated permissions (logs, audit) are only
+  The GITHUB_ACTOR environment variable specifies the GitHub username for role-based
+  access control. The actor's repository role (admin, maintain, write, etc.) determines
+  which tools are available. Tools requiring elevated permissions (logs, audit) are only
   mounted for users with at least write access to the repository.
 
 By default, the server uses stdio transport. Use the --port flag to run
@@ -74,19 +72,17 @@ an HTTP server with SSE (Server-Sent Events) transport instead.
 
 Examples:
   gh aw mcp-server                                  # Run with stdio transport (default for MCP clients)
-  gh aw mcp-server --actor octocat                  # Run with specific actor for access control
   gh aw mcp-server --port 8080                      # Run HTTP server on port 8080 (for web-based clients)
   gh aw mcp-server --cmd ./gh-aw                    # Use custom gh-aw binary path
-  GITHUB_ACTOR=octocat gh aw mcp-server             # Use environment variable for actor
-  DEBUG=mcp:* gh aw mcp-server --actor octocat      # Run with verbose logging for debugging`,
+  GITHUB_ACTOR=octocat gh aw mcp-server             # Set actor via environment variable for access control
+  DEBUG=mcp:* GITHUB_ACTOR=octocat gh aw mcp-server # Run with verbose logging and actor`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runMCPServer(port, cmdPath, actor)
+			return runMCPServer(port, cmdPath)
 		},
 	}
 
 	cmd.Flags().IntVarP(&port, "port", "p", 0, "Port to run HTTP server on (uses stdio if not specified)")
 	cmd.Flags().StringVar(&cmdPath, "cmd", "", "Path to gh aw command to use (defaults to 'gh aw')")
-	cmd.Flags().StringVar(&actor, "actor", "", "GitHub username for role-based access control (defaults to GITHUB_ACTOR environment variable)")
 
 	return cmd
 }
@@ -112,17 +108,15 @@ func checkAndLogGHVersion() {
 }
 
 // runMCPServer starts the MCP server on stdio or HTTP transport
-func runMCPServer(port int, cmdPath string, actor string) error {
-	// Resolve actor from flag or environment variable
-	if actor == "" {
-		actor = os.Getenv("GITHUB_ACTOR")
-	}
+func runMCPServer(port int, cmdPath string) error {
+	// Get actor from environment variable
+	actor := os.Getenv("GITHUB_ACTOR")
 
 	if actor != "" {
 		mcpLog.Printf("Using actor: %s", actor)
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Actor: %s", actor)))
 	} else {
-		mcpLog.Print("No actor specified (--actor flag or GITHUB_ACTOR environment variable)")
+		mcpLog.Print("No actor specified (GITHUB_ACTOR environment variable)")
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No actor specified - some tools may be unavailable without proper access control"))
 	}
 
