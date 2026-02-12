@@ -226,9 +226,42 @@ kill $(cat /tmp/server.pid) 2>/dev/null || true
 rm -f /tmp/server.pid /tmp/slides-preview.html /tmp/slides-preview-updated.html /tmp/server.log
 ```
 
-## Step 9: Create Pull Request (if changes made)
+## Step 9: Report Your Actions (REQUIRED)
 
-If you made changes to `docs/slides/index.md`, create a pull request with:
+**CRITICAL**: You MUST call one of the safe output tools before completing:
+
+### If NO changes were made:
+
+Call the `noop` tool to report completion:
+
+```json
+{
+  "message": "Slide deck maintenance complete - no changes needed",
+  "details": {
+    "slides_reviewed": 49,
+    "layout_issues_found": 0,
+    "content_errors_found": 0,
+    "sources_checked": ["code", "docs", "workflows"],
+    "focus_mode": "${{ inputs.focus }}",
+    "next_recommended_focus": "feature-deep-dive or area to review next"
+  }
+}
+```
+
+**Why this matters**: The `noop` tool records that you completed your work successfully 
+even though no code changes were made. Without this, the workflow will be marked as failed.
+
+### If changes WERE made:
+
+Proceed to Step 10 to create a pull request.
+
+**Important Note**: Safe output tools (`noop`, `create_pull_request`, etc.) are MCP tools 
+available through your standard tool calling interface. Call them directly - do NOT try to 
+invoke them via bash commands, npm scripts, or curl requests.
+
+## Step 10: Create Pull Request (if changes made)
+
+If you made changes to `docs/slides/index.md`, call the `create_pull_request` tool with:
 
 **Title**: `[slides] Update slide deck - [brief description]`
 
@@ -257,12 +290,15 @@ ${{ inputs.focus }}
 
 **Labels**: `documentation`, `automated`, `slides`
 
-## Summary
+## Completion Checklist
 
-After completing your work, provide:
-- Number of slides reviewed
-- Number of layout issues detected and fixed
-- Key content updates made
-- Source areas scanned (code/workflows/docs)
-- PR link (if created)
-- Next recommended focus area for the next run
+Before finishing, ensure you have:
+
+- [ ] Built and tested slides (or documented why not possible)
+- [ ] Scanned repository content for accuracy
+- [ ] Detected and documented any layout issues
+- [ ] Made changes if needed
+- [ ] **Called `noop` OR `create_pull_request`** ← REQUIRED
+
+**Remember**: Safe output tools are MCP tools - call them through your tool interface, 
+not via bash/shell commands.
