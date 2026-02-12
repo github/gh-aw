@@ -15,7 +15,7 @@ async function main() {
   const runUrl = context.payload.repository ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
   core.info(`Reaction type: ${reaction}`);
-  core.info(`Command name: ${command || "none"}`);
+  safeInfo(`Command name: ${command || "none"}`);
   core.info(`Run ID: ${runId}`);
   core.info(`Run URL: ${runUrl}`);
 

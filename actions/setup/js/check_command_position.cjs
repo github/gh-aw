@@ -64,7 +64,7 @@ async function main() {
     const trimmedText = text.trim();
     const firstWord = trimmedText.split(/\s+/)[0];
 
-    core.info(`Checking command position. First word in text: ${firstWord}`);
+    safeInfo(`Checking command position. First word in text: ${firstWord}`);
     core.info(`Looking for commands: ${commands.map(c => `/${c}`).join(", ")}`);
 
     // Check if any of the commands match
@@ -79,12 +79,12 @@ async function main() {
     }
 
     if (matchedCommand) {
-      core.info(`✓ Command '/${matchedCommand}' matched at the start of the text`);
+      safeInfo(`✓ Command '/${matchedCommand}' matched at the start of the text`);
       core.setOutput("command_position_ok", "true");
       core.setOutput("matched_command", matchedCommand);
     } else {
       const expectedCommands = commands.map(c => `/${c}`).join(", ");
-      core.warning(`⚠️ None of the commands [${expectedCommands}] matched the first word (found: '${firstWord}'). Workflow will be skipped.`);
+      safeWarning(`⚠️ None of the commands [${expectedCommands}] matched the first word (found: '${firstWord}'). Workflow will be skipped.`);
       core.setOutput("command_position_ok", "false");
       core.setOutput("matched_command", "");
     }

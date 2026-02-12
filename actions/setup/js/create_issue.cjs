@@ -580,7 +580,7 @@ async function main(config = {}) {
           core.info("✓ Successfully linked issue #" + issue.number + " as sub-issue of #" + effectiveParentIssueNumber);
         } catch (error) {
           safeInfo(`Warning: Could not link sub-issue to parent: ${getErrorMessage(error)}`);
-          core.info(`Error details: ${error instanceof Error ? error.stack : String(error)}`);
+          safeInfo(`Error details: ${error instanceof Error ? error.stack : String(error)}`);
           // Fallback: add a comment if sub-issue linking fails
           try {
             core.info(`Attempting fallback: adding comment to parent issue #${effectiveParentIssueNumber}...`);

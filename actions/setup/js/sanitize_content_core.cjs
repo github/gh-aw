@@ -302,8 +302,8 @@ function neutralizeAllMentions(s) {
   // This prevents bypass patterns like "test_@user" from escaping sanitization
   return s.replace(/(^|[^A-Za-z0-9`])@([A-Za-z0-9](?:[A-Za-z0-9_-]{0,37}[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?)/g, (m, p1, p2) => {
     // Log when a mention is escaped to help debug issues
-    if (typeof core !== "undefined" && core.info) {
-      core.info(`Escaped mention: @${p2} (not in allowed list)`);
+    if (typeof core !== "undefined" && typeof core.info === "function") {
+      safeInfo(`Escaped mention: @${p2} (not in allowed list)`);
     }
     return `${p1}\`@${p2}\``;
   });

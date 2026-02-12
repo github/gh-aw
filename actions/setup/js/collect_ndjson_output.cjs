@@ -192,7 +192,7 @@ async function main() {
         core.info(`[INGESTION] Expected output types full config: ${JSON.stringify(expectedOutputTypes)}`);
       } catch (error) {
         const errorMsg = getErrorMessage(error);
-        core.info(`Warning: Could not parse safe-outputs config: ${errorMsg}`);
+        safeInfo(`Warning: Could not parse safe-outputs config: ${errorMsg}`);
       }
     }
     // Parse JSONL (JSON Lines) format: each line is a separate JSON object

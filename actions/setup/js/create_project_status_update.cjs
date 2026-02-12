@@ -39,14 +39,14 @@ function logGraphQLError(error, operation) {
     safeInfo(`Errors array (${error.errors.length} error(s)):`);
     error.errors.forEach((err, idx) => {
       safeInfo(`  [${idx + 1}] ${err.message}`);
-      if (err.type) core.info(`      Type: ${err.type}`);
-      if (err.path) core.info(`      Path: ${JSON.stringify(err.path)}`);
-      if (err.locations) core.info(`      Locations: ${JSON.stringify(err.locations)}`);
+      if (err.type) safeInfo(`      Type: ${err.type}`);
+      if (err.path) safeInfo(`      Path: ${JSON.stringify(err.path)}`);
+      if (err.locations) safeInfo(`      Locations: ${JSON.stringify(err.locations)}`);
     });
   }
 
-  if (error.request) core.info(`Request: ${JSON.stringify(error.request, null, 2)}`);
-  if (error.data) core.info(`Response data: ${JSON.stringify(error.data, null, 2)}`);
+  if (error.request) safeInfo(`Request: ${JSON.stringify(error.request, null, 2)}`);
+  if (error.data) safeInfo(`Response data: ${JSON.stringify(error.data, null, 2)}`);
 }
 
 /**
