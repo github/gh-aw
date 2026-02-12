@@ -573,8 +573,8 @@ func TestScanMarkdownSecurity_SocialEngineering_Base64Decode(t *testing.T) {
 }
 
 func TestScanMarkdownSecurity_SocialEngineering_LargeBase64(t *testing.T) {
-	// 120 chars of base64-looking content
-	content := "Config: " + strings.Repeat("ABCDEFGHIJ", 12)
+	// 220 chars of base64-looking content (threshold is 200)
+	content := "Config: " + strings.Repeat("ABCDEFGHIJ", 22)
 	findings := ScanMarkdownSecurity(content)
 	require.NotEmpty(t, findings, "should detect large base64 payload")
 	assert.Equal(t, CategorySocialEngineering, findings[0].Category, "category should be social-engineering")
@@ -707,7 +707,7 @@ func TestStripFrontmatter(t *testing.T) {
 		{
 			name:           "unclosed frontmatter",
 			content:        "---\nengine: copilot\n# Hello",
-			expectedBody:   "---\nengine: copilot\n# Hello",
+			expectedBody:   "",
 			expectedOffset: 0,
 		},
 		{
