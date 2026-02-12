@@ -360,10 +360,13 @@ This workflow tests body: (null) for backward compatibility.
 		t.Fatal("Expected update-issue configuration to be parsed")
 	}
 
-	// With FieldParsingBoolValue mode, null values result in nil pointer
-	// The handler will default to true via AddBoolPtrOrDefault
+	// With FieldParsingBoolValue mode, null values are treated as true (explicit enablement)
 	// This maintains backward compatibility where body: enables body updates
-	if workflowData.SafeOutputs.UpdateIssues.Body != nil {
-		t.Fatal("Expected body to be nil when set to null (will default to true in handler)")
+	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
+		t.Fatal("Expected body to be non-nil when set to null")
 	}
+	
+	if !*workflowData.SafeOutputs.UpdateIssues.Body {
+		t.Fatal("Expected body to be true when set to null (backward compatibility)")
+}
 }

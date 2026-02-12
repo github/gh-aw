@@ -78,7 +78,8 @@ func TestParseUpdateEntityBoolField(t *testing.T) {
 			configMap: map[string]any{"title": nil},
 			fieldName: "title",
 			mode:      FieldParsingBoolValue,
-			wantNil:   true, // Non-bool values return nil
+			wantNil:   false,  // Nil values are treated as true (explicit enablement)
+			wantValue: true,   // Defaults to true for backward compatibility
 		},
 		{
 			name:      "bool value mode: string value (not a bool)",

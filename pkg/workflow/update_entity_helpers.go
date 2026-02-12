@@ -233,7 +233,13 @@ func parseUpdateEntityBoolField(configMap map[string]any, fieldName string, mode
 		if boolVal, ok := val.(bool); ok {
 			return &boolVal
 		}
-		// If present but not a bool (e.g., null), return nil (no explicit setting)
+		// If value is explicitly nil (not a bool), treat as true (explicit enablement)
+		// This maintains backward compatibility where body: null enables the field
+		if val == nil {
+			trueVal := true
+			return &trueVal
+		}
+		// For other non-bool values (like strings), return nil (invalid config)
 		return nil
 
 	default:
