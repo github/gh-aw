@@ -1145,6 +1145,146 @@ func TestValidateMainWorkflowFrontmatterWithSchema(t *testing.T) {
 			errContains: "maxProperties",
 		},
 		{
+			name: "valid: workflow_dispatch with all valid input types",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"string_input": map[string]any{
+								"description": "String input",
+								"type":        "string",
+								"default":     "default value",
+							},
+							"choice_input": map[string]any{
+								"description": "Choice input",
+								"type":        "choice",
+								"options":     []string{"option1", "option2", "option3"},
+								"default":     "option1",
+							},
+							"boolean_input": map[string]any{
+								"description": "Boolean input",
+								"type":        "boolean",
+								"default":     true,
+							},
+							"number_input": map[string]any{
+								"description": "Number input",
+								"type":        "number",
+								"default":     42,
+							},
+							"environment_input": map[string]any{
+								"description": "Environment input",
+								"type":        "environment",
+								"default":     "production",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'text'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "text",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'int'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "int",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'bool'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "bool",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'select'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "select",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'dropdown'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "dropdown",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
+			name: "invalid: workflow_dispatch with invalid input type 'checkbox'",
+			frontmatter: map[string]any{
+				"on": map[string]any{
+					"workflow_dispatch": map[string]any{
+						"inputs": map[string]any{
+							"test_input": map[string]any{
+								"description": "Test input",
+								"type":        "checkbox",
+							},
+						},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "value must be one of 'string', 'choice', 'boolean', 'number', 'environment'",
+		},
+		{
 			name: "valid metadata with various key-value pairs",
 			frontmatter: map[string]any{
 				"on": "workflow_dispatch",
