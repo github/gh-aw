@@ -1,82 +1,82 @@
 {
-  "run_date": "2026-02-12T06:32:00Z",
-  "run_id": "21936141489",
-  "total_prs_triaged": 4,
-  "new_prs": 4,
+  "run_date": "2026-02-12T12:23:50Z",
+  "run_id": "21946390800",
+  "total_prs_triaged": 2,
+  "new_prs": 2,
   "re_triaged": 0,
   "results": [
     {
-      "number": 15097,
-      "title": "[WIP] Add support for safe-outputs.body to update issue body",
-      "category": "feature",
-      "risk": "medium",
-      "priority": 32,
-      "action": "defer",
-      "wip": true,
-      "ci_status": "pending"
-    },
-    {
-      "number": 15096,
-      "title": "[WIP] Update strict mode to warn without failing on action pin resolution",
+      "number": 15142,
+      "title": "Add prototype pollution protection to parseJsonWithRepair with stack-based algorithm",
       "category": "bug",
-      "risk": "medium",
-      "priority": 43,
-      "action": "defer",
-      "wip": true,
-      "ci_status": "pending"
-    },
-    {
-      "number": 15095,
-      "title": "Add build setup to Daily Syntax Error Quality Check workflow",
-      "category": "chore",
-      "risk": "low",
-      "priority": 40,
+      "subcategory": "security",
+      "risk": "high",
+      "priority": {
+        "total": 95,
+        "impact": 50,
+        "urgency": 30,
+        "quality": 15
+      },
       "action": "fast_track",
-      "wip": false,
-      "ci_status": "pending"
+      "ci_status": "pending",
+      "files_changed": 7,
+      "total_changes": 516,
+      "created_at": "2026-02-12T11:53:27Z",
+      "updated_at": "2026-02-12T12:20:29Z",
+      "url": "https://github.com/github/gh-aw/pull/15142"
     },
     {
       "number": 15084,
-      "title": "[WIP] Add support for --actor flag in mcp-server command",
+      "title": "Add support for GITHUB_ACTOR environment variable and --validate-actor flag in mcp-server command",
       "category": "feature",
       "risk": "medium",
-      "priority": 38,
-      "action": "defer",
-      "wip": true,
-      "ci_status": "pending"
+      "priority": {
+        "total": 48,
+        "impact": 30,
+        "urgency": 8,
+        "quality": 10
+      },
+      "action": "batch_review",
+      "ci_status": "pending",
+      "files_changed": 27,
+      "total_changes": 399,
+      "created_at": "2026-02-12T04:05:18Z",
+      "updated_at": "2026-02-12T12:20:49Z",
+      "url": "https://github.com/github/gh-aw/pull/15084"
     }
   ],
   "statistics": {
     "by_category": {
-      "docs": 0,
       "bug": 1,
-      "feature": 2,
+      "feature": 1,
+      "docs": 0,
       "test": 0,
       "formatting": 0,
       "refactor": 0,
-      "chore": 1
+      "chore": 0
     },
     "by_risk": {
-      "low": 1,
-      "medium": 3,
-      "high": 0
+      "low": 0,
+      "medium": 1,
+      "high": 1
     },
     "by_priority": {
-      "high": 0,
-      "medium": 2,
-      "low": 2
+      "high": 1,
+      "medium": 1,
+      "low": 0
     },
     "by_action": {
-      "defer": 3,
-      "fast_track": 1,
       "auto_merge": 0,
-      "batch_review": 0,
+      "fast_track": 1,
+      "batch_review": 1,
+      "defer": 0,
       "close": 0
     }
   },
   "auto_merge_candidates": [],
-  "fast_track_needed": [15095],
-  "batches": {},
+  "fast_track_needed": [15142],
+  "batch_review_candidates": [15084],
+  "defer_candidates": [],
   "close_candidates": [],
-  "defer_candidates": [15097, 15096, 15084]
+  "batches": {}
 }
