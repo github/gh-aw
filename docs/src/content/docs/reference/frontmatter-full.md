@@ -1517,6 +1517,12 @@ tools:
     # (optional)
     scope: "workflow"
 
+    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [".json",
+    # ".jsonl", ".txt", ".md", ".csv"]
+    # (optional)
+    allowed-extensions: []
+      # Array of strings
+
   # Option 4: Array of cache-memory configurations for multiple caches
   cache-memory: []
     # Array items: object
@@ -1713,6 +1719,12 @@ tools:
     # Create orphaned branch if it doesn't exist (default: true)
     # (optional)
     create-orphan: true
+
+    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [".json",
+    # ".jsonl", ".txt", ".md", ".csv"]
+    # (optional)
+    allowed-extensions: []
+      # Array of strings
 
   # Option 4: Array of repo-memory configurations for multiple memory locations
   repo-memory: []
