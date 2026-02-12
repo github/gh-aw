@@ -30,6 +30,21 @@ safe-outputs:
     close-older-issues: true
 timeout-minutes: 20
 strict: true
+steps:
+  - name: Setup Go
+    uses: actions/setup-go@v5
+    with:
+      go-version: "1.23"
+      cache: true
+      
+  - name: Build gh-aw
+    run: |
+      make build
+      
+  - name: Verify gh-aw installation
+    run: |
+      ./gh-aw --version
+      echo "gh-aw binary is ready at ./gh-aw"
 imports:
   - shared/mood.md
   - shared/reporting.md
