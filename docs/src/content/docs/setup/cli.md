@@ -517,12 +517,19 @@ gh aw pr transfer <pr-url> --repo target-owner/target-repo
 Run MCP server exposing gh-aw commands as tools. Spawns subprocesses to isolate GitHub tokens.
 
 ```bash wrap
-gh aw mcp-server              # stdio transport
-gh aw mcp-server --port 8080  # HTTP server with SSE
+gh aw mcp-server                      # stdio transport
+gh aw mcp-server --port 8080          # HTTP server with SSE
+gh aw mcp-server --validate-actor     # Enable actor validation
 ```
 
-**Options:** `--port`, `--cmd`
+**Options:**
+- `--port`: HTTP server port for SSE transport
+- `--cmd`: Custom command for subprocess execution
+- `--validate-actor`: Enforce actor validation for logs and audit tools
+
 **Available Tools:** status, compile, logs, audit, mcp-inspect, add, update
+
+**Actor Validation:** When `--validate-actor` is enabled, logs and audit tools require write+ repository access. The server uses `GITHUB_ACTOR` and `GITHUB_REPOSITORY` environment variables to validate permissions via GitHub API. Permission checks are cached for 1 hour.
 
 See [MCP Server Guide](/gh-aw/setup/mcp-server/).
 

@@ -156,13 +156,17 @@ function sanitizeDomainName(domain) {
   // Filter out empty parts
   const nonEmptyParts = sanitizedParts.filter(part => part.length > 0);
 
-  // Take up to 3 parts
-  if (nonEmptyParts.length <= 3) {
-    return nonEmptyParts.join(".");
-  } else {
-    // Take first 3 parts and add "..."
-    return nonEmptyParts.slice(0, 3).join(".") + "...";
+  // Join the parts back together
+  const joined = nonEmptyParts.join(".");
+
+  // If the domain is longer than 48 characters, truncate to show first 24 and last 24
+  if (joined.length > 48) {
+    const first24 = joined.substring(0, 24);
+    const last24 = joined.substring(joined.length - 24);
+    return first24 + "…" + last24;
   }
+
+  return joined;
 }
 
 /**

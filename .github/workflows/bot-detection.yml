@@ -1,10 +1,9 @@
 name: Bot Detection
-description: "Detect potential bots by analyzing comment similarity. DOI: https://doi.org/10.1145/3387940.3391503"
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 3 * * *"  # daily
+    - cron: "0 * * * *"
 
 permissions:
   contents: read
@@ -15,335 +14,429 @@ jobs:
   detect-bots:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Python
-        uses: actions/setup-python@v5
+      - name: Detect brand new accounts with suspicious activity
+        uses: actions/github-script@v7
         with:
-          python-version: "3.11"
+          script: |
+            const HOURS_BACK = 6;
+            const MAX_PR = 50;
+            const MIN_ACCOUNT_AGE_DAYS = 14;
 
-      - name: Install dependencies
-        run: pip install requests
+            const cutoff = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000);
 
-      - name: Run bot detection
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          python << 'EOF'
-          import os, requests, datetime, itertools, math, threading
-          from collections import defaultdict
-          from concurrent.futures import ThreadPoolExecutor, as_completed
+            const fs = require('fs');
+            function appendSummary(markdown) {
+              const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+              if (!summaryPath) return;
+              fs.appendFileSync(summaryPath, `${markdown}\n`);
+            }
 
-          TOKEN = os.environ["GH_TOKEN"]
-          REPO = os.environ["REPO"]
-          HEADERS = {"Authorization": f"Bearer {TOKEN}"}
-
-          DAYS_BACK = 3
-          MAX_PR = 200
-          MIN_MESSAGES = 25
-          EPS = 0.22
-          BOT_CLUSTER_THRESHOLD = 10
-          MAX_WORKERS = 10  # Parallel API requests
-
-          cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=DAYS_BACK)
-
-          def gh(url):
-              r = requests.get(url, headers=HEADERS)
-              r.raise_for_status()
-              return r.json()
-
-          def gh_paginated(url, key=None):
-              """Fetch all paginated results from GitHub API"""
-              results = []
-              page = 1
-              while True:
-                  paginated_url = f"{url}&page={page}&per_page=100" if "?" in url else f"{url}?page={page}&per_page=100"
-                  data = gh(paginated_url)
-                  if not data:
-                      break
-                  results.extend(data)
-                  if len(data) < 100:
-                      break
-                  page += 1
-              return results
-
-          # -----------------------------
-          # Fetch PRs
-          # -----------------------------
-          prs = gh(f"https://api.github.com/repos/{REPO}/pulls?state=all&per_page=100&sort=updated&direction=desc")
-          user_created_dates = {}  # Cache user account creation dates
-          user_cache_lock = threading.Lock()
-
-          comments_by_author = defaultdict(list)
-          comment_details = defaultdict(list)  # Track PR/issue links and timestamps
-          new_accounts = []  # Track accounts created recently (< 7 days)
-
-          def fetch_pr_comments(pr):
-              """Fetch comments for a single PR"""
-              try:
-                  if datetime.datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ") < cutoff:
-                      return []
-                  
-                  number = pr["number"]
-                  issue_comments = gh_paginated(f"https://api.github.com/repos/{REPO}/issues/{number}/comments")
-                  review_comments = gh_paginated(f"https://api.github.com/repos/{REPO}/pulls/{number}/comments")
-                  return [(number, c) for c in (issue_comments + review_comments)]
-              except:
-                  return []
-
-          # Fetch all comments in parallel
-          all_pr_comments = []
-          with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-              futures = [executor.submit(fetch_pr_comments, pr) for pr in prs[:MAX_PR]]
-              for future in as_completed(futures):
-                  all_pr_comments.extend(future.result())
-
-          # Collect unique users that need account age lookup
-          users_to_fetch = set()
-          for number, c in all_pr_comments:
-              created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
-              if created < cutoff:
-                  continue
-              user = c.get("user", {})
-              login = user.get("login")
-              if login:
-                  users_to_fetch.add(login)
-
-          # Fetch all user account creation dates in parallel
-          def fetch_user_info(login):
-              try:
-                  user_info = gh(f"https://api.github.com/users/{login}")
-                  if user_info:
-                      created_at = datetime.datetime.strptime(
-                          user_info.get("created_at", ""), "%Y-%m-%dT%H:%M:%SZ"
-                      )
-                      return (login, created_at)
-              except:
-                  pass
-              return (login, None)
-
-          with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-              futures = [executor.submit(fetch_user_info, login) for login in users_to_fetch]
-              for future in as_completed(futures):
-                  login, created_at = future.result()
-                  user_created_dates[login] = created_at
-
-          # Process comments
-          for number, c in all_pr_comments:
-              created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
-              if created < cutoff:
-                  continue
-              user = c.get("user", {})
-              login = user.get("login")
-              if not login:
-                  continue
-              
-              # Check if account is suspiciously new (< 7 days old)
-              account_created = user_created_dates.get(login)
-              if account_created and (cutoff - account_created).days < 7:
-                  new_accounts.append((login, (cutoff - account_created).days))
-              
-              comments_by_author[login].append(c["body"])
-              
-              # Track comment details: PR#, URL, and timestamp
-              comment_url = c.get("html_url", f"https://github.com/{REPO}/pull/{number}#comment")
-              comment_details[login].append({
-                  "pr": number,
-                  "url": comment_url,
-                  "timestamp": c["created_at"]
-              })
-
-          # -----------------------------
-          # Distance metrics
-          # -----------------------------
-          def levenshtein(a, b):
-              if len(a) < len(b):
-                  a, b = b, a
-              prev = range(len(b) + 1)
-              for i, ca in enumerate(a):
-                  curr = [i + 1]
-                  for j, cb in enumerate(b):
-                      insert = prev[j + 1] + 1
-                      delete = curr[j] + 1
-                      replace = prev[j] + (ca != cb)
-                      curr.append(min(insert, delete, replace))
-                  prev = curr
-              return prev[-1]
-
-          def jaccard(a, b):
-              sa = set(a.split())
-              sb = set(b.split())
-              if not sa and not sb:
-                  return 0
-              return 1 - len(sa & sb) / len(sa | sb)
-
-          # -----------------------------
-          # DBSCAN (precomputed distance)
-          # -----------------------------
-          def dbscan(dist_matrix, eps):
-              n = len(dist_matrix)
-              labels = [-1] * n
-              cluster_id = 0
-
-              for i in range(n):
-                  if labels[i] != -1:
-                      continue
-
-                  neighbors = [j for j in range(n) if dist_matrix[i][j] <= eps]
-
-                  if not neighbors:
-                      continue
-
-                  labels[i] = cluster_id
-                  seeds = neighbors[:]
-
-                  while seeds:
-                      j = seeds.pop()
-                      if labels[j] == -1:
-                          labels[j] = cluster_id
-                          new_neighbors = [
-                              k for k in range(n)
-                              if dist_matrix[j][k] <= eps
-                          ]
-                          seeds.extend(new_neighbors)
-
-                  cluster_id += 1
-
-              return labels
-
-          # Analyze authors (limit sample size for performance)
-          results = []
-          suspicious_unknowns = []  # Track accounts that warrant investigation
-          MAX_MESSAGES_TO_ANALYZE = 100  # Cap on messages to analyze per author
-
-          for author, messages in comments_by_author.items():
-              # Check for new bots: few messages that are all very similar
-              if 3 <= len(messages) < MIN_MESSAGES:
-                  norm = [m.lower().strip() for m in messages[:MAX_MESSAGES_TO_ANALYZE]]
-                  
-                  # Quick check: all identical
-                  if len(set(norm)) == 1:
-                      results.append((author, 1, len(messages)))
-                      continue
-                  
-                  # Check if messages are very similar (likely AI bot)
-                  n = len(norm)
-                  if n >= 2:
-                      # Fast similarity check: sample pairs if too many
-                      similarity_sum = 0
-                      pair_count = 0
-                      pairs = list(itertools.combinations(range(n), 2))
-                      sample_pairs = pairs if len(pairs) <= 20 else pairs[::len(pairs)//20]
-                      
-                      for i, j in sample_pairs:
-                          L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]), 1)
-                          J = jaccard(norm[i], norm[j])
-                          D = (L + J) / 2
-                          similarity_sum += D
-                          pair_count += 1
-                      
-                      # If average distance is very low (< 0.15), messages are nearly identical
-                      avg_distance = similarity_sum / pair_count if pair_count > 0 else 0
-                      if avg_distance < 0.15:
-                          # Cluster into 1 group if all very similar
-                          results.append((author, 1, len(messages)))
-                      else:
-                          # Flag as suspicious unknown: few messages with unusual patterns
-                          suspicious_unknowns.append((author, len(messages), avg_distance))
-                      continue
-              
-              if len(messages) < MIN_MESSAGES:
-                  continue
-
-              # Limit messages analyzed for large authors
-              norm = [m.lower().strip() for m in messages[:MAX_MESSAGES_TO_ANALYZE]]
-
-              n = len(norm)
-              dist_matrix = [[0]*n for _ in range(n)]
-
-              # Only compute distance matrix for reasonable numbers of messages
-              if n > 50:
-                  # For authors with many messages, sample pairs
-                  pair_count = 0
-                  max_pairs = 500  # Limit pairwise comparisons
-                  for i in range(n):
-                      for j in range(i+1, min(n, i+10)):  # Compare with nearby messages
-                          L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
-                          J = jaccard(norm[i], norm[j])
-                          D = (L + J) / 2
-                          dist_matrix[i][j] = D
-                          dist_matrix[j][i] = D
-                          pair_count += 1
-                          if pair_count >= max_pairs:
-                              break
-                      if pair_count >= max_pairs:
-                          break
-              else:
-                  # Full matrix for small message counts
-                  for i, j in itertools.combinations(range(n), 2):
-                      L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
-                      J = jaccard(norm[i], norm[j])
-                      D = (L + J) / 2
-                      dist_matrix[i][j] = D
-                      dist_matrix[j][i] = D
-
-              labels = dbscan(dist_matrix, EPS)
-              clusters = len(set(labels))
-
-              results.append((author, clusters, len(messages)))
-
-          # -----------------------------
-          # Build report
-          # -----------------------------
-          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
-          body = f"# Bot Detection Report — {today}\n\n"
-          body += f"Parameters: eps={EPS}, threshold={BOT_CLUSTER_THRESHOLD}\n\n"
-
-          body += "## Likely Bots\n"
-          for author, clusters, count in sorted(results, key=lambda x: x[1]):
-              if clusters <= BOT_CLUSTER_THRESHOLD:
-                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(author, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
-
-          body += "\n## Likely Humans\n"
-          for author, clusters, count in sorted(results, key=lambda x: -x[1]):
-              if clusters > BOT_CLUSTER_THRESHOLD:
-                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
-
-          if suspicious_unknowns:
-              body += "\n## Suspicious/Unknown Contributors\n"
-              body += "Accounts with few messages and unusual patterns (may warrant investigation):\n\n"
-              for author, count, avg_dist in sorted(suspicious_unknowns, key=lambda x: x[1]):
-                  body += f"- **{author}** — messages={count}, similarity={avg_dist:.2f}\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(author, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
-
-          if new_accounts:
-              body += "\n## 🚨 HIGH RISK: Brand New Accounts (< 7 days old)\n"
-              body += "Recently-created accounts often indicate bots, spam accounts, or malicious actors:\n\n"
-              # Deduplicate new accounts
-              seen_accounts = {}
-              for login, days_old in sorted(new_accounts, key=lambda x: x[1]):
-                  if login not in seen_accounts:
-                      seen_accounts[login] = days_old
-              
-              for login, days_old in sorted(seen_accounts.items(), key=lambda x: x[1]):
-                  body += f"- **{login}** — account age: {days_old} days\n"
-                  # Add links to their comments
-                  for detail in comment_details.get(login, []):
-                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
-
-          requests.post(
-              f"https://api.github.com/repos/{REPO}/issues",
-              headers=HEADERS,
-              json={
-                  "title": f"Bot Detection Report — {today}",
-                  "body": body
+            function buildAccountSummaryTable(sortedAccounts, limit) {
+              const baseRepoURL = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+              function linkCount(count, url) {
+                if (!count) return '0';
+                return `[${count}](${url})`;
               }
-          )
-          EOF
+
+              const rows = [];
+              const capped = sortedAccounts.slice(0, limit);
+              for (const [login, data] of capped) {
+                const encodedLogin = encodeURIComponent(login);
+                const openIssues = (data.issues || []).filter(i => i.state === 'open').length;
+                const closedIssues = (data.issues || []).filter(i => i.state === 'closed').length;
+                const openPRs = (data.prs || []).filter(p => p.state === 'open').length;
+                const closedPRs = (data.prs || []).filter(p => p.state === 'closed').length;
+                const comments = (data.comments || []).length;
+
+                const openIssuesLink = linkCount(openIssues, `${baseRepoURL}/issues?q=is%3Aissue+is%3Aopen+author%3A${encodedLogin}`);
+                const closedIssuesLink = linkCount(closedIssues, `${baseRepoURL}/issues?q=is%3Aissue+is%3Aclosed+author%3A${encodedLogin}`);
+                const openPRsLink = linkCount(openPRs, `${baseRepoURL}/pulls?q=is%3Apr+is%3Aopen+author%3A${encodedLogin}`);
+                const closedPRsLink = linkCount(closedPRs, `${baseRepoURL}/pulls?q=is%3Apr+is%3Aclosed+author%3A${encodedLogin}`);
+                const commentsLink = linkCount(comments, `${baseRepoURL}/issues?q=commenter%3A${encodedLogin}`);
+
+                rows.push(`| @${login} | ${data.daysOld}d | ${openIssuesLink} | ${closedIssuesLink} | ${openPRsLink} | ${closedPRsLink} | ${commentsLink} |`);
+              }
+
+              const header = [
+                '| Account | Age | Issues (open) | Issues (closed) | PRs (open) | PRs (closed) | Comments |',
+                '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+              ];
+
+              let table = header.concat(rows).join('\n');
+              if (sortedAccounts.length > capped.length) {
+                table += `\n\n_And ${sortedAccounts.length - capped.length} more account(s) not shown in summary._`;
+              }
+              return table;
+            }
+
+            // Fetch recent PRs (up to MAX_PR)
+            const prs = [];
+            if (github.paginate?.iterator) {
+              for await (const response of github.paginate.iterator(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc',
+                per_page: 100,
+              })) {
+                prs.push(...response.data);
+                if (prs.length >= MAX_PR) break;
+              }
+            } else {
+              const { data } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc',
+                per_page: Math.min(100, MAX_PR),
+              });
+              prs.push(...data);
+            }
+
+            const highRiskAccounts = new Map();
+            const commentsByUser = new Map();
+            const userCreatedDates = new Map();
+            const accountsSeen = new Set();
+            let userLookupFailures = 0;
+
+            async function ensureUserCreatedDate(login) {
+              if (!login) return;
+              accountsSeen.add(login);
+              if (userCreatedDates.has(login)) return;
+              try {
+                const { data: userInfo } = await github.rest.users.getByUsername({ username: login });
+                userCreatedDates.set(login, new Date(userInfo.created_at));
+              } catch (e) {
+                userLookupFailures += 1;
+                userCreatedDates.set(login, null);
+              }
+            }
+
+            for (const pr of prs.slice(0, MAX_PR)) {
+              if (new Date(pr.updated_at) < cutoff) continue;
+
+              await ensureUserCreatedDate(pr.user?.login);
+
+              const issueComments = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.issues.listComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                })) {
+                  issueComments.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                });
+                issueComments.push(...data);
+              }
+
+              const reviewComments = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.pulls.listReviewComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                })) {
+                  reviewComments.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.pulls.listReviewComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                });
+                reviewComments.push(...data);
+              }
+
+              // Review submissions (e.g., "LGTM" reviews) are NOT included in listReviewComments.
+              const reviews = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.pulls.listReviews, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                })) {
+                  reviews.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.pulls.listReviews({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                });
+                reviews.push(...data);
+              }
+
+              for (const comment of [...issueComments, ...reviewComments]) {
+                if (new Date(comment.created_at) < cutoff) continue;
+                const login = comment.user?.login;
+                if (!login) continue;
+
+                await ensureUserCreatedDate(login);
+
+                if (!commentsByUser.has(login)) {
+                  commentsByUser.set(login, []);
+                }
+                commentsByUser.get(login).push({
+                  pr: pr.number,
+                  url: comment.html_url,
+                  timestamp: comment.created_at,
+                });
+              }
+
+              for (const review of reviews) {
+                const submittedAt = review.submitted_at || review.submittedAt;
+                if (!submittedAt) continue;
+                if (new Date(submittedAt) < cutoff) continue;
+
+                const login = review.user?.login;
+                if (!login) continue;
+
+                await ensureUserCreatedDate(login);
+
+                if (!commentsByUser.has(login)) {
+                  commentsByUser.set(login, []);
+                }
+
+                const reviewURL = review.html_url || `${pr.html_url}#pullrequestreview-${review.id}`;
+                commentsByUser.get(login).push({
+                  pr: pr.number,
+                  url: reviewURL,
+                  timestamp: submittedAt,
+                });
+              }
+            }
+
+            // Also consider recent issue creators (not just PR comments).
+            // This helps catch new accounts that only opened issues/PRs (even if already closed).
+            try {
+              const { data: recentIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                since: cutoff.toISOString(),
+                per_page: 100,
+              });
+
+              for (const issue of recentIssues) {
+                await ensureUserCreatedDate(issue.user?.login);
+              }
+            } catch (e) {
+              // If issue listing fails, continue with PR/comment-based detection.
+            }
+
+            // Identify high-risk accounts
+            const now = new Date();
+            for (const [login, createdDate] of userCreatedDates) {
+              if (!createdDate) continue;
+
+              const daysOld = Math.floor((now - createdDate) / (24 * 60 * 60 * 1000));
+              if (daysOld < MIN_ACCOUNT_AGE_DAYS) {
+                highRiskAccounts.set(login, {
+                  daysOld,
+                  comments: commentsByUser.get(login) || [],
+                  issues: [],
+                  prs: [],
+                });
+              }
+            }
+
+            if (highRiskAccounts.size === 0) {
+              let msg = `✅ Bot Detection: no high-risk accounts (<${MIN_ACCOUNT_AGE_DAYS}d) detected in last ${HOURS_BACK}h.`;
+              if (accountsSeen.size > 0) {
+                msg += ` Checked ${accountsSeen.size} unique account(s).`;
+              }
+              if (userLookupFailures > 0) {
+                msg += ` ⚠️ ${userLookupFailures} account lookup(s) failed.`;
+              }
+              appendSummary(msg);
+              return;
+            }
+
+            // Fetch additional activity for high-risk accounts
+            for (const [login, data] of highRiskAccounts) {
+
+              try {
+                const { data: issues } = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  creator: login,
+                  state: 'all',
+                });
+                data.issues = issues
+                  .filter(i => !i.pull_request)
+                  .filter(i => new Date(i.created_at) >= cutoff)
+                  .map(i => ({
+                    number: i.number,
+                    title: i.title,
+                    state: i.state,
+                    created_at: i.created_at,
+                    html_url: i.html_url,
+                  }));
+              } catch (e) {
+                console.log(`Could not fetch issues for ${login}`);
+              }
+
+              try {
+                const { data: prList } = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'all',
+                  per_page: 100,
+                });
+                data.prs = prList
+                  .filter(p => p.user?.login === login && new Date(p.created_at) >= cutoff)
+                  .map(p => ({
+                    number: p.number,
+                    title: p.title,
+                    state: p.state,
+                    created_at: p.created_at,
+                    html_url: p.html_url,
+                  }));
+              } catch (e) {
+                console.log(`Could not fetch PRs for ${login}`);
+              }
+            }
+
+            // Skip alerting if everything found is already closed.
+            let hasAnyOpenItem = false;
+            for (const [, data] of highRiskAccounts) {
+              if (data.issues?.some(i => i.state === 'open')) {
+                hasAnyOpenItem = true;
+                break;
+              }
+              if (data.prs?.some(p => p.state === 'open')) {
+                hasAnyOpenItem = true;
+                break;
+              }
+            }
+
+            if (!hasAnyOpenItem) {
+              console.log('No open issues or PRs from new accounts; skipping alert issue.');
+
+              const sorted = Array.from(highRiskAccounts.entries()).sort((a, b) => a[1].daysOld - b[1].daysOld);
+              appendSummary(`ℹ️ Bot Detection: ${highRiskAccounts.size} new account(s) (<${MIN_ACCOUNT_AGE_DAYS}d) found in last ${HOURS_BACK}h, but all related issues/PRs are closed. No alert issue created.`);
+              appendSummary('');
+              appendSummary(buildAccountSummaryTable(sorted, 20));
+              return;
+            }
+
+            // Build report
+            const today = new Date().toISOString().split('T')[0];
+            // Mention a maintainer for timely triage.
+            let body = `@pelikhan\n\nRecently-created accounts often indicate bots, spam accounts, or coordinated attacks.\n\n`;
+
+            const sorted = Array.from(highRiskAccounts.entries()).sort((a, b) => a[1].daysOld - b[1].daysOld);
+
+            for (const [login, data] of sorted) {
+              body += `## @${login}\n`;
+              body += `**Account age:** ${data.daysOld} day(s) old\n\n`;
+
+              if (data.issues && data.issues.length > 0) {
+                body += `### Issues Opened (${data.issues.length})\n`;
+                for (const issue of data.issues) {
+                  body += `- ${issue.html_url} (${issue.created_at})\n`;
+                }
+                body += `\n`;
+              }
+
+              if (data.prs && data.prs.length > 0) {
+                body += `### Pull Requests Opened (${data.prs.length})\n`;
+                for (const pr of data.prs) {
+                  body += `- ${pr.html_url} (${pr.created_at})\n`;
+                }
+                body += `\n`;
+              }
+
+              if (data.comments && data.comments.length > 0) {
+                body += `### Comments (${data.comments.length})\n`;
+                for (const comment of data.comments.slice(0, 10)) {
+                  body += `- ${comment.url} (${comment.timestamp})\n`;
+                }
+                if (data.comments.length > 10) {
+                  body += `- ... and ${data.comments.length - 10} more comments\n`;
+                }
+                body += `\n`;
+              }
+
+              if (!data.issues?.length && !data.prs?.length && !data.comments?.length) {
+                body += `*(No issues, PRs, or comments in the last ${HOURS_BACK} hours)*\n\n`;
+              }
+            }
+
+            console.log('\nCreating security alert issue...');
+              const title = `🚨 HIGH RISK: Brand New Accounts — ${today}`;
+              let existingIssueNumber;
+
+              try {
+                const { data: existingIssues } = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  per_page: 100,
+                });
+
+                const existing = existingIssues.find(i => i.title === title);
+                if (existing?.number) {
+                  existingIssueNumber = existing.number;
+                }
+              } catch (e) {
+                // If listing issues fails, fall back to creating a new issue.
+              }
+
+            try {
+                if (existingIssueNumber) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existingIssueNumber,
+                    body,
+                  });
+                  appendSummary(`🚨 Bot Detection: updated alert issue #${existingIssueNumber} (found ${highRiskAccounts.size} new account(s) in last ${HOURS_BACK}h).`);
+                } else {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title,
+                    body,
+                    labels: ['security', 'bot-detection'],
+                  });
+                  appendSummary(`🚨 Bot Detection: created alert issue (found ${highRiskAccounts.size} new account(s) in last ${HOURS_BACK}h).`);
+                }
+            } catch (e) {
+                console.log('Issue create/update with labels failed; retrying without labels...');
+                if (existingIssueNumber) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existingIssueNumber,
+                    body,
+                  });
+                  appendSummary(`🚨 Bot Detection: updated alert issue #${existingIssueNumber} (labels failed).`);
+                } else {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title,
+                    body,
+                  });
+                  appendSummary('🚨 Bot Detection: created alert issue (labels failed).');
+                }
+            }
+
+            // Include a compact breakdown in the Step Summary for quick triage.
+            appendSummary('');
+            appendSummary(buildAccountSummaryTable(sorted, 20));

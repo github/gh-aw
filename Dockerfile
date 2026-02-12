@@ -35,9 +35,10 @@ WORKDIR /workspace
 # Set the entrypoint to gh-aw
 ENTRYPOINT ["gh-aw"]
 
-# Default command runs MCP server
-# Note: Binary path detection is automatic via os.Executable()
-CMD ["mcp-server"]
+# Default command runs MCP server with actor validation enabled
+# The GITHUB_ACTOR environment variable must be set for logs and audit tools to be available
+# Binary path detection is automatic via os.Executable()
+CMD ["mcp-server", "--validate-actor"]
 
 # Metadata labels
 LABEL org.opencontainers.image.source="https://github.com/github/gh-aw"

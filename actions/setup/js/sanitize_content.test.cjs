@@ -570,9 +570,9 @@ describe("sanitize_content.cjs", () => {
       expect(sanitizeDomainName("a.b.c")).toBe("a.b.c");
     });
 
-    it("should truncate domains with more than 3 parts", () => {
-      expect(sanitizeDomainName("a.b.c.d.com")).toBe("a.b.c...");
-      expect(sanitizeDomainName("one.two.three.four.five.com")).toBe("one.two.three...");
+    it("should keep domains under 48 characters unchanged", () => {
+      expect(sanitizeDomainName("a.b.c.d.com")).toBe("a.b.c.d.com");
+      expect(sanitizeDomainName("one.two.three.four.five.com")).toBe("one.two.three.four.five.com");
     });
 
     it("should remove non-alphanumeric characters from each part", () => {
@@ -615,8 +615,15 @@ describe("sanitize_content.cjs", () => {
       expect(sanitizeDomainName("@#$")).toBe("");
     });
 
-    it("should truncate with ... for 4+ parts after sanitization", () => {
-      expect(sanitizeDomainName("alpha.beta.gamma.delta.epsilon.com")).toBe("alpha.beta.gamma...");
+    it("should truncate domains longer than 48 characters to show first 24 and last 24", () => {
+      // This domain is 52 characters long
+      const longDomain = "very.long.subdomain.name.with.many.parts.example.com";
+      const result = sanitizeDomainName(longDomain);
+      expect(result.length).toBe(49); // 24 + 1 (ellipsis) + 24
+      expect(result).toBe("very.long.subdomain.name…h.many.parts.example.com");
+
+      // Another long domain test
+      expect(sanitizeDomainName("alpha.beta.gamma.delta.epsilon.com")).toBe("alpha.beta.gamma.delta.epsilon.com");
     });
 
     it("should handle mixed case domains", () => {
@@ -631,12 +638,12 @@ describe("sanitize_content.cjs", () => {
 
     it("should apply sanitization in actual URL redaction for HTTP", () => {
       const result = sanitizeContent("Visit http://sub.example.malicious.com/path");
-      expect(result).toContain("(sub.example.malicious.../redacted)");
+      expect(result).toContain("(sub.example.malicious.com/redacted)");
     });
 
     it("should apply sanitization in actual URL redaction for HTTPS", () => {
       const result = sanitizeContent("Visit https://very.deep.nested.subdomain.evil.com/path");
-      expect(result).toContain("(very.deep.nested.../redacted)");
+      expect(result).toContain("(very.deep.nested.subdomain.evil.com/redacted)");
     });
 
     it("should handle domains with special characters in URL context", () => {
@@ -651,18 +658,19 @@ describe("sanitize_content.cjs", () => {
       expect(result).toContain("(test.com/redacted)");
     });
 
-    it("should handle subdomain with 3 parts correctly", () => {
-      // api.v2.example.com has 4 parts, so it will be truncated
+    it("should handle subdomain with multiple parts correctly", () => {
+      // api.v2.example.com is under 48 chars, so it stays unchanged
       const result = sanitizeContent("Visit http://api.v2.example.com/endpoint");
-      expect(result).toContain("(api.v2.example.../redacted)");
+      expect(result).toContain("(api.v2.example.com/redacted)");
     });
 
-    it("should handle 5+ part domains", () => {
-      expect(sanitizeDomainName("a.b.c.d.e.f.com")).toBe("a.b.c...");
+    it("should handle domains with many parts", () => {
+      // Under 48 chars - not truncated
+      expect(sanitizeDomainName("a.b.c.d.e.f.com")).toBe("a.b.c.d.e.f.com");
     });
 
     it("should handle domains starting with numbers", () => {
-      expect(sanitizeDomainName("123.456.example.com")).toBe("123.456.example...");
+      expect(sanitizeDomainName("123.456.example.com")).toBe("123.456.example.com");
     });
 
     it("should handle single part domain", () => {
