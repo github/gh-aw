@@ -233,6 +233,30 @@ func generateGitHubScriptWithRequire(scriptPath string) string {
 	return script.String()
 }
 
+// generateInlineGitHubScriptStep generates a simple inline github-script step
+// for validation or utility operations that don't require artifact downloads.
+//
+// Parameters:
+//   - stepName: The name of the step (e.g., "Validate cache-memory file types")
+//   - script: The JavaScript code to execute (pre-formatted with proper indentation)
+//   - condition: Optional if condition (e.g., "always()"). Empty string means no condition.
+//
+// Returns a string containing the complete YAML for the github-script step.
+func generateInlineGitHubScriptStep(stepName, script, condition string) string {
+	var step strings.Builder
+
+	step.WriteString("      - name: " + stepName + "\n")
+	if condition != "" {
+		step.WriteString("        if: " + condition + "\n")
+	}
+	step.WriteString("        uses: " + GetActionPin("actions/github-script") + "\n")
+	step.WriteString("        with:\n")
+	step.WriteString("          script: |\n")
+	step.WriteString(script)
+
+	return step.String()
+}
+
 // generateSetupStep generates the setup step based on the action mode.
 // In script mode, it runs the setup.sh script directly from the checked-out source.
 // In other modes (dev/release), it uses the setup action.

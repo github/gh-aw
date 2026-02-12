@@ -305,12 +305,12 @@ This is a test workflow with multiple cache-memory entries.
 		t.Error("Expected 'Create prompt with built-in context' step in generated workflow")
 	}
 
-	// Test 2: Verify plural form is used for multiple caches
-	if !strings.Contains(lockStr, "Cache Folders Available") {
-		t.Error("Expected 'Cache Folders Available' (plural) header for multiple caches")
+	// Test 2: Verify multi-cache template file is referenced
+	if !strings.Contains(lockStr, "cache_memory_prompt_multi.md") {
+		t.Error("Expected 'cache_memory_prompt_multi.md' template file reference for multiple caches")
 	}
 
-	// Test 3: Verify both cache directories are mentioned
+	// Test 3: Verify both cache directories are mentioned in environment variables
 	if !strings.Contains(lockStr, "/tmp/gh-aw/cache-memory/") {
 		t.Error("Expected '/tmp/gh-aw/cache-memory/' reference for default cache")
 	}
