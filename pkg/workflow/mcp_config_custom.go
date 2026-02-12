@@ -263,7 +263,12 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 				if argIndex == len(mcpConfig.EntrypointArgs)-1 {
 					argComma = ""
 				}
-				fmt.Fprintf(yaml, "%s  \"%s\"%s\n", renderer.IndentLevel, arg, argComma)
+				// Replace template expressions with environment variable references
+				argValue := arg
+				if renderer.RequiresCopilotFields {
+					argValue = ReplaceTemplateExpressionsWithEnvVars(argValue)
+				}
+				fmt.Fprintf(yaml, "%s  \"%s\"%s\n", renderer.IndentLevel, argValue, argComma)
 			}
 			fmt.Fprintf(yaml, "%s]%s\n", renderer.IndentLevel, comma)
 		case "mounts":
@@ -279,7 +284,12 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 				if mountIndex == len(mcpConfig.Mounts)-1 {
 					mountComma = ""
 				}
-				fmt.Fprintf(yaml, "%s  \"%s\"%s\n", renderer.IndentLevel, mount, mountComma)
+				// Replace template expressions with environment variable references
+				mountValue := mount
+				if renderer.RequiresCopilotFields {
+					mountValue = ReplaceTemplateExpressionsWithEnvVars(mountValue)
+				}
+				fmt.Fprintf(yaml, "%s  \"%s\"%s\n", renderer.IndentLevel, mountValue, mountComma)
 			}
 			fmt.Fprintf(yaml, "%s]%s\n", renderer.IndentLevel, comma)
 		case "command":
@@ -324,7 +334,14 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 					if i > 0 {
 						yaml.WriteString(", ")
 					}
-					fmt.Fprintf(yaml, "\"%s\" = \"%s\"", envKey, mcpConfig.Env[envKey])
+					// Replace template expressions with environment variable references for TOML
+					envValue := mcpConfig.Env[envKey]
+					// For TOML, we use direct shell variable syntax without backslash
+					envValue = strings.ReplaceAll(envValue, "${{ secrets.", "${")
+					envValue = strings.ReplaceAll(envValue, "${{ env.", "${")
+					envValue = strings.ReplaceAll(envValue, "${{ github.workspace }}", "${GITHUB_WORKSPACE}")
+					envValue = strings.ReplaceAll(envValue, " }}", "}")
+					fmt.Fprintf(yaml, "\"%s\" = \"%s\"", envKey, envValue)
 				}
 				yaml.WriteString(" }\n")
 			} else {
@@ -363,8 +380,15 @@ func renderSharedMCPConfig(yaml *strings.Builder, toolName string, toolConfig ma
 						// Use passthrough syntax: "VAR_NAME": "\\${VAR_NAME}"
 						fmt.Fprintf(yaml, "%s  \"%s\": \"\\${%s}\"%s\n", renderer.IndentLevel, envKey, envKey, envComma)
 					} else {
-						// Use existing env value
-						fmt.Fprintf(yaml, "%s  \"%s\": \"%s\"%s\n", renderer.IndentLevel, envKey, mcpConfig.Env[envKey], envComma)
+						// Replace template expressions with environment variable references
+						// This prevents template injection by using shell variable substitution
+						// instead of GitHub Actions template expansion
+						envValue := mcpConfig.Env[envKey]
+						if renderer.RequiresCopilotFields {
+							// For Copilot, replace all template expressions with \${VAR} syntax
+							envValue = ReplaceTemplateExpressionsWithEnvVars(envValue)
+						}
+						fmt.Fprintf(yaml, "%s  \"%s\": \"%s\"%s\n", renderer.IndentLevel, envKey, envValue, envComma)
 					}
 				}
 				fmt.Fprintf(yaml, "%s}%s\n", renderer.IndentLevel, comma)

@@ -580,8 +580,8 @@ jobs:
               "agenticworkflows": {
                 "type": "stdio",
                 "container": "localhost/gh-aw:dev",
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
-                "args": ["--network", "host", "-w", "${{ github.workspace }}"],
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "args": ["--network", "host", "-w", "\${GITHUB_WORKSPACE}"],
                 "env": {
                   "DEBUG": "*",
                   "GITHUB_TOKEN": "\${GITHUB_TOKEN}"
@@ -610,7 +610,7 @@ jobs:
                   "*"
                 ],
                 "env": {
-                  "BRAVE_API_KEY": "${{ secrets.BRAVE_API_KEY }}"
+                  "BRAVE_API_KEY": "\${BRAVE_API_KEY}"
                 }
               },
               "context7": {
@@ -621,7 +621,7 @@ jobs:
                   "resolve-library-id"
                 ],
                 "env": {
-                  "CONTEXT7_API_KEY": "${{ secrets.CONTEXT7_API_KEY }}"
+                  "CONTEXT7_API_KEY": "\${CONTEXT7_API_KEY}"
                 }
               },
               "datadog": {
@@ -677,9 +677,9 @@ jobs:
                   "get_eventstream_definition"
                 ],
                 "env": {
-                  "AZURE_CLIENT_ID": "${{ secrets.AZURE_CLIENT_ID }}",
-                  "AZURE_CLIENT_SECRET": "${{ secrets.AZURE_CLIENT_SECRET }}",
-                  "AZURE_TENANT_ID": "${{ secrets.AZURE_TENANT_ID }}"
+                  "AZURE_CLIENT_ID": "\${AZURE_CLIENT_ID}",
+                  "AZURE_CLIENT_SECRET": "\${AZURE_CLIENT_SECRET}",
+                  "AZURE_TENANT_ID": "\${AZURE_TENANT_ID}"
                 }
               },
               "github": {
@@ -730,7 +730,7 @@ jobs:
                   "query_database"
                 ],
                 "env": {
-                  "NOTION_API_TOKEN": "${{ secrets.NOTION_API_TOKEN }}"
+                  "NOTION_API_TOKEN": "\${NOTION_API_TOKEN}"
                 }
               },
               "safeoutputs": {
@@ -765,9 +765,9 @@ jobs:
                   "get_doc"
                 ],
                 "env": {
-                  "OPENAI_API_KEY": "${{ secrets.SENTRY_OPENAI_API_KEY }}",
-                  "SENTRY_ACCESS_TOKEN": "${{ secrets.SENTRY_ACCESS_TOKEN }}",
-                  "SENTRY_HOST": "${{ env.SENTRY_HOST }}"
+                  "OPENAI_API_KEY": "\${SENTRY_OPENAI_API_KEY}",
+                  "SENTRY_ACCESS_TOKEN": "\${SENTRY_ACCESS_TOKEN}",
+                  "SENTRY_HOST": "\${SENTRY_HOST}"
                 }
               },
               "serena": {
@@ -775,8 +775,8 @@ jobs:
                 "container": "ghcr.io/github/serena-mcp-server:latest",
                 "args": ["--network", "host"],
                 "entrypoint": "serena",
-                "entrypointArgs": ["start-mcp-server", "--context", "codex", "--project", "${{ github.workspace }}"],
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw"]
+                "entrypointArgs": ["start-mcp-server", "--context", "codex", "--project", "\${GITHUB_WORKSPACE}"],
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"]
               },
               "tavily": {
                 "type": "http",

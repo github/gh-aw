@@ -461,7 +461,7 @@ jobs:
                   "*"
                 ],
                 "env": {
-                  "BRAVE_API_KEY": "${{ secrets.BRAVE_API_KEY }}"
+                  "BRAVE_API_KEY": "\${BRAVE_API_KEY}"
                 }
               },
               "github": {

@@ -788,9 +788,9 @@ jobs:
             "--context",
             "codex",
             "--project",
-            "${{ github.workspace }}"
+            "${GITHUB_WORKSPACE}"
           ]
-          mounts = ["${{ github.workspace }}:${{ github.workspace }}:rw"]
+          mounts = ["${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw"]
           GH_AW_MCP_CONFIG_EOF
           
           # Generate JSON config for MCP gateway
@@ -849,9 +849,9 @@ jobs:
                   "--context",
                   "codex",
                   "--project",
-                  "${{ github.workspace }}"
+                  "\${GITHUB_WORKSPACE}"
                 ],
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw"]
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"]
               }
             },
             "gateway": {

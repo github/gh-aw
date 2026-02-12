@@ -429,9 +429,9 @@ const DefaultGhBinaryMount = "/usr/bin/gh:/usr/bin/gh:ro"
 const DefaultTmpGhAwMount = "/tmp/gh-aw:/tmp/gh-aw:rw"
 
 // DefaultWorkspaceMount is the mount path for the GitHub workspace directory in containerized MCP servers
-// Uses GitHub Actions expression syntax which expands to the actual workspace path at runtime
-// This is required when MCP servers need read-write access to repository files
-const DefaultWorkspaceMount = "${{ github.workspace }}:${{ github.workspace }}:rw"
+// Security: Uses GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+// The GITHUB_WORKSPACE environment variable is automatically set by GitHub Actions and passed to the MCP gateway
+const DefaultWorkspaceMount = "\\${GITHUB_WORKSPACE}:\\${GITHUB_WORKSPACE}:rw"
 
 // DefaultPythonVersion is the default version of Python for runtime setup
 const DefaultPythonVersion Version = "3.12"

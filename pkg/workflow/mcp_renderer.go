@@ -311,7 +311,8 @@ func (r *MCPConfigRendererUnified) renderSerenaTOML(yaml *strings.Builder, seren
 		yaml.WriteString("            \"--context\",\n")
 		yaml.WriteString("            \"codex\",\n")
 		yaml.WriteString("            \"--project\",\n")
-		yaml.WriteString("            \"${{ github.workspace }}\"")
+		// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+		yaml.WriteString("            \"${GITHUB_WORKSPACE}\"")
 
 		// Append custom args if present
 		for _, arg := range customArgs {
@@ -323,7 +324,8 @@ func (r *MCPConfigRendererUnified) renderSerenaTOML(yaml *strings.Builder, seren
 		yaml.WriteString("          ]\n")
 
 		// Add volume mount for workspace access
-		yaml.WriteString("          mounts = [\"${{ github.workspace }}:${{ github.workspace }}:rw\"]\n")
+		// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+		yaml.WriteString("          mounts = [\"${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:rw\"]\n")
 	}
 }
 

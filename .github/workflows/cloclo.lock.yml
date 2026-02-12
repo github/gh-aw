@@ -628,8 +628,8 @@ jobs:
             "mcpServers": {
               "agenticworkflows": {
                 "container": "localhost/gh-aw:dev",
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
-                "args": ["--network", "host", "-w", "${{ github.workspace }}"],
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw", "/tmp/gh-aw:/tmp/gh-aw:rw"],
+                "args": ["--network", "host", "-w", "\${GITHUB_WORKSPACE}"],
                 "env": {
                   "DEBUG": "*",
                   "GITHUB_TOKEN": "$GITHUB_TOKEN"
@@ -680,9 +680,9 @@ jobs:
                   "--context",
                   "codex",
                   "--project",
-                  "${{ github.workspace }}"
+                  "\${GITHUB_WORKSPACE}"
                 ],
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw"]
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"]
               }
             },
             "gateway": {

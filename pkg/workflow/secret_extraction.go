@@ -120,3 +120,80 @@ func ReplaceSecretsWithEnvVars(value string, secrets map[string]string) string {
 	}
 	return result
 }
+
+// ExtractEnvExpressionsFromValue extracts all GitHub Actions env expressions from a string value
+// Returns a map of environment variable names to their full env expressions
+// Examples:
+//   - "${{ env.SENTRY_HOST }}" -> {"SENTRY_HOST": "${{ env.SENTRY_HOST }}"}
+//   - "${{ env.DD_SITE || 'default' }}" -> {"DD_SITE": "${{ env.DD_SITE || 'default' }}"}
+func ExtractEnvExpressionsFromValue(value string) map[string]string {
+	envExpressions := make(map[string]string)
+
+	start := 0
+	for {
+		// Find the start of an expression
+		startIdx := strings.Index(value[start:], "${{ env.")
+		if startIdx == -1 {
+			break
+		}
+		startIdx += start
+
+		// Find the end of the expression
+		endIdx := strings.Index(value[startIdx:], "}}")
+		if endIdx == -1 {
+			break
+		}
+		endIdx += startIdx + 2 // Include the closing }}
+
+		// Extract the full expression
+		fullExpr := value[startIdx:endIdx]
+
+		// Extract the variable name from "env.VARIABLE_NAME" or "env.VARIABLE_NAME ||"
+		envPart := strings.TrimPrefix(fullExpr, "${{ env.")
+		envPart = strings.TrimSuffix(envPart, "}}")
+		envPart = strings.TrimSpace(envPart)
+
+		// Find the variable name (everything before space, ||, or end)
+		varName := envPart
+		if spaceIdx := strings.IndexAny(varName, " |"); spaceIdx != -1 {
+			varName = varName[:spaceIdx]
+		}
+
+		// Store the variable name and full expression
+		if varName != "" {
+			envExpressions[varName] = fullExpr
+			secretLog.Printf("Extracted env expression: %s", varName)
+		}
+
+		start = endIdx
+	}
+
+	return envExpressions
+}
+
+// ReplaceTemplateExpressionsWithEnvVars replaces all template expressions with environment variable references
+// Handles: secrets.*, env.*, and github.workspace
+// Examples:
+//   - "${{ secrets.DD_API_KEY }}" -> "\${DD_API_KEY}"
+//   - "${{ env.SENTRY_HOST }}" -> "\${SENTRY_HOST}"
+//   - "${{ github.workspace }}" -> "\${GITHUB_WORKSPACE}"
+func ReplaceTemplateExpressionsWithEnvVars(value string) string {
+	result := value
+
+	// Extract and replace secrets
+	secrets := ExtractSecretsFromValue(value)
+	for varName, secretExpr := range secrets {
+		result = strings.ReplaceAll(result, secretExpr, "\\${"+varName+"}")
+	}
+
+	// Extract and replace env vars
+	envVars := ExtractEnvExpressionsFromValue(value)
+	for varName, envExpr := range envVars {
+		result = strings.ReplaceAll(result, envExpr, "\\${"+varName+"}")
+	}
+
+	// Replace github.workspace with GITHUB_WORKSPACE env var
+	result = strings.ReplaceAll(result, "${{ github.workspace }}", "\\${GITHUB_WORKSPACE}")
+
+	return result
+}

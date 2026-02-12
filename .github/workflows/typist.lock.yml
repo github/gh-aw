@@ -472,9 +472,9 @@ jobs:
                   "--context",
                   "codex",
                   "--project",
-                  "${{ github.workspace }}"
+                  "\${GITHUB_WORKSPACE}"
                 ],
-                "mounts": ["${{ github.workspace }}:${{ github.workspace }}:rw"]
+                "mounts": ["\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"]
               }
             },
             "gateway": {

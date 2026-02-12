@@ -232,7 +232,8 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 	// Add Docker runtime args:
 	// - --network host: Enables network access for GitHub API calls (gh CLI needs api.github.com)
 	// - -w: Sets working directory to workspace for .github/workflows folder resolution
-	yaml.WriteString("                \"args\": [\"--network\", \"host\", \"-w\", \"${{ github.workspace }}\"],\n")
+	// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+	yaml.WriteString("                \"args\": [\"--network\", \"host\", \"-w\", \"\\${GITHUB_WORKSPACE}\"],\n")
 
 	// Note: tools field is NOT included here - the converter script adds it back
 	// for Copilot. This keeps the gateway config compatible with the schema.
@@ -341,7 +342,8 @@ func renderAgenticWorkflowsMCPConfigTOML(yaml *strings.Builder, actionMode Actio
 	// Add Docker runtime args:
 	// - --network host: Enables network access for GitHub API calls (gh CLI needs api.github.com)
 	// - -w: Sets working directory to workspace for .github/workflows folder resolution
-	yaml.WriteString("          args = [\"--network\", \"host\", \"-w\", \"${{ github.workspace }}\"]\n")
+	// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+	yaml.WriteString("          args = [\"--network\", \"host\", \"-w\", \"${GITHUB_WORKSPACE}\"]\n")
 
 	// Use env_vars array to reference environment variables instead of embedding secrets
 	yaml.WriteString("          env_vars = [\"DEBUG\", \"GITHUB_TOKEN\"]\n")

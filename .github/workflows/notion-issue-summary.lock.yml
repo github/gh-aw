@@ -428,7 +428,7 @@ jobs:
                   "query_database"
                 ],
                 "env": {
-                  "NOTION_API_TOKEN": "${{ secrets.NOTION_API_TOKEN }}"
+                  "NOTION_API_TOKEN": "\${NOTION_API_TOKEN}"
                 }
               },
               "safeoutputs": {

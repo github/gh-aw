@@ -145,8 +145,9 @@ func renderSerenaMCPConfigWithOptions(yaml *strings.Builder, serenaTool any, isL
 		yaml.WriteString("                \"entrypoint\": \"serena\",\n")
 
 		// Entrypoint args for Serena MCP server
+		// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
 		if inlineArgs {
-			yaml.WriteString("                \"entrypointArgs\": [\"start-mcp-server\", \"--context\", \"codex\", \"--project\", \"${{ github.workspace }}\"")
+			yaml.WriteString("                \"entrypointArgs\": [\"start-mcp-server\", \"--context\", \"codex\", \"--project\", \"\\${GITHUB_WORKSPACE}\"")
 			// Append custom args if present
 			writeArgsToYAMLInline(yaml, customArgs)
 			yaml.WriteString("],\n")
@@ -156,7 +157,7 @@ func renderSerenaMCPConfigWithOptions(yaml *strings.Builder, serenaTool any, isL
 			yaml.WriteString("                  \"--context\",\n")
 			yaml.WriteString("                  \"codex\",\n")
 			yaml.WriteString("                  \"--project\",\n")
-			yaml.WriteString("                  \"${{ github.workspace }}\"")
+			yaml.WriteString("                  \"\\${GITHUB_WORKSPACE}\"")
 			// Append custom args if present
 			writeArgsToYAML(yaml, customArgs, "                  ")
 			yaml.WriteString("\n")
@@ -164,7 +165,8 @@ func renderSerenaMCPConfigWithOptions(yaml *strings.Builder, serenaTool any, isL
 		}
 
 		// Add volume mount for workspace access
-		yaml.WriteString("                \"mounts\": [\"${{ github.workspace }}:${{ github.workspace }}:rw\"]\n")
+		// Security: Use GITHUB_WORKSPACE environment variable instead of template expansion to prevent template injection
+		yaml.WriteString("                \"mounts\": [\"\\${GITHUB_WORKSPACE}:\\${GITHUB_WORKSPACE}:rw\"]\n")
 
 		// Note: tools field is NOT included here - the converter script adds it back
 		// for Copilot. This keeps the gateway config compatible with the schema.
