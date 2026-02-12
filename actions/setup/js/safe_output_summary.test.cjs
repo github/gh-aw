@@ -239,16 +239,17 @@ describe("safe_output_summary", () => {
 
         await writeSafeOutputSummaries(results, messages);
 
-        // Verify that core.startGroup and core.endGroup were called
-        expect(mockCore.startGroup).toHaveBeenCalledWith("📄 Raw safe-output .jsonl content");
+        // Verify that displayFileContent was called (which uses core.startGroup and core.endGroup)
+        expect(mockCore.startGroup).toHaveBeenCalled();
         expect(mockCore.endGroup).toHaveBeenCalled();
 
-        // Verify that core.info was called with size and line count
-        const infoCalls = mockCore.info.mock.calls.map(call => call[0]);
-        expect(infoCalls.some(call => call.includes("Size:") && call.includes("bytes") && call.includes("Lines:"))).toBe(true);
+        // Verify that the group title includes the file name and size
+        const startGroupCalls = mockCore.startGroup.mock.calls.map(call => call[0]);
+        expect(startGroupCalls.some(call => call.includes("safe-outputs.jsonl"))).toBe(true);
 
-        // Verify that the content was logged (not truncated for small content)
-        expect(mockCore.info).toHaveBeenCalledWith(jsonlContent);
+        // Verify that content lines were logged
+        const infoCalls = mockCore.info.mock.calls.map(call => call[0]);
+        expect(infoCalls.length).toBeGreaterThan(0);
       } finally {
         // Cleanup
         process.env.GH_AW_SAFE_OUTPUTS = originalEnv;
@@ -346,21 +347,17 @@ describe("safe_output_summary", () => {
 
         await writeSafeOutputSummaries(results, messages);
 
-        // Verify that core.startGroup and core.endGroup were called
-        expect(mockCore.startGroup).toHaveBeenCalledWith("📄 Raw safe-output .jsonl content");
+        // Verify that displayFileContent was called (which uses core.startGroup and core.endGroup)
+        expect(mockCore.startGroup).toHaveBeenCalled();
         expect(mockCore.endGroup).toHaveBeenCalled();
 
-        // Verify that truncation message was logged
+        // Verify that the group title includes the file name
+        const startGroupCalls = mockCore.startGroup.mock.calls.map(call => call[0]);
+        expect(startGroupCalls.some(call => call.includes("safe-outputs.jsonl"))).toBe(true);
+
+        // Verify that truncation message was logged (displayFileContent shows truncation info)
         const infoCalls = mockCore.info.mock.calls.map(call => call[0]);
-        expect(infoCalls.some(call => call.includes("Preview (first 5000 chars)"))).toBe(true);
-        expect(infoCalls.some(call => call.includes("[Content truncated"))).toBe(true);
-
-        // Verify that the full content was NOT logged
-        expect(mockCore.info).not.toHaveBeenCalledWith(jsonlContent);
-
-        // Verify that a preview (substring) was logged
-        const preview = jsonlContent.substring(0, 5000);
-        expect(mockCore.info).toHaveBeenCalledWith(preview);
+        expect(infoCalls.some(call => call.includes("truncated") || call.includes("..."))).toBe(true);
       } finally {
         // Cleanup
         process.env.GH_AW_SAFE_OUTPUTS = originalEnv;

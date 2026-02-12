@@ -8,6 +8,8 @@
  * Each processed safe-output generates a summary enclosed in a <details> section.
  */
 
+const { displayFileContent } = require("./display_file_helpers.cjs");
+
 /**
  * Generate a step summary for a single safe-output message
  * @param {Object} options - Summary generation options
@@ -95,36 +97,20 @@ async function writeSafeOutputSummaries(results, messages) {
   }
 
   // Log the raw .jsonl content from the safe outputs file
-  const fs = require("fs");
   const safeOutputsFile = process.env.GH_AW_SAFE_OUTPUTS;
-  if (safeOutputsFile && fs.existsSync(safeOutputsFile)) {
-    try {
-      const rawContent = fs.readFileSync(safeOutputsFile, "utf8");
-      if (rawContent.trim()) {
-        const contentSize = rawContent.length;
-        const lineCount = rawContent.split("\n").filter(line => line.trim()).length;
-
-        // Define truncation limits
-        const maxPreviewLength = 5000; // First 5000 characters
-        const truncated = contentSize > maxPreviewLength;
-        const preview = truncated ? rawContent.substring(0, maxPreviewLength) : rawContent;
-
-        // Wrap in a log group to reduce spam
-        core.startGroup("📄 Raw safe-output .jsonl content");
-        core.info(`Size: ${contentSize} bytes, Lines: ${lineCount}`);
-
-        if (truncated) {
-          core.info(`Preview (first ${maxPreviewLength} chars):`);
-          core.info(preview);
-          core.info(`[Content truncated - showing first ${maxPreviewLength} of ${contentSize} bytes]`);
-        } else {
-          core.info(preview);
+  if (safeOutputsFile) {
+    const fs = require("fs");
+    if (fs.existsSync(safeOutputsFile)) {
+      try {
+        const content = fs.readFileSync(safeOutputsFile, "utf8");
+        if (content.trim()) {
+          // Use displayFileContent helper to show file with truncation and collapsible group
+          // Pass a filename with .jsonl extension so it's recognized as displayable
+          displayFileContent(safeOutputsFile, "safe-outputs.jsonl", 5000);
         }
-
-        core.endGroup();
+      } catch (error) {
+        core.debug(`Could not read raw safe-output file: ${error instanceof Error ? error.message : String(error)}`);
       }
-    } catch (error) {
-      core.debug(`Could not read raw safe-output file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
