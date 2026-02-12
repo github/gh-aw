@@ -233,7 +233,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"add_labels":{"allowed":["spam","ai-generated","link-spam","ai-inspected"],"max":3},"hide_comment":{"allowed_reasons":["spam"],"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"add_labels":{"allowed":["spam","ai-generated","link-spam","ai-inspected"],"max":3,"target":"*"},"hide_comment":{"allowed_reasons":["spam"],"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
