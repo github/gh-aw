@@ -101,8 +101,27 @@ async function writeSafeOutputSummaries(results, messages) {
     try {
       const rawContent = fs.readFileSync(safeOutputsFile, "utf8");
       if (rawContent.trim()) {
-        core.info("📄 Raw safe-output .jsonl content:");
-        core.info(rawContent);
+        const contentSize = rawContent.length;
+        const lineCount = rawContent.split("\n").filter(line => line.trim()).length;
+
+        // Define truncation limits
+        const maxPreviewLength = 5000; // First 5000 characters
+        const truncated = contentSize > maxPreviewLength;
+        const preview = truncated ? rawContent.substring(0, maxPreviewLength) : rawContent;
+
+        // Wrap in a log group to reduce spam
+        core.startGroup("📄 Raw safe-output .jsonl content");
+        core.info(`Size: ${contentSize} bytes, Lines: ${lineCount}`);
+
+        if (truncated) {
+          core.info(`Preview (first ${maxPreviewLength} chars):`);
+          core.info(preview);
+          core.info(`\n[Content truncated - showing first ${maxPreviewLength} of ${contentSize} bytes]`);
+        } else {
+          core.info(preview);
+        }
+
+        core.endGroup();
       }
     } catch (error) {
       core.debug(`Could not read raw safe-output file: ${error instanceof Error ? error.message : String(error)}`);

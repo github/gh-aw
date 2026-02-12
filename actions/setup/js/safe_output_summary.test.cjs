@@ -8,6 +8,8 @@ const mockCore = {
   info: vi.fn(),
   debug: vi.fn(),
   warning: vi.fn(),
+  startGroup: vi.fn(),
+  endGroup: vi.fn(),
   summary: {
     addRaw: vi.fn().mockReturnThis(),
     write: vi.fn().mockResolvedValue(undefined),
@@ -237,8 +239,15 @@ describe("safe_output_summary", () => {
 
         await writeSafeOutputSummaries(results, messages);
 
-        // Verify that core.info was called with the raw content
-        expect(mockCore.info).toHaveBeenCalledWith("📄 Raw safe-output .jsonl content:");
+        // Verify that core.startGroup and core.endGroup were called
+        expect(mockCore.startGroup).toHaveBeenCalledWith("📄 Raw safe-output .jsonl content");
+        expect(mockCore.endGroup).toHaveBeenCalled();
+
+        // Verify that core.info was called with size and line count
+        const infoCalls = mockCore.info.mock.calls.map(call => call[0]);
+        expect(infoCalls.some(call => call.includes("Size:") && call.includes("bytes") && call.includes("Lines:"))).toBe(true);
+
+        // Verify that the content was logged (not truncated for small content)
         expect(mockCore.info).toHaveBeenCalledWith(jsonlContent);
       } finally {
         // Cleanup
@@ -299,9 +308,59 @@ describe("safe_output_summary", () => {
 
         await writeSafeOutputSummaries(results, messages);
 
-        // Should not log empty content
+        // Should not log empty content or start a log group
+        expect(mockCore.startGroup).not.toHaveBeenCalled();
+        expect(mockCore.endGroup).not.toHaveBeenCalled();
+      } finally {
+        // Cleanup
+        process.env.GH_AW_SAFE_OUTPUTS = originalEnv;
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("should truncate large safe outputs file content", async () => {
+      // Create a temporary .jsonl file with large content (> 5000 bytes)
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-safe-outputs-"));
+      const jsonlFile = path.join(tempDir, "outputs.jsonl");
+
+      // Create content larger than 5000 bytes
+      const largeEntry = { type: "create_issue", title: "Test", body: "a".repeat(5000) };
+      const jsonlContent = JSON.stringify(largeEntry) + "\n" + JSON.stringify(largeEntry);
+      fs.writeFileSync(jsonlFile, jsonlContent, "utf8");
+
+      // Set environment variable
+      const originalEnv = process.env.GH_AW_SAFE_OUTPUTS;
+      process.env.GH_AW_SAFE_OUTPUTS = jsonlFile;
+
+      try {
+        const results = [
+          {
+            type: "create_issue",
+            messageIndex: 0,
+            success: true,
+            result: { repo: "owner/repo", number: 123 },
+          },
+        ];
+
+        const messages = [{ title: "Issue 1" }];
+
+        await writeSafeOutputSummaries(results, messages);
+
+        // Verify that core.startGroup and core.endGroup were called
+        expect(mockCore.startGroup).toHaveBeenCalledWith("📄 Raw safe-output .jsonl content");
+        expect(mockCore.endGroup).toHaveBeenCalled();
+
+        // Verify that truncation message was logged
         const infoCalls = mockCore.info.mock.calls.map(call => call[0]);
-        expect(infoCalls).not.toContain("📄 Raw safe-output .jsonl content:");
+        expect(infoCalls.some(call => call.includes("Preview (first 5000 chars)"))).toBe(true);
+        expect(infoCalls.some(call => call.includes("[Content truncated"))).toBe(true);
+
+        // Verify that the full content was NOT logged
+        expect(mockCore.info).not.toHaveBeenCalledWith(jsonlContent);
+
+        // Verify that a preview (substring) was logged
+        const preview = jsonlContent.substring(0, 5000);
+        expect(mockCore.info).toHaveBeenCalledWith(preview);
       } finally {
         // Cleanup
         process.env.GH_AW_SAFE_OUTPUTS = originalEnv;
