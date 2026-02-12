@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 1d773c2bb30e40025c0c1216fdb5d51d00dfa0505f14af0d63b3f48529cbca64
+# frontmatter-hash: ba8ac38783175d2491cfa23fdbc191b34f88eb3068c3e9b4c795c4c36094a988
 
 name: "Smoke Copilot"
 "on":
@@ -307,7 +307,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"add_comment":{"max":2},"add_labels":{"allowed":["smoke-copilot"],"max":3},"create_issue":{"expires":2,"group":true,"max":1},"dispatch_workflow":{"max":1,"workflow_files":{"haiku-printer":".yml"},"workflows":["haiku-printer"]},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3},"send-slack-message":{"description":"Send a message to Slack (stub for testing)","inputs":{"message":{"default":null,"description":"The message to send","required":true,"type":"string"}},"output":"Slack message stub executed!"}}
+          {"add_comment":{"allowed_repos":["github/gh-aw"],"max":2},"add_labels":{"allowed":["smoke-copilot"],"allowed_repos":["github/gh-aw"],"max":3},"create_issue":{"expires":2,"group":true,"max":1},"dispatch_workflow":{"max":1,"workflow_files":{"haiku-printer":".yml"},"workflows":["haiku-printer"]},"missing_data":{},"missing_tool":{},"noop":{"max":1},"remove_labels":{"allowed":["smoke"],"max":3},"send-slack-message":{"description":"Send a message to Slack (stub for testing)","inputs":{"message":{"default":null,"description":"The message to send","required":true,"type":"string"}},"output":"Slack message stub executed!"}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
@@ -363,6 +363,10 @@ jobs:
                   "item_number": {
                     "description": "The issue, pull request, or discussion number to comment on. This is the numeric ID from the GitHub URL (e.g., 123 in github.com/owner/repo/issues/123). If omitted, the tool will attempt to resolve the target from the current workflow context (triggering issue, PR, or discussion).",
                     "type": "number"
+                  },
+                  "repo": {
+                    "description": "Target repository for this operation in 'owner/repo' format. Must be the target-repo or in the allowed-repos list.",
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -387,6 +391,10 @@ jobs:
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "repo": {
+                    "description": "Target repository for this operation in 'owner/repo' format. Must be the target-repo or in the allowed-repos list.",
+                    "type": "string"
                   }
                 },
                 "type": "object"
@@ -1895,7 +1903,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"dispatch_workflow\":{\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke\"]}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"allowed_repos\":[\"github/gh-aw\"],\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-copilot\"],\"allowed_repos\":[\"github/gh-aw\"]},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"dispatch_workflow\":{\"max\":1,\"workflow_files\":{\"haiku-printer\":\".yml\"},\"workflows\":[\"haiku-printer\"]},\"missing_data\":{},\"missing_tool\":{},\"remove_labels\":{\"allowed\":[\"smoke\"]}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

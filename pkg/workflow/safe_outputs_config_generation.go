@@ -90,10 +90,19 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 			)
 		}
 		if data.SafeOutputs.AddComments != nil {
-			safeOutputsConfig["add_comment"] = generateMaxWithTargetConfig(
+			additionalFields := make(map[string]any)
+			// Note: AddCommentsConfig has Target, TargetRepoSlug, AllowedRepos but not embedded SafeOutputTargetConfig
+			// So we need to construct the target config manually
+			targetConfig := SafeOutputTargetConfig{
+				Target:         data.SafeOutputs.AddComments.Target,
+				TargetRepoSlug: data.SafeOutputs.AddComments.TargetRepoSlug,
+				AllowedRepos:   data.SafeOutputs.AddComments.AllowedRepos,
+			}
+			safeOutputsConfig["add_comment"] = generateTargetConfigWithRepos(
+				targetConfig,
 				data.SafeOutputs.AddComments.Max,
 				1, // default max
-				data.SafeOutputs.AddComments.Target,
+				additionalFields,
 			)
 		}
 		if data.SafeOutputs.CreateDiscussions != nil {
