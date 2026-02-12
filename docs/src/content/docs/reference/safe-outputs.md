@@ -101,6 +101,9 @@ safe-outputs:
     target-repo: "owner/repo"        # cross-repository
 ```
 
+> [!TIP]
+> Use `footer: false` to omit the AI-generated footer while preserving workflow-id markers for searchability. See [Footer Control](/gh-aw/reference/footers/) for details.
+
 #### Auto-Expiration
 
 The `expires` field auto-closes issues after a time period. Supports integers (days), relative formats (`2h`, `7d`, `2w`, `1m`, `1y`), or `false` to disable expiration. Generates `agentics-maintenance.yml` workflow that runs at the minimum required frequency based on the shortest expiration time across all workflows:
@@ -1365,6 +1368,14 @@ Common combinations:
 See:
 - [Projects & Monitoring](/gh-aw/patterns/monitoring/)
 - [Orchestration](/gh-aw/patterns/orchestration/)
+
+## Footer Control
+
+Control whether AI-generated footers are added to created and updated GitHub items. See [Footer Control](/gh-aw/reference/footers/) for complete documentation on:
+- Global and per-handler footer control (`footer: true/false`)
+- XML marker preservation for searchability
+- Customizing footer messages with `messages.footer` template
+- Use cases and examples
 
 ## Custom Messages (`messages:`)
 

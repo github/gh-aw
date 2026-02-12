@@ -178,6 +178,10 @@ Compile Markdown workflows to GitHub Actions YAML with optional static analysis.
 
 Download and analyze workflow logs with timeout handling and size guardrails.
 
+> [!WARNING]
+> Role Requirement
+> This tool requires the workflow actor to have **write, maintain, or admin** repository role. Actors with read or triage access will receive a permission denied error.
+
 **Parameters:**
 - `workflow_name` (optional): Workflow name to download logs for (empty for all)
 - `count` (optional): Number of workflow runs to download (default: 100)
@@ -203,6 +207,10 @@ Download and analyze workflow logs with timeout handling and size guardrails.
 ### audit
 
 Investigate a workflow run, job, or specific step and generate a detailed report.
+
+> [!WARNING]
+> Role Requirement
+> This tool requires the workflow actor to have **write, maintain, or admin** repository role. Actors with read or triage access will receive a permission denied error.
 
 **Parameters:**
 - `run_id_or_url` (required): One of:
@@ -328,6 +336,31 @@ Check workflow status, download logs, and audit failures.
 ```
 
 > [!CAUTION]
-> Required Permission
+> Required Permissions and Roles
+> 
+> **GitHub Actions Permission:**
 > The `agentic-workflows` tool requires `actions: read` permission to access GitHub Actions workflow logs and run data.
+> 
+> **Repository Role Requirements:**
+> The `logs` and `audit` tools require the workflow actor to have **write, maintain, or admin** role in the repository. These tools check the actor's repository permissions using the GitHub API before allowing access.
+> 
+> - **Minimum role:** write, maintain, or admin
+> - **Environment variable:** `GITHUB_ACTOR` must be set (automatically provided in GitHub Actions)
+> - **Permission check:** Runtime validation via GitHub API `/repos/{owner}/{repo}/collaborators/{username}/permission`
+> 
+> **Permission Denied Errors:**
+> 
+> If the actor has insufficient permissions (e.g., read or triage access), the tools will return:
+> ```json
+> {
+>   "error": "insufficient repository permissions",
+>   "actor": "username",
+>   "repository": "owner/repo",
+>   "role": "read",
+>   "required": "write, maintain, or admin",
+>   "reason": "Actor username has read access to owner/repo. This tool requires at least write access."
+> }
+> ```
+> 
+> **Other tools** (status, compile, mcp-inspect, add, update, fix) are available to all users regardless of repository role.
 
