@@ -616,8 +616,8 @@ var (
 	// Patterns that suggest prompt injection via hidden instructions
 	promptInjectionPatterns = regexp.MustCompile(`(?i)(?:ignore\s+(?:previous|above|all)\s+instructions|override\s+instructions|new\s+instructions|you\s+are\s+now|disregard\s+(?:previous|above|all)|forget\s+(?:previous|above|all)|system\s*:\s*you\s+are)`)
 
-	// Base64 encoded payloads (long base64 strings)
-	base64PayloadPattern = regexp.MustCompile(`[A-Za-z0-9+/]{100,}={0,2}`)
+	// Base64 encoded payloads (very long base64 strings; threshold tuned to reduce false positives)
+	base64PayloadPattern = regexp.MustCompile(`[A-Za-z0-9+/]{200,}={0,2}`)
 
 	// Shell pipe-to-execute patterns
 	pipeToShellPattern = regexp.MustCompile(`(?i)(?:curl|wget)\s+[^\n|]*\|\s*(?:sh|bash|zsh|python|node|perl|ruby)`)
