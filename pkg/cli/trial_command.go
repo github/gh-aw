@@ -49,19 +49,20 @@ type RepoConfig struct {
 
 // TrialOptions contains all configuration options for running workflow trials
 type TrialOptions struct {
-	Repos          RepoConfig
-	DeleteHostRepo bool
-	ForceDelete    bool
-	Quiet          bool
-	DryRun         bool
-	TimeoutMinutes int
-	TriggerContext string
-	RepeatCount    int
-	AutoMergePRs   bool
-	EngineOverride string
-	AppendText     string
-	PushSecrets    bool
-	Verbose        bool
+	Repos                  RepoConfig
+	DeleteHostRepo         bool
+	ForceDelete            bool
+	Quiet                  bool
+	DryRun                 bool
+	TimeoutMinutes         int
+	TriggerContext         string
+	RepeatCount            int
+	AutoMergePRs           bool
+	EngineOverride         string
+	AppendText             string
+	PushSecrets            bool
+	Verbose                bool
+	DisableSecurityScanner bool
 }
 
 // NewTrialCommand creates the trial command
@@ -132,6 +133,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 			appendText, _ := cmd.Flags().GetString("append")
 			pushSecrets, _ := cmd.Flags().GetBool("use-local-secrets")
 			verbose, _ := cmd.Root().PersistentFlags().GetBool("verbose")
+			disableSecurityScanner, _ := cmd.Flags().GetBool("disable-security-scanner")
 
 			if err := validateEngine(engineOverride); err != nil {
 				return err
@@ -147,18 +149,19 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 					CloneRepo:   cloneRepoSpec,
 					HostRepo:    hostRepoSpec,
 				},
-				DeleteHostRepo: deleteHostRepo,
-				ForceDelete:    forceDeleteHostRepo,
-				Quiet:          yes,
-				DryRun:         dryRun,
-				TimeoutMinutes: timeout,
-				TriggerContext: triggerContext,
-				RepeatCount:    repeatCount,
-				AutoMergePRs:   autoMergePRs,
-				EngineOverride: engineOverride,
-				AppendText:     appendText,
-				PushSecrets:    pushSecrets,
-				Verbose:        verbose,
+				DeleteHostRepo:         deleteHostRepo,
+				ForceDelete:            forceDeleteHostRepo,
+				Quiet:                  yes,
+				DryRun:                 dryRun,
+				TimeoutMinutes:         timeout,
+				TriggerContext:         triggerContext,
+				RepeatCount:            repeatCount,
+				AutoMergePRs:           autoMergePRs,
+				EngineOverride:         engineOverride,
+				AppendText:             appendText,
+				PushSecrets:            pushSecrets,
+				Verbose:                verbose,
+				DisableSecurityScanner: disableSecurityScanner,
 			}
 
 			if err := RunWorkflowTrials(cmd.Context(), workflowSpecs, opts); err != nil {
@@ -192,6 +195,7 @@ Trial results are saved both locally (in trials/ directory) and in the host repo
 	addEngineFlag(cmd)
 	cmd.Flags().String("append", "", "Append extra content to the end of agentic workflow on installation")
 	cmd.Flags().Bool("use-local-secrets", false, "Use local environment API key secrets for trial execution (pushes and cleans up secrets in repository)")
+	cmd.Flags().Bool("disable-security-scanner", false, "Disable security scanning of workflow markdown content")
 	cmd.MarkFlagsMutuallyExclusive("host-repo", "repo")
 	cmd.MarkFlagsMutuallyExclusive("logical-repo", "clone-repo")
 
@@ -440,7 +444,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("=== Running trial for workflow: %s ===", parsedSpec.WorkflowName)))
 
 			// Install workflow with trial mode compilation
-			if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, secretTracker, opts.EngineOverride, opts.AppendText, opts.PushSecrets, directTrialMode, opts.Verbose); err != nil {
+			if err := installWorkflowInTrialMode(ctx, tempDir, parsedSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug, secretTracker, opts.EngineOverride, opts.AppendText, opts.PushSecrets, directTrialMode, opts.Verbose, &opts); err != nil {
 				return fmt.Errorf("failed to install workflow '%s' in trial mode: %w", parsedSpec.WorkflowName, err)
 			}
 

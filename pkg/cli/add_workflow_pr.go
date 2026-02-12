@@ -13,7 +13,7 @@ import (
 var addWorkflowPRLog = logger.New("cli:add_workflow_pr")
 
 // addWorkflowsWithPR handles workflow addition with PR creation and returns the PR number and URL.
-func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, quiet bool, engineOverride string, name string, force bool, appendText string, push bool, noGitattributes bool, fromWildcard bool, workflowDir string, noStopAfter bool, stopAfter string) (int, string, error) {
+func addWorkflowsWithPR(workflows []*WorkflowSpec, opts AddOptions) (int, string, error) {
 	addWorkflowPRLog.Printf("Adding %d workflow(s) with PR creation", len(workflows))
 
 	// Get current branch for restoration later
@@ -31,7 +31,7 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 
 	addWorkflowPRLog.Printf("Creating temporary branch: %s", branchName)
 
-	if err := createAndSwitchBranch(branchName, verbose); err != nil {
+	if err := createAndSwitchBranch(branchName, opts.Verbose); err != nil {
 		return 0, "", fmt.Errorf("failed to create branch %s: %w", branchName, err)
 	}
 
@@ -43,17 +43,20 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 
 	// Ensure we switch back to original branch on exit
 	defer func() {
-		if switchErr := switchBranch(currentBranch, verbose); switchErr != nil && verbose {
+		if switchErr := switchBranch(currentBranch, opts.Verbose); switchErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to switch back to branch %s: %v", currentBranch, switchErr)))
 		}
 	}()
 
 	// Add workflows using the normal function logic
 	addWorkflowPRLog.Print("Adding workflows to repository")
-	if err := addWorkflowsNormal(workflows, number, verbose, quiet, engineOverride, name, force, appendText, push, noGitattributes, fromWildcard, workflowDir, noStopAfter, stopAfter); err != nil {
+	// Disable security scanner for PR creation to use workflow settings
+	prOpts := opts
+	prOpts.DisableSecurityScanner = false
+	if err := addWorkflowsNormal(workflows, prOpts); err != nil {
 		addWorkflowPRLog.Printf("Failed to add workflows: %v", err)
 		// Rollback on error
-		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to add workflows: %w", err)
@@ -61,15 +64,15 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 
 	// Stage all files before creating PR
 	addWorkflowPRLog.Print("Staging workflow files")
-	if err := tracker.StageAllFiles(verbose); err != nil {
-		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
+	if err := tracker.StageAllFiles(opts.Verbose); err != nil {
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to stage workflow files: %w", err)
 	}
 
-	// Update .gitattributes and stage it if modified
-	if err := stageGitAttributesIfChanged(); err != nil && verbose {
+	// Update .gitattributes and stage it if changed
+	if err := stageGitAttributesIfChanged(); err != nil && opts.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to stage .gitattributes: %v", err)))
 	}
 
@@ -92,8 +95,8 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 		prBody = fmt.Sprintf("Add agentic workflows: %s", joinedNames)
 	}
 
-	if err := commitChanges(commitMessage, verbose); err != nil {
-		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
+	if err := commitChanges(commitMessage, opts.Verbose); err != nil {
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to commit files: %w", err)
@@ -101,9 +104,9 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 
 	// Push branch
 	addWorkflowPRLog.Printf("Pushing branch %s to remote", branchName)
-	if err := pushBranch(branchName, verbose); err != nil {
+	if err := pushBranch(branchName, opts.Verbose); err != nil {
 		addWorkflowPRLog.Printf("Failed to push branch: %v", err)
-		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to push branch %s: %w", branchName, err)
@@ -111,10 +114,10 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 
 	// Create PR
 	addWorkflowPRLog.Printf("Creating pull request: %s", prTitle)
-	prNumber, prURL, err := createPR(branchName, prTitle, prBody, verbose)
+	prNumber, prURL, err := createPR(branchName, prTitle, prBody, opts.Verbose)
 	if err != nil {
 		addWorkflowPRLog.Printf("Failed to create PR: %v", err)
-		if rollbackErr := tracker.RollbackAllFiles(verbose); rollbackErr != nil && verbose {
+		if rollbackErr := tracker.RollbackAllFiles(opts.Verbose); rollbackErr != nil && opts.Verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to rollback files: %v", rollbackErr)))
 		}
 		return 0, "", fmt.Errorf("failed to create PR: %w", err)
@@ -125,7 +128,7 @@ func addWorkflowsWithPR(workflows []*WorkflowSpec, number int, verbose bool, qui
 	// Success - no rollback needed
 
 	// Switch back to original branch
-	if err := switchBranch(currentBranch, verbose); err != nil {
+	if err := switchBranch(currentBranch, opts.Verbose); err != nil {
 		return prNumber, prURL, fmt.Errorf("failed to switch back to branch %s: %w", currentBranch, err)
 	}
 

@@ -84,7 +84,8 @@ This is a test workflow.`
 		os.Remove(".gitattributes")
 
 		// Call addWorkflowsNormal with noGitattributes=false
-		err := addWorkflowsNormal([]*WorkflowSpec{spec}, 1, false, false, "", "", false, "", false, false, false, "", false, "")
+		opts := AddOptions{Number: 1}
+		err := addWorkflowsNormal([]*WorkflowSpec{spec}, opts)
 		if err != nil {
 			// We expect this to fail because we don't have a full workflow setup,
 			// but gitattributes should still be updated before the error
@@ -113,8 +114,9 @@ This is a test workflow.`
 		// Remove any existing .gitattributes
 		os.Remove(".gitattributes")
 
+		opts := AddOptions{Number: 1, NoGitattributes: true}
 		// Call addWorkflowsNormal with noGitattributes=true
-		err := addWorkflowsNormal([]*WorkflowSpec{spec}, 1, false, false, "", "", false, "", false, true, false, "", false, "")
+		err := addWorkflowsNormal([]*WorkflowSpec{spec}, opts)
 		if err != nil {
 			// We expect this to fail because we don't have a full workflow setup
 			t.Logf("Expected error during workflow addition: %v", err)
@@ -135,8 +137,9 @@ This is a test workflow.`
 			t.Fatalf("Failed to create .gitattributes: %v", err)
 		}
 
+		opts := AddOptions{Number: 1, NoGitattributes: true}
 		// Call addWorkflowsNormal with noGitattributes=true
-		err := addWorkflowsNormal([]*WorkflowSpec{spec}, 1, false, false, "", "", false, "", false, true, false, "", false, "")
+		err := addWorkflowsNormal([]*WorkflowSpec{spec}, opts)
 		if err != nil {
 			// We expect this to fail because we don't have a full workflow setup
 			t.Logf("Expected error during workflow addition: %v", err)

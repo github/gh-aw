@@ -109,7 +109,10 @@ func TestAddWorkflows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := AddWorkflows(tt.workflows, tt.number, false, "", "", false, "", false, false, false, "", false, "")
+			opts := AddOptions{
+				Number: tt.number,
+			}
+			_, err := AddWorkflows(tt.workflows, opts)
 
 			if tt.expectError {
 				require.Error(t, err, "Expected error for test case: %s", tt.name)
@@ -171,22 +174,13 @@ func TestAddResolvedWorkflows(t *testing.T) {
 				},
 			}
 
+			opts := AddOptions{
+				Number: tt.number,
+			}
 			_, err := AddResolvedWorkflows(
 				[]string{"test/repo/test-workflow"},
 				resolved,
-				tt.number,
-				false, // verbose
-				false, // quiet
-				"",    // engineOverride
-				"",    // name
-				false, // force
-				"",    // appendText
-				false, // createPR
-				false, // push
-				false, // noGitattributes
-				"",    // workflowDir
-				false, // noStopAfter
-				"",    // stopAfter
+				opts,
 			)
 
 			if tt.expectError {

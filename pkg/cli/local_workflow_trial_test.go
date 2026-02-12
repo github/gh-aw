@@ -65,7 +65,7 @@ This is a test workflow.
 	}
 
 	// Test the local installation function
-	err = installLocalWorkflowInTrialMode(originalDir, tempDir, spec, "", false)
+	err = installLocalWorkflowInTrialMode(originalDir, tempDir, spec, "", false, &TrialOptions{DisableSecurityScanner: false})
 	if err != nil {
 		t.Fatalf("Failed to install local workflow: %v", err)
 	}

@@ -202,7 +202,7 @@ func cloneTrialHostRepository(repoSlug string, verbose bool) (string, error) {
 }
 
 // installWorkflowInTrialMode installs a workflow in trial mode using a parsed spec
-func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, secretTracker *TrialSecretTracker, engineOverride string, appendText string, pushSecrets bool, directTrialMode bool, verbose bool) error {
+func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec *WorkflowSpec, logicalRepoSlug, cloneRepoSlug, hostRepoSlug string, secretTracker *TrialSecretTracker, engineOverride string, appendText string, pushSecrets bool, directTrialMode bool, verbose bool, opts *TrialOptions) error {
 	trialRepoLog.Printf("Installing workflow in trial mode: workflow=%s, hostRepo=%s, directMode=%v", parsedSpec.WorkflowName, hostRepoSlug, directTrialMode)
 
 	// Change to temp directory
@@ -223,7 +223,7 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 		}
 
 		// For local workflows, copy the file directly from the filesystem
-		if err := installLocalWorkflowInTrialMode(originalDir, tempDir, parsedSpec, appendText, verbose); err != nil {
+		if err := installLocalWorkflowInTrialMode(originalDir, tempDir, parsedSpec, appendText, verbose, opts); err != nil {
 			return fmt.Errorf("failed to install local workflow: %w", err)
 		}
 	} else {
@@ -237,7 +237,22 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 		}
 
 		// Add the workflow from the installed package
-		if _, err := AddWorkflows([]string{parsedSpec.String()}, 1, verbose, "", "", true, appendText, false, false, false, "", false, ""); err != nil {
+		opts := AddOptions{
+			Number:                 1,
+			Verbose:                verbose,
+			EngineOverride:         "",
+			Name:                   "",
+			Force:                  true,
+			AppendText:             appendText,
+			CreatePR:               false,
+			Push:                   false,
+			NoGitattributes:        false,
+			WorkflowDir:            "",
+			NoStopAfter:            false,
+			StopAfter:              "",
+			DisableSecurityScanner: opts.DisableSecurityScanner,
+		}
+		if _, err := AddWorkflows([]string{parsedSpec.String()}, opts); err != nil {
 			return fmt.Errorf("failed to add workflow: %w", err)
 		}
 	}
@@ -290,7 +305,7 @@ func installWorkflowInTrialMode(ctx context.Context, tempDir string, parsedSpec 
 }
 
 // installLocalWorkflowInTrialMode installs a local workflow file for trial mode
-func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *WorkflowSpec, appendText string, verbose bool) error {
+func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *WorkflowSpec, appendText string, verbose bool, opts *TrialOptions) error {
 	// Construct the source path (relative to original directory)
 	sourcePath := filepath.Join(originalDir, parsedSpec.WorkflowPath)
 
@@ -334,13 +349,17 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 	}
 
 	// Security scan: reject workflows containing malicious or dangerous content
-	if findings := workflow.ScanMarkdownSecurity(string(content)); len(findings) > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for local workflow"))
-		fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings))
-		return fmt.Errorf("local workflow '%s' failed security scan: %d issue(s) detected", parsedSpec.WorkflowName, len(findings))
-	}
-	if verbose {
-		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
+	if !opts.DisableSecurityScanner {
+		if findings := workflow.ScanMarkdownSecurity(string(content)); len(findings) > 0 {
+			fmt.Fprintln(os.Stderr, console.FormatErrorMessage("Security scan failed for local workflow"))
+			fmt.Fprintln(os.Stderr, workflow.FormatSecurityFindings(findings))
+			return fmt.Errorf("local workflow '%s' failed security scan: %d issue(s) detected", parsedSpec.WorkflowName, len(findings))
+		}
+		if verbose {
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Security scan passed"))
+		}
+	} else if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("Security scanning disabled"))
 	}
 
 	// Append text if provided

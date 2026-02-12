@@ -68,7 +68,7 @@ func TestAddWorkflowsFromCurrentRepository(t *testing.T) {
 			// Clear cache before each test
 			ClearCurrentRepoSlugCache()
 
-			_, err := AddWorkflows(tt.workflowSpecs, 1, false, "", "", false, "", false, false, false, "", false, "")
+			_, err := AddWorkflows(tt.workflowSpecs, 1, false, "", "", false, "", false, false, false, "", false, "", false)
 
 			if tt.expectError {
 				if err == nil {
@@ -151,7 +151,8 @@ func TestAddWorkflowsFromCurrentRepositoryMultiple(t *testing.T) {
 			// Clear cache before each test
 			ClearCurrentRepoSlugCache()
 
-			_, err := AddWorkflows(tt.workflowSpecs, 1, false, "", "", false, "", false, false, false, "", false, "")
+			opts := AddOptions{Number: 1}
+			_, err := AddWorkflows(tt.workflowSpecs, opts)
 
 			if tt.expectError {
 				if err == nil {
@@ -192,7 +193,8 @@ func TestAddWorkflowsFromCurrentRepositoryNotInGitRepo(t *testing.T) {
 
 	// When not in a git repo, the check should be skipped (can't determine current repo)
 	// The function should proceed and fail for other reasons (e.g., workflow not found)
-	_, err = AddWorkflows([]string{"some-owner/some-repo/workflow"}, 1, false, "", "", false, "", false, false, false, "", false, "")
+	opts := AddOptions{Number: 1}
+	_, err = AddWorkflows([]string{"some-owner/some-repo/workflow"}, opts)
 
 	// Should NOT get the "cannot add workflows from the current repository" error
 	if err != nil && strings.Contains(err.Error(), "cannot add workflows from the current repository") {
