@@ -79,7 +79,7 @@ async function main() {
     }
 
     if (matchedCommand) {
-      safeInfo(`✓ Command '/${matchedCommand}' matched at the start of the text`);
+      core.info(`✓ Command '/${matchedCommand}' matched at the start of the text`);
       core.setOutput("command_position_ok", "true");
       core.setOutput("matched_command", matchedCommand);
     } else {

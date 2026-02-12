@@ -4,7 +4,6 @@
 const { getRunStartedMessage } = require("./messages_run_status.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
-const { safeInfo } = require("./sanitized_logging.cjs");
 
 async function main() {
   // Read inputs from environment variables
@@ -15,7 +14,7 @@ async function main() {
   const runUrl = context.payload.repository ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
   core.info(`Reaction type: ${reaction}`);
-  safeInfo(`Command name: ${command || "none"}`);
+  core.info(`Command name: ${command || "none"}`);
   core.info(`Run ID: ${runId}`);
   core.info(`Run URL: ${runUrl}`);
 
