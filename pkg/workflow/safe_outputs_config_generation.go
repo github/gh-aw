@@ -195,6 +195,13 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 				data.SafeOutputs.AssignToUser.Allowed,
 			)
 		}
+		if data.SafeOutputs.UnassignFromUser != nil {
+			safeOutputsConfig["unassign_from_user"] = generateMaxWithAllowedConfig(
+				data.SafeOutputs.UnassignFromUser.Max,
+				1, // default max
+				data.SafeOutputs.UnassignFromUser.Allowed,
+			)
+		}
 		if data.SafeOutputs.UpdateIssues != nil {
 			safeOutputsConfig["update_issue"] = generateMaxConfig(
 				data.SafeOutputs.UpdateIssues.Max,
@@ -619,6 +626,9 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	if data.SafeOutputs.AssignToUser != nil {
 		enabledTools["assign_to_user"] = true
 	}
+	if data.SafeOutputs.UnassignFromUser != nil {
+		enabledTools["unassign_from_user"] = true
+	}
 	if data.SafeOutputs.UpdateIssues != nil {
 		enabledTools["update_issue"] = true
 	}
@@ -848,7 +858,7 @@ func addRepoParameterIfNeeded(tool map[string]any, toolName string, safeOutputs 
 			targetRepoSlug = config.TargetRepoSlug
 		}
 	case "add_labels", "remove_labels", "hide_comment", "link_sub_issue", "mark_pull_request_as_ready_for_review",
-		"add_reviewer", "assign_milestone", "assign_to_agent", "assign_to_user":
+		"add_reviewer", "assign_milestone", "assign_to_agent", "assign_to_user", "unassign_from_user":
 		// These use SafeOutputTargetConfig - check the appropriate config
 		switch toolName {
 		case "add_labels":
@@ -893,6 +903,11 @@ func addRepoParameterIfNeeded(tool map[string]any, toolName string, safeOutputs 
 			}
 		case "assign_to_user":
 			if config := safeOutputs.AssignToUser; config != nil {
+				hasAllowedRepos = len(config.AllowedRepos) > 0
+				targetRepoSlug = config.TargetRepoSlug
+			}
+		case "unassign_from_user":
+			if config := safeOutputs.UnassignFromUser; config != nil {
 				hasAllowedRepos = len(config.AllowedRepos) > 0
 				targetRepoSlug = config.TargetRepoSlug
 			}
