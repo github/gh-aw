@@ -3502,6 +3502,14 @@ safe-outputs:
     # (optional)
     max: 1
 
+  # Global footer control for all safe outputs. When false, omits visible
+  # AI-generated footer content from all created/updated entities (issues, PRs,
+  # discussions, releases) while still including XML markers for searchability.
+  # Individual safe-output types (create-issue, update-issue, etc.) can override
+  # this by specifying their own footer field. Defaults to true.
+  # (optional)
+  footer: true
+
   # Runner specification for all safe-outputs jobs (activation, create-issue,
   # add-comment, etc.). Single runner label (e.g., 'ubuntu-slim', 'ubuntu-latest',
   # 'windows-latest', 'self-hosted'). Defaults to 'ubuntu-slim'. See
