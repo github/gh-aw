@@ -328,11 +328,11 @@ func containsSuspiciousCommentContent(lowerComment string) bool {
 // --- Obfuscated Links Detection ---
 
 var (
-	// Markdown links: [text](url)
-	markdownLinkPattern = regexp.MustCompile(`\[([^\]]*)\]\(([^)]+)\)`)
+	// Markdown links: [text](url), with support for escaped characters inside text and URL
+	markdownLinkPattern = regexp.MustCompile(`\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^\\)])+)\)`)
 
-	// Markdown images: ![alt](url)
-	markdownImagePattern = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+	// Markdown images: ![alt](url), with support for escaped characters inside alt text and URL
+	markdownImagePattern = regexp.MustCompile(`!\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^\\)])+)\)`)
 
 	// Data URI pattern
 	dataURIPattern = regexp.MustCompile(`(?i)data\s*:\s*[a-z]+/[a-z0-9.+\-]+\s*[;,]`)
