@@ -194,12 +194,10 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// Get allowed domains (Codex defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetCodexAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
-		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
-		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
+		// Build AWF arguments: standard flags + custom args from config
+		// AWF v0.15.0+ uses chroot mode by default, providing transparent access to host binaries
+		// and environment while maintaining network isolation
 		var awfArgs []string
-		awfArgs = append(awfArgs, "--enable-chroot")
-		codexEngineLog.Print("Enabled chroot mode for transparent host access")
 
 		// Pass all environment variables to the container
 		awfArgs = append(awfArgs, "--env-all")
@@ -279,7 +277,7 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// INSTRUCTION reading is done inside the AWF command to avoid Docker Compose interpolation
 		// issues with $ characters in the prompt.
 		//
-		// AWF with --enable-chroot and --env-all handles most PATH setup natively:
+		// AWF v0.15.0+ with --env-all handles most PATH setup natively (chroot mode is default):
 		// - GOROOT, JAVA_HOME, etc. are handled via AWF_HOST_PATH and entrypoint.sh
 		// However, npm-installed CLIs (like codex) need hostedtoolcache bin directories in PATH.
 		npmPathSetup := GetNpmBinPathSetup()
