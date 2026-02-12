@@ -77,18 +77,18 @@ func TestBuildCacheMemoryPromptSection_MultipleCaches(t *testing.T) {
 	require.NotNil(t, section, "Should return a prompt section for multiple caches")
 	assert.True(t, section.IsFile, "Should use template file for multiple caches")
 	assert.Equal(t, cacheMemoryPromptMultiFile, section.Content, "Should reference template file")
-	
+
 	// Verify environment variables are set
 	require.NotNil(t, section.EnvVars, "Should have environment variables for template substitution")
 	assert.Contains(t, section.EnvVars, "GH_AW_CACHE_LIST", "Should have cache list env var")
 	assert.Contains(t, section.EnvVars, "GH_AW_CACHE_EXAMPLES", "Should have cache examples env var")
 	assert.Contains(t, section.EnvVars, "GH_AW_ALLOWED_EXTENSIONS", "Should have allowed extensions env var")
-	
+
 	// Verify cache list content
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
 	assert.Contains(t, cacheList, "- **default**: `/tmp/gh-aw/cache-memory/`", "Should list default cache")
 	assert.Contains(t, cacheList, "- **session**: `/tmp/gh-aw/cache-memory-session/` - Session-specific cache", "Should list session cache with description")
-	
+
 	// Verify cache examples content
 	cacheExamples := section.EnvVars["GH_AW_CACHE_EXAMPLES"]
 	assert.Contains(t, cacheExamples, "/tmp/gh-aw/cache-memory/notes.txt", "Should have examples for default cache")
@@ -111,11 +111,11 @@ func TestBuildCacheMemoryPromptSection_SingleNonDefaultCache(t *testing.T) {
 	require.NotNil(t, section, "Should return a prompt section")
 	assert.True(t, section.IsFile, "Should use template file for non-default single cache")
 	assert.Equal(t, "cache_memory_prompt_multi.md", section.Content, "Should reference template file")
-	
+
 	// Verify environment variables
 	require.NotNil(t, section.EnvVars, "Should have environment variables for template substitution")
 	assert.Contains(t, section.EnvVars, "GH_AW_CACHE_LIST", "Should have cache list env var")
-	
+
 	// Verify cache list content
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
 	assert.Contains(t, cacheList, "- **custom**: `/tmp/gh-aw/cache-memory-custom/` - Custom cache", "Should list custom cache")
@@ -164,7 +164,7 @@ func TestBuildCacheMemoryPromptSection_MultipleCachesWithMixedDescriptions(t *te
 
 	// Verify environment variables are set
 	require.NotNil(t, section.EnvVars, "Should have environment variables")
-	
+
 	// Verify all caches are listed in cache list env var
 	cacheList := section.EnvVars["GH_AW_CACHE_LIST"]
 	assert.Contains(t, cacheList, "- **default**: `/tmp/gh-aw/cache-memory/` - Main cache", "Should list default with description")
