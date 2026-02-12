@@ -178,6 +178,16 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		}
 	}
 
+	// Pass repo-memory validation failure outputs if repo-memory is configured
+	// This allows the agent failure handler to report validation issues
+	if data.RepoMemoryConfig != nil && len(data.RepoMemoryConfig.Memories) > 0 {
+		for _, memory := range data.RepoMemoryConfig.Memories {
+			// Add validation status for each memory
+			agentFailureEnvVars = append(agentFailureEnvVars, fmt.Sprintf("          GH_AW_REPO_MEMORY_VALIDATION_FAILED_%s: ${{ needs.push_repo_memory.outputs.validation_failed_%s }}\n", memory.ID, memory.ID))
+			agentFailureEnvVars = append(agentFailureEnvVars, fmt.Sprintf("          GH_AW_REPO_MEMORY_VALIDATION_ERROR_%s: ${{ needs.push_repo_memory.outputs.validation_error_%s }}\n", memory.ID, memory.ID))
+		}
+	}
+
 	// Build the agent failure handling step
 	agentFailureSteps := c.buildGitHubScriptStepWithoutDownload(data, GitHubScriptStepConfig{
 		StepName:      "Handle Agent Failure",

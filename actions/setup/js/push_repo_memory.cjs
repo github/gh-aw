@@ -248,7 +248,10 @@ async function main() {
   const { validateMemoryFiles } = require("./validate_memory_files.cjs");
   const validation = validateMemoryFiles(sourceMemoryPath, "repo", allowedExtensions);
   if (!validation.valid) {
-    core.setFailed(`File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only ${allowedExtensions.join(", ")} are allowed.`);
+    const errorMessage = `File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only ${allowedExtensions.join(", ")} are allowed. Invalid files: ${validation.invalidFiles.join(", ")}`;
+    core.setOutput("validation_failed", "true");
+    core.setOutput("validation_error", errorMessage);
+    core.setFailed(errorMessage);
     return;
   }
 

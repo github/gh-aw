@@ -342,6 +342,20 @@ async function main() {
     const createDiscussionErrors = process.env.GH_AW_CREATE_DISCUSSION_ERRORS || "";
     const createDiscussionErrorCount = process.env.GH_AW_CREATE_DISCUSSION_ERROR_COUNT || "0";
     const checkoutPRSuccess = process.env.GH_AW_CHECKOUT_PR_SUCCESS || "";
+    
+    // Collect repo-memory validation errors from all memory configurations
+    const repoMemoryValidationErrors = [];
+    for (const key in process.env) {
+      if (key.startsWith("GH_AW_REPO_MEMORY_VALIDATION_FAILED_")) {
+        const memoryID = key.replace("GH_AW_REPO_MEMORY_VALIDATION_FAILED_", "");
+        const failed = process.env[key] === "true";
+        if (failed) {
+          const errorKey = `GH_AW_REPO_MEMORY_VALIDATION_ERROR_${memoryID}`;
+          const errorMessage = process.env[errorKey] || "Unknown validation error";
+          repoMemoryValidationErrors.push({ memoryID, errorMessage });
+        }
+      }
+    }
 
     core.info(`Agent conclusion: ${agentConclusion}`);
     core.info(`Workflow name: ${workflowName}`);
@@ -489,6 +503,7 @@ async function main() {
               : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
+          repo_memory_validation_context: repoMemoryValidationContext,
           missing_data_context: missingDataContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };
@@ -548,6 +563,16 @@ async function main() {
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
 
+        // Build repo-memory validation errors context
+        let repoMemoryValidationContext = "";
+        if (repoMemoryValidationErrors.length > 0) {
+          repoMemoryValidationContext = "\n**⚠️ Repo-Memory Validation Failed**: Invalid file types detected in repo-memory.\n\n**Validation Errors:**\n";
+          for (const { memoryID, errorMessage } of repoMemoryValidationErrors) {
+            repoMemoryValidationContext += `- Memory "${memoryID}": ${errorMessage}\n`;
+          }
+          repoMemoryValidationContext += "\n";
+        }
+
         // Build missing_data context
         const missingDataContext = buildMissingDataContext();
 
@@ -575,6 +600,7 @@ async function main() {
               : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
+          repo_memory_validation_context: repoMemoryValidationContext,
           missing_data_context: missingDataContext,
           missing_safe_outputs_context: missingSafeOutputsContext,
         };

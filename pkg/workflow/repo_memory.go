@@ -638,6 +638,7 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		// Build step with github-script action
 		var step strings.Builder
 		fmt.Fprintf(&step, "      - name: Push repo-memory changes (%s)\n", memory.ID)
+		fmt.Fprintf(&step, "        id: push_repo_memory_%s\n", memory.ID)
 		step.WriteString("        if: always()\n")
 		fmt.Fprintf(&step, "        uses: %s\n", GetActionPin("actions/github-script"))
 		step.WriteString("        env:\n")
@@ -687,6 +688,15 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		jobCondition = "always() && needs.detection.outputs.success == 'true'"
 	}
 
+	// Build outputs map for validation failures from all memory steps
+	outputs := make(map[string]string)
+	for _, memory := range data.RepoMemoryConfig.Memories {
+		stepID := fmt.Sprintf("push_repo_memory_%s", memory.ID)
+		// Add outputs for each memory's validation status
+		outputs[fmt.Sprintf("validation_failed_%s", memory.ID)] = fmt.Sprintf("${{ steps.%s.outputs.validation_failed }}", stepID)
+		outputs[fmt.Sprintf("validation_error_%s", memory.ID)] = fmt.Sprintf("${{ steps.%s.outputs.validation_error }}", stepID)
+	}
+
 	job := &Job{
 		Name:        "push_repo_memory",
 		DisplayName: "", // No display name - job ID is sufficient
@@ -695,6 +705,7 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 		Permissions: "permissions:\n      contents: write",
 		Needs:       []string{"agent"}, // Detection dependency added by caller if needed
 		Steps:       steps,
+		Outputs:     outputs,
 	}
 
 	return job, nil
