@@ -73,8 +73,18 @@ runs:
         echo "Installing actionlint..." | tee -a build-steps.log
         go install github.com/rhysd/actionlint/cmd/actionlint@latest 2>&1 | tee -a build-steps.log
         
-        echo "Installing golangci-lint..." | tee -a build-steps.log
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest 2>&1 | tee -a build-steps.log
+        echo "Installing golangci-lint binary (avoiding GPL dependencies)..." | tee -a build-steps.log
+        GOLANGCI_LINT_VERSION="v2.8.0"
+        GOOS=$(go env GOOS)
+        GOARCH=$(go env GOARCH)
+        GOPATH=$(go env GOPATH)
+        BINARY_NAME="golangci-lint"
+        
+        DOWNLOAD_URL="https://github.com/golangci/golangci-lint/releases/download/$GOLANGCI_LINT_VERSION/golangci-lint-${GOLANGCI_LINT_VERSION#v}-$GOOS-$GOARCH.tar.gz"
+        curl -sSL "$DOWNLOAD_URL" | tar -xz -C /tmp 2>&1 | tee -a build-steps.log
+        mkdir -p "$GOPATH/bin"
+        mv /tmp/golangci-lint-*/$BINARY_NAME "$GOPATH/bin/$BINARY_NAME" 2>&1 | tee -a build-steps.log
+        chmod +x "$GOPATH/bin/$BINARY_NAME"
         
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))

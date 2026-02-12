@@ -362,6 +362,40 @@ tools: ## Install build-time tools from tools.go
 	@grep _ tools.go | awk -F'"' '{print $$2}' | xargs -tI % go install %
 	@echo "✓ Tools installed successfully"
 
+# Install golangci-lint binary (avoiding GPL dependencies in go.mod)
+# Downloads pre-built binary from GitHub releases
+.PHONY: install-golangci-lint
+install-golangci-lint:
+	@echo "Installing golangci-lint binary..."
+	@GOLANGCI_LINT_VERSION="v2.8.0"; \
+	GOPATH=$$(go env GOPATH); \
+	GOOS=$$(go env GOOS); \
+	GOARCH=$$(go env GOARCH); \
+	BINARY_NAME="golangci-lint"; \
+	if [ "$$GOOS" = "windows" ]; then \
+		BINARY_NAME="golangci-lint.exe"; \
+	fi; \
+	if [ -x "$$GOPATH/bin/$$BINARY_NAME" ]; then \
+		INSTALLED_VERSION=$$("$$GOPATH/bin/$$BINARY_NAME" version --short 2>/dev/null || echo "unknown"); \
+		if [ "$$INSTALLED_VERSION" = "$${GOLANGCI_LINT_VERSION#v}" ]; then \
+			echo "✓ golangci-lint $$GOLANGCI_LINT_VERSION already installed"; \
+			exit 0; \
+		fi; \
+	fi; \
+	DOWNLOAD_URL="https://github.com/golangci/golangci-lint/releases/download/$$GOLANGCI_LINT_VERSION/golangci-lint-$${GOLANGCI_LINT_VERSION#v}-$$GOOS-$$GOARCH.tar.gz"; \
+	TEMP_DIR=$$(mktemp -d); \
+	trap "rm -rf $$TEMP_DIR" EXIT; \
+	echo "Downloading golangci-lint $$GOLANGCI_LINT_VERSION for $$GOOS/$$GOARCH..."; \
+	if curl -sSL "$$DOWNLOAD_URL" | tar -xz -C "$$TEMP_DIR"; then \
+		mkdir -p "$$GOPATH/bin"; \
+		mv "$$TEMP_DIR"/golangci-lint-*/$$BINARY_NAME "$$GOPATH/bin/$$BINARY_NAME"; \
+		chmod +x "$$GOPATH/bin/$$BINARY_NAME"; \
+		echo "✓ golangci-lint $$GOLANGCI_LINT_VERSION installed to $$GOPATH/bin/$$BINARY_NAME"; \
+	else \
+		echo "Error: Failed to download golangci-lint from $$DOWNLOAD_URL"; \
+		exit 1; \
+	fi
+
 # License compliance checking
 .PHONY: license-check
 license-check: ## Check dependency licenses for compliance
@@ -386,7 +420,7 @@ deps: check-node-version
 
 # Install development tools (including linter)
 .PHONY: deps-dev
-deps-dev: check-node-version deps tools download-github-actions-schema
+deps-dev: check-node-version deps tools install-golangci-lint download-github-actions-schema
 	@echo "✓ Development dependencies installed"
 
 # Download GitHub Actions workflow schema for embedded validation

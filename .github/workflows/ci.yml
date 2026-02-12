@@ -840,10 +840,26 @@ jobs:
           fi
           echo "✅ Go formatting check passed" >> $GITHUB_STEP_SUMMARY
 
-      # Install only golangci-lint (the only tool needed for linting)
-      # Other tools (actionlint, gosec, gopls, govulncheck) are not used in this job
+      # Install golangci-lint binary (avoiding GPL dependencies)
+      # Downloads pre-built binary from GitHub releases instead of using go install
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
+        run: |
+          GOLANGCI_LINT_VERSION="v2.8.0"
+          GOOS=$(go env GOOS)
+          GOARCH=$(go env GOARCH)
+          GOPATH=$(go env GOPATH)
+          BINARY_NAME="golangci-lint"
+          
+          echo "Installing golangci-lint $GOLANGCI_LINT_VERSION for $GOOS/$GOARCH..."
+          DOWNLOAD_URL="https://github.com/golangci/golangci-lint/releases/download/$GOLANGCI_LINT_VERSION/golangci-lint-${GOLANGCI_LINT_VERSION#v}-$GOOS-$GOARCH.tar.gz"
+          
+          curl -sSL "$DOWNLOAD_URL" | tar -xz -C /tmp
+          mkdir -p "$GOPATH/bin"
+          mv /tmp/golangci-lint-*/$BINARY_NAME "$GOPATH/bin/$BINARY_NAME"
+          chmod +x "$GOPATH/bin/$BINARY_NAME"
+          
+          echo "✓ golangci-lint $GOLANGCI_LINT_VERSION installed"
+          "$GOPATH/bin/$BINARY_NAME" version
 
       # Run golangci-lint via Makefile for consistency
       # Uses incremental linting on PRs for faster CI (50-75% speedup)
