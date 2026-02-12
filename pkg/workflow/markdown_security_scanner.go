@@ -122,8 +122,8 @@ func stripFrontmatter(content string) (string, int) {
 		}
 	}
 
-	// No closing --- found; treat entire content as frontmatter-only (no markdown body)
-	return content, 0
+	// No closing --- found; treat as frontmatter-only with no markdown body to scan
+	return "", 0
 }
 
 // FormatSecurityFindings formats a list of findings into a human-readable error message
@@ -328,14 +328,14 @@ func containsSuspiciousCommentContent(lowerComment string) bool {
 // --- Obfuscated Links Detection ---
 
 var (
-	// Markdown links: [text](url)
-	markdownLinkPattern = regexp.MustCompile(`\[([^\]]*)\]\(([^)]+)\)`)
+	// Markdown links: [text](url), with support for escaped characters inside text and URL
+	markdownLinkPattern = regexp.MustCompile(`\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^\\)])+)\)`)
 
-	// Markdown images: ![alt](url)
-	markdownImagePattern = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+	// Markdown images: ![alt](url), with support for escaped characters inside alt text and URL
+	markdownImagePattern = regexp.MustCompile(`!\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^\\)])+)\)`)
 
 	// Data URI pattern
-	dataURIPattern = regexp.MustCompile(`(?i)data\s*:\s*[a-z]+/[a-z0-9.+\-]+\s*[;,]`)
+	dataURIPattern = regexp.MustCompile(`(?i)\bdata:[ \t]*[a-zA-Z]+/[a-zA-Z0-9.+\-]+[ \t]*[;,]`)
 
 	// Multiple URL encoding (percent-encoded percent signs)
 	multipleEncodingPattern = regexp.MustCompile(`%25[0-9a-fA-F]{2}`)
@@ -616,8 +616,8 @@ var (
 	// Patterns that suggest prompt injection via hidden instructions
 	promptInjectionPatterns = regexp.MustCompile(`(?i)(?:ignore\s+(?:previous|above|all)\s+instructions|override\s+instructions|new\s+instructions|you\s+are\s+now|disregard\s+(?:previous|above|all)|forget\s+(?:previous|above|all)|system\s*:\s*you\s+are)`)
 
-	// Base64 encoded payloads (long base64 strings)
-	base64PayloadPattern = regexp.MustCompile(`[A-Za-z0-9+/]{100,}={0,2}`)
+	// Base64 encoded payloads (very long base64 strings; threshold tuned to reduce false positives)
+	base64PayloadPattern = regexp.MustCompile(`[A-Za-z0-9+/]{200,}={0,2}`)
 
 	// Shell pipe-to-execute patterns
 	pipeToShellPattern = regexp.MustCompile(`(?i)(?:curl|wget)\s+[^\n|]*\|\s*(?:sh|bash|zsh|python|node|perl|ruby)`)
