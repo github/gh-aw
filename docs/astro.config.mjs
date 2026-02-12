@@ -199,6 +199,7 @@ export default defineConfig({
 						{ label: 'AI Engines', link: '/reference/engines/' },
 						{ label: 'Cache & Memory', link: '/reference/memory/' },
 						{ label: 'Concurrency', link: '/reference/concurrency/' },
+						{ label: 'Custom Agent for AW', link: '/reference/custom-agent-for-aw/' },
 						{ label: 'Custom Agents', link: '/reference/copilot-custom-agents/' },
 						{ label: 'Custom Safe Outputs', link: '/reference/custom-safe-outputs/' },
 						{ label: 'FAQ', link: '/reference/faq/' },
