@@ -4,10 +4,10 @@
  * @module sanitize_title
  */
 
-const { hardenUnicodeText } = require("./sanitize_content_core.cjs");
+const { sanitizeContent } = require("./sanitize_content.cjs");
 
 /**
- * Sanitizes a title by applying Unicode security hardening and preventing duplicate prefixes
+ * Sanitizes a title by applying full content sanitization and preventing duplicate prefixes
  * @param {string} title - The title to sanitize
  * @param {string} [titlePrefix] - Optional prefix that may need to be added
  * @returns {string} The sanitized title
@@ -17,10 +17,9 @@ function sanitizeTitle(title, titlePrefix = "") {
     return "";
   }
 
-  let sanitized = title.trim();
-
-  // Apply Unicode security hardening (NFC normalization, zero-width removal, etc.)
-  sanitized = hardenUnicodeText(sanitized);
+  // Apply full content sanitization (includes Unicode hardening, @mention escaping, etc.)
+  // Use a reasonable max length for titles (128 chars as defined in validation config)
+  let sanitized = sanitizeContent(title, 128);
 
   // If a prefix is provided, remove any existing occurrences to avoid duplication
   if (titlePrefix && titlePrefix.trim()) {

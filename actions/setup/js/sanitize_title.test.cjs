@@ -193,4 +193,28 @@ describe("sanitize_title", () => {
       expect(final).toBe("[Agent] Fix critical bug");
     });
   });
+
+  describe("content sanitization via sanitizeContent", () => {
+    it("should escape @mentions in titles", () => {
+      expect(sanitizeTitle("Fix bug for @username")).toBe("Fix bug for `@username`");
+      expect(sanitizeTitle("@user please review")).toBe("`@user` please review");
+    });
+
+    it("should sanitize URLs with disallowed protocols", () => {
+      expect(sanitizeTitle("Click javascript:alert(1)")).toBe("Click (redacted)");
+      expect(sanitizeTitle("Visit data:text/html")).toBe("Visit (redacted)");
+    });
+
+    it("should preserve normal text content", () => {
+      expect(sanitizeTitle("Fix bug #123: Update configuration")).toBe("Fix bug #123: Update configuration");
+      expect(sanitizeTitle("Feature: Add new feature")).toBe("Feature: Add new feature");
+    });
+
+    it("should apply content sanitization pipeline", () => {
+      // Unicode hardening (zero-width removed), @mention escaping, URL sanitization
+      const title = "@user Test\u200Btitle with javascript:alert(1)";
+      const sanitized = sanitizeTitle(title);
+      expect(sanitized).toBe("`@user` Testtitle with (redacted)");
+    });
+  });
 });
