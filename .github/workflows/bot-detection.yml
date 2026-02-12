@@ -31,6 +31,31 @@ jobs:
               fs.appendFileSync(summaryPath, `${markdown}\n`);
             }
 
+            function buildAccountSummaryTable(sortedAccounts, limit) {
+              const rows = [];
+              const capped = sortedAccounts.slice(0, limit);
+              for (const [login, data] of capped) {
+                const openIssues = (data.issues || []).filter(i => i.state === 'open').length;
+                const closedIssues = (data.issues || []).filter(i => i.state === 'closed').length;
+                const openPRs = (data.prs || []).filter(p => p.state === 'open').length;
+                const closedPRs = (data.prs || []).filter(p => p.state === 'closed').length;
+                const comments = (data.comments || []).length;
+
+                rows.push(`| @${login} | ${data.daysOld}d | ${openIssues} | ${closedIssues} | ${openPRs} | ${closedPRs} | ${comments} |`);
+              }
+
+              const header = [
+                '| Account | Age | Issues (open) | Issues (closed) | PRs (open) | PRs (closed) | Comments |',
+                '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+              ];
+
+              let table = header.concat(rows).join('\n');
+              if (sortedAccounts.length > capped.length) {
+                table += `\n\n_And ${sortedAccounts.length - capped.length} more account(s) not shown in summary._`;
+              }
+              return table;
+            }
+
             // Fetch recent PRs (up to MAX_PR)
             const prs = [];
             if (github.paginate?.iterator) {
@@ -245,7 +270,11 @@ jobs:
 
             if (!hasAnyOpenItem) {
               console.log('No open issues or PRs from new accounts; skipping alert issue.');
-              appendSummary('Bot Detection: flagged new accounts, but all related issues/PRs are closed. No alert issue created.');
+
+              const sorted = Array.from(highRiskAccounts.entries()).sort((a, b) => a[1].daysOld - b[1].daysOld);
+              appendSummary(`ℹ️ Bot Detection: ${highRiskAccounts.size} new account(s) (<${MIN_ACCOUNT_AGE_DAYS}d) found in last ${HOURS_BACK}h, but all related issues/PRs are closed. No alert issue created.`);
+              appendSummary('');
+              appendSummary(buildAccountSummaryTable(sorted, 20));
               return;
             }
 
@@ -319,6 +348,7 @@ jobs:
                     issue_number: existingIssueNumber,
                     body,
                   });
+                  appendSummary(`🚨 Bot Detection: updated alert issue #${existingIssueNumber} (found ${highRiskAccounts.size} new account(s) in last ${HOURS_BACK}h).`);
                 } else {
                   await github.rest.issues.create({
                     owner: context.repo.owner,
@@ -327,6 +357,7 @@ jobs:
                     body,
                     labels: ['security', 'bot-detection'],
                   });
+                  appendSummary(`🚨 Bot Detection: created alert issue (found ${highRiskAccounts.size} new account(s) in last ${HOURS_BACK}h).`);
                 }
             } catch (e) {
                 console.log('Issue create/update with labels failed; retrying without labels...');
@@ -337,6 +368,7 @@ jobs:
                     issue_number: existingIssueNumber,
                     body,
                   });
+                  appendSummary(`🚨 Bot Detection: updated alert issue #${existingIssueNumber} (labels failed).`);
                 } else {
                   await github.rest.issues.create({
                     owner: context.repo.owner,
@@ -344,5 +376,10 @@ jobs:
                     title,
                     body,
                   });
+                  appendSummary('🚨 Bot Detection: created alert issue (labels failed).');
                 }
             }
+
+            // Include a compact breakdown in the Step Summary for quick triage.
+            appendSummary('');
+            appendSummary(buildAccountSummaryTable(sorted, 20));
