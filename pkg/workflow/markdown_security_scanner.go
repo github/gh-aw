@@ -335,7 +335,7 @@ var (
 	markdownImagePattern = regexp.MustCompile(`!\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^\\)])+)\)`)
 
 	// Data URI pattern
-	dataURIPattern = regexp.MustCompile(`(?i)data\s*:\s*[a-z]+/[a-z0-9.+\-]+\s*[;,]`)
+	dataURIPattern = regexp.MustCompile(`(?i)\bdata:[ \t]*[a-zA-Z]+/[a-zA-Z0-9.+\-]+[ \t]*[;,]`)
 
 	// Multiple URL encoding (percent-encoded percent signs)
 	multipleEncodingPattern = regexp.MustCompile(`%25[0-9a-fA-F]{2}`)
