@@ -734,3 +734,75 @@ func TestAutoEnabledHandlers(t *testing.T) {
 		})
 	}
 }
+
+// TestCreatePullRequestBaseBranch tests the base-branch field configuration
+func TestCreatePullRequestBaseBranch(t *testing.T) {
+	tests := []struct {
+		name               string
+		baseBranch         string
+		expectedBaseBranch string
+	}{
+		{
+			name:               "custom base branch",
+			baseBranch:         "vnext",
+			expectedBaseBranch: "vnext",
+		},
+		{
+			name:               "default base branch",
+			baseBranch:         "",
+			expectedBaseBranch: "${{ github.ref_name }}",
+		},
+		{
+			name:               "branch with slash",
+			baseBranch:         "release/v1.0",
+			expectedBaseBranch: "release/v1.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+
+			workflowData := &WorkflowData{
+				Name: "Test Workflow",
+				SafeOutputs: &SafeOutputsConfig{
+					CreatePullRequests: &CreatePullRequestsConfig{
+						BaseSafeOutputConfig: BaseSafeOutputConfig{
+							Max: 1,
+						},
+						BaseBranch: tt.baseBranch,
+					},
+				},
+			}
+
+			var steps []string
+			compiler.addHandlerManagerConfigEnvVar(&steps, workflowData)
+
+			require.NotEmpty(t, steps, "Steps should be generated")
+
+			// Extract and validate JSON
+			for _, step := range steps {
+				if strings.Contains(step, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG") {
+					parts := strings.Split(step, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: ")
+					if len(parts) == 2 {
+						jsonStr := strings.TrimSpace(parts[1])
+						jsonStr = strings.Trim(jsonStr, "\"")
+						jsonStr = strings.ReplaceAll(jsonStr, "\\\"", "\"")
+
+						var config map[string]map[string]any
+						err := json.Unmarshal([]byte(jsonStr), &config)
+						require.NoError(t, err, "Config JSON should be valid")
+
+						prConfig, ok := config["create_pull_request"]
+						require.True(t, ok, "create_pull_request config should exist")
+
+						baseBranch, ok := prConfig["base_branch"]
+						require.True(t, ok, "base_branch should be in config")
+
+						assert.Equal(t, tt.expectedBaseBranch, baseBranch, "base_branch should match expected value")
+					}
+				}
+			}
+		})
+	}
+}

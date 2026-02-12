@@ -4835,6 +4835,10 @@
                   "type": "boolean",
                   "description": "Enable auto-merge for the pull request. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Defaults to false.",
                   "default": false
+                },
+                "base-branch": {
+                  "type": "string",
+                  "description": "Base branch for the pull request. Defaults to the workflow's branch (github.ref_name) if not specified. Useful for cross-repository PRs targeting non-default branches (e.g., 'vnext', 'release/v1.0')."
                 }
               },
               "additionalProperties": false,

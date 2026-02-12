@@ -23,6 +23,7 @@ type CreatePullRequestsConfig struct {
 	AllowedRepos         []string `yaml:"allowed-repos,omitempty"`  // List of additional repositories that pull requests can be created in (additionally to the target-repo)
 	Expires              int      `yaml:"expires,omitempty"`        // Hours until the pull request expires and should be automatically closed (only for same-repo PRs)
 	AutoMerge            bool     `yaml:"auto-merge,omitempty"`     // Enable auto-merge for the pull request when all required checks pass
+	BaseBranch           string   `yaml:"base-branch,omitempty"`    // Base branch for the pull request (defaults to github.ref_name if not specified)
 }
 
 // buildCreateOutputPullRequestJob creates the create_pull_request job
@@ -61,8 +62,12 @@ func (c *Compiler) buildCreateOutputPullRequestJob(data *WorkflowData, mainJobNa
 	var customEnvVars []string
 	// Pass the workflow ID for branch naming
 	customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_WORKFLOW_ID: %q\n", mainJobName))
-	// Pass the base branch from GitHub context
-	customEnvVars = append(customEnvVars, "          GH_AW_BASE_BRANCH: ${{ github.ref_name }}\n")
+	// Pass the base branch - use custom value if specified, otherwise default to github.ref_name
+	if data.SafeOutputs.CreatePullRequests.BaseBranch != "" {
+		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_BASE_BRANCH: %q\n", data.SafeOutputs.CreatePullRequests.BaseBranch))
+	} else {
+		customEnvVars = append(customEnvVars, "          GH_AW_BASE_BRANCH: ${{ github.ref_name }}\n")
+	}
 	customEnvVars = append(customEnvVars, buildTitlePrefixEnvVar("GH_AW_PR_TITLE_PREFIX", data.SafeOutputs.CreatePullRequests.TitlePrefix)...)
 	customEnvVars = append(customEnvVars, buildLabelsEnvVar("GH_AW_PR_LABELS", data.SafeOutputs.CreatePullRequests.Labels)...)
 	customEnvVars = append(customEnvVars, buildLabelsEnvVar("GH_AW_PR_ALLOWED_LABELS", data.SafeOutputs.CreatePullRequests.AllowedLabels)...)

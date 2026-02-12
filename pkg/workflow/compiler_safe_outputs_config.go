@@ -300,7 +300,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		if cfg.MaximumPatchSize > 0 {
 			maxPatchSize = cfg.MaximumPatchSize
 		}
-		return newHandlerConfigBuilder().
+		builder := newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
 			AddStringSlice("labels", c.Labels).
@@ -311,9 +311,14 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("expires", c.Expires).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
-			AddDefault("base_branch", "${{ github.ref_name }}").
-			AddDefault("max_patch_size", maxPatchSize).
-			Build()
+			AddDefault("max_patch_size", maxPatchSize)
+		// Add base_branch - use custom value if specified, otherwise use github.ref_name
+		if c.BaseBranch != "" {
+			builder.AddDefault("base_branch", c.BaseBranch)
+		} else {
+			builder.AddDefault("base_branch", "${{ github.ref_name }}")
+		}
+		return builder.Build()
 	},
 	"push_to_pull_request_branch": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.PushToPullRequestBranch == nil {
