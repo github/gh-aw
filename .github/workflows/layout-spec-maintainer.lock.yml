@@ -25,12 +25,12 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 33037bc81af8081a610b44516bc87f43f5bf7fe102a032e0e6949652cbb2d847
+# frontmatter-hash: 16b65f0e91dbbc230a48657381e9955e83742a9972b9f6a66209b9496390fac3
 
 name: "Layout Specification Maintainer"
 "on":
   schedule:
-  - cron: "0 7 * * 1-5"
+  - cron: "0 7 * * 1"
   workflow_dispatch:
 
 permissions: {}
