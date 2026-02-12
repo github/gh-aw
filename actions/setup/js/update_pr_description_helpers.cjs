@@ -22,31 +22,31 @@ function buildAIFooter(workflowName, runUrl) {
 
 /**
  * Build the island start marker for replace-island mode
- * @param {number} runId - Workflow run ID
+ * @param {string} workflowId - Workflow ID (stable identifier across runs)
  * @returns {string} Island start marker
  */
-function buildIslandStartMarker(runId) {
-  return `<!-- gh-aw-island-start:${runId} -->`;
+function buildIslandStartMarker(workflowId) {
+  return `<!-- gh-aw-island-start:${workflowId} -->`;
 }
 
 /**
  * Build the island end marker for replace-island mode
- * @param {number} runId - Workflow run ID
+ * @param {string} workflowId - Workflow ID (stable identifier across runs)
  * @returns {string} Island end marker
  */
-function buildIslandEndMarker(runId) {
-  return `<!-- gh-aw-island-end:${runId} -->`;
+function buildIslandEndMarker(workflowId) {
+  return `<!-- gh-aw-island-end:${workflowId} -->`;
 }
 
 /**
  * Find and extract island content from body
  * @param {string} body - The body content to search
- * @param {number} runId - Workflow run ID
+ * @param {string} workflowId - Workflow ID (stable identifier across runs)
  * @returns {{found: boolean, startIndex: number, endIndex: number}} Island location info
  */
-function findIsland(body, runId) {
-  const startMarker = buildIslandStartMarker(runId);
-  const endMarker = buildIslandEndMarker(runId);
+function findIsland(body, workflowId) {
+  const startMarker = buildIslandStartMarker(workflowId);
+  const endMarker = buildIslandEndMarker(workflowId);
 
   const startIndex = body.indexOf(startMarker);
   if (startIndex === -1) {
@@ -70,12 +70,12 @@ function findIsland(body, runId) {
  * @param {string} params.operation - Operation type: "append", "prepend", "replace", or "replace-island"
  * @param {string} params.workflowName - Name of the workflow
  * @param {string} params.runUrl - URL of the workflow run
- * @param {number} params.runId - Workflow run ID
+ * @param {string} params.workflowId - Workflow ID (stable identifier across runs)
  * @param {boolean} [params.includeFooter=true] - Whether to include AI-generated footer (default: true)
  * @returns {string} Updated body content
  */
 function updateBody(params) {
-  const { currentBody, newContent, operation, workflowName, runUrl, runId, includeFooter = true } = params;
+  const { currentBody, newContent, operation, workflowName, runUrl, workflowId, includeFooter = true } = params;
   const aiFooter = includeFooter ? buildAIFooter(workflowName, runUrl) : "";
 
   if (operation === "replace") {
@@ -85,14 +85,14 @@ function updateBody(params) {
   }
 
   if (operation === "replace-island") {
-    // Try to find existing island for this run ID
-    const island = findIsland(currentBody, runId);
+    // Try to find existing island for this workflow ID
+    const island = findIsland(currentBody, workflowId);
 
     if (island.found) {
       // Replace the island content
-      core.info(`Operation: replace-island (updating existing island for run ${runId})`);
-      const startMarker = buildIslandStartMarker(runId);
-      const endMarker = buildIslandEndMarker(runId);
+      core.info(`Operation: replace-island (updating existing island for workflow ${workflowId})`);
+      const startMarker = buildIslandStartMarker(workflowId);
+      const endMarker = buildIslandEndMarker(workflowId);
       const islandContent = `${startMarker}\n${newContent}${aiFooter}\n${endMarker}`;
 
       const before = currentBody.substring(0, island.startIndex);
@@ -100,9 +100,9 @@ function updateBody(params) {
       return before + islandContent + after;
     } else {
       // Island not found, fall back to append mode
-      core.info(`Operation: replace-island (island not found for run ${runId}, falling back to append)`);
-      const startMarker = buildIslandStartMarker(runId);
-      const endMarker = buildIslandEndMarker(runId);
+      core.info(`Operation: replace-island (island not found for workflow ${workflowId}, falling back to append)`);
+      const startMarker = buildIslandStartMarker(workflowId);
+      const endMarker = buildIslandEndMarker(workflowId);
       const islandContent = `${startMarker}\n${newContent}${aiFooter}\n${endMarker}`;
       const appendSection = `\n\n---\n\n${islandContent}`;
       return currentBody + appendSection;

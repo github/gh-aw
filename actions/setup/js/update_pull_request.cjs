@@ -41,6 +41,7 @@ async function executePRUpdate(github, context, prNumber, updateData) {
 
     // Get workflow run URL for AI attribution
     const workflowName = process.env.GH_AW_WORKFLOW_NAME || "GitHub Agentic Workflow";
+    const workflowId = process.env.GH_AW_WORKFLOW_ID || "";
     const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
     // Use helper to update body (handles all operations including replace)
@@ -50,7 +51,7 @@ async function executePRUpdate(github, context, prNumber, updateData) {
       operation,
       workflowName,
       runUrl,
-      runId: context.runId,
+      workflowId,
     });
 
     core.info(`Will update body (length: ${apiData.body.length})`);

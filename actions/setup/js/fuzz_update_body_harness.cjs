@@ -23,10 +23,10 @@ const { updateBody } = require("./update_pr_description_helpers.cjs");
  * @param {string} operation - Operation type: "append", "prepend", "replace", or "replace-island"
  * @param {string} workflowName - Name of the workflow
  * @param {string} runUrl - URL of the workflow run
- * @param {number} runId - Workflow run ID
+ * @param {string} workflowId - Workflow ID (stable identifier across runs)
  * @returns {{result: string, error: string | null}} Result object
  */
-function testUpdateBody(currentBody, newContent, operation, workflowName, runUrl, runId) {
+function testUpdateBody(currentBody, newContent, operation, workflowName, runUrl, workflowId) {
   try {
     const result = updateBody({
       currentBody,
@@ -34,7 +34,7 @@ function testUpdateBody(currentBody, newContent, operation, workflowName, runUrl
       operation,
       workflowName,
       runUrl,
-      runId,
+      workflowId,
     });
     return { result, error: null };
   } catch (err) {
@@ -55,9 +55,9 @@ if (require.main === module) {
 
   process.stdin.on("end", () => {
     try {
-      // Parse input as JSON: { currentBody, newContent, operation, workflowName, runUrl, runId }
-      const { currentBody, newContent, operation, workflowName, runUrl, runId } = JSON.parse(input);
-      const result = testUpdateBody(currentBody || "", newContent || "", operation || "append", workflowName || "Test Workflow", runUrl || "https://github.com/test/actions/runs/123", runId || 123);
+      // Parse input as JSON: { currentBody, newContent, operation, workflowName, runUrl, workflowId }
+      const { currentBody, newContent, operation, workflowName, runUrl, workflowId } = JSON.parse(input);
+      const result = testUpdateBody(currentBody || "", newContent || "", operation || "append", workflowName || "Test Workflow", runUrl || "https://github.com/test/actions/runs/123", workflowId || "test-workflow");
       process.stdout.write(JSON.stringify(result));
       process.exit(0);
     } catch (err) {
