@@ -56,11 +56,42 @@ Even with `footer: false`, the following are still included:
    <!-- gh-aw-tracker-id: unique-id -->
    ```
 
-These markers enable you to search for workflow-created items using GitHub's search:
+These markers enable you to search for workflow-created items using GitHub's search, even when footers are hidden.
 
+### Searching for Workflow-Created Items
+
+You can use the workflow-id marker to find all items created by a specific workflow on GitHub.com. The marker is always included in the body of issues, pull requests, discussions, and comments, regardless of the `footer` setting.
+
+**Search Examples:**
+
+Find all open issues created by the `daily-team-status` workflow:
 ```
-repo:owner/repo "gh-aw-workflow-id: my-workflow" in:body
+repo:owner/repo is:issue is:open "gh-aw-workflow-id: daily-team-status" in:body
 ```
+
+Find all pull requests created by the `security-audit` workflow:
+```
+repo:owner/repo is:pr "gh-aw-workflow-id: security-audit" in:body
+```
+
+Find all items (issues, PRs, discussions) from any workflow in your organization:
+```
+org:your-org "gh-aw-workflow-id:" in:body
+```
+
+Find comments from a specific workflow:
+```
+repo:owner/repo "gh-aw-workflow-id: bot-responder" in:comments
+```
+
+> [!TIP]
+> **Search Tips for Workflow Markers**
+>
+> - Use quotes around the marker text to search for the exact phrase
+> - Add `in:body` to search issue/PR descriptions, or `in:comments` for comments
+> - Combine with other filters like `is:open`, `is:closed`, `created:>2024-01-01`
+> - The workflow name in the marker is the workflow filename without the `.md` extension
+> - Use GitHub's advanced search to refine results: [Advanced search documentation](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)
 
 ## Use Cases
 
