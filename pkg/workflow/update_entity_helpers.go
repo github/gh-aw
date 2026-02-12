@@ -40,12 +40,18 @@
 //     body: null     # Can update body (key exists)
 //     ```
 //
-//  2. **Bool Value Mode** (for pull requests):
-//     Fields are enabled based on explicit boolean values:
+//  2. **Bool Value Mode** (for body/footer fields in all entities):
+//     Fields are enabled based on explicit boolean values.
+//     Special case: null values are treated as true for backward compatibility:
 //     ```yaml
+//     update-issue:
+//       body: true     # Explicitly enable body updates
+//       body: false    # Explicitly disable body updates
+//       body: null     # Treated as true (backward compatibility)
+//       body:          # Same as null, treated as true
 //     update-pull-request:
-//     title: true    # Can update title
-//     body: false    # Cannot update body
+//       title: true    # Can update title
+//       body: false    # Cannot update body
 //     ```
 //
 // # When to Use vs Alternatives
@@ -194,8 +200,9 @@ const (
 	// FieldParsingKeyExistence mode: Field presence (even if nil) indicates it can be updated
 	// Used by update-issue and update-discussion
 	FieldParsingKeyExistence FieldParsingMode = iota
-	// FieldParsingBoolValue mode: Field's boolean value determines if it can be updated
-	// Used by update-pull-request (defaults to true if nil)
+	// FieldParsingBoolValue mode: Field's boolean value determines if it can be updated.
+	// Special case: nil values are treated as true for backward compatibility.
+	// Used by body/footer fields in all update entities.
 	FieldParsingBoolValue
 )
 
@@ -212,7 +219,9 @@ const (
 //
 // Behavior by mode:
 //   - FieldParsingKeyExistence: Returns new(bool) if key exists, nil otherwise
-//   - FieldParsingBoolValue: Returns &boolValue if key exists and is bool, nil otherwise
+//   - FieldParsingBoolValue: Returns &boolValue if key exists and is bool.
+//     Special case: if key exists with nil value (e.g., body: null), returns &true
+//     for backward compatibility. Returns nil for other non-bool values (invalid config).
 func parseUpdateEntityBoolField(configMap map[string]any, fieldName string, mode FieldParsingMode) *bool {
 	if configMap == nil {
 		return nil

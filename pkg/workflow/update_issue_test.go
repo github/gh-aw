@@ -365,8 +365,8 @@ This workflow tests body: (null) for backward compatibility.
 	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
 		t.Fatal("Expected body to be non-nil when set to null")
 	}
-	
+
 	if !*workflowData.SafeOutputs.UpdateIssues.Body {
 		t.Fatal("Expected body to be true when set to null (backward compatibility)")
-}
+	}
 }
