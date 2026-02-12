@@ -279,12 +279,12 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 			expectedContainer:    `container = "alpine:latest"`,
 			shouldHaveEntrypoint: true,
 			expectedMounts: []string{
-				`entrypoint = "/opt/gh-aw/gh-aw"`,                // Entrypoint needed in release mode
-				`entrypointArgs = ["mcp-server"]`,                // EntrypointArgs needed in release mode
-				`"/opt/gh-aw:/opt/gh-aw:ro"`,                     // gh-aw binary mount
-				`"/usr/bin/gh:/usr/bin/gh:ro"`,                   // gh CLI binary mount
-				`"\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"`, // workspace mount
-				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                     // temp directory mount
+				`entrypoint = "/opt/gh-aw/gh-aw"`,                               // Entrypoint needed in release mode
+				`entrypointArgs = ["mcp-server", "--actor", "${GITHUB_ACTOR}"]`, // EntrypointArgs needed in release mode with actor flag
+				`"/opt/gh-aw:/opt/gh-aw:ro"`,                                    // gh-aw binary mount
+				`"/usr/bin/gh:/usr/bin/gh:ro"`,                                  // gh CLI binary mount
+				`"\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"`,                // workspace mount
+				`"/tmp/gh-aw:/tmp/gh-aw:rw"`,                                    // temp directory mount
 			},
 			unexpectedContent: []string{
 				`--cmd`,
@@ -304,7 +304,7 @@ func TestRenderAgenticWorkflowsMCPConfigTOML(t *testing.T) {
 				`[mcp_servers.agenticworkflows]`,
 				tt.expectedContainer,
 				`args = ["--network", "host", "-w", "${GITHUB_WORKSPACE}"]`, // Network access + working directory
-				`env_vars = ["DEBUG", "GITHUB_TOKEN"]`,
+				`env_vars = ["DEBUG", "GITHUB_TOKEN", "GITHUB_ACTOR"]`,
 			}
 			expectedContent = append(expectedContent, tt.expectedMounts...)
 
