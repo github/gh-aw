@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
@@ -96,8 +97,41 @@ func generateRepoMemoryPromptSection(yaml *strings.Builder, config *RepoMemoryCo
 		yaml.WriteString("          - **Automatic Push**: Changes are automatically committed and pushed after the workflow completes\n")
 		yaml.WriteString("          - **Merge Strategy**: In case of conflicts, your changes (current version) win\n")
 		yaml.WriteString("          - **Persistence**: Files persist across workflow runs via git branch storage\n")
-		// Build allowed extensions text (use first memory's extensions as default)
-		allowedExtsText := strings.Join(config.Memories[0].AllowedExtensions, ", ")
+		// Build allowed extensions text - check if all memories have the same extensions
+		allowedExtsText := strings.Join(config.Memories[0].AllowedExtensions, "`, `")
+		allSame := true
+		for i := 1; i < len(config.Memories); i++ {
+			if len(config.Memories[i].AllowedExtensions) != len(config.Memories[0].AllowedExtensions) {
+				allSame = false
+				break
+			}
+			for j, ext := range config.Memories[i].AllowedExtensions {
+				if ext != config.Memories[0].AllowedExtensions[j] {
+					allSame = false
+					break
+				}
+			}
+			if !allSame {
+				break
+			}
+		}
+
+		// If not all the same, build a union of all extensions
+		if !allSame {
+			extensionSet := make(map[string]bool)
+			for _, mem := range config.Memories {
+				for _, ext := range mem.AllowedExtensions {
+					extensionSet[ext] = true
+				}
+			}
+			// Convert set to sorted slice for consistent output
+			var allExtensions []string
+			for ext := range extensionSet {
+				allExtensions = append(allExtensions, ext)
+			}
+			sort.Strings(allExtensions)
+			allowedExtsText = strings.Join(allExtensions, "`, `")
+		}
 		fmt.Fprintf(yaml, "          - **Allowed File Types**: Only the following file extensions are allowed: `%s`. Files with other extensions will be rejected during validation.\n", allowedExtsText)
 		yaml.WriteString("          \n")
 		yaml.WriteString("          Examples of what you can store:\n")

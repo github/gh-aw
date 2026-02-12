@@ -27,7 +27,7 @@
 #     - shared/github-queries-safe-input.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: ba8ac38783175d2491cfa23fdbc191b34f88eb3068c3e9b4c795c4c36094a988
+# frontmatter-hash: 23fb974caf81e30df69d8ee71fb9c8a011690ef75670f3f539f699673640002e
 
 name: "Smoke Copilot"
 "on":
@@ -1998,7 +1998,7 @@ jobs:
             const allowedExtensions = [".json",".jsonl",".txt",".md",".csv"];
             const result = validateMemoryFiles('/tmp/gh-aw/cache-memory', 'cache', allowedExtensions);
             if (!result.valid) {
-              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
             }
       - name: Save cache-memory to cache (default)
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

@@ -1770,7 +1770,7 @@ jobs:
             const allowedExtensions = [".json",".jsonl",".txt",".md",".csv"];
             const result = validateMemoryFiles('/tmp/gh-aw/cache-memory', 'cache', allowedExtensions);
             if (!result.valid) {
-              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
             }
       - name: Save cache-memory to cache (default)
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

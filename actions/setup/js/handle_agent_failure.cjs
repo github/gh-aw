@@ -342,7 +342,7 @@ async function main() {
     const createDiscussionErrors = process.env.GH_AW_CREATE_DISCUSSION_ERRORS || "";
     const createDiscussionErrorCount = process.env.GH_AW_CREATE_DISCUSSION_ERROR_COUNT || "0";
     const checkoutPRSuccess = process.env.GH_AW_CHECKOUT_PR_SUCCESS || "";
-    
+
     // Collect repo-memory validation errors from all memory configurations
     const repoMemoryValidationErrors = [];
     for (const key in process.env) {
@@ -476,6 +476,16 @@ async function main() {
 
         // Build create_discussion errors context
         const createDiscussionErrorsContext = hasCreateDiscussionErrors ? buildCreateDiscussionErrorsContext(createDiscussionErrors) : "";
+
+        // Build repo-memory validation errors context
+        let repoMemoryValidationContext = "";
+        if (repoMemoryValidationErrors.length > 0) {
+          repoMemoryValidationContext = "\n**⚠️ Repo-Memory Validation Failed**: Invalid file types detected in repo-memory.\n\n**Validation Errors:**\n";
+          for (const { memoryID, errorMessage } of repoMemoryValidationErrors) {
+            repoMemoryValidationContext += `- Memory "${memoryID}": ${errorMessage}\n`;
+          }
+          repoMemoryValidationContext += "\n";
+        }
 
         // Build missing_data context
         const missingDataContext = buildMissingDataContext();

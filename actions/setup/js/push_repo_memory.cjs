@@ -44,7 +44,18 @@ async function main() {
   const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || "10240", 10);
   const maxFileCount = parseInt(process.env.MAX_FILE_COUNT || "100", 10);
   const fileGlobFilter = process.env.FILE_GLOB_FILTER || "";
-  const allowedExtensions = process.env.ALLOWED_EXTENSIONS ? JSON.parse(process.env.ALLOWED_EXTENSIONS) : [".json", ".jsonl", ".txt", ".md", ".csv"];
+
+  // Parse allowed extensions with error handling
+  let allowedExtensions = [".json", ".jsonl", ".txt", ".md", ".csv"];
+  if (process.env.ALLOWED_EXTENSIONS) {
+    try {
+      allowedExtensions = JSON.parse(process.env.ALLOWED_EXTENSIONS);
+    } catch (/** @type {any} */ error) {
+      core.setFailed(`Failed to parse ALLOWED_EXTENSIONS environment variable: ${error.message}. Expected JSON array format.`);
+      return;
+    }
+  }
+
   const ghToken = process.env.GH_TOKEN;
   const githubRunId = process.env.GITHUB_RUN_ID || "unknown";
 

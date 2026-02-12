@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -608,8 +609,42 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 		}
 	}
 
-	// Build allowed extensions text (use the first cache's extensions as they should all be the same for the group)
+	// Build allowed extensions text
+	// Check if all caches have the same allowed extensions
 	allowedExtsText := strings.Join(config.Caches[0].AllowedExtensions, ", ")
+	allSame := true
+	for i := 1; i < len(config.Caches); i++ {
+		if len(config.Caches[i].AllowedExtensions) != len(config.Caches[0].AllowedExtensions) {
+			allSame = false
+			break
+		}
+		for j, ext := range config.Caches[i].AllowedExtensions {
+			if ext != config.Caches[0].AllowedExtensions[j] {
+				allSame = false
+				break
+			}
+		}
+		if !allSame {
+			break
+		}
+	}
+
+	// If not all the same, build a union of all extensions
+	if !allSame {
+		extensionSet := make(map[string]bool)
+		for _, cache := range config.Caches {
+			for _, ext := range cache.AllowedExtensions {
+				extensionSet[ext] = true
+			}
+		}
+		// Convert set to sorted slice for consistent output
+		var allExtensions []string
+		for ext := range extensionSet {
+			allExtensions = append(allExtensions, ext)
+		}
+		sort.Strings(allExtensions)
+		allowedExtsText = strings.Join(allExtensions, ", ")
+	}
 
 	// Build cache examples
 	var cacheExamples strings.Builder
@@ -694,7 +729,7 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		fmt.Fprintf(&validationScript, "            const allowedExtensions = %s;\n", allowedExtsJSON)
 		fmt.Fprintf(&validationScript, "            const result = validateMemoryFiles('%s', 'cache', allowedExtensions);\n", cacheDir)
 		validationScript.WriteString("            if (!result.valid) {\n")
-		fmt.Fprintf(&validationScript, "              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
+		fmt.Fprintf(&validationScript, "              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
 		validationScript.WriteString("            }\n")
 
 		// Generate validation step using helper

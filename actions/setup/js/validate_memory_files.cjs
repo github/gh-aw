@@ -15,7 +15,10 @@ const path = require("path");
  */
 function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions) {
   // Use default extensions if not provided or if empty array
-  const extensions = allowedExtensions && allowedExtensions.length > 0 ? allowedExtensions : [".json", ".jsonl", ".txt", ".md", ".csv"];
+  const defaultExtensions = [".json", ".jsonl", ".txt", ".md", ".csv"];
+  const rawExtensions = allowedExtensions && allowedExtensions.length > 0 ? allowedExtensions : defaultExtensions;
+  // Normalize extensions to lowercase and trim whitespace
+  const extensions = rawExtensions.map(ext => ext.trim().toLowerCase());
   const invalidFiles = [];
 
   // Check if directory exists
