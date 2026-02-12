@@ -336,7 +336,8 @@ jobs:
 
             // Build report
             const today = new Date().toISOString().split('T')[0];
-            let body = `Recently-created accounts often indicate bots, spam accounts, or coordinated attacks.\n\n`;
+            // Mention a maintainer for timely triage.
+            let body = `@pelikhan\n\nRecently-created accounts often indicate bots, spam accounts, or coordinated attacks.\n\n`;
 
             const sorted = Array.from(highRiskAccounts.entries()).sort((a, b) => a[1].daysOld - b[1].daysOld);
 
