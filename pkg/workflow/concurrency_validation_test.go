@@ -225,7 +225,7 @@ func TestValidateConcurrencyGroupExpression(t *testing.T) {
 			err := validateConcurrencyGroupExpression(tt.group)
 
 			if tt.wantErr {
-				assert.Error(t, err, "Test case: %s - Expected error but got nil", tt.description)
+				require.Error(t, err, "Test case: %s - Expected error but got nil", tt.description)
 				if tt.errorInMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorInMsg,
 						"Error message should contain expected substring for: %s", tt.description)
@@ -777,8 +777,26 @@ func TestExtractConcurrencyGroupFromYAML(t *testing.T) {
 			description: "Should extract group without quotes",
 		},
 		{
-			name:        "no group field",
-			yaml:        `concurrency:
+			name:        "string format with double quotes",
+			yaml:        `concurrency: "my-workflow-group"`,
+			expected:    "my-workflow-group",
+			description: "Should extract string format concurrency",
+		},
+		{
+			name:        "string format with expression",
+			yaml:        `concurrency: workflow-${{ github.ref }}`,
+			expected:    "workflow-${{ github.ref }}",
+			description: "Should extract string format with expression",
+		},
+		{
+			name:        "string format with unclosed expression",
+			yaml:        `concurrency: workflow-${{ github.ref`,
+			expected:    "workflow-${{ github.ref",
+			description: "Should extract string even with malformed expression (validation will catch it)",
+		},
+		{
+			name: "no group field",
+			yaml: `concurrency:
   cancel-in-progress: true`,
 			expected:    "",
 			description: "Should return empty string when no group field",
