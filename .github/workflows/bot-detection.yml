@@ -1,0 +1,187 @@
+name: Bot Detection (Comment Similarity)
+description: "Detect potential bots by analyzing comment similarity. DOI: https://doi.org/10.1145/3387940.3391503"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"  # daily
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  detect-bots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run bot detection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          python << 'EOF'
+          import os, requests, datetime, itertools, math
+          from collections import defaultdict
+
+          TOKEN = os.environ["GH_TOKEN"]
+          REPO = os.environ["REPO"]
+          HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+
+          DAYS_BACK = 90
+          MAX_PR = 200
+          MIN_MESSAGES = 25
+          EPS = 0.22
+          BOT_CLUSTER_THRESHOLD = 10
+
+          cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=DAYS_BACK)
+
+          def gh(url):
+              r = requests.get(url, headers=HEADERS)
+              r.raise_for_status()
+              return r.json()
+
+          # -----------------------------
+          # Fetch PRs
+          # -----------------------------
+          prs = gh(f"https://api.github.com/repos/{REPO}/pulls?state=all&per_page=100")
+
+          comments_by_author = defaultdict(list)
+
+          for pr in prs[:MAX_PR]:
+              if datetime.datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ") < cutoff:
+                  continue
+
+              number = pr["number"]
+
+              issue_comments = gh(f"https://api.github.com/repos/{REPO}/issues/{number}/comments")
+              review_comments = gh(f"https://api.github.com/repos/{REPO}/pulls/{number}/comments")
+
+              for c in issue_comments + review_comments:
+                  created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+                  if created < cutoff:
+                      continue
+                  user = c.get("user", {})
+                  login = user.get("login")
+                  if not login:
+                      continue
+                  comments_by_author[login].append(c["body"])
+
+          # -----------------------------
+          # Distance metrics
+          # -----------------------------
+          def levenshtein(a, b):
+              if len(a) < len(b):
+                  a, b = b, a
+              prev = range(len(b) + 1)
+              for i, ca in enumerate(a):
+                  curr = [i + 1]
+                  for j, cb in enumerate(b):
+                      insert = prev[j + 1] + 1
+                      delete = curr[j] + 1
+                      replace = prev[j] + (ca != cb)
+                      curr.append(min(insert, delete, replace))
+                  prev = curr
+              return prev[-1]
+
+          def jaccard(a, b):
+              sa = set(a.split())
+              sb = set(b.split())
+              if not sa and not sb:
+                  return 0
+              return 1 - len(sa & sb) / len(sa | sb)
+
+          # -----------------------------
+          # DBSCAN (precomputed distance)
+          # -----------------------------
+          def dbscan(dist_matrix, eps):
+              n = len(dist_matrix)
+              labels = [-1] * n
+              cluster_id = 0
+
+              for i in range(n):
+                  if labels[i] != -1:
+                      continue
+
+                  neighbors = [j for j in range(n) if dist_matrix[i][j] <= eps]
+
+                  if not neighbors:
+                      continue
+
+                  labels[i] = cluster_id
+                  seeds = neighbors[:]
+
+                  while seeds:
+                      j = seeds.pop()
+                      if labels[j] == -1:
+                          labels[j] = cluster_id
+                          new_neighbors = [
+                              k for k in range(n)
+                              if dist_matrix[j][k] <= eps
+                          ]
+                          seeds.extend(new_neighbors)
+
+                  cluster_id += 1
+
+              return labels
+
+          # -----------------------------
+          # Analyze authors
+          # -----------------------------
+          results = []
+
+          for author, messages in comments_by_author.items():
+              if len(messages) < MIN_MESSAGES:
+                  continue
+
+              norm = [m.lower().strip() for m in messages]
+
+              n = len(norm)
+              dist_matrix = [[0]*n for _ in range(n)]
+
+              for i, j in itertools.combinations(range(n), 2):
+                  L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
+                  J = jaccard(norm[i], norm[j])
+                  D = (L + J) / 2
+                  dist_matrix[i][j] = D
+                  dist_matrix[j][i] = D
+
+              labels = dbscan(dist_matrix, EPS)
+              clusters = len(set(labels))
+
+              results.append((author, clusters, len(messages)))
+
+          # -----------------------------
+          # Build report
+          # -----------------------------
+          today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+          body = f"# Bot Detection Report — {today}\n\n"
+          body += f"Parameters: eps={EPS}, threshold={BOT_CLUSTER_THRESHOLD}\n\n"
+
+          body += "## Likely Bots\n"
+          for author, clusters, count in sorted(results, key=lambda x: x[1]):
+              if clusters <= BOT_CLUSTER_THRESHOLD:
+                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
+
+          body += "\n## Likely Humans\n"
+          for author, clusters, count in sorted(results, key=lambda x: -x[1]):
+              if clusters > BOT_CLUSTER_THRESHOLD:
+                  body += f"- **{author}** — clusters={clusters}, messages={count}\n"
+
+          requests.post(
+              f"https://api.github.com/repos/{REPO}/issues",
+              headers=HEADERS,
+              json={
+                  "title": f"Bot Detection Report — {today}",
+                  "body": body
+              }
+          )
+          EOF
