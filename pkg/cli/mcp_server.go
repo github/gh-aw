@@ -55,8 +55,8 @@ secrets are not shared with the MCP server process itself.
 The server provides the following tools:
   - status      - Show status of agentic workflow files
   - compile     - Compile Markdown workflows to GitHub Actions YAML
-  - logs        - Download and analyze workflow logs (requires maintainer+ access)
-  - audit       - Investigate a workflow run, job, or step and generate a report (requires maintainer+ access)
+  - logs        - Download and analyze workflow logs (requires write+ access)
+  - audit       - Investigate a workflow run, job, or step and generate a report (requires write+ access)
   - mcp-inspect - Inspect MCP servers in workflows and list available tools
   - add         - Add workflows from remote repositories to .github/workflows
   - update      - Update workflows from their source repositories
@@ -65,9 +65,9 @@ The server provides the following tools:
 Access Control:
   The --actor flag specifies the GitHub username for role-based access control.
   If not provided, it defaults to the GITHUB_ACTOR environment variable.
-  The actor's repository role (admin, maintainer, write, etc.) determines which
+  The actor's repository role (admin, maintain, write, etc.) determines which
   tools are available. Tools requiring elevated permissions (logs, audit) are only
-  mounted for users with at least maintainer access to the repository.
+  mounted for users with at least write access to the repository.
 
 By default, the server uses stdio transport. Use the --port flag to run
 an HTTP server with SSE (Server-Sent Events) transport instead.
@@ -178,8 +178,8 @@ func runMCPServer(port int, cmdPath string, actor string) error {
 }
 
 // shouldMountLogsAndAuditTools determines if the actor has sufficient permissions for logs and audit tools.
-// These tools require at least maintainer access to the repository.
-// Returns true if the actor has maintainer+ access, false otherwise.
+// These tools require at least write access to the repository.
+// Returns true if the actor has write+ access, false otherwise.
 func shouldMountLogsAndAuditTools(actor string) bool {
 	// If no actor is specified, default to allowing all tools (access control disabled)
 	if actor == "" {
@@ -210,14 +210,14 @@ func createMCPServer(cmdPath string, actor string) *mcp.Server {
 	}
 
 	// Determine if logs and audit tools should be mounted based on actor permissions
-	// These tools require at least maintainer access to the repository
+	// These tools require at least write access to the repository
 	mountLogsAndAudit := shouldMountLogsAndAuditTools(actor)
 
 	if actor != "" {
 		if mountLogsAndAudit {
 			mcpLog.Printf("Actor %s has sufficient permissions - mounting logs and audit tools", actor)
 		} else {
-			mcpLog.Printf("Actor %s does not have maintainer+ access - logs and audit tools will not be mounted", actor)
+			mcpLog.Printf("Actor %s does not have write+ access - logs and audit tools will not be mounted", actor)
 		}
 	} else {
 		mcpLog.Print("No actor specified - mounting all tools (access control disabled)")
@@ -446,7 +446,7 @@ Returns JSON array with validation results for each workflow:
 		}, nil, nil
 	})
 
-	// Add logs tool (requires maintainer+ access)
+	// Add logs tool (requires write+ access)
 	if mountLogsAndAudit {
 		type logsArgs struct {
 			WorkflowName string `json:"workflow_name,omitempty" jsonschema:"Name of the workflow to download logs for (empty for all)"`
@@ -618,7 +618,7 @@ return a schema description instead of the full output. Adjust the 'max_tokens' 
 		})
 	} // End of logs tool conditional
 
-	// Add audit tool (requires maintainer+ access)
+	// Add audit tool (requires write+ access)
 	if mountLogsAndAudit {
 		type auditArgs struct {
 			RunIDOrURL string `json:"run_id_or_url" jsonschema:"GitHub Actions workflow run ID or URL. Accepts: numeric run ID (e.g., 1234567890), run URL (https://github.com/owner/repo/actions/runs/1234567890), job URL (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210), or job URL with step (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)"`
