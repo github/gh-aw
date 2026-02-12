@@ -98,8 +98,12 @@ safe-outputs:
     expires: 7                       # auto-close after 7 days (or false to disable)
     group: true                      # group as sub-issues under parent
     close-older-issues: true         # close previous issues from same workflow
+    footer: false                    # hide AI-generated footer (default: true)
     target-repo: "owner/repo"        # cross-repository
 ```
+
+> [!TIP]
+> Use `footer: false` to omit the AI-generated footer while preserving workflow-id markers for searchability. See [Footer Control](#footer-control-footer) for details.
 
 #### Auto-Expiration
 
@@ -341,10 +345,14 @@ safe-outputs:
     status:                   # enable status updates
     title:                    # enable title updates
     body:                     # enable body updates
+    footer: false             # hide AI-generated footer (default: true)
     max: 3                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
+
+> [!NOTE]
+> The `footer` field only applies when body updates are enabled. XML markers for searchability are preserved even with `footer: false`.
 
 **Target**: `"triggering"` (requires issue event), `"*"` (any issue), or number (specific issue).
 
@@ -367,10 +375,14 @@ safe-outputs:
   update-pull-request:
     title: true               # enable title updates (default: true)
     body: true                # enable body updates (default: true)
+    footer: false             # hide AI-generated footer (default: true)
     max: 1                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
+
+> [!NOTE]
+> The `footer` field only applies when body updates are enabled.
 
 **Target**: `"triggering"` (requires PR event), `"*"` (any PR), or number (specific PR).
 
@@ -635,6 +647,7 @@ safe-outputs:
     reviewers: [user1, copilot]   # reviewers (use 'copilot' for bot)
     draft: true                   # create as draft (default: true)
     expires: 14                   # auto-close after 14 days (same-repo only)
+    footer: false                 # hide AI-generated footer (default: true)
     if-no-changes: "warn"         # "warn" (default), "error", or "ignore"
     target-repo: "owner/repo"     # cross-repository
     base-branch: "vnext"          # target branch for PR (default: github.ref_name)
@@ -724,6 +737,7 @@ Updates GitHub release descriptions: replace (complete replacement), append (add
 ```yaml wrap
 safe-outputs:
   update-release:
+    footer: false                # hide AI-generated footer (default: true)
     max: 1                       # max releases (default: 1, max: 10)
     target-repo: "owner/repo"    # cross-repository
     github-token: ${{ secrets.CUSTOM_TOKEN }}  # custom token
@@ -832,6 +846,7 @@ safe-outputs:
     title-prefix: "[ai] "     # prefix for titles
     category: "general"       # category slug, name, or ID (use lowercase)
     expires: 3                # auto-close after 3 days (or false to disable)
+    footer: false             # hide AI-generated footer (default: true)
     max: 3                    # max discussions (default: 1)
     target-repo: "owner/repo" # cross-repository
     fallback-to-issue: true   # fallback to issue creation on permission errors (default: true)
@@ -888,12 +903,16 @@ safe-outputs:
   update-discussion:
     title:                    # enable title updates
     body:                     # enable body updates
+    footer: false             # hide AI-generated footer (default: true)
     labels:                   # enable label updates
     allowed-labels: [bug, idea] # restrict to specific labels
     max: 1                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
+
+> [!NOTE]
+> The `footer` field only applies when body updates are enabled.
 
 **Field Enablement**: Include `title:`, `body:`, or `labels:` keys to enable updates for those fields. Without these keys, the field cannot be updated. Setting `allowed-labels` implicitly enables label updates.
 
@@ -1365,6 +1384,99 @@ Common combinations:
 See:
 - [Projects & Monitoring](/gh-aw/patterns/monitoring/)
 - [Orchestration](/gh-aw/patterns/orchestration/)
+
+## Footer Control (`footer:`)
+
+Control whether AI-generated footers are added to created and updated GitHub items (issues, pull requests, discussions, releases). Footers provide attribution and links to workflow runs, but you may want to omit them for cleaner content or when using custom branding.
+
+### Global Footer Control
+
+Set `footer: false` at the safe-outputs level to hide footers for all output types:
+
+```yaml wrap
+safe-outputs:
+  footer: false                      # hide footers globally
+  create-issue:
+    title-prefix: "[ai] "
+  create-pull-request:
+    title-prefix: "[ai] "
+```
+
+When `footer: false` is set:
+- **Visible footer content is omitted** - No AI-generated attribution text appears in the item body
+- **XML markers are preserved** - Hidden workflow-id and tracker-id markers remain for searchability
+- **All safe output types affected** - Applies to create-issue, create-pull-request, create-discussion, update-issue, update-discussion, and update-release
+
+### Per-Handler Footer Control
+
+Override the global setting for specific output types by setting `footer` at the handler level:
+
+```yaml wrap
+safe-outputs:
+  footer: false                      # global default: no footers
+  create-issue:
+    title-prefix: "[issue] "
+    # inherits footer: false
+  create-pull-request:
+    title-prefix: "[pr] "
+    footer: true                     # override: show footer for PRs only
+```
+
+Individual handler settings always take precedence over the global setting.
+
+### What's Preserved When Footer is Hidden
+
+Even with `footer: false`, the following are still included:
+
+1. **Workflow-id marker** - Hidden HTML comment for search and tracking:
+   ```html
+   <!-- gh-aw-workflow-id: WORKFLOW_NAME -->
+   ```
+
+2. **Tracker-id marker** - For issue/discussion tracking (when applicable):
+   ```html
+   <!-- gh-aw-tracker-id: unique-id -->
+   ```
+
+These markers enable you to search for workflow-created items using GitHub's search:
+
+```
+repo:owner/repo "gh-aw-workflow-id: my-workflow" in:body
+```
+
+### Use Cases
+
+**Clean content for public repositories:**
+```yaml wrap
+safe-outputs:
+  footer: false
+  create-issue:
+    title-prefix: "[report] "
+    labels: [automated]
+```
+
+**Custom branding - footers on PRs only:**
+```yaml wrap
+safe-outputs:
+  footer: false                      # hide for issues
+  create-issue:
+    title-prefix: "[issue] "
+  create-pull-request:
+    footer: true                     # show for PRs
+    title-prefix: "[pr] "
+```
+
+**Minimal documentation updates:**
+```yaml wrap
+safe-outputs:
+  update-release:
+    footer: false                    # clean release notes
+    max: 1
+```
+
+### Backward Compatibility
+
+The default value for `footer` is `true`, maintaining backward compatibility with existing workflows. To hide footers, you must explicitly set `footer: false`.
 
 ## Custom Messages (`messages:`)
 
