@@ -9,6 +9,7 @@
  */
 
 const fs = require("fs");
+const { safeInfo } = require("./sanitized_logging.cjs");
 
 /**
  * Display a single file's content in a collapsible group
@@ -56,7 +57,7 @@ function displayFileContent(filePath, fileName, maxBytes = 64 * 1024) {
     core.startGroup(`${fileName} (${stats.size} bytes)`);
     const lines = contentToDisplay.split("\n");
     for (const line of lines) {
-      core.info(line);
+      safeInfo(line);
     }
     if (wasTruncated) {
       core.info(`...`);
