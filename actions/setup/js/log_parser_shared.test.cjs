@@ -2095,7 +2095,7 @@ describe("log_parser_shared.cjs", () => {
       const result = wrapAgentLogInSection(markdown, { parserName: "Copilot" });
 
       expect(result).toContain("<details open>");
-      expect(result).toContain("<summary>🤖 Copilot CLI Session</summary>");
+      expect(result).toContain("<summary>Agentic Conversation</summary>");
       expect(result).toContain(markdown);
       expect(result).toContain("</details>");
     });
@@ -2106,7 +2106,7 @@ describe("log_parser_shared.cjs", () => {
       const markdown = "Test content";
       const result = wrapAgentLogInSection(markdown, { parserName: "Claude" });
 
-      expect(result).toContain("🤖 Claude CLI Session");
+      expect(result).toContain("Agentic Conversation");
     });
 
     it("should allow closed state when open is false", async () => {
@@ -2125,7 +2125,7 @@ describe("log_parser_shared.cjs", () => {
       const markdown = "Test content";
       const result = wrapAgentLogInSection(markdown);
 
-      expect(result).toContain("🤖 Agent CLI Session");
+      expect(result).toContain("Agentic Conversation");
     });
 
     it("should return empty string for empty or undefined markdown", async () => {

@@ -1430,8 +1430,7 @@ function wrapAgentLogInSection(markdown, options = {}) {
   }
 
   const openAttr = open ? " open" : "";
-  const emoji = "🤖";
-  const title = `${emoji} ${parserName} CLI Session`;
+  const title = "Agentic Conversation";
 
   return `<details${openAttr}>\n<summary>${title}</summary>\n\n${markdown}\n</details>`;
 }
