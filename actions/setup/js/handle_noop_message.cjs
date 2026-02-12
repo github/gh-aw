@@ -47,10 +47,10 @@ async function ensureAgentRunsIssue() {
   const templatePath = "/opt/gh-aw/prompts/noop_runs_issue.md";
   const parentBodyContent = fs.readFileSync(templatePath, "utf8");
 
-  // Add expiration marker (30 days from now) inside the quoted section using helper
+  // Add expiration marker (7 days from now) inside the quoted section using helper
   const footer = generateFooterWithExpiration({
     footerText: parentBodyContent,
-    expiresHours: 24 * 30, // 30 days
+    expiresHours: 24 * 7, // 7 days (weekly)
   });
   const parentBody = footer;
 
