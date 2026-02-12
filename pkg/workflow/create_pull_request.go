@@ -23,6 +23,7 @@ type CreatePullRequestsConfig struct {
 	AllowedRepos         []string `yaml:"allowed-repos,omitempty"`  // List of additional repositories that pull requests can be created in (additionally to the target-repo)
 	Expires              int      `yaml:"expires,omitempty"`        // Hours until the pull request expires and should be automatically closed (only for same-repo PRs)
 	AutoMerge            bool     `yaml:"auto-merge,omitempty"`     // Enable auto-merge for the pull request when all required checks pass
+	Footer               *bool    `yaml:"footer,omitempty"`         // Controls whether AI-generated footer is added. When false, visible footer is omitted but XML markers are kept.
 }
 
 // buildCreateOutputPullRequestJob creates the create_pull_request job
@@ -103,6 +104,12 @@ func (c *Compiler) buildCreateOutputPullRequestJob(data *WorkflowData, mainJobNa
 	// Add expires value if set (only for same-repo PRs - when target-repo is not set)
 	if data.SafeOutputs.CreatePullRequests.Expires > 0 && data.SafeOutputs.CreatePullRequests.TargetRepoSlug == "" {
 		customEnvVars = append(customEnvVars, fmt.Sprintf("          GH_AW_PR_EXPIRES: \"%d\"\n", data.SafeOutputs.CreatePullRequests.Expires))
+	}
+
+	// Add footer flag if explicitly set to false
+	if data.SafeOutputs.CreatePullRequests.Footer != nil && !*data.SafeOutputs.CreatePullRequests.Footer {
+		customEnvVars = append(customEnvVars, "          GH_AW_FOOTER: \"false\"\n")
+		createPRLog.Print("Footer disabled - XML markers will be included but visible footer content will be omitted")
 	}
 
 	// Add standard environment variables (metadata + staged/target repo)
