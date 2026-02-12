@@ -641,7 +641,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 		}
 
 		// Build allowed extensions text
-		allowedExtsText := strings.Join(cache.AllowedExtensions, "`, `")
+		allowedExtsText := strings.Join(cache.AllowedExtensions, ", ")
 
 		cacheLog.Printf("Building cache memory prompt section with env vars: cache_dir=%s, description=%s, allowed_extensions=%v", cacheDir, descriptionText, cache.AllowedExtensions)
 
@@ -677,7 +677,7 @@ func buildCacheMemoryPromptSection(config *CacheMemoryConfig) *PromptSection {
 	}
 
 	// Build allowed extensions text (use the first cache's extensions as they should all be the same for the group)
-	allowedExtsText := strings.Join(config.Caches[0].AllowedExtensions, "`, `")
+	allowedExtsText := strings.Join(config.Caches[0].AllowedExtensions, ", ")
 
 	// Build cache examples
 	var cacheExamples strings.Builder

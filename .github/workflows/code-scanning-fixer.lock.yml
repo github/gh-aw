@@ -571,7 +571,7 @@ jobs:
           - **Automatic Push**: Changes are automatically committed and pushed after the workflow completes
           - **Merge Strategy**: In case of conflicts, your changes (current version) win
           - **Persistence**: Files persist across workflow runs via git branch storage
-          - **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.
+          - **Allowed File Types**: Only the following file extensions are allowed: `.json, .jsonl, .txt, .md, .csv`. Files with other extensions will be rejected during validation.
           
           Examples of what you can store:
           - `/tmp/gh-aw/repo-memory/notes.md` - general notes and observations
@@ -640,7 +640,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ALLOWED_EXTENSIONS: '.json`, `.jsonl`, `.txt`, `.md`, `.csv'
+          GH_AW_ALLOWED_EXTENSIONS: '.json, .jsonl, .txt, .md, .csv'
           GH_AW_CACHE_DESCRIPTION: ''
           GH_AW_CACHE_DIR: '/tmp/gh-aw/cache-memory/'
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}

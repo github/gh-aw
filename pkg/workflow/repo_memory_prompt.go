@@ -97,7 +97,7 @@ func generateRepoMemoryPromptSection(yaml *strings.Builder, config *RepoMemoryCo
 		yaml.WriteString("          - **Merge Strategy**: In case of conflicts, your changes (current version) win\n")
 		yaml.WriteString("          - **Persistence**: Files persist across workflow runs via git branch storage\n")
 		// Build allowed extensions text (use first memory's extensions as default)
-		allowedExtsText := strings.Join(config.Memories[0].AllowedExtensions, "`, `")
+		allowedExtsText := strings.Join(config.Memories[0].AllowedExtensions, ", ")
 		fmt.Fprintf(yaml, "          - **Allowed File Types**: Only the following file extensions are allowed: `%s`. Files with other extensions will be rejected during validation.\n", allowedExtsText)
 		yaml.WriteString("          \n")
 		yaml.WriteString("          Examples of what you can store:\n")
