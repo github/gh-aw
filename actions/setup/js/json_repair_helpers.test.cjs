@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { repairJson } from "./json_repair_helpers.cjs";
+import { repairJson, sanitizePrototypePollution } from "./json_repair_helpers.cjs";
 
 describe("json_repair_helpers", () => {
   describe("repairJson", () => {
@@ -223,6 +223,287 @@ describe("json_repair_helpers", () => {
       it("should repair output with embedded newlines", () => {
         const json = '{"body": "Line 1\nLine 2\nLine 3"}';
         expect(repairJson(json)).toBe('{"body": "Line 1\\nLine 2\\nLine 3"}');
+      });
+    });
+  });
+
+  describe("sanitizePrototypePollution", () => {
+    describe("basic sanitization", () => {
+      it("should remove __proto__ property", () => {
+        const obj = { name: "test", __proto__: { isAdmin: true } };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ name: "test" });
+        // Verify __proto__ key was removed from own properties
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "__proto__")).toBe(false);
+      });
+
+      it("should remove constructor property", () => {
+        const obj = { name: "test", constructor: { prototype: { isAdmin: true } } };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ name: "test" });
+        // Verify constructor key was removed from own properties
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "constructor")).toBe(false);
+      });
+
+      it("should remove prototype property", () => {
+        const obj = { name: "test", prototype: { isAdmin: true } };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ name: "test" });
+        // Verify prototype key was removed from own properties
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "prototype")).toBe(false);
+      });
+
+      it("should remove all dangerous keys simultaneously", () => {
+        const obj = {
+          name: "test",
+          __proto__: { isAdmin: true },
+          constructor: { isAdmin: true },
+          prototype: { isAdmin: true },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ name: "test" });
+      });
+
+      it("should preserve safe properties", () => {
+        const obj = { name: "John", age: 30, city: "NYC", status: "active" };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual(obj);
+      });
+    });
+
+    describe("nested object sanitization", () => {
+      it("should sanitize nested __proto__ properties", () => {
+        const obj = {
+          user: {
+            name: "test",
+            __proto__: { isAdmin: true },
+          },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ user: { name: "test" } });
+      });
+
+      it("should sanitize deeply nested dangerous properties", () => {
+        const obj = {
+          outer: {
+            middle: {
+              inner: {
+                __proto__: { isAdmin: true },
+                constructor: { bad: true },
+                safe: "value",
+              },
+            },
+          },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({
+          outer: {
+            middle: {
+              inner: {
+                safe: "value",
+              },
+            },
+          },
+        });
+      });
+
+      it("should handle mixed safe and dangerous properties at multiple levels", () => {
+        const obj = {
+          level1: "safe",
+          __proto__: { bad: true },
+          nested: {
+            level2: "safe",
+            constructor: { bad: true },
+            deepNested: {
+              level3: "safe",
+              prototype: { bad: true },
+            },
+          },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({
+          level1: "safe",
+          nested: {
+            level2: "safe",
+            deepNested: {
+              level3: "safe",
+            },
+          },
+        });
+      });
+    });
+
+    describe("array sanitization", () => {
+      it("should sanitize objects within arrays", () => {
+        const obj = [
+          { name: "test1", __proto__: { isAdmin: true } },
+          { name: "test2", constructor: { bad: true } },
+        ];
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual([{ name: "test1" }, { name: "test2" }]);
+      });
+
+      it("should handle nested arrays", () => {
+        const obj = {
+          items: [[{ __proto__: { bad: true }, value: 1 }], [{ constructor: { bad: true }, value: 2 }]],
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({
+          items: [[{ value: 1 }], [{ value: 2 }]],
+        });
+      });
+
+      it("should preserve arrays with safe values", () => {
+        const obj = { items: ["a", "b", "c"], numbers: [1, 2, 3] };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual(obj);
+      });
+    });
+
+    describe("primitive type handling", () => {
+      it("should handle null", () => {
+        const sanitized = sanitizePrototypePollution(null);
+        expect(sanitized).toBeNull();
+      });
+
+      it("should handle undefined", () => {
+        const sanitized = sanitizePrototypePollution(undefined);
+        expect(sanitized).toBeUndefined();
+      });
+
+      it("should handle strings", () => {
+        const sanitized = sanitizePrototypePollution("test string");
+        expect(sanitized).toBe("test string");
+      });
+
+      it("should handle numbers", () => {
+        const sanitized = sanitizePrototypePollution(42);
+        expect(sanitized).toBe(42);
+      });
+
+      it("should handle booleans", () => {
+        const sanitized = sanitizePrototypePollution(true);
+        expect(sanitized).toBe(true);
+      });
+    });
+
+    describe("edge cases", () => {
+      it("should handle empty objects", () => {
+        const sanitized = sanitizePrototypePollution({});
+        expect(sanitized).toEqual({});
+      });
+
+      it("should handle empty arrays", () => {
+        const sanitized = sanitizePrototypePollution([]);
+        expect(sanitized).toEqual([]);
+      });
+
+      it("should handle objects with only dangerous properties", () => {
+        const obj = {
+          __proto__: { isAdmin: true },
+          constructor: { bad: true },
+          prototype: { bad: true },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({});
+      });
+
+      it("should handle objects with null prototype", () => {
+        const obj = Object.create(null);
+        obj.name = "test";
+        obj.__proto__ = { isAdmin: true };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized).toEqual({ name: "test" });
+      });
+    });
+
+    describe("real-world attack scenarios", () => {
+      it("should prevent prototype pollution via __proto__", () => {
+        const malicious = { type: "create_issue", __proto__: { isAdmin: true } };
+        const sanitized = sanitizePrototypePollution(malicious);
+        expect(sanitized).toEqual({ type: "create_issue" });
+        // Verify that the prototype was not polluted
+        expect({}.isAdmin).toBeUndefined();
+      });
+
+      it("should prevent prototype pollution via constructor", () => {
+        const malicious = {
+          type: "update_issue",
+          constructor: { prototype: { isAdmin: true } },
+        };
+        const sanitized = sanitizePrototypePollution(malicious);
+        expect(sanitized).toEqual({ type: "update_issue" });
+      });
+
+      it("should handle agent output with prototype pollution attempt", () => {
+        const malicious = {
+          type: "create_issue",
+          title: "Legitimate Issue",
+          body: "Description",
+          __proto__: { isAdmin: true, polluted: true },
+          constructor: { prototype: { injected: true } },
+        };
+        const sanitized = sanitizePrototypePollution(malicious);
+        expect(sanitized).toEqual({
+          type: "create_issue",
+          title: "Legitimate Issue",
+          body: "Description",
+        });
+      });
+
+      it("should handle deeply nested pollution attempts", () => {
+        const malicious = {
+          type: "create_issue",
+          metadata: {
+            __proto__: { level1: true },
+            config: {
+              constructor: { level2: true },
+              settings: {
+                prototype: { level3: true },
+                value: "safe",
+              },
+            },
+          },
+        };
+        const sanitized = sanitizePrototypePollution(malicious);
+        expect(sanitized).toEqual({
+          type: "create_issue",
+          metadata: {
+            config: {
+              settings: {
+                value: "safe",
+              },
+            },
+          },
+        });
+      });
+    });
+
+    describe("integration with common patterns", () => {
+      it("should work with Object.assign after sanitization", () => {
+        const target = { existing: "value" };
+        const malicious = { new: "data", __proto__: { isAdmin: true } };
+        const sanitized = sanitizePrototypePollution(malicious);
+        Object.assign(target, sanitized);
+        expect(target).toEqual({ existing: "value", new: "data" });
+        expect({}.isAdmin).toBeUndefined();
+      });
+
+      it("should prevent pollution when pushing to arrays", () => {
+        const items = [];
+        const malicious = { type: "item", __proto__: { polluted: true } };
+        const sanitized = sanitizePrototypePollution(malicious);
+        items.push(sanitized);
+        expect(items).toEqual([{ type: "item" }]);
+        expect({}.polluted).toBeUndefined();
+      });
+
+      it("should work with spread operator after sanitization", () => {
+        const malicious = { safe: "data", __proto__: { isAdmin: true } };
+        const sanitized = sanitizePrototypePollution(malicious);
+        const result = { ...sanitized, extra: "value" };
+        expect(result).toEqual({ safe: "data", extra: "value" });
+        expect({}.isAdmin).toBeUndefined();
       });
     });
   });

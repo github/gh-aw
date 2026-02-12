@@ -1,6 +1,55 @@
 // @ts-check
 
 /**
+ * Recursively sanitizes an object to remove dangerous prototype pollution keys.
+ * This function removes keys that could be used for prototype pollution attacks:
+ * - __proto__: JavaScript's prototype chain accessor
+ * - constructor: Object constructor property
+ * - prototype: Function prototype property
+ *
+ * @param {any} obj - The object to sanitize (can be any type)
+ * @returns {any} The sanitized object with dangerous keys removed
+ *
+ * @example
+ * // Removes __proto__ key
+ * sanitizePrototypePollution({name: "test", __proto__: {isAdmin: true}})
+ * // Returns: {name: "test"}
+ *
+ * @example
+ * // Recursively sanitizes nested objects
+ * sanitizePrototypePollution({outer: {__proto__: {bad: true}, safe: "value"}})
+ * // Returns: {outer: {safe: "value"}}
+ */
+function sanitizePrototypePollution(obj) {
+  // Handle non-objects (primitives, null, undefined)
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+
+  // Dangerous keys that can be used for prototype pollution
+  const dangerousKeys = ["__proto__", "constructor", "prototype"];
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizePrototypePollution(item));
+  }
+
+  // Handle objects
+  const sanitized = {};
+  for (const key in obj) {
+    // Skip dangerous keys
+    if (dangerousKeys.includes(key)) {
+      continue;
+    }
+    // Only process own properties (not inherited)
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      sanitized[key] = sanitizePrototypePollution(obj[key]);
+    }
+  }
+  return sanitized;
+}
+
+/**
  * Attempts to repair malformed JSON strings using various heuristics.
  * This function applies multiple repair strategies to fix common JSON formatting issues:
  * - Escapes control characters
@@ -76,4 +125,4 @@ function repairJson(jsonStr) {
   return repaired;
 }
 
-module.exports = { repairJson };
+module.exports = { repairJson, sanitizePrototypePollution };

@@ -2,7 +2,7 @@
 /// <reference types="@actions/github-script" />
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { repairJson } = require("./json_repair_helpers.cjs");
+const { repairJson, sanitizePrototypePollution } = require("./json_repair_helpers.cjs");
 const { AGENT_OUTPUT_FILENAME, TMP_GH_AW_PATH } = require("./constants.cjs");
 
 async function main() {
@@ -128,11 +128,15 @@ async function main() {
     }
     function parseJsonWithRepair(jsonStr) {
       try {
-        return JSON.parse(jsonStr);
+        const parsed = JSON.parse(jsonStr);
+        // Sanitize the parsed object to prevent prototype pollution
+        return sanitizePrototypePollution(parsed);
       } catch (originalError) {
         try {
           const repairedJson = repairJson(jsonStr);
-          return JSON.parse(repairedJson);
+          const parsed = JSON.parse(repairedJson);
+          // Sanitize the parsed object to prevent prototype pollution
+          return sanitizePrototypePollution(parsed);
         } catch (repairError) {
           core.info(`invalid input json: ${jsonStr}`);
           const originalMsg = originalError instanceof Error ? originalError.message : String(originalError);
