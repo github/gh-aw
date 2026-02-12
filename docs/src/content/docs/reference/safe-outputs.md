@@ -103,7 +103,7 @@ safe-outputs:
 ```
 
 > [!TIP]
-> Use `footer: false` to omit the AI-generated footer while preserving workflow-id markers for searchability. See [Footer Control](#footer-control-footer) for details.
+> Use `footer: false` to omit the AI-generated footer while preserving workflow-id markers for searchability. See [Footer Control](/gh-aw/reference/footers/) for details.
 
 #### Auto-Expiration
 
@@ -1385,116 +1385,13 @@ See:
 - [Projects & Monitoring](/gh-aw/patterns/monitoring/)
 - [Orchestration](/gh-aw/patterns/orchestration/)
 
-## Footer Control (`footer:`)
+## Footer Control
 
-Control whether AI-generated footers are added to created and updated GitHub items (issues, pull requests, discussions, releases). Footers provide attribution and links to workflow runs, but you may want to omit them for cleaner content or when using custom branding.
-
-### Global Footer Control
-
-Set `footer: false` at the safe-outputs level to hide footers for all output types:
-
-```yaml wrap
-safe-outputs:
-  footer: false                      # hide footers globally
-  create-issue:
-    title-prefix: "[ai] "
-  create-pull-request:
-    title-prefix: "[ai] "
-```
-
-When `footer: false` is set:
-- **Visible footer content is omitted** - No AI-generated attribution text appears in the item body
-- **XML markers are preserved** - Hidden workflow-id and tracker-id markers remain for searchability
-- **All safe output types affected** - Applies to create-issue, create-pull-request, create-discussion, update-issue, update-discussion, and update-release
-
-### Per-Handler Footer Control
-
-Override the global setting for specific output types by setting `footer` at the handler level:
-
-```yaml wrap
-safe-outputs:
-  footer: false                      # global default: no footers
-  create-issue:
-    title-prefix: "[issue] "
-    # inherits footer: false
-  create-pull-request:
-    title-prefix: "[pr] "
-    footer: true                     # override: show footer for PRs only
-```
-
-Individual handler settings always take precedence over the global setting.
-
-### What's Preserved When Footer is Hidden
-
-Even with `footer: false`, the following are still included:
-
-1. **Workflow-id marker** - Hidden HTML comment for search and tracking:
-   ```html
-   <!-- gh-aw-workflow-id: WORKFLOW_NAME -->
-   ```
-
-2. **Tracker-id marker** - For issue/discussion tracking (when applicable):
-   ```html
-   <!-- gh-aw-tracker-id: unique-id -->
-   ```
-
-These markers enable you to search for workflow-created items using GitHub's search:
-
-```
-repo:owner/repo "gh-aw-workflow-id: my-workflow" in:body
-```
-
-### Use Cases
-
-**Clean content for public repositories:**
-```yaml wrap
-safe-outputs:
-  footer: false
-  create-issue:
-    title-prefix: "[report] "
-    labels: [automated]
-```
-
-**Custom branding - footers on PRs only:**
-```yaml wrap
-safe-outputs:
-  footer: false                      # hide for issues
-  create-issue:
-    title-prefix: "[issue] "
-  create-pull-request:
-    footer: true                     # show for PRs
-    title-prefix: "[pr] "
-```
-
-**Minimal documentation updates:**
-```yaml wrap
-safe-outputs:
-  update-release:
-    footer: false                    # clean release notes
-    max: 1
-```
-
-### Backward Compatibility
-
-The default value for `footer` is `true`, maintaining backward compatibility with existing workflows. To hide footers, you must explicitly set `footer: false`.
-
-### Customizing Footer Messages
-
-Instead of hiding footers entirely, you can customize the footer message text using the `messages.footer` template. This allows you to maintain attribution while using custom branding:
-
-```yaml wrap
-safe-outputs:
-  messages:
-    footer: "> 🤖 Powered by [{workflow_name}]({run_url})"
-  create-issue:
-    title-prefix: "[bot] "
-```
-
-The `messages.footer` template supports variables like `{workflow_name}`, `{run_url}`, `{triggering_number}`, and more. See [Custom Messages](#custom-messages-messages) for complete documentation on message templates and available variables.
-
-**When to use each approach:**
-- **`footer: false`** - Completely hide attribution footers for cleaner content
-- **`messages.footer`** - Keep attribution but customize the text and branding
+Control whether AI-generated footers are added to created and updated GitHub items. See [Footer Control](/gh-aw/reference/footers/) for complete documentation on:
+- Global and per-handler footer control (`footer: true/false`)
+- XML marker preservation for searchability
+- Customizing footer messages with `messages.footer` template
+- Use cases and examples
 
 ## Custom Messages (`messages:`)
 
