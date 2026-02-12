@@ -20,6 +20,7 @@ type CreateIssuesConfig struct {
 	CloseOlderIssues     bool     `yaml:"close-older-issues,omitempty"` // When true, close older issues with same title prefix or labels as "not planned"
 	Expires              int      `yaml:"expires,omitempty"`            // Hours until the issue expires and should be automatically closed
 	Group                bool     `yaml:"group,omitempty"`              // If true, group issues as sub-issues under a parent issue (workflow ID is used as group identifier)
+	Footer               *bool    `yaml:"footer,omitempty"`             // Controls whether AI-generated footer is added. When false, visible footer is omitted but XML markers are kept.
 }
 
 // parseIssuesConfig handles create-issue configuration
@@ -152,6 +153,12 @@ func (c *Compiler) buildCreateOutputIssueJob(data *WorkflowData, mainJobName str
 	if data.SafeOutputs.CreateIssues.CloseOlderIssues {
 		customEnvVars = append(customEnvVars, "          GH_AW_CLOSE_OLDER_ISSUES: \"true\"\n")
 		createIssueLog.Print("Close older issues enabled - older issues with same title prefix or labels will be closed")
+	}
+
+	// Add footer flag if explicitly set to false
+	if data.SafeOutputs.CreateIssues.Footer != nil && !*data.SafeOutputs.CreateIssues.Footer {
+		customEnvVars = append(customEnvVars, "          GH_AW_FOOTER: \"false\"\n")
+		createIssueLog.Print("Footer disabled - XML markers will be included but visible footer content will be omitted")
 	}
 
 	// Add standard environment variables (metadata + staged/target repo)

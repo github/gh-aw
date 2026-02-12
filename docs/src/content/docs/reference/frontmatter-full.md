@@ -1878,6 +1878,12 @@ safe-outputs:
     # (optional)
     close-older-issues: true
 
+    # Controls whether AI-generated footer is added to the issue. When false, the
+    # visible footer content is omitted but XML markers (workflow-id, tracker-id,
+    # metadata) are still included for searchability. Defaults to true.
+    # (optional)
+    footer: true
+
   # Option 2: Enable issue creation with default configuration
   create-issue: null
 
@@ -2222,6 +2228,12 @@ safe-outputs:
     # (optional)
     fallback-to-issue: true
 
+    # Controls whether AI-generated footer is added to the discussion. When false, the
+    # visible footer content is omitted but XML markers (workflow-id, tracker-id,
+    # metadata) are still included for searchability. Defaults to true.
+    # (optional)
+    footer: true
+
     # Time until the discussion expires and should be automatically closed. Supports
     # integer (days), relative time format like '2h' (2 hours), '7d' (7 days), '2w' (2
     # weeks), '1m' (1 month), '1y' (1 year), or false to disable expiration. Minimum
@@ -2321,6 +2333,12 @@ safe-outputs:
     # updates. Takes precedence over trial target repo settings.
     # (optional)
     target-repo: "example-value"
+
+    # Controls whether AI-generated footer is added when updating the discussion body.
+    # When false, the visible footer content is omitted. Defaults to true. Only
+    # applies when 'body' is enabled.
+    # (optional)
+    footer: true
 
   # Option 2: Enable discussion updating with default configuration
   update-discussion: null
@@ -2586,6 +2604,12 @@ safe-outputs:
     # non-default branches (e.g., 'vnext', 'release/v1.0').
     # (optional)
     base-branch: "example-value"
+
+    # Controls whether AI-generated footer is added to the pull request. When false,
+    # the visible footer content is omitted but XML markers (workflow-id, tracker-id,
+    # metadata) are still included for searchability. Defaults to true.
+    # (optional)
+    footer: true
 
   # Option 2: Enable pull request creation with default configuration
   create-pull-request: null
@@ -2971,6 +2995,12 @@ safe-outputs:
     # (optional)
     body: null
 
+    # Controls whether AI-generated footer is added when updating the issue body. When
+    # false, the visible footer content is omitted but XML markers are still included.
+    # Defaults to true. Only applies when 'body' is enabled.
+    # (optional)
+    footer: true
+
     # Maximum number of issues to update (default: 1)
     # (optional)
     max: 1
@@ -3280,6 +3310,11 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # Controls whether AI-generated footer is added when updating the release body.
+    # When false, the visible footer content is omitted. Defaults to true.
+    # (optional)
+    footer: true
+
   # Option 2: Enable release updates with default configuration
   update-release: null
 
@@ -3472,6 +3507,14 @@ safe-outputs:
     # Maximum number of mentions allowed per message. Default: 50
     # (optional)
     max: 1
+
+  # Global footer control for all safe outputs. When false, omits visible
+  # AI-generated footer content from all created/updated entities (issues, PRs,
+  # discussions, releases) while still including XML markers for searchability.
+  # Individual safe-output types (create-issue, update-issue, etc.) can override
+  # this by specifying their own footer field. Defaults to true.
+  # (optional)
+  footer: true
 
   # Runner specification for all safe-outputs jobs (activation, create-issue,
   # add-comment, etc.). Single runner label (e.g., 'ubuntu-slim', 'ubuntu-latest',

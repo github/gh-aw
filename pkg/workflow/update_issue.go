@@ -12,6 +12,7 @@ type UpdateIssuesConfig struct {
 	Status             *bool `yaml:"status,omitempty"` // Allow updating issue status (open/closed) - presence indicates field can be updated
 	Title              *bool `yaml:"title,omitempty"`  // Allow updating issue title - presence indicates field can be updated
 	Body               *bool `yaml:"body,omitempty"`   // Allow updating issue body - presence indicates field can be updated
+	Footer             *bool `yaml:"footer,omitempty"` // Controls whether AI-generated footer is added. When false, visible footer is omitted but XML markers are kept.
 }
 
 // parseUpdateIssuesConfig handles update-issue configuration
@@ -23,6 +24,7 @@ func (c *Compiler) parseUpdateIssuesConfig(outputMap map[string]any) *UpdateIssu
 				{Name: "status", Mode: FieldParsingKeyExistence, Dest: &cfg.Status},
 				{Name: "title", Mode: FieldParsingKeyExistence, Dest: &cfg.Title},
 				{Name: "body", Mode: FieldParsingKeyExistence, Dest: &cfg.Body},
+				{Name: "footer", Mode: FieldParsingBoolValue, Dest: &cfg.Footer},
 			}
 		}, nil)
 }

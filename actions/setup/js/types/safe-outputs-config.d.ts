@@ -16,6 +16,7 @@ interface CreateIssueConfig extends SafeOutputConfig {
   labels?: string[];
   "target-repo"?: string;
   "allowed-repos"?: string[];
+  footer?: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ interface CreateDiscussionConfig extends SafeOutputConfig {
   "category-id"?: string;
   "target-repo"?: string;
   "allowed-repos"?: string[];
+  footer?: boolean;
 }
 
 /**
@@ -81,6 +83,7 @@ interface CreatePullRequestConfig extends SafeOutputConfig {
   labels?: string[];
   draft?: boolean;
   "if-no-changes"?: string;
+  footer?: boolean;
 }
 
 /**
@@ -128,6 +131,7 @@ interface UpdateIssueConfig extends SafeOutputConfig {
   target?: string;
   title?: boolean;
   body?: boolean;
+  footer?: boolean;
 }
 
 /**
@@ -137,6 +141,7 @@ interface UpdateDiscussionConfig extends SafeOutputConfig {
   target?: string;
   title?: boolean;
   body?: boolean;
+  footer?: boolean;
 }
 
 /**
@@ -190,6 +195,7 @@ interface AssignToAgentConfig extends SafeOutputConfig {
  */
 interface UpdateReleaseConfig extends SafeOutputConfig {
   target?: string;
+  footer?: boolean;
 }
 
 /**

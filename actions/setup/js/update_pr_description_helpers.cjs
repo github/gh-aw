@@ -71,15 +71,16 @@ function findIsland(body, runId) {
  * @param {string} params.workflowName - Name of the workflow
  * @param {string} params.runUrl - URL of the workflow run
  * @param {number} params.runId - Workflow run ID
+ * @param {boolean} [params.includeFooter=true] - Whether to include AI-generated footer (default: true)
  * @returns {string} Updated body content
  */
 function updateBody(params) {
-  const { currentBody, newContent, operation, workflowName, runUrl, runId } = params;
-  const aiFooter = buildAIFooter(workflowName, runUrl);
+  const { currentBody, newContent, operation, workflowName, runUrl, runId, includeFooter = true } = params;
+  const aiFooter = includeFooter ? buildAIFooter(workflowName, runUrl) : "";
 
   if (operation === "replace") {
-    // Replace: use new content with AI footer
-    core.info("Operation: replace (full body replacement with footer)");
+    // Replace: use new content with optional AI footer
+    core.info("Operation: replace (full body replacement)");
     return newContent + aiFooter;
   }
 
@@ -109,7 +110,7 @@ function updateBody(params) {
   }
 
   if (operation === "prepend") {
-    // Prepend: add content, AI footer, and horizontal line at the start
+    // Prepend: add content, AI footer (if enabled), and horizontal line at the start
     core.info("Operation: prepend (add to start with separator)");
     const prependSection = `${newContent}${aiFooter}\n\n---\n\n`;
     return prependSection + currentBody;

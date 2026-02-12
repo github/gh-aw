@@ -9,6 +9,16 @@ import (
 
 var compilerSafeOutputsConfigLog = logger.New("workflow:compiler_safe_outputs_config")
 
+// getEffectiveFooter returns the effective footer value for a config
+// If the local footer is set, use it; otherwise fall back to global footer
+// Returns nil if neither is set (default to true in JavaScript)
+func getEffectiveFooter(localFooter *bool, globalFooter *bool) *bool {
+	if localFooter != nil {
+		return localFooter
+	}
+	return globalFooter
+}
+
 // handlerConfigBuilder provides a fluent API for building handler configurations
 type handlerConfigBuilder struct {
 	config map[string]any
@@ -111,6 +121,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddIfTrue("group", c.Group).
 			AddIfTrue("close_older_issues", c.CloseOlderIssues).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"add_comment": func(cfg *SafeOutputsConfig) map[string]any {
@@ -143,6 +154,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("expires", c.Expires).
 			AddBoolPtr("fallback_to_issue", c.FallbackToIssue).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"close_issue": func(cfg *SafeOutputsConfig) map[string]any {
@@ -228,6 +240,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		return builder.
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"update_discussion": func(cfg *SafeOutputsConfig) map[string]any {
@@ -252,6 +265,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddStringSlice("allowed_labels", c.AllowedLabels).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"link_sub_issue": func(cfg *SafeOutputsConfig) map[string]any {
@@ -276,6 +290,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.UpdateRelease
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"create_pull_request_review_comment": func(cfg *SafeOutputsConfig) map[string]any {
@@ -311,7 +326,8 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfPositive("expires", c.Expires).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
-			AddDefault("max_patch_size", maxPatchSize)
+			AddDefault("max_patch_size", maxPatchSize).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer))
 		// Add base_branch - use custom value if specified, otherwise use github.ref_name
 		if c.BaseBranch != "" {
 			builder.AddDefault("base_branch", c.BaseBranch)
