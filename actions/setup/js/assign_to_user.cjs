@@ -8,6 +8,7 @@
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveIssueNumber, extractAssignees } = require("./safe_output_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "assign_to_user";
@@ -67,37 +68,19 @@ async function main(config = {}) {
 
     const assignItem = message;
 
-    // Determine issue number
-    let issueNumber;
-    if (assignItem.issue_number !== undefined) {
-      issueNumber = parseInt(String(assignItem.issue_number), 10);
-      if (isNaN(issueNumber)) {
-        core.warning(`Invalid issue_number: ${assignItem.issue_number}`);
-        return {
-          success: false,
-          error: `Invalid issue_number: ${assignItem.issue_number}`,
-        };
-      }
-    } else {
-      // Use context issue if available
-      const contextIssue = context.payload?.issue?.number;
-      if (!contextIssue) {
-        core.warning("No issue_number provided and not in issue context");
-        return {
-          success: false,
-          error: "No issue number available",
-        };
-      }
-      issueNumber = contextIssue;
+    // Determine issue number using shared helper
+    const issueResult = resolveIssueNumber(assignItem);
+    if (!issueResult.success) {
+      core.warning(`Skipping assign_to_user: ${issueResult.error}`);
+      return {
+        success: false,
+        error: issueResult.error,
+      };
     }
+    const issueNumber = issueResult.issueNumber;
 
-    // Support both singular "assignee" and plural "assignees" for flexibility
-    let requestedAssignees = [];
-    if (assignItem.assignees && Array.isArray(assignItem.assignees)) {
-      requestedAssignees = assignItem.assignees;
-    } else if (assignItem.assignee) {
-      requestedAssignees = [assignItem.assignee];
-    }
+    // Extract assignees using shared helper
+    const requestedAssignees = extractAssignees(assignItem);
 
     core.info(`Requested assignees: ${JSON.stringify(requestedAssignees)}`);
 

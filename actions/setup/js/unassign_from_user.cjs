@@ -8,6 +8,7 @@
 const { processItems } = require("./safe_output_processor.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { resolveIssueNumber, extractAssignees } = require("./safe_output_helpers.cjs");
 
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "unassign_from_user";
@@ -57,37 +58,19 @@ async function main(config = {}) {
 
     const unassignItem = message;
 
-    // Determine issue number
-    let issueNumber;
-    if (unassignItem.issue_number !== undefined) {
-      issueNumber = parseInt(String(unassignItem.issue_number), 10);
-      if (isNaN(issueNumber)) {
-        core.warning(`Invalid issue_number: ${unassignItem.issue_number}`);
-        return {
-          success: false,
-          error: `Invalid issue_number: ${unassignItem.issue_number}`,
-        };
-      }
-    } else {
-      // Use context issue if available
-      const contextIssue = context.payload?.issue?.number;
-      if (!contextIssue) {
-        core.warning("No issue_number provided and not in issue context");
-        return {
-          success: false,
-          error: "No issue number available",
-        };
-      }
-      issueNumber = contextIssue;
+    // Determine issue number using shared helper
+    const issueResult = resolveIssueNumber(unassignItem);
+    if (!issueResult.success) {
+      core.warning(`Skipping unassign_from_user: ${issueResult.error}`);
+      return {
+        success: false,
+        error: issueResult.error,
+      };
     }
+    const issueNumber = issueResult.issueNumber;
 
-    // Support both singular "assignee" and plural "assignees" for flexibility
-    let requestedAssignees = [];
-    if (unassignItem.assignees && Array.isArray(unassignItem.assignees)) {
-      requestedAssignees = unassignItem.assignees;
-    } else if (unassignItem.assignee) {
-      requestedAssignees = [unassignItem.assignee];
-    }
+    // Extract assignees using shared helper
+    const requestedAssignees = extractAssignees(unassignItem);
 
     core.info(`Requested assignees to unassign: ${JSON.stringify(requestedAssignees)}`);
 
