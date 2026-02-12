@@ -34,64 +34,64 @@ describe("update_pr_description_helpers.cjs", () => {
   });
 
   describe("buildIslandStartMarker", () => {
-    it("should build island start marker with run ID", () => {
-      const marker = buildIslandStartMarker(12345);
-      expect(marker).toBe("<!-- gh-aw-island-start:12345 -->");
+    it("should build island start marker with workflow ID", () => {
+      const marker = buildIslandStartMarker("test-workflow");
+      expect(marker).toBe("<!-- gh-aw-island-start:test-workflow -->");
     });
 
-    it("should handle different run IDs", () => {
-      expect(buildIslandStartMarker(1)).toBe("<!-- gh-aw-island-start:1 -->");
-      expect(buildIslandStartMarker(999999)).toBe("<!-- gh-aw-island-start:999999 -->");
+    it("should handle different workflow IDs", () => {
+      expect(buildIslandStartMarker("workflow-1")).toBe("<!-- gh-aw-island-start:workflow-1 -->");
+      expect(buildIslandStartMarker("my-awesome-workflow")).toBe("<!-- gh-aw-island-start:my-awesome-workflow -->");
     });
   });
 
   describe("buildIslandEndMarker", () => {
-    it("should build island end marker with run ID", () => {
-      const marker = buildIslandEndMarker(12345);
-      expect(marker).toBe("<!-- gh-aw-island-end:12345 -->");
+    it("should build island end marker with workflow ID", () => {
+      const marker = buildIslandEndMarker("test-workflow");
+      expect(marker).toBe("<!-- gh-aw-island-end:test-workflow -->");
     });
 
-    it("should handle different run IDs", () => {
-      expect(buildIslandEndMarker(1)).toBe("<!-- gh-aw-island-end:1 -->");
-      expect(buildIslandEndMarker(999999)).toBe("<!-- gh-aw-island-end:999999 -->");
+    it("should handle different workflow IDs", () => {
+      expect(buildIslandEndMarker("workflow-1")).toBe("<!-- gh-aw-island-end:workflow-1 -->");
+      expect(buildIslandEndMarker("my-awesome-workflow")).toBe("<!-- gh-aw-island-end:my-awesome-workflow -->");
     });
   });
 
   describe("findIsland", () => {
     it("should find island when both markers are present", () => {
-      const body = "Before\n<!-- gh-aw-island-start:123 -->\nIsland content\n<!-- gh-aw-island-end:123 -->\nAfter";
-      const result = findIsland(body, 123);
+      const body = "Before\n<!-- gh-aw-island-start:test-workflow -->\nIsland content\n<!-- gh-aw-island-end:test-workflow -->\nAfter";
+      const result = findIsland(body, "test-workflow");
       expect(result.found).toBe(true);
       expect(result.startIndex).toBeGreaterThanOrEqual(0);
       expect(result.endIndex).toBeGreaterThan(result.startIndex);
     });
 
     it("should not find island when start marker is missing", () => {
-      const body = "Before\nIsland content\n<!-- gh-aw-island-end:123 -->\nAfter";
-      const result = findIsland(body, 123);
+      const body = "Before\nIsland content\n<!-- gh-aw-island-end:test-workflow -->\nAfter";
+      const result = findIsland(body, "test-workflow");
       expect(result.found).toBe(false);
       expect(result.startIndex).toBe(-1);
       expect(result.endIndex).toBe(-1);
     });
 
     it("should not find island when end marker is missing", () => {
-      const body = "Before\n<!-- gh-aw-island-start:123 -->\nIsland content\nAfter";
-      const result = findIsland(body, 123);
+      const body = "Before\n<!-- gh-aw-island-start:test-workflow -->\nIsland content\nAfter";
+      const result = findIsland(body, "test-workflow");
       expect(result.found).toBe(false);
       expect(result.startIndex).toBe(-1);
       expect(result.endIndex).toBe(-1);
     });
 
-    it("should not find island when run ID does not match", () => {
-      const body = "Before\n<!-- gh-aw-island-start:123 -->\nIsland content\n<!-- gh-aw-island-end:123 -->\nAfter";
-      const result = findIsland(body, 456);
+    it("should not find island when workflow ID does not match", () => {
+      const body = "Before\n<!-- gh-aw-island-start:workflow-a -->\nIsland content\n<!-- gh-aw-island-end:workflow-a -->\nAfter";
+      const result = findIsland(body, "workflow-b");
       expect(result.found).toBe(false);
     });
 
-    it("should handle multiple islands with different run IDs", () => {
-      const body = "<!-- gh-aw-island-start:100 -->\nIsland 1\n<!-- gh-aw-island-end:100 -->\n<!-- gh-aw-island-start:200 -->\nIsland 2\n<!-- gh-aw-island-end:200 -->";
-      const result1 = findIsland(body, 100);
-      const result2 = findIsland(body, 200);
+    it("should handle multiple islands with different workflow IDs", () => {
+      const body = "<!-- gh-aw-island-start:workflow-1 -->\nIsland 1\n<!-- gh-aw-island-end:workflow-1 -->\n<!-- gh-aw-island-start:workflow-2 -->\nIsland 2\n<!-- gh-aw-island-end:workflow-2 -->";
+      const result1 = findIsland(body, "workflow-1");
+      const result2 = findIsland(body, "workflow-2");
       expect(result1.found).toBe(true);
       expect(result2.found).toBe(true);
       expect(result1.startIndex).toBeLessThan(result2.startIndex);
@@ -106,7 +106,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "replace",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("New content");
       expect(result).not.toContain("Old content");
@@ -125,7 +125,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("---");
       expect(result).toContain("New content");
@@ -142,7 +142,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Original content");
       expect(result).toContain("New content");
@@ -156,7 +156,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("# Title");
       expect(result).toContain("**Bold**");
@@ -172,7 +172,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "prepend",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("---");
       expect(result).toContain("New content");
@@ -189,7 +189,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "prepend",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Original content");
       expect(result).toContain("New content");
@@ -205,12 +205,12 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Original content");
       expect(result).toContain("Island content");
-      expect(result).toContain("<!-- gh-aw-island-start:123 -->");
-      expect(result).toContain("<!-- gh-aw-island-end:123 -->");
+      expect(result).toContain("<!-- gh-aw-island-start:test-workflow -->");
+      expect(result).toContain("<!-- gh-aw-island-end:test-workflow -->");
       // Check for footer elements (uses messages system)
       expect(result).toContain("Test");
       expect(result).toContain("https://github.com/test/actions/runs/123");
@@ -218,33 +218,33 @@ describe("update_pr_description_helpers.cjs", () => {
     });
 
     it("should replace existing island content", () => {
-      const currentBody = "Before\n<!-- gh-aw-island-start:123 -->\nOld island\n<!-- gh-aw-island-end:123 -->\nAfter";
+      const currentBody = "Before\n<!-- gh-aw-island-start:test-workflow -->\nOld island\n<!-- gh-aw-island-end:test-workflow -->\nAfter";
       const result = updateBody({
         currentBody,
         newContent: "New island",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Before");
       expect(result).toContain("After");
       expect(result).toContain("New island");
       expect(result).not.toContain("Old island");
-      expect(result).toContain("<!-- gh-aw-island-start:123 -->");
-      expect(result).toContain("<!-- gh-aw-island-end:123 -->");
+      expect(result).toContain("<!-- gh-aw-island-start:test-workflow -->");
+      expect(result).toContain("<!-- gh-aw-island-end:test-workflow -->");
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("updating existing island"));
     });
 
     it("should preserve content outside island when replacing", () => {
-      const currentBody = "# Title\n\nSome intro\n\n<!-- gh-aw-island-start:123 -->\nOld\n<!-- gh-aw-island-end:123 -->\n\n## Footer\n\nMore content";
+      const currentBody = "# Title\n\nSome intro\n\n<!-- gh-aw-island-start:test-workflow -->\nOld\n<!-- gh-aw-island-end:test-workflow -->\n\n## Footer\n\nMore content";
       const result = updateBody({
         currentBody,
         newContent: "Updated content",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("# Title");
       expect(result).toContain("Some intro");
@@ -254,33 +254,33 @@ describe("update_pr_description_helpers.cjs", () => {
       expect(result).not.toContain("Old");
     });
 
-    it("should not replace island with different run ID", () => {
-      const currentBody = "Before\n<!-- gh-aw-island-start:456 -->\nOther island\n<!-- gh-aw-island-end:456 -->\nAfter";
+    it("should not replace island with different workflow ID", () => {
+      const currentBody = "Before\n<!-- gh-aw-island-start:other-workflow -->\nOther island\n<!-- gh-aw-island-end:other-workflow -->\nAfter";
       const result = updateBody({
         currentBody,
         newContent: "New island",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
-      // Should append because island 123 doesn't exist
+      // Should append because island test-workflow doesn't exist
       expect(result).toContain("Other island");
       expect(result).toContain("New island");
-      expect(result).toContain("<!-- gh-aw-island-start:456 -->");
-      expect(result).toContain("<!-- gh-aw-island-start:123 -->");
+      expect(result).toContain("<!-- gh-aw-island-start:other-workflow -->");
+      expect(result).toContain("<!-- gh-aw-island-start:test-workflow -->");
       expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("falling back to append"));
     });
 
-    it("should handle multiple islands with same run ID (replace first)", () => {
-      const currentBody = "<!-- gh-aw-island-start:123 -->\nFirst\n<!-- gh-aw-island-end:123 -->\n<!-- gh-aw-island-start:123 -->\nSecond\n<!-- gh-aw-island-end:123 -->";
+    it("should handle multiple islands with same workflow ID (replace first)", () => {
+      const currentBody = "<!-- gh-aw-island-start:test-workflow -->\nFirst\n<!-- gh-aw-island-end:test-workflow -->\n<!-- gh-aw-island-start:test-workflow -->\nSecond\n<!-- gh-aw-island-end:test-workflow -->";
       const result = updateBody({
         currentBody,
         newContent: "Replaced",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Replaced");
       // First island should be replaced
@@ -288,14 +288,14 @@ describe("update_pr_description_helpers.cjs", () => {
     });
 
     it("should handle empty island content", () => {
-      const currentBody = "Before\n<!-- gh-aw-island-start:123 -->\n\n<!-- gh-aw-island-end:123 -->\nAfter";
+      const currentBody = "Before\n<!-- gh-aw-island-start:test-workflow -->\n\n<!-- gh-aw-island-end:test-workflow -->\nAfter";
       const result = updateBody({
         currentBody,
         newContent: "New content",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("New content");
       expect(result).toContain("Before");
@@ -303,14 +303,14 @@ describe("update_pr_description_helpers.cjs", () => {
     });
 
     it("should handle special characters in island content", () => {
-      const currentBody = "<!-- gh-aw-island-start:123 -->\nOld\n<!-- gh-aw-island-end:123 -->";
+      const currentBody = "<!-- gh-aw-island-start:test-workflow -->\nOld\n<!-- gh-aw-island-end:test-workflow -->";
       const result = updateBody({
         currentBody,
         newContent: "Content with **markdown**, `code`, [links](http://example.com)",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("**markdown**");
       expect(result).toContain("`code`");
@@ -318,14 +318,14 @@ describe("update_pr_description_helpers.cjs", () => {
     });
 
     it("should handle newlines and whitespace correctly", () => {
-      const currentBody = "<!-- gh-aw-island-start:123 -->\n  \n\nOld\n\n  \n<!-- gh-aw-island-end:123 -->";
+      const currentBody = "<!-- gh-aw-island-start:test-workflow -->\n  \n\nOld\n\n  \n<!-- gh-aw-island-end:test-workflow -->";
       const result = updateBody({
         currentBody,
         newContent: "New\n\nMultiline\n\nContent",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("New\n\nMultiline\n\nContent");
     });
@@ -339,7 +339,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Original");
       // Check for footer elements
@@ -353,7 +353,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("New");
     });
@@ -365,7 +365,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("你好");
       expect(result).toContain("世界 🚀");
@@ -379,7 +379,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain(longContent);
       expect(result.length).toBeGreaterThan(10000);
@@ -392,7 +392,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "unknown",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
       });
       expect(result).toContain("Original");
       expect(result).toContain("New");
@@ -409,7 +409,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         includeFooter: false,
       });
       expect(result).toContain("Original");
@@ -425,7 +425,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         // includeFooter not specified, should default to true
       });
       expect(result).toContain("Original");
@@ -440,7 +440,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "append",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         includeFooter: true,
       });
       expect(result).toContain("Original");
@@ -455,7 +455,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "replace",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         includeFooter: false,
       });
       expect(result).toBe("Replacement");
@@ -469,7 +469,7 @@ describe("update_pr_description_helpers.cjs", () => {
         operation: "prepend",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         includeFooter: false,
       });
       expect(result).toContain("Prepended");
@@ -478,22 +478,22 @@ describe("update_pr_description_helpers.cjs", () => {
     });
 
     it("should omit footer in replace-island operation when includeFooter is false", () => {
-      const currentBody = "Before\n<!-- gh-aw-island-start:123 -->\nOld island\n<!-- gh-aw-island-end:123 -->\nAfter";
+      const currentBody = "Before\n<!-- gh-aw-island-start:test-workflow -->\nOld island\n<!-- gh-aw-island-end:test-workflow -->\nAfter";
       const result = updateBody({
         currentBody,
         newContent: "New island",
         operation: "replace-island",
         workflowName: "Test",
         runUrl: "https://github.com/test/actions/runs/123",
-        runId: 123,
+        workflowId: "test-workflow",
         includeFooter: false,
       });
       expect(result).toContain("Before");
       expect(result).toContain("New island");
       expect(result).toContain("After");
       expect(result).not.toContain("Generated by");
-      expect(result).toContain("<!-- gh-aw-island-start:123 -->");
-      expect(result).toContain("<!-- gh-aw-island-end:123 -->");
+      expect(result).toContain("<!-- gh-aw-island-start:test-workflow -->");
+      expect(result).toContain("<!-- gh-aw-island-end:test-workflow -->");
     });
   });
 });
