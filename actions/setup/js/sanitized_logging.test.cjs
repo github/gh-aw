@@ -192,7 +192,7 @@ End of file`;
 
     it("should protect file content logging", () => {
       const fileLines = ["::add-mask::password123", "normal line", "::error::fake error"];
-      fileLines.forEach((line) => safeInfo(line));
+      fileLines.forEach(line => safeInfo(line));
 
       expect(core.info).toHaveBeenNthCalledWith(1, ": :add-mask::password123");
       expect(core.info).toHaveBeenNthCalledWith(2, "normal line");
