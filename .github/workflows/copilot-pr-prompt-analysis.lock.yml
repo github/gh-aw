@@ -535,6 +535,7 @@ jobs:
           - **Automatic Push**: Changes are automatically committed and pushed after the workflow completes
           - **Merge Strategy**: In case of conflicts, your changes (current version) win
           - **Persistence**: Files persist across workflow runs via git branch storage
+          - **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.
           
           **Constraints:**
           - **Allowed Files**: Only files matching patterns: memory/prompt-analysis/*.json, memory/prompt-analysis/*.jsonl, memory/prompt-analysis/*.csv, memory/prompt-analysis/*.md
@@ -543,10 +544,13 @@ jobs:
           
           Examples of what you can store:
           - `/tmp/gh-aw/repo-memory/default/notes.md` - general notes and observations
+          - `/tmp/gh-aw/repo-memory/default/notes.txt` - plain text notes
           - `/tmp/gh-aw/repo-memory/default/state.json` - structured state data
-          - `/tmp/gh-aw/repo-memory/default/history/` - organized history files in subdirectories
+          - `/tmp/gh-aw/repo-memory/default/history.jsonl` - activity history in JSON Lines format
+          - `/tmp/gh-aw/repo-memory/default/data.csv` - tabular data
+          - `/tmp/gh-aw/repo-memory/default/history/` - organized history files in subdirectories (with allowed file types)
           
-          Feel free to create, read, update, and organize files in this folder as needed for your tasks.
+          Feel free to create, read, update, and organize files in this folder as needed for your tasks, using only the allowed file types.
           
           <safe-outputs>
           <description>GitHub API Access Instructions</description>
@@ -814,6 +818,18 @@ jobs:
           path: /tmp/gh-aw/repo-memory/default
           retention-days: 1
           if-no-files-found: ignore
+      - name: Validate cache-memory file types
+        if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');
+            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory', 'cache');
+            if (!result.valid) {
+              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+            }
       - name: Upload cache-memory data as artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
@@ -1209,6 +1225,17 @@ jobs:
         with:
           name: cache-memory
           path: /tmp/gh-aw/cache-memory
+      - name: Validate cache-memory file types (default)
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');
+            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory', 'cache');
+            if (!result.valid) {
+              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+            }
       - name: Save cache-memory to cache (default)
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:

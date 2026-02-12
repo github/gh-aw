@@ -307,13 +307,17 @@ jobs:
           - **Persistence**: Files in these folders persist across workflow runs via GitHub Actions cache
           - **Last Write Wins**: If multiple processes write to the same file, the last write will be preserved
           - **File Share**: Use these as simple file shares - organize files as you see fit
+          - **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.
           
           Examples of what you can store:
           - `/tmp/gh-aw/cache-memory-chroma/notes.txt` - general notes and observations
+          - `/tmp/gh-aw/cache-memory-chroma/notes.md` - markdown formatted notes
           - `/tmp/gh-aw/cache-memory-chroma/preferences.json` - user preferences and settings
-          - `/tmp/gh-aw/cache-memory-chroma/state/` - organized state files in subdirectories
+          - `/tmp/gh-aw/cache-memory-chroma/history.jsonl` - activity history in JSON Lines format
+          - `/tmp/gh-aw/cache-memory-chroma/data.csv` - tabular data
+          - `/tmp/gh-aw/cache-memory-chroma/state/` - organized state files in subdirectories (with allowed file types)
           
-          Feel free to create, read, update, and organize files in these folders as needed for your tasks.
+          Feel free to create, read, update, and organize files in these folders as needed for your tasks, using only the allowed file types.
           
           <github-context>
           The following GitHub context information is available for this workflow:
@@ -515,6 +519,18 @@ jobs:
           # AWF runs with sudo, creating files owned by root
           sudo chmod -R a+r /tmp/gh-aw/sandbox/firewall/logs 2>/dev/null || true
           awf logs summary | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Validate cache-memory file types (chroma)
+        if: always()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');
+            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory-chroma', 'cache');
+            if (!result.valid) {
+              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
+            }
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true

@@ -591,6 +591,7 @@ jobs:
           - **Automatic Push**: Changes are automatically committed and pushed after the workflow completes
           - **Merge Strategy**: In case of conflicts, your changes (current version) win
           - **Persistence**: Files persist across workflow runs via git branch storage
+          - **Allowed File Types**: Only the following file extensions are allowed: `.json`, `.jsonl`, `.txt`, `.md`, `.csv`. Files with other extensions will be rejected during validation.
           
           **Constraints:**
           - **Allowed Files**: Only files matching patterns: memory/delight/*.json, memory/delight/*.md
@@ -599,10 +600,13 @@ jobs:
           
           Examples of what you can store:
           - `/tmp/gh-aw/repo-memory/default/notes.md` - general notes and observations
+          - `/tmp/gh-aw/repo-memory/default/notes.txt` - plain text notes
           - `/tmp/gh-aw/repo-memory/default/state.json` - structured state data
-          - `/tmp/gh-aw/repo-memory/default/history/` - organized history files in subdirectories
+          - `/tmp/gh-aw/repo-memory/default/history.jsonl` - activity history in JSON Lines format
+          - `/tmp/gh-aw/repo-memory/default/data.csv` - tabular data
+          - `/tmp/gh-aw/repo-memory/default/history/` - organized history files in subdirectories (with allowed file types)
           
-          Feel free to create, read, update, and organize files in this folder as needed for your tasks.
+          Feel free to create, read, update, and organize files in this folder as needed for your tasks, using only the allowed file types.
           
           <safe-outputs>
           <description>GitHub API Access Instructions</description>
