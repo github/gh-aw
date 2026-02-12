@@ -3528,9 +3528,10 @@ rate-limit:
   events: []
     # Array of strings
 
-  # Optional list of roles that are exempt from rate limiting. Users with any of
-  # these roles will not be subject to rate limiting checks. Common roles: 'admin',
-  # 'maintain', 'write', 'triage', 'read'.
+  # Optional list of roles that are exempt from rate limiting. Defaults to ['admin',
+  # 'maintain', 'write'] if not specified. Users with any of these roles will not be
+  # subject to rate limiting checks. To apply rate limiting to all users, set to an
+  # empty array: []
   # (optional)
   ignored-roles: []
     # Array of strings
