@@ -153,7 +153,7 @@ This workflow tests the update-issue configuration with all options.
 	if workflowData.SafeOutputs.UpdateIssues.Body == nil {
 		t.Fatal("Expected body to be non-nil (updatable)")
 	}
-	
+
 	// Verify body is set to true
 	if !*workflowData.SafeOutputs.UpdateIssues.Body {
 		t.Fatal("Expected body to be true")
