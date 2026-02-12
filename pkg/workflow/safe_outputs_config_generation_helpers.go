@@ -60,18 +60,6 @@ func generateMaxWithAllowedConfig(max int, defaultMax int, allowed []string) map
 	return config
 }
 
-// generateMaxWithRequiredFieldsConfig creates a config with max and optional required filter fields
-func generateMaxWithRequiredFieldsConfig(max int, defaultMax int, requiredLabels []string, requiredTitlePrefix string) map[string]any {
-	config := generateMaxConfig(max, defaultMax)
-	if len(requiredLabels) > 0 {
-		config["required_labels"] = requiredLabels
-	}
-	if requiredTitlePrefix != "" {
-		config["required_title_prefix"] = requiredTitlePrefix
-	}
-	return config
-}
-
 // generateMaxWithDiscussionFieldsConfig creates a config with discussion-specific filter fields
 func generateMaxWithDiscussionFieldsConfig(max int, defaultMax int, requiredCategory string, requiredLabels []string, requiredTitlePrefix string) map[string]any {
 	config := generateMaxConfig(max, defaultMax)
