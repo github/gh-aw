@@ -172,7 +172,7 @@ Custom jobs and safe outputs jobs can have their own permission requirements bas
 
 Some tools require specific permissions to function:
 
-- **`agentic-workflows`**: Requires `actions: read` to access workflow logs and run data
+- **`agentic-workflows`**: Requires `actions: read` to access workflow logs and run data. Additionally, the `logs` and `audit` tools require the workflow actor to have **write, maintain, or admin** repository role.
 - **GitHub Model Context Protocol (MCP) toolsets**: See [Tools](/gh-aw/reference/tools/) for GitHub API permission requirements
 
 The compiler validates these requirements and provides clear error messages when permissions are missing.

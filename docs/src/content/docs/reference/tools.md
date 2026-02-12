@@ -196,6 +196,9 @@ tools:
   agentic-workflows:
 ```
 
+> [!NOTE]
+> The `logs` and `audit` tools require the workflow actor to have **write, maintain, or admin** repository role. Other tools (status, compile, mcp-inspect, add, update, fix) are available to all users.
+
 See [MCP Server](/gh-aw/setup/mcp-server/#using-as-agentic-workflows-tool) for available operations.
 
 ### Cache Memory (`cache-memory:`)

@@ -181,6 +181,90 @@ graph LR
 
 Safe output jobs without cross-dependencies run concurrently for performance. When threat detection is enabled, safe outputs depend on both agent and detection jobs.
 
+## Why Detection, Safe Outputs, and Conclusion Are Separate Jobs
+
+A typical compiled workflow contains these post-agent jobs:
+
+```mermaid
+flowchart TD
+    activation["activation\nubuntu-slim\ncontents: read"] --> agent["agent\nubuntu-latest\nREAD-ONLY permissions\nconcurrency group"]
+    agent --> detection["detection\nubuntu-latest\ncontents: read\nconcurrency group\nRUNS AI ENGINE"]
+    agent --> conclusion["conclusion\nubuntu-slim\nissues: write\npr: write"]
+    detection --> safe_outputs["safe_outputs\nubuntu-slim\ncontents: write\nissues: write\npr: write"]
+    detection --> conclusion
+    safe_outputs --> conclusion
+    detection --> update_cache_memory["update_cache_memory\nubuntu-latest\ncontents: read"]
+    update_cache_memory --> conclusion
+    activation --> safe_outputs
+    activation --> conclusion
+```
+
+These three jobs form a **sequential security pipeline** and cannot be combined into a single job for the following reasons.
+
+### 1. Security Architecture: Trust Boundaries
+
+The system is built on [Plan-Level Trust](/gh-aw/introduction/architecture/) — separating AI reasoning (read-only) from write operations. The **detection** job is a security gate between the agent's output and write operations:
+
+- It runs **its own AI engine** as a second opinion on whether the agent's output is safe
+- If combined with `safe_outputs`, a compromised agent's output could be executed before threat detection completes
+- The detection result (`success == 'true'`) is an **explicit gate** that controls whether `safe_outputs` runs at all
+
+### 2. Job-Level Permissions Are Immutable
+
+In GitHub Actions, permissions are declared per-job and cannot change during execution:
+
+| Job | Key Permissions | Rationale |
+|-----|----------------|-----------|
+| **detection** | `contents: read` (minimal) | Runs AI analysis — must NOT have write access |
+| **safe_outputs** | `contents: write`, `issues: write`, `pull-requests: write` | Executes GitHub API write operations |
+| **conclusion** | `issues: write`, `pull-requests: write`, `discussions: write` | Updates comments, handles failures |
+
+If detection and safe_outputs were combined, the combined job would hold **write permissions during threat detection**, violating least privilege. A compromised detection step could exploit those write permissions.
+
+### 3. Job-Level Gating Provides Hard Isolation
+
+The `safe_outputs` job condition ensures it only runs when detection approves:
+
+```yaml
+if: ((!cancelled()) && (needs.agent.result != 'skipped'))
+    && (needs.detection.outputs.success == 'true')
+```
+
+With job-level gating, if detection fails, the safe_outputs runner **never starts** — write-permission code never loads. Step-level `if` within a single job provides weaker isolation since subsequent steps could still reference dangerous output.
+
+### 4. The Conclusion Job Requires `always()` Semantics
+
+The `conclusion` job runs with `always()` — even when the agent, detection, or safe_outputs jobs fail. It handles:
+
+- Agent failure reporting and issue creation
+- No-op message logging
+- Activation comment updates with error status
+- Missing tool reporting
+
+As a separate job, it can inspect the **result status** of each upstream job (`needs.detection.result`, `needs.agent.result`) and report accordingly. If combined with safe_outputs, a failure in write operations would prevent conclusion steps from running.
+
+### 5. Different Runners and Resource Requirements
+
+- **detection**: `ubuntu-latest` — needs full environment for AI engine execution (Copilot CLI, Node.js)
+- **safe_outputs**: `ubuntu-slim` — lightweight, runs JavaScript/GitHub API calls
+- **conclusion**: `ubuntu-slim` — lightweight status reporting
+
+Combining detection with safe_outputs would force the expensive `ubuntu-latest` runner for the entire pipeline.
+
+### 6. Concurrency Group Isolation
+
+The `detection` job shares a **concurrency group** (`gh-aw-copilot-${{ github.workflow }}`) with the agent job, serializing AI engine execution. The `safe_outputs` job intentionally does **not** have this group — it can run concurrently with other workflow instances' detection phases.
+
+### 7. Artifact-Based Security Handoff
+
+Data flows between jobs via GitHub Actions artifacts:
+
+1. Agent writes `agent_output.json` as an artifact
+2. Detection downloads it, analyzes it, outputs `success`
+3. Safe_outputs downloads the same artifact **only if detection approved**
+
+This artifact-based handoff ensures the detection job cannot be influenced by the safe_outputs environment and vice versa. In a single job, the agent output would be a file on the same filesystem, and a compromised step could modify it between detection and execution.
+
 ## Action Pinning
 
 All GitHub Actions are pinned to commit SHAs (e.g., `actions/checkout@b4ffde6...11 # v4`) to prevent supply chain attacks and ensure reproducibility. Tags can be moved to malicious commits, but SHA commits are immutable.
