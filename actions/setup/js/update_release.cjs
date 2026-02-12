@@ -10,6 +10,7 @@ const { updateBody } = require("./update_pr_description_helpers.cjs");
  *
  * @param {Object} config - Handler configuration
  * @param {number} [config.max] - Maximum number of releases to update
+ * @param {boolean} [config.footer] - Controls whether AI-generated footer is added (default: true)
  * @returns {Promise<Function>} Handler function that processes a single message
  */
 async function main(config = {}) {
