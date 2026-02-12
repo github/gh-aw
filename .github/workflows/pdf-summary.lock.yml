@@ -74,11 +74,13 @@ jobs:
       issues: write
       pull-requests: write
     outputs:
+      body: ${{ steps.compute-text.outputs.body }}
       comment_id: ${{ steps.add-comment.outputs.comment-id }}
       comment_repo: ${{ steps.add-comment.outputs.comment-repo }}
       comment_url: ${{ steps.add-comment.outputs.comment-url }}
       slash_command: ${{ needs.pre_activation.outputs.matched_command }}
       text: ${{ steps.compute-text.outputs.text }}
+      title: ${{ steps.compute-text.outputs.title }}
     steps:
       - name: Checkout actions folder
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
