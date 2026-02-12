@@ -14,6 +14,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
+	"github.com/github/gh-aw/pkg/sliceutil"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -160,6 +161,49 @@ func hasWriteAccess(permission string) bool {
 	default:
 		return false
 	}
+}
+
+// validateWorkflowName validates that a workflow name exists.
+// Returns nil if the workflow exists, or an error with suggestions if not.
+// Empty workflow names are considered valid (means all workflows).
+func validateWorkflowName(workflowName string) error {
+	// Empty workflow name means "all workflows" - this is valid
+	if workflowName == "" {
+		return nil
+	}
+
+	mcpLog.Printf("Validating workflow name: %s", workflowName)
+
+	// Try to resolve as workflow ID first
+	resolvedName, err := workflow.ResolveWorkflowName(workflowName)
+	if err == nil {
+		mcpLog.Printf("Workflow name resolved successfully: %s -> %s", workflowName, resolvedName)
+		return nil
+	}
+
+	// Check if it's a valid GitHub Actions workflow name
+	agenticWorkflowNames, nameErr := getAgenticWorkflowNames(false)
+	if nameErr == nil && sliceutil.Contains(agenticWorkflowNames, workflowName) {
+		mcpLog.Printf("Workflow name is valid GitHub Actions workflow name: %s", workflowName)
+		return nil
+	}
+
+	// Workflow not found - build error with suggestions
+	mcpLog.Printf("Workflow name not found: %s", workflowName)
+
+	suggestions := []string{
+		"Use the 'status' tool to see all available workflows",
+		"Check for typos in the workflow name",
+		"Use the workflow ID (e.g., 'test-claude') or GitHub Actions workflow name (e.g., 'Test Claude')",
+	}
+
+	// Add fuzzy match suggestions
+	similarNames := suggestWorkflowNames(workflowName)
+	if len(similarNames) > 0 {
+		suggestions = append([]string{fmt.Sprintf("Did you mean: %s?", strings.Join(similarNames, ", "))}, suggestions...)
+	}
+
+	return fmt.Errorf("workflow '%s' not found. %s", workflowName, strings.Join(suggestions, " "))
 }
 
 // NewMCPServerCommand creates the mcp-server command
@@ -715,6 +759,19 @@ return a schema description instead of the full output. Adjust the 'max_tokens' 
 				Code:    jsonrpc.CodeInvalidParams,
 				Message: "conflicting parameters: cannot specify both 'firewall' and 'no_firewall'",
 				Data:    nil,
+			}
+		}
+
+		// Validate workflow name before executing command
+		if err := validateWorkflowName(args.WorkflowName); err != nil {
+			mcpLog.Printf("Workflow name validation failed: %v", err)
+			return nil, nil, &jsonrpc.Error{
+				Code:    jsonrpc.CodeInvalidParams,
+				Message: err.Error(),
+				Data: mcpErrorData(map[string]any{
+					"workflow_name": args.WorkflowName,
+					"error_type":    "workflow_not_found",
+				}),
 			}
 		}
 
