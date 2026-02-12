@@ -79,8 +79,8 @@ function updateBody(params) {
   const aiFooter = includeFooter ? buildAIFooter(workflowName, runUrl) : "";
 
   if (operation === "replace") {
-    // Replace: use new content with AI footer (if enabled)
-    core.info("Operation: replace (full body replacement with footer)");
+    // Replace: use new content with optional AI footer
+    core.info("Operation: replace (full body replacement)");
     return newContent + aiFooter;
   }
 
