@@ -13,8 +13,10 @@ var frontmatterMetadataLog = logger.New("workflow:frontmatter_extraction_metadat
 // extractFeatures extracts the features field from frontmatter
 // Returns a map of feature flags and configuration options (supports boolean flags and string values)
 func (c *Compiler) extractFeatures(frontmatter map[string]any) map[string]any {
+	frontmatterMetadataLog.Print("Extracting features from frontmatter")
 	value, exists := frontmatter["features"]
 	if !exists {
+		frontmatterMetadataLog.Print("No features field found in frontmatter")
 		return nil
 	}
 
@@ -25,12 +27,11 @@ func (c *Compiler) extractFeatures(frontmatter map[string]any) map[string]any {
 			// Accept any value type (boolean, string, etc.)
 			result[key] = val
 		}
-		if log.Enabled() {
-			frontmatterLog.Printf("Extracted %d features", len(result))
-		}
+		frontmatterMetadataLog.Printf("Extracted %d features", len(result))
 		return result
 	}
 
+	frontmatterMetadataLog.Print("Features field is not a map")
 	return nil
 }
 
@@ -43,9 +44,12 @@ func (c *Compiler) extractDescription(frontmatter map[string]any) string {
 
 	// Convert the value to string
 	if strValue, ok := value.(string); ok {
-		return strings.TrimSpace(strValue)
+		desc := strings.TrimSpace(strValue)
+		frontmatterMetadataLog.Printf("Extracted description: %d characters", len(desc))
+		return desc
 	}
 
+	frontmatterMetadataLog.Printf("Description field is not a string: type=%T", value)
 	return ""
 }
 
@@ -104,6 +108,7 @@ func (c *Compiler) extractTrackerID(frontmatter map[string]any) (string, error) 
 // buildSourceURL converts a source string (owner/repo/path@ref) to a GitHub URL
 // For enterprise deployments, the URL will use the GitHub server URL from the workflow context
 func buildSourceURL(source string) string {
+	frontmatterMetadataLog.Printf("Building source URL from: %s", source)
 	if source == "" {
 		return ""
 	}
@@ -125,6 +130,7 @@ func buildSourceURL(source string) string {
 	// "${GITHUB_SERVER_URL}/owner/repo/tree/ref/workflows/file.md"
 	pathComponents := strings.SplitN(pathPart, "/", 3)
 	if len(pathComponents) < 3 {
+		frontmatterMetadataLog.Printf("Invalid source path format: %s (expected owner/repo/path)", pathPart)
 		return ""
 	}
 
@@ -132,8 +138,10 @@ func buildSourceURL(source string) string {
 	repo := pathComponents[1]
 	filePath := pathComponents[2]
 
+	url := fmt.Sprintf("${{ github.server_url }}/%s/%s/tree/%s/%s", owner, repo, refPart, filePath)
+	frontmatterMetadataLog.Printf("Built source URL: %s/%s tree %s", owner, repo, refPart)
 	// Use github.server_url for enterprise GitHub deployments
-	return fmt.Sprintf("${{ github.server_url }}/%s/%s/tree/%s/%s", owner, repo, refPart, filePath)
+	return url
 }
 
 // safeUintToInt safely converts uint to int, returning 0 if overflow would occur

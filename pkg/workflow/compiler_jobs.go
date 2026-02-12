@@ -35,15 +35,18 @@ func (c *Compiler) isActivationJobNeeded() bool {
 // Returns true if the condition contains "needs.<customJobName>." patterns, which includes
 // both outputs (needs.job.outputs.*) and results (needs.job.result).
 func (c *Compiler) referencesCustomJobOutputs(condition string, customJobs map[string]any) bool {
+	compilerJobsLog.Printf("Checking if condition references custom job outputs: custom_job_count=%d", len(customJobs))
 	if condition == "" || customJobs == nil {
 		return false
 	}
 	for jobName := range customJobs {
 		// Check for patterns like "needs.ast_grep.outputs" or "needs.ast_grep.result"
 		if strings.Contains(condition, fmt.Sprintf("needs.%s.", jobName)) {
+			compilerJobsLog.Printf("Found reference to custom job %s in condition", jobName)
 			return true
 		}
 	}
+	compilerJobsLog.Print("No custom job references found in condition")
 	return false
 }
 
@@ -86,12 +89,15 @@ func jobDependsOnAgent(jobConfig map[string]any) bool {
 // getCustomJobsDependingOnPreActivation returns custom job names that explicitly depend on pre_activation.
 // These jobs run after pre_activation but before activation, and activation should depend on them.
 func (c *Compiler) getCustomJobsDependingOnPreActivation(customJobs map[string]any) []string {
-	return sliceutil.FilterMapKeys(customJobs, func(jobName string, jobConfig any) bool {
+	compilerJobsLog.Printf("Finding custom jobs depending on pre_activation: total_custom_jobs=%d", len(customJobs))
+	deps := sliceutil.FilterMapKeys(customJobs, func(jobName string, jobConfig any) bool {
 		if configMap, ok := jobConfig.(map[string]any); ok {
 			return jobDependsOnPreActivation(configMap)
 		}
 		return false
 	})
+	compilerJobsLog.Printf("Found %d custom jobs depending on pre_activation: %v", len(deps), deps)
+	return deps
 }
 
 // getReferencedCustomJobs returns custom job names that are referenced in the given content.
@@ -100,13 +106,18 @@ func (c *Compiler) getReferencedCustomJobs(content string, customJobs map[string
 	if content == "" || customJobs == nil {
 		return nil
 	}
+	compilerJobsLog.Printf("Searching for custom job references in content: content_length=%d, custom_job_count=%d", len(content), len(customJobs))
 	// Check for patterns like "needs.job_name." which covers:
 	// - needs.job_name.outputs.X
 	// - ${{ needs.job_name.outputs.X }}
 	// - needs.job_name.result
-	return sliceutil.FilterMapKeys(customJobs, func(jobName string, _ any) bool {
+	refs := sliceutil.FilterMapKeys(customJobs, func(jobName string, _ any) bool {
 		return strings.Contains(content, fmt.Sprintf("needs.%s.", jobName))
 	})
+	if len(refs) > 0 {
+		compilerJobsLog.Printf("Found %d custom job references: %v", len(refs), refs)
+	}
+	return refs
 }
 
 // buildJobs creates all jobs for the workflow and adds them to the job manager.

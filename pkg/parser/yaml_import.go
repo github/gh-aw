@@ -21,11 +21,14 @@ func isYAMLWorkflowFile(filePath string) bool {
 
 	// Reject .lock.yml files (these are compiled outputs from gh-aw)
 	if strings.HasSuffix(lower, ".lock.yml") {
+		yamlImportLog.Printf("Rejecting lock file: %s", filePath)
 		return false
 	}
 
 	// Accept .yml and .yaml files
-	return strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml")
+	isWorkflow := strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml")
+	yamlImportLog.Printf("File %s is workflow: %v", filePath, isWorkflow)
+	return isWorkflow
 }
 
 // isActionDefinitionFile checks if a YAML file is a GitHub Action definition (action.yml)
@@ -79,9 +82,11 @@ func processYAMLWorkflowImport(filePath string) (jobs string, services string, e
 	// Check if this is an action definition file (not a workflow)
 	isAction, err := isActionDefinitionFile(filePath, content)
 	if err != nil {
+		yamlImportLog.Printf("Error checking if file is action definition: %v", err)
 		return "", "", fmt.Errorf("failed to check if file is action definition: %w", err)
 	}
 	if isAction {
+		yamlImportLog.Printf("Rejecting action definition file: %s", filePath)
 		return "", "", fmt.Errorf("cannot import action definition file (action.yml). Only workflow files (.yml) can be imported")
 	}
 
@@ -95,8 +100,10 @@ func processYAMLWorkflowImport(filePath string) (jobs string, services string, e
 	_, hasOn := workflow["on"]
 	_, hasJobs := workflow["jobs"]
 	if !hasOn && !hasJobs {
+		yamlImportLog.Printf("Invalid workflow file %s: missing 'on' or 'jobs' field", filePath)
 		return "", "", fmt.Errorf("not a valid GitHub Actions workflow: missing 'on' or 'jobs' field")
 	}
+	yamlImportLog.Printf("Validated workflow file %s: hasOn=%v, hasJobs=%v", filePath, hasOn, hasJobs)
 
 	// Special handling for copilot-setup-steps.yml: extract only steps from the setup job
 	if isCopilotSetupStepsFile(filePath) {
