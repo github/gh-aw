@@ -98,7 +98,6 @@ safe-outputs:
     expires: 7                       # auto-close after 7 days (or false to disable)
     group: true                      # group as sub-issues under parent
     close-older-issues: true         # close previous issues from same workflow
-    footer: false                    # hide AI-generated footer (default: true)
     target-repo: "owner/repo"        # cross-repository
 ```
 
@@ -345,14 +344,10 @@ safe-outputs:
     status:                   # enable status updates
     title:                    # enable title updates
     body:                     # enable body updates
-    footer: false             # hide AI-generated footer (default: true)
     max: 3                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
-
-> [!NOTE]
-> The `footer` field only applies when body updates are enabled. XML markers for searchability are preserved even with `footer: false`.
 
 **Target**: `"triggering"` (requires issue event), `"*"` (any issue), or number (specific issue).
 
@@ -375,14 +370,10 @@ safe-outputs:
   update-pull-request:
     title: true               # enable title updates (default: true)
     body: true                # enable body updates (default: true)
-    footer: false             # hide AI-generated footer (default: true)
     max: 1                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
-
-> [!NOTE]
-> The `footer` field only applies when body updates are enabled.
 
 **Target**: `"triggering"` (requires PR event), `"*"` (any PR), or number (specific PR).
 
@@ -647,7 +638,6 @@ safe-outputs:
     reviewers: [user1, copilot]   # reviewers (use 'copilot' for bot)
     draft: true                   # create as draft (default: true)
     expires: 14                   # auto-close after 14 days (same-repo only)
-    footer: false                 # hide AI-generated footer (default: true)
     if-no-changes: "warn"         # "warn" (default), "error", or "ignore"
     target-repo: "owner/repo"     # cross-repository
     base-branch: "vnext"          # target branch for PR (default: github.ref_name)
@@ -737,7 +727,6 @@ Updates GitHub release descriptions: replace (complete replacement), append (add
 ```yaml wrap
 safe-outputs:
   update-release:
-    footer: false                # hide AI-generated footer (default: true)
     max: 1                       # max releases (default: 1, max: 10)
     target-repo: "owner/repo"    # cross-repository
     github-token: ${{ secrets.CUSTOM_TOKEN }}  # custom token
@@ -846,7 +835,6 @@ safe-outputs:
     title-prefix: "[ai] "     # prefix for titles
     category: "general"       # category slug, name, or ID (use lowercase)
     expires: 3                # auto-close after 3 days (or false to disable)
-    footer: false             # hide AI-generated footer (default: true)
     max: 3                    # max discussions (default: 1)
     target-repo: "owner/repo" # cross-repository
     fallback-to-issue: true   # fallback to issue creation on permission errors (default: true)
@@ -903,16 +891,12 @@ safe-outputs:
   update-discussion:
     title:                    # enable title updates
     body:                     # enable body updates
-    footer: false             # hide AI-generated footer (default: true)
     labels:                   # enable label updates
     allowed-labels: [bug, idea] # restrict to specific labels
     max: 1                    # max updates (default: 1)
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
 ```
-
-> [!NOTE]
-> The `footer` field only applies when body updates are enabled.
 
 **Field Enablement**: Include `title:`, `body:`, or `labels:` keys to enable updates for those fields. Without these keys, the field cannot be updated. Setting `allowed-labels` implicitly enables label updates.
 
