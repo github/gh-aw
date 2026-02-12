@@ -17,6 +17,8 @@ func (c *Compiler) parseUpdateReleaseConfig(outputMap map[string]any) *UpdateRel
 	return parseUpdateEntityConfigTyped(c, outputMap,
 		UpdateEntityRelease, "update-release", updateReleaseLog,
 		func(cfg *UpdateReleaseConfig) []UpdateEntityFieldSpec {
-			return nil // No entity-specific fields for releases
+			return []UpdateEntityFieldSpec{
+				{Name: "footer", Mode: FieldParsingBoolValue, Dest: &cfg.Footer},
+			}
 		}, nil)
 }

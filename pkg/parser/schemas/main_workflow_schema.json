@@ -3942,6 +3942,11 @@
                   "type": "boolean",
                   "description": "When true, automatically close older issues with the same workflow-id marker as 'not planned' with a comment linking to the new issue. Searches for issues containing the workflow-id marker in their body. Maximum 10 issues will be closed. Only runs if issue creation succeeds.",
                   "default": false
+                },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added to the issue. When false, the visible footer content is omitted but XML markers (workflow-id, tracker-id, metadata) are still included for searchability. Defaults to true.",
+                  "default": true
                 }
               },
               "additionalProperties": false,
@@ -4364,6 +4369,11 @@
                   "description": "When true (default), fallback to creating an issue if discussion creation fails due to permissions. The fallback issue will include a note indicating it was intended to be a discussion. If close-older-discussions is enabled, the close-older-issues logic will be applied to the fallback issue.",
                   "default": true
                 },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added to the discussion. When false, the visible footer content is omitted but XML markers (workflow-id, tracker-id, metadata) are still included for searchability. Defaults to true.",
+                  "default": true
+                },
                 "expires": {
                   "oneOf": [
                     {
@@ -4514,6 +4524,11 @@
                 "target-repo": {
                   "type": "string",
                   "description": "Target repository in format 'owner/repo' for cross-repository discussion updates. Takes precedence over trial target repo settings."
+                },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added when updating the discussion body. When false, the visible footer content is omitted. Defaults to true. Only applies when 'body' is enabled.",
+                  "default": true
                 }
               },
               "additionalProperties": false
@@ -4835,6 +4850,11 @@
                   "type": "boolean",
                   "description": "Enable auto-merge for the pull request. When enabled, the PR will be automatically merged once all required checks pass and required approvals are met. Defaults to false.",
                   "default": false
+                },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added to the pull request. When false, the visible footer content is omitted but XML markers (workflow-id, tracker-id, metadata) are still included for searchability. Defaults to true.",
+                  "default": true
                 }
               },
               "additionalProperties": false,
@@ -5290,6 +5310,11 @@
                   "type": "null",
                   "description": "Allow updating issue body - presence of key indicates field can be updated"
                 },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added when updating the issue body. When false, the visible footer content is omitted but XML markers are still included. Defaults to true. Only applies when 'body' is enabled.",
+                  "default": true
+                },
                 "max": {
                   "type": "integer",
                   "description": "Maximum number of issues to update (default: 1)",
@@ -5678,6 +5703,11 @@
                   "type": "string",
                   "description": "Target repository for cross-repo release updates (format: owner/repo). If not specified, updates releases in the workflow's repository.",
                   "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+                },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added when updating the release body. When false, the visible footer content is omitted. Defaults to true.",
+                  "default": true
                 }
               },
               "additionalProperties": false

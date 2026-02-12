@@ -24,6 +24,7 @@ func (c *Compiler) parseUpdateIssuesConfig(outputMap map[string]any) *UpdateIssu
 				{Name: "status", Mode: FieldParsingKeyExistence, Dest: &cfg.Status},
 				{Name: "title", Mode: FieldParsingKeyExistence, Dest: &cfg.Title},
 				{Name: "body", Mode: FieldParsingKeyExistence, Dest: &cfg.Body},
+				{Name: "footer", Mode: FieldParsingBoolValue, Dest: &cfg.Footer},
 			}
 		}, nil)
 }
