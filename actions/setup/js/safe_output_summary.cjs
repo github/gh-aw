@@ -94,6 +94,21 @@ async function writeSafeOutputSummaries(results, messages) {
     return;
   }
 
+  // Log the raw .jsonl content from the safe outputs file
+  const fs = require("fs");
+  const safeOutputsFile = process.env.GH_AW_SAFE_OUTPUTS;
+  if (safeOutputsFile && fs.existsSync(safeOutputsFile)) {
+    try {
+      const rawContent = fs.readFileSync(safeOutputsFile, "utf8");
+      if (rawContent.trim()) {
+        core.info("📄 Raw safe-output .jsonl content:");
+        core.info(rawContent);
+      }
+    } catch (error) {
+      core.debug(`Could not read raw safe-output file: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   let summaryContent = `## Safe Output Processing Summary\n\n`;
   summaryContent += `Processed ${results.length} safe-output message(s).\n\n`;
 
