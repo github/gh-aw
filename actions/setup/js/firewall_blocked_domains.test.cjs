@@ -112,7 +112,7 @@ describe("firewall_blocked_domains.cjs", () => {
     it("should extract and sanitize domain from domain:port format", () => {
       expect(extractAndSanitizeDomain("example.com:443")).toBe("example.com");
       expect(extractAndSanitizeDomain("api.github.com:443")).toBe("api.github.com");
-      expect(extractAndSanitizeDomain("sub.domain.example.com:8080")).toBe("sub.domain.example...");
+      expect(extractAndSanitizeDomain("sub.domain.example.com:8080")).toBe("sub.domain.example.com");
     });
 
     it("should handle placeholder domain", () => {
