@@ -194,7 +194,7 @@ Analyze the account for these 8 specific red flags:
 3. For bots: Verify if it's a legitimate, known bot (dependabot, renovate, github-actions)
 
 **Threshold**: Flag if:
-- User type is "Bot" AND not in allowlist: [dependabot, renovate, github-actions]
+- User type is "Bot" AND not in allowlist: [dependabot, renovate, github-actions, copilot]
 - OR username ends with `[bot]` but isn't a known legitimate bot
 
 ## Analysis Process
