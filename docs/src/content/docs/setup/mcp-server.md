@@ -31,6 +31,57 @@ Run with HTTP/SSE transport using `--port`:
 gh aw mcp-server --port 8080
 ```
 
+### Actor Validation
+
+Control access to logs and audit tools based on repository permissions using `--validate-actor`:
+
+```bash wrap
+gh aw mcp-server --validate-actor
+```
+
+When actor validation is enabled:
+- Logs and audit tools require write, maintain, or admin repository access
+- The server reads `GITHUB_ACTOR` and `GITHUB_REPOSITORY` environment variables to determine actor permissions
+- Permission checks are performed at runtime using the GitHub API
+- Results are cached for 1 hour to minimize API calls
+
+When actor validation is disabled (default):
+- All tools are available without permission checks
+- Backward compatible with existing configurations
+
+**Environment Variables:**
+- `GITHUB_ACTOR`: GitHub username of the current actor (required when validation enabled)
+- `GITHUB_REPOSITORY`: Repository in `owner/repo` format (optional, improves performance)
+
+**Permission Requirements:**
+
+Restricted tools (logs, audit) require:
+- Minimum role: write, maintain, or admin
+- Permission check via GitHub API: `GET /repos/{owner}/{repo}/collaborators/{username}/permission`
+
+**Error Handling:**
+
+When `GITHUB_ACTOR` is not set and validation is enabled:
+```json
+{
+  "error": "GITHUB_ACTOR environment variable not set",
+  "tool": "logs",
+  "reason": "This tool requires at least write access to the repository. Set GITHUB_ACTOR environment variable to enable access."
+}
+```
+
+When actor has insufficient permissions:
+```json
+{
+  "error": "insufficient repository permissions",
+  "actor": "username",
+  "repository": "owner/repo",
+  "role": "read",
+  "required": "write, maintain, or admin",
+  "reason": "Actor username has read access to owner/repo. This tool requires at least write access."
+}
+```
+
 ## Configuring with GitHub Copilot Agent
 
 Configure GitHub Copilot Agent to use gh-aw MCP server:
