@@ -452,6 +452,84 @@ Custom secret: my-secret-123456789012`;
           expect(redacted).toContain("AKI*****************");
           expect(redacted).toContain("my-*******************");
         });
+
+        describe("ReDoS protection", () => {
+          it("should handle pathological Azure SAS Token input without timing out", async () => {
+            const testFile = path.join(tempDir, "test.txt");
+            // Create pathological input that would cause ReDoS with unbounded quantifiers
+            const pathological = `?sv=${"9".repeat(1000)}&srt=${"w".repeat(1000)}&sig=${"A".repeat(1000)}`;
+            fs.writeFileSync(testFile, `Pathological: ${pathological}`);
+            process.env.GH_AW_SECRET_NAMES = "";
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+
+            // This should complete quickly (< 1 second) without hanging
+            const startTime = Date.now();
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+            const duration = Date.now() - startTime;
+
+            // Verify it completed quickly (should be < 1000ms, but allow 5000ms for slower CI)
+            expect(duration).toBeLessThan(5000);
+
+            // The pattern shouldn't match due to length bounds
+            const content = fs.readFileSync(testFile, "utf8");
+            expect(content).toBe(`Pathological: ${pathological}`);
+          });
+
+          it("should handle pathological Google OAuth token input without timing out", async () => {
+            const testFile = path.join(tempDir, "test.txt");
+            // Create pathological input that would cause ReDoS with unbounded quantifiers
+            const pathological = `ya29.${"A".repeat(5000)}`;
+            fs.writeFileSync(testFile, `Token: ${pathological}`);
+            process.env.GH_AW_SECRET_NAMES = "";
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+
+            // This should complete quickly (< 1 second) without hanging
+            const startTime = Date.now();
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+            const duration = Date.now() - startTime;
+
+            // Verify it completed quickly (should be < 1000ms, but allow 5000ms for slower CI)
+            expect(duration).toBeLessThan(5000);
+
+            // The pattern should match up to 800 chars and redact it
+            const content = fs.readFileSync(testFile, "utf8");
+            expect(content).toContain("ya2");
+            expect(content).not.toBe(`Token: ${pathological}`);
+            // Should contain asterisks from redaction
+            expect(content).toContain("*");
+            // Should still have unredacted 'A' chars at the end beyond 800 char limit
+            expect(content).toMatch(/\*+A+$/);
+          });
+
+          it("should still match valid Azure SAS tokens within bounds", async () => {
+            const testFile = path.join(tempDir, "test.txt");
+            // Valid Azure SAS token within bounds
+            const validSAS = "?sv=2021-06-08&sr=b&sig=AbCdEf0123456789+/=";
+            fs.writeFileSync(testFile, `SAS: ${validSAS}`);
+            process.env.GH_AW_SECRET_NAMES = "";
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+            const redacted = fs.readFileSync(testFile, "utf8");
+            // Should be redacted since it's a valid pattern within bounds
+            expect(redacted).toContain("?sv");
+            expect(redacted).not.toBe(`SAS: ${validSAS}`);
+          });
+
+          it("should still match valid Google OAuth tokens within bounds", async () => {
+            const testFile = path.join(tempDir, "test.txt");
+            // Valid Google OAuth token within bounds (typical length ~100-200 chars)
+            const validToken = "ya29." + "a".repeat(150);
+            fs.writeFileSync(testFile, `Token: ${validToken}`);
+            process.env.GH_AW_SECRET_NAMES = "";
+            const modifiedScript = redactScript.replace('findFiles("/tmp/gh-aw", targetExtensions)', `findFiles("${tempDir.replace(/\\/g, "\\\\")}", targetExtensions)`);
+            await eval(`(async () => { ${modifiedScript}; await main(); })()`);
+            const redacted = fs.readFileSync(testFile, "utf8");
+            // Should be redacted since it's a valid pattern within bounds
+            expect(redacted).toContain("ya2");
+            expect(redacted).not.toBe(`Token: ${validToken}`);
+            expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Google OAuth Access Token"));
+          });
+        });
       });
     }));
 });

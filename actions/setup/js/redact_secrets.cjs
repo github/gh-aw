@@ -55,11 +55,11 @@ const BUILT_IN_PATTERNS = [
 
   // Azure tokens
   { name: "Azure Storage Account Key", pattern: /[a-zA-Z0-9+/]{88}==/g },
-  { name: "Azure SAS Token", pattern: /\?sv=[0-9-]+&s[rts]=[\w\-]+&sig=[A-Za-z0-9%+/=]+/g },
+  { name: "Azure SAS Token", pattern: /\?sv=[0-9-]{1,20}&s[rts]=[\w\-]{1,20}&sig=[A-Za-z0-9%+/=]{1,200}/g },
 
   // Google/GCP tokens
   { name: "Google API Key", pattern: /AIzaSy[0-9A-Za-z_-]{33}/g },
-  { name: "Google OAuth Access Token", pattern: /ya29\.[0-9A-Za-z_-]+/g },
+  { name: "Google OAuth Access Token", pattern: /ya29\.[0-9A-Za-z_-]{1,800}/g },
 
   // AWS tokens
   { name: "AWS Access Key ID", pattern: /AKIA[0-9A-Z]{16}/g },
