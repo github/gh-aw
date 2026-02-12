@@ -39,7 +39,7 @@ jobs:
           REPO = os.environ["REPO"]
           HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-          DAYS_BACK = 90
+          DAYS_BACK = 3
           MAX_PR = 200
           MIN_MESSAGES = 25
           EPS = 0.22
@@ -55,9 +55,13 @@ jobs:
           # -----------------------------
           # Fetch PRs
           # -----------------------------
+          # Fetch PRs and user account ages
           prs = gh(f"https://api.github.com/repos/{REPO}/pulls?state=all&per_page=100")
+          user_created_dates = {}  # Cache user account creation dates
 
           comments_by_author = defaultdict(list)
+          comment_details = defaultdict(list)  # Track PR/issue links and timestamps
+          new_accounts = []  # Track accounts created recently (< 7 days)
 
           for pr in prs[:MAX_PR]:
               if datetime.datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ") < cutoff:
@@ -76,7 +80,35 @@ jobs:
                   login = user.get("login")
                   if not login:
                       continue
+                  
+                  # Fetch user account age if not cached
+                  if login not in user_created_dates:
+                      try:
+                          user_info = gh(f"https://api.github.com/users/{login}")
+                          if user_info:
+                              created_at = datetime.datetime.strptime(
+                                  user_info.get("created_at", ""), "%Y-%m-%dT%H:%M:%SZ"
+                              )
+                              user_created_dates[login] = created_at
+                          else:
+                              user_created_dates[login] = None
+                      except:
+                          user_created_dates[login] = None
+                  
+                  # Check if account is suspiciously new (< 7 days old)
+                  account_created = user_created_dates.get(login)
+                  if account_created and (cutoff - account_created).days < 7:
+                      new_accounts.append((login, (cutoff - account_created).days))
+                  
                   comments_by_author[login].append(c["body"])
+                  
+                  # Track comment details: PR#, URL, and timestamp
+                  comment_url = c.get("html_url", f"https://github.com/{REPO}/pull/{number}#comment")
+                  comment_details[login].append({
+                      "pr": number,
+                      "url": comment_url,
+                      "timestamp": c["created_at"]
+                  })
 
           # -----------------------------
           # Distance metrics
@@ -140,8 +172,40 @@ jobs:
           # Analyze authors
           # -----------------------------
           results = []
+          suspicious_unknowns = []  # Track accounts that warrant investigation
 
           for author, messages in comments_by_author.items():
+              # Check for new bots: few messages that are all very similar
+              if 3 <= len(messages) < MIN_MESSAGES:
+                  norm = [m.lower().strip() for m in messages]
+                  
+                  # Quick check: all identical
+                  if len(set(norm)) == 1:
+                      results.append((author, 1, len(messages)))
+                      continue
+                  
+                  # Check if messages are very similar (likely AI bot)
+                  n = len(norm)
+                  if n >= 2:
+                      similarity_sum = 0
+                      pair_count = 0
+                      for i, j in itertools.combinations(range(n), 2):
+                          L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]), 1)
+                          J = jaccard(norm[i], norm[j])
+                          D = (L + J) / 2
+                          similarity_sum += D
+                          pair_count += 1
+                      
+                      # If average distance is very low (< 0.15), messages are nearly identical
+                      avg_distance = similarity_sum / pair_count if pair_count > 0 else 0
+                      if avg_distance < 0.15:
+                          # Cluster into 1 group if all very similar
+                          results.append((author, 1, len(messages)))
+                      else:
+                          # Flag as suspicious unknown: few messages with unusual patterns
+                          suspicious_unknowns.append((author, len(messages), avg_distance))
+                      continue
+              
               if len(messages) < MIN_MESSAGES:
                   continue
 
@@ -173,11 +237,38 @@ jobs:
           for author, clusters, count in sorted(results, key=lambda x: x[1]):
               if clusters <= BOT_CLUSTER_THRESHOLD:
                   body += f"- **{author}** — clusters={clusters}, messages={count}\n"
+                  # Add links to their comments
+                  for detail in comment_details.get(author, []):
+                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
 
           body += "\n## Likely Humans\n"
           for author, clusters, count in sorted(results, key=lambda x: -x[1]):
               if clusters > BOT_CLUSTER_THRESHOLD:
                   body += f"- **{author}** — clusters={clusters}, messages={count}\n"
+
+          if suspicious_unknowns:
+              body += "\n## Suspicious/Unknown Contributors\n"
+              body += "Accounts with few messages and unusual patterns (may warrant investigation):\n\n"
+              for author, count, avg_dist in sorted(suspicious_unknowns, key=lambda x: x[1]):
+                  body += f"- **{author}** — messages={count}, similarity={avg_dist:.2f}\n"
+                  # Add links to their comments
+                  for detail in comment_details.get(author, []):
+                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
+
+          if new_accounts:
+              body += "\n## 🚨 HIGH RISK: Brand New Accounts (< 7 days old)\n"
+              body += "Recently-created accounts often indicate bots, spam accounts, or malicious actors:\n\n"
+              # Deduplicate new accounts
+              seen_accounts = {}
+              for login, days_old in sorted(new_accounts, key=lambda x: x[1]):
+                  if login not in seen_accounts:
+                      seen_accounts[login] = days_old
+              
+              for login, days_old in sorted(seen_accounts.items(), key=lambda x: x[1]):
+                  body += f"- **{login}** — account age: {days_old} days\n"
+                  # Add links to their comments
+                  for detail in comment_details.get(login, []):
+                      body += f"  - PR #{detail['pr']}: {detail['url']} ({detail['timestamp']})\n"
 
           requests.post(
               f"https://api.github.com/repos/{REPO}/issues",
