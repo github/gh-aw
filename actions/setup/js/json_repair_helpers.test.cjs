@@ -415,6 +415,123 @@ describe("json_repair_helpers", () => {
         const sanitized = sanitizePrototypePollution(obj);
         expect(sanitized).toEqual({ name: "test" });
       });
+
+      it("should handle circular references in objects", () => {
+        const obj = { name: "test", safe: "value" };
+        obj.circular = obj;
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized.name).toBe("test");
+        expect(sanitized.safe).toBe("value");
+        expect(sanitized.circular).toBe(sanitized);
+      });
+
+      it("should handle circular references with dangerous keys", () => {
+        const obj = { name: "test", __proto__: { bad: true } };
+        obj.circular = obj;
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized.name).toBe("test");
+        expect(sanitized.circular).toBe(sanitized);
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "__proto__")).toBe(false);
+      });
+
+      it("should handle nested circular references", () => {
+        const obj = { name: "outer", nested: { name: "inner" } };
+        obj.nested.parent = obj;
+        obj.self = obj;
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized.name).toBe("outer");
+        expect(sanitized.nested.name).toBe("inner");
+        expect(sanitized.nested.parent).toBe(sanitized);
+        expect(sanitized.self).toBe(sanitized);
+      });
+
+      it("should handle circular references in arrays", () => {
+        const arr = [1, 2, { name: "test" }];
+        arr.push(arr);
+        const sanitized = sanitizePrototypePollution(arr);
+        expect(sanitized[0]).toBe(1);
+        expect(sanitized[1]).toBe(2);
+        expect(sanitized[2]).toEqual({ name: "test" });
+        expect(sanitized[3]).toBe(sanitized);
+      });
+
+      it("should handle very deep nesting (1000 levels)", () => {
+        let obj = { value: "leaf", __proto__: { bad: true } };
+        for (let i = 0; i < 1000; i++) {
+          obj = { level: i, nested: obj, __proto__: { bad: true } };
+        }
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized.level).toBe(999);
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "__proto__")).toBe(false);
+        // Verify we can traverse to the leaf
+        let current = sanitized;
+        for (let i = 999; i >= 0; i--) {
+          expect(current.level).toBe(i);
+          expect(Object.prototype.hasOwnProperty.call(current, "__proto__")).toBe(false);
+          current = current.nested;
+        }
+        expect(current.value).toBe("leaf");
+      });
+
+      it("should handle mixed circular and nested structures", () => {
+        const root = { name: "root" };
+        const child1 = { name: "child1", parent: root };
+        const child2 = { name: "child2", parent: root, sibling: child1 };
+        root.children = [child1, child2];
+        child1.sibling = child2;
+        const sanitized = sanitizePrototypePollution(root);
+        expect(sanitized.name).toBe("root");
+        expect(sanitized.children[0].name).toBe("child1");
+        expect(sanitized.children[1].name).toBe("child2");
+        expect(sanitized.children[0].parent).toBe(sanitized);
+        expect(sanitized.children[1].parent).toBe(sanitized);
+        expect(sanitized.children[0].sibling).toBe(sanitized.children[1]);
+        expect(sanitized.children[1].sibling).toBe(sanitized.children[0]);
+      });
+
+      it("should handle array with circular object references", () => {
+        const obj1 = { name: "obj1" };
+        const obj2 = { name: "obj2", ref: obj1 };
+        obj1.ref = obj2;
+        const arr = [obj1, obj2, obj1, obj2];
+        const sanitized = sanitizePrototypePollution(arr);
+        expect(sanitized[0].name).toBe("obj1");
+        expect(sanitized[1].name).toBe("obj2");
+        expect(sanitized[0]).toBe(sanitized[2]);
+        expect(sanitized[1]).toBe(sanitized[3]);
+        expect(sanitized[0].ref).toBe(sanitized[1]);
+        expect(sanitized[1].ref).toBe(sanitized[0]);
+      });
+
+      it("should handle objects with repeated references (non-circular)", () => {
+        const shared = { value: "shared", __proto__: { bad: true } };
+        const obj = {
+          ref1: shared,
+          ref2: shared,
+          nested: {
+            ref3: shared,
+          },
+        };
+        const sanitized = sanitizePrototypePollution(obj);
+        expect(sanitized.ref1.value).toBe("shared");
+        expect(sanitized.ref1).toBe(sanitized.ref2);
+        expect(sanitized.ref1).toBe(sanitized.nested.ref3);
+        expect(Object.prototype.hasOwnProperty.call(sanitized.ref1, "__proto__")).toBe(false);
+      });
+
+      it("should handle malicious deeply nested attack with circularity", () => {
+        const attack = { __proto__: { exploit: true } };
+        for (let i = 0; i < 100; i++) {
+          attack.nested = { __proto__: { exploit: true }, level: i };
+          if (i === 50) {
+            attack.nested.circular = attack;
+          }
+          Object.assign(attack, attack.nested);
+        }
+        const sanitized = sanitizePrototypePollution(attack);
+        expect(Object.prototype.hasOwnProperty.call(sanitized, "__proto__")).toBe(false);
+        expect({}.exploit).toBeUndefined();
+      });
     });
 
     describe("real-world attack scenarios", () => {

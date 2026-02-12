@@ -1,11 +1,14 @@
 // @ts-check
 
 /**
- * Recursively sanitizes an object to remove dangerous prototype pollution keys.
+ * Sanitizes an object to remove dangerous prototype pollution keys using a stack-based algorithm.
  * This function removes keys that could be used for prototype pollution attacks:
  * - __proto__: JavaScript's prototype chain accessor
  * - constructor: Object constructor property
  * - prototype: Function prototype property
+ *
+ * Uses an iterative approach with a stack to handle deeply nested structures and
+ * protect against stack overflow from malicious recursive object trees.
  *
  * @param {any} obj - The object to sanitize (can be any type)
  * @returns {any} The sanitized object with dangerous keys removed
@@ -16,7 +19,7 @@
  * // Returns: {name: "test"}
  *
  * @example
- * // Recursively sanitizes nested objects
+ * // Handles nested objects
  * sanitizePrototypePollution({outer: {__proto__: {bad: true}, safe: "value"}})
  * // Returns: {outer: {safe: "value"}}
  */
@@ -29,24 +32,68 @@ function sanitizePrototypePollution(obj) {
   // Dangerous keys that can be used for prototype pollution
   const dangerousKeys = ["__proto__", "constructor", "prototype"];
 
-  // Handle arrays
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizePrototypePollution(item));
+  // Track visited objects to handle circular references
+  const seen = new WeakMap();
+
+  // Stack-based traversal to avoid recursion and stack overflow
+  // Each entry: { source: original object, target: sanitized object, parent: parent target, key: property key }
+  const stack = [];
+  const root = Array.isArray(obj) ? [] : {};
+  seen.set(obj, root);
+  stack.push({ source: obj, target: root, parent: null, key: null });
+
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (!item) continue;
+    const { source, target } = item;
+
+    if (Array.isArray(source)) {
+      // Process array elements
+      for (let i = 0; i < source.length; i++) {
+        const value = source[i];
+        if (value === null || typeof value !== "object") {
+          // Primitive value - copy directly
+          target[i] = value;
+        } else if (seen.has(value)) {
+          // Circular reference detected - use existing sanitized object
+          target[i] = seen.get(value);
+        } else {
+          // New object or array - create sanitized version and add to stack
+          const newTarget = Array.isArray(value) ? [] : {};
+          target[i] = newTarget;
+          seen.set(value, newTarget);
+          stack.push({ source: value, target: newTarget, parent: target, key: i });
+        }
+      }
+    } else {
+      // Process object properties
+      for (const key in source) {
+        // Skip dangerous keys
+        if (dangerousKeys.includes(key)) {
+          continue;
+        }
+        // Only process own properties (not inherited)
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          const value = source[key];
+          if (value === null || typeof value !== "object") {
+            // Primitive value - copy directly
+            target[key] = value;
+          } else if (seen.has(value)) {
+            // Circular reference detected - use existing sanitized object
+            target[key] = seen.get(value);
+          } else {
+            // New object or array - create sanitized version and add to stack
+            const newTarget = Array.isArray(value) ? [] : {};
+            target[key] = newTarget;
+            seen.set(value, newTarget);
+            stack.push({ source: value, target: newTarget, parent: target, key: key });
+          }
+        }
+      }
+    }
   }
 
-  // Handle objects
-  const sanitized = {};
-  for (const key in obj) {
-    // Skip dangerous keys
-    if (dangerousKeys.includes(key)) {
-      continue;
-    }
-    // Only process own properties (not inherited)
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      sanitized[key] = sanitizePrototypePollution(obj[key]);
-    }
-  }
-  return sanitized;
+  return root;
 }
 
 /**
