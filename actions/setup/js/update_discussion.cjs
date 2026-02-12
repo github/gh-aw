@@ -134,6 +134,9 @@ function buildDiscussionUpdateData(item, config) {
     updateData.body = item.body;
   }
 
+  // Pass footer config to executeUpdate (default to true)
+  updateData._includeFooter = config.footer !== false;
+
   return { success: true, data: updateData };
 }
 

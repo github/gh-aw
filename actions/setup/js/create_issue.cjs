@@ -198,6 +198,7 @@ async function main(config = {}) {
   const defaultTargetRepo = getDefaultTargetRepo(config);
   const groupEnabled = config.group === true || config.group === "true";
   const closeOlderIssuesEnabled = config.close_older_issues === true || config.close_older_issues === "true";
+  const includeFooter = config.footer !== false; // Default to true (include footer)
 
   // Check if copilot assignment is enabled
   const assignCopilot = process.env.GH_AW_ASSIGN_COPILOT === "true";
@@ -417,11 +418,14 @@ async function main(config = {}) {
     }
 
     // Generate footer and add expiration using helper
-    const footer = addExpirationToFooter(generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber).trimEnd(), expiresHours, "Issue");
-
-    bodyLines.push(``, ``, footer);
+    // When footer is disabled, only add XML markers (no visible footer content)
+    if (includeFooter) {
+      const footer = addExpirationToFooter(generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber).trimEnd(), expiresHours, "Issue");
+      bodyLines.push(``, ``, footer);
+    }
 
     // Add standalone workflow-id marker for searchability (consistent with comments)
+    // Always add XML markers even when footer is disabled
     if (workflowId) {
       bodyLines.push(``, generateWorkflowIdMarker(workflowId));
     }

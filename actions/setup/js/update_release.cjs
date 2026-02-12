@@ -16,6 +16,7 @@ async function main(config = {}) {
   // Check if we're in staged mode
   const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "GitHub Agentic Workflow";
+  const includeFooter = config.footer !== false; // Default to true (include footer)
 
   /**
    * Process a single update-release message
@@ -90,6 +91,7 @@ async function main(config = {}) {
         workflowName,
         runUrl,
         runId: context.runId,
+        includeFooter, // Pass footer flag to helper
       });
 
       // Update the release

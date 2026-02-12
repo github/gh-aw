@@ -27,9 +27,10 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
   // Default to "append" to add footer with AI attribution
   const operation = updateData._operation || "append";
   let rawBody = updateData._rawBody;
+  const includeFooter = updateData._includeFooter !== false; // Default to true
 
   // Remove internal fields
-  const { _operation, _rawBody, ...apiData } = updateData;
+  const { _operation, _rawBody, _includeFooter, ...apiData } = updateData;
 
   // If we have a body, process it with the appropriate operation
   if (rawBody !== undefined) {
@@ -61,6 +62,7 @@ async function executeIssueUpdate(github, context, issueNumber, updateData) {
       workflowName,
       runUrl,
       runId: context.runId,
+      includeFooter, // Pass footer flag to helper
     });
 
     core.info(`Will update body (length: ${apiData.body.length})`);
@@ -135,6 +137,9 @@ function buildIssueUpdateData(item, config) {
   if (item.milestone !== undefined) {
     updateData.milestone = item.milestone;
   }
+
+  // Pass footer config to executeUpdate (default to true)
+  updateData._includeFooter = config.footer !== false;
 
   return { success: true, data: updateData };
 }
