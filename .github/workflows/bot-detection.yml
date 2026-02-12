@@ -1,10 +1,9 @@
 name: Bot Detection
-description: "Detect potential bots by analyzing comment similarity. DOI: https://doi.org/10.1145/3387940.3391503"
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 3 * * *"  # daily
+    - cron: "0 * * * *"
 
 permissions:
   contents: read
@@ -19,47 +18,94 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const DAYS_BACK = 3;
-            const MAX_PR = 200;
-            const MIN_ACCOUNT_AGE_DAYS = 7;
+            const HOURS_BACK = 6;
+            const MAX_PR = 50;
+            const MIN_ACCOUNT_AGE_DAYS = 14;
 
-            const cutoff = new Date(Date.now() - DAYS_BACK * 24 * 60 * 60 * 1000);
+            const cutoff = new Date(Date.now() - HOURS_BACK * 60 * 60 * 1000);
 
-            console.log(`🔍 Scanning for new accounts created in last ${MIN_ACCOUNT_AGE_DAYS} days...`);
-            console.log(`📊 Checking ${MAX_PR} most recent PRs...`);
+            const fs = require('fs');
+            function appendSummary(markdown) {
+              const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+              if (!summaryPath) return;
+              fs.appendFileSync(summaryPath, `${markdown}\n`);
+            }
 
-            // Fetch recent PRs
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'all',
-              sort: 'updated',
-              direction: 'desc',
-              per_page: 100,
-            });
+            // Fetch recent PRs (up to MAX_PR)
+            const prs = [];
+            if (github.paginate?.iterator) {
+              for await (const response of github.paginate.iterator(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc',
+                per_page: 100,
+              })) {
+                prs.push(...response.data);
+                if (prs.length >= MAX_PR) break;
+              }
+            } else {
+              const { data } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc',
+                per_page: Math.min(100, MAX_PR),
+              });
+              prs.push(...data);
+            }
 
             const highRiskAccounts = new Map();
             const commentsByUser = new Map();
             const userCreatedDates = new Map();
 
-            console.log(`\n📝 Fetching comments from ${Math.min(prs.length, MAX_PR)} PRs...`);
-
             for (const pr of prs.slice(0, MAX_PR)) {
               if (new Date(pr.updated_at) < cutoff) continue;
 
-              const { data: issueComments } = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-              });
+              const issueComments = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.issues.listComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                })) {
+                  issueComments.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  per_page: 100,
+                });
+                issueComments.push(...data);
+              }
 
-              const { data: reviewComments } = await github.rest.pulls.listReviewComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-              });
+              const reviewComments = [];
+              if (github.paginate?.iterator) {
+                for await (const response of github.paginate.iterator(github.rest.pulls.listReviewComments, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                })) {
+                  reviewComments.push(...response.data);
+                }
+              } else {
+                const { data } = await github.rest.pulls.listReviewComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                });
+                reviewComments.push(...data);
+              }
 
               for (const comment of [...issueComments, ...reviewComments]) {
+                if (new Date(comment.created_at) < cutoff) continue;
                 const login = comment.user?.login;
                 if (!login) continue;
 
@@ -100,31 +146,32 @@ jobs:
             }
 
             if (highRiskAccounts.size === 0) {
-              console.log('\n✅ No high-risk accounts detected. Skipping report.');
+              appendSummary(`✅ Bot Detection: no new accounts (<${MIN_ACCOUNT_AGE_DAYS}d) found in last ${HOURS_BACK}h.`);
               return;
             }
 
-            console.log(`\n🚨 Found ${highRiskAccounts.size} high-risk account(s)`);
-
             // Fetch additional activity for high-risk accounts
             for (const [login, data] of highRiskAccounts) {
-              console.log(`  📊 Fetching activity for @${login}...`);
 
               try {
-                const { data: issues } = await github.rest.issues.listByRepo({
+                const { data: issues } = await github.rest.issues.listForRepo({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   creator: login,
                   state: 'all',
                 });
-                data.issues = issues.map(i => ({
-                  number: i.number,
-                  title: i.title,
-                  created_at: i.created_at,
-                  html_url: i.html_url,
-                }));
+                data.issues = issues
+                  .filter(i => !i.pull_request)
+                  .filter(i => new Date(i.created_at) >= cutoff)
+                  .map(i => ({
+                    number: i.number,
+                    title: i.title,
+                    state: i.state,
+                    created_at: i.created_at,
+                    html_url: i.html_url,
+                  }));
               } catch (e) {
-                console.log(`  ⚠️ Could not fetch issues for ${login}`);
+                console.log(`Could not fetch issues for ${login}`);
               }
 
               try {
@@ -135,21 +182,41 @@ jobs:
                   per_page: 100,
                 });
                 data.prs = prList
-                  .filter(p => p.user?.login === login)
+                  .filter(p => p.user?.login === login && new Date(p.created_at) >= cutoff)
                   .map(p => ({
                     number: p.number,
                     title: p.title,
+                    state: p.state,
                     created_at: p.created_at,
                     html_url: p.html_url,
                   }));
               } catch (e) {
-                console.log(`  ⚠️ Could not fetch PRs for ${login}`);
+                console.log(`Could not fetch PRs for ${login}`);
               }
+            }
+
+            // Skip alerting if everything found is already closed.
+            let hasAnyOpenItem = false;
+            for (const [, data] of highRiskAccounts) {
+              if (data.issues?.some(i => i.state === 'open')) {
+                hasAnyOpenItem = true;
+                break;
+              }
+              if (data.prs?.some(p => p.state === 'open')) {
+                hasAnyOpenItem = true;
+                break;
+              }
+            }
+
+            if (!hasAnyOpenItem) {
+              console.log('No open issues or PRs from new accounts; skipping alert issue.');
+              appendSummary('Bot Detection: flagged new accounts, but all related issues/PRs are closed. No alert issue created.');
+              return;
             }
 
             // Build report
             const today = new Date().toISOString().split('T')[0];
-            body = `Recently-created accounts often indicate bots, spam accounts, or coordinated attacks.\n\n`;
+            let body = `Recently-created accounts often indicate bots, spam accounts, or coordinated attacks.\n\n`;
 
             const sorted = Array.from(highRiskAccounts.entries()).sort((a, b) => a[1].daysOld - b[1].daysOld);
 
@@ -185,17 +252,62 @@ jobs:
               }
 
               if (!data.issues?.length && !data.prs?.length && !data.comments?.length) {
-                body += `*(No issues, PRs, or comments in the last ${DAYS_BACK} days)*\n\n`;
+                body += `*(No issues, PRs, or comments in the last ${HOURS_BACK} hours)*\n\n`;
               }
             }
 
-            console.log('\n📤 Creating security alert issue...');
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🚨 HIGH RISK: Brand New Accounts — ${today}`,
-              body,
-              labels: ['security', 'bot-detection'],
-            });
+            console.log('\nCreating security alert issue...');
+              const title = `🚨 HIGH RISK: Brand New Accounts — ${today}`;
+              let existingIssueNumber;
 
-            console.log('✅ Report created successfully');
+              try {
+                const { data: existingIssues } = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  per_page: 100,
+                });
+
+                const existing = existingIssues.find(i => i.title === title);
+                if (existing?.number) {
+                  existingIssueNumber = existing.number;
+                }
+              } catch (e) {
+                // If listing issues fails, fall back to creating a new issue.
+              }
+
+            try {
+                if (existingIssueNumber) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existingIssueNumber,
+                    body,
+                  });
+                } else {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title,
+                    body,
+                    labels: ['security', 'bot-detection'],
+                  });
+                }
+            } catch (e) {
+                console.log('Issue create/update with labels failed; retrying without labels...');
+                if (existingIssueNumber) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: existingIssueNumber,
+                    body,
+                  });
+                } else {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title,
+                    body,
+                  });
+                }
+            }
