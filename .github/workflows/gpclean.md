@@ -79,20 +79,16 @@ Systematically detect Go dependencies that introduce non-MIT friendly (GPL-type)
 
 ## Your Tasks
 
-### Phase 0: Download SBOM and Round-Robin Module Selection
+### Phase 0: Use Pre-Downloaded SBOM and Round-Robin Module Selection
 
 Use the repository's SBOM (Software Bill of Materials) to get accurate dependency information, then select one module to analyze in a round-robin fashion.
 
-1. **Download SBOM from GitHub**:
-   ```bash
-   # Download SBOM using gh CLI (requires contents: read permission)
-   gh api "repos/${{ github.repository }}/dependency-graph/sbom" \
-     -H "Accept: application/vnd.github+json" \
-     -H "X-GitHub-Api-Version: 2022-11-28" \
-     > /tmp/sbom.json
-   ```
-   
-   **Note**: The workflow already has `contents: read` permission which is required to access the dependency graph SBOM API.
+**IMPORTANT**: The SBOM has been pre-downloaded to `/tmp/sbom.json` in the frontmatter setup step. **Use this file directly** - do NOT try to download it again using curl or gh api (you do not have a GitHub token in the agent environment).
+
+1. **Use Pre-Downloaded SBOM**:
+   - The SBOM file is already available at `/tmp/sbom.json`
+   - It was downloaded using the GitHub Dependency Graph API with `contents: read` permission
+   - Simply read and parse this file in subsequent steps
 
 2. **Extract dependencies from SBOM**:
    - Parse the SBOM JSON file (SPDX format)
@@ -346,13 +342,13 @@ After creating the issue:
 
 ### SBOM Usage
 
-- **Download SBOM first** at the beginning of each run to get the latest dependency information
-- **Use `gh api`** to download SBOM - the workflow has `contents: read` permission which is required for the dependency graph API
+- **SBOM is pre-downloaded** - The SBOM has been downloaded in the frontmatter setup step and is available at `/tmp/sbom.json`
+- **Do NOT try to download SBOM again** - You do not have a GitHub token in the agent environment. Use the pre-downloaded file at `/tmp/sbom.json`
 - SBOM is in SPDX format with packages listed in `sbom.packages[]` array
 - Go packages have `purl` (Package URL) in format: `pkg:golang/github.com/org/repo@version`
 - Parse the SBOM to extract all Go dependencies before license checking
 - SBOM provides a comprehensive view including transitive dependencies
-- If SBOM download fails, fall back to parsing `go.mod` directly
+- The SBOM was downloaded using `gh api` with the workflow's `contents: read` permission in the frontmatter setup step
 
 ### Focus on One Dependency
 
@@ -404,7 +400,7 @@ After creating the issue:
 
 ## Error Handling
 
-- If SBOM download fails, fall back to parsing `go.mod` directly to extract dependencies
+- If the SBOM file `/tmp/sbom.json` is missing or corrupted, report the error and exit (this should not happen as it's pre-downloaded in frontmatter)
 - If `go mod graph` fails, report the error and exit
 - If license detection fails for a module, document it in the issue and recommend manual review
 - If no direct dependencies exist, exit successfully
@@ -412,7 +408,7 @@ After creating the issue:
 
 ## Example Module Selection Flow
 
-**Run 1**: Download SBOM → Extract Go dependencies → Check `github.com/spf13/cobra` → No GPL found → Add to checked_modules
+**Run 1**: Use pre-downloaded SBOM → Extract Go dependencies → Check `github.com/spf13/cobra` → No GPL found → Add to checked_modules
 **Run 2**: Check `github.com/spf13/viper` (from SBOM) → No GPL found → Add to checked_modules
 **Run 3**: Check `github.com/cli/go-gh` (from SBOM) → GPL found in transitive dep → Create issue, add to checked_modules
 **Run 4**: Check `gopkg.in/yaml.v3` (from SBOM) → No GPL found → Add to checked_modules
