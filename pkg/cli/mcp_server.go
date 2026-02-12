@@ -212,7 +212,7 @@ func createMCPServer(cmdPath string, actor string) *mcp.Server {
 	// Determine if logs and audit tools should be mounted based on actor permissions
 	// These tools require at least maintainer access to the repository
 	mountLogsAndAudit := shouldMountLogsAndAuditTools(actor)
-	
+
 	if actor != "" {
 		if mountLogsAndAudit {
 			mcpLog.Printf("Actor %s has sufficient permissions - mounting logs and audit tools", actor)
@@ -451,38 +451,38 @@ Returns JSON array with validation results for each workflow:
 		type logsArgs struct {
 			WorkflowName string `json:"workflow_name,omitempty" jsonschema:"Name of the workflow to download logs for (empty for all)"`
 			Count        int    `json:"count,omitempty" jsonschema:"Number of workflow runs to download (default: 100)"`
-		StartDate    string `json:"start_date,omitempty" jsonschema:"Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
-		EndDate      string `json:"end_date,omitempty" jsonschema:"Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
-		Engine       string `json:"engine,omitempty" jsonschema:"Filter logs by agentic engine type (claude, codex, copilot)"`
-		Firewall     bool   `json:"firewall,omitempty" jsonschema:"Filter to only runs with firewall enabled"`
-		NoFirewall   bool   `json:"no_firewall,omitempty" jsonschema:"Filter to only runs without firewall enabled"`
-		Branch       string `json:"branch,omitempty" jsonschema:"Filter runs by branch name"`
-		AfterRunID   int64  `json:"after_run_id,omitempty" jsonschema:"Filter runs with database ID after this value (exclusive)"`
-		BeforeRunID  int64  `json:"before_run_id,omitempty" jsonschema:"Filter runs with database ID before this value (exclusive)"`
-		Timeout      int    `json:"timeout,omitempty" jsonschema:"Maximum time in seconds to spend downloading logs (default: 50 for MCP server)"`
-		MaxTokens    int    `json:"max_tokens,omitempty" jsonschema:"Maximum number of tokens in output before triggering guardrail (default: 12000)"`
-	}
+			StartDate    string `json:"start_date,omitempty" jsonschema:"Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
+			EndDate      string `json:"end_date,omitempty" jsonschema:"Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
+			Engine       string `json:"engine,omitempty" jsonschema:"Filter logs by agentic engine type (claude, codex, copilot)"`
+			Firewall     bool   `json:"firewall,omitempty" jsonschema:"Filter to only runs with firewall enabled"`
+			NoFirewall   bool   `json:"no_firewall,omitempty" jsonschema:"Filter to only runs without firewall enabled"`
+			Branch       string `json:"branch,omitempty" jsonschema:"Filter runs by branch name"`
+			AfterRunID   int64  `json:"after_run_id,omitempty" jsonschema:"Filter runs with database ID after this value (exclusive)"`
+			BeforeRunID  int64  `json:"before_run_id,omitempty" jsonschema:"Filter runs with database ID before this value (exclusive)"`
+			Timeout      int    `json:"timeout,omitempty" jsonschema:"Maximum time in seconds to spend downloading logs (default: 50 for MCP server)"`
+			MaxTokens    int    `json:"max_tokens,omitempty" jsonschema:"Maximum number of tokens in output before triggering guardrail (default: 12000)"`
+		}
 
-	// Generate schema with elicitation defaults
-	logsSchema, err := GenerateSchema[logsArgs]()
-	if err != nil {
-		mcpLog.Printf("Failed to generate logs tool schema: %v", err)
-		return server
-	}
-	// Add elicitation defaults for common parameters
-	if err := AddSchemaDefault(logsSchema, "count", 100); err != nil {
-		mcpLog.Printf("Failed to add default for count: %v", err)
-	}
-	if err := AddSchemaDefault(logsSchema, "timeout", 50); err != nil {
-		mcpLog.Printf("Failed to add default for timeout: %v", err)
-	}
-	if err := AddSchemaDefault(logsSchema, "max_tokens", 12000); err != nil {
-		mcpLog.Printf("Failed to add default for max_tokens: %v", err)
-	}
+		// Generate schema with elicitation defaults
+		logsSchema, err := GenerateSchema[logsArgs]()
+		if err != nil {
+			mcpLog.Printf("Failed to generate logs tool schema: %v", err)
+			return server
+		}
+		// Add elicitation defaults for common parameters
+		if err := AddSchemaDefault(logsSchema, "count", 100); err != nil {
+			mcpLog.Printf("Failed to add default for count: %v", err)
+		}
+		if err := AddSchemaDefault(logsSchema, "timeout", 50); err != nil {
+			mcpLog.Printf("Failed to add default for timeout: %v", err)
+		}
+		if err := AddSchemaDefault(logsSchema, "max_tokens", 12000); err != nil {
+			mcpLog.Printf("Failed to add default for max_tokens: %v", err)
+		}
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "logs",
-		Description: `Download and analyze workflow logs.
+		mcp.AddTool(server, &mcp.Tool{
+			Name: "logs",
+			Description: `Download and analyze workflow logs.
 
 Returns JSON with workflow run data and metrics. If the command times out before fetching all available logs, 
 a "continuation" field will be present in the response with updated parameters to continue fetching more data.
@@ -493,129 +493,129 @@ the previous request stopped due to timeout.
 
 ⚠️  Output Size Guardrail: If the output exceeds the token limit (default: 12000 tokens), the tool will 
 return a schema description instead of the full output. Adjust the 'max_tokens' parameter to control this behavior.`,
-		InputSchema: logsSchema,
-		Icons: []mcp.Icon{
-			{Source: "📜"},
-		},
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args logsArgs) (*mcp.CallToolResult, any, error) {
-		// Check for cancellation before starting
-		select {
-		case <-ctx.Done():
-			return nil, nil, &jsonrpc.Error{
-				Code:    jsonrpc.CodeInternalError,
-				Message: "request cancelled",
-				Data:    mcpErrorData(ctx.Err().Error()),
-			}
-		default:
-		}
-
-		// Validate firewall parameters
-		if args.Firewall && args.NoFirewall {
-			return nil, nil, &jsonrpc.Error{
-				Code:    jsonrpc.CodeInvalidParams,
-				Message: "conflicting parameters: cannot specify both 'firewall' and 'no_firewall'",
-				Data:    nil,
-			}
-		}
-
-		// Build command arguments
-		// Force output directory to /tmp/gh-aw/aw-mcp/logs for MCP server
-		cmdArgs := []string{"logs", "-o", "/tmp/gh-aw/aw-mcp/logs"}
-		if args.WorkflowName != "" {
-			cmdArgs = append(cmdArgs, args.WorkflowName)
-		}
-		if args.Count > 0 {
-			cmdArgs = append(cmdArgs, "-c", strconv.Itoa(args.Count))
-		}
-		if args.StartDate != "" {
-			cmdArgs = append(cmdArgs, "--start-date", args.StartDate)
-		}
-		if args.EndDate != "" {
-			cmdArgs = append(cmdArgs, "--end-date", args.EndDate)
-		}
-		if args.Engine != "" {
-			cmdArgs = append(cmdArgs, "--engine", args.Engine)
-		}
-		if args.Firewall {
-			cmdArgs = append(cmdArgs, "--firewall")
-		}
-		if args.NoFirewall {
-			cmdArgs = append(cmdArgs, "--no-firewall")
-		}
-		if args.Branch != "" {
-			cmdArgs = append(cmdArgs, "--branch", args.Branch)
-		}
-		if args.AfterRunID > 0 {
-			cmdArgs = append(cmdArgs, "--after-run-id", strconv.FormatInt(args.AfterRunID, 10))
-		}
-		if args.BeforeRunID > 0 {
-			cmdArgs = append(cmdArgs, "--before-run-id", strconv.FormatInt(args.BeforeRunID, 10))
-		}
-
-		// Set timeout to 50 seconds for MCP server if not explicitly specified
-		timeoutValue := args.Timeout
-		if timeoutValue == 0 {
-			timeoutValue = 50
-		}
-		cmdArgs = append(cmdArgs, "--timeout", strconv.Itoa(timeoutValue))
-
-		// Always use --json mode in MCP server
-		cmdArgs = append(cmdArgs, "--json")
-
-		// Log the command being executed for debugging
-		mcpLog.Printf("Executing logs tool: workflow=%s, count=%d, firewall=%v, no_firewall=%v, timeout=%d, command_args=%v",
-			args.WorkflowName, args.Count, args.Firewall, args.NoFirewall, timeoutValue, cmdArgs)
-
-		// Execute the CLI command
-		// Use separate stdout/stderr capture instead of CombinedOutput because:
-		// - Stdout contains JSON output (--json flag)
-		// - Stderr contains console messages and error details
-		cmd := execCmd(ctx, cmdArgs...)
-		stdout, err := cmd.Output()
-
-		// The logs command outputs JSON to stdout when --json flag is used.
-		// If the command fails, we need to provide detailed error information.
-		outputStr := string(stdout)
-
-		if err != nil {
-			// Try to get stderr and exit code for detailed error reporting
-			var stderr string
-			var exitCode int
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				stderr = string(exitErr.Stderr)
-				exitCode = exitErr.ExitCode()
-			}
-
-			mcpLog.Printf("Logs command exited with error: %v (stdout length: %d, stderr length: %d, exit_code: %d)",
-				err, len(outputStr), len(stderr), exitCode)
-
-			// Build detailed error data
-			errorData := map[string]any{
-				"error":     err.Error(),
-				"command":   strings.Join(cmdArgs, " "),
-				"exit_code": exitCode,
-				"stdout":    outputStr,
-				"stderr":    stderr,
-				"timeout":   timeoutValue,
-				"workflow":  args.WorkflowName,
-			}
-
-			return nil, nil, &jsonrpc.Error{
-				Code:    jsonrpc.CodeInternalError,
-				Message: fmt.Sprintf("failed to download workflow logs: %s", err.Error()),
-				Data:    mcpErrorData(errorData),
-			}
-		}
-
-		// Check output size and apply guardrail if needed
-		finalOutput, _ := checkLogsOutputSize(outputStr, args.MaxTokens)
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: finalOutput},
+			InputSchema: logsSchema,
+			Icons: []mcp.Icon{
+				{Source: "📜"},
 			},
-		}, nil, nil
-	})
+		}, func(ctx context.Context, req *mcp.CallToolRequest, args logsArgs) (*mcp.CallToolResult, any, error) {
+			// Check for cancellation before starting
+			select {
+			case <-ctx.Done():
+				return nil, nil, &jsonrpc.Error{
+					Code:    jsonrpc.CodeInternalError,
+					Message: "request cancelled",
+					Data:    mcpErrorData(ctx.Err().Error()),
+				}
+			default:
+			}
+
+			// Validate firewall parameters
+			if args.Firewall && args.NoFirewall {
+				return nil, nil, &jsonrpc.Error{
+					Code:    jsonrpc.CodeInvalidParams,
+					Message: "conflicting parameters: cannot specify both 'firewall' and 'no_firewall'",
+					Data:    nil,
+				}
+			}
+
+			// Build command arguments
+			// Force output directory to /tmp/gh-aw/aw-mcp/logs for MCP server
+			cmdArgs := []string{"logs", "-o", "/tmp/gh-aw/aw-mcp/logs"}
+			if args.WorkflowName != "" {
+				cmdArgs = append(cmdArgs, args.WorkflowName)
+			}
+			if args.Count > 0 {
+				cmdArgs = append(cmdArgs, "-c", strconv.Itoa(args.Count))
+			}
+			if args.StartDate != "" {
+				cmdArgs = append(cmdArgs, "--start-date", args.StartDate)
+			}
+			if args.EndDate != "" {
+				cmdArgs = append(cmdArgs, "--end-date", args.EndDate)
+			}
+			if args.Engine != "" {
+				cmdArgs = append(cmdArgs, "--engine", args.Engine)
+			}
+			if args.Firewall {
+				cmdArgs = append(cmdArgs, "--firewall")
+			}
+			if args.NoFirewall {
+				cmdArgs = append(cmdArgs, "--no-firewall")
+			}
+			if args.Branch != "" {
+				cmdArgs = append(cmdArgs, "--branch", args.Branch)
+			}
+			if args.AfterRunID > 0 {
+				cmdArgs = append(cmdArgs, "--after-run-id", strconv.FormatInt(args.AfterRunID, 10))
+			}
+			if args.BeforeRunID > 0 {
+				cmdArgs = append(cmdArgs, "--before-run-id", strconv.FormatInt(args.BeforeRunID, 10))
+			}
+
+			// Set timeout to 50 seconds for MCP server if not explicitly specified
+			timeoutValue := args.Timeout
+			if timeoutValue == 0 {
+				timeoutValue = 50
+			}
+			cmdArgs = append(cmdArgs, "--timeout", strconv.Itoa(timeoutValue))
+
+			// Always use --json mode in MCP server
+			cmdArgs = append(cmdArgs, "--json")
+
+			// Log the command being executed for debugging
+			mcpLog.Printf("Executing logs tool: workflow=%s, count=%d, firewall=%v, no_firewall=%v, timeout=%d, command_args=%v",
+				args.WorkflowName, args.Count, args.Firewall, args.NoFirewall, timeoutValue, cmdArgs)
+
+			// Execute the CLI command
+			// Use separate stdout/stderr capture instead of CombinedOutput because:
+			// - Stdout contains JSON output (--json flag)
+			// - Stderr contains console messages and error details
+			cmd := execCmd(ctx, cmdArgs...)
+			stdout, err := cmd.Output()
+
+			// The logs command outputs JSON to stdout when --json flag is used.
+			// If the command fails, we need to provide detailed error information.
+			outputStr := string(stdout)
+
+			if err != nil {
+				// Try to get stderr and exit code for detailed error reporting
+				var stderr string
+				var exitCode int
+				if exitErr, ok := err.(*exec.ExitError); ok {
+					stderr = string(exitErr.Stderr)
+					exitCode = exitErr.ExitCode()
+				}
+
+				mcpLog.Printf("Logs command exited with error: %v (stdout length: %d, stderr length: %d, exit_code: %d)",
+					err, len(outputStr), len(stderr), exitCode)
+
+				// Build detailed error data
+				errorData := map[string]any{
+					"error":     err.Error(),
+					"command":   strings.Join(cmdArgs, " "),
+					"exit_code": exitCode,
+					"stdout":    outputStr,
+					"stderr":    stderr,
+					"timeout":   timeoutValue,
+					"workflow":  args.WorkflowName,
+				}
+
+				return nil, nil, &jsonrpc.Error{
+					Code:    jsonrpc.CodeInternalError,
+					Message: fmt.Sprintf("failed to download workflow logs: %s", err.Error()),
+					Data:    mcpErrorData(errorData),
+				}
+			}
+
+			// Check output size and apply guardrail if needed
+			finalOutput, _ := checkLogsOutputSize(outputStr, args.MaxTokens)
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: finalOutput},
+				},
+			}, nil, nil
+		})
 	} // End of logs tool conditional
 
 	// Add audit tool (requires maintainer+ access)
@@ -624,16 +624,16 @@ return a schema description instead of the full output. Adjust the 'max_tokens' 
 			RunIDOrURL string `json:"run_id_or_url" jsonschema:"GitHub Actions workflow run ID or URL. Accepts: numeric run ID (e.g., 1234567890), run URL (https://github.com/owner/repo/actions/runs/1234567890), job URL (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210), or job URL with step (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)"`
 		}
 
-	// Generate schema for audit tool
-	auditSchema, err := GenerateSchema[auditArgs]()
-	if err != nil {
-		mcpLog.Printf("Failed to generate audit tool schema: %v", err)
-		return server
-	}
+		// Generate schema for audit tool
+		auditSchema, err := GenerateSchema[auditArgs]()
+		if err != nil {
+			mcpLog.Printf("Failed to generate audit tool schema: %v", err)
+			return server
+		}
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "audit",
-		Description: `Investigate a workflow run, job, or specific step and generate a concise report.
+		mcp.AddTool(server, &mcp.Tool{
+			Name: "audit",
+			Description: `Investigate a workflow run, job, or specific step and generate a concise report.
 
 Accepts multiple input formats:
 - Numeric run ID: 1234567890
@@ -657,48 +657,48 @@ Returns JSON with the following structure:
 - warnings: Warning details (file, line, type, message)
 - tool_usage: Tool usage statistics (name, call_count, max_output_size, max_duration)
 - firewall_analysis: Network firewall analysis if available (total_requests, allowed_requests, blocked_requests, allowed_domains, blocked_domains)`,
-		InputSchema: auditSchema,
-		Icons: []mcp.Icon{
-			{Source: "🔍"},
-		},
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args auditArgs) (*mcp.CallToolResult, any, error) {
-		// Check for cancellation before starting
-		select {
-		case <-ctx.Done():
-			return nil, nil, &jsonrpc.Error{
-				Code:    jsonrpc.CodeInternalError,
-				Message: "request cancelled",
-				Data:    mcpErrorData(ctx.Err().Error()),
-			}
-		default:
-		}
-
-		// Build command arguments
-		// Force output directory to /tmp/gh-aw/aw-mcp/logs for MCP server (same as logs)
-		// Use --json flag to output structured JSON for MCP consumption
-		// Pass the run ID or URL directly - the audit command will parse it
-		cmdArgs := []string{"audit", args.RunIDOrURL, "-o", "/tmp/gh-aw/aw-mcp/logs", "--json"}
-
-		// Execute the CLI command
-		cmd := execCmd(ctx, cmdArgs...)
-		output, err := cmd.CombinedOutput()
-
-		if err != nil {
-			return nil, nil, &jsonrpc.Error{
-				Code:    jsonrpc.CodeInternalError,
-				Message: "failed to audit workflow run",
-				Data:    mcpErrorData(map[string]any{"error": err.Error(), "output": string(output), "run_id_or_url": args.RunIDOrURL}),
-			}
-		}
-
-		outputStr := string(output)
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: outputStr},
+			InputSchema: auditSchema,
+			Icons: []mcp.Icon{
+				{Source: "🔍"},
 			},
-		}, nil, nil
-	})
+		}, func(ctx context.Context, req *mcp.CallToolRequest, args auditArgs) (*mcp.CallToolResult, any, error) {
+			// Check for cancellation before starting
+			select {
+			case <-ctx.Done():
+				return nil, nil, &jsonrpc.Error{
+					Code:    jsonrpc.CodeInternalError,
+					Message: "request cancelled",
+					Data:    mcpErrorData(ctx.Err().Error()),
+				}
+			default:
+			}
+
+			// Build command arguments
+			// Force output directory to /tmp/gh-aw/aw-mcp/logs for MCP server (same as logs)
+			// Use --json flag to output structured JSON for MCP consumption
+			// Pass the run ID or URL directly - the audit command will parse it
+			cmdArgs := []string{"audit", args.RunIDOrURL, "-o", "/tmp/gh-aw/aw-mcp/logs", "--json"}
+
+			// Execute the CLI command
+			cmd := execCmd(ctx, cmdArgs...)
+			output, err := cmd.CombinedOutput()
+
+			if err != nil {
+				return nil, nil, &jsonrpc.Error{
+					Code:    jsonrpc.CodeInternalError,
+					Message: "failed to audit workflow run",
+					Data:    mcpErrorData(map[string]any{"error": err.Error(), "output": string(output), "run_id_or_url": args.RunIDOrURL}),
+				}
+			}
+
+			outputStr := string(output)
+
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: outputStr},
+				},
+			}, nil, nil
+		})
 	} // End of audit tool conditional
 
 	// Add mcp-inspect tool

@@ -549,7 +549,8 @@ jobs:
                 "args": ["--network", "host", "-w", "\${GITHUB_WORKSPACE}"],
                 "env": {
                   "DEBUG": "*",
-                  "GITHUB_TOKEN": "$GITHUB_TOKEN"
+                  "GITHUB_TOKEN": "$GITHUB_TOKEN",
+                  "GITHUB_ACTOR": "$GITHUB_ACTOR"
                 }
               },
               "github": {

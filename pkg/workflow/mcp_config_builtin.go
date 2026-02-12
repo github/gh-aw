@@ -168,9 +168,9 @@ func renderAgenticWorkflowsMCPConfigWithOptions(yaml *strings.Builder, isLast bo
 		value     string
 		isLiteral bool
 	}{
-		{"DEBUG", "*", true},                        // Literal value "*"
-		{"GITHUB_TOKEN", "GITHUB_TOKEN", false},     // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
-		{"GITHUB_ACTOR", "GITHUB_ACTOR", false},     // Variable reference for actor-based access control
+		{"DEBUG", "*", true},                    // Literal value "*"
+		{"GITHUB_TOKEN", "GITHUB_TOKEN", false}, // Variable reference (gh CLI auto-sets GH_TOKEN from GITHUB_TOKEN if needed)
+		{"GITHUB_ACTOR", "GITHUB_ACTOR", false}, // Variable reference for actor-based access control
 	}
 
 	// Use MCP Gateway spec format with container, entrypoint, entrypointArgs, and mounts
