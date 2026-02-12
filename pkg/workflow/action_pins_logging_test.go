@@ -117,25 +117,30 @@ func TestActionPinResolutionWithMismatchedVersions(t *testing.T) {
 	}
 }
 
-// TestActionPinResolutionWithStrictMode tests that strict mode prevents version mismatches
+// TestActionPinResolutionWithStrictMode tests action pin resolution in strict mode
+// Note: Strict mode now emits warnings instead of errors when SHA resolution fails,
+// as it's not always possible to resolve pins
 func TestActionPinResolutionWithStrictMode(t *testing.T) {
 	tests := []struct {
-		name         string
-		repo         string
-		requestedVer string
-		expectError  bool
+		name          string
+		repo          string
+		requestedVer  string
+		expectWarning bool
+		expectSuccess bool
 	}{
 		{
-			name:         "ai-inference v1 fails in strict mode",
-			repo:         "actions/ai-inference",
-			requestedVer: "v1",
-			expectError:  true,
+			name:          "ai-inference v1 emits warning in strict mode",
+			repo:          "actions/ai-inference",
+			requestedVer:  "v1",
+			expectWarning: true,
+			expectSuccess: false,
 		},
 		{
-			name:         "checkout v5.0.1 succeeds in strict mode",
-			repo:         "actions/checkout",
-			requestedVer: "v5.0.1",
-			expectError:  false,
+			name:          "checkout v5.0.1 succeeds in strict mode",
+			repo:          "actions/checkout",
+			requestedVer:  "v5.0.1",
+			expectWarning: false,
+			expectSuccess: true,
 		},
 	}
 
@@ -143,7 +148,7 @@ func TestActionPinResolutionWithStrictMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a WorkflowData in strict mode without a resolver
 			data := &WorkflowData{
-				StrictMode:     true, // Strict mode should error on version mismatch
+				StrictMode:     true,
 				ActionResolver: nil,
 			}
 
@@ -159,15 +164,25 @@ func TestActionPinResolutionWithStrictMode(t *testing.T) {
 
 			var buf bytes.Buffer
 			buf.ReadFrom(r)
+			stderrOutput := buf.String()
 
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error in strict mode for %s@%s, got nil", tt.repo, tt.requestedVer)
+			// Strict mode should never return an error for resolution failures
+			if err != nil {
+				t.Errorf("Unexpected error in strict mode for %s@%s: %v", tt.repo, tt.requestedVer, err)
+			}
+
+			if tt.expectWarning {
+				// Should emit warning and return empty result
+				if !strings.Contains(stderrOutput, "Unable to pin action") {
+					t.Errorf("Expected warning message for %s@%s, got: %s", tt.repo, tt.requestedVer, stderrOutput)
 				}
 				if result != "" {
-					t.Errorf("Expected empty result on error, got: %s", result)
+					t.Errorf("Expected empty result on warning, got: %s", result)
 				}
-			} else {
+			}
+
+			if tt.expectSuccess {
+				// Should not emit warning and return non-empty result
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}

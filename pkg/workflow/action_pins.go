@@ -156,7 +156,7 @@ func GetActionPin(actionRepo string) string {
 
 // GetActionPinWithData returns the pinned action reference for a given action@version
 // It tries dynamic resolution first, then falls back to hardcoded pins
-// If strictMode is true and resolution fails, it returns an error
+// If resolution fails, emits a warning and returns empty string (in both strict and non-strict modes)
 // The returned reference includes a comment with the version tag (e.g., "repo@sha # v1")
 func GetActionPinWithData(actionRepo, version string, data *WorkflowData) (string, error) {
 	actionPinsLog.Printf("Resolving action pin: repo=%s, version=%s, strict_mode=%t", actionRepo, version, data.StrictMode)
@@ -272,17 +272,11 @@ func GetActionPinWithData(actionRepo, version string, data *WorkflowData) (strin
 		}
 	}
 
-	// No pin available
-	if data.StrictMode {
-		errMsg := fmt.Sprintf("Unable to pin action %s@%s", actionRepo, version)
-		if data.ActionResolver != nil {
-			errMsg = fmt.Sprintf("Unable to pin action %s@%s: resolution failed", actionRepo, version)
-		}
-		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
-		return "", fmt.Errorf("%s", errMsg)
-	}
+	// No pin available - emit warning in both strict and non-strict modes
+	// Note: This used to fail in strict mode, but it's not always possible to resolve pins
+	// so we now emit a warning and continue compilation in both modes
 
-	// In non-strict mode, emit warning and return empty string (unless it's already a SHA)
+	// In both strict and non-strict mode, emit warning and return empty string (unless it's already a SHA)
 	if isAlreadySHA {
 		// If version is already a SHA and we couldn't find it in pins, return it as-is without warnings
 		actionPinsLog.Printf("SHA %s not found in hardcoded pins, returning as-is", version)
