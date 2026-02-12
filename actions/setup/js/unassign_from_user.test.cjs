@@ -244,7 +244,7 @@ describe("unassign_from_user (Handler Factory Architecture)", () => {
     const crossRepoHandler = await main({
       max: 10,
       allowed: ["user1"],
-      "allowed-repos": ["test-owner/other-repo"],
+      allowed_repos: ["test-owner/other-repo"],
     });
 
     mockGithub.rest.issues.removeAssignees.mockResolvedValue({});

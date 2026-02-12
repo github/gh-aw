@@ -105,12 +105,7 @@ async function main(config = {}) {
     }
 
     // Resolve and validate target repository
-    const repoResult = resolveAndValidateRepo(
-      unassignItem,
-      defaultTargetRepo,
-      allowedRepos,
-      "issue"
-    );
+    const repoResult = resolveAndValidateRepo(unassignItem, defaultTargetRepo, allowedRepos, "issue");
 
     if (!repoResult.success) {
       core.warning(`Repository validation failed: ${repoResult.error}`);
@@ -123,9 +118,7 @@ async function main(config = {}) {
     const repoParts = repoResult.repoParts;
     const targetRepo = repoResult.repo;
 
-    core.info(
-      `Unassigning ${uniqueAssignees.length} users from issue #${issueNumber} in ${targetRepo}: ${JSON.stringify(uniqueAssignees)}`
-    );
+    core.info(`Unassigning ${uniqueAssignees.length} users from issue #${issueNumber} in ${targetRepo}: ${JSON.stringify(uniqueAssignees)}`);
 
     try {
       // Remove assignees from the issue
@@ -136,9 +129,7 @@ async function main(config = {}) {
         assignees: uniqueAssignees,
       });
 
-      core.info(
-        `Successfully unassigned ${uniqueAssignees.length} user(s) from issue #${issueNumber} in ${targetRepo}`
-      );
+      core.info(`Successfully unassigned ${uniqueAssignees.length} user(s) from issue #${issueNumber} in ${targetRepo}`);
 
       return {
         success: true,
