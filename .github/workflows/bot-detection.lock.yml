@@ -21,7 +21,11 @@
 #
 # Automated bot detection agent that analyzes suspicious GitHub accounts for common bot and AI-driven account patterns
 #
-# frontmatter-hash: 6fcd47f47e3f8a5dee38532fbabc9f2b0edc28743e87f982f20d20ae7b48896d
+# Resolved workflow manifest:
+#   Imports:
+#     - shared/mood.md
+#
+# frontmatter-hash: 30dbe4d95d6bc27f2a4c7acefc794b9a8a5da7dcbd278d3a7f87cd9ccd439bae
 
 name: "Bot Detection Agent 🔍🤖"
 "on":
@@ -610,6 +614,9 @@ jobs:
           fi
           cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           </system>
+          GH_AW_PROMPT_EOF
+          cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
+          {{#runtime-import .github/workflows/shared/mood.md}}
           GH_AW_PROMPT_EOF
           cat << 'GH_AW_PROMPT_EOF' >> "$GH_AW_PROMPT"
           {{#runtime-import .github/workflows/bot-detection.md}}

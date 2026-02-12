@@ -38,6 +38,8 @@ safe-outputs:
     run-success: "✅ [{workflow_name}]({run_url}) completed bot detection analysis."
     run-failure: "⚠️ [{workflow_name}]({run_url}) {status} during bot detection."
 timeout-minutes: 10
+imports:
+  - shared/mood.md
 ---
 
 # Bot Detection Agent 🔍🤖
