@@ -128,7 +128,7 @@ func TestSafeOutputsMaxConfiguration(t *testing.T) {
 					"target": "456",
 					"status": nil,
 					"title":  nil,
-					"body":   nil,
+					"body":   true, // Explicitly allow body updates
 				},
 			},
 		}
