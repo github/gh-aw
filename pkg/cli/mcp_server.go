@@ -192,7 +192,7 @@ func validateWorkflowName(workflowName string) error {
 	mcpLog.Printf("Workflow name not found: %s", workflowName)
 
 	suggestions := []string{
-		"Run 'gh aw status' to see all available workflows",
+		"Use the 'status' tool to see all available workflows",
 		"Check for typos in the workflow name",
 		"Use the workflow ID (e.g., 'test-claude') or GitHub Actions workflow name (e.g., 'Test Claude')",
 	}

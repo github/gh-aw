@@ -30,7 +30,7 @@ func TestMCPValidateWorkflowName(t *testing.T) {
 			name:          "error includes suggestions",
 			workflowName:  "invalid-name",
 			shouldSucceed: false,
-			errorContains: "Run 'gh aw status' to see all available workflows",
+			errorContains: "Use the 'status' tool to see all available workflows",
 		},
 		{
 			name:          "error includes fuzzy matched suggestions for similar names",
