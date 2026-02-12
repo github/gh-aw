@@ -111,11 +111,13 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		fullPath, resolveErr := parser.ResolveIncludePath(importFilePath, markdownDir, importCache)
 		if resolveErr != nil {
 			orchestratorEngineLog.Printf("Skipping security scan for unresolvable import: %s: %v", importedFile, resolveErr)
+			fmt.Fprintf(os.Stderr, "WARNING: Skipping security scan for unresolvable import '%s': %v\n", importedFile, resolveErr)
 			continue
 		}
 		importContent, readErr := os.ReadFile(fullPath)
 		if readErr != nil {
 			orchestratorEngineLog.Printf("Skipping security scan for unreadable import: %s: %v", fullPath, readErr)
+			fmt.Fprintf(os.Stderr, "WARNING: Skipping security scan for unreadable import '%s' (resolved path: %s): %v\n", importedFile, fullPath, readErr)
 			continue
 		}
 		if findings := ScanMarkdownSecurity(string(importContent)); len(findings) > 0 {
