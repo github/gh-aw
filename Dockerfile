@@ -36,7 +36,8 @@ WORKDIR /workspace
 ENTRYPOINT ["gh-aw"]
 
 # Default command runs MCP server
-# Note: Binary path detection is automatic via os.Executable()
+# Note: The --actor flag will be passed via environment variable GITHUB_ACTOR
+# Binary path detection is automatic via os.Executable()
 CMD ["mcp-server"]
 
 # Metadata labels

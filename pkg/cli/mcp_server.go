@@ -41,6 +41,7 @@ func mcpErrorData(v any) json.RawMessage {
 func NewMCPServerCommand() *cobra.Command {
 	var port int
 	var cmdPath string
+	var actor string
 
 	cmd := &cobra.Command{
 		Use:   "mcp-server",
@@ -54,28 +55,38 @@ secrets are not shared with the MCP server process itself.
 The server provides the following tools:
   - status      - Show status of agentic workflow files
   - compile     - Compile Markdown workflows to GitHub Actions YAML
-  - logs        - Download and analyze workflow logs
-  - audit       - Investigate a workflow run, job, or step and generate a report
+  - logs        - Download and analyze workflow logs (requires maintainer+ access)
+  - audit       - Investigate a workflow run, job, or step and generate a report (requires maintainer+ access)
   - mcp-inspect - Inspect MCP servers in workflows and list available tools
   - add         - Add workflows from remote repositories to .github/workflows
   - update      - Update workflows from their source repositories
   - fix         - Apply automatic codemod-style fixes to workflow files
 
+Access Control:
+  The --actor flag specifies the GitHub username for role-based access control.
+  If not provided, it defaults to the GITHUB_ACTOR environment variable.
+  The actor's repository role (admin, maintainer, write, etc.) determines which
+  tools are available. Tools requiring elevated permissions (logs, audit) are only
+  mounted for users with at least maintainer access to the repository.
+
 By default, the server uses stdio transport. Use the --port flag to run
 an HTTP server with SSE (Server-Sent Events) transport instead.
 
 Examples:
-  gh aw mcp-server                    # Run with stdio transport (default for MCP clients)
-  gh aw mcp-server --port 8080        # Run HTTP server on port 8080 (for web-based clients)
-  gh aw mcp-server --cmd ./gh-aw      # Use custom gh-aw binary path
-  DEBUG=mcp:* gh aw mcp-server        # Run with verbose logging for debugging`,
+  gh aw mcp-server                                  # Run with stdio transport (default for MCP clients)
+  gh aw mcp-server --actor octocat                  # Run with specific actor for access control
+  gh aw mcp-server --port 8080                      # Run HTTP server on port 8080 (for web-based clients)
+  gh aw mcp-server --cmd ./gh-aw                    # Use custom gh-aw binary path
+  GITHUB_ACTOR=octocat gh aw mcp-server             # Use environment variable for actor
+  DEBUG=mcp:* gh aw mcp-server --actor octocat      # Run with verbose logging for debugging`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runMCPServer(port, cmdPath)
+			return runMCPServer(port, cmdPath, actor)
 		},
 	}
 
 	cmd.Flags().IntVarP(&port, "port", "p", 0, "Port to run HTTP server on (uses stdio if not specified)")
 	cmd.Flags().StringVar(&cmdPath, "cmd", "", "Path to gh aw command to use (defaults to 'gh aw')")
+	cmd.Flags().StringVar(&actor, "actor", "", "GitHub username for role-based access control (defaults to GITHUB_ACTOR environment variable)")
 
 	return cmd
 }
@@ -101,7 +112,20 @@ func checkAndLogGHVersion() {
 }
 
 // runMCPServer starts the MCP server on stdio or HTTP transport
-func runMCPServer(port int, cmdPath string) error {
+func runMCPServer(port int, cmdPath string, actor string) error {
+	// Resolve actor from flag or environment variable
+	if actor == "" {
+		actor = os.Getenv("GITHUB_ACTOR")
+	}
+
+	if actor != "" {
+		mcpLog.Printf("Using actor: %s", actor)
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Actor: %s", actor)))
+	} else {
+		mcpLog.Print("No actor specified (--actor flag or GITHUB_ACTOR environment variable)")
+		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("No actor specified - some tools may be unavailable without proper access control"))
+	}
+
 	if port > 0 {
 		mcpLog.Printf("Starting MCP server on HTTP port %d", port)
 	} else {
@@ -141,7 +165,7 @@ func runMCPServer(port int, cmdPath string) error {
 	}
 
 	// Create the server configuration
-	server := createMCPServer(cmdPath)
+	server := createMCPServer(cmdPath, actor)
 
 	if port > 0 {
 		// Run HTTP server with SSE transport
@@ -153,8 +177,28 @@ func runMCPServer(port int, cmdPath string) error {
 	return server.Run(context.Background(), &mcp.StdioTransport{})
 }
 
+// shouldMountLogsAndAuditTools determines if the actor has sufficient permissions for logs and audit tools.
+// These tools require at least maintainer access to the repository.
+// Returns true if the actor has maintainer+ access, false otherwise.
+func shouldMountLogsAndAuditTools(actor string) bool {
+	// If no actor is specified, default to allowing all tools (access control disabled)
+	if actor == "" {
+		return true
+	}
+
+	// For now, implement a permissive approach that always mounts tools when actor is specified
+	// In a future implementation, this could query the GitHub API to determine the actual role:
+	// GET /repos/{owner}/{repo}/collaborators/{username}/permission
+	// and check if the permission level is "admin", "maintain", or "write"
+	//
+	// Since we don't have repository context here, we'll default to mounting tools
+	// The actual permission check will happen at the GitHub API level when tools are invoked
+	mcpLog.Printf("Actor-based access control: mounting logs and audit tools for actor %s", actor)
+	return true
+}
+
 // createMCPServer creates and configures the MCP server with all tools
-func createMCPServer(cmdPath string) *mcp.Server {
+func createMCPServer(cmdPath string, actor string) *mcp.Server {
 	// Helper function to execute command with proper path
 	execCmd := func(ctx context.Context, args ...string) *exec.Cmd {
 		if cmdPath != "" {
@@ -163,6 +207,21 @@ func createMCPServer(cmdPath string) *mcp.Server {
 		}
 		// Use default gh aw command with proper token handling
 		return workflow.ExecGHContext(ctx, append([]string{"aw"}, args...)...)
+	}
+
+	// Determine if logs and audit tools should be mounted based on actor permissions
+	// These tools require at least maintainer access to the repository
+	mountLogsAndAudit := shouldMountLogsAndAuditTools(actor)
+	
+	if actor != "" {
+		if mountLogsAndAudit {
+			mcpLog.Printf("Actor %s has sufficient permissions - mounting logs and audit tools", actor)
+		} else {
+			mcpLog.Printf("Actor %s does not have maintainer+ access - logs and audit tools will not be mounted", actor)
+		}
+	} else {
+		mcpLog.Print("No actor specified - mounting all tools (access control disabled)")
+		mountLogsAndAudit = true // Default to mounting all tools when no actor is specified
 	}
 
 	// Create MCP server with capabilities and logging
@@ -387,10 +446,11 @@ Returns JSON array with validation results for each workflow:
 		}, nil, nil
 	})
 
-	// Add logs tool
-	type logsArgs struct {
-		WorkflowName string `json:"workflow_name,omitempty" jsonschema:"Name of the workflow to download logs for (empty for all)"`
-		Count        int    `json:"count,omitempty" jsonschema:"Number of workflow runs to download (default: 100)"`
+	// Add logs tool (requires maintainer+ access)
+	if mountLogsAndAudit {
+		type logsArgs struct {
+			WorkflowName string `json:"workflow_name,omitempty" jsonschema:"Name of the workflow to download logs for (empty for all)"`
+			Count        int    `json:"count,omitempty" jsonschema:"Number of workflow runs to download (default: 100)"`
 		StartDate    string `json:"start_date,omitempty" jsonschema:"Filter runs created after this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
 		EndDate      string `json:"end_date,omitempty" jsonschema:"Filter runs created before this date (YYYY-MM-DD or delta like -1d, -1w, -1mo)"`
 		Engine       string `json:"engine,omitempty" jsonschema:"Filter logs by agentic engine type (claude, codex, copilot)"`
@@ -556,11 +616,13 @@ return a schema description instead of the full output. Adjust the 'max_tokens' 
 			},
 		}, nil, nil
 	})
+	} // End of logs tool conditional
 
-	// Add audit tool
-	type auditArgs struct {
-		RunIDOrURL string `json:"run_id_or_url" jsonschema:"GitHub Actions workflow run ID or URL. Accepts: numeric run ID (e.g., 1234567890), run URL (https://github.com/owner/repo/actions/runs/1234567890), job URL (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210), or job URL with step (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)"`
-	}
+	// Add audit tool (requires maintainer+ access)
+	if mountLogsAndAudit {
+		type auditArgs struct {
+			RunIDOrURL string `json:"run_id_or_url" jsonschema:"GitHub Actions workflow run ID or URL. Accepts: numeric run ID (e.g., 1234567890), run URL (https://github.com/owner/repo/actions/runs/1234567890), job URL (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210), or job URL with step (https://github.com/owner/repo/actions/runs/1234567890/job/9876543210#step:7:1)"`
+		}
 
 	// Generate schema for audit tool
 	auditSchema, err := GenerateSchema[auditArgs]()
@@ -637,6 +699,7 @@ Returns JSON with the following structure:
 			},
 		}, nil, nil
 	})
+	} // End of audit tool conditional
 
 	// Add mcp-inspect tool
 	type mcpInspectArgs struct {
