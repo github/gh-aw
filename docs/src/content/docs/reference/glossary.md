@@ -158,6 +158,17 @@ safe-outputs:
     allowed-exts: [.png, .jpg, .svg] # allowed extensions
 ```
 
+### Base Branch
+
+A configuration field in the `create-pull-request` safe output that specifies which branch the pull request should target. Defaults to `github.ref_name` (the triggering branch) if not specified. Particularly useful for cross-repository pull requests that need to target non-default branches like `vnext`, `release/v1.0`, or feature branches.
+
+```yaml
+safe-outputs:
+  create-pull-request:
+    target-repo: "owner/other-repo"
+    base-branch: "vnext"  # Target vnext branch instead of main
+```
+
 ### Minimize Comment
 
 A safe output capability that allows workflows to hide or minimize GitHub comments without requiring write permissions. When minimized, comments are classified as SPAM. Requires GraphQL node IDs (format: `IC_kwDOABCD123456`) to identify comments. Useful for content moderation workflows.
