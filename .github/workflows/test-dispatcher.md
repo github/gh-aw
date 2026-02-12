@@ -1,5 +1,6 @@
 ---
-on: issues
+on:
+  workflow_dispatch:
 permissions:
   contents: read
   issues: read

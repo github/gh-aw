@@ -430,5 +430,104 @@ describe("remove_labels", () => {
       expect(removeLabelCalls[0].owner).toBe("test-owner");
       expect(removeLabelCalls[0].repo).toBe("test-repo");
     });
+
+    it("should support target-repo from config", async () => {
+      const handler = await main({
+        max: 10,
+        "target-repo": "external-org/external-repo",
+      });
+      const removeLabelCalls = [];
+
+      mockGithub.rest.issues.removeLabel = async params => {
+        removeLabelCalls.push(params);
+        return {};
+      };
+
+      const result = await handler(
+        {
+          item_number: 100,
+          labels: ["bug"],
+        },
+        {}
+      );
+
+      expect(result.success).toBe(true);
+      expect(removeLabelCalls[0].owner).toBe("external-org");
+      expect(removeLabelCalls[0].repo).toBe("external-repo");
+    });
+
+    it("should support repo field in message for cross-repository operations", async () => {
+      const handler = await main({
+        max: 10,
+        "target-repo": "default-org/default-repo",
+        allowed_repos: ["cross-org/cross-repo"],
+      });
+      const removeLabelCalls = [];
+
+      mockGithub.rest.issues.removeLabel = async params => {
+        removeLabelCalls.push(params);
+        return {};
+      };
+
+      const result = await handler(
+        {
+          item_number: 456,
+          labels: ["bug"],
+          repo: "cross-org/cross-repo",
+        },
+        {}
+      );
+
+      expect(result.success).toBe(true);
+      expect(removeLabelCalls[0].owner).toBe("cross-org");
+      expect(removeLabelCalls[0].repo).toBe("cross-repo");
+    });
+
+    it("should reject repo not in allowed-repos list", async () => {
+      const handler = await main({
+        max: 10,
+        "target-repo": "default-org/default-repo",
+        allowed_repos: ["allowed-org/allowed-repo"],
+      });
+
+      const result = await handler(
+        {
+          item_number: 100,
+          labels: ["bug"],
+          repo: "unauthorized-org/unauthorized-repo",
+        },
+        {}
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not in the allowed-repos list");
+    });
+
+    it("should qualify bare repo name with default repo org", async () => {
+      const handler = await main({
+        max: 10,
+        "target-repo": "github/default-repo",
+        allowed_repos: ["github/gh-aw"],
+      });
+      const removeLabelCalls = [];
+
+      mockGithub.rest.issues.removeLabel = async params => {
+        removeLabelCalls.push(params);
+        return {};
+      };
+
+      const result = await handler(
+        {
+          item_number: 100,
+          labels: ["bug"],
+          repo: "gh-aw", // Bare repo name
+        },
+        {}
+      );
+
+      expect(result.success).toBe(true);
+      expect(removeLabelCalls[0].owner).toBe("github");
+      expect(removeLabelCalls[0].repo).toBe("gh-aw");
+    });
   });
 });

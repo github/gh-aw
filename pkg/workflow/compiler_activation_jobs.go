@@ -425,8 +425,10 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 		steps = append(steps, "          script: |\n")
 		steps = append(steps, generateGitHubScriptWithRequire("compute_text.cjs"))
 
-		// Set up outputs
+		// Set up outputs - includes text, title, and body
 		outputs["text"] = "${{ steps.compute-text.outputs.text }}"
+		outputs["title"] = "${{ steps.compute-text.outputs.title }}"
+		outputs["body"] = "${{ steps.compute-text.outputs.body }}"
 	}
 
 	// Add comment with workflow run link if ai-reaction is configured and not "none"

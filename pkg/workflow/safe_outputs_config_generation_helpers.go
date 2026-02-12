@@ -155,3 +155,34 @@ func generateHideCommentConfig(max int, defaultMax int, allowedReasons []string)
 	}
 	return config
 }
+
+// generateTargetConfigWithRepos creates a config with target, target-repo, allowed_repos, and optional fields.
+// Note on naming conventions:
+// - "target-repo" uses hyphen to match frontmatter YAML format (key in config.json)
+// - "allowed_repos" uses underscore to match JavaScript handler expectations (see repo_helpers.cjs)
+// This inconsistency is intentional to maintain compatibility with existing handler code.
+func generateTargetConfigWithRepos(targetConfig SafeOutputTargetConfig, max int, defaultMax int, additionalFields map[string]any) map[string]any {
+	config := generateMaxConfig(max, defaultMax)
+
+	// Add target if specified
+	if targetConfig.Target != "" {
+		config["target"] = targetConfig.Target
+	}
+
+	// Add target-repo if specified (use hyphenated key for consistency with frontmatter)
+	if targetConfig.TargetRepoSlug != "" {
+		config["target-repo"] = targetConfig.TargetRepoSlug
+	}
+
+	// Add allowed_repos if specified (use underscore for consistency with handler code)
+	if len(targetConfig.AllowedRepos) > 0 {
+		config["allowed_repos"] = targetConfig.AllowedRepos
+	}
+
+	// Add any additional fields
+	for key, value := range additionalFields {
+		config[key] = value
+	}
+
+	return config
+}

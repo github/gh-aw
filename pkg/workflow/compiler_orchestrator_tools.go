@@ -322,10 +322,16 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}, nil
 }
 
-// detectTextOutputUsage checks if the markdown content uses ${{ needs.activation.outputs.text }}
+// detectTextOutputUsage checks if the markdown content uses ${{ needs.activation.outputs.text }},
+// ${{ needs.activation.outputs.title }}, or ${{ needs.activation.outputs.body }}
 func (c *Compiler) detectTextOutputUsage(markdownContent string) bool {
-	// Check for the specific GitHub Actions expression
-	hasUsage := strings.Contains(markdownContent, "${{ needs.activation.outputs.text }}")
-	detectionLog.Printf("Detected usage of activation.outputs.text: %v", hasUsage)
+	// Check for any of the text-related output expressions
+	hasTextUsage := strings.Contains(markdownContent, "${{ needs.activation.outputs.text }}")
+	hasTitleUsage := strings.Contains(markdownContent, "${{ needs.activation.outputs.title }}")
+	hasBodyUsage := strings.Contains(markdownContent, "${{ needs.activation.outputs.body }}")
+
+	hasUsage := hasTextUsage || hasTitleUsage || hasBodyUsage
+	detectionLog.Printf("Detected usage of activation outputs - text: %v, title: %v, body: %v, any: %v",
+		hasTextUsage, hasTitleUsage, hasBodyUsage, hasUsage)
 	return hasUsage
 }

@@ -2927,6 +2927,48 @@ safe-outputs:
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+  # Enable AI agents to unassign users from issues or pull requests. Useful for
+  # reassigning work or removing users from issues.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Enable user unassignment with default configuration
+  unassign-from-user: null
+
+  # Option 2: Configuration for removing assignees from issues in agentic workflow
+  # output
+  unassign-from-user:
+    # Optional list of allowed usernames. If specified, only these users can be
+    # unassigned.
+    # (optional)
+    allowed: []
+      # Array of strings
+
+    # Optional maximum number of unassignment operations (default: 1)
+    # (optional)
+    max: 1
+
+    # Target issue to unassign users from. Use 'triggering' (default) for the
+    # triggering issue, '*' to allow any issue, or a specific issue number.
+    # (optional)
+    target: null
+
+    # Target repository in format 'owner/repo' for cross-repository user unassignment.
+    # Takes precedence over trial target repo settings.
+    # (optional)
+    target-repo: "example-value"
+
+    # List of allowed repositories in format 'owner/repo' for cross-repository
+    # unassignment operations. Use with 'repo' field in tool calls.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
   # Enable AI agents to create hierarchical relationships between issues using
   # GitHub's sub-issue (tasklist) feature.
   # (optional)

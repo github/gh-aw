@@ -55,11 +55,11 @@ const BUILT_IN_PATTERNS = [
 
   // Azure tokens
   { name: "Azure Storage Account Key", pattern: /[a-zA-Z0-9+/]{88}==/g },
-  { name: "Azure SAS Token", pattern: /\?sv=[0-9-]+&s[rts]=[\w\-]+&sig=[A-Za-z0-9%+/=]+/g },
+  { name: "Azure SAS Token", pattern: /\?sv=[0-9-]{1,20}&s[rts]=[\w\-]{1,20}&sig=[A-Za-z0-9%+/=]{1,200}/g },
 
   // Google/GCP tokens
   { name: "Google API Key", pattern: /AIzaSy[0-9A-Za-z_-]{33}/g },
-  { name: "Google OAuth Access Token", pattern: /ya29\.[0-9A-Za-z_-]+/g },
+  { name: "Google OAuth Access Token", pattern: /ya29\.[0-9A-Za-z_-]{1,800}/g },
 
   // AWS tokens
   { name: "AWS Access Key ID", pattern: /AKIA[0-9A-Z]{16}/g },
@@ -85,11 +85,9 @@ function redactBuiltInPatterns(content) {
   for (const { name, pattern } of BUILT_IN_PATTERNS) {
     const matches = redacted.match(pattern);
     if (matches && matches.length > 0) {
-      // Redact each match
+      // Redact each match with fixed-length string
+      const replacement = "***REDACTED***";
       for (const match of matches) {
-        const prefix = match.substring(0, 3);
-        const asterisks = "*".repeat(Math.max(0, match.length - 3));
-        const replacement = prefix + asterisks;
         redacted = redacted.split(match).join(replacement);
       }
       redactionCount += matches.length;
@@ -114,16 +112,14 @@ function redactSecrets(content, secretValues) {
   const sortedSecrets = secretValues.slice().sort((a, b) => b.length - a.length);
   for (const secretValue of sortedSecrets) {
     // Skip empty or very short values (likely not actual secrets)
-    if (!secretValue || secretValue.length < 8) {
+    if (!secretValue || secretValue.length < 6) {
       continue;
     }
     // Count occurrences before replacement
     // Use split and join for exact string matching (not regex)
     // This is safer than regex as it doesn't interpret special characters
-    // Show first 3 letters followed by asterisks for the remaining length
-    const prefix = secretValue.substring(0, 3);
-    const asterisks = "*".repeat(Math.max(0, secretValue.length - 3));
-    const replacement = prefix + asterisks;
+    // Use fixed-length redaction string without prefix preservation
+    const replacement = "***REDACTED***";
     const parts = redacted.split(secretValue);
     const occurrences = parts.length - 1;
     if (occurrences > 0) {

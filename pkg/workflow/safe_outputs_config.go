@@ -172,6 +172,12 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.AssignToUser = assignToUserConfig
 			}
 
+			// Handle unassign-from-user
+			unassignFromUserConfig := c.parseUnassignFromUserConfig(outputMap)
+			if unassignFromUserConfig != nil {
+				config.UnassignFromUser = unassignFromUserConfig
+			}
+
 			// Handle update-issue
 			updateIssuesConfig := c.parseUpdateIssuesConfig(outputMap)
 			if updateIssuesConfig != nil {

@@ -476,6 +476,21 @@ func TestDetectTextOutputUsageInOrchestrator(t *testing.T) {
 			markdown:       "${{ needs.activation.outputs.text }}\nFirst\n${{ needs.activation.outputs.text }}\nSecond",
 			expectedOutput: true,
 		},
+		{
+			name:           "with title output usage",
+			markdown:       "# Workflow\n\nUse ${{ needs.activation.outputs.title }} here.",
+			expectedOutput: true,
+		},
+		{
+			name:           "with body output usage",
+			markdown:       "# Workflow\n\nUse ${{ needs.activation.outputs.body }} here.",
+			expectedOutput: true,
+		},
+		{
+			name:           "with mixed text, title, body usage",
+			markdown:       "# Workflow\n\nTitle: ${{ needs.activation.outputs.title }}\nBody: ${{ needs.activation.outputs.body }}\nFull: ${{ needs.activation.outputs.text }}",
+			expectedOutput: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -238,4 +238,111 @@ describe("assign_to_user (Handler Factory Architecture)", () => {
       assignees: ["user1", "user2"],
     });
   });
+
+  it("should support target-repo from config", async () => {
+    vi.clearAllMocks();
+    const { main } = require("./assign_to_user.cjs");
+    const targetRepoHandler = await main({
+      max: 10,
+      "target-repo": "external-org/external-repo",
+    });
+    const addAssigneesCalls = [];
+
+    mockGithub.rest.issues.addAssignees = async params => {
+      addAssigneesCalls.push(params);
+      return {};
+    };
+
+    const result = await targetRepoHandler(
+      {
+        issue_number: 100,
+        assignees: ["user1"],
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(addAssigneesCalls[0].owner).toBe("external-org");
+    expect(addAssigneesCalls[0].repo).toBe("external-repo");
+  });
+
+  it("should support repo field in message for cross-repository operations", async () => {
+    vi.clearAllMocks();
+    const { main } = require("./assign_to_user.cjs");
+    const crossRepoHandler = await main({
+      max: 10,
+      "target-repo": "default-org/default-repo",
+      allowed_repos: ["cross-org/cross-repo"],
+    });
+    const addAssigneesCalls = [];
+
+    mockGithub.rest.issues.addAssignees = async params => {
+      addAssigneesCalls.push(params);
+      return {};
+    };
+
+    const result = await crossRepoHandler(
+      {
+        issue_number: 456,
+        assignees: ["user1"],
+        repo: "cross-org/cross-repo",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(addAssigneesCalls[0].owner).toBe("cross-org");
+    expect(addAssigneesCalls[0].repo).toBe("cross-repo");
+  });
+
+  it("should reject repo not in allowed-repos list", async () => {
+    vi.clearAllMocks();
+    const { main } = require("./assign_to_user.cjs");
+    const handler = await main({
+      max: 10,
+      "target-repo": "default-org/default-repo",
+      allowed_repos: ["allowed-org/allowed-repo"],
+    });
+
+    const result = await handler(
+      {
+        issue_number: 100,
+        assignees: ["user1"],
+        repo: "unauthorized-org/unauthorized-repo",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not in the allowed-repos list");
+  });
+
+  it("should qualify bare repo name with default repo org", async () => {
+    vi.clearAllMocks();
+    const { main } = require("./assign_to_user.cjs");
+    const handler = await main({
+      max: 10,
+      "target-repo": "github/default-repo",
+      allowed_repos: ["github/gh-aw"],
+    });
+    const addAssigneesCalls = [];
+
+    mockGithub.rest.issues.addAssignees = async params => {
+      addAssigneesCalls.push(params);
+      return {};
+    };
+
+    const result = await handler(
+      {
+        issue_number: 100,
+        assignees: ["user1"],
+        repo: "gh-aw", // Bare repo name
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(addAssigneesCalls[0].owner).toBe("github");
+    expect(addAssigneesCalls[0].repo).toBe("gh-aw");
+  });
 });
