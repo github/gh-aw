@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
 engine: copilot
 network:
-  allowed: [defaults, node, "api.github.com"]
+  allowed: [defaults, node, "api.github.com", "proxy.golang.org", "sum.golang.org"]
 tools:
   edit:
   web-fetch:
