@@ -133,7 +133,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"type": "stdio"`,
 				`"container": "alpine:latest"`,
 				`"entrypoint": "/opt/gh-aw/gh-aw"`,
-				`"entrypointArgs": ["mcp-server"]`,
+				`"entrypointArgs": ["mcp-server", "--actor", "\${GITHUB_ACTOR}"]`,
 				`"/opt/gh-aw:/opt/gh-aw:ro"`,                                  // gh-aw binary mount (read-only)
 				`"/usr/bin/gh:/usr/bin/gh:ro"`,                                // gh CLI binary mount (read-only)
 				`"\${GITHUB_WORKSPACE}:\${GITHUB_WORKSPACE}:rw"`,              // workspace mount (read-write)
@@ -141,6 +141,7 @@ func TestRenderAgenticWorkflowsMCPConfigWithOptions(t *testing.T) {
 				`"args": ["--network", "host", "-w", "\${GITHUB_WORKSPACE}"]`, // Network access + working directory
 				`"DEBUG": "*"`,
 				`"GITHUB_TOKEN": "\${GITHUB_TOKEN}"`,
+				`"GITHUB_ACTOR": "\${GITHUB_ACTOR}"`, // Actor for role-based access control
 				`              },`,
 			},
 			unexpectedContent: []string{
