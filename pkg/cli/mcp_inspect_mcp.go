@@ -159,7 +159,9 @@ func connectStdioMCPServer(ctx context.Context, config parser.MCPServerConfig, v
 	}
 
 	// Create MCP client and connect
-	client := mcp.NewClient(&mcp.Implementation{Name: "gh-aw-inspector", Version: "1.0.0"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "gh-aw-inspector", Version: "1.0.0"}, &mcp.ClientOptions{
+		Logger: logger.NewSlogLoggerWithHandler(mcpInspectServerLog),
+	})
 	transport := &mcp.CommandTransport{Command: cmd}
 
 	// Create a timeout context for connection
@@ -246,8 +248,10 @@ func connectHTTPMCPServer(ctx context.Context, config parser.MCPServerConfig, ve
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Connecting to HTTP MCP server: %s", config.URL)))
 	}
 
-	// Create MCP client
-	client := mcp.NewClient(&mcp.Implementation{Name: "gh-aw-inspector", Version: "1.0.0"}, nil)
+	// Create MCP client with logger for better debugging
+	client := mcp.NewClient(&mcp.Implementation{Name: "gh-aw-inspector", Version: "1.0.0"}, &mcp.ClientOptions{
+		Logger: logger.NewSlogLoggerWithHandler(mcpInspectServerLog),
+	})
 
 	// Create streamable client transport for HTTP
 	transport := &mcp.StreamableClientTransport{

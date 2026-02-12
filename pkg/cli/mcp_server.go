@@ -166,6 +166,7 @@ func createMCPServer(cmdPath string) *mcp.Server {
 	}
 
 	// Create MCP server with capabilities and logging
+	// Note: Schema caching is automatic in go-sdk v1.3.0+ (eliminates repeated reflection overhead)
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "gh-aw",
 		Version: GetVersion(),
