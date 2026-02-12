@@ -1478,6 +1478,24 @@ safe-outputs:
 
 The default value for `footer` is `true`, maintaining backward compatibility with existing workflows. To hide footers, you must explicitly set `footer: false`.
 
+### Customizing Footer Messages
+
+Instead of hiding footers entirely, you can customize the footer message text using the `messages.footer` template. This allows you to maintain attribution while using custom branding:
+
+```yaml wrap
+safe-outputs:
+  messages:
+    footer: "> 🤖 Powered by [{workflow_name}]({run_url})"
+  create-issue:
+    title-prefix: "[bot] "
+```
+
+The `messages.footer` template supports variables like `{workflow_name}`, `{run_url}`, `{triggering_number}`, and more. See [Custom Messages](#custom-messages-messages) for complete documentation on message templates and available variables.
+
+**When to use each approach:**
+- **`footer: false`** - Completely hide attribution footers for cleaner content
+- **`messages.footer`** - Keep attribution but customize the text and branding
+
 ## Custom Messages (`messages:`)
 
 Customize notifications using template variables and Markdown. Import from shared workflows (local overrides imported).
