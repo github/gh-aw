@@ -60,11 +60,11 @@ curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | 
 curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash -s v0.1.0      # Pinned
 ```
 
-Installs to `~/.local/share/gh/extensions/gh-aw/gh-aw` and works with all `gh aw` commands. Supports Linux, macOS, FreeBSD, and Windows. Works in environments where GitHub API access is blocked by MITM proxies or corporate firewalls by using direct release download URLs.
+Installs to `~/.local/share/gh/extensions/gh-aw/gh-aw`. Supports Linux, macOS, FreeBSD, and Windows. Works behind corporate firewalls using direct release download URLs.
 
 ### GitHub Actions Setup Action
 
-Install the CLI in GitHub Actions workflows using the `setup-cli` action:
+Install the CLI in GitHub Actions workflows using the `setup-cli` action with automatic checksum verification and platform detection:
 
 ``````yaml wrap
 - name: Install gh-aw CLI
@@ -73,31 +73,7 @@ Install the CLI in GitHub Actions workflows using the `setup-cli` action:
     version: v0.37.18
 ``````
 
-The action automatically installs the specified version with checksum verification and platform detection. Useful for CI/CD pipelines, workflow testing, and automation scripts.
-
-**Features:**
-- Version validation against GitHub releases
-- SHA256 checksum verification for security
-- Automatic platform and architecture detection
-- Fallback installation methods for reliability
-- Works on Linux, macOS, Windows, and FreeBSD
-
-**Example with verification:**
-
-``````yaml wrap
-- name: Install gh-aw CLI
-  id: install
-  uses: github/gh-aw/actions/setup-cli@main
-  with:
-    version: v0.37.18
-
-- name: Verify installation
-  run: |
-    gh aw version
-    echo "Installed: ${{ steps.install.outputs.installed-version }}"
-``````
-
-See the [setup-cli action README](https://github.com/github/gh-aw/blob/main/actions/setup-cli/README.md) for complete documentation and examples.
+See the [setup-cli action README](https://github.com/github/gh-aw/blob/main/actions/setup-cli/README.md) for complete documentation.
 
 ### GitHub Enterprise Server Support
 
@@ -116,6 +92,23 @@ gh aw logs workflow --repo github.enterprise.com/owner/repo      # Use with comm
 | `-h`, `--help` | Show help (`gh aw help [command]` for command-specific help) |
 | `-v`, `--verbose` | Enable verbose output with debugging details |
 
+### The `--push` Flag
+
+Several commands support the `--push` flag to automatically commit and push changes to the remote repository:
+
+1. **Remote check**: Requires a remote repository to be configured
+2. **Branch validation**: Verifies current branch matches repository default branch (or specified with `--ref`)
+3. **User confirmation**: Prompts for confirmation before committing/pushing (skipped in CI)
+4. **Automatic commit**: Creates commit with descriptive message
+5. **Pull and push**: Pulls latest changes with rebase, then pushes to remote
+
+Safety features:
+- Prevents accidental pushes to non-default branches (unless explicitly specified)
+- Requires explicit user confirmation outside CI environments
+- Auto-confirms in CI (detected via `CI`, `CONTINUOUS_INTEGRATION`, `GITHUB_ACTIONS` env vars)
+
+Commands with `--push` require a clean working directory (no uncommitted changes) before starting.
+
 ## Commands
 
 Commands are organized by workflow lifecycle: creating, building, testing, monitoring, and managing workflows.
@@ -124,9 +117,7 @@ Commands are organized by workflow lifecycle: creating, building, testing, monit
 
 #### `init`
 
-Initialize repository for agentic workflows. Configures `.gitattributes`, Copilot instructions, prompt files, and logs `.gitignore`. Enables MCP server integration by default (use `--no-mcp` to skip).
-
-When run without arguments, enters interactive mode to guide you through engine selection (Copilot, Claude, or Codex) and secret configuration.
+Initialize repository for agentic workflows. Configures `.gitattributes`, Copilot instructions, prompt files, and logs `.gitignore`. Enables MCP server integration by default (use `--no-mcp` to skip). Without arguments, enters interactive mode for engine selection and secret configuration.
 
 ```bash wrap
 gh aw init                              # Interactive mode: select engine and configure secrets
@@ -139,28 +130,7 @@ gh aw init --completions                # Install shell completions
 gh aw init --push                       # Initialize and automatically commit/push changes
 ```
 
-**Interactive Mode:** When invoked without `--engine`, prompts you to select an engine and optionally configure repository secrets using the `gh` CLI.
-
-**Options:** `--engine` (copilot, claude, codex), `--no-mcp`, `--tokens`, `--codespaces`, `--completions`, `--push`
-
-##### `--push` Flag
-
-The `--push` flag automatically commits and pushes initialization changes to the remote repository:
-
-1. **Remote check**: Requires a remote repository to be configured
-2. **Branch validation**: Verifies current branch matches repository default branch
-3. **User confirmation**: Prompts for confirmation before committing/pushing (skipped in CI)
-4. **Pre-check**: Validates working directory is clean before starting
-5. **Initialization**: Runs normal init process
-6. **Automatic commit**: Stages all changes with commit message "chore: initialize agentic workflows"
-7. **Pull and push**: Pulls latest changes with rebase, then pushes to remote
-
-Safety features:
-- Prevents accidental pushes to non-default branches
-- Requires explicit user confirmation outside CI environments
-- Auto-confirms in CI (detected via `CI`, `CONTINUOUS_INTEGRATION`, `GITHUB_ACTIONS` env vars)
-
-When used, requires a clean working directory (no uncommitted changes) before starting.
+**Options:** `--engine` (copilot, claude, codex), `--no-mcp`, `--tokens`, `--codespaces`, `--completions`, `--push` (see [--push flag](#the---push-flag))
 
 #### `add`
 
@@ -229,8 +199,6 @@ gh aw fix --list-codemods              # List available codemods
 
 **Options:** `--write`, `--list-codemods`
 
-Available codemods: `sandbox: false` → `sandbox.agent: false`, `network.firewall` removal, `on.command` → `on.slash_command`, and more. Use `--list-codemods` to see all available fixes.
-
 #### `compile`
 
 Compile Markdown workflows to GitHub Actions YAML. Remote imports cached in `.github/aw/imports/`.
@@ -249,27 +217,13 @@ gh aw compile --purge                      # Remove orphaned .lock.yml files
 
 **Options:** `--validate`, `--strict`, `--fix`, `--zizmor`, `--dependabot`, `--json`, `--watch`, `--purge`
 
-**Error Reporting:** The compile command displays detailed error messages with the exact location and context of compilation failures:
+**Error Reporting:** Displays detailed error messages with file paths, line numbers, column positions, and contextual code snippets.
 
-```text
-✗ Compiled 1 workflow(s): 1 error(s), 0 warning(s)
-.github/workflows/example.md:6:1: error: Unknown property: bad_field...
-3 |   workflow_dispatch:
-4 |
-5 | # Comment
-6 | bad_field: value
-    ^^^^^^^^^
-7 | ---
-✗ compilation failed
-```
-
-Error messages include file paths, line numbers, column positions, and contextual code snippets to help identify and resolve issues quickly.
-
-**Dependabot Integration (`--dependabot`):** Automatically generates dependency manifests (`package.json`, `requirements.txt`, `go.mod`) and `.github/dependabot.yml` configuration by analyzing runtime tools (`npx`, `pip install`, `go install`) used across all workflows. This enables Dependabot to detect and update outdated dependencies. See [Dependabot Support reference](/gh-aw/reference/dependabot/) for details on handling Dependabot PRs.
+**Dependabot Integration (`--dependabot`):** Generates dependency manifests and `.github/dependabot.yml` by analyzing runtime tools across all workflows. See [Dependabot Support reference](/gh-aw/reference/dependabot/).
 
 **Strict Mode (`--strict`):** Enforces security best practices: no write permissions (use [safe-outputs](/gh-aw/reference/safe-outputs/)), explicit `network` config, no wildcard domains, pinned Actions, no deprecated fields. See [Strict Mode reference](/gh-aw/reference/frontmatter/#strict-mode-strict).
 
-**Shared Workflows:** Workflows without an `on` field are automatically detected as shared workflow components intended for import by other workflows. These files are validated using a relaxed schema that permits optional markdown content and skip compilation with an informative message. To use a shared workflow, import it in another workflow's frontmatter or with markdown directives. See [Imports reference](/gh-aw/reference/imports/).
+**Shared Workflows:** Workflows without an `on` field are detected as shared components. Validated with relaxed schema and skip compilation. See [Imports reference](/gh-aw/reference/imports/).
 
 ### Testing
 
@@ -282,7 +236,7 @@ gh aw trial githubnext/agentics/ci-doctor          # Test remote workflow
 gh aw trial ./workflow.md --use-local-secrets      # Test with local API keys
 gh aw trial ./workflow.md --logical-repo owner/repo # Act as different repo
 gh aw trial ./workflow.md --repo owner/repo        # Run directly in repository
-gh aw trial ./workflow.md --dry-run                # Preview actions without executing
+gh aw trial ./workflow.md --dry-run                # Preview without executing
 ```
 
 **Options:** `-e`, `--engine`, `--auto-merge-prs`, `--repeat`, `--delete-host-repo-after`, `--use-local-secrets`, `--logical-repo`, `--clone-repo`, `--trigger-context`, `--repo`, `--dry-run`
@@ -300,27 +254,9 @@ gh aw run workflow --push                   # Auto-commit, push, and dispatch wo
 gh aw run workflow --push --ref main        # Push to specific branch
 ```
 
-**Options:** `--repeat`, `--use-local-secrets`, `--push`, `--ref`
+**Options:** `--repeat`, `--use-local-secrets`, `--push` (see [--push flag](#the---push-flag)), `--ref`
 
-##### `--push` Flag
-
-The `--push` flag automatically handles workflow updates before execution:
-
-1. **Remote check**: Requires a remote repository to be configured
-2. **Branch validation**: Verifies current branch matches repository default branch (or branch specified with `--ref`)
-3. **User confirmation**: Prompts for confirmation before committing/pushing (skipped in CI)
-4. **Auto-recompilation**: Detects when `.lock.yml` is outdated and recompiles workflow
-5. **Transitive imports**: Collects and stages all imported files recursively
-6. **Smart staging**: Stages workflow `.md` and `.lock.yml` files plus dependencies
-7. **Automatic commit**: Creates commit with message "Updated agentic workflow"
-8. **Workflow dispatch**: Triggers workflow run after successful push
-
-Safety features:
-- Prevents accidental pushes to non-default branches (unless explicitly specified with `--ref`)
-- Requires explicit user confirmation outside CI environments
-- Auto-confirms in CI (detected via `CI`, `CONTINUOUS_INTEGRATION`, `GITHUB_ACTIONS` env vars)
-
-When `--push` is not used, warnings are displayed for missing or outdated lock files.
+When `--push` is used, automatically recompiles outdated `.lock.yml` files, stages all transitive imports, and triggers workflow run after successful push. Without `--push`, warnings are displayed for missing or outdated lock files.
 
 > [!NOTE]
 > Codespaces Permissions
@@ -330,7 +266,7 @@ When `--push` is not used, warnings are displayed for missing or outdated lock f
 
 #### `list`
 
-List workflows with basic information (name, engine, compilation status) without checking GitHub Actions state. Fast enumeration for discovering available workflows.
+List workflows with basic information (name, engine, compilation status) without checking GitHub Actions state.
 
 ```bash wrap
 gh aw list                                  # List all workflows
@@ -341,7 +277,7 @@ gh aw list --label automation               # Filter by label
 
 **Options:** `--json`, `--label`
 
-Unlike `status`, this command does not query GitHub API for workflow state or execution history. Use this for quick discovery and filtering. For detailed status including enabled/disabled state and latest run information, use `status` instead.
+Fast enumeration without GitHub API queries. For detailed status including enabled/disabled state and run information, use `status` instead.
 
 #### `status`
 
@@ -358,7 +294,7 @@ gh aw status --repo owner/other-repo        # Check different repository
 
 #### `logs`
 
-Download and analyze logs with tool usage, network patterns, errors, warnings. Results cached for ~10-100x speedup on subsequent runs.
+Download and analyze logs with tool usage, network patterns, errors, warnings. Results cached for 10-100x speedup on subsequent runs.
 
 ```bash wrap
 gh aw logs workflow                        # Download logs for workflow
@@ -370,9 +306,7 @@ gh aw logs --ref main --parse --json      # With markdown/JSON output for branch
 
 #### `audit`
 
-Analyze specific runs with overview, metrics, tool usage, MCP failures, firewall analysis, noops, and artifacts. Accepts run IDs, workflow run URLs, job URLs, and step-level URLs. Auto-detects Copilot agent runs for specialized parsing.
-
-When provided with a job URL, automatically extracts logs for the specific job. When a step fragment is included, extracts only that step's output. If no step is specified, automatically identifies and extracts the first failing step.
+Analyze specific runs with overview, metrics, tool usage, MCP failures, firewall analysis, noops, and artifacts. Accepts run IDs, workflow run URLs, job URLs, and step-level URLs. Auto-detects Copilot agent runs for specialized parsing. Job URLs automatically extract specific job logs; step URLs extract specific steps; without step, extracts first failing step.
 
 ```bash wrap
 gh aw audit 12345678                                      # By run ID
@@ -386,7 +320,7 @@ Logs are saved to `logs/run-{id}/` with filenames indicating the extraction leve
 
 #### `health`
 
-Display workflow health metrics and success rates for analyzing workflow reliability.
+Display workflow health metrics and success rates.
 
 ```bash wrap
 gh aw health                       # Summary of all workflows (last 7 days)
@@ -399,14 +333,7 @@ gh aw health issue-monster --days 90  # 90-day metrics for workflow
 
 **Options:** `--days`, `--threshold`, `--repo`, `--json`
 
-Shows metrics such as:
-- Success/failure rates over time period
-- Trend indicators (↑ improving, → stable, ↓ degrading)
-- Average execution duration and token usage
-- Average and total cost
-- Alerts when success rate drops below threshold
-
-Use this command to identify problematic workflows and monitor overall workflow health in your repository.
+Shows success/failure rates, trend indicators (↑ improving, → stable, ↓ degrading), execution duration, token usage, costs, and alerts when success rate drops below threshold.
 
 ### Management
 
@@ -458,36 +385,16 @@ gh aw update ci-doctor --major --force    # Allow major version updates
 
 #### `upgrade`
 
-Upgrade repository with latest agent files and apply codemods to all workflows. Ensures workflows are compatible with the latest gh-aw version.
+Upgrade repository with latest agent files and apply codemods to all workflows.
 
 ```bash wrap
 gh aw upgrade                              # Upgrade repository agent files and all workflows
-gh aw upgrade --no-fix                     # Update agent files only (skip codemods and compilation)
-gh aw upgrade --push                       # Upgrade and automatically commit/push changes
+gh aw upgrade --no-fix                     # Update agent files only (skip codemods)
+gh aw upgrade --push                       # Upgrade and automatically commit/push
 gh aw upgrade --push --no-fix              # Update agent files and push
 ```
 
-**Options:** `--dir`, `--no-fix`, `--push`
-
-##### `--push` Flag
-
-The `--push` flag automatically commits and pushes upgrade changes to the remote repository:
-
-1. **Remote check**: Requires a remote repository to be configured
-2. **Branch validation**: Verifies current branch matches repository default branch
-3. **User confirmation**: Prompts for confirmation before committing/pushing (skipped in CI)
-4. **Pre-check**: Validates working directory is clean before starting
-5. **Version check**: Ensures gh-aw extension is on latest version
-6. **Upgrade process**: Updates agent files, applies codemods, and recompiles workflows
-7. **Automatic commit**: Stages all changes with commit message "chore: upgrade agentic workflows"
-8. **Pull and push**: Pulls latest changes with rebase, then pushes to remote
-
-Safety features:
-- Prevents accidental pushes to non-default branches
-- Requires explicit user confirmation outside CI environments
-- Auto-confirms in CI (detected via `CI`, `CONTINUOUS_INTEGRATION`, `GITHUB_ACTIONS` env vars)
-
-When used, requires a clean working directory (no uncommitted changes) before starting.
+**Options:** `--dir`, `--no-fix`, `--push` (see [--push flag](#the---push-flag))
 
 ### Advanced
 
@@ -522,16 +429,11 @@ gh aw mcp-server --port 8080          # HTTP server with SSE
 gh aw mcp-server --validate-actor     # Enable actor validation
 ```
 
-**Options:**
-- `--port`: HTTP server port for SSE transport
-- `--cmd`: Custom command for subprocess execution
-- `--validate-actor`: Enforce actor validation for logs and audit tools
+**Options:** `--port` (HTTP server port), `--cmd` (custom subprocess command), `--validate-actor` (enforce actor validation for logs and audit tools)
 
 **Available Tools:** status, compile, logs, audit, mcp-inspect, add, update
 
-**Actor Validation:** When `--validate-actor` is enabled, logs and audit tools require write+ repository access. The server uses `GITHUB_ACTOR` and `GITHUB_REPOSITORY` environment variables to validate permissions via GitHub API. Permission checks are cached for 1 hour.
-
-See [MCP Server Guide](/gh-aw/setup/mcp-server/).
+When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/setup/mcp-server/).
 
 ### Utility Commands
 
@@ -556,17 +458,15 @@ gh aw completion fish                 # Generate fish script
 gh aw completion powershell           # Generate powershell script
 ```
 
-**Subcommands:** `install`, `uninstall`, `bash`, `zsh`, `fish`, `powershell`
-
-See [Shell Completions](#shell-completions) for detailed installation instructions.
+**Subcommands:** `install`, `uninstall`, `bash`, `zsh`, `fish`, `powershell`. See [Shell Completions](#shell-completions).
 
 #### `project`
 
-Create and manage GitHub Projects V2 boards. Use this to create project boards for tracking issues, pull requests, and tasks.
+Create and manage GitHub Projects V2 boards.
 
 ##### `project new`
 
-Create a new GitHub Project V2 owned by a user or organization. Optionally link the project to a specific repository.
+Create a new GitHub Project V2 owned by a user or organization with optional repository linking.
 
 ```bash wrap
 gh aw project new "My Project" --owner @me                      # Create user project
@@ -581,14 +481,12 @@ gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link
 **Token Requirements:**
 
 > [!IMPORTANT]
-> The default `GITHUB_TOKEN` cannot create projects. You must use a Personal Access Token (PAT) with Projects permissions:
+> The default `GITHUB_TOKEN` cannot create projects. Use a Personal Access Token (PAT) with Projects permissions:
 >
 > - **Classic PAT**: `project` scope (user projects) or `project` + `repo` (org projects)
 > - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
 >
-> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or use `gh auth login` with a suitable token.
-
-**Related:** See [Tokens Reference](/gh-aw/reference/tokens/) for complete token configuration guide.
+> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or `gh auth login`. See [Tokens Reference](/gh-aw/reference/tokens/).
 
 #### `hash-frontmatter`
 
@@ -599,30 +497,22 @@ gh aw hash-frontmatter my-workflow.md
 gh aw hash-frontmatter .github/workflows/audit-workflows.md
 ```
 
-The hash includes:
-- All frontmatter fields from the main workflow
-- Frontmatter from all imported workflows (BFS traversal)
-- Template expressions containing `env.` or `vars.` from the markdown body
-- Version information (gh-aw, awf, agents)
-
-The hash can be used to detect configuration changes between compilation and execution.
+Includes all frontmatter fields, imported workflow frontmatter (BFS traversal), template expressions containing `env.` or `vars.`, and version information (gh-aw, awf, agents).
 
 ## Shell Completions
 
 Enable tab completion for workflow names, engines, and paths.
 
-### Automatic Installation (Recommended)
+### Automatic Installation
 
 ```bash wrap
 gh aw completion install    # Auto-detects your shell and installs
 gh aw completion uninstall  # Remove completions
 ```
 
-After installation, restart your shell or source your configuration file.
+Restart your shell or source your configuration file after installation.
 
 ### Manual Installation
-
-For manual control, generate and install completion scripts for your shell:
 
 ```bash wrap
 # Bash
@@ -638,11 +528,9 @@ gh aw completion fish > ~/.config/fish/completions/gh-aw.fish
 gh aw completion powershell | Out-String | Invoke-Expression
 ```
 
-Completes workflow names, engine names (copilot, claude, codex), and directory paths.
-
 ## Debug Logging
 
-Enable detailed debugging with namespace, message, and time diffs. Zero overhead when disabled.
+Enable detailed debugging with namespace, message, and time diffs.
 
 ```bash wrap
 DEBUG=* gh aw compile                # All logs
@@ -650,13 +538,13 @@ DEBUG=cli:* gh aw compile            # CLI only
 DEBUG=*,-tests gh aw compile         # All except tests
 ```
 
-Use `--verbose` flag for user-facing details instead of DEBUG.
+Use `--verbose` flag for user-facing details.
 
 ## Smart Features
 
 ### Fuzzy Workflow Name Matching
 
-Auto-suggests similar workflow names on typos using Levenshtein distance (up to 3 suggestions, edit distance ≤ 3).
+Auto-suggests similar workflow names on typos using Levenshtein distance.
 
 ```bash wrap
 gh aw compile audti-workflows
