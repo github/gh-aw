@@ -37,6 +37,78 @@ func mcpErrorData(v any) json.RawMessage {
 	return data
 }
 
+// actorPermissionCache stores cached actor permission lookups with TTL
+type actorPermissionCache struct {
+	permission string
+	timestamp  time.Time
+}
+
+var (
+	permissionCache    = make(map[string]*actorPermissionCache)
+	permissionCacheTTL = 1 * time.Hour
+)
+
+// queryActorRole queries the GitHub API to determine the actor's role in the repository.
+// Returns the permission level (admin, maintain, write, triage, read) or an error.
+// Results are cached for 1 hour to avoid excessive API calls.
+func queryActorRole(ctx context.Context, actor string, repo string) (string, error) {
+	if actor == "" {
+		return "", fmt.Errorf("actor not specified")
+	}
+	if repo == "" {
+		return "", fmt.Errorf("repository not specified")
+	}
+
+	// Check cache first
+	cacheKey := fmt.Sprintf("%s:%s", actor, repo)
+	if cached, ok := permissionCache[cacheKey]; ok {
+		if time.Since(cached.timestamp) < permissionCacheTTL {
+			mcpLog.Printf("Using cached permission for %s in %s: %s (age: %v)", actor, repo, cached.permission, time.Since(cached.timestamp))
+			return cached.permission, nil
+		}
+		// Cache expired, remove it
+		delete(permissionCache, cacheKey)
+		mcpLog.Printf("Permission cache expired for %s in %s", actor, repo)
+	}
+
+	// Query GitHub API for user's permission level
+	// GET /repos/{owner}/{repo}/collaborators/{username}/permission
+	apiPath := fmt.Sprintf("/repos/%s/collaborators/%s/permission", repo, actor)
+	mcpLog.Printf("Querying GitHub API for %s's permission in %s", actor, repo)
+
+	cmd := workflow.ExecGHContext(ctx, "api", apiPath, "--jq", ".permission")
+	output, err := cmd.Output()
+	if err != nil {
+		mcpLog.Printf("Failed to query actor permission: %v", err)
+		return "", fmt.Errorf("failed to query actor permission: %w", err)
+	}
+
+	permission := strings.TrimSpace(string(output))
+	if permission == "" {
+		return "", fmt.Errorf("no permission found for actor %s in repository %s", actor, repo)
+	}
+
+	// Cache the result
+	permissionCache[cacheKey] = &actorPermissionCache{
+		permission: permission,
+		timestamp:  time.Now(),
+	}
+	mcpLog.Printf("Cached permission for %s in %s: %s", actor, repo, permission)
+
+	return permission, nil
+}
+
+// hasWriteAccess checks if the given permission level is write or higher.
+// Permission levels from highest to lowest: admin, maintain, write, triage, read
+func hasWriteAccess(permission string) bool {
+	switch permission {
+	case "admin", "maintain", "write":
+		return true
+	default:
+		return false
+	}
+}
+
 // NewMCPServerCommand creates the mcp-server command
 func NewMCPServerCommand() *cobra.Command {
 	var port int
@@ -189,6 +261,7 @@ func runMCPServer(port int, cmdPath string, validateActor bool) error {
 
 // checkActorPermission validates if the actor has sufficient permissions for restricted tools.
 // Returns nil if access is allowed, or a jsonrpc.Error if access is denied.
+// Uses GitHub API to query the actor's actual repository role with 1-hour caching.
 func checkActorPermission(actor string, validateActor bool, toolName string) error {
 	// If validation is disabled, always allow access
 	if !validateActor {
@@ -210,11 +283,65 @@ func checkActorPermission(actor string, validateActor bool, toolName string) err
 		}
 	}
 
-	// Actor is specified - for now, always allow access
-	// In a future implementation, this would query the GitHub API to verify the actor's role:
-	// GET /repos/{owner}/{repo}/collaborators/{username}/permission
-	// and check if the permission level is "admin", "maintain", or "write"
-	mcpLog.Printf("Tool %s: access allowed for actor %s (validation enabled)", toolName, actor)
+	// Get repository from environment or git config
+	repo := os.Getenv("GITHUB_REPOSITORY")
+	if repo == "" {
+		// Try to get repository from gh CLI
+		cmd := workflow.ExecGH("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
+		output, err := cmd.Output()
+		if err != nil {
+			mcpLog.Printf("Tool %s: failed to get repository context, allowing access: %v", toolName, err)
+			// If we can't determine the repository, allow access (fail open)
+			return nil
+		}
+		repo = strings.TrimSpace(string(output))
+	}
+
+	if repo == "" {
+		mcpLog.Printf("Tool %s: no repository context, allowing access", toolName)
+		// No repository context, allow access
+		return nil
+	}
+
+	// Query actor's role in the repository with caching
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	permission, err := queryActorRole(ctx, actor, repo)
+	if err != nil {
+		mcpLog.Printf("Tool %s: failed to query actor role, denying access: %v", toolName, err)
+		return &jsonrpc.Error{
+			Code:    jsonrpc.CodeInternalError,
+			Message: "permission denied: unable to verify repository access",
+			Data: mcpErrorData(map[string]any{
+				"error":      err.Error(),
+				"tool":       toolName,
+				"actor":      actor,
+				"repository": repo,
+				"reason":     "Failed to query actor's repository permissions from GitHub API.",
+			}),
+		}
+	}
+
+	// Check if the actor has write+ access
+	if !hasWriteAccess(permission) {
+		mcpLog.Printf("Tool %s: access denied for actor %s (permission: %s, requires: write+)", toolName, actor, permission)
+		return &jsonrpc.Error{
+			Code:    jsonrpc.CodeInvalidRequest,
+			Message: "permission denied: insufficient role",
+			Data: mcpErrorData(map[string]any{
+				"error":      "insufficient repository permissions",
+				"tool":       toolName,
+				"actor":      actor,
+				"repository": repo,
+				"role":       permission,
+				"required":   "write, maintain, or admin",
+				"reason":     fmt.Sprintf("Actor %s has %s access to %s. This tool requires at least write access.", actor, permission, repo),
+			}),
+		}
+	}
+
+	mcpLog.Printf("Tool %s: access allowed for actor %s (permission: %s)", toolName, actor, permission)
 	return nil
 }
 
