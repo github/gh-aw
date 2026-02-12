@@ -60,9 +60,26 @@ jobs:
             const highRiskAccounts = new Map();
             const commentsByUser = new Map();
             const userCreatedDates = new Map();
+            const accountsSeen = new Set();
+            let userLookupFailures = 0;
+
+            async function ensureUserCreatedDate(login) {
+              if (!login) return;
+              accountsSeen.add(login);
+              if (userCreatedDates.has(login)) return;
+              try {
+                const { data: userInfo } = await github.rest.users.getByUsername({ username: login });
+                userCreatedDates.set(login, new Date(userInfo.created_at));
+              } catch (e) {
+                userLookupFailures += 1;
+                userCreatedDates.set(login, null);
+              }
+            }
 
             for (const pr of prs.slice(0, MAX_PR)) {
               if (new Date(pr.updated_at) < cutoff) continue;
+
+              await ensureUserCreatedDate(pr.user?.login);
 
               const issueComments = [];
               if (github.paginate?.iterator) {
@@ -109,14 +126,7 @@ jobs:
                 const login = comment.user?.login;
                 if (!login) continue;
 
-                if (!userCreatedDates.has(login)) {
-                  try {
-                    const { data: userInfo } = await github.rest.users.getByUsername({ username: login });
-                    userCreatedDates.set(login, new Date(userInfo.created_at));
-                  } catch (e) {
-                    userCreatedDates.set(login, null);
-                  }
-                }
+                await ensureUserCreatedDate(login);
 
                 if (!commentsByUser.has(login)) {
                   commentsByUser.set(login, []);
@@ -127,6 +137,24 @@ jobs:
                   timestamp: comment.created_at,
                 });
               }
+            }
+
+            // Also consider recent issue creators (not just PR comments).
+            // This helps catch new accounts that only opened issues/PRs (even if already closed).
+            try {
+              const { data: recentIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                since: cutoff.toISOString(),
+                per_page: 100,
+              });
+
+              for (const issue of recentIssues) {
+                await ensureUserCreatedDate(issue.user?.login);
+              }
+            } catch (e) {
+              // If issue listing fails, continue with PR/comment-based detection.
             }
 
             // Identify high-risk accounts
@@ -146,7 +174,14 @@ jobs:
             }
 
             if (highRiskAccounts.size === 0) {
-              appendSummary(`✅ Bot Detection: no new accounts (<${MIN_ACCOUNT_AGE_DAYS}d) found in last ${HOURS_BACK}h.`);
+              let msg = `✅ Bot Detection: no high-risk accounts (<${MIN_ACCOUNT_AGE_DAYS}d) detected in last ${HOURS_BACK}h.`;
+              if (accountsSeen.size > 0) {
+                msg += ` Checked ${accountsSeen.size} unique account(s).`;
+              }
+              if (userLookupFailures > 0) {
+                msg += ` ⚠️ ${userLookupFailures} account lookup(s) failed.`;
+              }
+              appendSummary(msg);
               return;
             }
 
