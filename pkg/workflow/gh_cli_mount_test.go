@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// TestChrootModeInAWFContainer tests that AWF uses --enable-chroot mode for transparent host access
+// TestChrootModeInAWFContainer tests that AWF uses chroot mode (default in v0.15.0+) for transparent host access
 func TestChrootModeInAWFContainer(t *testing.T) {
-	t.Run("chroot mode is enabled when firewall is enabled", func(t *testing.T) {
+	t.Run("chroot mode is enabled by default when firewall is enabled", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -31,9 +31,9 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that --enable-chroot is used instead of individual binary mounts
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected AWF command to contain '--enable-chroot' for transparent host access")
+		// Check that AWF is used (chroot mode is default in v0.15.0+)
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected AWF command for transparent host access")
 		}
 	})
 
@@ -63,11 +63,6 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 		if strings.Contains(stepContent, "awf") {
 			t.Error("Expected no AWF command when firewall is disabled")
 		}
-
-		// Check that --enable-chroot is not present
-		if strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected no --enable-chroot when firewall is disabled")
-		}
 	})
 
 	t.Run("chroot mode replaces individual binary mounts", func(t *testing.T) {
@@ -92,12 +87,12 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify --enable-chroot is present
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected --enable-chroot to be present")
+		// Verify AWF is present (chroot mode is default in v0.15.0+)
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected AWF to be present")
 		}
 
-		// Verify individual binary mounts are NOT present (replaced by chroot)
+		// Verify individual binary mounts are NOT present (replaced by default chroot mode)
 		individualMounts := []string{
 			"--mount /usr/bin/gh:/usr/bin/gh:ro",
 			"--mount /usr/bin/cat:/usr/bin/cat:ro",
@@ -108,7 +103,7 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 
 		for _, mount := range individualMounts {
 			if strings.Contains(stepContent, mount) {
-				t.Errorf("Individual mount '%s' should be replaced by --enable-chroot mode", mount)
+				t.Errorf("Individual mount '%s' should be replaced by default chroot mode", mount)
 			}
 		}
 	})
@@ -136,9 +131,9 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify both --enable-chroot and custom args are present
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected --enable-chroot to be present with custom firewall args")
+		// Verify AWF is present with custom args (chroot mode is default in v0.15.0+)
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected AWF to be present with custom firewall args")
 		}
 
 		if !strings.Contains(stepContent, "--custom-flag") {
@@ -174,12 +169,7 @@ func TestChrootModeInAWFContainer(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify --enable-chroot is present
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected --enable-chroot to be present when using AWF")
-		}
-
-		// Verify AWF is being used
+		// Verify AWF is being used (chroot mode is default in v0.15.0+)
 		if !strings.Contains(stepContent, "awf") {
 			t.Error("Expected AWF to be used when firewall is enabled")
 		}
@@ -210,9 +200,9 @@ func TestChrootModeEnvFlags(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Verify --enable-chroot is present (provides transparent host access)
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected --enable-chroot to be present")
+		// Verify AWF is present (chroot mode is default in v0.15.0+)
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected AWF to be present")
 		}
 
 		// Verify --env-all IS used (required for AWF to receive host environment variables)

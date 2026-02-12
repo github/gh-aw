@@ -89,7 +89,7 @@ network:
 
 #### Chroot Mode
 
-AWF v0.13.1+ uses **chroot mode** (`--enable-chroot`) to provide transparent host filesystem access while maintaining network isolation via iptables. This eliminates explicit volume mounts and environment variable configuration.
+AWF v0.15.0+ uses **chroot mode by default** to provide transparent host filesystem access while maintaining network isolation via iptables. This eliminates explicit volume mounts and environment variable configuration.
 
 ```text
 ┌─────────────────────────────────────────────┐

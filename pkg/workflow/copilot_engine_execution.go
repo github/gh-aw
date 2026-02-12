@@ -255,12 +255,10 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// Get allowed domains (copilot defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetCopilotAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
-		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
-		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
+		// Build AWF arguments: standard flags + custom args from config
+		// AWF v0.15.0+ uses chroot mode by default, providing transparent access to host binaries
+		// and environment while maintaining network isolation
 		var awfArgs []string
-		awfArgs = append(awfArgs, "--enable-chroot")
-		copilotExecLog.Print("Enabled chroot mode for transparent host access")
 
 		// Pass all environment variables to the container
 		awfArgs = append(awfArgs, "--env-all")
@@ -340,7 +338,7 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// AWF v0.2.0 uses -- to separate AWF args from the actual command
 		// The command arguments should be passed as individual shell arguments, not as a single string
 		//
-		// AWF with --enable-chroot and --env-all handles PATH natively:
+		// AWF v0.15.0+ with --env-all handles PATH natively (chroot mode is default):
 		// 1. Captures host PATH → AWF_HOST_PATH (already has correct ordering from actions/setup-*)
 		// 2. Passes ALL host env vars including JAVA_HOME, DOTNET_ROOT, GOROOT
 		// 3. entrypoint.sh exports PATH="${AWF_HOST_PATH}" and tool-specific vars

@@ -270,12 +270,10 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Get allowed domains (Claude defaults + network permissions + HTTP MCP server URLs + runtime ecosystem domains)
 		allowedDomains := GetClaudeAllowedDomainsWithToolsAndRuntimes(workflowData.NetworkPermissions, workflowData.Tools, workflowData.Runtimes)
 
-		// Build AWF arguments: enable-chroot mode + standard flags + custom args from config
-		// AWF v0.13.1+ chroot mode provides transparent access to host binaries and environment
-		// while maintaining network isolation, eliminating the need for explicit mounts and env flags
+		// Build AWF arguments: standard flags + custom args from config
+		// AWF v0.15.0+ uses chroot mode by default, providing transparent access to host binaries
+		// and environment while maintaining network isolation
 		var awfArgs []string
-		awfArgs = append(awfArgs, "--enable-chroot")
-		claudeLog.Print("Enabled chroot mode for transparent host access")
 
 		// TTY is required for Claude Code CLI
 		awfArgs = append(awfArgs, "--tty")

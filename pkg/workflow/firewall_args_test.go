@@ -33,9 +33,9 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that the command contains --enable-chroot for AWF v0.13.1+ chroot mode
-		if !strings.Contains(stepContent, "awf --enable-chroot") {
-			t.Error("Expected command to contain 'awf --enable-chroot'")
+		// Check that the command contains awf (AWF v0.15.0+ uses chroot mode by default)
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected command to contain 'sudo -E awf'")
 		}
 
 		if !strings.Contains(stepContent, "--allow-domains") {
@@ -150,15 +150,15 @@ func TestFirewallArgsInCopilotEngine(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		// Check that --enable-chroot is used for transparent host access (AWF v0.13.1+)
-		// This replaces the need for explicit binary mounts like --mount /usr/bin/gh:/usr/bin/gh:ro
-		if !strings.Contains(stepContent, "--enable-chroot") {
-			t.Error("Expected AWF command to contain '--enable-chroot' for transparent host access")
+		// Check that AWF is used for transparent host access (AWF v0.15.0+)
+		// Chroot mode is now the default, so no --enable-chroot flag is needed
+		if !strings.Contains(stepContent, "sudo -E awf") {
+			t.Error("Expected AWF command for transparent host access")
 		}
 
-		// Verify that individual binary mounts are no longer used (replaced by chroot)
+		// Verify that individual binary mounts are not used (chroot mode is default)
 		if strings.Contains(stepContent, "--mount /usr/bin/gh:/usr/bin/gh:ro") {
-			t.Error("Individual binary mounts should be replaced by --enable-chroot mode")
+			t.Error("Individual binary mounts should not be present with default chroot mode")
 		}
 	})
 
