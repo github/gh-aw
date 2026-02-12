@@ -100,12 +100,16 @@ func (c *Compiler) setupEngineAndImports(result *parser.FrontmatterResult, clean
 		return nil, err // Error is already formatted with source location
 	}
 
-	// Security scan imported files' markdown content
+	// Security scan imported markdown files' content (skip non-markdown imports like .yml)
 	for _, importedFile := range importsResult.ImportedFiles {
 		// Strip section references (e.g., "shared/foo.md#Section")
 		importFilePath := importedFile
 		if idx := strings.Index(importFilePath, "#"); idx >= 0 {
 			importFilePath = importFilePath[:idx]
+		}
+		// Only scan markdown files — .yml imports are YAML config, not markdown content
+		if !strings.HasSuffix(importFilePath, ".md") {
+			continue
 		}
 		// Resolve the import path to a full filesystem path
 		fullPath, resolveErr := parser.ResolveIncludePath(importFilePath, markdownDir, importCache)
