@@ -472,9 +472,9 @@ func TestContainsLogicalOperators(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "has != comparison (should not trigger)",
+			name:     "has != comparison (triggers due to ! character)",
 			expr:     "github.workflow != 'test'",
-			expected: true, // Contains ! so it returns true (acceptable as parser handles it)
+			expected: true, // The function detects '!' even when part of '!='; parser will handle correctly
 		},
 	}
 

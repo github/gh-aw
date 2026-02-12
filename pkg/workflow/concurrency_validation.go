@@ -314,10 +314,10 @@ func extractGroupExpression(concurrency any) string {
 //
 // Returns the group value string or empty string if not found.
 //
-// Note: This function uses a simple regex pattern that matches values up to the first newline
-// or quote character. Group values containing embedded quotes or newlines may not be fully
-// captured, but such cases are rare in concurrency group expressions and will be caught by
-// the expression validation if they cause syntax errors.
+// Note: This function uses a regex pattern that stops at the first quote or newline character.
+// Group values containing embedded quotes or newlines will be truncated at that point. However,
+// such values are rare in concurrency group expressions, and any resulting syntax errors will be
+// caught by the subsequent expression validation.
 func extractConcurrencyGroupFromYAML(concurrencyYAML string) string {
 	// First, check if it's object format with explicit "group:" field
 	// Pattern: group: "value" or group: 'value' or group: value (at start of line or after spaces)
