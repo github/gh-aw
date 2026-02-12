@@ -131,6 +131,61 @@ describe("sanitize_content.cjs", () => {
     });
   });
 
+  describe("@mention bypass prevention (underscore-prefixed)", () => {
+    // Security tests for CVE-like vulnerability where underscore before @ could bypass sanitization
+    // These test cases are from the security report documenting the bypass patterns
+
+    it("should neutralize @mentions preceded by underscore in function names", () => {
+      const result = sanitizeContent("test_@user");
+      expect(result).toBe("test_`@user`");
+    });
+
+    it("should neutralize @mentions preceded by underscore in variable names", () => {
+      const result = sanitizeContent("production_@maintainer");
+      expect(result).toBe("production_`@maintainer`");
+    });
+
+    it("should neutralize @mentions preceded by underscore with hyphens", () => {
+      const result = sanitizeContent("validate_@security-team");
+      expect(result).toBe("validate_`@security-team`");
+    });
+
+    it("should neutralize @mentions preceded by underscore in commands", () => {
+      const result = sanitizeContent("run_@admin");
+      expect(result).toBe("run_`@admin`");
+    });
+
+    it("should neutralize @mentions preceded by multiple underscores", () => {
+      const result = sanitizeContent("My_Project_@owner");
+      expect(result).toBe("My_Project_`@owner`");
+    });
+
+    it("should neutralize @mentions with just underscore prefix", () => {
+      const result = sanitizeContent("_@user");
+      expect(result).toBe("_`@user`");
+    });
+
+    it("should neutralize @mentions preceded by underscore with possessive", () => {
+      const result = sanitizeContent("is_@user's project");
+      expect(result).toBe("is_`@user`'s project");
+    });
+
+    it("should neutralize multiple underscore-prefixed @mentions", () => {
+      const result = sanitizeContent("config_@admin and deploy_@maintainer");
+      expect(result).toBe("config_`@admin` and deploy_`@maintainer`");
+    });
+
+    it("should neutralize underscore-prefixed org/team mentions", () => {
+      const result = sanitizeContent("api_@org/team");
+      expect(result).toBe("api_`@org/team`");
+    });
+
+    it("should handle mixed normal and underscore-prefixed mentions", () => {
+      const result = sanitizeContent("Hello @user and test_@admin");
+      expect(result).toBe("Hello `@user` and test_`@admin`");
+    });
+  });
+
   describe("@mention allowedAliases", () => {
     it("should not neutralize mentions in allowedAliases list", () => {
       const result = sanitizeContent("Hello @author", { allowedAliases: ["author"] });
