@@ -32,8 +32,9 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           python << 'EOF'
-          import os, requests, datetime, itertools, math
+          import os, requests, datetime, itertools, math, threading
           from collections import defaultdict
+          from concurrent.futures import ThreadPoolExecutor, as_completed
 
           TOKEN = os.environ["GH_TOKEN"]
           REPO = os.environ["REPO"]
@@ -44,6 +45,7 @@ jobs:
           MIN_MESSAGES = 25
           EPS = 0.22
           BOT_CLUSTER_THRESHOLD = 10
+          MAX_WORKERS = 10  # Parallel API requests
 
           cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=DAYS_BACK)
 
@@ -52,63 +54,106 @@ jobs:
               r.raise_for_status()
               return r.json()
 
+          def gh_paginated(url, key=None):
+              """Fetch all paginated results from GitHub API"""
+              results = []
+              page = 1
+              while True:
+                  paginated_url = f"{url}&page={page}&per_page=100" if "?" in url else f"{url}?page={page}&per_page=100"
+                  data = gh(paginated_url)
+                  if not data:
+                      break
+                  results.extend(data)
+                  if len(data) < 100:
+                      break
+                  page += 1
+              return results
+
           # -----------------------------
           # Fetch PRs
           # -----------------------------
-          # Fetch PRs and user account ages
-          prs = gh(f"https://api.github.com/repos/{REPO}/pulls?state=all&per_page=100")
+          prs = gh(f"https://api.github.com/repos/{REPO}/pulls?state=all&per_page=100&sort=updated&direction=desc")
           user_created_dates = {}  # Cache user account creation dates
+          user_cache_lock = threading.Lock()
 
           comments_by_author = defaultdict(list)
           comment_details = defaultdict(list)  # Track PR/issue links and timestamps
           new_accounts = []  # Track accounts created recently (< 7 days)
 
-          for pr in prs[:MAX_PR]:
-              if datetime.datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ") < cutoff:
+          def fetch_pr_comments(pr):
+              """Fetch comments for a single PR"""
+              try:
+                  if datetime.datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ") < cutoff:
+                      return []
+                  
+                  number = pr["number"]
+                  issue_comments = gh_paginated(f"https://api.github.com/repos/{REPO}/issues/{number}/comments")
+                  review_comments = gh_paginated(f"https://api.github.com/repos/{REPO}/pulls/{number}/comments")
+                  return [(number, c) for c in (issue_comments + review_comments)]
+              except:
+                  return []
+
+          # Fetch all comments in parallel
+          all_pr_comments = []
+          with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+              futures = [executor.submit(fetch_pr_comments, pr) for pr in prs[:MAX_PR]]
+              for future in as_completed(futures):
+                  all_pr_comments.extend(future.result())
+
+          # Collect unique users that need account age lookup
+          users_to_fetch = set()
+          for number, c in all_pr_comments:
+              created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+              if created < cutoff:
                   continue
+              user = c.get("user", {})
+              login = user.get("login")
+              if login:
+                  users_to_fetch.add(login)
 
-              number = pr["number"]
+          # Fetch all user account creation dates in parallel
+          def fetch_user_info(login):
+              try:
+                  user_info = gh(f"https://api.github.com/users/{login}")
+                  if user_info:
+                      created_at = datetime.datetime.strptime(
+                          user_info.get("created_at", ""), "%Y-%m-%dT%H:%M:%SZ"
+                      )
+                      return (login, created_at)
+              except:
+                  pass
+              return (login, None)
 
-              issue_comments = gh(f"https://api.github.com/repos/{REPO}/issues/{number}/comments")
-              review_comments = gh(f"https://api.github.com/repos/{REPO}/pulls/{number}/comments")
+          with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+              futures = [executor.submit(fetch_user_info, login) for login in users_to_fetch]
+              for future in as_completed(futures):
+                  login, created_at = future.result()
+                  user_created_dates[login] = created_at
 
-              for c in issue_comments + review_comments:
-                  created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
-                  if created < cutoff:
-                      continue
-                  user = c.get("user", {})
-                  login = user.get("login")
-                  if not login:
-                      continue
-                  
-                  # Fetch user account age if not cached
-                  if login not in user_created_dates:
-                      try:
-                          user_info = gh(f"https://api.github.com/users/{login}")
-                          if user_info:
-                              created_at = datetime.datetime.strptime(
-                                  user_info.get("created_at", ""), "%Y-%m-%dT%H:%M:%SZ"
-                              )
-                              user_created_dates[login] = created_at
-                          else:
-                              user_created_dates[login] = None
-                      except:
-                          user_created_dates[login] = None
-                  
-                  # Check if account is suspiciously new (< 7 days old)
-                  account_created = user_created_dates.get(login)
-                  if account_created and (cutoff - account_created).days < 7:
-                      new_accounts.append((login, (cutoff - account_created).days))
-                  
-                  comments_by_author[login].append(c["body"])
-                  
-                  # Track comment details: PR#, URL, and timestamp
-                  comment_url = c.get("html_url", f"https://github.com/{REPO}/pull/{number}#comment")
-                  comment_details[login].append({
-                      "pr": number,
-                      "url": comment_url,
-                      "timestamp": c["created_at"]
-                  })
+          # Process comments
+          for number, c in all_pr_comments:
+              created = datetime.datetime.strptime(c["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+              if created < cutoff:
+                  continue
+              user = c.get("user", {})
+              login = user.get("login")
+              if not login:
+                  continue
+              
+              # Check if account is suspiciously new (< 7 days old)
+              account_created = user_created_dates.get(login)
+              if account_created and (cutoff - account_created).days < 7:
+                  new_accounts.append((login, (cutoff - account_created).days))
+              
+              comments_by_author[login].append(c["body"])
+              
+              # Track comment details: PR#, URL, and timestamp
+              comment_url = c.get("html_url", f"https://github.com/{REPO}/pull/{number}#comment")
+              comment_details[login].append({
+                  "pr": number,
+                  "url": comment_url,
+                  "timestamp": c["created_at"]
+              })
 
           # -----------------------------
           # Distance metrics
@@ -168,16 +213,15 @@ jobs:
 
               return labels
 
-          # -----------------------------
-          # Analyze authors
-          # -----------------------------
+          # Analyze authors (limit sample size for performance)
           results = []
           suspicious_unknowns = []  # Track accounts that warrant investigation
+          MAX_MESSAGES_TO_ANALYZE = 100  # Cap on messages to analyze per author
 
           for author, messages in comments_by_author.items():
               # Check for new bots: few messages that are all very similar
               if 3 <= len(messages) < MIN_MESSAGES:
-                  norm = [m.lower().strip() for m in messages]
+                  norm = [m.lower().strip() for m in messages[:MAX_MESSAGES_TO_ANALYZE]]
                   
                   # Quick check: all identical
                   if len(set(norm)) == 1:
@@ -187,9 +231,13 @@ jobs:
                   # Check if messages are very similar (likely AI bot)
                   n = len(norm)
                   if n >= 2:
+                      # Fast similarity check: sample pairs if too many
                       similarity_sum = 0
                       pair_count = 0
-                      for i, j in itertools.combinations(range(n), 2):
+                      pairs = list(itertools.combinations(range(n), 2))
+                      sample_pairs = pairs if len(pairs) <= 20 else pairs[::len(pairs)//20]
+                      
+                      for i, j in sample_pairs:
                           L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]), 1)
                           J = jaccard(norm[i], norm[j])
                           D = (L + J) / 2
@@ -209,17 +257,37 @@ jobs:
               if len(messages) < MIN_MESSAGES:
                   continue
 
-              norm = [m.lower().strip() for m in messages]
+              # Limit messages analyzed for large authors
+              norm = [m.lower().strip() for m in messages[:MAX_MESSAGES_TO_ANALYZE]]
 
               n = len(norm)
               dist_matrix = [[0]*n for _ in range(n)]
 
-              for i, j in itertools.combinations(range(n), 2):
-                  L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
-                  J = jaccard(norm[i], norm[j])
-                  D = (L + J) / 2
-                  dist_matrix[i][j] = D
-                  dist_matrix[j][i] = D
+              # Only compute distance matrix for reasonable numbers of messages
+              if n > 50:
+                  # For authors with many messages, sample pairs
+                  pair_count = 0
+                  max_pairs = 500  # Limit pairwise comparisons
+                  for i in range(n):
+                      for j in range(i+1, min(n, i+10)):  # Compare with nearby messages
+                          L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
+                          J = jaccard(norm[i], norm[j])
+                          D = (L + J) / 2
+                          dist_matrix[i][j] = D
+                          dist_matrix[j][i] = D
+                          pair_count += 1
+                          if pair_count >= max_pairs:
+                              break
+                      if pair_count >= max_pairs:
+                          break
+              else:
+                  # Full matrix for small message counts
+                  for i, j in itertools.combinations(range(n), 2):
+                      L = levenshtein(norm[i], norm[j]) / max(len(norm[i]), len(norm[j]))
+                      J = jaccard(norm[i], norm[j])
+                      D = (L + J) / 2
+                      dist_matrix[i][j] = D
+                      dist_matrix[j][i] = D
 
               labels = dbscan(dist_matrix, EPS)
               clusters = len(set(labels))
