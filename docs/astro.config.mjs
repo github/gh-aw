@@ -211,6 +211,7 @@ export default defineConfig({
 						{ label: 'MCP Gateway', link: '/reference/mcp-gateway/' },
 						{ label: 'Network Access', link: '/reference/network/' },
 						{ label: 'Permissions', link: '/reference/permissions/' },
+						{ label: 'Rate Limiting Controls', link: '/reference/rate-limiting-controls/' },
 						{ label: 'Safe Inputs', link: '/reference/safe-inputs/' },
 						{ label: 'Safe Outputs', link: '/reference/safe-outputs/' },
 						{ label: 'Schedule Syntax', link: '/reference/schedule-syntax/' },
