@@ -2191,6 +2191,9 @@ safe-outputs:
     # available category. Matched first against category IDs, then against category
     # names, then against category slugs. Numeric values are automatically converted
     # to strings at runtime.
+    # 
+    # Best Practice: Use announcement-capable categories (such as "announcements")
+    # for AI-generated content to ensure proper visibility and notification features.
     # (optional)
     category: null
 
