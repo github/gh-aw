@@ -26,6 +26,7 @@ permissions:
   pull-requests: read
 timeout_minutes: 10
 engine: copilot
+strict: false
 network:
   allowed:
     - "api.example.com"
@@ -45,6 +46,7 @@ permissions:
   pull-requests: read
 timeout-minutes: 10
 engine: copilot
+strict: false
 network:
   allowed:
     - "api.example.com"
@@ -114,6 +116,7 @@ permissions:
   pull-requests: read
 timeout_minutes: 10
 engine: copilot
+strict: false
 network:
   allowed:
     - "api.example.com"
