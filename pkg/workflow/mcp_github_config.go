@@ -313,7 +313,7 @@ func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder,
 // - GitHub tool is enabled AND
 // - lockdown field is explicitly set to true
 //
-// The validation ensures that GH_AW_GITHUB_TOKEN is configured when lockdown mode is explicitly enabled.
+// The validation ensures that GH_AW_GITHUB_TOKEN or a similar token is configured when lockdown mode is explicitly enabled.
 // If the token is missing, the workflow fails with a clear error message.
 func (c *Compiler) generateGitHubMCPLockdownValidationStep(yaml *strings.Builder, data *WorkflowData) {
 	// Check if GitHub tool is present

@@ -74,7 +74,7 @@ gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_FINE_GRAINED_PAT"
 
 - `GH_AW_GITHUB_TOKEN` must be configured as a repository secret
 - The token requires appropriate permissions (Contents: Read, Issues: Read, Pull requests: Read)
-- Without `GH_AW_GITHUB_TOKEN`, workflows with `lockdown: true` will fail at runtime
+- Without `GH_AW_GITHUB_TOKEN` or a similar token, workflows with `lockdown: true` will fail at runtime
 
 ### Disabling Lockdown Mode
 
