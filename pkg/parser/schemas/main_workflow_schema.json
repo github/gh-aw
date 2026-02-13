@@ -4894,6 +4894,11 @@
                   "type": "boolean",
                   "description": "Controls whether AI-generated footer is added to the pull request. When false, the visible footer content is omitted but XML markers (workflow-id, tracker-id, metadata) are still included for searchability. Defaults to true.",
                   "default": true
+                },
+                "fallback-as-issue": {
+                  "type": "boolean",
+                  "description": "Controls the fallback behavior when pull request creation fails. When true (default), an issue is created as a fallback with the patch content. When false, no issue is created and the workflow fails with an error. Setting to false also removes the issues:write permission requirement.",
+                  "default": true
                 }
               },
               "additionalProperties": false,

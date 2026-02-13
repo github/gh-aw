@@ -199,7 +199,16 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 			permissions.Merge(NewPermissionsContentsReadPRWrite())
 		}
 		if data.SafeOutputs.CreatePullRequests != nil {
-			permissions.Merge(NewPermissionsContentsWriteIssuesWritePRWrite())
+			// Check fallback-as-issue setting to determine permissions
+			fallbackAsIssue := true // Default
+			if data.SafeOutputs.CreatePullRequests.FallbackAsIssue != nil {
+				fallbackAsIssue = *data.SafeOutputs.CreatePullRequests.FallbackAsIssue
+			}
+			if fallbackAsIssue {
+				permissions.Merge(NewPermissionsContentsWriteIssuesWritePRWrite())
+			} else {
+				permissions.Merge(NewPermissionsContentsWritePRWrite())
+			}
 		}
 		if data.SafeOutputs.PushToPullRequestBranch != nil {
 			permissions.Merge(NewPermissionsContentsWriteIssuesWritePRWrite())

@@ -326,7 +326,8 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddDefault("max_patch_size", maxPatchSize).
-			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer))
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
+			AddBoolPtr("fallback_as_issue", c.FallbackAsIssue)
 		// Add base_branch - use custom value if specified, otherwise use github.ref_name
 		if c.BaseBranch != "" {
 			builder.AddDefault("base_branch", c.BaseBranch)

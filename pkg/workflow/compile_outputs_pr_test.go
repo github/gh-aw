@@ -606,3 +606,198 @@ This test verifies that auto-merge configuration is properly handled.
 		t.Error("Expected auto_merge:true in handler config JSON")
 	}
 }
+
+func TestOutputPullRequestFallbackAsIssueFalse(t *testing.T) {
+// Create temporary directory for test files
+tmpDir := testutil.TempDir(t, "output-pr-fallback-false-test")
+
+// Test case with create-pull-request configuration with fallback-as-issue: false
+testContent := `---
+on: push
+permissions:
+  contents: read
+  pull-requests: write
+engine: claude
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  create-pull-request:
+    title-prefix: "[test] "
+    fallback-as-issue: false
+---
+
+# Test Output Pull Request Fallback False
+
+This workflow tests the create-pull-request with fallback-as-issue disabled.
+`
+
+testFile := filepath.Join(tmpDir, "test-output-pr-fallback-false.md")
+if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+t.Fatal(err)
+}
+
+compiler := NewCompiler()
+
+// Parse the workflow data
+workflowData, err := compiler.ParseWorkflowFile(testFile)
+if err != nil {
+t.Fatalf("Unexpected error parsing workflow with fallback-as-issue: false: %v", err)
+}
+
+// Verify that fallback-as-issue is parsed correctly
+if workflowData.SafeOutputs == nil {
+t.Fatal("Expected output configuration to be parsed")
+}
+
+if workflowData.SafeOutputs.CreatePullRequests == nil {
+t.Fatal("Expected pull-request configuration to be parsed")
+}
+
+if workflowData.SafeOutputs.CreatePullRequests.FallbackAsIssue == nil {
+t.Fatal("Expected fallback-as-issue to be set")
+}
+
+if *workflowData.SafeOutputs.CreatePullRequests.FallbackAsIssue != false {
+t.Error("Expected fallback-as-issue to be false")
+}
+
+// Compile the workflow
+if err := compiler.CompileWorkflow(testFile); err != nil {
+t.Fatalf("Unexpected error compiling workflow with fallback-as-issue: false: %v", err)
+}
+
+// Read the generated lock file
+lockFile := stringutil.MarkdownToLockFile(testFile)
+lockContent, err := os.ReadFile(lockFile)
+if err != nil {
+t.Fatalf("Failed to read generated lock file: %v", err)
+}
+
+// Convert to string for easier testing
+lockContentStr := string(lockContent)
+
+	// Find the safe_outputs job section in the lock file
+	safeOutputsJobStart := strings.Index(lockContentStr, "safe_outputs:")
+	if safeOutputsJobStart == -1 {
+		t.Fatal("Could not find safe_outputs job in lock file")
+	}
+
+	// Find the next job after safe_outputs (to limit our search scope)
+	// Extract a large section after safe_outputs job (next 2000 chars should include all job details)
+	endIdx := safeOutputsJobStart + 2000
+	if endIdx > len(lockContentStr) {
+		endIdx = len(lockContentStr)
+	}
+	safeOutputsJobSection := lockContentStr[safeOutputsJobStart:endIdx]
+
+	// Verify permissions in safe_outputs job
+	if !strings.Contains(safeOutputsJobSection, "contents: write") {
+		t.Error("Expected contents: write permission in safe_outputs job")
+	}
+
+	if !strings.Contains(safeOutputsJobSection, "pull-requests: write") {
+		t.Error("Expected pull-requests: write permission in safe_outputs job")
+	}
+
+	if strings.Contains(safeOutputsJobSection, "issues: write") {
+		t.Error("Did not expect issues: write permission in safe_outputs job when fallback-as-issue: false")
+	}
+
+// Verify handler config includes fallback_as_issue: false
+if !strings.Contains(lockContentStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG") {
+t.Error("Expected GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG environment variable")
+}
+
+if !strings.Contains(lockContentStr, `fallback_as_issue\":false`) {
+t.Error("Expected fallback_as_issue:false in handler config JSON")
+}
+}
+
+func TestOutputPullRequestFallbackAsIssueDefault(t *testing.T) {
+// Create temporary directory for test files
+tmpDir := testutil.TempDir(t, "output-pr-fallback-default-test")
+
+// Test case with create-pull-request configuration without fallback-as-issue (should default to true)
+testContent := `---
+on: push
+permissions:
+  contents: read
+  pull-requests: write
+engine: claude
+features:
+  dangerous-permissions-write: true
+strict: false
+safe-outputs:
+  create-pull-request:
+    title-prefix: "[test] "
+---
+
+# Test Output Pull Request Fallback Default
+
+This workflow tests the create-pull-request with default fallback-as-issue behavior.
+`
+
+testFile := filepath.Join(tmpDir, "test-output-pr-fallback-default.md")
+if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+t.Fatal(err)
+}
+
+compiler := NewCompiler()
+
+// Parse the workflow data
+workflowData, err := compiler.ParseWorkflowFile(testFile)
+if err != nil {
+t.Fatalf("Unexpected error parsing workflow: %v", err)
+}
+
+// Verify that fallback-as-issue defaults to true (nil means default)
+if workflowData.SafeOutputs == nil {
+t.Fatal("Expected output configuration to be parsed")
+}
+
+if workflowData.SafeOutputs.CreatePullRequests == nil {
+t.Fatal("Expected pull-request configuration to be parsed")
+}
+
+// When not specified, FallbackAsIssue should be nil (which means default to true)
+if workflowData.SafeOutputs.CreatePullRequests.FallbackAsIssue != nil {
+t.Logf("FallbackAsIssue is set to %v, expected nil for default", *workflowData.SafeOutputs.CreatePullRequests.FallbackAsIssue)
+}
+
+// Compile the workflow
+if err := compiler.CompileWorkflow(testFile); err != nil {
+t.Fatalf("Unexpected error compiling workflow: %v", err)
+}
+
+// Read the generated lock file
+lockFile := stringutil.MarkdownToLockFile(testFile)
+lockContent, err := os.ReadFile(lockFile)
+if err != nil {
+t.Fatalf("Failed to read generated lock file: %v", err)
+}
+
+// Convert to string for easier testing
+lockContentStr := string(lockContent)
+
+// Verify permissions include issues: write (default behavior)
+if !strings.Contains(lockContentStr, "contents: write") {
+t.Error("Expected contents: write permission in create_pull_request job")
+}
+
+if !strings.Contains(lockContentStr, "pull-requests: write") {
+t.Error("Expected pull-requests: write permission in create_pull_request job")
+}
+
+// Verify handler config defaults fallback_as_issue to true (or omitted means default true)
+if !strings.Contains(lockContentStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG") {
+t.Error("Expected GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG environment variable")
+}
+
+// When not explicitly set, fallback_as_issue is omitted from JSON (defaults to true in handler)
+// So we just verify it is NOT explicitly set to false
+if strings.Contains(lockContentStr, `fallback_as_issue\":false`) {
+t.Error("Did not expect fallback_as_issue:false in handler config JSON when using default")
+}
+}
+
