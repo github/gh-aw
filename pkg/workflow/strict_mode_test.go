@@ -855,9 +855,6 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow with github.workflow
@@ -875,9 +872,6 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Complex Expression Test
@@ -894,9 +888,6 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Multiple Expressions
