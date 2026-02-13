@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 8bf554cdaf8e2ce9de7c062acdcd08272c44fd8bcb1427409c3533e4c129e01f
+# frontmatter-hash: ec2fdba48bda53ab4274111925b73d41a1771dcc8f4cb613eef6ae68a222b1af
 
 name: "Bot Detection"
 "on":
@@ -1181,16 +1181,21 @@ jobs:
             await loadMemberAccounts();
             await loadOrgMembers();
 
-            // Search issues + PRs updated in window
-            const q = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
-            const search = await github.rest.search.issuesAndPullRequests({
-              q,
-              per_page: 100,
-              sort: "updated",
-              order: "desc",
-            });
+            // Search issues + PRs updated in window (API requires is:issue or is:pull-request)
+            const qBase = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
+            const rawItems = [];
+            for (const scope of ["is:issue", "is:pull-request"]) {
+              const search = await github.rest.search.issuesAndPullRequests({
+                q: `${qBase} ${scope}`,
+                per_page: 100,
+                sort: "updated",
+                order: "desc",
+              });
+              rawItems.push(...(search.data.items || []));
+            }
 
-            const items = (search.data.items || [])
+            const seen = new Set();
+            const items = rawItems
               .filter(i => new Date(i.updated_at) >= start && new Date(i.updated_at) <= end)
               .map(i => ({
                 number: i.number,
@@ -1201,7 +1206,12 @@ jobs:
                 updated_at: i.updated_at,
                 is_pr: Boolean(i.pull_request),
                 author: i.user?.login || "",
-              }));
+              }))
+              .filter(i => {
+                if (seen.has(i.url)) return false;
+                seen.add(i.url);
+                return true;
+              });
 
             // Deterministic ordering for any downstream processing
             items.sort((a, b) => {

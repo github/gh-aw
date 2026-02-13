@@ -208,16 +208,21 @@ jobs:
             await loadMemberAccounts();
             await loadOrgMembers();
 
-            // Search issues + PRs updated in window
-            const q = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
-            const search = await github.rest.search.issuesAndPullRequests({
-              q,
-              per_page: 100,
-              sort: "updated",
-              order: "desc",
-            });
+            // Search issues + PRs updated in window (API requires is:issue or is:pull-request)
+            const qBase = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
+            const rawItems = [];
+            for (const scope of ["is:issue", "is:pull-request"]) {
+              const search = await github.rest.search.issuesAndPullRequests({
+                q: `${qBase} ${scope}`,
+                per_page: 100,
+                sort: "updated",
+                order: "desc",
+              });
+              rawItems.push(...(search.data.items || []));
+            }
 
-            const items = (search.data.items || [])
+            const seen = new Set();
+            const items = rawItems
               .filter(i => new Date(i.updated_at) >= start && new Date(i.updated_at) <= end)
               .map(i => ({
                 number: i.number,
@@ -228,7 +233,12 @@ jobs:
                 updated_at: i.updated_at,
                 is_pr: Boolean(i.pull_request),
                 author: i.user?.login || "",
-              }));
+              }))
+              .filter(i => {
+                if (seen.has(i.url)) return false;
+                seen.add(i.url);
+                return true;
+              });
 
             // Deterministic ordering for any downstream processing
             items.sort((a, b) => {
