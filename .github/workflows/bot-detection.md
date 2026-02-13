@@ -40,6 +40,43 @@ jobs:
             const MIN_ACCOUNT_AGE_DAYS = 14;
             const MAX_PR = 50;
             const MAX_COMMENT_EXAMPLES = 10;
+            const ALLOWED_DOMAINS = new Set([
+              // GitHub docs + blog
+              "docs.github.com",
+              "github.blog",
+              // Marketplace + package registries
+              "marketplace.visualstudio.com",
+              "npmjs.com",
+              "pkg.go.dev",
+              // Language vendor sites
+              "golang.org",
+              "go.dev",
+              "nodejs.org",
+            ]);
+            const ALLOWED_ACCOUNTS = new Set([
+              // Bots and service accounts
+              "github-actions[bot]",
+              "dependabot[bot]",
+              "renovate[bot]",
+              "copilot",
+              "copilot-swe-agent",
+            ]);
+            const TRUSTED_ORGS = [
+              // Orgs whose members should be allowlisted
+              "github",
+            ];
+            const MEMBER_ACCOUNTS = new Set();
+
+            function parseJsonList(envName) {
+              try {
+                const raw = process.env[envName];
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            }
 
             function toISO(d) {
               return new Date(d).toISOString();
@@ -77,7 +114,47 @@ jobs:
                 "avatars.githubusercontent.com",
                 "api.github.com",
               ]);
-              return host && !allowed.has(host);
+              return host && !allowed.has(host) && !ALLOWED_DOMAINS.has(host);
+            }
+
+            function isAllowedAccount(login) {
+              const normalized = String(login || "").toLowerCase();
+              return ALLOWED_ACCOUNTS.has(normalized) || MEMBER_ACCOUNTS.has(normalized);
+            }
+
+            async function loadMemberAccounts() {
+              try {
+                const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
+                  owner,
+                  repo,
+                  per_page: 100,
+                });
+                for (const collaborator of collaborators) {
+                  if (collaborator?.login) {
+                    MEMBER_ACCOUNTS.add(String(collaborator.login).toLowerCase());
+                  }
+                }
+              } catch {
+                // If collaborator lookup fails, continue without member allowlist.
+              }
+            }
+
+            async function loadOrgMembers() {
+              for (const org of TRUSTED_ORGS) {
+                try {
+                  const members = await github.paginate(github.rest.orgs.listMembers, {
+                    org,
+                    per_page: 100,
+                  });
+                  for (const member of members) {
+                    if (member?.login) {
+                      MEMBER_ACCOUNTS.add(String(member.login).toLowerCase());
+                    }
+                  }
+                } catch {
+                  // If org member lookup fails, continue without org allowlist.
+                }
+              }
             }
 
             function isShortener(host) {
@@ -116,6 +193,19 @@ jobs:
 
             const end = await getRunCreatedAt();
             const start = new Date(end.getTime() - HOURS_BACK * 60 * 60 * 1000);
+
+            for (const domain of parseJsonList("BOT_DETECTION_ALLOWED_DOMAINS")) {
+              if (domain) ALLOWED_DOMAINS.add(String(domain).toLowerCase());
+            }
+            for (const account of parseJsonList("BOT_DETECTION_ALLOWED_ACCOUNTS")) {
+              if (account) ALLOWED_ACCOUNTS.add(String(account).toLowerCase());
+            }
+            for (const org of parseJsonList("BOT_DETECTION_TRUSTED_ORGS")) {
+              if (org) TRUSTED_ORGS.push(String(org));
+            }
+
+            await loadMemberAccounts();
+            await loadOrgMembers();
 
             // Search issues + PRs updated in window
             const q = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
@@ -187,6 +277,7 @@ jobs:
             for (const it of items) {
               const login = it.author;
               if (!login) continue;
+              if (isAllowedAccount(login)) continue;
               const s = ensureAuthor(login);
               await ensureUserCreatedAt(login);
               s.itemCount += 1;
@@ -227,6 +318,7 @@ jobs:
             for (const it of prItems) {
               const login = it.author;
               if (login) {
+                if (isAllowedAccount(login)) continue;
                 await ensureUserCreatedAt(login);
               }
 
@@ -328,6 +420,7 @@ jobs:
               for (const c of commentCandidates) {
                 const commenter = c.user?.login || "";
                 if (!commenter) continue;
+                if (isAllowedAccount(commenter)) continue;
                 await ensureUserCreatedAt(commenter);
                 const s = ensureAuthor(commenter);
                 s.commentCount += 1;
@@ -349,6 +442,7 @@ jobs:
               for (const r of reviewCandidates) {
                 const reviewer = r.user?.login || "";
                 if (!reviewer) continue;
+                if (isAllowedAccount(reviewer)) continue;
                 await ensureUserCreatedAt(reviewer);
                 const s = ensureAuthor(reviewer);
                 s.reviewCount += 1;
@@ -362,6 +456,7 @@ jobs:
             for (const it of prItems) {
               const login = it.author;
               if (!login) continue;
+              if (isAllowedAccount(login)) continue;
               const s = ensureAuthor(login);
 
               try {
@@ -520,9 +615,12 @@ jobs:
               }
 
               if (domains.length > 0) {
-                lines.push("## Domains (external)", "", "| Domain | Accounts |", "| --- | ---: |");
+                lines.push("## Domains (external)", "", "| Domain | Accounts | Logins |", "| --- | ---: | --- |");
                 for (const d of domains.slice(0, 20)) {
-                  lines.push(`| ${d.domain} | ${d.count} |`);
+                  const maxLogins = 5;
+                  const shown = d.accounts.slice(0, maxLogins).map(login => `@${login}`);
+                  const overflow = d.accounts.length > maxLogins ? ` +${d.accounts.length - maxLogins} more` : "";
+                  lines.push(`| ${d.domain} | ${d.count} | ${shown.join(", ")}${overflow} |`);
                 }
                 lines.push("");
               }
@@ -537,6 +635,16 @@ jobs:
                 for (const a of arr.slice(0, 25)) {
                   const sig = a.signals.join(", ");
                   lines.push(`- @${a.login} — score=${a.risk_score} — ${sig}`);
+                  if (a.examples && a.examples.length > 0) {
+                    lines.push("  <details><summary>Evidence</summary>", "");
+                    for (const ex of a.examples.slice(0, 5)) {
+                      lines.push(`  - ${ex.url}`);
+                    }
+                    if (a.examples.length > 5) {
+                      lines.push(`  - ... and ${a.examples.length - 5} more`);
+                    }
+                    lines.push("", "  </details>");
+                  }
                 }
                 lines.push("");
               }
@@ -544,30 +652,6 @@ jobs:
               renderAccounts("Accounts (High)", high);
               renderAccounts("Accounts (Medium)", med);
               renderAccounts("Accounts (Low)", low);
-
-              // Evidence links (bounded)
-              const evidence = [];
-              for (const a of accounts.filter(a => a.severity !== "None").slice(0, 25)) {
-                for (const ex of a.examples) {
-                  evidence.push({ url: ex.url, key: `${a.login}:${ex.url}` });
-                }
-              }
-              const seen = new Set();
-              const deduped = [];
-              for (const e of evidence) {
-                if (seen.has(e.key)) continue;
-                seen.add(e.key);
-                deduped.push(e);
-              }
-              deduped.sort((a, b) => a.url.localeCompare(b.url));
-
-              if (deduped.length > 0) {
-                lines.push("## Evidence", "");
-                for (const e of deduped.slice(0, 30)) {
-                  lines.push(`- ${e.url}`);
-                }
-                lines.push("");
-              }
 
               lines.push("## Notes", "", "- This report is computed deterministically from GitHub Search + PR file listings + PR comments/reviews within the window.");
               return lines.join("\n");
