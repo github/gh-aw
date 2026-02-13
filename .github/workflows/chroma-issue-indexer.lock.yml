@@ -340,7 +340,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_ALLOWED_EXTENSIONS: '.json, .jsonl, .txt, .md, .csv'
+          GH_AW_ALLOWED_EXTENSIONS: ''
           GH_AW_CACHE_EXAMPLES: '- `/tmp/gh-aw/cache-memory-chroma/notes.txt` - general notes and observations
 - `/tmp/gh-aw/cache-memory-chroma/notes.md` - markdown formatted notes
 - `/tmp/gh-aw/cache-memory-chroma/preferences.json` - user preferences and settings
@@ -508,19 +508,6 @@ jobs:
           # AWF runs with sudo, creating files owned by root
           sudo chmod -R a+r /tmp/gh-aw/sandbox/firewall/logs 2>/dev/null || true
           awf logs summary | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Validate cache-memory file types (chroma)
-        if: always()
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');
-            const allowedExtensions = [".json",".jsonl",".txt",".md",".csv"];
-            const result = validateMemoryFiles('/tmp/gh-aw/cache-memory-chroma', 'cache', allowedExtensions);
-            if (!result.valid) {
-              core.setFailed(`File type validation failed: Found $${result.invalidFiles.length} file(s) with invalid extensions. Only .json, .jsonl, .txt, .md, .csv are allowed.`);
-            }
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true

@@ -1116,7 +1116,7 @@ jobs:
           BRANCH_NAME: memory/copilot-cli-research
           MAX_FILE_SIZE: 204800
           MAX_FILE_COUNT: 100
-          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
+          ALLOWED_EXTENSIONS: '[]'
           FILE_GLOB_FILTER: "memory/copilot-cli-research/*.json memory/copilot-cli-research/*.md"
         with:
           script: |

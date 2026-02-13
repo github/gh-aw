@@ -16,13 +16,13 @@ const path = require("path");
 function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions) {
   // If allowedExtensions is not provided, undefined, or empty array, allow all files
   const allowAll = !allowedExtensions || allowedExtensions.length === 0;
-  
+
   // If allowing all files, skip validation
   if (allowAll) {
     core.info(`All file extensions are allowed in ${memoryType}-memory directory`);
     return { valid: true, invalidFiles: [] };
   }
-  
+
   // Normalize extensions to lowercase and trim whitespace
   const extensions = allowedExtensions.map(ext => ext.trim().toLowerCase());
   const invalidFiles = [];

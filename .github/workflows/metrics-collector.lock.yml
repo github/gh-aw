@@ -678,7 +678,7 @@ jobs:
           BRANCH_NAME: memory/meta-orchestrators
           MAX_FILE_SIZE: 10240
           MAX_FILE_COUNT: 100
-          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
+          ALLOWED_EXTENSIONS: '[]'
           FILE_GLOB_FILTER: "metrics/**"
         with:
           script: |

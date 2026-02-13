@@ -1167,7 +1167,7 @@ jobs:
           BRANCH_NAME: memory/discussion-task-miner
           MAX_FILE_SIZE: 102400
           MAX_FILE_COUNT: 100
-          ALLOWED_EXTENSIONS: '[".json",".jsonl",".txt",".md",".csv"]'
+          ALLOWED_EXTENSIONS: '[]'
           FILE_GLOB_FILTER: "memory/discussion-task-miner/*.json memory/discussion-task-miner/*.md"
         with:
           script: |

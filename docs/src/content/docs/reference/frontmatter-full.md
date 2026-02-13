@@ -2386,6 +2386,14 @@ safe-outputs:
     # (optional)
     target-repo: "example-value"
 
+    # List of additional repositories in format 'owner/repo' that issues can be closed
+    # in. When specified, the agent can use a 'repo' field in the output to specify
+    # which repository to close the issue in. The target repository (current or
+    # target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
   # Option 2: Enable issue closing with default configuration
   close-issue: null
 
@@ -2751,6 +2759,14 @@ safe-outputs:
     # if specified.
     # (optional)
     github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+    # List of additional repositories in format 'owner/repo' that labels can be added
+    # to. When specified, the agent can use a 'repo' field in the output to specify
+    # which repository to add labels to. The target repository (current or
+    # target-repo) is always implicitly allowed.
+    # (optional)
+    allowed-repos: []
+      # Array of strings
 
   # Enable AI agents to remove labels from GitHub issues or pull requests.
   # (optional)
