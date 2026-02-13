@@ -146,23 +146,23 @@ function validateGitParameter(value, name) {
  */
 function validateSafePath(userPath, basePath, name) {
   // Reject paths with null bytes
-  if (userPath.includes('\0')) {
+  if (userPath.includes("\0")) {
     throw new Error(`Invalid ${name}: contains null bytes`);
   }
-  
+
   // Reject paths that attempt to traverse up (..)
-  if (userPath.includes('..')) {
+  if (userPath.includes("..")) {
     throw new Error(`Invalid ${name}: path traversal detected`);
   }
-  
+
   // Resolve the full path and ensure it's within the base path
   const resolvedPath = path.resolve(basePath, userPath);
   const resolvedBase = path.resolve(basePath);
-  
+
   if (!resolvedPath.startsWith(resolvedBase + path.sep) && resolvedPath !== resolvedBase) {
     throw new Error(`Invalid ${name}: path escapes base directory`);
   }
-  
+
   return resolvedPath;
 }
 
@@ -239,7 +239,7 @@ function mergeGithubFolder(sourcePath, destPath) {
   for (const relativePath of sourceFiles) {
     // Validate relative path to prevent path traversal
     validateSafePath(relativePath, sourcePath, "relative file path");
-    
+
     // Check if the file is in one of the allowed subfolders
     const pathParts = relativePath.split(path.sep);
     const topLevelFolder = pathParts[0];

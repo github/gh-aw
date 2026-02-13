@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: f54859bebf7a13ba4572c7b7a7517c28034a4b338ff8332d2a311c31a425daa4
+# frontmatter-hash: 0bac2c340b44ea7294a8fda4f2dd2a465985b67136517651ad01a0e9e3192397
 
 name: "Bot Detection"
 "on":
@@ -1205,39 +1205,57 @@ jobs:
 
               let issueComments = [];
               try {
-                const { data } = await github.rest.issues.listComments({
-                  owner,
-                  repo,
-                  issue_number: it.number,
-                  per_page: 100,
-                });
-                issueComments = data || [];
+                issueComments = await github.paginate(
+                  github.rest.issues.listComments,
+                  {
+                    owner,
+                    repo,
+                    issue_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    if (response.data.length >= 500) done();
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
 
               let reviewComments = [];
               try {
-                const { data } = await github.rest.pulls.listReviewComments({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                reviewComments = data || [];
+                reviewComments = await github.paginate(
+                  github.rest.pulls.listReviewComments,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    if (response.data.length >= 500) done();
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
 
               let reviews = [];
               try {
-                const { data } = await github.rest.pulls.listReviews({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                reviews = data || [];
+                reviews = await github.paginate(
+                  github.rest.pulls.listReviews,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    if (response.data.length >= 500) done();
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
@@ -1287,13 +1305,20 @@ jobs:
               const s = ensureAuthor(login);
 
               try {
-                const filesResp = await github.rest.pulls.listFiles({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                const filenames = (filesResp.data || []).map(f => f.filename);
+                const files = await github.paginate(
+                  github.rest.pulls.listFiles,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    if (response.data.length >= 500) done();
+                    return response.data;
+                  }
+                );
+                const filenames = files.map(f => f.filename);
                 for (const fn of filenames) {
                   if (fn.startsWith(".github/workflows/") || fn.startsWith(".github/actions/")) s.touchesWorkflows = true;
                   if (fn === "Dockerfile" || fn === "Makefile" || fn.startsWith("scripts/") || fn.startsWith("actions/")) s.touchesCI = true;
