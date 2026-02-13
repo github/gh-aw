@@ -13,18 +13,18 @@ GitHub Agentic Workflows use [AI Engines](/gh-aw/reference/glossary/#engine) (no
 
 To use Copilot CLI with GitHub Agentic Workflows:
 
-1. Copilot CLI is the default. You can optionally request the use of of the Copilot CLI in your workflow frontmatter:
+1. Copilot CLI is the default AI engine (coding agent). You can optionally request the use of of the Copilot CLI in your workflow frontmatter:
 
    ```yaml wrap
    engine: copilot
    ```
 
-2. Configure `COPILOT_GITHUB_TOKEN` repository secret
+2. Create a fine-grained GitHub Personal Access Token (PAT)
 
    You need a GitHub Personal Access Token (PAT) with the `copilot-requests` scope to authenticate Copilot CLI. Create a fine-grained PAT at <https://github.com/settings/personal-access-tokens/new>.
 
-   - **IMPORTANT:** Select your user account, NOT an organization
-   - **IMPORTANT:** Choose "Public repositories" access, even if adding to a private repo. Yes that's right just do it
+   - **IMPORTANT:** Select your user account, NOT an organization.
+   - **IMPORTANT:** Choose "Public repositories" access, even if adding to a private repo.
    - **IMPORTANT:** Enable "Copilot Requests" permissions.
 
    You **must** have "Public repositories" selected; otherwise, you will not have access to the Copilot Requests permission option.
@@ -37,7 +37,7 @@ To use Copilot CLI with GitHub Agentic Workflows:
 
 ## Using Claude by Anthropic (Claude Code)
 
-[Claude by Anthropic](https://www.anthropic.com/index/claude) (aka Claude Code) is an AI engine option that provides full MCP tool support and allow-listing capabilities.
+To use [Claude by Anthropic](https://www.anthropic.com/index/claude) (aka Claude Code):
 
 1. Request the use of the Claude by Anthropic engine in your workflow frontmatter:
 
@@ -45,9 +45,9 @@ To use Copilot CLI with GitHub Agentic Workflows:
    engine: claude
    ```
 
-2. Configuring `ANTHROPIC_API_KEY`
+2. Configure `ANTHROPIC_API_KEY` GitHub Actions secret.
 
-   Create an Anthropic API key at <https://console.anthropic.com/api-keys> and add it to your repository:
+   [Create an Anthropic API key](https://platform.claude.com/docs/en/get-started) and add it to your repository:
 
    ```bash wrap
    gh aw secrets set ANTHROPIC_API_KEY --value "<your-anthropic-api-key>"
@@ -55,7 +55,7 @@ To use Copilot CLI with GitHub Agentic Workflows:
 
 ## Using OpenAI Codex
 
-[OpenAI Codex](https://openai.com/blog/openai-codex) is a coding agent engine option.
+To use [OpenAI Codex](https://openai.com/blog/openai-codex):
 
 1. Request the use of the Codex engine in your workflow frontmatter:
 
@@ -63,7 +63,9 @@ To use Copilot CLI with GitHub Agentic Workflows:
    engine: codex
    ```
 
-2. Create an OpenAI API key at <https://platform.openai.com/account/api-keys> and add it to your repository:
+2. Configure `OPENAI_API_KEY` GitHub Actions secret.
+
+   [Create an OpenAI API key](https://platform.openai.com/api-keys) and add it to your repository:
 
    ```bash wrap
    gh aw secrets set OPENAI_API_KEY --value "<your-openai-api-key>"

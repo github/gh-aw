@@ -65,9 +65,9 @@
       "version": "v4.3.1",
       "sha": "67a3573c9a986a3f9c594539f4ab511d57bb3ce9"
     },
-    "actions/setup-go@v5": {
+    "actions/setup-go@v5.6.0": {
       "repo": "actions/setup-go",
-      "version": "v5",
+      "version": "v5.6.0",
       "sha": "40f1582b2485089dde7abd97c1529aa768e1baff"
     },
     "actions/setup-go@v6.2.0": {
@@ -130,15 +130,10 @@
       "version": "v2.0.3",
       "sha": "e95548e56dfa95d4e1a28d6f422fafe75c4c26fb"
     },
-    "docker/build-push-action@v6": {
+    "docker/build-push-action@v6.19.2": {
       "repo": "docker/build-push-action",
-      "version": "v6",
-      "sha": "ee4ca427a2f43b6a16632044ca514c076267da23"
-    },
-    "docker/build-push-action@v6.18.0": {
-      "repo": "docker/build-push-action",
-      "version": "v6.18.0",
-      "sha": "263435318d21b8e681c14492fe198d362a7d2c83"
+      "version": "v6.19.2",
+      "sha": "10e90e3645eae34f1e60eeb005ba3a3d33f178e8"
     },
     "docker/login-action@v3.7.0": {
       "repo": "docker/login-action",
@@ -160,10 +155,10 @@
       "version": "v1.20.4",
       "sha": "dff508cca8ce57162e7aa6c4769a4f97c2fed638"
     },
-    "github/codeql-action/upload-sarif@v3.32.2": {
+    "github/codeql-action/upload-sarif@v3.32.3": {
       "repo": "github/codeql-action/upload-sarif",
-      "version": "v3.32.2",
-      "sha": "46a5d05688af3c0b623936fd3365ef1ae945c1cd"
+      "version": "v3.32.3",
+      "sha": "17ec405481c24be464d4b2c5727a82f700ddb189"
     },
     "github/stale-repos@v3": {
       "repo": "github/stale-repos",
