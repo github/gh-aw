@@ -2,6 +2,8 @@
 /// <reference types="@actions/github-script" />
 
 const { getErrorMessage } = require("./error_helpers.cjs");
+const { getTrackerID } = require("./get_tracker_id.cjs");
+const { generateFooter } = require("./generate_footer.cjs");
 
 /**
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
@@ -223,12 +225,11 @@ async function main(config = {}) {
  * Check if labels match the required labels filter
  * @param {Array<{name: string}>} prLabels - Labels on the PR
  * @param {string[]} requiredLabels - Required labels (any match)
- * @returns {boolean} True if PR has at least one required label
+ * @returns {boolean} True if PR has at least one required label or no filter is set
  */
 function checkLabelFilter(prLabels, requiredLabels) {
-  if (requiredLabels.length === 0) {
-    return true;
-  }
+  if (requiredLabels.length === 0) return true;
+
   const labelNames = prLabels.map(l => l.name);
   return requiredLabels.some(required => labelNames.includes(required));
 }
@@ -237,12 +238,10 @@ function checkLabelFilter(prLabels, requiredLabels) {
  * Check if title matches the required prefix filter
  * @param {string} title - PR title
  * @param {string} requiredTitlePrefix - Required title prefix
- * @returns {boolean} True if title starts with required prefix
+ * @returns {boolean} True if title starts with required prefix or no filter is set
  */
 function checkTitlePrefixFilter(title, requiredTitlePrefix) {
-  if (!requiredTitlePrefix) {
-    return true;
-  }
+  if (!requiredTitlePrefix) return true;
   return title.startsWith(requiredTitlePrefix);
 }
 
@@ -254,9 +253,6 @@ function checkTitlePrefixFilter(title, requiredTitlePrefix) {
  * @returns {string} The complete comment body with tracker ID and footer
  */
 function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber) {
-  const { getTrackerID } = require("./get_tracker_id.cjs");
-  const { generateFooter } = require("./generate_footer.cjs");
-
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
   const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
   const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
@@ -264,11 +260,7 @@ function buildCommentBody(body, triggeringIssueNumber, triggeringPRNumber) {
   const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
   const runUrl = context.payload.repository ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-  let commentBody = body.trim();
-  commentBody += getTrackerID("markdown");
-  commentBody += generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, undefined);
-
-  return commentBody;
+  return body.trim() + getTrackerID("markdown") + generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, undefined);
 }
 
 module.exports = { main };
