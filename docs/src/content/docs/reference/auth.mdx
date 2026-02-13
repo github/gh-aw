@@ -25,7 +25,7 @@ You will need one of the following GitHub Actions secrets configured in your rep
 
 Depending on what your workflow needs to do, you may need additional GitHub tokens added as repository secrets:
 
-- **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token)
+- **Lockdown mode, cross-repo access, or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token)
 - **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#gh_aw_project_github_token)
 - **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#gh_aw_agent_token)
 - **MCP server with special permissions** – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
@@ -128,14 +128,25 @@ See also (/gh-aw/reference/engines/#using-openai-codex) for additional configura
 
 ### `GH_AW_GITHUB_TOKEN`
 
-If using cross-repo access or the remote GitHub MCP server, you need to configure this GitHub Actions secret a Personal Access Token (PAT) with appropriate scopes and permissions.
+A Personal Access Token (PAT) with appropriate scopes and permissions for enhanced security and cross-repository operations.
 
-**When to use**:
+**When Required**:
 
-- Cross-repository operations (accessing other repos).
-- Remote GitHub tools mode (faster startup without Docker).
-- Codex engine operations with GitHub MCP.
-- Any workflow that needs to access multiple repositories.
+- **Lockdown Mode**: Required when `lockdown: true` is set in workflow frontmatter. The workflow will fail at runtime if the token is not configured.
+- **Cross-repository operations**: Required for accessing other repositories beyond the current one.
+- **Remote GitHub tools mode**: Required for faster startup without Docker.
+- **Codex engine operations**: Required for GitHub MCP integration.
+
+**Lockdown Mode Behavior**:
+
+Lockdown mode is only automatically enabled for public repositories when `GH_AW_GITHUB_TOKEN` is configured:
+
+- When `lockdown: true` is set explicitly, `GH_AW_GITHUB_TOKEN` **must** be configured or the workflow fails
+- For public repositories, automatic lockdown requires both:
+  1. `GH_AW_GITHUB_TOKEN` configured as a repository secret
+  2. `lockdown: true` set in the workflow frontmatter
+- Without `GH_AW_GITHUB_TOKEN`, workflows in public repositories run without lockdown mode
+- See [Lockdown Mode documentation](/gh-aw/reference/lockdown-mode/) for security considerations
 
 **Setup**:
 
@@ -147,7 +158,36 @@ Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/n
   - Contents: Read (minimum) or Read+Write (for PRs)
   - Issues: Read+Write (for issue operations)
   - Pull requests: Read+Write (for PR operations)
-  - No write permissions should be granted
+
+Then add to repository secrets:
+
+```bash wrap
+gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_FINE_GRAINED_PAT"
+```
+
+**Example Workflow with Lockdown**:
+
+```yaml wrap
+---
+lockdown: true  # Requires GH_AW_GITHUB_TOKEN
+engine: copilot
+tools:
+  github:
+    mode: remote
+    toolsets: [repos, issues, pull_requests]
+---
+
+# Your workflow prompt here
+```
+
+**Error Handling**:
+
+If `lockdown: true` is set but `GH_AW_GITHUB_TOKEN` is not configured, the workflow fails immediately with:
+
+```
+Lockdown mode is enabled (lockdown: true) but GH_AW_GITHUB_TOKEN is not configured.
+Please configure GH_AW_GITHUB_TOKEN as a repository secret.
+```
 
 Note that using `GH_AW_GITHUB_TOKEN` replaces the default behaviour of GitHub Agentic Workflows (which arranges temporary `GITHUB_TOKEN` GitHub Actions tokens appropriate to the `permissions:` you have declared).
 

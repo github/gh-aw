@@ -8,7 +8,7 @@ sidebar:
 **GitHub lockdown mode** is [a security feature of the GitHub MCP server](https://github.com/github/github-mcp-server/blob/main/docs/server-configuration.md#lockdown-mode) that filters content in public repositories to only surface items (issues, pull requests, comments, discussions, etc.) from users with **push access** to the repository. This protects agentic workflows from processing potentially malicious or misleading content from untrusted users.
 
 > [!TIP]
-> **Automatic Protection**: GitHub lockdown mode is **automatically enabled** for public repositories. This provides secure defaults without manual configuration.
+> **Enabling Lockdown Mode**: Set `lockdown: true` in your workflow frontmatter and configure [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) as a repository secret. For public repositories, this provides enhanced security against untrusted input.
 
 ## Security Benefits
 
@@ -44,28 +44,43 @@ Malicious users could craft issues that:
 
 ## Configuration
 
-### Automatic Mode (Recommended)
+### Enabling Lockdown Mode
 
-Lockdown is automatically determined based on repository visibility:
+To enable lockdown mode for your workflow:
+
+1. **Set `lockdown: true` in your workflow frontmatter**
+2. **Configure `GH_AW_GITHUB_TOKEN` as a repository secret** (see [Authentication](/gh-aw/reference/auth/#gh_aw_github_token))
 
 ```yaml wrap
+---
+lockdown: true
+engine: copilot
 tools:
   github:
     mode: remote
     toolsets: [repos, issues, pull_requests]
-    # Lockdown automatically enabled for public repos
-    # Automatically disabled for private/internal repos
+---
+
+# Your workflow that requires lockdown protection
 ```
 
-### Manual Override
+```bash
+# Configure the required token
+gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_FINE_GRAINED_PAT"
+```
 
-Explicitly enable or disable lockdown for specific workflows:
+**Requirements**:
+- `GH_AW_GITHUB_TOKEN` must be configured as a repository secret
+- The token requires appropriate permissions (Contents: Read, Issues: Read, Pull requests: Read)
+- Without `GH_AW_GITHUB_TOKEN`, workflows with `lockdown: true` will fail at runtime
+
+### Disabling Lockdown Mode
+
+Explicitly disable lockdown for workflows designed to process content from all users:
 
 ```yaml wrap
 tools:
   github:
-    lockdown: true   # Force enable (use in public repos to ensure protection)
-    # or
     lockdown: false  # Explicitly disable (see "When to Disable" below)
 ```
 
