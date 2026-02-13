@@ -289,7 +289,7 @@ gh aw logs
 # Filter by date range
 gh aw logs --start-date -1w accessibility-review
 
-# Generate the lock file from the frontmatter of a workflow
+# Generate the lock file for a workflow
 gh aw compile
 ```
 

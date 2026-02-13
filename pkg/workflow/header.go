@@ -52,7 +52,7 @@ func GenerateWorkflowHeader(sourceFile string, generatedBy string, customInstruc
 
 	// Add regeneration instructions
 	if sourceFile != "" {
-		fmt.Fprintf(&header, "# To update this file, edit the frontmatter of %s and run:\n", sourceFile)
+		fmt.Fprintf(&header, "# To update this file, edit %s and run (not all updates will cause changes in this file):\n", sourceFile)
 	} else {
 		header.WriteString("# To regenerate this workflow, run:\n")
 	}
