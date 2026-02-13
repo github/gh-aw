@@ -58,9 +58,7 @@ func BuildOr(left ConditionNode, right ConditionNode) ConditionNode {
 
 // BuildAnd creates an AND node combining two conditions
 func BuildAnd(left ConditionNode, right ConditionNode) ConditionNode {
-	if log.Enabled() {
-		expressionBuilderLog.Print("Building AND condition node")
-	}
+	expressionBuilderLog.Print("Building AND condition node")
 	return &AndNode{Left: left, Right: right}
 }
 
@@ -84,9 +82,7 @@ func BuildReactionCondition() ConditionNode {
 	}
 	terms = append(terms, pullRequestCondition)
 
-	if log.Enabled() {
-		expressionBuilderLog.Printf("Created disjunction with %d event type terms", len(terms))
-	}
+	expressionBuilderLog.Printf("Created disjunction with %d event type terms", len(terms))
 
 	// Use DisjunctionNode to avoid deep nesting
 	return &DisjunctionNode{Terms: terms}
