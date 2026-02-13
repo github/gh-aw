@@ -90,7 +90,7 @@ You can add this workflow to your own repository and remix it as follows:
 gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/issue-triage-agent.md
 ```
 
-Then edit and remix the workflow specification to meet your needs, regenerate the lock file from the frontmatter using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
+Then edit and remix the workflow specification to meet your needs, regenerate the lock file using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
 
 You can also [create your own workflows](/gh-aw/setup/creating-workflows).
 
