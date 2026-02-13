@@ -349,8 +349,14 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 	if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
 		strictModeValidationLog.Printf("Validating network domains in strict mode for all engines")
 
-		// Check if allowed domains contain only known ecosystems or "defaults"
-		hasCustomDomain := false
+		// Check if allowed domains contain only known ecosystem identifiers
+		// Track domains that are not ecosystem identifiers (both individual ecosystem domains and truly custom domains)
+		type domainSuggestion struct {
+			domain    string
+			ecosystem string // empty if no ecosystem found, non-empty if domain belongs to known ecosystem
+		}
+		var invalidDomains []domainSuggestion
+
 		for _, domain := range networkPermissions.Allowed {
 			// Skip wildcards (handled below)
 			if domain == "*" {
@@ -360,27 +366,45 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 			// Check if this is a known ecosystem identifier
 			ecosystemDomains := getEcosystemDomains(domain)
 			if len(ecosystemDomains) > 0 {
-				// This is a known ecosystem identifier
+				// This is a known ecosystem identifier - allowed in strict mode
 				strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
 				continue
 			}
 
-			// Check if this domain belongs to any ecosystem
+			// Not an ecosystem identifier - check if it belongs to any ecosystem
 			ecosystem := GetDomainEcosystem(domain)
 			if ecosystem != "" {
-				// This domain is from a known ecosystem
-				strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s'", domain, ecosystem)
-				continue
+				// This domain belongs to a known ecosystem, but user should use ecosystem identifier instead
+				strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s', but should use ecosystem identifier in strict mode", domain, ecosystem)
+				invalidDomains = append(invalidDomains, domainSuggestion{domain: domain, ecosystem: ecosystem})
+			} else {
+				// This is a truly custom domain (not in any ecosystem)
+				strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
+				invalidDomains = append(invalidDomains, domainSuggestion{domain: domain, ecosystem: ""})
 			}
-
-			// This is a custom domain
-			strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
-			hasCustomDomain = true
 		}
 
-		if hasCustomDomain {
-			strictModeValidationLog.Printf("Engine '%s' has custom domains in strict mode, failing validation", engineID)
-			return fmt.Errorf("strict mode: network domains must be from known ecosystems (e.g., 'defaults', 'python', 'node') for all engines in strict mode. Custom domains are not allowed for security. Set 'strict: false' to use custom domains. See: https://github.github.com/gh-aw/reference/network/")
+		if len(invalidDomains) > 0 {
+			strictModeValidationLog.Printf("Engine '%s' has invalid domains in strict mode, failing validation", engineID)
+
+			// Build error message with ecosystem suggestions
+			errorMsg := "strict mode: network domains must be from known ecosystems (e.g., 'defaults', 'python', 'node') for all engines in strict mode. Custom domains are not allowed for security."
+
+			// Add suggestions for domains that belong to known ecosystems
+			var suggestions []string
+			for _, ds := range invalidDomains {
+				if ds.ecosystem != "" {
+					suggestions = append(suggestions, fmt.Sprintf("'%s' belongs to ecosystem '%s'", ds.domain, ds.ecosystem))
+				}
+			}
+
+			if len(suggestions) > 0 {
+				errorMsg += " Did you mean: " + strings.Join(suggestions, ", ") + "?"
+			}
+
+			errorMsg += " Set 'strict: false' to use custom domains. See: https://github.github.com/gh-aw/reference/network/"
+
+			return fmt.Errorf("%s", errorMsg)
 		}
 	}
 
