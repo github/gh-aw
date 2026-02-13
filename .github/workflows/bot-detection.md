@@ -37,10 +37,11 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const HOURS_BACK = 6;
-            const ISSUE_TITLE = "🚨 Bot Detection: Suspicious Activity";
+            const ISSUE_TITLE = "🔎 Activity Signals: Review Queue";
             const MIN_ACCOUNT_AGE_DAYS = 14;
             const MAX_PR = 50;
             const MAX_COMMENT_EXAMPLES = 10;
+            const MAX_TOUCHED_FILES = 10;
             const ALLOWED_DOMAINS = new Set([
               // GitHub docs + blog
               "docs.github.com",
@@ -62,10 +63,7 @@ jobs:
               "copilot",
               "copilot-swe-agent",
             ]);
-            const TRUSTED_ORGS = [
-              // Orgs whose members should be allowlisted
-              "github",
-            ];
+            const TRUSTED_ORGS = [owner];
             const MEMBER_ACCOUNTS = new Set();
 
             function parseJsonList(envName) {
@@ -198,12 +196,6 @@ jobs:
             for (const domain of parseJsonList("BOT_DETECTION_ALLOWED_DOMAINS")) {
               if (domain) ALLOWED_DOMAINS.add(String(domain).toLowerCase());
             }
-            for (const account of parseJsonList("BOT_DETECTION_ALLOWED_ACCOUNTS")) {
-              if (account) ALLOWED_ACCOUNTS.add(String(account).toLowerCase());
-            }
-            for (const org of parseJsonList("BOT_DETECTION_TRUSTED_ORGS")) {
-              if (org) TRUSTED_ORGS.push(String(org));
-            }
 
             await loadMemberAccounts();
             await loadOrgMembers();
@@ -269,6 +261,8 @@ jobs:
                 perAuthor.set(login, {
                   login,
                   itemCount: 0,
+                  prCount: 0,
+                  issueCount: 0,
                   commentCount: 0,
                   reviewCount: 0,
                   accountAgeDays: null,
@@ -279,6 +273,8 @@ jobs:
                   touchesCI: false,
                   touchesDeps: false,
                   dupTexts: new Map(),
+                  exampleItems: [],
+                  touchedFiles: new Set(),
                   examples: [],
                 });
               }
@@ -292,6 +288,16 @@ jobs:
               const s = ensureAuthor(login);
               await ensureUserCreatedAt(login);
               s.itemCount += 1;
+              if (it.is_pr) s.prCount += 1;
+              else s.issueCount += 1;
+              if (s.exampleItems.length < 5) {
+                s.exampleItems.push({
+                  title: it.title || "",
+                  url: it.url,
+                  is_pr: it.is_pr,
+                  number: it.number,
+                });
+              }
               if (s.examples.length < 5) {
                 s.examples.push({ url: it.url, is_pr: it.is_pr, number: it.number });
               }
@@ -497,6 +503,7 @@ jobs:
                 );
                 const filenames = files.map(f => f.filename);
                 for (const fn of filenames) {
+                  if (s.touchedFiles.size < MAX_TOUCHED_FILES) s.touchedFiles.add(fn);
                   if (fn.startsWith(".github/workflows/") || fn.startsWith(".github/actions/")) s.touchesWorkflows = true;
                   if (fn === "Dockerfile" || fn === "Makefile" || fn.startsWith("scripts/") || fn.startsWith("actions/")) s.touchesCI = true;
                   if (
@@ -575,6 +582,12 @@ jobs:
                 severity,
                 signals,
                 external_domains: extDomains.sort((a, b) => a.localeCompare(b)),
+                pr_count: s.prCount,
+                issue_count: s.issueCount,
+                comment_count: s.commentCount,
+                review_count: s.reviewCount,
+                example_items: s.exampleItems,
+                touched_files: Array.from(s.touchedFiles).sort((a, b) => a.localeCompare(b)),
                 examples: s.examples,
               };
             });
@@ -646,6 +659,25 @@ jobs:
                 for (const a of arr.slice(0, 25)) {
                   const sig = a.signals.join(", ");
                   lines.push(`- @${a.login} — score=${a.risk_score} — ${sig}`);
+                    const changeParts = [];
+                    if (a.example_items && a.example_items.length > 0) {
+                      const itemSamples = a.example_items.slice(0, 2).map(item => {
+                        const label = item.is_pr ? `PR #${item.number}` : `Issue #${item.number}`;
+                        const title = item.title ? ` "${item.title}"` : "";
+                        return `${label}${title}`;
+                      });
+                      changeParts.push(itemSamples.join("; "));
+                    }
+                    if (a.touched_files && a.touched_files.length > 0) {
+                      const files = a.touched_files.slice(0, 6).join(", ");
+                      changeParts.push(`files: ${files}`);
+                    }
+                    if (changeParts.length > 0) {
+                      lines.push(`  - Change summary: ${changeParts.join("; ")}`);
+                    }
+                    lines.push(
+                      `  - Activity summary: ${a.pr_count || 0} PR, ${a.issue_count || 0} issue, ${a.comment_count || 0} comment, ${a.review_count || 0} review`
+                    );
                   if (a.examples && a.examples.length > 0) {
                     lines.push("  <details><summary>Evidence</summary>", "");
                     for (const ex of a.examples.slice(0, 5)) {
@@ -730,7 +762,7 @@ Using the GitHub toolset, collect enough evidence to support each suspicion:
 
 Maintain a **single** open triage issue with the exact title:
 
-`🚨 Bot Detection: Suspicious Activity`
+`🔎 Activity Signals: Review Queue`
 
 ### When to Create vs Update
 
