@@ -125,13 +125,8 @@ func (e *CopilotSDKEngine) computeSDKToolConfig(workflowData *WorkflowData) (ava
 	// Sort for consistent output
 	sort.Strings(availableTools)
 
-	// Build excluded tools list
-	// web-search is excluded by default (not supported)
+	// Build excluded tools list (currently empty; reserved for future use)
 	var excludedTools []string
-	if _, hasWebSearch := tools["web-search"]; !hasWebSearch {
-		// Only exclude web_search if it's not explicitly requested
-		// (Copilot CLI doesn't support it anyway)
-	}
 
 	return availableTools, excludedTools
 }
