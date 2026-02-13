@@ -374,7 +374,7 @@ The YAML frontmatter supports these fields:
     {"type": "create_issue", "temporary_id": "aw_abc123def456", "title": "Parent", "body": "Parent issue"}
     {"type": "create_issue", "parent": "aw_abc123def456", "title": "Sub-task", "body": "References #aw_abc123def456"}
     ```
-  - `close-issue:` - Close issues with comment
+  - `close-issue:` - Close issues with comment (use this to close issues, not update-issue)
     ```yaml
     safe-outputs:
       close-issue:
@@ -453,7 +453,7 @@ The YAML frontmatter supports these fields:
         target-repo: "owner/repo"       # Optional: cross-repository
     ```
     When using `safe-outputs.create-pull-request-review-comment`, the main job does **not** need `pull-requests: write` permission since review comment creation is handled by a separate job with appropriate permissions.
-  - `update-issue:` - Safe issue updates
+  - `update-issue:` - Update issue title, body, labels, assignees, or milestone (NOT for closing - use close-issue instead)
     ```yaml
     safe-outputs:
       update-issue:
@@ -464,6 +464,7 @@ The YAML frontmatter supports these fields:
         max: 3                          # Optional: maximum number of issues to update (default: 1)
         target-repo: "owner/repo"       # Optional: cross-repository
     ```
+    **Note:** While `update-issue` technically supports changing status between 'open' and 'closed', use `close-issue` instead when you want to close an issue with a closing comment. Use `update-issue` primarily for changing the title, body, labels, assignees, or milestone without closing.
     When using `safe-outputs.update-issue`, the main job does **not** need `issues: write` permission since issue updates are handled by a separate job with appropriate permissions.
   - `update-pull-request:` - Update PR title or body
     ```yaml
