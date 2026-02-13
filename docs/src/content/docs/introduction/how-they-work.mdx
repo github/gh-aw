@@ -55,9 +55,9 @@ Workflows run with minimal permissions (no write access by default), use tool al
 - **[Safe inputs](/gh-aw/reference/safe-inputs/)** (validated user input tools) - Custom MCP tools defined inline to prevent injection attacks
 - **[Safe outputs](/gh-aw/reference/safe-outputs/)** (validated GitHub operations) - Pre-approved actions the AI can request without write permissions
 
-## Compilation
+## Regenerating the Lock File
 
-Use `gh aw compile` to generate [`.lock.yml` files](/gh-aw/reference/glossary/#workflow-lock-file-lockyml) (compiled GitHub Actions workflow files) from workflow `.md` files. The `.md` file is the editable source of truth, while `.lock.yml` is the compiled GitHub Actions workflow with security hardening. Commit both files.
+Use `gh aw compile` to generate [`.lock.yml` files](/gh-aw/reference/glossary/#workflow-lock-file-lockyml) from the frontmatter of the workflow `.md` files. The `.md` file is the editable source of truth, while `.lock.yml` is the compiled GitHub Actions workflow with security hardening. Commit both files.
 
 ## Continuous AI Patterns
 

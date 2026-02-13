@@ -64,7 +64,7 @@ When triggered from a GitHub issue created via the "Create an Agentic Workflow" 
    - Include complete frontmatter with all necessary configuration
    - Write a clear prompt body with instructions for the AI agent
 
-4. **Compile the Workflow** using `gh aw compile <workflow-id>` to generate the `.lock.yml` file
+4. **Generate the lock file for the Workflow** using `gh aw compile <workflow-id>` to generate the `.lock.yml` file
 
 5. **Create a Pull Request** with both the `.md` and `.lock.yml` files
 

@@ -2,5 +2,8 @@
   "github.copilot.enable": {
     "markdown": true
   },
-  "remote.autoForwardPortsFallback": 0
+  "remote.autoForwardPortsFallback": 0,
+  "search.exclude": {
+    ".github/workflows/*.lock.yml": true
+  }
 }
