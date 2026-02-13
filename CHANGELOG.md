@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Move from githubnext/gh-aw to github/gh-aw
 
-if you were are former user of the githubnext Agentic Workflows you might have to **re-register** the extension to reflect the new location.
+If you were a former user of the githubnext Agentic Workflows you might have to **re-register** the extension to reflect the new location.
 As the gh-aw project moved from githubnext to github please delete the old channel and register the new one. 
 
 Example:
