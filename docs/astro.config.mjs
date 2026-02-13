@@ -211,7 +211,7 @@ export default defineConfig({
 						{ label: 'Frontmatter (Full)', link: '/reference/frontmatter-full/' },
 						{ label: 'GitHub Lockdown Mode', link: '/reference/lockdown-mode/' },
 						{ label: 'GH-AW Agent', link: '/reference/custom-agent-for-aw/' },
-						{ label: 'GH-AW as MCP Server', link: '/setup/mcp-server/' },
+						{ label: 'GH-AW as MCP Server', link: '/reference/gh-aw-as-mcp-server/' },
 						{ label: 'Glossary', link: '/reference/glossary/' },
 						{ label: 'Imports', link: '/reference/imports/' },
 						{ label: 'Markdown', link: '/reference/markdown/' },
