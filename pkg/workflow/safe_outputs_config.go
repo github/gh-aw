@@ -98,6 +98,12 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.CreatePullRequestReviewComments = prReviewCommentsConfig
 			}
 
+			// Handle submit-pull-request-review
+			submitPRReviewConfig := c.parseSubmitPullRequestReviewConfig(outputMap)
+			if submitPRReviewConfig != nil {
+				config.SubmitPullRequestReview = submitPRReviewConfig
+			}
+
 			// Handle create-code-scanning-alert
 			securityReportsConfig := c.parseCodeScanningAlertsConfig(outputMap)
 			if securityReportsConfig != nil {

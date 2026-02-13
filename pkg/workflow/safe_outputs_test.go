@@ -89,6 +89,13 @@ func TestHasSafeOutputsEnabled(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "submit pull request review enabled",
+			safeOutputs: &SafeOutputsConfig{
+				SubmitPullRequestReview: &SubmitPullRequestReviewConfig{},
+			},
+			expected: true,
+		},
+		{
 			name: "create code scanning alerts enabled",
 			safeOutputs: &SafeOutputsConfig{
 				CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{},
@@ -1048,20 +1055,21 @@ func TestGetEnabledSafeOutputToolNames(t *testing.T) {
 		{
 			name: "all standard tools are sorted",
 			safeOutputs: &SafeOutputsConfig{
-				CreateIssues:        &CreateIssuesConfig{},
-				CreateAgentSessions: &CreateAgentSessionConfig{},
-				CreateDiscussions:   &CreateDiscussionsConfig{},
-				CloseDiscussions:    &CloseDiscussionsConfig{},
-				CloseIssues:         &CloseIssuesConfig{},
-				ClosePullRequests:   &ClosePullRequestsConfig{},
-				AddComments:         &AddCommentsConfig{},
-				CreatePullRequests:  &CreatePullRequestsConfig{},
-				AddLabels:           &AddLabelsConfig{},
-				AddReviewer:         &AddReviewerConfig{},
-				AssignMilestone:     &AssignMilestoneConfig{},
-				UpdateIssues:        &UpdateIssuesConfig{},
-				UpdatePullRequests:  &UpdatePullRequestsConfig{},
-				NoOp:                &NoOpConfig{},
+				CreateIssues:            &CreateIssuesConfig{},
+				CreateAgentSessions:     &CreateAgentSessionConfig{},
+				CreateDiscussions:       &CreateDiscussionsConfig{},
+				CloseDiscussions:        &CloseDiscussionsConfig{},
+				CloseIssues:             &CloseIssuesConfig{},
+				ClosePullRequests:       &ClosePullRequestsConfig{},
+				AddComments:             &AddCommentsConfig{},
+				CreatePullRequests:      &CreatePullRequestsConfig{},
+				AddLabels:               &AddLabelsConfig{},
+				AddReviewer:             &AddReviewerConfig{},
+				AssignMilestone:         &AssignMilestoneConfig{},
+				UpdateIssues:            &UpdateIssuesConfig{},
+				UpdatePullRequests:      &UpdatePullRequestsConfig{},
+				SubmitPullRequestReview: &SubmitPullRequestReviewConfig{},
+				NoOp:                    &NoOpConfig{},
 			},
 			// Expected order is alphabetical
 			expected: []string{
@@ -1077,6 +1085,7 @@ func TestGetEnabledSafeOutputToolNames(t *testing.T) {
 				"create_issue",
 				"create_pull_request",
 				"noop",
+				"submit_pull_request_review",
 				"update_issue",
 				"update_pull_request",
 			},

@@ -52,7 +52,8 @@
         { "$ref": "#/$defs/LinkSubIssueOutput" },
         { "$ref": "#/$defs/HideCommentOutput" },
         { "$ref": "#/$defs/DispatchWorkflowOutput" },
-        { "$ref": "#/$defs/AutofixCodeScanningAlertOutput" }
+        { "$ref": "#/$defs/AutofixCodeScanningAlertOutput" },
+        { "$ref": "#/$defs/SubmitPullRequestReviewOutput" }
       ]
     },
     "CreateIssueOutput": {
@@ -296,6 +297,47 @@
       },
       "required": ["type", "path", "line", "body"],
       "additionalProperties": false
+    },
+    "SubmitPullRequestReviewOutput": {
+      "title": "Submit Pull Request Review Output",
+      "description": "Output for submitting a PR review with a status (APPROVE, REQUEST_CHANGES, COMMENT). All create_pull_request_review_comment outputs are collected and submitted as part of this review. If omitted, comments are submitted as a COMMENT review.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "submit_pull_request_review"
+        },
+        "body": {
+          "type": "string",
+          "description": "Overall review body text summarizing the review. Required and must be non-empty for APPROVE or REQUEST_CHANGES reviews; optional for COMMENT reviews."
+        },
+        "event": {
+          "type": "string",
+          "description": "Review decision: APPROVE to approve the PR, REQUEST_CHANGES to request changes, or COMMENT for general feedback. Defaults to COMMENT when omitted.",
+          "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"],
+          "default": "COMMENT"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "event": { "enum": ["APPROVE", "REQUEST_CHANGES"] }
+            },
+            "required": ["event"]
+          },
+          "then": {
+            "required": ["type", "event", "body"],
+            "properties": {
+              "body": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "CreateDiscussionOutput": {
       "title": "Create Discussion Output",

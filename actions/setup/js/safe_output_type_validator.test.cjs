@@ -66,6 +66,13 @@ const SAMPLE_VALIDATION_CONFIG = {
       side: { type: "string", enum: ["LEFT", "RIGHT"] },
     },
   },
+  submit_pull_request_review: {
+    defaultMax: 1,
+    fields: {
+      body: { type: "string", sanitize: true, maxLength: 65000 },
+      event: { type: "string", enum: ["APPROVE", "REQUEST_CHANGES", "COMMENT"] },
+    },
+  },
   link_sub_issue: {
     defaultMax: 5,
     customValidation: "parentAndSubDifferent",

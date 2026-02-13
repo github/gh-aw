@@ -305,6 +305,15 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			Build()
 	},
+	"submit_pull_request_review": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.SubmitPullRequestReview == nil {
+			return nil
+		}
+		c := cfg.SubmitPullRequestReview
+		return newHandlerConfigBuilder().
+			AddIfPositive("max", c.Max).
+			Build()
+	},
 	"create_pull_request": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CreatePullRequests == nil {
 			return nil

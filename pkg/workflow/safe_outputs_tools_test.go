@@ -79,6 +79,15 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 			expectedTools: []string{"create_pull_request_review_comment"},
 		},
 		{
+			name: "submit pull request review enabled",
+			safeOutputs: &SafeOutputsConfig{
+				SubmitPullRequestReview: &SubmitPullRequestReviewConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1},
+				},
+			},
+			expectedTools: []string{"submit_pull_request_review"},
+		},
+		{
 			name: "create code scanning alerts enabled",
 			safeOutputs: &SafeOutputsConfig{
 				CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{
@@ -152,6 +161,7 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 				AddComments:                     &AddCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 10}},
 				CreatePullRequests:              &CreatePullRequestsConfig{},
 				CreatePullRequestReviewComments: &CreatePullRequestReviewCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 5}},
+				SubmitPullRequestReview:         &SubmitPullRequestReviewConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1}},
 				CreateCodeScanningAlerts:        &CreateCodeScanningAlertsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 100}},
 				AddLabels:                       &AddLabelsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3}},
 				AddReviewer:                     &AddReviewerConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3}},
@@ -167,6 +177,7 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 				"add_comment",
 				"create_pull_request",
 				"create_pull_request_review_comment",
+				"submit_pull_request_review",
 				"create_code_scanning_alert",
 				"add_labels",
 				"add_reviewer",
@@ -283,6 +294,7 @@ func TestGetSafeOutputsToolsJSON(t *testing.T) {
 		"add_comment",
 		"create_pull_request",
 		"create_pull_request_review_comment",
+		"submit_pull_request_review",
 		"create_code_scanning_alert",
 		"add_labels",
 		"remove_labels",

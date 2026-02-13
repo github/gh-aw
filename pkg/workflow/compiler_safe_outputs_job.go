@@ -131,6 +131,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		data.SafeOutputs.LinkSubIssue != nil ||
 		data.SafeOutputs.UpdateRelease != nil ||
 		data.SafeOutputs.CreatePullRequestReviewComments != nil ||
+		data.SafeOutputs.SubmitPullRequestReview != nil ||
 		data.SafeOutputs.CreatePullRequests != nil ||
 		data.SafeOutputs.PushToPullRequestBranch != nil ||
 		data.SafeOutputs.UpdatePullRequests != nil ||
@@ -195,7 +196,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		if data.SafeOutputs.UpdateRelease != nil {
 			permissions.Merge(NewPermissionsContentsWrite())
 		}
-		if data.SafeOutputs.CreatePullRequestReviewComments != nil {
+		if data.SafeOutputs.CreatePullRequestReviewComments != nil || data.SafeOutputs.SubmitPullRequestReview != nil {
 			permissions.Merge(NewPermissionsContentsReadPRWrite())
 		}
 		if data.SafeOutputs.CreatePullRequests != nil {

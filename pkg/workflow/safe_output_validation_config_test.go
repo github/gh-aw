@@ -36,6 +36,7 @@ func TestGetValidationConfigJSON(t *testing.T) {
 		"update_pull_request",
 		"push_to_pull_request_branch",
 		"create_pull_request_review_comment",
+		"submit_pull_request_review",
 		"create_discussion",
 		"close_discussion",
 		"close_issue",

@@ -20,7 +20,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 
@@ -107,6 +107,8 @@ function getAllFiles(dir, baseDir = dir) {
   const items = fs.readdirSync(dir);
 
   for (const item of items) {
+    // Validate that item doesn't contain path traversal sequences
+    validateSafePath(item, dir, "directory item");
     const fullPath = path.join(dir, item);
     const stat = fs.statSync(fullPath);
 
@@ -121,6 +123,50 @@ function getAllFiles(dir, baseDir = dir) {
 }
 
 /**
+ * Validate that a string only contains safe characters for git operations
+ * @param {string} value - Value to validate
+ * @param {string} name - Name of the parameter (for error messages)
+ * @throws {Error} If value contains unsafe characters
+ */
+function validateGitParameter(value, name) {
+  // Allow alphanumeric, hyphens, underscores, dots, and forward slashes
+  // This is safe for git owner/repo/ref names
+  const safePattern = /^[a-zA-Z0-9._/-]+$/;
+  if (!safePattern.test(value)) {
+    throw new Error(`Invalid ${name}: contains unsafe characters. Only alphanumeric, hyphens, underscores, dots, and forward slashes are allowed.`);
+  }
+}
+
+/**
+ * Validate path to prevent path traversal attacks
+ * @param {string} userPath - Path component from user input
+ * @param {string} basePath - Base path that result must be within
+ * @param {string} name - Name of the parameter (for error messages)
+ * @throws {Error} If path attempts to traverse outside base path
+ */
+function validateSafePath(userPath, basePath, name) {
+  // Reject paths with null bytes
+  if (userPath.includes('\0')) {
+    throw new Error(`Invalid ${name}: contains null bytes`);
+  }
+  
+  // Reject paths that attempt to traverse up (..)
+  if (userPath.includes('..')) {
+    throw new Error(`Invalid ${name}: path traversal detected`);
+  }
+  
+  // Resolve the full path and ensure it's within the base path
+  const resolvedPath = path.resolve(basePath, userPath);
+  const resolvedBase = path.resolve(basePath);
+  
+  if (!resolvedPath.startsWith(resolvedBase + path.sep) && resolvedPath !== resolvedBase) {
+    throw new Error(`Invalid ${name}: path escapes base directory`);
+  }
+  
+  return resolvedPath;
+}
+
+/**
  * Sparse checkout the .github folder from a remote repository
  * @deprecated This function is no longer used. The compiler now generates actions/checkout steps
  * that checkout repositories into .github/aw/imports/ (relative to GITHUB_WORKSPACE), and mergeRepositoryGithubFolder uses those.
@@ -132,15 +178,20 @@ function getAllFiles(dir, baseDir = dir) {
 function sparseCheckoutGithubFolder(owner, repo, ref, tempDir) {
   coreObj.info(`Performing sparse checkout of .github folder from ${owner}/${repo}@${ref}`);
 
+  // Validate inputs to prevent command injection
+  validateGitParameter(owner, "owner");
+  validateGitParameter(repo, "repo");
+  validateGitParameter(ref, "ref");
+
   const repoUrl = `https://github.com/${owner}/${repo}.git`;
 
   try {
     // Initialize git repository
-    execSync("git init", { cwd: tempDir, stdio: "pipe" });
+    execFileSync("git", ["init"], { cwd: tempDir, stdio: "pipe" });
     coreObj.info("Initialized temporary git repository");
 
     // Configure sparse checkout
-    execSync("git config coreObj.sparseCheckout true", { cwd: tempDir, stdio: "pipe" });
+    execFileSync("git", ["config", "core.sparseCheckout", "true"], { cwd: tempDir, stdio: "pipe" });
     coreObj.info("Enabled sparse checkout");
 
     // Set sparse checkout pattern to only include .github folder
@@ -148,16 +199,16 @@ function sparseCheckoutGithubFolder(owner, repo, ref, tempDir) {
     fs.writeFileSync(sparseCheckoutFile, ".github/\n");
     coreObj.info("Configured sparse checkout pattern: .github/");
 
-    // Add remote
-    execSync(`git remote add origin ${repoUrl}`, { cwd: tempDir, stdio: "pipe" });
+    // Add remote - using execFileSync prevents shell injection
+    execFileSync("git", ["remote", "add", "origin", repoUrl], { cwd: tempDir, stdio: "pipe" });
     coreObj.info(`Added remote: ${repoUrl}`);
 
-    // Fetch and checkout
+    // Fetch and checkout - using execFileSync with validated ref
     coreObj.info(`Fetching ref: ${ref}`);
-    execSync(`git fetch --depth 1 origin ${ref}`, { cwd: tempDir, stdio: "pipe" });
+    execFileSync("git", ["fetch", "--depth", "1", "origin", ref], { cwd: tempDir, stdio: "pipe" });
 
     coreObj.info("Checking out .github folder");
-    execSync(`git checkout FETCH_HEAD`, { cwd: tempDir, stdio: "pipe" });
+    execFileSync("git", ["checkout", "FETCH_HEAD"], { cwd: tempDir, stdio: "pipe" });
 
     coreObj.info("Sparse checkout completed successfully");
   } catch (error) {
@@ -186,6 +237,9 @@ function mergeGithubFolder(sourcePath, destPath) {
   coreObj.info(`Found ${sourceFiles.length} files in source .github folder`);
 
   for (const relativePath of sourceFiles) {
+    // Validate relative path to prevent path traversal
+    validateSafePath(relativePath, sourcePath, "relative file path");
+    
     // Check if the file is in one of the allowed subfolders
     const pathParts = relativePath.split(path.sep);
     const topLevelFolder = pathParts[0];

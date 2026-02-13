@@ -155,6 +155,12 @@ func generateSafeOutputsConfig(data *WorkflowData) string {
 				10, // default max
 			)
 		}
+		if data.SafeOutputs.SubmitPullRequestReview != nil {
+			safeOutputsConfig["submit_pull_request_review"] = generateMaxConfig(
+				data.SafeOutputs.SubmitPullRequestReview.Max,
+				1, // default max
+			)
+		}
 		if data.SafeOutputs.CreateCodeScanningAlerts != nil {
 			safeOutputsConfig["create_code_scanning_alert"] = generateMaxConfig(
 				data.SafeOutputs.CreateCodeScanningAlerts.Max,
@@ -622,6 +628,9 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	}
 	if data.SafeOutputs.CreatePullRequestReviewComments != nil {
 		enabledTools["create_pull_request_review_comment"] = true
+	}
+	if data.SafeOutputs.SubmitPullRequestReview != nil {
+		enabledTools["submit_pull_request_review"] = true
 	}
 	if data.SafeOutputs.CreateCodeScanningAlerts != nil {
 		enabledTools["create_code_scanning_alert"] = true

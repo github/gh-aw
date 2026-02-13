@@ -153,6 +153,13 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"side":       {Type: "string", Enum: []string{"LEFT", "RIGHT"}},
 		},
 	},
+	"submit_pull_request_review": {
+		DefaultMax: 1,
+		Fields: map[string]FieldValidation{
+			"body":  {Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
+			"event": {Type: "string", Enum: []string{"APPROVE", "REQUEST_CHANGES", "COMMENT"}},
+		},
+	},
 	"create_discussion": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

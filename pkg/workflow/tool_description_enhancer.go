@@ -158,6 +158,13 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 			}
 		}
 
+	case "submit_pull_request_review":
+		if config := safeOutputs.SubmitPullRequestReview; config != nil {
+			if config.Max > 0 {
+				constraints = append(constraints, fmt.Sprintf("Maximum %d review(s) can be submitted.", config.Max))
+			}
+		}
+
 	case "create_code_scanning_alert":
 		if config := safeOutputs.CreateCodeScanningAlerts; config != nil {
 			if config.Max > 0 {
