@@ -52,6 +52,7 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 - [**Assign Milestone**](#assign-milestone-assign-milestone) (`assign-milestone`) - Assign issues to milestones (max: 1)
 - [**Assign to Agent**](#assign-to-agent-assign-to-agent) (`assign-to-agent`) - Assign Copilot agents to issues or PRs (max: 1)
 - [**Assign to User**](#assign-to-user-assign-to-user) (`assign-to-user`) - Assign users to issues (max: 1)
+- [**Unassign from User**](#unassign-from-user-unassign-from-user) (`unassign-from-user`) - Remove user assignments from issues or PRs (max: 1)
 
 ### Projects, Releases & Assets
 
@@ -1275,6 +1276,19 @@ safe-outputs:
   assign-to-user:
     allowed: [user1, user2]    # restrict to specific users
     max: 3                     # max assignments (default: 1)
+    target: "*"                # "triggering" (default), "*", or number
+    target-repo: "owner/repo"  # cross-repository
+```
+
+### Unassign from User (`unassign-from-user:`)
+
+Removes user assignments from issues or pull requests. Restrict with `allowed` list to control which users can be unassigned. Target: `"triggering"` (issue/PR event), `"*"` (any), or number.
+
+```yaml wrap
+safe-outputs:
+  unassign-from-user:
+    allowed: [user1, user2]    # restrict to specific users
+    max: 1                     # max unassignments (default: 1)
     target: "*"                # "triggering" (default), "*", or number
     target-repo: "owner/repo"  # cross-repository
 ```
