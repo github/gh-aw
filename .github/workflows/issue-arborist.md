@@ -132,7 +132,7 @@ For each potential relationship, evaluate:
 - If you identify a cluster of **5 or more related issues** that lack a parent issue, you may create a new parent issue
 - The parent issue should have a clear, descriptive title starting with "[Parent] " that captures the common theme
 - Include a body that explains the cluster and references all related issues
-- Use temporary IDs (format: `aw_` + 4-8 alphanumeric characters) for newly created parent issues
+- Use temporary IDs (format: `aw_` + 3-8 alphanumeric characters) for newly created parent issues
 - After creating the parent, link all related issues as sub-issues using the temporary ID
 
 **Constraints:**
@@ -148,7 +148,7 @@ For each potential relationship, evaluate:
 **For orphan clusters (5+ related issues without a parent):**
 1. Create a parent issue using the `create_issue` tool with a temporary ID
    - Format: `{"type": "create_issue", "temporary_id": "aw_XXXXXXXX", "title": "[Parent] Theme Description", "body": "Description with references to related issues"}`
-   - Temporary ID must be `aw_` followed by 4-8 alphanumeric characters (e.g., `aw_abc123`, `aw_Test123`)
+   - Temporary ID must be `aw_` followed by 3-8 alphanumeric characters (e.g., `aw_abc123`, `aw_Test123`)
 2. Link each related issue to the parent using `link_sub_issue` tool with the temporary ID
    - Format: `{"type": "link_sub_issue", "parent_issue_number": "aw_XXXXXXXX", "sub_issue_number": 123}`
 
@@ -202,6 +202,6 @@ Your discussion should include:
 - Prefer precision over recall (better to miss a link than create a wrong one)
 - Consider that unlinking is a manual process, so be confident before linking
 - **Create parent issues only for clusters of 5+ related issues** that clearly share a common theme
-- Use temporary IDs (format: `aw_` + 4-8 alphanumeric characters) when creating parent issues
+- Use temporary IDs (format: `aw_` + 3-8 alphanumeric characters) when creating parent issues
 - When creating parent issues, include references to all related sub-issues in the body
 - Link all related issues as sub-issues immediately after creating the parent issue

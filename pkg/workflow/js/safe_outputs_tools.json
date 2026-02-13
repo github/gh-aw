@@ -34,7 +34,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
+          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 3 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
         }
       },
       "additionalProperties": false
@@ -110,7 +110,7 @@
   },
   {
     "name": "close_discussion",
-    "description": "Close a GitHub discussion with a resolution comment and optional reason. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed.",
+    "description": "Close a GitHub discussion with a resolution comment and optional reason. You can and should always add a comment when closing a discussion to explain the action or provide context. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed. If the discussion is already closed, a comment will still be posted.",
     "inputSchema": {
       "type": "object",
       "required": [
@@ -144,7 +144,7 @@
   },
   {
     "name": "close_issue",
-    "description": "Close a GitHub issue with a closing comment. This tool is ONLY for closing issues - use update_issue if you need to change the title, body, labels, or other metadata without closing. Use close_issue when work is complete, the issue is no longer relevant, or it's a duplicate. The closing comment should explain the resolution or reason for closing.",
+    "description": "Close a GitHub issue with a closing comment. You can and should always add a comment when closing an issue to explain the action or provide context. This tool is ONLY for closing issues - use update_issue if you need to change the title, body, labels, or other metadata without closing. Use close_issue when work is complete, the issue is no longer relevant, or it's a duplicate. The closing comment should explain the resolution or reason for closing. If the issue is already closed, a comment will still be posted.",
     "inputSchema": {
       "type": "object",
       "required": [
@@ -168,7 +168,7 @@
   },
   {
     "name": "close_pull_request",
-    "description": "Close a pull request WITHOUT merging, adding a closing comment. Use this for PRs that should be abandoned, superseded, or closed for other reasons. The closing comment should explain why the PR is being closed. This does NOT merge the changes.",
+    "description": "Close a pull request WITHOUT merging, adding a closing comment. You can and should always add a comment when closing a PR to explain the action or provide context. Use this for PRs that should be abandoned, superseded, or closed for other reasons. The closing comment should explain why the PR is being closed. This does NOT merge the changes. If the PR is already closed, a comment will still be posted.",
     "inputSchema": {
       "type": "object",
       "required": [
@@ -850,7 +850,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 4 to 8 alphanumeric characters."
+          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 3 to 8 alphanumeric characters."
         },
         "fields": {
           "type": "object",
@@ -990,7 +990,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
+          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 3 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
         }
       },
       "additionalProperties": false

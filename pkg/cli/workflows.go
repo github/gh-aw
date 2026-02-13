@@ -133,7 +133,7 @@ func fetchGitHubWorkflows(repoOverride string, verbose bool) (map[string]*GitHub
 		workflowMap[name] = &workflows[i]
 	}
 
-	// Count user workflows (those with .md files) vs internal workflows
+	// Count user workflows (those with .md files)
 	mdFiles, _ := getMarkdownWorkflowFiles("")
 	mdWorkflowNames := make(map[string]bool)
 	for _, file := range mdFiles {
@@ -141,25 +141,23 @@ func fetchGitHubWorkflows(repoOverride string, verbose bool) (map[string]*GitHub
 		mdWorkflowNames[name] = true
 	}
 
-	var userWorkflowCount, internalWorkflowCount int
+	var userWorkflowCount int
 	for name := range workflowMap {
 		if mdWorkflowNames[name] {
 			userWorkflowCount++
-		} else {
-			internalWorkflowCount++
 		}
 	}
 
-	// Stop spinner with success message showing user and internal workflow counts
+	// Stop spinner with success message showing only user workflow count
 	if !verbose {
-		if internalWorkflowCount > 0 {
-			spinner.StopWithMessage(fmt.Sprintf("✓ Fetched %d public and %d internal workflows", userWorkflowCount, internalWorkflowCount))
+		if userWorkflowCount == 1 {
+			spinner.StopWithMessage("✓ Fetched 1 workflow")
 		} else {
 			spinner.StopWithMessage(fmt.Sprintf("✓ Fetched %d workflows", userWorkflowCount))
 		}
 	}
 
-	workflowsLog.Printf("Fetched %d GitHub workflows (%d user, %d internal)", len(workflowMap), userWorkflowCount, internalWorkflowCount)
+	workflowsLog.Printf("Fetched %d GitHub workflows (%d with .md files)", len(workflowMap), userWorkflowCount)
 	return workflowMap, nil
 }
 

@@ -448,14 +448,12 @@ flowchart TB
 **Compilation Commands:**
 
 ```bash wrap
-# Standard compilation
+# Generate the lock file from the workflow frontmatter, which includes schema validation,
+# expression safety checks, action pinning, and security scanning
 gh aw compile
 
-# Strict mode enforces additional security constraints (no write permissions, explicit network configuration)
-gh aw compile --strict
-
-# Enable security scanners for additional validation
-gh aw compile --strict --actionlint --zizmor --poutine
+# Enable added security scanners for additional validation
+gh aw compile --actionlint --zizmor --poutine
 ```
 
 ## Content Sanitization

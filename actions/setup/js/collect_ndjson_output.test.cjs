@@ -1627,7 +1627,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].type).toBe("link_sub_issue"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should reject invalid temporary ID format (wrong length)", async () => {
-          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_abc", sub_issue_number: 50 }),
+          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_ab", sub_issue_number: 50 }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-invalid-temp-id.txt";
           (fs.writeFileSync(outputPath, testInput),
             (process.env.GH_AW_SAFE_OUTPUTS = outputPath),

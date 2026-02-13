@@ -19,22 +19,38 @@ type PushToPullRequestBranchConfig struct {
 	CommitTitleSuffix    string   `yaml:"commit-title-suffix,omitempty"` // Optional suffix to append to generated commit titles
 }
 
-func buildCheckoutRepository(steps []string, c *Compiler) []string {
+// buildCheckoutRepository generates a checkout step with optional target repository
+// Parameters:
+//   - steps: existing steps to append to
+//   - c: compiler instance for trialMode checks
+//   - targetRepoSlug: optional target repository (e.g., "org/repo") for cross-repo operations
+//     If empty, checks out the source repository (github.repository)
+//     If set, checks out the specified target repository
+func buildCheckoutRepository(steps []string, c *Compiler, targetRepoSlug string) []string {
 	steps = append(steps, "      - name: Checkout repository\n")
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", GetActionPin("actions/checkout")))
 	steps = append(steps, "        with:\n")
+
+	// Determine which repository to check out
+	// Priority: targetRepoSlug > trialLogicalRepoSlug > default (source repo)
+	effectiveTargetRepo := targetRepoSlug
+	if c.trialMode && c.trialLogicalRepoSlug != "" {
+		effectiveTargetRepo = c.trialLogicalRepoSlug
+	}
+
+	// Set repository parameter if we're checking out a different repo
+	if effectiveTargetRepo != "" {
+		steps = append(steps, fmt.Sprintf("          repository: %s\n", effectiveTargetRepo))
+	}
+
 	steps = append(steps, "          persist-credentials: false\n")
 	steps = append(steps, "          fetch-depth: 0\n")
-	if c.trialMode {
-		if c.trialLogicalRepoSlug != "" {
-			steps = append(steps, fmt.Sprintf("          repository: %s\n", c.trialLogicalRepoSlug))
-			// trialTargetRepoName := strings.Split(c.trialLogicalRepoSlug, "/")
-			// if len(trialTargetRepoName) == 2 {
-			// 	steps = append(steps, fmt.Sprintf("          path: %s\n", trialTargetRepoName[1]))
-			// }
-		}
+
+	// Add token for trial mode or when checking out a different repository
+	if c.trialMode || targetRepoSlug != "" {
 		steps = append(steps, "          token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}\n")
 	}
+
 	return steps
 }
 

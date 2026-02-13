@@ -65,7 +65,7 @@ The terminology for starting an agent is changing from "New Agent Task" to "New 
 - `skills/gh-agent-task/SKILL.md` - Skill documentation
 - `docs/src/content/docs/reference/safe-outputs.md` - Safe outputs reference
 - `docs/src/content/docs/reference/frontmatter-full.md` - Frontmatter reference
-- `docs/src/content/docs/reference/tokens.md` - Token reference
+- `docs/src/content/docs/reference/auth.md` - Token reference
 - `docs/src/content/docs/patterns/multirepoops.md` - Multi-repo guide
 - `docs/src/content/docs/examples/multi-repo.md` - Multi-repo example
 - `pkg/cli/templates/github-agentic-workflows.md` - Template
@@ -199,7 +199,7 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
 2. **Update Reference Docs**
    - `docs/src/content/docs/reference/safe-outputs.md`
    - `docs/src/content/docs/reference/frontmatter-full.md`
-   - `docs/src/content/docs/reference/tokens.md`
+   - `docs/src/content/docs/reference/auth.md`
 
 3. **Update Guides and Examples**
    - `docs/src/content/docs/patterns/multirepoops.md`
@@ -333,7 +333,7 @@ During transition period:
     - [ ] Update all text references
     - [ ] Update code examples
   - [ ] `docs/src/content/docs/reference/frontmatter-full.md`
-  - [ ] `docs/src/content/docs/reference/tokens.md`
+  - [ ] `docs/src/content/docs/reference/auth.md`
   
 - [ ] Update Guides
   - [ ] `docs/src/content/docs/patterns/multirepoops.md`

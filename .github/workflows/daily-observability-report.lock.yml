@@ -17,7 +17,9 @@
 #
 # To update this file, edit the corresponding .md file and run:
 #   gh aw compile
-# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
+# Not all edits will cause changes to this file.
+#
+# For more information: https://github.github.com/gh-aw/introduction/overview/
 #
 # Daily observability report analyzing logging and telemetry coverage for AWF firewall and MCP Gateway across workflow runs
 #
@@ -302,7 +304,7 @@ jobs:
               "name": "create_discussion"
             },
             {
-              "description": "Close a GitHub discussion with a resolution comment and optional reason. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed. CONSTRAINTS: Maximum 10 discussion(s) can be closed.",
+              "description": "Close a GitHub discussion with a resolution comment and optional reason. You can and should always add a comment when closing a discussion to explain the action or provide context. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed. If the discussion is already closed, a comment will still be posted. CONSTRAINTS: Maximum 10 discussion(s) can be closed.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -663,14 +665,14 @@ jobs:
           
           **IMPORTANT - temporary_id format rules:**
           - If you DON'T need to reference the item later, OMIT the temporary_id field entirely (it will be auto-generated if needed)
-          - If you DO need cross-references/chaining, you MUST match this EXACT validation regex: /^aw_[A-Za-z0-9]{4,8}$/i
-          - Format: aw_ prefix followed by 4 to 8 alphanumeric characters (A-Z, a-z, 0-9, case-insensitive)
+          - If you DO need cross-references/chaining, you MUST match this EXACT validation regex: /^aw_[A-Za-z0-9]{3,8}$/i
+          - Format: aw_ prefix followed by 3 to 8 alphanumeric characters (A-Z, a-z, 0-9, case-insensitive)
           - Valid alphanumeric characters: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
-          - INVALID examples: aw_abc (too short), aw_123456789 (too long), aw_test-id (contains hyphen), aw_id_123 (contains underscore)
-          - VALID examples: aw_abc1, aw_Test123, aw_A1B2C3D4, aw_12345678
-          - To generate valid IDs: use 4-8 random alphanumeric characters or omit the field to let the system auto-generate
+          - INVALID examples: aw_ab (too short), aw_123456789 (too long), aw_test-id (contains hyphen), aw_id_123 (contains underscore)
+          - VALID examples: aw_abc, aw_abc1, aw_Test123, aw_A1B2C3D4, aw_12345678
+          - To generate valid IDs: use 3-8 random alphanumeric characters or omit the field to let the system auto-generate
           
-          Do NOT invent other aw_* formats — downstream steps will reject them with validation errors matching against /^aw_[A-Za-z0-9]{4,8}$/i.
+          Do NOT invent other aw_* formats — downstream steps will reject them with validation errors matching against /^aw_[A-Za-z0-9]{3,8}$/i.
           
           Discover available tools from the safeoutputs MCP server.
           

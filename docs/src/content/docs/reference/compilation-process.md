@@ -9,13 +9,17 @@ This guide documents the internal compilation process that transforms markdown w
 
 ## Overview
 
-The `gh aw compile` command transforms a markdown file with YAML frontmatter into a complete GitHub Actions workflow with multiple orchestrated jobs. This process involves:
+The `gh aw compile` command transforms a markdown file into a complete GitHub Actions workflow by embedding the frontmatter and setting up runtime loading of the markdown body. The GitHub Actions workflow will have multiple orchestrated jobs.
+
+This process involves:
 
 1. **Parsing** - Extract frontmatter and markdown content
 2. **Validation** - Verify configuration against JSON schemas
 3. **Job Building** - Create specialized jobs for different workflow stages
 4. **Dependency Management** - Establish job execution order
 5. **YAML Generation** - Output final `.lock.yml` file
+
+When the workflow runs, the markdown body is loaded at runtime, allowing you to edit instructions without recompilation. See [Editing Workflows](/gh-aw/guides/editing-workflows/) for details.
 
 ## Compilation Phases
 

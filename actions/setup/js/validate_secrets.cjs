@@ -38,7 +38,7 @@ const SECRET_DOCS = {
   GH_AW_PROJECT_GITHUB_TOKEN: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
   GH_AW_COPILOT_TOKEN: "https://docs.github.com/en/copilot",
   ANTHROPIC_API_KEY: "https://docs.anthropic.com/en/api/getting-started",
-  OPENAI_API_KEY: "https://platform.openai.com/docs/api-reference/authentication",
+  OPENAI_API_KEY: "https://platform.openai.com/docs/api-reference/auth",
   BRAVE_API_KEY: "https://brave.com/search/api/",
   NOTION_API_TOKEN: "https://developers.notion.com/docs/authorization",
 };
