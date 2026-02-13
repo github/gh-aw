@@ -8,7 +8,7 @@ permissions:
   issues: read
 tools:
   github:
-    lockdown: false
+    lockdown: true
     toolsets: [issues, labels]
 safe-outputs:
   add-labels:
