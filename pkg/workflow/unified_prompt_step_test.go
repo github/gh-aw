@@ -483,7 +483,7 @@ func TestCollectPromptSections_DisableXPIA(t *testing.T) {
 		// Check that XPIA section is included (it's the first section)
 		hasXPIA := false
 		for _, section := range sections {
-			if section.IsFile && strings.Contains(section.Content, "xpia") {
+			if section.IsFile && section.Content == xpiaPromptFile {
 				hasXPIA = true
 				break
 			}
@@ -506,7 +506,7 @@ func TestCollectPromptSections_DisableXPIA(t *testing.T) {
 		// Check that XPIA section is NOT included
 		hasXPIA := false
 		for _, section := range sections {
-			if section.IsFile && strings.Contains(section.Content, "xpia") {
+			if section.IsFile && section.Content == xpiaPromptFile {
 				hasXPIA = true
 				break
 			}
@@ -529,7 +529,7 @@ func TestCollectPromptSections_DisableXPIA(t *testing.T) {
 		// Check that XPIA section is included
 		hasXPIA := false
 		for _, section := range sections {
-			if section.IsFile && strings.Contains(section.Content, "xpia") {
+			if section.IsFile && section.Content == xpiaPromptFile {
 				hasXPIA = true
 				break
 			}
