@@ -232,39 +232,90 @@ jobs:
 
               let issueComments = [];
               try {
-                const { data } = await github.rest.issues.listComments({
-                  owner,
-                  repo,
-                  issue_number: it.number,
-                  per_page: 100,
-                });
-                issueComments = data || [];
+                let total = 0;
+                issueComments = await github.paginate(
+                  github.rest.issues.listComments,
+                  {
+                    owner,
+                    repo,
+                    issue_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
+                    if (total + response.data.length >= 500) {
+                      total = 500;
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
+                    total += response.data.length;
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
 
               let reviewComments = [];
               try {
-                const { data } = await github.rest.pulls.listReviewComments({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                reviewComments = data || [];
+                let total = 0;
+                reviewComments = await github.paginate(
+                  github.rest.pulls.listReviewComments,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
+                    if (total + response.data.length >= 500) {
+                      total = 500;
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
+                    total += response.data.length;
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
 
               let reviews = [];
               try {
-                const { data } = await github.rest.pulls.listReviews({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                reviews = data || [];
+                let total = 0;
+                reviews = await github.paginate(
+                  github.rest.pulls.listReviews,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
+                    if (total + response.data.length >= 500) {
+                      total = 500;
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
+                    total += response.data.length;
+                    return response.data;
+                  }
+                );
               } catch {
                 // ignore
               }
@@ -314,13 +365,31 @@ jobs:
               const s = ensureAuthor(login);
 
               try {
-                const filesResp = await github.rest.pulls.listFiles({
-                  owner,
-                  repo,
-                  pull_number: it.number,
-                  per_page: 100,
-                });
-                const filenames = (filesResp.data || []).map(f => f.filename);
+                let total = 0;
+                const files = await github.paginate(
+                  github.rest.pulls.listFiles,
+                  {
+                    owner,
+                    repo,
+                    pull_number: it.number,
+                    per_page: 100,
+                  },
+                  (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
+                    if (total + response.data.length >= 500) {
+                      total = 500;
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
+                    total += response.data.length;
+                    return response.data;
+                  }
+                );
+                const filenames = files.map(f => f.filename);
                 for (const fn of filenames) {
                   if (fn.startsWith(".github/workflows/") || fn.startsWith(".github/actions/")) s.touchesWorkflows = true;
                   if (fn === "Dockerfile" || fn === "Makefile" || fn.startsWith("scripts/") || fn.startsWith("actions/")) s.touchesCI = true;
