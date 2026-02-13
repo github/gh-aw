@@ -150,7 +150,7 @@ jobs:
               engine_name: "Codex",
               model: process.env.GH_AW_MODEL_AGENT_CODEX || "",
               version: "",
-              agent_version: "0.99.0",
+              agent_version: "0.101.0",
               workflow_name: "Duplicate Code Detector",
               experimental: false,
               supports_tools_allowlist: true,
@@ -194,7 +194,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex
-        run: npm install -g --silent @openai/codex@0.99.0
+        run: npm install -g --silent @openai/codex@0.101.0
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.1
       - name: Determine automatic lockdown mode for GitHub MCP server
@@ -1004,7 +1004,7 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Install Codex
-        run: npm install -g --silent @openai/codex@0.99.0
+        run: npm install -g --silent @openai/codex@0.101.0
       - name: Run Codex
         run: |
           set -o pipefail
