@@ -19,55 +19,6 @@ safe-outputs:
 
 The agent requests issue creation; a separate job with `issues: write` creates it.
 
-## Required Permissions by Safe Output Type
-
-Each safe output type requires specific GitHub permissions. When using GitHub App tokens (`app:`), permissions are **automatically narrowed per-job** to match only what's needed. The table below shows the minimum permissions required for each safe output type:
-
-| Safe Output Type | `contents` | `issues` | `pull-requests` | `discussions` | `actions` | `security-events` | `organization-projects` | Notes |
-|------------------|------------|----------|-----------------|---------------|-----------|-------------------|-------------------------|-------|
-| `create-issue` | read | write | - | - | - | - | - | |
-| `update-issue` | read | write | - | - | - | - | - | |
-| `close-issue` | read | write | - | - | - | - | - | |
-| `link-sub-issue` | read | write | - | - | - | - | - | |
-| `create-discussion` | read | write | write | - | - | - | - | With `fallback-to-issue: true` (default) |
-| `create-discussion` | read | - | - | write | - | - | - | With `fallback-to-issue: false` |
-| `update-discussion` | read | - | - | write | - | - | - | |
-| `close-discussion` | read | - | - | write | - | - | - | |
-| `add-comment` | read | write | write | write | - | - | - | Supports issues, PRs, and discussions |
-| `hide-comment` | read | write | write | write | - | - | - | Supports issues, PRs, and discussions |
-| `add-labels` | read | write | write | - | - | - | - | For issues and PRs |
-| `remove-labels` | read | write | write | - | - | - | - | For issues and PRs |
-| `create-pull-request` | write | write | write | - | - | - | - | With `fallback-as-issue: true` (default) |
-| `create-pull-request` | write | - | write | - | - | - | - | With `fallback-as-issue: false` |
-| `push-to-pull-request-branch` | write | write | write | - | - | - | - | |
-| `update-pull-request` | read | - | write | - | - | - | - | |
-| `close-pull-request` | read | - | write | - | - | - | - | |
-| `mark-pull-request-as-ready-for-review` | read | - | write | - | - | - | - | |
-| `create-pull-request-review-comment` | read | - | write | - | - | - | - | |
-| `add-reviewer` | read | - | write | - | - | - | - | |
-| `update-release` | write | - | - | - | - | - | - | |
-| `dispatch-workflow` | - | - | - | - | write | - | - | |
-| `assign-to-agent` | read | write | - | - | - | - | - | |
-| `create-agent-session` | read | write | - | - | - | - | - | |
-| `assign-milestone` | read | write | write | - | - | - | - | For issues and PRs |
-| `assign-to-user` | read | write | - | - | - | - | - | |
-| `create-code-scanning-alert` | read | - | - | - | - | write | - | |
-| `autofix-code-scanning-alert` | read | - | - | - | read | write | - | |
-| `create-project` | read | - | - | - | - | - | write | |
-| `update-project` | read | - | - | - | - | - | write | |
-| `create-project-status-update` | read | - | - | - | - | - | write | |
-| `upload-asset` | write | - | - | - | - | - | - | |
-
-> [!NOTE]
-> **Permission Union**: When multiple safe outputs are configured in the same workflow, the safe output job receives the **union** of all required permissions. For example, configuring both `create-issue:` and `create-pull-request:` results in `contents: write`, `issues: write`, and `pull-requests: write`.
-
-> [!TIP]
-> **Fallback Fields**: Some safe output types support fallback mechanisms that affect required permissions:
-> - `create-pull-request`: Set `fallback-as-issue: false` to avoid requiring `issues: write` permission
-> - `create-discussion`: Set `fallback-to-issue: false` to avoid requiring `issues: write` permission
-> 
-> Without these fields set to `false`, the default behavior includes fallback capabilities which require additional permissions.
-
 ## Available Safe Output Types
 
 > [!NOTE]
