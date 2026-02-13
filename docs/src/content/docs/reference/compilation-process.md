@@ -9,7 +9,9 @@ This guide documents the internal compilation process that transforms markdown w
 
 ## Overview
 
-The `gh aw compile` command transforms the frontmatter of a markdown file into a complete GitHub Actions workflow with multiple orchestrated jobs. This process involves:
+The `gh aw compile` command transforms a markdown file into a complete GitHub Actions workflow by embedding the frontmatter and setting up runtime loading of the markdown body. The GitHub Actions workflow will have multiple orchestrated jobs.
+
+This process involves:
 
 1. **Parsing** - Extract frontmatter and markdown content
 2. **Validation** - Verify configuration against JSON schemas
