@@ -26,6 +26,7 @@ on: push
 timeout-minutes: 10
 permissions:
   contents: read
+  issues: read
   pull-requests: read
 engine: copilot
 strict: false
