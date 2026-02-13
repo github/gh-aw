@@ -26,8 +26,8 @@ The aim here is to become familiar with **automated AI**: to install something t
 
 Before installing, ensure you have:
 
-- **AI Account** - a [GitHub Copilot](https://github.com/features/copilot) subscription, or an [Anthropic Claude](https://www.anthropic.com/) or [OpenAI Codex](https://openai.com/api/) API key
-- **GitHub Repository** - A repository where you have write access or higher
+- **AI Account** - [GitHub Copilot](https://github.com/features/copilot), [Anthropic Claude](https://www.anthropic.com/) or [OpenAI Codex](https://openai.com/api/)
+- **GitHub Repository** - A repository where you have write access
 - **GitHub Actions** enabled - Check in [Settings → Actions](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)
 - **GitHub CLI** (`gh`) v2.0.0+ - [Install here](https://cli.github.com). Check version: `gh --version`
 - **Operating System**: Linux, macOS, or Windows with WSL
@@ -56,14 +56,14 @@ gh aw add-wizard githubnext/agentics/daily-repo-status
 
 This will take you through an interactive process to:
 
-1. **Check pre-requisttes** - Verify repository permissions and GitHub Actions is enabled
-2. **Select an AI Engine** - Choose between Claude, Copilot, or Codex
-3. **Set up required secrets** - e.g. [`COPILOT_GITHUB_TOKEN`, `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`](/gh-aw/reference/engines/)
-4. **Add the workflow** - Copies the workflow [markdown file](/gh-aw/reference/workflow-structure/) to `.github/workflows/`
-5. **Trigger an initial run** - Starts the workflow immediately
+1. **Check pre-requisttes** - Verify repository permissions.
+2. **Select an AI Engine** - Choose between Copilot, Claude, or Codex.
+3. **Set up the required secret** - [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#copilot_github_token), [`ANTHROPIC_API_KEY`](/gh-aw/reference/tokens/#anthropic_api_key) or [`OPENAI_API_KEY`](/gh-aw/reference/tokens/#openai_api_key).
+4. **Add the workflow** - Adds the workflow and lock file to `.github/workflows/`.
+5. **Optionally trigger an initial run** - Starts the workflow immediately.
 
 > [!TIP]
-> **Having trouble?** Check your [repository secrets](/gh-aw/reference/engines/), see the [FAQ](/gh-aw/reference/faq/) and [Common Issues](/gh-aw/troubleshooting/common-issues/).
+> **Having trouble?** Check your [repository secrets](/gh-aw/reference/tokens/), see the [FAQ](/gh-aw/reference/faq/) and [Common Issues](/gh-aw/troubleshooting/common-issues/).
 
 ## Step 3 - Wait for the workflow to complete
 
