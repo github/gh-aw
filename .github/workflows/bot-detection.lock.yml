@@ -898,9 +898,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-      discussions: write
       issues: write
-      pull-requests: write
     outputs:
       noop_message: ${{ steps.noop.outputs.noop_message }}
       tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}

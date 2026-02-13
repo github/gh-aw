@@ -960,7 +960,7 @@ jobs:
     if: (always()) && (needs.agent.result != 'skipped')
     runs-on: ubuntu-slim
     permissions:
-      contents: read
+      contents: write
       discussions: write
       issues: write
       pull-requests: write

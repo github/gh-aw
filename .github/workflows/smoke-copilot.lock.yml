@@ -1720,6 +1720,7 @@ jobs:
     if: (always()) && (needs.agent.result != 'skipped')
     runs-on: ubuntu-slim
     permissions:
+      actions: write
       contents: read
       discussions: write
       issues: write
