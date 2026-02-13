@@ -267,6 +267,46 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		// WorkflowData.Permissions contains the raw YAML string (including "permissions:" prefix)
 		permissions := NewPermissionsParser(workflowData.Permissions).ToPermissions()
 
+		// Auto-infer compatible toolsets if:
+		// 1. Permissions are specified AND
+		// 2. Toolsets are not explicitly configured
+		if permissions != nil && len(workflowData.ParsedTools.GitHub.Toolset) == 0 && workflowData.Permissions != "" {
+			log.Print("Auto-inferring compatible GitHub MCP toolsets from permissions")
+			compatibleToolsets := InferCompatibleToolsets(permissions, workflowData.ParsedTools.GitHub.ReadOnly)
+			
+			if len(compatibleToolsets) > 0 {
+				log.Printf("Inferred %d compatible toolsets: %v", len(compatibleToolsets), compatibleToolsets)
+				// Set the inferred toolsets in the GitHub tool configuration
+				workflowData.ParsedTools.GitHub.Toolset = make(GitHubToolsets, len(compatibleToolsets))
+				for i, toolset := range compatibleToolsets {
+					workflowData.ParsedTools.GitHub.Toolset[i] = GitHubToolset(toolset)
+				}
+				
+				// Also update the raw Tools map so the renderer picks up the inferred toolsets
+				if workflowData.Tools != nil {
+					if githubTool, exists := workflowData.Tools["github"]; exists {
+						// Convert to map if needed
+						var githubConfig map[string]any
+						if toolConfig, ok := githubTool.(map[string]any); ok {
+							githubConfig = toolConfig
+						} else {
+							githubConfig = make(map[string]any)
+						}
+						
+						// Convert toolsets to []any for the raw map
+						toolsetsAny := make([]any, len(compatibleToolsets))
+						for i, toolset := range compatibleToolsets {
+							toolsetsAny[i] = toolset
+						}
+						githubConfig["toolsets"] = toolsetsAny
+						workflowData.Tools["github"] = githubConfig
+					}
+				}
+			} else {
+				log.Print("No compatible toolsets found for the given permissions")
+			}
+		}
+
 		// Validate permissions using the typed GitHub tool configuration
 		validationResult := ValidatePermissions(permissions, workflowData.ParsedTools.GitHub)
 
