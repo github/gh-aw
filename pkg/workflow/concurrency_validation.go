@@ -74,6 +74,7 @@ func validateConcurrencyGroupExpression(group string) error {
 
 // validateBalancedBraces checks that all ${{ }} braces are balanced and properly closed
 func validateBalancedBraces(group string) error {
+	concurrencyValidationLog.Print("Checking balanced braces in expression")
 	openCount := 0
 	i := 0
 	positions := []int{} // Track positions of opening braces for error reporting
@@ -111,6 +112,7 @@ func validateBalancedBraces(group string) error {
 	if openCount > 0 {
 		// Find the position of the first unclosed opening brace
 		pos := positions[0]
+		concurrencyValidationLog.Printf("Found %d unclosed brace(s) starting at position %d", openCount, pos)
 		return NewValidationError(
 			"concurrency",
 			"unclosed expression braces",
@@ -119,6 +121,7 @@ func validateBalancedBraces(group string) error {
 		)
 	}
 
+	concurrencyValidationLog.Print("Brace balance check passed")
 	return nil
 }
 
@@ -127,6 +130,8 @@ func validateExpressionSyntax(group string) error {
 	// Pattern to extract content between ${{ and }}
 	expressionPattern := regexp.MustCompile(`\$\{\{([^}]*)\}\}`)
 	matches := expressionPattern.FindAllStringSubmatch(group, -1)
+
+	concurrencyValidationLog.Printf("Found %d expression(s) to validate", len(matches))
 
 	for _, match := range matches {
 		if len(match) < 2 {
@@ -189,7 +194,9 @@ func validateExpressionContent(expr string, fullGroup string) error {
 
 	// Try to parse complex expressions with logical operators
 	if containsLogicalOperators(expr) {
+		concurrencyValidationLog.Print("Expression contains logical operators, performing deep validation")
 		if _, err := ParseExpression(expr); err != nil {
+			concurrencyValidationLog.Printf("Expression parsing failed: %v", err)
 			return NewValidationError(
 				"concurrency",
 				"invalid expression syntax",

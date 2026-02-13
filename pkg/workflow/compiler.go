@@ -517,9 +517,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 	// Track compilation time for performance monitoring
 	startTime := time.Now()
 	defer func() {
-		if log.Enabled() {
-			log.Printf("Compilation completed in %v", time.Since(startTime))
-		}
+		log.Printf("Compilation completed in %v", time.Since(startTime))
 	}()
 
 	// Reset the step order tracker for this compilation

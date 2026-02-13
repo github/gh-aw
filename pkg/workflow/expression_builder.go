@@ -58,6 +58,7 @@ func BuildOr(left ConditionNode, right ConditionNode) ConditionNode {
 
 // BuildAnd creates an AND node combining two conditions
 func BuildAnd(left ConditionNode, right ConditionNode) ConditionNode {
+	expressionBuilderLog.Print("Building AND condition node")
 	return &AndNode{Left: left, Right: right}
 }
 
@@ -80,6 +81,8 @@ func BuildReactionCondition() ConditionNode {
 		Right: BuildNotFromFork(),
 	}
 	terms = append(terms, pullRequestCondition)
+
+	expressionBuilderLog.Printf("Created disjunction with %d event type terms", len(terms))
 
 	// Use DisjunctionNode to avoid deep nesting
 	return &DisjunctionNode{Terms: terms}
@@ -169,6 +172,7 @@ func BuildNotFromFork() *ComparisonNode {
 }
 
 func BuildSafeOutputType(outputType string) ConditionNode {
+	expressionBuilderLog.Printf("Building safe-output condition for output type: %s", outputType)
 	// Use !cancelled() && needs.agent.result != 'skipped' to properly handle workflow cancellation
 	// !cancelled() allows jobs to run when dependencies fail (for error reporting)
 	// needs.agent.result != 'skipped' prevents running when workflow is cancelled (dependencies get skipped)
