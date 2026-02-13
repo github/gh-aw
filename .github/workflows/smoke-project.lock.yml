@@ -441,8 +441,8 @@ jobs:
                     "type": "string"
                   },
                   "draft_issue_id": {
-                    "description": "Temporary ID of an existing draft issue to update (e.g., 'aw_abc123def456' or '#aw_abc123def456'). Use this to reference a draft created earlier with a matching temporary_id. When provided, draft_title is not required for updates.",
-                    "pattern": "^#?aw_[0-9a-f]{12}$",
+                    "description": "Temporary ID of an existing draft issue to update (e.g., 'aw_abc123def456'). Use this to reference a draft created earlier with a matching temporary_id. When provided, draft_title is not required for updates.",
+                    "pattern": "^aw_[0-9a-f]{12}$",
                     "type": "string"
                   },
                   "draft_title": {
@@ -503,8 +503,8 @@ jobs:
                     "type": "string"
                   },
                   "temporary_id": {
-                    "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc123def456' or '#aw_abc123def456'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: optional leading '#', then 'aw_' followed by 12 hex characters.",
-                    "pattern": "^#?aw_[0-9a-f]{12}$",
+                    "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc123def456'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 12 hex characters.",
+                    "pattern": "^aw_[0-9a-f]{12}$",
                     "type": "string"
                   },
                   "view": {
