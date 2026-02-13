@@ -312,7 +312,7 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 
 // validateStrictFirewall requires firewall to be enabled in strict mode for copilot and codex engines
 // when network domains are provided (non-wildcard).
-// For engines without LLM gateway support, strict mode also requires that network domains
+// In strict mode, ALL engines (regardless of LLM gateway support) require that network domains
 // must be defaults or from known ecosystems, and sandbox.agent must be enabled.
 func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *NetworkPermissions, sandboxConfig *SandboxConfig) error {
 	if !c.strictMode {
@@ -334,58 +334,53 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 	// Check if sandbox.agent: false is set (explicitly disabled)
 	sandboxAgentDisabled := sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled
 
-	// For engines without LLM gateway support, enforce additional security requirements
-	if !supportsLLMGateway {
-		// Validate that sandbox.agent is enabled (not explicitly disabled)
-		if sandboxAgentDisabled {
-			strictModeValidationLog.Printf("Engine without LLM gateway requires sandbox.agent to be enabled")
+	// In strict mode, sandbox.agent: false is not allowed for any engine as it disables the agent sandbox firewall
+	if sandboxAgentDisabled {
+		strictModeValidationLog.Printf("sandbox.agent: false is set, refusing in strict mode")
+		// For engines without LLM gateway support, provide more specific error message
+		if !supportsLLMGateway {
 			return fmt.Errorf("strict mode: engine '%s' does not support LLM gateway and requires 'sandbox.agent' to be enabled for security. Remove 'sandbox.agent: false' or set 'strict: false'. See: https://github.github.com/gh-aw/reference/sandbox/", engineID)
 		}
+		return fmt.Errorf("strict mode: 'sandbox.agent: false' is not allowed because it disables the agent sandbox firewall. This removes important security protections. Remove 'sandbox.agent: false' or set 'strict: false' to disable strict mode. See: https://github.github.com/gh-aw/reference/sandbox/")
+	}
 
-		// Validate that network domains are defaults or from known ecosystems (not custom domains)
-		if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
-			strictModeValidationLog.Printf("Validating network domains for engine without LLM gateway support")
+	// In strict mode, ALL engines must use network domains from known ecosystems (not custom domains)
+	// This applies regardless of LLM gateway support
+	if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
+		strictModeValidationLog.Printf("Validating network domains in strict mode for all engines")
 
-			// Check if allowed domains contain only known ecosystems or "defaults"
-			hasCustomDomain := false
-			for _, domain := range networkPermissions.Allowed {
-				// Skip wildcards (handled below)
-				if domain == "*" {
-					continue
-				}
-
-				// Check if this is a known ecosystem identifier
-				ecosystemDomains := getEcosystemDomains(domain)
-				if len(ecosystemDomains) > 0 {
-					// This is a known ecosystem identifier
-					strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
-					continue
-				}
-
-				// Check if this domain belongs to any ecosystem
-				ecosystem := GetDomainEcosystem(domain)
-				if ecosystem != "" {
-					// This domain is from a known ecosystem
-					strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s'", domain, ecosystem)
-					continue
-				}
-
-				// This is a custom domain
-				strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
-				hasCustomDomain = true
+		// Check if allowed domains contain only known ecosystems or "defaults"
+		hasCustomDomain := false
+		for _, domain := range networkPermissions.Allowed {
+			// Skip wildcards (handled below)
+			if domain == "*" {
+				continue
 			}
 
-			if hasCustomDomain {
-				strictModeValidationLog.Printf("Engine without LLM gateway has custom domains, failing validation")
-				return fmt.Errorf("strict mode: engine '%s' does not support LLM gateway and requires network domains to be from known ecosystems (e.g., 'defaults', 'python', 'node'). Custom domains are not allowed for security. See: https://github.github.com/gh-aw/reference/network/", engineID)
+			// Check if this is a known ecosystem identifier
+			ecosystemDomains := getEcosystemDomains(domain)
+			if len(ecosystemDomains) > 0 {
+				// This is a known ecosystem identifier
+				strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
+				continue
 			}
+
+			// Check if this domain belongs to any ecosystem
+			ecosystem := GetDomainEcosystem(domain)
+			if ecosystem != "" {
+				// This domain is from a known ecosystem
+				strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s'", domain, ecosystem)
+				continue
+			}
+
+			// This is a custom domain
+			strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
+			hasCustomDomain = true
 		}
-	} else {
-		// For engines with LLM gateway support, still check sandbox.agent at the top level
-		// In strict mode, this is not allowed for any engine as it disables the agent sandbox firewall
-		if sandboxAgentDisabled {
-			strictModeValidationLog.Printf("sandbox.agent: false is set, refusing in strict mode")
-			return fmt.Errorf("strict mode: 'sandbox.agent: false' is not allowed because it disables the agent sandbox firewall. This removes important security protections. Remove 'sandbox.agent: false' or set 'strict: false' to disable strict mode. See: https://github.github.com/gh-aw/reference/sandbox/")
+
+		if hasCustomDomain {
+			strictModeValidationLog.Printf("Engine '%s' has custom domains in strict mode, failing validation", engineID)
+			return fmt.Errorf("strict mode: network domains must be from known ecosystems (e.g., 'defaults', 'python', 'node') for all engines in strict mode. Custom domains are not allowed for security. Set 'strict: false' to use custom domains. See: https://github.github.com/gh-aw/reference/network/")
 		}
 	}
 

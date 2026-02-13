@@ -9,7 +9,7 @@ import (
 
 // TestValidateStrictFirewall_LLMGatewaySupport tests the LLM gateway validation in strict mode
 func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
-	t.Run("codex engine with LLM gateway support allows custom domains", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway support also rejects custom domains in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -21,8 +21,11 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 
 		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
-		if err != nil {
-			t.Errorf("Expected no error for codex engine (supports LLM gateway) with custom domains, got: %v", err)
+		if err == nil {
+			t.Error("Expected error for codex engine with custom domains in strict mode, got nil")
+		}
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -39,12 +42,9 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for copilot engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for copilot engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
-		}
-		if err != nil && !strings.Contains(err.Error(), "network domains to be from known ecosystems") {
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
 			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
@@ -101,6 +101,41 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
+	t.Run("codex engine with LLM gateway also allows known ecosystems", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"python", "node", "github"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
+		if err != nil {
+			t.Errorf("Expected no error for codex engine with known ecosystem identifiers, got: %v", err)
+		}
+	})
+
+	t.Run("codex engine with LLM gateway allows domains from known ecosystems", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		// These domains are from known ecosystems (python, node)
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"pypi.org", "registry.npmjs.org"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
+		if err != nil {
+			t.Errorf("Expected no error for codex engine with known ecosystem domains, got: %v", err)
+		}
+	})
+
 	t.Run("copilot engine without LLM gateway support rejects mixed ecosystems and custom domains", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
@@ -116,8 +151,8 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for copilot engine with mixed ecosystems and custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -134,10 +169,10 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("claude", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for claude engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for claude engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -167,7 +202,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine with LLM gateway allows sandbox.agent: false", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway rejects sandbox.agent: false in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -184,13 +219,12 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 			},
 		}
 
-		// Note: This should still fail because sandbox.agent: false is not allowed in strict mode for any engine
-		// But the error should be about sandbox.agent, not about LLM gateway
+		// sandbox.agent: false is not allowed in strict mode for any engine
 		err := compiler.validateStrictFirewall("codex", networkPerms, sandboxConfig)
 		if err == nil {
 			t.Error("Expected error for sandbox.agent: false in strict mode, got nil")
 		}
-		if err != nil && strings.Contains(err.Error(), "LLM gateway") {
+		if err != nil && strings.Contains(err.Error(), "does not support LLM gateway") {
 			t.Errorf("Expected error about sandbox.agent (not LLM gateway), got: %v", err)
 		}
 		if err != nil && !strings.Contains(err.Error(), "sandbox.agent") {
@@ -236,10 +270,10 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("custom", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for custom engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for custom engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 }
