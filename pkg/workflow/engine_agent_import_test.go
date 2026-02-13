@@ -378,9 +378,9 @@ func TestCheckoutWithAgentFromImports(t *testing.T) {
 		}
 	})
 
-	t.Run("no_checkout_without_agent_and_permissions", func(t *testing.T) {
+	t.Run("checkout_added_without_agent", func(t *testing.T) {
 		compiler := NewCompiler()
-		// Set action mode to release to prevent automatic contents:read addition
+		// Set action mode to release
 		compiler.SetActionMode(ActionModeRelease)
 
 		workflowData := &WorkflowData{
@@ -391,8 +391,8 @@ func TestCheckoutWithAgentFromImports(t *testing.T) {
 		}
 
 		shouldCheckout := compiler.shouldAddCheckoutStep(workflowData)
-		if shouldCheckout {
-			t.Error("Expected checkout NOT to be added in release mode without agent file and without contents permission")
+		if !shouldCheckout {
+			t.Error("Expected checkout to be added (always needed unless already in custom steps)")
 		}
 	})
 
