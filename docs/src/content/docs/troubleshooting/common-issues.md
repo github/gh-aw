@@ -322,6 +322,56 @@ tools:
     key: memory-${{ github.workflow }}-${{ github.run_id }}
 ```
 
+## GitHub Lockdown Mode Blocking Expected Content
+
+**GitHub lockdown mode** filters public repository content to only show items from users with push access. This protects workflows from untrusted input but can block legitimate use cases.
+
+### Symptoms
+
+- Workflow cannot see newly created issues or pull requests
+- Comments from external contributors are invisible
+- Status reports missing recent activity
+- Triage workflows not processing community contributions
+
+### Cause
+
+GitHub lockdown mode is automatically enabled by default for public repositories. The workflow only sees content from users with push, maintain, or admin access.
+
+This means that, by default, your workflow will not see issues, PRs, or comments from external contributors in a public repository. This is a security measure to prevent untrusted input from influencing the workflow, but it can interfere with workflows that need to process community contributions.
+
+### Solution
+
+Evaluate if your workflow needs to process content from all users:
+
+**Option 1: Keep Lockdown Enabled (Recommended for most workflows)**
+
+If your workflow performs sensitive operations (code generation, repository updates, web access), keep lockdown enabled. Consider alternative approaches:
+
+- Use separate workflows: One with lockdown for sensitive operations, another without for public processing
+- Manual triggers: Let maintainers trigger workflows after reviewing external content
+- Approval workflows: Create a two-stage workflow where maintainers approve content before processing
+
+**Option 2: Disable Lockdown (For Safe Public Workflows)**
+
+If your workflow is **specifically designed** to handle untrusted input safely, disable lockdown:
+
+```yaml wrap
+tools:
+  github:
+    lockdown: false
+```
+
+**Only use `lockdown: false` if your workflow**:
+
+- Uses restrictive safe outputs with specific allowed values
+- Doesn't generate code or create pull requests
+- Validates/sanitizes all input before processing
+- Does not access secrets or perform sensitive operations
+
+**Safe use cases**: Issue triage/labeling, spam detection, public dashboards, command workflows that verify permissions.
+
+See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for complete configuration guidance and security considerations.
+
 ## Workflow Failures and Debugging
 
 ### Why Did My Workflow Fail?

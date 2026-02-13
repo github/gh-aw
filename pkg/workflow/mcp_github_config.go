@@ -23,7 +23,7 @@
 //
 // Security features:
 //   - Read-only mode: Prevents write operations (default: true)
-//   - Lockdown mode: Restricts access to current repository only
+//   - GitHub lockdown mode: Restricts access to current repository only
 //   - Automatic lockdown: Enables lockdown for private repositories
 //   - Allowed tools: Restricts available GitHub API operations
 //
@@ -261,7 +261,7 @@ func getGitHubDockerImageVersion(githubTool any) string {
 // for GitHub MCP server based on repository visibility. This step is added when:
 // - GitHub tool is enabled AND
 // - lockdown field is not explicitly specified in the workflow configuration
-// The step includes a runtime condition that only executes if GH_AW_GITHUB_MCP_SERVER_TOKEN is defined
+// The step always runs to determine lockdown mode based on repository visibility
 func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
 	// Check if GitHub tool is present
 	githubTool, hasGitHub := data.Tools["github"]
@@ -289,12 +289,8 @@ func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder,
 	}
 
 	// Generate the step using the determine_automatic_lockdown.cjs action
-	// The step only runs if GH_AW_GITHUB_MCP_SERVER_TOKEN secret is defined
 	yaml.WriteString("      - name: Determine automatic lockdown mode for GitHub MCP server\n")
 	yaml.WriteString("        id: determine-automatic-lockdown\n")
-	yaml.WriteString("        env:\n")
-	yaml.WriteString("          TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}\n")
-	yaml.WriteString("        if: env.TOKEN_CHECK != ''\n")
 	fmt.Fprintf(yaml, "        uses: %s\n", pinnedAction)
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
