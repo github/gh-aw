@@ -318,17 +318,17 @@ describe("create_issue", () => {
       const handler = await main({});
       const result = await handler({ title: "Test" });
 
-      expect(result.temporaryId).toMatch(/^aw_[0-9a-f]{12}$/);
+      expect(result.temporaryId).toMatch(/^aw_[A-Za-z0-9]{4,8}$/);
     });
 
     it("should use provided temporary ID", async () => {
       const handler = await main({});
       const result = await handler({
         title: "Test",
-        temporary_id: "aw_abc123def456",
+        temporary_id: "aw_abc123",
       });
 
-      expect(result.temporaryId).toBe("aw_abc123def456");
+      expect(result.temporaryId).toBe("aw_abc123");
     });
 
     it("should track temporary ID after creating issue", async () => {
@@ -336,11 +336,11 @@ describe("create_issue", () => {
 
       const result = await handler({
         title: "Test Issue",
-        temporary_id: "aw_deadbeefcafe",
+        temporary_id: "aw_deadbeef",
       });
 
       expect(result.success).toBe(true);
-      expect(result.temporaryId).toBe("aw_deadbeefcafe");
+      expect(result.temporaryId).toBe("aw_deadbeef");
       expect(result.number).toBe(123);
     });
   });

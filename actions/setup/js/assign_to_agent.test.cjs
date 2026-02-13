@@ -211,14 +211,14 @@ describe("assign_to_agent", () => {
 
   it("should resolve temporary issue IDs (aw_...) using GH_AW_TEMPORARY_ID_MAP", async () => {
     process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({
-      aw_abc123def456: { repo: "test-owner/test-repo", number: 99 },
+      aw_abc123: { repo: "test-owner/test-repo", number: 99 },
     });
 
     setAgentOutput({
       items: [
         {
           type: "assign_to_agent",
-          issue_number: "aw_abc123def456",
+          issue_number: "aw_abc123",
           agent: "copilot",
         },
       ],

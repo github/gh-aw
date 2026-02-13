@@ -143,20 +143,20 @@ describe("Safe Output Handler Manager", () => {
 
     it("should pass the shared temporary ID map to handlers", async () => {
       const messages = [
-        { type: "create_issue", title: "Issue", body: "Body", temporary_id: "aw_abc123def456" },
-        { type: "update_project", project: "https://github.com/orgs/test/projects/1", content_type: "issue", content_number: "aw_abc123def456" },
+        { type: "create_issue", title: "Issue", body: "Body", temporary_id: "aw_abc123" },
+        { type: "update_project", project: "https://github.com/orgs/test/projects/1", content_type: "issue", content_number: "aw_abc123" },
       ];
 
       const mockCreateHandler = vi.fn().mockResolvedValue({
         repo: "owner/repo",
         number: 101,
-        temporaryId: "aw_abc123def456",
+        temporaryId: "aw_abc123",
       });
 
       const mockUpdateProjectHandler = vi.fn().mockImplementation((message, resolvedTemporaryIds, temporaryIdMap) => {
         expect(temporaryIdMap).toBeInstanceOf(Map);
-        expect(temporaryIdMap.get("aw_abc123def456")).toEqual({ repo: "owner/repo", number: 101 });
-        expect(resolvedTemporaryIds["aw_abc123def456"]).toEqual({ repo: "owner/repo", number: 101 });
+        expect(temporaryIdMap.get("aw_abc123")).toEqual({ repo: "owner/repo", number: 101 });
+        expect(resolvedTemporaryIds["aw_abc123"]).toEqual({ repo: "owner/repo", number: 101 });
         return Promise.resolve({ success: true });
       });
 
@@ -256,7 +256,7 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "create_issue",
-          body: "See #aw_abc123def456 for context",
+          body: "See #aw_abc123 for context",
           title: "Test Issue",
         },
       ];
@@ -282,12 +282,12 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "create_issue",
-          body: "See #aw_abc123def456 for context",
+          body: "See #aw_abc123 for context",
           title: "First Issue",
         },
         {
           type: "create_issue",
-          temporary_id: "aw_abc123def456",
+          temporary_id: "aw_abc123",
           body: "Second issue body",
           title: "Second Issue",
         },
@@ -302,7 +302,7 @@ describe("Safe Output Handler Manager", () => {
         .mockResolvedValueOnce({
           repo: "owner/repo",
           number: 101,
-          temporaryId: "aw_abc123def456",
+          temporaryId: "aw_abc123",
         });
 
       const handlers = new Map([["create_issue", mockCreateIssueHandler]]);
@@ -315,15 +315,15 @@ describe("Safe Output Handler Manager", () => {
       expect(result.outputsWithUnresolvedIds.length).toBe(1);
       expect(result.outputsWithUnresolvedIds[0].result.number).toBe(100);
       // Temp ID should be registered
-      expect(result.temporaryIdMap["aw_abc123def456"]).toBeDefined();
-      expect(result.temporaryIdMap["aw_abc123def456"].number).toBe(101);
+      expect(result.temporaryIdMap["aw_abc123"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_abc123"].number).toBe(101);
     });
 
     it("should not track output if temporary IDs remain unresolved", async () => {
       const messages = [
         {
           type: "create_issue",
-          body: "See #aw_abc123def456 and #aw_unresolved99 for context",
+          body: "See #aw_abc123 and #aw_unresolved99 for context",
           title: "Test Issue",
         },
       ];
@@ -347,17 +347,17 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "create_issue",
-          body: "Related to #aw_aabbcc111111",
+          body: "Related to #aw_aabbcc11",
           title: "First Issue",
         },
         {
           type: "create_discussion",
-          body: "See #aw_aabbcc111111 for details",
+          body: "See #aw_aabbcc11 for details",
           title: "Discussion",
         },
         {
           type: "create_issue",
-          temporary_id: "aw_aabbcc111111",
+          temporary_id: "aw_aabbcc11",
           body: "The referenced issue",
           title: "Referenced Issue",
         },
@@ -372,7 +372,7 @@ describe("Safe Output Handler Manager", () => {
         .mockResolvedValueOnce({
           repo: "owner/repo",
           number: 102,
-          temporaryId: "aw_aabbcc111111",
+          temporaryId: "aw_aabbcc11",
         });
 
       const mockCreateDiscussionHandler = vi.fn().mockResolvedValue({
@@ -392,7 +392,7 @@ describe("Safe Output Handler Manager", () => {
       // Should track 2 outputs (issue and discussion) with unresolved temp IDs
       expect(result.outputsWithUnresolvedIds.length).toBe(2);
       // Temp ID should be registered
-      expect(result.temporaryIdMap["aw_aabbcc111111"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_aabbcc11"]).toBeDefined();
     });
 
     it("should silently skip message types handled by standalone steps", async () => {
@@ -471,12 +471,12 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "link_sub_issue",
-          parent_issue_number: "aw_parent123456",
+          parent_issue_number: "aw_parent12",
           sub_issue_number: 42,
         },
         {
           type: "create_issue",
-          temporary_id: "aw_parent123456",
+          temporary_id: "aw_parent12",
           title: "Parent Issue",
           body: "Parent body",
         },
@@ -489,7 +489,7 @@ describe("Safe Output Handler Manager", () => {
         .fn()
         .mockResolvedValueOnce({
           deferred: true,
-          error: "Unresolved temporary IDs: parent: aw_parent123456",
+          error: "Unresolved temporary IDs: parent: aw_parent12",
         })
         .mockResolvedValueOnce({
           parent_issue_number: 100,
@@ -500,7 +500,7 @@ describe("Safe Output Handler Manager", () => {
       const mockCreateIssueHandler = vi.fn().mockResolvedValue({
         repo: "owner/repo",
         number: 100,
-        temporaryId: "aw_parent123456",
+        temporaryId: "aw_parent12",
       });
 
       const handlers = new Map([
@@ -513,8 +513,8 @@ describe("Safe Output Handler Manager", () => {
       expect(result.success).toBe(true);
 
       // Temp ID should be registered after create_issue
-      expect(result.temporaryIdMap["aw_parent123456"]).toBeDefined();
-      expect(result.temporaryIdMap["aw_parent123456"].number).toBe(100);
+      expect(result.temporaryIdMap["aw_parent12"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_parent12"].number).toBe(100);
 
       // link_sub_issue should succeed after retry
       const linkResult = result.results.find(r => r.type === "link_sub_issue");
@@ -526,18 +526,18 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "create_issue",
-          temporary_id: "aw_aabbcc111111",
+          temporary_id: "aw_aabbcc11",
           title: "Issue 1",
-          body: "References #aw_ddeeff222222",
+          body: "References #aw_ddeeff22",
         },
         {
           type: "link_sub_issue",
-          parent_issue_number: "aw_aabbcc111111",
-          sub_issue_number: "aw_ddeeff222222",
+          parent_issue_number: "aw_aabbcc11",
+          sub_issue_number: "aw_ddeeff22",
         },
         {
           type: "create_issue",
-          temporary_id: "aw_ddeeff222222",
+          temporary_id: "aw_ddeeff22",
           title: "Issue 2",
           body: "Issue 2 body",
         },
@@ -552,12 +552,12 @@ describe("Safe Output Handler Manager", () => {
         .mockResolvedValueOnce({
           repo: "owner/repo",
           number: 100,
-          temporaryId: "aw_aabbcc111111",
+          temporaryId: "aw_aabbcc11",
         })
         .mockResolvedValueOnce({
           repo: "owner/repo",
           number: 101,
-          temporaryId: "aw_ddeeff222222",
+          temporaryId: "aw_ddeeff22",
         });
 
       const mockLinkHandler = vi
@@ -582,12 +582,12 @@ describe("Safe Output Handler Manager", () => {
       expect(result.success).toBe(true);
 
       // Both issues should have temp IDs registered
-      expect(result.temporaryIdMap["aw_aabbcc111111"]).toBeDefined();
-      expect(result.temporaryIdMap["aw_ddeeff222222"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_aabbcc11"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_ddeeff22"]).toBeDefined();
 
       // Issue 1 should be tracked for synthetic update (had unresolved temp ID in body at creation time)
       // Note: By the time all messages are processed, the temp ID is resolved, but Issue 1 was
-      // tracked when it was created because at that moment aw_ddeeff222222 was not yet in the map
+      // tracked when it was created because at that moment aw_ddeeff22 was not yet in the map
       const trackedIssue1 = result.outputsWithUnresolvedIds.find(o => o.result.number === 100);
       expect(trackedIssue1).toBeDefined();
     });
@@ -596,19 +596,19 @@ describe("Safe Output Handler Manager", () => {
       const messages = [
         {
           type: "create_issue",
-          temporary_id: "aw_abc111111def",
+          temporary_id: "aw_abc11def",
           title: "Parent",
-          body: "See #aw_111aaa222bbb and #aw_333ccc444ddd",
+          body: "See #aw_111aaa22 and #aw_333ccc44",
         },
         {
           type: "create_issue",
-          temporary_id: "aw_111aaa222bbb",
+          temporary_id: "aw_111aaa22",
           title: "Sub 1",
           body: "Sub 1 body",
         },
         {
           type: "create_issue",
-          temporary_id: "aw_333ccc444ddd",
+          temporary_id: "aw_333ccc44",
           title: "Sub 2",
           body: "Sub 2 body",
         },
@@ -632,12 +632,12 @@ describe("Safe Output Handler Manager", () => {
       expect(result.success).toBe(true);
 
       // All temp IDs should be registered
-      expect(result.temporaryIdMap["aw_abc111111def"]).toBeDefined();
-      expect(result.temporaryIdMap["aw_111aaa222bbb"]).toBeDefined();
-      expect(result.temporaryIdMap["aw_333ccc444ddd"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_abc11def"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_111aaa22"]).toBeDefined();
+      expect(result.temporaryIdMap["aw_333ccc44"]).toBeDefined();
 
       // Parent issue should be tracked (had unresolved temp IDs at creation time)
-      // When the parent was created, aw_111aaa222bbb and aw_333ccc444ddd were not yet in the map
+      // When the parent was created, aw_111aaa22 and aw_333ccc44 were not yet in the map
       const parentTracked = result.outputsWithUnresolvedIds.find(
         o => o.result.number === 100 // Parent was issue #100
       );

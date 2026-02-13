@@ -119,7 +119,7 @@ const mockCore = {
       expect(result2.error).toContain("Max count of 1 reached");
     });
     it("should defer when parent is unresolved temporary ID", async () => {
-      const message = { type: "link_sub_issue", parent_issue_number: "aw_123456789abc", sub_issue_number: 50 };
+      const message = { type: "link_sub_issue", parent_issue_number: "aw_12345678", sub_issue_number: 50 };
 
       // Empty temp ID map - temporary ID is unresolved
       const result = await handler(message, {});
@@ -127,10 +127,10 @@ const mockCore = {
       expect(result.success).toBe(false);
       expect(result.deferred).toBe(true);
       expect(result.error).toContain("Unresolved temporary IDs");
-      expect(result.error).toContain("parent: aw_123456789abc");
+      expect(result.error).toContain("parent: aw_12345678");
     });
     it("should defer when sub-issue is unresolved temporary ID", async () => {
-      const message = { type: "link_sub_issue", parent_issue_number: 100, sub_issue_number: "aw_456789abcdef" };
+      const message = { type: "link_sub_issue", parent_issue_number: 100, sub_issue_number: "aw_456789ab" };
 
       // Empty temp ID map - temporary ID is unresolved
       const result = await handler(message, {});
@@ -138,15 +138,15 @@ const mockCore = {
       expect(result.success).toBe(false);
       expect(result.deferred).toBe(true);
       expect(result.error).toContain("Unresolved temporary IDs");
-      expect(result.error).toContain("sub: aw_456789abcdef");
+      expect(result.error).toContain("sub: aw_456789ab");
     });
     it("should succeed when temporary IDs are resolved", async () => {
-      const message = { type: "link_sub_issue", parent_issue_number: "aw_123456789abc", sub_issue_number: "aw_456789abcdef" };
+      const message = { type: "link_sub_issue", parent_issue_number: "aw_12345678", sub_issue_number: "aw_456789ab" };
 
       // Provide resolved temp IDs
       const resolvedIds = {
-        aw_123456789abc: { repo: "testowner/testrepo", number: 100 },
-        aw_456789abcdef: { repo: "testowner/testrepo", number: 50 },
+        aw_12345678: { repo: "testowner/testrepo", number: 100 },
+        aw_456789ab: { repo: "testowner/testrepo", number: 50 },
       };
 
       mockGithub.rest.issues.get
@@ -163,11 +163,11 @@ const mockCore = {
     });
 
     it("should fail when parent and sub temporary IDs resolve to different repos", async () => {
-      const message = { type: "link_sub_issue", parent_issue_number: "aw_123456789abc", sub_issue_number: "aw_456789abcdef" };
+      const message = { type: "link_sub_issue", parent_issue_number: "aw_12345678", sub_issue_number: "aw_456789ab" };
 
       const resolvedIds = {
-        aw_123456789abc: { repo: "org-a/repo-a", number: 100 },
-        aw_456789abcdef: { repo: "org-b/repo-b", number: 50 },
+        aw_12345678: { repo: "org-a/repo-a", number: 100 },
+        aw_456789ab: { repo: "org-b/repo-b", number: 50 },
       };
 
       const result = await handler(message, resolvedIds);
