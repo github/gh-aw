@@ -138,9 +138,9 @@ func TestPromptStepRefactoringConsistency(t *testing.T) {
 		if !strings.Contains(result, "GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt") {
 			t.Error("Expected GH_AW_PROMPT env variable not found")
 		}
-		// Verify temp folder instructions are included
-		if !strings.Contains(result, `cat "/opt/gh-aw/prompts/temp_folder_prompt.md" >> "$GH_AW_PROMPT"`) {
-			t.Error("Expected cat command for temp folder prompt file not found")
+		// Verify temp folder instructions are included (now uses envsubst for env var expansion)
+		if !strings.Contains(result, `envsubst < "/opt/gh-aw/prompts/temp_folder_prompt.md" >> "$GH_AW_PROMPT"`) {
+			t.Error("Expected envsubst command for temp folder prompt file not found")
 		}
 	})
 }
