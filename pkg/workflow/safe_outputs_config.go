@@ -18,11 +18,15 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 
 	if output, exists := frontmatter["safe-outputs"]; exists {
 		if outputMap, ok := output.(map[string]any); ok {
+			if log.Enabled() {
+				safeOutputsConfigLog.Printf("Processing safe-outputs configuration with %d top-level keys", len(outputMap))
+			}
 			config = &SafeOutputsConfig{}
 
 			// Handle create-issue
 			issuesConfig := c.parseIssuesConfig(outputMap)
 			if issuesConfig != nil {
+				safeOutputsConfigLog.Print("Configured create-issue output handler")
 				config.CreateIssues = issuesConfig
 			}
 
@@ -89,6 +93,7 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			// Handle create-pull-request
 			pullRequestsConfig := c.parsePullRequestsConfig(outputMap)
 			if pullRequestsConfig != nil {
+				safeOutputsConfigLog.Print("Configured create-pull-request output handler")
 				config.CreatePullRequests = pullRequestsConfig
 			}
 
@@ -126,6 +131,7 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 						}
 					}
 					config.AllowedDomains = domainStrings
+					safeOutputsConfigLog.Printf("Configured allowed-domains with %d domain(s)", len(domainStrings))
 				}
 			}
 
@@ -399,10 +405,17 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 			if outputMap, ok := output.(map[string]any); ok {
 				if _, exists := outputMap["threat-detection"]; !exists {
 					// Only apply default if threat-detection key doesn't exist
+					safeOutputsConfigLog.Print("Applying default threat-detection configuration")
 					config.ThreatDetection = &ThreatDetectionConfig{}
 				}
 			}
 		}
+	}
+
+	if config != nil {
+		safeOutputsConfigLog.Print("Successfully extracted safe-outputs configuration")
+	} else {
+		safeOutputsConfigLog.Print("No safe-outputs configuration found in frontmatter")
 	}
 
 	return config

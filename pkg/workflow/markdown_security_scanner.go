@@ -68,6 +68,15 @@ func (f SecurityFinding) String() string {
 	return fmt.Sprintf("[%s] %s", f.Category, f.Description)
 }
 
+// countCategories counts unique security finding categories
+func countCategories(findings []SecurityFinding) int {
+	categories := make(map[SecurityFindingCategory]bool)
+	for _, f := range findings {
+		categories[f.Category] = true
+	}
+	return len(categories)
+}
+
 // ScanMarkdownSecurity scans markdown content for dangerous or malicious patterns.
 // It automatically strips YAML frontmatter (delimited by ---) so that only the
 // markdown body is scanned. Line numbers in returned findings are adjusted to
@@ -78,14 +87,23 @@ func ScanMarkdownSecurity(content string) []SecurityFinding {
 
 	// Strip frontmatter and get the line offset for correct line number reporting
 	markdownBody, lineOffset := stripFrontmatter(content)
+	if log.Enabled() {
+		markdownSecurityLog.Printf("Stripped frontmatter: %d line(s) removed, scanning %d bytes of markdown", lineOffset, len(markdownBody))
+	}
 
 	var findings []SecurityFinding
 
+	markdownSecurityLog.Print("Running unicode abuse detection")
 	findings = append(findings, scanUnicodeAbuse(markdownBody)...)
+	markdownSecurityLog.Print("Running hidden content detection")
 	findings = append(findings, scanHiddenContent(markdownBody)...)
+	markdownSecurityLog.Print("Running obfuscated links detection")
 	findings = append(findings, scanObfuscatedLinks(markdownBody)...)
+	markdownSecurityLog.Print("Running HTML abuse detection")
 	findings = append(findings, scanHTMLAbuse(markdownBody)...)
+	markdownSecurityLog.Print("Running embedded files detection")
 	findings = append(findings, scanEmbeddedFiles(markdownBody)...)
+	markdownSecurityLog.Print("Running social engineering detection")
 	findings = append(findings, scanSocialEngineering(markdownBody)...)
 
 	// Adjust line numbers to account for stripped frontmatter
@@ -98,7 +116,9 @@ func ScanMarkdownSecurity(content string) []SecurityFinding {
 	}
 
 	if len(findings) > 0 {
-		markdownSecurityLog.Printf("Found %d security issues in markdown content", len(findings))
+		markdownSecurityLog.Printf("Security scan complete: found %d issue(s) across %d categor(ies)", len(findings), countCategories(findings))
+	} else {
+		markdownSecurityLog.Print("Security scan complete: no issues found")
 	}
 
 	return findings
@@ -176,6 +196,10 @@ var bidiOverrideRunes = map[rune]string{
 func scanUnicodeAbuse(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
+
+	if log.Enabled() {
+		markdownSecurityLog.Printf("Scanning %d line(s) for unicode abuse", len(lines))
+	}
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1
