@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestWorkflowCounting tests that user and internal workflows are counted correctly
+// TestWorkflowCounting tests that only user workflows are counted and displayed
 func TestWorkflowCounting(t *testing.T) {
-	// This test verifies the logic for counting user vs internal workflows
-	// It simulates what fetchGitHubWorkflows does
+	// This test verifies that internal workflows (those without .md files) are hidden from users
+	// Only workflows with .md source files are counted and displayed
 
 	// Save current directory
 	originalDir, err := os.Getwd()
@@ -68,31 +69,26 @@ func TestWorkflowCounting(t *testing.T) {
 		}
 	}
 
-	// Count user vs internal workflows
-	var userWorkflowCount, internalWorkflowCount int
+	// Count user workflows only (internal workflows are not displayed to users)
+	var userWorkflowCount int
 	for name := range simulatedGitHubWorkflows {
 		if mdWorkflowNames[name] {
 			userWorkflowCount++
-		} else {
-			internalWorkflowCount++
 		}
 	}
 
 	// Verify counts
 	assert.Equal(t, len(mdWorkflowNames), userWorkflowCount, "User workflow count should match .md file count")
-	assert.GreaterOrEqual(t, internalWorkflowCount, 0, "Internal workflow count should be non-negative")
 
-	// Verify message format
+	// Verify message format (internal workflows are never mentioned)
 	var message string
-	if internalWorkflowCount > 0 {
-		message = "✓ Fetched " + string(rune(userWorkflowCount+'0')) + " public and " + string(rune(internalWorkflowCount+'0')) + " internal workflows"
-		assert.Contains(t, message, "public", "Message should contain 'public' when internal workflows exist")
-		assert.Contains(t, message, "internal", "Message should contain 'internal' when internal workflows exist")
+	if userWorkflowCount == 1 {
+		message = "✓ Fetched 1 workflow"
 	} else {
-		message = "✓ Fetched " + string(rune(userWorkflowCount+'0')) + " workflows"
-		assert.NotContains(t, message, "internal", "Message should not contain 'internal' when no internal workflows")
+		message = fmt.Sprintf("✓ Fetched %d workflows", userWorkflowCount)
 	}
+	assert.NotContains(t, message, "internal", "Message should never contain 'internal' - internal workflows are hidden from users")
+	assert.NotContains(t, message, "public", "Message should not contain 'public' - only user workflows are shown")
 
-	t.Logf("User workflows: %d, Internal workflows: %d", userWorkflowCount, internalWorkflowCount)
-	t.Logf("Expected message format: %s", message)
+	t.Logf("User workflows: %d, Expected message: %s", userWorkflowCount, message)
 }
