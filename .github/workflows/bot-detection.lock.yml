@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: a918ebbe1eea26447c07270656e51c43c6644c5fa9eeea9bd71d9678567c1a43
+# frontmatter-hash: 3647c359071f847a8f97886139045c31a6a5840084eb5d45a8ec72d281095053
 
 name: "Bot Detection"
 "on":
@@ -1597,11 +1597,13 @@ jobs:
               });
 
             const topSeverity = accounts.find(a => a.severity !== "None")?.severity || "None";
-            const hasFindings = accounts.some(a => a.risk_score >= 10) || domains.some(d => d.count >= 2);
 
-            // Log analysis summary for observability
+            // Calculate metrics for observability and decision logic
             const highRiskAccounts = accounts.filter(a => a.risk_score >= 10).length;
             const multiAccountDomains = domains.filter(d => d.count >= 2).length;
+            const hasFindings = highRiskAccounts > 0 || multiAccountDomains > 0;
+
+            // Log analysis summary for observability
             core.info(`Analysis complete: ${accounts.length} accounts analyzed, ${highRiskAccounts} with risk_score >= 10`);
             core.info(`External domains: ${domains.length} total, ${multiAccountDomains} shared by 2+ accounts`);
             core.info(`Has findings: ${hasFindings} (will ${hasFindings ? 'run' : 'skip'} agent job)`);
