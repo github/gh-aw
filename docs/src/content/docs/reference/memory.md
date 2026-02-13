@@ -30,8 +30,23 @@ tools:
   cache-memory:
     key: custom-memory-${{ github.workflow }}-${{ github.run_id }}
     retention-days: 30  # 1-90 days, extends access beyond cache expiration
+    allowed-extensions: [".json", ".txt", ".md"]  # Restrict file types (default: empty/all files allowed)
 ---
 ```
+
+### File Type Restrictions
+
+The `allowed-extensions` field restricts which file types can be written to cache-memory. By default, all file types are allowed (empty array). When specified, only files with listed extensions can be stored.
+
+```aw wrap
+---
+tools:
+  cache-memory:
+    allowed-extensions: [".json", ".jsonl", ".txt"]  # Only these extensions allowed
+---
+```
+
+If files with disallowed extensions are found, the workflow will report validation failures.
 
 ## Multiple Cache Configurations
 
@@ -118,10 +133,13 @@ tools:
     max-file-count: 50      # default 100
     target-repo: "owner/repository"
     create-orphan: true     # default
+    allowed-extensions: [".json", ".txt", ".md"]  # Restrict file types (default: empty/all files allowed)
 ---
 ```
 
 **Branch Prefix**: Use `branch-prefix` to customize the branch name prefix (default is `memory`). The prefix must be 4-32 characters, alphanumeric with hyphens/underscores, and cannot be `copilot`. When set, branches are created as `{branch-prefix}/{id}` instead of `memory/{id}`.
+
+**File Type Restrictions**: Use `allowed-extensions` to restrict which file types can be stored (default: empty/all files allowed). When specified, only files with listed extensions (e.g., `[".json", ".txt", ".md"]`) can be saved. Files with disallowed extensions will trigger validation failures.
 
 **Note**: File glob patterns must include the full branch path structure. For branch `memory/custom-agent-for-aw`, use patterns like `memory/custom-agent-for-aw/*.json` to match files stored at that path within the branch.
 
