@@ -308,7 +308,7 @@
         },
         "body": {
           "type": "string",
-          "description": "Overall review body text summarizing the review. Required and must be non-empty for APPROVE or REQUEST_CHANGES reviews; optional for COMMENT reviews."
+          "description": "Review body text summarizing the review. Required for REQUEST_CHANGES; optional for APPROVE and COMMENT."
         },
         "event": {
           "type": "string",
@@ -323,7 +323,7 @@
         {
           "if": {
             "properties": {
-              "event": { "enum": ["APPROVE", "REQUEST_CHANGES"] }
+              "event": { "const": "REQUEST_CHANGES" }
             },
             "required": ["event"]
           },

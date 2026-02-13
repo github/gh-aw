@@ -430,7 +430,7 @@ jobs:
                 "additionalProperties": false,
                 "properties": {
                   "body": {
-                    "description": "Overall review summary in Markdown. Provide a high-level assessment of the changes. Required for APPROVE and REQUEST_CHANGES events; optional for COMMENT.",
+                    "description": "Overall review summary in Markdown. Provide a high-level assessment of the changes. Required for REQUEST_CHANGES; optional for APPROVE and COMMENT.",
                     "type": "string"
                   },
                   "event": {

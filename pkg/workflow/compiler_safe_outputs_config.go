@@ -312,6 +312,7 @@ var handlerRegistry = map[string]handlerBuilder{
 		c := cfg.SubmitPullRequestReview
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
+			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
 	"create_pull_request": func(cfg *SafeOutputsConfig) map[string]any {

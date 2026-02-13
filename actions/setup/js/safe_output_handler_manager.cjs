@@ -737,6 +737,11 @@ async function main() {
     // Create the shared PR review buffer instance (no global state)
     const prReviewBuffer = createReviewBuffer();
 
+    // Apply footer config from submit_pull_request_review (if configured)
+    if (config.submit_pull_request_review?.footer === false) {
+      prReviewBuffer.setIncludeFooter(false);
+    }
+
     // Load and initialize handlers based on configuration (factory pattern)
     const messageHandlers = await loadHandlers(config, prReviewBuffer);
 
