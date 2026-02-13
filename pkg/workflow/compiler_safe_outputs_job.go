@@ -27,8 +27,10 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 
 	var steps []string
 	var outputs = make(map[string]string)
-	var permissions = NewPermissions()
 	var safeOutputStepNames []string
+
+	// Compute permissions based on configured safe outputs (principle of least privilege)
+	permissions := computePermissionsForSafeOutputs(data.SafeOutputs)
 
 	// Track whether threat detection job is enabled for step conditions
 	threatDetectionEnabled := data.SafeOutputs.ThreatDetection != nil
@@ -36,7 +38,9 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	// Add GitHub App token minting step if app is configured
 	if data.SafeOutputs.App != nil {
 		consolidatedSafeOutputsJobLog.Print("Adding GitHub App token minting step")
-		// We'll compute permissions after collecting all step requirements
+		// Prepend GitHub App token step before other steps
+		appTokenSteps := c.buildGitHubAppTokenMintStep(data.SafeOutputs.App, permissions)
+		steps = append(steps, appTokenSteps...)
 	}
 
 	// Add setup action to copy JavaScript files
@@ -103,8 +107,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		steps = append(steps, "          script: |\n")
 		steps = append(steps, generateGitHubScriptWithRequire("unlock-issue.cjs"))
 
-		// Add permissions needed for unlocking issues
-		permissions.Merge(NewPermissionsContentsReadIssuesWrite())
+		// Note: Permissions for unlocking issues are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// === Build safe output steps ===
@@ -162,80 +165,8 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		outputs["create_discussion_errors"] = "${{ steps.process_safe_outputs.outputs.create_discussion_errors }}"
 		outputs["create_discussion_error_count"] = "${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}"
 
-		// Merge permissions for all handler-managed types
-		if data.SafeOutputs.CreateIssues != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWrite())
-		}
-		if data.SafeOutputs.CreateDiscussions != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWriteDiscussionsWrite())
-		}
-		if data.SafeOutputs.AddComments != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWritePRWriteDiscussionsWrite())
-		}
-		if data.SafeOutputs.CloseIssues != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWrite())
-		}
-		if data.SafeOutputs.CloseDiscussions != nil {
-			permissions.Merge(NewPermissionsContentsReadDiscussionsWrite())
-		}
-		if data.SafeOutputs.AddLabels != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWritePRWrite())
-		}
-		if data.SafeOutputs.RemoveLabels != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWritePRWrite())
-		}
-		if data.SafeOutputs.UpdateIssues != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWrite())
-		}
-		if data.SafeOutputs.UpdateDiscussions != nil {
-			permissions.Merge(NewPermissionsContentsReadDiscussionsWrite())
-		}
-		if data.SafeOutputs.LinkSubIssue != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWrite())
-		}
-		if data.SafeOutputs.UpdateRelease != nil {
-			permissions.Merge(NewPermissionsContentsWrite())
-		}
-		if data.SafeOutputs.CreatePullRequestReviewComments != nil || data.SafeOutputs.SubmitPullRequestReview != nil {
-			permissions.Merge(NewPermissionsContentsReadPRWrite())
-		}
-		if data.SafeOutputs.CreatePullRequests != nil {
-			// Check fallback-as-issue setting to determine permissions
-			if getFallbackAsIssue(data.SafeOutputs.CreatePullRequests) {
-				permissions.Merge(NewPermissionsContentsWriteIssuesWritePRWrite())
-			} else {
-				permissions.Merge(NewPermissionsContentsWritePRWrite())
-			}
-		}
-		if data.SafeOutputs.PushToPullRequestBranch != nil {
-			permissions.Merge(NewPermissionsContentsWriteIssuesWritePRWrite())
-		}
-		if data.SafeOutputs.UpdatePullRequests != nil {
-			permissions.Merge(NewPermissionsContentsReadPRWrite())
-		}
-		if data.SafeOutputs.ClosePullRequests != nil {
-			permissions.Merge(NewPermissionsContentsReadPRWrite())
-		}
-		if data.SafeOutputs.MarkPullRequestAsReadyForReview != nil {
-			permissions.Merge(NewPermissionsContentsReadPRWrite())
-		}
-		if data.SafeOutputs.HideComment != nil {
-			permissions.Merge(NewPermissionsContentsReadIssuesWritePRWriteDiscussionsWrite())
-		}
-		if data.SafeOutputs.DispatchWorkflow != nil {
-			permissions.Merge(NewPermissionsActionsWrite())
-		}
-		// Project-related types now handled by the unified handler
-		// (not the separate project handler manager step)
-		if data.SafeOutputs.CreateProjects != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.UpdateProjects != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
-		if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-			permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-		}
+		// Note: Permissions are now computed centrally by computePermissionsForSafeOutputs()
+		// at the start of this function to ensure consistent permission calculation
 
 		// If create-issue is configured with assignees: copilot, run a follow-up step to
 		// assign the Copilot coding agent. The handler manager exports the list via
@@ -265,7 +196,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		outputs["assign_to_agent_assignment_errors"] = "${{ steps.assign_to_agent.outputs.assignment_errors }}"
 		outputs["assign_to_agent_assignment_error_count"] = "${{ steps.assign_to_agent.outputs.assignment_error_count }}"
 
-		permissions.Merge(NewPermissionsContentsReadIssuesWrite())
+		// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// 4. Create Agent Session step
@@ -278,7 +209,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		outputs["create_agent_session_session_number"] = "${{ steps.create_agent_session.outputs.session_number }}"
 		outputs["create_agent_session_session_url"] = "${{ steps.create_agent_session.outputs.session_url }}"
 
-		permissions.Merge(NewPermissionsContentsReadIssuesWrite())
+		// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// Note: Create Pull Request is now handled by the handler manager
@@ -289,35 +220,31 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 
 	// Note: Create Code Scanning Alert is now handled by the handler manager
 	// The permissions are configured in the handler manager section above
-	if data.SafeOutputs.CreateCodeScanningAlerts != nil {
-		permissions.Merge(NewPermissionsContentsReadSecurityEventsWrite())
-	}
+	// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 
 	// Note: Create Project Status Update is now handled by the handler manager
 	// The permissions are configured in the handler manager section above
-	if data.SafeOutputs.CreateProjectStatusUpdates != nil {
-		permissions.Merge(NewPermissionsContentsReadProjectsWrite())
-	}
+	// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 
 	// Note: Add Reviewer is now handled by the handler manager
 	// The outputs and permissions are configured in the handler manager section above
 	if data.SafeOutputs.AddReviewer != nil {
 		outputs["add_reviewer_reviewers_added"] = "${{ steps.process_safe_outputs.outputs.reviewers_added }}"
-		permissions.Merge(NewPermissionsContentsReadPRWrite())
+		// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// Note: Assign Milestone is now handled by the handler manager
 	// The outputs and permissions are configured in the handler manager section above
 	if data.SafeOutputs.AssignMilestone != nil {
 		outputs["assign_milestone_milestone_assigned"] = "${{ steps.process_safe_outputs.outputs.milestone_assigned }}"
-		permissions.Merge(NewPermissionsContentsReadIssuesWritePRWrite())
+		// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// Note: Assign To User is now handled by the handler manager
 	// The outputs and permissions are configured in the handler manager section above
 	if data.SafeOutputs.AssignToUser != nil {
 		outputs["assign_to_user_assigned"] = "${{ steps.process_safe_outputs.outputs.assigned }}"
-		permissions.Merge(NewPermissionsContentsReadIssuesWritePRWrite())
+		// Note: Permissions are computed centrally by computePermissionsForSafeOutputs()
 	}
 
 	// Note: Update Pull Request step - now handled by handler manager
