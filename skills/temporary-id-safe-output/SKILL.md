@@ -14,11 +14,11 @@ When an agent needs to create a parent issue and immediately link sub-issues to 
 
 ## Temporary ID Format
 
-Temporary IDs follow the pattern `aw_XXXXXXXXXXXX` where:
+Temporary IDs follow the pattern `aw_XXXXXXXX` where:
 - `aw_` is a fixed prefix identifying agentic workflow temporary IDs
-- `XXXXXXXXXXXX` is a 12-character lowercase hexadecimal string (6 random bytes)
+- `XXXXXXXX` is a 4-8 character alphanumeric string (A-Za-z0-9)
 
-Example: `aw_abc123def456`
+Example: `aw_abc123`, `aw_Test123`
 
 ## Implementation Components
 
@@ -175,18 +175,18 @@ safe-outputs:
 ### Agent Output
 
 ```json
-{"type": "create_issue", "temporary_id": "aw_abc123def456", "title": "Parent: Feature X", "body": "..."}
-{"type": "link_sub_issue", "parent_issue_number": "aw_abc123def456", "sub_issue_number": 42}
-{"type": "link_sub_issue", "parent_issue_number": "aw_abc123def456", "sub_issue_number": 43}
+{"type": "create_issue", "temporary_id": "aw_abc123", "title": "Parent: Feature X", "body": "..."}
+{"type": "link_sub_issue", "parent_issue_number": "aw_abc123", "sub_issue_number": 42}
+{"type": "link_sub_issue", "parent_issue_number": "aw_abc123", "sub_issue_number": 43}
 ```
 
 ### Execution Flow
 
-1. `main` job: Agent generates output with temporary ID `aw_abc123def456`
-2. `create_issue` job: Creates issue #100, outputs `{"aw_abc123def456": 100}`
+1. `main` job: Agent generates output with temporary ID `aw_abc123`
+2. `create_issue` job: Creates issue #100, outputs `{"aw_abc123": 100}`
 3. `link_sub_issue` job: 
    - Loads temporary ID map
-   - Resolves `aw_abc123def456` → `100`
+   - Resolves `aw_abc123` → `100`
    - Links issues #42 and #43 as sub-issues of #100
 
 ## Jobs That Support Temporary IDs

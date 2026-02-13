@@ -1991,7 +1991,7 @@ safe-outputs:
   # agent output field create_if_missing=true. Requires a Personal Access Token
   # (PAT) or GitHub App token with Projects permissions (default GITHUB_TOKEN cannot
   # be used). Agent output includes: project (full URL or temporary project ID like
-  # aw_XXXXXXXXXXXX or #aw_XXXXXXXXXXXX from create_project), content_type
+  # aw_XXXXXXXX or #aw_XXXXXXXX from create_project), content_type
   # (issue|pull_request|draft_issue), content_number, fields, create_if_missing. For
   # specialized operations, agent can also provide: operation
   # (create_fields|create_view), field_definitions (array of field configs when

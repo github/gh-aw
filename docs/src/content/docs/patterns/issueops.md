@@ -90,8 +90,8 @@ safe-outputs:
 
 Create a parent tracking issue, then sub-issues linked via parent field:
 
-{"type": "create_issue", "temporary_id": "aw_abc123def456", "title": "Feature X", "body": "Tracking issue"}
-{"type": "create_issue", "parent": "aw_abc123def456", "title": "Task 1", "body": "First task"}
+{"type": "create_issue", "temporary_id": "aw_abc123", "title": "Feature X", "body": "Tracking issue"}
+{"type": "create_issue", "parent": "aw_abc123", "title": "Task 1", "body": "First task"}
 ```
 
 > [!TIP]

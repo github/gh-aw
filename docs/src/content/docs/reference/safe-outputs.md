@@ -143,7 +143,7 @@ In this example, if the workflow creates 5 issues, all will be automatically gro
 
 #### Temporary IDs for Issue References
 
-Use temporary IDs (`aw_` + 12 hex chars) to reference parent issues before creation. References like `#aw_abc123def456` in bodies are replaced with actual numbers. The `parent` field creates sub-issue relationships.
+Use temporary IDs (`aw_` + 4-8 alphanumeric chars) to reference parent issues before creation. References like `#aw_abc123` in bodies are replaced with actual numbers. The `parent` field creates sub-issue relationships.
 
 #### Auto-Close Older Issues
 

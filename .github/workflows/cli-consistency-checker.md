@@ -153,7 +153,7 @@ When issues are found:
 1. **First**: Create a **parent tracking issue** that summarizes all findings
    - **Title**: "CLI Consistency Issues - [Date]"
    - **Body**: Include a high-level summary of issues found, total count, and breakdown by severity
-   - **temporary_id**: Generate a unique temporary ID (format: `aw_` followed by 12 hex characters, e.g., `aw_abc123def456`)
+   - **temporary_id**: Generate a unique temporary ID (format: `aw_` followed by 4-8 alphanumeric characters, e.g., `aw_abc123`, `aw_Test123`)
 
 2. **Then**: Create **sub-issues** (maximum 5) for each specific finding
    - Use the **parent** field with the temporary_id from the parent issue to link each sub-issue
@@ -164,7 +164,7 @@ When issues are found:
 ```json
 {
   "type": "create_issue",
-  "temporary_id": "aw_abc123def456",
+  "temporary_id": "aw_abc123",
   "title": "CLI Consistency Issues - January 15, 2026",
   "body": "## Summary\n\nFound 5 CLI consistency issues during automated inspection.\n\n### Breakdown by Severity\n- High: 1\n- Medium: 2\n- Low: 2\n\n### Issues\nSee linked sub-issues for details on each finding."
 }
@@ -173,7 +173,7 @@ When issues are found:
 ### Sub-Issue Format
 
 For each finding, create a sub-issue with:
-- **parent**: The temporary_id from the parent issue (e.g., `"aw_abc123def456"`)
+- **parent**: The temporary_id from the parent issue (e.g., `"aw_abc123"`)
 - **Title**: Brief description of the issue (e.g., "Typo in compile command help", "Missing example in logs command")
 - **Body**: Include:
   - The command/subcommand affected
@@ -187,7 +187,7 @@ For each finding, create a sub-issue with:
 ```json
 {
   "type": "create_issue",
-  "parent": "aw_abc123def456",
+  "parent": "aw_abc123",
   "title": "Typo in compile command help",
   "body": "## Issue Description\n\n**Command**: `gh aw compile`\n**Type**: Typo in help text\n**Priority**: Low\n\n### Current Output (from running ./gh-aw compile --help)\n```\nCompile markdown to YAML workflows\n```\n\n### Issue\nThe word \"markdown\" should be capitalized consistently with other commands.\n\n### Suggested Fix\n```\nCompile Markdown workflows to GitHub Actions YAML\n```"
 }
