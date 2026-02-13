@@ -227,6 +227,7 @@ jobs:
         env:
           GITHUB_MCP_LOCKDOWN_EXPLICIT: "true"
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
         with:
           script: |
             const validateLockdownRequirements = require('/opt/gh-aw/actions/validate_lockdown_requirements.cjs');

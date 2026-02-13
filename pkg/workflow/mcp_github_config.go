@@ -343,6 +343,9 @@ func (c *Compiler) generateGitHubMCPLockdownValidationStep(yaml *strings.Builder
 		pinnedAction = fmt.Sprintf("%s@%s", actionRepo, actionVersion)
 	}
 
+	// Extract custom github-token if present
+	customToken := getGitHubToken(githubTool)
+
 	// Generate the validation step
 	yaml.WriteString("      - name: Validate lockdown mode requirements\n")
 	yaml.WriteString("        id: validate-lockdown-requirements\n")
@@ -350,6 +353,10 @@ func (c *Compiler) generateGitHubMCPLockdownValidationStep(yaml *strings.Builder
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GITHUB_MCP_LOCKDOWN_EXPLICIT: \"true\"\n")
 	yaml.WriteString("          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}\n")
+	yaml.WriteString("          GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}\n")
+	if customToken != "" {
+		fmt.Fprintf(yaml, "          CUSTOM_GITHUB_TOKEN: %s\n", customToken)
+	}
 	yaml.WriteString("        with:\n")
 	yaml.WriteString("          script: |\n")
 	yaml.WriteString("            const validateLockdownRequirements = require('/opt/gh-aw/actions/validate_lockdown_requirements.cjs');\n")

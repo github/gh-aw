@@ -193,6 +193,7 @@ jobs:
       - name: Start MCP gateway
         id: start-mcp-gateway
         env:
+          GITHUB_MCP_LOCKDOWN: ${{ steps.determine-automatic-lockdown.outputs.lockdown == 'true' && '1' || '0' }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
@@ -219,6 +220,7 @@ jobs:
                 "type": "stdio",
                 "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
+                  "GITHUB_LOCKDOWN_MODE": "$GITHUB_MCP_LOCKDOWN",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}",
                   "GITHUB_TOOLSETS": "repos,issues,pull_requests"
                 }

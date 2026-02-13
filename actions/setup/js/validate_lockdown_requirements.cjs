@@ -4,7 +4,8 @@
  * Validates that lockdown mode requirements are met at runtime.
  *
  * When lockdown mode is explicitly enabled in the workflow configuration,
- * GH_AW_GITHUB_TOKEN MUST be configured as a repository secret. Without it,
+ * at least one custom GitHub token must be configured (GH_AW_GITHUB_TOKEN,
+ * GH_AW_GITHUB_MCP_SERVER_TOKEN, or custom github-token). Without any custom token,
  * the workflow will fail with a clear error message.
  *
  * This validation runs at the start of the workflow to fail fast if requirements
@@ -25,24 +26,37 @@ function validateLockdownRequirements(core) {
 
   core.info("Lockdown mode is explicitly enabled, validating requirements...");
 
-  // Check if GH_AW_GITHUB_TOKEN is configured
+  // Check if any custom GitHub token is configured
+  // This matches the token selection logic used by the MCP gateway:
+  // GH_AW_GITHUB_MCP_SERVER_TOKEN || GH_AW_GITHUB_TOKEN || custom github-token
   const hasGhAwToken = !!process.env.GH_AW_GITHUB_TOKEN;
+  const hasGhAwMcpToken = !!process.env.GH_AW_GITHUB_MCP_SERVER_TOKEN;
+  const hasCustomToken = !!process.env.CUSTOM_GITHUB_TOKEN;
+  const hasAnyCustomToken = hasGhAwToken || hasGhAwMcpToken || hasCustomToken;
 
-  if (!hasGhAwToken) {
+  core.info(`GH_AW_GITHUB_TOKEN configured: ${hasGhAwToken}`);
+  core.info(`GH_AW_GITHUB_MCP_SERVER_TOKEN configured: ${hasGhAwMcpToken}`);
+  core.info(`Custom github-token configured: ${hasCustomToken}`);
+
+  if (!hasAnyCustomToken) {
     const errorMessage =
-      "Lockdown mode is enabled (lockdown: true) but GH_AW_GITHUB_TOKEN is not configured.\\n" +
+      "Lockdown mode is enabled (lockdown: true) but no custom GitHub token is configured.\\n" +
       "\\n" +
-      "Please configure GH_AW_GITHUB_TOKEN as a repository secret with appropriate permissions.\\n" +
-      "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/auth.mdx#gh_aw_github_token\\n" +
+      "Please configure one of the following as a repository secret:\\n" +
+      "  - GH_AW_GITHUB_TOKEN (recommended)\\n" +
+      "  - GH_AW_GITHUB_MCP_SERVER_TOKEN (alternative)\\n" +
+      "  - Custom github-token in your workflow frontmatter\\n" +
       "\\n" +
-      "To set the token:\\n" +
+      "See: https://github.com/github/gh-aw/blob/main/docs/src/content/docs/reference/auth.mdx\\n" +
+      "\\n" +
+      "To set a token:\\n" +
       '  gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_FINE_GRAINED_PAT"';
 
     core.setFailed(errorMessage);
     throw new Error(errorMessage);
   }
 
-  core.info("✓ Lockdown mode requirements validated: GH_AW_GITHUB_TOKEN is configured");
+  core.info("✓ Lockdown mode requirements validated: Custom GitHub token is configured");
 }
 
 module.exports = validateLockdownRequirements;
