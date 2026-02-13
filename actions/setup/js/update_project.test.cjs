@@ -875,7 +875,7 @@ describe("updateProject", () => {
       type: "update_project",
       project: projectUrl,
       content_type: "draft_issue",
-      draft_issue_id: "aw_bad",
+      draft_issue_id: "aw_ab",
     };
 
     queueResponses([repoResponse(), viewerResponse(), orgProjectV2Response(projectUrl, 60, "project-draft")]);
