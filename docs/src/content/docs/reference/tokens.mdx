@@ -1,6 +1,6 @@
 ---
-title: GitHub Tokens and Secrets
-description: Comprehensive reference for all GitHub tokens (secrets) used in gh-aw, including authentication, token precedence, and security best practices
+title: Tokens & Authentication
+description: Comprehensive reference for GitHub Actions secrets, GitHub tokens and GitHub Apps in gh-aw
 sidebar:
   order: 650
 disable-agentic-editing: true
@@ -9,24 +9,31 @@ disable-agentic-editing: true
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import Video from '../../../components/Video.astro';
 
-## Which tokens/secrets do I need?
+This page provides a comprehensive reference for Authentication options in GitHub Agentic Workflows:
 
-You will need one of the following tokens/secrets:
+- GitHub Actions secrets
+- AI Account API keys
+- GitHub tokens
+- Using GitHub Apps as an alternative authorization mechanism
+
+## Which GitHub Actions secrets do I need?
+
+You will need one of the following GitHub Actions secrets configured in your repository to authenticate the AI engine you choose:
 
 - **Copilot** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token)
 - **Claude by Anthropic** – Add [`ANTHROPIC_API_KEY`](#anthropic_api_key)
 - **Codex by OpenAI** – Add [`OPENAI_API_KEY`](#openai_api_key)
 
-Depending on what your workflow needs to do, you may need additional tokens:
+Depending on what your workflow needs to do, you may need additional GitHub tokens added as repository secrets:
 
 - **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token)
 - **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#gh_aw_project_github_token)
 - **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#gh_aw_agent_token)
 - **MCP server with special permissions** – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
 
-## How do I add tokens/secrets to my repository?
+## How do I add a GitHub Actions secret to my repository?
 
-You can set up your tokens/secrets manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
+You can add secrets manually in the GitHub UI or use the CLI for a streamlined experience.
 
 ### Adding tokens using the CLI
 
@@ -40,13 +47,7 @@ You can also check existing secrets with:
 gh aw secrets bootstrap
 ```
 
-You can validate token permissions and configuration with:
-
-```bash
-gh aw init --tokens --engine <engine>
-```
-
-### Adding tokens using the GitHub UI
+### Adding secrets using the GitHub UI
 
 1. Go to your repository on GitHub
 2. Click on "Settings" → "Secrets and variables" → "Actions"
@@ -88,7 +89,7 @@ gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
 
 ### `ANTHROPIC_API_KEY`
 
-If using the Claude by Anthropic engine, you need to configure `ANTHROPIC_API_KEY` with an API key from Anthropic.
+If using the Claude by Anthropic engine, you need to set a GitHub Actions secret `ANTHROPIC_API_KEY` to be an API key from Anthropic.
 
 **Setup**:
 
@@ -106,7 +107,7 @@ See also (/gh-aw/reference/engines/#using-claude-by-anthropic-claude-code) for a
 
 ### `OPENAI_API_KEY`
 
-If using the Codex by OpenAI engine, you need to configure `OPENAI_API_KEY` with an API key from OpenAI.
+If using the Codex by OpenAI engine, you need to set a GitHub Actions secret `OPENAI_API_KEY` with an API key from OpenAI.
 
 **Setup**:
 
@@ -119,25 +120,6 @@ If using the Codex by OpenAI engine, you need to configure `OPENAI_API_KEY` with
    ```
 
 See also (/gh-aw/reference/engines/#using-openai-codex) for additional configuration needed when using Codex with GitHub MCP.
-
----
-
-### `GITHUB_TOKEN`
-
-GitHub Actions automatically provides this token with scoped access to the current repository. It is used by default to checkout the repository and for accessing GitHub via the GitHub MCP server running in local mode.
-
-**Setup**:
-
-- None. Provided by GitHub Actions for every workflow.
-
-**Token precedence and fallback**:
-
-`GH_AW_GITHUB_MCP_SERVER_TOKEN` -> `GH_AW_GITHUB_TOKEN` -> `GITHUB_TOKEN`.
-
-**Notes**:
-
-- Capabilities: read access to the current repository; permissions follow workflow `permissions:`.
-- Limitations: no cross-repo access, cannot trigger workflows via API, not supported for remote GitHub MCP server mode.
 
 ---
 
@@ -162,23 +144,17 @@ Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/n
   - Contents: Read (minimum) or Read+Write (for PRs)
   - Issues: Read+Write (for issue operations)
   - Pull requests: Read+Write (for PR operations)
+  - No write permissions should be granted
 
-**Token precedence and fallback**:
-
-`GH_AW_GITHUB_MCP_SERVER_TOKEN` -> `GH_AW_GITHUB_TOKEN` -> `GITHUB_TOKEN`
-
-**Notes**:
-
-- If you need to isolate GitHub MCP server permissions, set `GH_AW_GITHUB_MCP_SERVER_TOKEN`.
-
+Note that using `GH_AW_GITHUB_TOKEN` replaces the default behaviour of GitHub Agentic Workflows (which arranges temporary `GITHUB_TOKEN` GitHub Actions tokens appropriate to the `permissions:` you have declared).
 
 ---
 
 ### `GH_AW_GITHUB_MCP_SERVER_TOKEN`
 
-If you need different permissions for the GitHub MCP server than the default token chain, you can configure `GH_AW_GITHUB_MCP_SERVER_TOKEN` with a Personal Access Token (PAT) or use a GitHub App for enhanced security.
+If you need different permissions for the GitHub MCP server than the default, you can configure `GH_AW_GITHUB_MCP_SERVER_TOKEN` with a Personal Access Token (PAT) or use a GitHub App for enhanced security.
 
-This specialized token for the GitHub MCP server that can override the standard token chain. Use this when you need different permission levels for MCP server operations versus other workflow operations.
+Use this when you need different permission levels for MCP server operations versus other workflow operations.
 
 **When to use**:
 
@@ -217,77 +193,6 @@ Or add to repository secrets:
 ```bash wrap
 gh aw secrets set GH_AW_GITHUB_MCP_SERVER_TOKEN --value "YOUR_MCP_PAT"
 ```
-
-**Using GitHub App** (recommended for production):
-
-For enhanced security with short-lived tokens, configure a GitHub App instead. There are two ways:
-
-**Option 1: Direct configuration** (more control)
-
-```yaml wrap
-permissions:
-  contents: read
-  issues: read
-
-tools:
-  github:
-    mode: remote
-    toolsets: [repos, issues, pull_requests]
-    app:
-      app-id: ${{ vars.APP_ID }}
-      private-key: ${{ secrets.APP_PRIVATE_KEY }}
-      owner: "my-org"                    # Optional: defaults to current repo owner
-      repositories: ["repo1", "repo2"]   # Optional: defaults to current repo only
-```
-
-**Option 2: Shared workflow** (recommended - centralized configuration)
-
-Use the provided shared workflow for centralized configuration:
-
-```yaml wrap
-imports:
-  - shared/github-mcp-app.md  # Provides APP_ID and APP_PRIVATE_KEY configuration
-
-permissions:
-  contents: read
-  issues: read
-
-tools:
-  github:
-    mode: remote
-    toolsets: [repos, issues, pull_requests]
-```
-
-The shared workflow (`shared/github-mcp-app.md`) expects:
-- **Repository Variable**: `APP_ID` - Your GitHub App ID
-- **Repository Secret**: `APP_PRIVATE_KEY` - Your GitHub App private key
-
-Set up repository variables and secrets:
-
-```bash wrap
-gh variable set APP_ID --body "123456"
-gh aw secrets set APP_PRIVATE_KEY --value "$(cat path/to/private-key.pem)"
-```
-
-**How it works**:
-
-At workflow start, a token is automatically minted with **permissions matching your job's `permissions:` field**. The token is passed to the GitHub MCP server and automatically revoked at workflow end (even on failure).
-
-This is the same per-job narrowing behavior used by `safe-outputs.app:` - see the [Safe Outputs documentation](/gh-aw/reference/safe-outputs/#github-app-token-app) for a detailed explanation of how GitHub App tokens are narrowed per-job.
-
-**Token precedence and fallback**:
-
-`GH_AW_GITHUB_MCP_SERVER_TOKEN` -> `GH_AW_GITHUB_TOKEN` -> `GITHUB_TOKEN`.
-
-**Notes**:
-
-- The compiler automatically sets `GITHUB_MCP_SERVER_TOKEN` and passes it as `GITHUB_PERSONAL_ACCESS_TOKEN` (local/Docker) or an `Authorization: Bearer` header (remote).
-- In most cases, you do not need to set this token separately. Use `GH_AW_GITHUB_TOKEN` instead.
-- **GitHub App advantages**: Short-lived tokens (auto-revoked at workflow end), no credential rotation needed, automatic permission calculation, better auditability.
-- **Per-job permission narrowing**: When using a GitHub App (via `tools.github.app:` or `safe-outputs.app:`), tokens are automatically narrowed to match the job's `permissions:` block. This means you can safely configure a broadly-permissioned GitHub App at the organization level, and each job will only receive the specific permissions it needs.
-- If using a GitHub App for both safe-outputs and GitHub MCP server, you can configure them independently for different permission levels.
-- Set the resource owner to the organization when the repository is organization-owned.
-- `GITHUB_TOKEN` is not supported in remote mode. Use `GH_AW_GITHUB_TOKEN` or a GitHub App instead.
 
 ---
 
@@ -399,7 +304,6 @@ safe-outputs:
 - To opt-in to creating projects, the agent must include `create_if_missing: true` in its output, and the token must have sufficient permissions to create projects in the organization.
 - Use `GH_AW_PROJECT_GITHUB_TOKEN` for Projects-specific isolation; use `GH_AW_GITHUB_TOKEN` if it already has Projects permissions and you do not need isolation.
 
-
 ---
 
 ### `GH_AW_AGENT_TOKEN`
@@ -490,6 +394,65 @@ See [GitHub's official documentation on assigning issues to Copilot](https://doc
 This ensures the token has the appropriate permissions to assign agents to issues and pull requests in the repository.
 
 ---
+
+## Using tokens from GitHub Apps instead of secrets
+
+For enhanced security with short-lived tokens, you may configure GitHub Apps instead. 
+
+There are two ways:
+
+**Option 1: Direct configuration** (more control)
+
+```yaml wrap
+permissions:
+  contents: read
+  issues: read
+
+tools:
+  github:
+    mode: remote
+    toolsets: [repos, issues, pull_requests]
+    app:
+      app-id: ${{ vars.APP_ID }}
+      private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      owner: "my-org"                    # Optional: defaults to current repo owner
+      repositories: ["repo1", "repo2"]   # Optional: defaults to current repo only
+```
+
+**Option 2: Shared workflow** (recommended - centralized configuration)
+
+Use the provided shared workflow for centralized configuration:
+
+```yaml wrap
+imports:
+  - shared/github-mcp-app.md  # Provides APP_ID and APP_PRIVATE_KEY configuration
+
+permissions:
+  contents: read
+  issues: read
+
+tools:
+  github:
+    mode: remote
+    toolsets: [repos, issues, pull_requests]
+```
+
+The shared workflow (`shared/github-mcp-app.md`) expects:
+- **Repository Variable**: `APP_ID` - Your GitHub App ID
+- **Repository Secret**: `APP_PRIVATE_KEY` - Your GitHub App private key
+
+Set up repository variables and secrets:
+
+```bash wrap
+gh variable set APP_ID --body "123456"
+gh aw secrets set APP_PRIVATE_KEY --value "$(cat path/to/private-key.pem)"
+```
+
+**How it works**:
+
+At workflow start, a token is automatically minted with **permissions matching your job's `permissions:` field**. The token is passed to the GitHub MCP server and automatically revoked at workflow end (even on failure).
+
+This is the same per-job narrowing behavior used by `safe-outputs.app:` - see the [Safe Outputs documentation](/gh-aw/reference/safe-outputs/#github-app-token-app) for a detailed explanation of how GitHub App tokens are narrowed per-job.
 
 ## Who owns a GitHub token?
 
