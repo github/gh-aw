@@ -970,7 +970,8 @@ async function main() {
           core.warning(`✗ Failed to submit PR review: ${reviewResult.error}`);
         }
       } catch (reviewError) {
-        core.warning(`✗ Exception while submitting PR review: ${reviewError.message || reviewError}`);
+        const errorMessage = reviewError instanceof Error ? reviewError.message : String(reviewError);
+        core.warning(`✗ Exception while submitting PR review: ${errorMessage}`);
       }
     }
 
