@@ -5,40 +5,42 @@ const fs = require("fs");
 const path = require("path");
 
 /**
+ * @typedef {Object} ValidationResult
+ * @property {boolean} valid - Whether all files passed validation
+ * @property {string[]} invalidFiles - List of files with invalid extensions
+ */
+
+/**
  * Validate that all files in a memory directory have allowed file extensions
  * If allowedExtensions is empty or not provided, all file extensions are allowed
  *
  * @param {string} memoryDir - Path to the memory directory to validate
- * @param {string} memoryType - Type of memory ("cache" or "repo") for error messages
+ * @param {string} [memoryType="cache"] - Type of memory ("cache" or "repo") for error messages
  * @param {string[]} [allowedExtensions] - Optional custom list of allowed extensions (empty array or undefined means allow all files)
- * @returns {{valid: boolean, invalidFiles: string[]}} Validation result with list of invalid files
+ * @returns {ValidationResult} Validation result with list of invalid files
  */
 function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions) {
-  // If allowedExtensions is not provided, undefined, or empty array, allow all files
-  const allowAll = !allowedExtensions || allowedExtensions.length === 0;
+  const allowAll = !allowedExtensions?.length;
 
-  // If allowing all files, skip validation
   if (allowAll) {
     core.info(`All file extensions are allowed in ${memoryType}-memory directory`);
     return { valid: true, invalidFiles: [] };
   }
 
-  // Normalize extensions to lowercase and trim whitespace
-  const extensions = allowedExtensions.map(ext => ext.trim().toLowerCase());
-  const invalidFiles = [];
-
-  // Check if directory exists
   if (!fs.existsSync(memoryDir)) {
     core.info(`Memory directory does not exist: ${memoryDir}`);
     return { valid: true, invalidFiles: [] };
   }
 
+  const extensions = allowedExtensions.map(ext => ext.trim().toLowerCase());
+  const invalidFiles = [];
+
   /**
    * Recursively scan directory for files
    * @param {string} dirPath - Directory to scan
-   * @param {string} relativePath - Relative path from memory directory
+   * @param {string} [relativePath=""] - Relative path from memory directory
    */
-  function scanDirectory(dirPath, relativePath = "") {
+  const scanDirectory = (dirPath, relativePath = "") => {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -46,30 +48,29 @@ function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions)
       const relativeFilePath = relativePath ? path.join(relativePath, entry.name) : entry.name;
 
       if (entry.isDirectory()) {
-        // Recursively scan subdirectory
         scanDirectory(fullPath, relativeFilePath);
       } else if (entry.isFile()) {
-        // Check file extension
         const ext = path.extname(entry.name).toLowerCase();
         if (!extensions.includes(ext)) {
           invalidFiles.push(relativeFilePath);
         }
       }
     }
-  }
+  };
 
   try {
     scanDirectory(memoryDir);
   } catch (error) {
-    core.error(`Failed to scan ${memoryType}-memory directory: ${error instanceof Error ? error.message : String(error)}`);
+    const message = error instanceof Error ? error.message : String(error);
+    core.error(`Failed to scan ${memoryType}-memory directory: ${message}`);
     return { valid: false, invalidFiles: [] };
   }
 
   if (invalidFiles.length > 0) {
     core.error(`Found ${invalidFiles.length} file(s) with invalid extensions in ${memoryType}-memory:`);
     invalidFiles.forEach(file => {
-      const ext = path.extname(file).toLowerCase();
-      core.error(`  - ${file} (extension: ${ext || "(no extension)"})`);
+      const ext = path.extname(file).toLowerCase() || "(no extension)";
+      core.error(`  - ${file} (extension: ${ext})`);
     });
     core.error(`Allowed extensions: ${extensions.join(", ")}`);
     return { valid: false, invalidFiles };
