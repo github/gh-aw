@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 3647c359071f847a8f97886139045c31a6a5840084eb5d45a8ec72d281095053
+# frontmatter-hash: e4945922152cf00d6e0bfcc4b0b869b00af9e4067e3978ad70218706f4945164
 
 name: "Bot Detection"
 "on":
@@ -1206,6 +1206,10 @@ jobs:
             }
 
             const seen = new Set();
+            let skippedNoLogin = 0;
+            let skippedAllowed = 0;
+            const skippedAllowedLogins = new Set();
+            const MAX_LOGGED_SKIPPED = 10;
             const items = rawItems
               .filter(i => new Date(i.updated_at) >= start && new Date(i.updated_at) <= end)
               .map(i => ({
@@ -1275,8 +1279,17 @@ jobs:
 
             for (const it of items) {
               const login = it.author;
-              if (!login) continue;
-              if (isAllowedAccount(login)) continue;
+              if (!login) {
+                skippedNoLogin += 1;
+                continue;
+              }
+              if (isAllowedAccount(login)) {
+                skippedAllowed += 1;
+                if (skippedAllowedLogins.size < MAX_LOGGED_SKIPPED) {
+                  skippedAllowedLogins.add(login);
+                }
+                continue;
+              }
               const s = ensureAuthor(login);
               await ensureUserCreatedAt(login);
               s.itemCount += 1;
@@ -1605,9 +1618,62 @@ jobs:
             const hasFindings = highRiskAccounts > 0 || multiAccountDomains > 0;
 
             // Log analysis summary for observability
-            core.info(`Analysis complete: ${accounts.length} accounts analyzed, ${highRiskAccounts} with risk_score >= 10`);
-            core.info(`External domains: ${domains.length} total, ${multiAccountDomains} shared by 2+ accounts`);
-            core.info(`Has findings: ${hasFindings} (will ${hasFindings ? 'run' : 'skip'} agent job)`);
+            const skippedNames = Array.from(skippedAllowedLogins).sort((a, b) => a.localeCompare(b));
+            const skippedLabel = skippedNames.length > 0 ? skippedNames.map(n => `@${n}`).join(", ") : "none";
+            const analyzedNames = accounts.slice(0, 10).map(a => `@${a.login}`).join(", ") || "none";
+            const domainSamples = domains.slice(0, 10).map(d => d.domain).join(", ") || "none";
+            core.info("Summary:");
+            core.info(`- Window: ${toISO(start)} -> ${toISO(end)}`);
+            core.info(`- Items: raw=${rawItems.length}, in_window+dedup=${items.length}`);
+            core.info(`- PRs scanned: ${prItems.length} (max ${MAX_PR})`);
+            core.info(`- Skipped (no login): ${skippedNoLogin}`);
+            core.info(`- Skipped (allowlisted): ${skippedAllowed} [${skippedLabel}]`);
+            core.info(`- Accounts analyzed: ${accounts.length} [${analyzedNames}]`);
+            core.info(`- Risk >= 10: ${highRiskAccounts}`);
+            core.info(`- External domains: total=${domains.length}, shared>=2=${multiAccountDomains} [${domainSamples}]`);
+            core.info(`- Decision: has_findings=${hasFindings} (will ${hasFindings ? "run" : "skip"} agent job)`);
+
+            core.info("Detailed report:");
+            if (domains.length === 0) {
+              core.info("- Domains: none");
+            } else {
+              core.info("- Domains:");
+              for (const d of domains) {
+                const logins = d.accounts.map(login => `@${login}`).join(", ") || "none";
+                core.info(`  - ${d.domain}: accounts=${d.count} [${logins}]`);
+              }
+            }
+
+            if (accounts.length === 0) {
+              core.info("- Accounts: none");
+            } else {
+              core.info("- Accounts:");
+              for (const a of accounts) {
+                const signalsText = a.signals.join(", ") || "none";
+                const domainsText = (a.external_domains || []).join(", ") || "none";
+                const touchedText = (a.touched_files || []).join(", ") || "none";
+                core.info(`  - @${a.login}: score=${a.risk_score}, severity=${a.severity}, signals=[${signalsText}]`);
+                core.info(`    - activity: pr=${a.pr_count || 0}, issue=${a.issue_count || 0}, comment=${a.comment_count || 0}, review=${a.review_count || 0}`);
+                core.info(`    - external_domains: ${domainsText}`);
+                core.info(`    - touched_files: ${touchedText}`);
+                if (a.example_items && a.example_items.length > 0) {
+                  const itemLines = a.example_items
+                    .map(item => {
+                      const label = item.is_pr ? `PR #${item.number}` : `Issue #${item.number}`;
+                      const title = item.title ? ` "${item.title}"` : "";
+                      return `${label}${title}`;
+                    })
+                    .join("; ");
+                  core.info(`    - examples: ${itemLines}`);
+                }
+                if (a.examples && a.examples.length > 0) {
+                  core.info("    - evidence:");
+                  for (const ex of a.examples) {
+                    core.info(`      - ${ex.url}`);
+                  }
+                }
+              }
+            }
 
             // Find existing triage issue (exact title match)
             let existingIssueNumber = "";
