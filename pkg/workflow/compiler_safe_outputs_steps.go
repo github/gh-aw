@@ -106,27 +106,48 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 		condition = BuildSafeOutputType("push_to_pull_request_branch")
 	}
 
+	// Determine target repository for checkout and git config
+	// Priority: create-pull-request target-repo > trialLogicalRepoSlug > default (source repo)
+	var targetRepoSlug string
+	if data.SafeOutputs.CreatePullRequests != nil && data.SafeOutputs.CreatePullRequests.TargetRepoSlug != "" {
+		targetRepoSlug = data.SafeOutputs.CreatePullRequests.TargetRepoSlug
+		consolidatedSafeOutputsStepsLog.Printf("Using target-repo from create-pull-request: %s", targetRepoSlug)
+	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
+		targetRepoSlug = c.trialLogicalRepoSlug
+		consolidatedSafeOutputsStepsLog.Printf("Using trialLogicalRepoSlug: %s", targetRepoSlug)
+	}
+
 	// Step 1: Checkout repository with conditional execution
 	steps = append(steps, "      - name: Checkout repository\n")
 	steps = append(steps, fmt.Sprintf("        if: %s\n", condition.Render()))
 	steps = append(steps, fmt.Sprintf("        uses: %s\n", GetActionPin("actions/checkout")))
 	steps = append(steps, "        with:\n")
+
+	// Set repository parameter if checking out a different repository
+	if targetRepoSlug != "" {
+		steps = append(steps, fmt.Sprintf("          repository: %s\n", targetRepoSlug))
+		consolidatedSafeOutputsStepsLog.Printf("Added repository parameter: %s", targetRepoSlug)
+	}
+
 	steps = append(steps, fmt.Sprintf("          token: %s\n", checkoutToken))
 	steps = append(steps, "          persist-credentials: false\n")
 	steps = append(steps, "          fetch-depth: 1\n")
-	if c.trialMode {
-		if c.trialLogicalRepoSlug != "" {
-			steps = append(steps, fmt.Sprintf("          repository: %s\n", c.trialLogicalRepoSlug))
-		}
-	}
 
 	// Step 2: Configure Git credentials with conditional execution
 	// Security: Pass GitHub token through environment variable to prevent template injection
+
+	// Determine REPO_NAME value based on target repository
+	repoNameValue := "${{ github.repository }}"
+	if targetRepoSlug != "" {
+		repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
+		consolidatedSafeOutputsStepsLog.Printf("Using target repo for REPO_NAME: %s", targetRepoSlug)
+	}
+
 	gitConfigSteps := []string{
 		"      - name: Configure Git credentials\n",
 		fmt.Sprintf("        if: %s\n", condition.Render()),
 		"        env:\n",
-		"          REPO_NAME: ${{ github.repository }}\n",
+		fmt.Sprintf("          REPO_NAME: %s\n", repoNameValue),
 		"          SERVER_URL: ${{ github.server_url }}\n",
 		fmt.Sprintf("          GIT_TOKEN: %s\n", gitRemoteToken),
 		"        run: |\n",
