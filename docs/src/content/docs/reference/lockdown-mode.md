@@ -53,10 +53,11 @@ To enable lockdown mode for your workflow:
 
 ```yaml wrap
 ---
-lockdown: true
 engine: copilot
+
 tools:
   github:
+    lockdown: true
     mode: remote
     toolsets: [repos, issues, pull_requests]
 ---
@@ -70,6 +71,7 @@ gh aw secrets set GH_AW_GITHUB_TOKEN --value "YOUR_FINE_GRAINED_PAT"
 ```
 
 **Requirements**:
+
 - `GH_AW_GITHUB_TOKEN` must be configured as a repository secret
 - The token requires appropriate permissions (Contents: Read, Issues: Read, Pull requests: Read)
 - Without `GH_AW_GITHUB_TOKEN`, workflows with `lockdown: true` will fail at runtime
@@ -88,6 +90,8 @@ tools:
 > **Security Consideration**: Setting `lockdown: false` in public repositories allows workflows to process content from any GitHub user. Only use this for workflows specifically designed to handle untrusted input safely.
 
 ## When to Disable Lockdown
+
+If working in a public repository, it is recommended that you use an explicit `lockdown: true` or `lockdown: false`.
 
 Some workflows are **designed** to process content from all users and include appropriate safety controls. Safe use cases for `lockdown: false` in public repositories:
 
