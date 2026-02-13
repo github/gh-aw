@@ -131,9 +131,7 @@ func validateExpressionSyntax(group string) error {
 	expressionPattern := regexp.MustCompile(`\$\{\{([^}]*)\}\}`)
 	matches := expressionPattern.FindAllStringSubmatch(group, -1)
 
-	if log.Enabled() {
-		concurrencyValidationLog.Printf("Found %d expression(s) to validate", len(matches))
-	}
+	concurrencyValidationLog.Printf("Found %d expression(s) to validate", len(matches))
 
 	for _, match := range matches {
 		if len(match) < 2 {

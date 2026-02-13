@@ -87,9 +87,7 @@ func ScanMarkdownSecurity(content string) []SecurityFinding {
 
 	// Strip frontmatter and get the line offset for correct line number reporting
 	markdownBody, lineOffset := stripFrontmatter(content)
-	if log.Enabled() {
-		markdownSecurityLog.Printf("Stripped frontmatter: %d line(s) removed, scanning %d bytes of markdown", lineOffset, len(markdownBody))
-	}
+	markdownSecurityLog.Printf("Stripped frontmatter: %d line(s) removed, scanning %d bytes of markdown", lineOffset, len(markdownBody))
 
 	var findings []SecurityFinding
 
@@ -197,9 +195,7 @@ func scanUnicodeAbuse(content string) []SecurityFinding {
 	var findings []SecurityFinding
 	lines := strings.Split(content, "\n")
 
-	if log.Enabled() {
-		markdownSecurityLog.Printf("Scanning %d line(s) for unicode abuse", len(lines))
-	}
+	markdownSecurityLog.Printf("Scanning %d line(s) for unicode abuse", len(lines))
 
 	for lineNum, line := range lines {
 		lineNo := lineNum + 1

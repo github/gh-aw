@@ -389,9 +389,7 @@ func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, saf
 	// Sort the allowed tools alphabetically for consistent output
 	sort.Strings(allowedTools)
 
-	if log.Enabled() {
-		claudeToolsLog.Printf("Generated allowed tools string with %d tools", len(allowedTools))
-	}
+	claudeToolsLog.Printf("Generated allowed tools string with %d tools", len(allowedTools))
 
 	return strings.Join(allowedTools, ",")
 }

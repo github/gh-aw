@@ -45,9 +45,7 @@ func CollectSecretReferences(yamlContent string) []string {
 	// Sort for consistent output
 	SortStrings(secrets)
 
-	if log.Enabled() {
-		secretMaskingLog.Printf("Found %d unique secret reference(s) in workflow", len(secrets))
-	}
+	secretMaskingLog.Printf("Found %d unique secret reference(s) in workflow", len(secrets))
 
 	return secrets
 }
