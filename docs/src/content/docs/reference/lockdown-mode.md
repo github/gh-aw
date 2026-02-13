@@ -89,6 +89,6 @@ Some workflows are **designed** to process content from all users and include ap
 - [Tools](/gh-aw/reference/tools/) - GitHub tools configuration
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Write operation controls
 - [Permissions](/gh-aw/reference/permissions/) - GitHub Actions permissions
-- [FAQ: Lockdown Mode](/gh-aw/reference/faq/#what-is-lockdown-mode-and-when-is-it-enabled) - Common questions
+- [FAQ: Lockdown Mode](/gh-aw/reference/faq/#what-is-github-lockdown-mode-and-when-is-it-enabled) - Common questions
 - [Troubleshooting: Access Issues](/gh-aw/troubleshooting/common-issues/#lockdown-mode-blocking-expected-content) - Resolving access problems
 - [GitHub MCP Server Documentation](https://github.com/github/github-mcp-server/blob/main/docs/server-configuration.md#lockdown-mode) - Upstream reference

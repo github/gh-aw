@@ -173,7 +173,7 @@ Here are our tips!
 - Allow manual override
 - Track triage accuracy
 - Update classification rules based on feedback
-- **For public repos**: Consider if you need to [disable lockdown mode](/gh-aw/reference/faq/#what-is-lockdown-mode-and-when-is-it-enabled) to process issues from all users (this is one of the rare safe use cases - see [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for security guidance)
+- **For public repos**: Consider if you need to [disable lockdown mode](/gh-aw/reference/faq/#what-is-github-lockdown-mode-and-when-is-it-enabled) to process issues from all users (this is one of the rare safe use cases - see [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for security guidance)
 
 **Learn more**: [IssueOps Examples](https://github.github.com/gh-aw/patterns/issueops/)
 
