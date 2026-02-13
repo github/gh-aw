@@ -199,9 +199,6 @@ jobs:
         run: npm install -g --silent @anthropic-ai/claude-code@2.1.39
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
-        env:
-          TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
-        if: env.TOKEN_CHECK != ''
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |

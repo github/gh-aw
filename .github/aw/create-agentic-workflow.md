@@ -425,6 +425,25 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    - **Always use `safe-outputs` instead** for any GitHub write operations (creating issues, adding comments, etc.)
    - **Mode configuration** - Both `mode: local` (Docker-based, default) and `mode: remote` (hosted) are supported. Remote mode offers faster startup and no Docker requirement.
 
+   **GitHub lockdown Mode (Security Feature)**:
+
+   GitHub lockdown mode is a security feature that filters content in public repositories to only show issues, PRs, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
+
+   - **Automatic by default** - Lockdown is automatically enabled for public repositories, and has no impact for for private repositories (where all collaborators are trusted)
+   - **When to disable**: Only disable lockdown (`lockdown: false`) for specific safe use cases:
+     - Issue triage/labeling workflows with restricted safe outputs
+     - Spam detection systems designed to handle untrusted content
+     - Public status dashboards with read-only operations
+     - Command workflows that explicitly verify user permissions before acting
+   - **How to disable**:
+     ```yaml
+     tools:
+       github:
+         lockdown: false  # Only for workflows designed to safely process all user input
+     ```
+   - **Security considerations**: Workflows with `lockdown: false` should have read-only operations, restrictive safe outputs with specific allowed values, no bash/web-fetch/playwright tools, and explicit input validation
+   - **Documentation**: See https://github.github.com/gh-aw/reference/lockdown-mode/ for complete guidance
+
   **Advanced static analysis tools**:
   For advanced code analysis tasks, see `.github/aw/serena-tool.md` for when and how to use Serena language server.
   For coordinator-style workflows, see `.github/aw/orchestration.md` for orchestration patterns.

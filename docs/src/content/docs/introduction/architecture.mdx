@@ -553,6 +553,19 @@ XML and HTML tags are converted to a safe parentheses format to prevent injectio
 Workflows should use `${{ needs.activation.outputs.text }}` instead of raw `github.event` fields to ensure proper sanitization of user-provided content.
 </Aside>
 
+## GitHub Lockdown Mode
+
+GitHub lockdown mode is a security feature of the GitHub MCP server that filters content in public repositories to only surface items from users with push access. This protects workflows from processing potentially malicious or misleading input from untrusted users.
+
+When **lockdown mode is enabled** (automatically the default for public repositories with custom tokens), the GitHub MCP server:
+- Only returns issues, PRs, comments, and discussions from users with push, maintain, or admin access
+- Blocks coding agent from seeing content from other users
+- Has no particular effect for private or internal repos
+
+<Aside type="tip">
+See [Lockdown Mode Reference](/gh-aw/reference/lockdown-mode/) for complete configuration guidance, use cases, and security considerations.
+</Aside>
+
 ## Secret Redaction
 
 Before workflow artifacts are uploaded, all files in the `/tmp/gh-aw` directory are scanned for secret values and redacted. This mechanism prevents accidental credential leakage through logs, outputs, or artifacts. Secret redaction executes unconditionally (with `if: always()`), ensuring that secrets are protected even if the workflow fails at an earlier stage.
@@ -783,6 +796,7 @@ gh aw status
 | **Configuration** | Action SHA pinning | Supply chain attacks, tag hijacking |
 | **Configuration** | Security scanners (actionlint, zizmor, poutine) | Privilege escalation, misconfigurations, supply chain risks |
 | **Configuration** | Pre-activation checks (role/permission) | Unauthorized users, expired workflows |
+| **Plan** | GitHub lockdown mode | Untrusted user input, context poisoning, social engineering |
 | **Plan** | Content sanitization | @mention abuse, bot triggers |
 | **Plan** | Secret redaction | Credential leakage in logs/artifacts |
 | **Plan** | Threat detection | Malicious patches, secret leaks |
@@ -792,6 +806,7 @@ gh aw status
 
 ## Related Documentation
 
+- [Lockdown Mode](/gh-aw/reference/lockdown-mode/) - GitHub content filtering for public repositories
 - [Threat Detection Guide](/gh-aw/reference/threat-detection/) - Configuring threat analysis
 - [Network Permissions](/gh-aw/reference/network/) - Network access control
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Output processing configuration

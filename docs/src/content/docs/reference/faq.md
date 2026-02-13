@@ -179,6 +179,19 @@ network:
 
 See [Network Permissions](/gh-aw/reference/network/) for complete configuration options.
 
+### What is GitHub lockdown mode and when is it enabled?
+
+**GitHub lockdown mode** is a security feature that filters content in public repositories to only show issues, pull requests, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
+
+Lockdown is **automatically enabled** for public repositories. It has no particular effect in private or internal repositories. You can disable lockdown for specific workflows designed to safely process all user input:
+
+- Issue triage and organization workflows
+- Spam detection systems
+- Public status dashboards
+- Command workflows (like `/plan`) that maintainers can use
+
+See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for detailed configuration guidance and security considerations.
+
 ## Configuration & Setup
 
 ### What is a workflow lock file?

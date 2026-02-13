@@ -182,6 +182,7 @@ Some key characteristics are:
 - Often includes intelligent classification
 - Maintains issue relationships
 - Respects user intent and context
+- **For public repo triage**: May need [lockdown mode disabled](/gh-aw/reference/lockdown-mode/) to process issues from all users
 
 ---
 

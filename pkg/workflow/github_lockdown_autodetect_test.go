@@ -37,8 +37,8 @@ Test automatic lockdown determination.
 `,
 			expectedDetectStep: true,
 			expectedLockdown:   "auto",
-			expectIfCondition:  true,
-			description:        "When lockdown is not specified, determination step should be added with if condition",
+			expectIfCondition:  false,
+			description:        "When lockdown is not specified, determination step should be added",
 		},
 		{
 			name: "No auto-determination when lockdown explicitly set to true",
@@ -99,7 +99,7 @@ Test auto-determination with remote GitHub MCP.
 `,
 			expectedDetectStep: true,
 			expectedLockdown:   "auto",
-			expectIfCondition:  true,
+			expectIfCondition:  false,
 			description:        "Auto-determination should work with remote mode",
 		},
 	}
@@ -140,16 +140,6 @@ Test auto-determination with remote GitHub MCP.
 
 			if detectStepPresent != tt.expectedDetectStep {
 				t.Errorf("%s: Detection step presence = %v, want %v", tt.description, detectStepPresent, tt.expectedDetectStep)
-			}
-
-			// Check if the step has the if condition when expected
-			if tt.expectIfCondition && detectStepPresent {
-				if !strings.Contains(yaml, "TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}") {
-					t.Errorf("%s: Expected env var for GH_AW_GITHUB_MCP_SERVER_TOKEN", tt.description)
-				}
-				if !strings.Contains(yaml, "if: env.TOKEN_CHECK != ''") {
-					t.Errorf("%s: Expected if condition checking TOKEN_CHECK env var", tt.description)
-				}
 			}
 
 			// Check lockdown configuration based on expected value
@@ -224,14 +214,6 @@ Test automatic lockdown determination with Claude.
 
 	if !detectStepPresent {
 		t.Error("Determination step should be present for Claude engine")
-	}
-
-	// Check if the step has the if condition
-	if !strings.Contains(yaml, "TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}") {
-		t.Error("Expected env var for GH_AW_GITHUB_MCP_SERVER_TOKEN in determination step")
-	}
-	if !strings.Contains(yaml, "if: env.TOKEN_CHECK != ''") {
-		t.Error("Expected if condition checking TOKEN_CHECK env var in determination step")
 	}
 
 	// Check if lockdown uses step output expression

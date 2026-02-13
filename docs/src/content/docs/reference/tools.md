@@ -109,21 +109,13 @@ Setup: `gh aw secrets set GH_AW_GITHUB_TOKEN --value "<your-pat>"`
 
 **Read-Only**: Default behavior; restricts to read operations unless write operations configured.
 
-**Lockdown**: Automatically determined based on repository visibility when using a custom token (`GH_AW_GITHUB_MCP_SERVER_TOKEN`). Filters public repository content to items from users with push access. Private repositories are unaffected.
-
-- **Automatic (default)**: When `GH_AW_GITHUB_MCP_SERVER_TOKEN` is defined, lockdown is automatically enabled for public repositories and disabled for private/internal repositories
-- **Manual override**: Explicitly set `lockdown: true` or `lockdown: false` to override automatic determination
+**Lockdown Mode**: Security feature that filters public repository content to only show issues, PRs, and comments from users with push access. Automatically enabled for public repositories when using custom tokens. See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for complete documentation.
 
 ```yaml wrap
 tools:
   github:
-    # Option 1: Automatic (recommended) - determined at runtime
-    # Lockdown automatically enabled for public repos when GH_AW_GITHUB_MCP_SERVER_TOKEN is set
-
-    # Option 2: Explicit override
-    lockdown: true   # Force enable
-    # or
-    lockdown: false  # Explicitly disable (use with caution in public repos)
+    lockdown: true   # Force enable (automatic for public repos)
+    lockdown: false  # Disable (for workflows processing all user input)
 ```
 
 See [GitHub Tokens](/gh-aw/reference/tokens/) for security implications and authentication options.
