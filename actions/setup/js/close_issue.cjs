@@ -157,14 +157,10 @@ async function main(config = {}) {
       // Fetch issue details
       const issue = await getIssueDetails(github, repoParts.owner, repoParts.repo, issueNumber);
 
-      // Check if already closed
-      if (issue.state === "closed") {
-        core.info(`Issue #${issueNumber} is already closed`);
-        return {
-          success: true,
-          number: issueNumber,
-          alreadyClosed: true,
-        };
+      // Check if already closed - but still add comment
+      const wasAlreadyClosed = issue.state === "closed";
+      if (wasAlreadyClosed) {
+        core.info(`Issue #${issueNumber} is already closed, but will still add comment`);
       }
 
       // Validate required labels if configured
@@ -195,15 +191,22 @@ async function main(config = {}) {
         core.info(`Added comment to issue #${issueNumber}`);
       }
 
-      // Close the issue
-      const closedIssue = await closeIssue(github, repoParts.owner, repoParts.repo, issueNumber);
-      core.info(`Closed issue #${issueNumber} in ${itemRepo}: ${closedIssue.html_url}`);
+      // Close the issue if not already closed
+      let closedIssue;
+      if (wasAlreadyClosed) {
+        core.info(`Issue #${issueNumber} was already closed, comment added`);
+        closedIssue = issue;
+      } else {
+        closedIssue = await closeIssue(github, repoParts.owner, repoParts.repo, issueNumber);
+        core.info(`Closed issue #${issueNumber} in ${itemRepo}: ${closedIssue.html_url}`);
+      }
 
       return {
         success: true,
         number: issueNumber,
         url: closedIssue.html_url,
         title: closedIssue.title,
+        alreadyClosed: wasAlreadyClosed,
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);

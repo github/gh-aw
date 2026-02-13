@@ -152,14 +152,10 @@ async function main(config = {}) {
       };
     }
 
-    // Check if already closed
-    if (pr.state === "closed") {
-      core.info(`PR #${prNumber} is already closed`);
-      return {
-        success: true,
-        pull_request_number: pr.number,
-        pull_request_url: pr.html_url,
-      };
+    // Check if already closed - but still add comment
+    const wasAlreadyClosed = pr.state === "closed";
+    if (wasAlreadyClosed) {
+      core.info(`PR #${prNumber} is already closed, but will still add comment`);
     }
 
     // Check label filter
@@ -195,23 +191,31 @@ async function main(config = {}) {
       }
     }
 
-    // Close the PR
-    try {
-      const closedPR = await closePullRequest(github, owner, repo, prNumber);
-      core.info(`✓ Closed PR #${prNumber}: ${closedPR.title}`);
-      return {
-        success: true,
-        pull_request_number: closedPR.number,
-        pull_request_url: closedPR.html_url,
-      };
-    } catch (error) {
-      const errorMsg = getErrorMessage(error);
-      core.warning(`Failed to close PR #${prNumber}: ${errorMsg}`);
-      return {
-        success: false,
-        error: `Failed to close PR #${prNumber}: ${errorMsg}`,
-      };
+    // Close the PR if not already closed
+    let closedPR;
+    if (wasAlreadyClosed) {
+      core.info(`PR #${prNumber} was already closed, comment added`);
+      closedPR = pr;
+    } else {
+      try {
+        closedPR = await closePullRequest(github, owner, repo, prNumber);
+        core.info(`✓ Closed PR #${prNumber}: ${closedPR.title}`);
+      } catch (error) {
+        const errorMsg = getErrorMessage(error);
+        core.warning(`Failed to close PR #${prNumber}: ${errorMsg}`);
+        return {
+          success: false,
+          error: `Failed to close PR #${prNumber}: ${errorMsg}`,
+        };
+      }
     }
+
+    return {
+      success: true,
+      pull_request_number: closedPR.number,
+      pull_request_url: closedPR.html_url,
+      alreadyClosed: wasAlreadyClosed,
+    };
   };
 }
 

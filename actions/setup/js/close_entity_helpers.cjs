@@ -297,22 +297,28 @@ async function processCloseEntityItems(config, callbacks, handlerConfig = {}) {
         continue;
       }
 
-      // Check if already closed
-      if (entity.state === "closed") {
-        core.info(`${config.displayNameCapitalized} #${entityNumber} is already closed, skipping`);
-        continue;
+      // Check if already closed - but still add comment
+      const wasAlreadyClosed = entity.state === "closed";
+      if (wasAlreadyClosed) {
+        core.info(`${config.displayNameCapitalized} #${entityNumber} is already closed, but will still add comment`);
       }
 
       // Build comment body
       const commentBody = buildCommentBody(item.body, triggeringIssueNumber, triggeringPRNumber);
 
-      // Add comment before closing
+      // Add comment before closing (or to already-closed entity)
       const comment = await callbacks.addComment(github, context.repo.owner, context.repo.repo, entityNumber, commentBody);
       core.info(`✓ Added comment to ${config.displayName} #${entityNumber}: ${comment.html_url}`);
 
-      // Close the entity
-      const closedEntity = await callbacks.closeEntity(github, context.repo.owner, context.repo.repo, entityNumber);
-      core.info(`✓ Closed ${config.displayName} #${entityNumber}: ${closedEntity.html_url}`);
+      // Close the entity if not already closed
+      let closedEntity;
+      if (wasAlreadyClosed) {
+        core.info(`${config.displayNameCapitalized} #${entityNumber} was already closed, comment added`);
+        closedEntity = entity;
+      } else {
+        closedEntity = await callbacks.closeEntity(github, context.repo.owner, context.repo.repo, entityNumber);
+        core.info(`✓ Closed ${config.displayName} #${entityNumber}: ${closedEntity.html_url}`);
+      }
 
       closedEntities.push({
         entity: closedEntity,
