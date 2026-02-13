@@ -96,7 +96,7 @@ github-token: ${{ secrets.CUSTOM_PAT }}
 3. Top-level `github-token`
 4. Default: `${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}`
 
-See [GitHub Tokens](/gh-aw/reference/tokens/) for complete documentation.
+See [GitHub Tokens](/gh-aw/reference/authentication/) for complete documentation.
 
 ### Plugins (`plugins:`)
 

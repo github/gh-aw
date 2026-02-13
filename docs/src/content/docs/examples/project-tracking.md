@@ -106,7 +106,7 @@ Use a **fine-grained PAT** with:
 gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN --value "YOUR_PROJECT_TOKEN"
 ```
 
-See the [GitHub Projects V2 token reference](/gh-aw/reference/tokens/#gh_aw_project_github_token) for complete details.
+See the [GitHub Projects V2 authentication](/gh-aw/reference/authentication/#gh_aw_project_github_token) for complete details.
 
 ## Example: Issue Triage
 
@@ -323,6 +323,6 @@ Update the project item with the team field.
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Complete safe-outputs documentation
 - [update-project](/gh-aw/reference/safe-outputs/#project-board-updates-update-project) - Detailed update-project configuration
 - [create-project-status-update](/gh-aw/reference/safe-outputs/#project-status-updates-create-project-status-update) - Status update configuration
-- [GitHub Projects V2 Tokens](/gh-aw/reference/tokens/#gh_aw_project_github_token) - Token setup guide
+- [GitHub Projects V2 Tokens](/gh-aw/reference/authentication/#gh_aw_project_github_token) - Token setup guide
 - [Projects & Monitoring](/gh-aw/patterns/monitoring/) - Design pattern guide
 - [Orchestration](/gh-aw/patterns/orchestration/) - Design pattern guide

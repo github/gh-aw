@@ -182,7 +182,7 @@ gh aw secrets bootstrap --engine claude    # Check Claude tokens
 
 **Options:** `--engine` (copilot, claude, codex), `--owner`, `--repo`
 
-See [GitHub Tokens reference](/gh-aw/reference/tokens/) for details.
+See [GitHub Tokens reference](/gh-aw/reference/authentication/) for details.
 
 ### Building
 
@@ -486,7 +486,7 @@ gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link
 > - **Classic PAT**: `project` scope (user projects) or `project` + `repo` (org projects)
 > - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
 >
-> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or `gh auth login`. See [Tokens Reference](/gh-aw/reference/tokens/).
+> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or `gh auth login`. See [Authentication](/gh-aw/reference/authentication/).
 
 #### `hash-frontmatter`
 

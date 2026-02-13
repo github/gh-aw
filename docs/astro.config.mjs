@@ -197,6 +197,7 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'AI Engines', link: '/reference/engines/' },
+						{ label: 'Authentication', link: '/reference/authentication/' },
 						{ label: 'Cache & Memory', link: '/reference/memory/' },
 						{ label: 'Command Triggers', link: '/reference/command-triggers/' },
 						{ label: 'Compilation Process', link: '/reference/compilation-process/' },
@@ -224,7 +225,6 @@ export default defineConfig({
 						{ label: 'Schedule Syntax', link: '/reference/schedule-syntax/' },
 						{ label: 'Templating', link: '/reference/templating/' },
 						{ label: 'Threat Detection', link: '/reference/threat-detection/' },
-						{ label: 'Tokens', link: '/reference/tokens/' },
 						{ label: 'Tools', link: '/reference/tools/' },
 						{ label: 'Triggers', link: '/reference/triggers/' },
 						{ label: 'Workflow Structure', link: '/reference/workflow-structure/' },
