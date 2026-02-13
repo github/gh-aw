@@ -45,10 +45,6 @@ jobs:
               return new Date(d).toISOString();
             }
 
-            function safeLower(s) {
-              return (s || "").toString().toLowerCase();
-            }
-
             function normalizeForDup(s) {
               return (s || "")
                 .toString()
