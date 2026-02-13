@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 46466ddd218d6b59039bb1195a8546bb6b3e19d7f6640ae77e2351cae4cbe60f
+# frontmatter-hash: c708e2e5820dca7c69da7bdc46db153754c7db5eff5ad659c01dc46a14f311d7
 
 name: "Plan Command"
 "on":
@@ -547,7 +547,6 @@ jobs:
                 "type": "stdio",
                 "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
-                  "GITHUB_LOCKDOWN_MODE": "1",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}",
                   "GITHUB_READ_ONLY": "1",
                   "GITHUB_TOOLSETS": "context,repos,issues,pull_requests,discussions"

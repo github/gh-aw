@@ -13,7 +13,7 @@ permissions:
 engine: copilot
 tools:
   github:
-    lockdown: true
+    lockdown: false
     toolsets: [default, discussions]
 safe-outputs:
   create-issue:

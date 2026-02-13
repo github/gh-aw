@@ -25,7 +25,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 52fe2e53ca1466eaa957a915afde5dba915890e57f983dde6e72ddc99997e7e2
+# frontmatter-hash: b83cb2b45fe279ce8b41b9ca98999bf1ee9af50af4572f948b83893acf5f09e6
 
 name: "Issue Triage Agent"
 "on":
@@ -434,7 +434,6 @@ jobs:
                 "type": "stdio",
                 "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
-                  "GITHUB_LOCKDOWN_MODE": "1",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_MCP_SERVER_TOKEN}",
                   "GITHUB_READ_ONLY": "1",
                   "GITHUB_TOOLSETS": "issues,labels"
