@@ -376,18 +376,18 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	}
 
 	// Build the job condition
-	// The job should run if agent job completed (not skipped) AND detection passed (if enabled)
-	agentNotSkipped := BuildAnd(
+	// The job should run if agent job succeeded AND detection passed (if enabled)
+	agentSuccess := BuildAnd(
 		&NotNode{Child: BuildFunctionCall("cancelled")},
-		BuildNotEquals(
+		BuildEquals(
 			BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.AgentJobName)),
-			BuildStringLiteral("skipped"),
+			BuildStringLiteral("success"),
 		),
 	)
 
-	jobCondition := agentNotSkipped
+	jobCondition := agentSuccess
 	if threatDetectionEnabled {
-		jobCondition = BuildAnd(agentNotSkipped, buildDetectionSuccessCondition())
+		jobCondition = BuildAnd(agentSuccess, buildDetectionSuccessCondition())
 	}
 
 	// Build dependencies
@@ -488,9 +488,15 @@ func (c *Compiler) buildJobLevelSafeOutputEnvVars(data *WorkflowData, workflowID
 }
 
 // buildDetectionSuccessCondition builds the condition to check if detection passed
+// This checks both that the detection job succeeded AND the detection outputs.success is true
 func buildDetectionSuccessCondition() ConditionNode {
-	return BuildEquals(
+	detectionResultSuccess := BuildEquals(
+		BuildPropertyAccess(fmt.Sprintf("needs.%s.result", constants.DetectionJobName)),
+		BuildStringLiteral("success"),
+	)
+	detectionOutputSuccess := BuildEquals(
 		BuildPropertyAccess(fmt.Sprintf("needs.%s.outputs.success", constants.DetectionJobName)),
 		BuildStringLiteral("true"),
 	)
+	return BuildAnd(detectionResultSuccess, detectionOutputSuccess)
 }
