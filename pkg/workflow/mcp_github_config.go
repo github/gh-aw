@@ -43,9 +43,6 @@
 // Automatic lockdown detection:
 // When lockdown is not explicitly set, a step is generated to automatically
 // enable lockdown for public repositories ONLY when GH_AW_GITHUB_TOKEN is configured.
-// This provides security by preventing the token from accessing private repositories.
-// Public repos without GH_AW_GITHUB_TOKEN use the default GITHUB_TOKEN (already scoped),
-// so lockdown is not needed.
 //
 // Related files:
 //   - mcp_renderer.go: Renders GitHub MCP configuration to YAML
@@ -266,8 +263,6 @@ func getGitHubDockerImageVersion(githubTool any) string {
 //
 // Lockdown mode is automatically enabled for public repositories when any custom GitHub token
 // is configured (GH_AW_GITHUB_TOKEN, GH_AW_GITHUB_MCP_SERVER_TOKEN, or custom github-token).
-// This prevents the token from accessing private repositories.
-// For public repos without custom tokens, lockdown is disabled (default GITHUB_TOKEN is scoped).
 func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
 	// Check if GitHub tool is present
 	githubTool, hasGitHub := data.Tools["github"]
