@@ -13,7 +13,7 @@ This page describes authorization settings for GitHub Agentic Workflows, includi
 
 - GitHub Actions secrets, API Keys and tokens required for different AI engines
 - GitHub tokens for GitHub tools and safe outputs
-- Using GitHub Apps as an alternative authorization mechanism
+- Using a GitHub App as an alternative for authorization
 
 ## Which GitHub Actions secrets do I need?
 
@@ -398,11 +398,13 @@ This ensures the token has the appropriate permissions to assign agents to issue
 
 ---
 
-## Using tokens from GitHub Apps instead of secrets
+## Using a GitHub App for authentication
 
-For enhanced security with short-lived tokens, you may configure GitHub Apps instead. 
+For enhanced security with short-lived tokens, you may configure a GitHub App instead of using PATs.
 
-There are two ways:
+This does not apply to `COPILOT_GITHUB_TOKEN`, which must currently be a PAT. A single GitHub App can be used for all other GitHub tokens.
+
+After creating your app, there are two ways to configure it in your workflow:
 
 **Option 1: Direct configuration** (more control)
 
