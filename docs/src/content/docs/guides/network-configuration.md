@@ -112,11 +112,48 @@ sandbox:
 
 See [Network Permissions - Protocol-Specific Filtering](/gh-aw/reference/network/#protocol-specific-domain-filtering) for complete details.
 
+## Strict Mode and Ecosystem Identifiers
+
+Workflows use [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) by default, which enforces ecosystem identifiers instead of individual domains for security. This applies to all engines.
+
+````yaml
+# ❌ Rejected in strict mode
+network:
+  allowed:
+    - "pypi.org"       # Error: use 'python' ecosystem instead
+    - "npmjs.org"      # Error: use 'node' ecosystem instead
+
+# ✅ Accepted in strict mode
+network:
+  allowed:
+    - python           # Ecosystem identifier
+    - node             # Ecosystem identifier
+    - "api.example.com"  # Custom domains still allowed
+````
+
+When strict mode rejects a domain, the error message suggests the correct ecosystem:
+
+````text
+error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
+'python', 'node') for all engines in strict mode. Custom domains are not allowed for
+security. Did you mean: 'pypi.org' belongs to ecosystem 'python'?
+````
+
+Disable strict mode for development or testing:
+
+````yaml
+strict: false
+network:
+  allowed:
+    - "pypi.org"  # Now allowed
+````
+
 ## Security Best Practices
 
 1. **Start minimal** - Only add ecosystems you actually use
 2. **Use ecosystem identifiers** - Don't list individual domains (use `python` instead of `pypi.org`, `files.pythonhosted.org`, etc.)
-3. **Add incrementally** - Start with `defaults`, add ecosystems as needed based on firewall denials
+3. **Keep strict mode enabled** - Provides enhanced security validation (enabled by default)
+4. **Add incrementally** - Start with `defaults`, add ecosystems as needed based on firewall denials
 
 ## Troubleshooting Firewall Blocking
 

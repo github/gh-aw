@@ -210,6 +210,67 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 >
 > See the [Network Configuration Guide](/gh-aw/guides/network-configuration/) for complete examples and domain lists.
 
+## Strict Mode Validation
+
+When [strict mode](/gh-aw/reference/frontmatter/#strict-mode-strict) is enabled (default), network configuration is validated to ensure security best practices. Strict mode enforces the use of ecosystem identifiers instead of individual domains for all engines.
+
+### Ecosystem Identifier Requirement
+
+Strict mode requires ecosystem identifiers (e.g., `python`, `node`) instead of individual ecosystem member domains (e.g., `pypi.org`, `npmjs.org`). This applies to all engines, including those with LLM gateway support.
+
+````yaml wrap
+# ❌ Rejected in strict mode (all engines)
+strict: true
+network:
+  allowed:
+    - defaults
+    - "pypi.org"        # Individual domain rejected
+    - "npmjs.org"       # Individual domain rejected
+
+# ✅ Accepted in strict mode
+strict: true
+network:
+  allowed:
+    - defaults
+    - python           # Ecosystem identifier
+    - node             # Ecosystem identifier
+
+# ✅ Custom domains still allowed in strict mode
+strict: true
+network:
+  allowed:
+    - defaults
+    - python
+    - "api.example.com"  # Custom domain (not part of known ecosystem)
+````
+
+### Helpful Error Messages
+
+When strict mode rejects an individual ecosystem domain, the error message suggests the appropriate ecosystem identifier:
+
+````text
+error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
+'python', 'node') for all engines in strict mode. Custom domains are not allowed for
+security. Did you mean: 'pypi.org' belongs to ecosystem 'python', 'npmjs.org' belongs
+to ecosystem 'node'? Set 'strict: false' to use custom domains.
+````
+
+### Bypassing Strict Mode
+
+To use individual domains for development or testing, disable strict mode:
+
+````yaml wrap
+strict: false
+network:
+  allowed:
+    - defaults
+    - "pypi.org"        # Individual domain allowed when strict: false
+    - "api.example.com" # Custom domain allowed
+````
+
+> [!CAUTION]
+> Production Workflows
+> Disabling strict mode reduces security validation. For production workflows, use ecosystem identifiers and keep strict mode enabled (default).
 
 ## Implementation
 

@@ -274,15 +274,18 @@ strict: false  # Disable for development/testing
 1. Refuses write permissions (`contents:write`, `issues:write`, `pull-requests:write`) - use [safe-outputs](/gh-aw/reference/safe-outputs/) instead
 2. Requires explicit [network configuration](/gh-aw/reference/network/)
 3. Refuses wildcard `*` in `network.allowed` domains
-4. Requires network config for custom MCP servers with containers
-5. Enforces GitHub Actions pinned to commit SHAs
-6. Refuses deprecated frontmatter fields
+4. Requires ecosystem identifiers (e.g., `python`, `node`) instead of individual ecosystem domains (e.g., `pypi.org`, `npmjs.org`) for all engines
+5. Requires network config for custom MCP servers with containers
+6. Enforces GitHub Actions pinned to commit SHAs
+7. Refuses deprecated frontmatter fields
+
+When strict mode rejects individual ecosystem domains, helpful error messages suggest the appropriate ecosystem identifier (e.g., "Did you mean: 'pypi.org' belongs to ecosystem 'python'?").
 
 **Configuration:**
 - **Frontmatter**: `strict: true/false` (per-workflow)
 - **CLI flag**: `gh aw compile --strict` (all workflows, overrides frontmatter)
 
-See [CLI Commands](/gh-aw/setup/cli/#compile) for details.
+See [Network Permissions - Strict Mode Validation](/gh-aw/reference/network/#strict-mode-validation) for details on network validation and [CLI Commands](/gh-aw/setup/cli/#compile) for compilation options.
 
 ### Feature Flags (`features:`)
 
