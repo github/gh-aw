@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: d1589fbbaa612af17ff08bbe8793c5dd10766ba6b239a6d22daaecdaababab84
+# frontmatter-hash: 1fbd5831963dbd4bda4b086e339f99a74e53b6f4c157a7ecf04754a506e24e10
 
 name: "Bot Detection"
 "on":
@@ -1112,6 +1112,23 @@ jobs:
               }
             }
 
+            async function loadContributorAccounts() {
+              try {
+                const contributors = await github.paginate(github.rest.repos.listContributors, {
+                  owner,
+                  repo,
+                  per_page: 100,
+                });
+                for (const contributor of contributors) {
+                  if (contributor?.login) {
+                    MEMBER_ACCOUNTS.add(String(contributor.login).toLowerCase());
+                  }
+                }
+              } catch {
+                // If contributor lookup fails, continue without contributor allowlist.
+              }
+            }
+
             async function loadOrgMembers() {
               for (const org of TRUSTED_ORGS) {
                 try {
@@ -1172,6 +1189,7 @@ jobs:
             }
 
             await loadMemberAccounts();
+            await loadContributorAccounts();
             await loadOrgMembers();
 
             // Search issues + PRs updated in window (API requires is:issue or is:pull-request)
