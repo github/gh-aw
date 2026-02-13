@@ -157,7 +157,7 @@ func fetchGitHubWorkflows(repoOverride string, verbose bool) (map[string]*GitHub
 		}
 	}
 
-	workflowsLog.Printf("Fetched %d GitHub workflows (%d user workflows)", len(workflowMap), userWorkflowCount)
+	workflowsLog.Printf("Fetched %d GitHub workflows (%d with .md files)", len(workflowMap), userWorkflowCount)
 	return workflowMap, nil
 }
 
