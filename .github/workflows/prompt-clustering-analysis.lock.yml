@@ -634,6 +634,8 @@ jobs:
           <instructions>
           To create or modify GitHub resources (issues, discussions, pull requests, etc.), you MUST call the appropriate safe output tool. Simply writing content will NOT work - the workflow requires actual tool calls.
           
+          Temporary IDs: Some safe output tools support a temporary ID field (usually named temporary_id) so you can reference newly-created items elsewhere in the SAME agent output (for example, using #aw_abc123def456 in a later body). If nothing needs to reference the item, you can omit temporary_id. If you DO need cross-references/chaining (including draft issue chaining in update_project via temporary_id + draft_issue_id), you MUST provide temporary_id yourself in the strict format: aw_ followed by 12 hexadecimal characters (0-9, a-f), e.g. aw_abc123def456, and reuse that exact value consistently. Do NOT invent other aw_* formats (e.g. aw_bundle_npm001) — downstream steps will reject them.
+          
           Discover available tools from the safeoutputs MCP server.
           
           **Critical**: Tool calls write structured data that downstream jobs process. Without tool calls, follow-up actions will be skipped.
