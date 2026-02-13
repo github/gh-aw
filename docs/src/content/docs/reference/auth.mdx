@@ -132,7 +132,7 @@ A Personal Access Token (PAT) with appropriate scopes and permissions for enhanc
 
 **When Required**:
 
-- **Lockdown Mode**: Required when `lockdown: true` is set in workflow frontmatter. The workflow will fail at runtime if the token is not configured.
+- **Lockdown Mode**: This or a similar token is required when `lockdown: true` is set in workflow frontmatter. The workflow will fail at runtime if the token is not configured.
 - **Cross-repository operations**: Required for accessing other repositories beyond the current one.
 - **Remote GitHub tools mode**: Required for faster startup without Docker.
 - **Codex engine operations**: Required for GitHub MCP integration.
