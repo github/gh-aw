@@ -33,8 +33,8 @@
         },
         "temporary_id": {
           "type": "string",
-          "pattern": "^aw_[0-9a-f]{12}$",
-          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
+          "pattern": "^aw_[A-Za-z0-9]{4,8}$",
+          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
         }
       },
       "additionalProperties": false
@@ -807,8 +807,8 @@
       "properties": {
         "project": {
           "type": "string",
-          "pattern": "^(https://github\\.com/(orgs|users)/[^/]+/projects/\\d+|#?aw_[0-9a-f]{12})$",
-          "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'), or a temporary project ID from a recent create_project call (e.g., '#aw_abc123def456' or 'aw_abc123def456'). Project names or numbers alone are NOT accepted."
+          "pattern": "^(https://github\\.com/(orgs|users)/[^/]+/projects/\\d+|#?aw_[A-Za-z0-9]{4,8})$",
+          "description": "Full GitHub project URL (e.g., 'https://github.com/orgs/myorg/projects/42' or 'https://github.com/users/username/projects/5'), or a temporary project ID from a recent create_project call (e.g., '#aw_abc1', 'aw_Test123'). Project names or numbers alone are NOT accepted."
         },
         "operation": {
           "type": "string",
@@ -844,13 +844,13 @@
         },
         "draft_issue_id": {
           "type": "string",
-          "pattern": "^aw_[0-9a-f]{12}$",
-          "description": "Temporary ID of an existing draft issue to update (e.g., 'aw_abc123def456'). Use this to reference a draft created earlier with a matching temporary_id. When provided, draft_title is not required for updates."
+          "pattern": "^aw_[A-Za-z0-9]{4,8}$",
+          "description": "Temporary ID of an existing draft issue to update (e.g., 'aw_abc1', 'aw_Test123'). Use this to reference a draft created earlier with a matching temporary_id. When provided, draft_title is not required for updates."
         },
         "temporary_id": {
           "type": "string",
-          "pattern": "^aw_[0-9a-f]{12}$",
-          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc123def456'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 12 hex characters."
+          "pattern": "^aw_[A-Za-z0-9]{4,8}$",
+          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 4 to 8 alphanumeric characters."
         },
         "fields": {
           "type": "object",
@@ -984,13 +984,13 @@
         },
         "item_url": {
           "type": "string",
-          "pattern": "^(https://github\\\\.com/[^/]+/[^/]+/issues/(\\\\d+|#?aw_[0-9a-f]{12})|#?aw_[0-9a-f]{12})$",
-          "description": "Optional GitHub issue URL or temporary ID to add as the first item to the project. Accepts either a full URL (e.g., 'https://github.com/owner/repo/issues/123'), a URL with temporary ID (e.g., 'https://github.com/owner/repo/issues/aw_abc123def456'), or a plain temporary ID (e.g., 'aw_abc123def456' or '#aw_abc123def456') from a previously created issue in the same workflow run."
+          "pattern": "^(https://github\\\\.com/[^/]+/[^/]+/issues/(\\\\d+|#?aw_[A-Za-z0-9]{4,8})|#?aw_[A-Za-z0-9]{4,8})$",
+          "description": "Optional GitHub issue URL or temporary ID to add as the first item to the project. Accepts either a full URL (e.g., 'https://github.com/owner/repo/issues/123'), a URL with temporary ID (e.g., 'https://github.com/owner/repo/issues/aw_abc1'), or a plain temporary ID (e.g., 'aw_abc1', '#aw_Test123') from a previously created issue in the same workflow run."
         },
         "temporary_id": {
           "type": "string",
-          "pattern": "^aw_[0-9a-f]{12}$",
-          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 12 hex characters (e.g., 'aw_abc123def456'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
+          "pattern": "^aw_[A-Za-z0-9]{4,8}$",
+          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
         }
       },
       "additionalProperties": false
