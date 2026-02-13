@@ -626,6 +626,13 @@ jobs:
             const topSeverity = accounts.find(a => a.severity !== "None")?.severity || "None";
             const hasFindings = accounts.some(a => a.risk_score >= 10) || domains.some(d => d.count >= 2);
 
+            // Log analysis summary for observability
+            const highRiskAccounts = accounts.filter(a => a.risk_score >= 10).length;
+            const multiAccountDomains = domains.filter(d => d.count >= 2).length;
+            core.info(`Analysis complete: ${accounts.length} accounts analyzed, ${highRiskAccounts} with risk_score >= 10`);
+            core.info(`External domains: ${domains.length} total, ${multiAccountDomains} shared by 2+ accounts`);
+            core.info(`Has findings: ${hasFindings} (will ${hasFindings ? 'run' : 'skip'} agent job)`);
+
             // Find existing triage issue (exact title match)
             let existingIssueNumber = "";
             try {
