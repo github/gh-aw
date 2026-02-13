@@ -311,21 +311,85 @@ func (c *Compiler) validateStrictMode(frontmatter map[string]any, networkPermiss
 }
 
 // validateStrictFirewall requires firewall to be enabled in strict mode for copilot and codex engines
-// when network domains are provided (non-wildcard)
+// when network domains are provided (non-wildcard).
+// For engines without LLM gateway support, strict mode also requires that network domains
+// must be defaults or from known ecosystems, and sandbox.agent must be enabled.
 func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *NetworkPermissions, sandboxConfig *SandboxConfig) error {
 	if !c.strictMode {
 		strictModeValidationLog.Printf("Strict mode disabled, skipping firewall validation")
 		return nil
 	}
 
-	// Check if sandbox.agent: false is set (explicitly disabled)
-	// In strict mode, this is not allowed for any engine as it disables the agent sandbox firewall
-	if sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled {
-		strictModeValidationLog.Printf("sandbox.agent: false is set, refusing in strict mode")
-		return fmt.Errorf("strict mode: 'sandbox.agent: false' is not allowed because it disables the agent sandbox firewall. This removes important security protections. Remove 'sandbox.agent: false' or set 'strict: false' to disable strict mode. See: https://github.github.com/gh-aw/reference/sandbox/")
+	// Get the engine instance to check LLM gateway support
+	agenticEngine, err := c.engineRegistry.GetEngine(engineID)
+	if err != nil {
+		strictModeValidationLog.Printf("Failed to get engine: %v", err)
+		return fmt.Errorf("internal error: failed to get engine '%s': %w", engineID, err)
 	}
 
-	// Only apply to copilot and codex engines
+	// Check if engine supports LLM gateway
+	supportsLLMGateway := agenticEngine.SupportsLLMGateway()
+	strictModeValidationLog.Printf("Engine '%s' LLM gateway support: %v", engineID, supportsLLMGateway)
+
+	// Check if sandbox.agent: false is set (explicitly disabled)
+	sandboxAgentDisabled := sandboxConfig != nil && sandboxConfig.Agent != nil && sandboxConfig.Agent.Disabled
+
+	// For engines without LLM gateway support, enforce additional security requirements
+	if !supportsLLMGateway {
+		// Validate that sandbox.agent is enabled (not explicitly disabled)
+		if sandboxAgentDisabled {
+			strictModeValidationLog.Printf("Engine without LLM gateway requires sandbox.agent to be enabled")
+			return fmt.Errorf("strict mode: engine '%s' does not support LLM gateway and requires 'sandbox.agent' to be enabled for security. Remove 'sandbox.agent: false' or set 'strict: false'. See: https://github.github.com/gh-aw/reference/sandbox/", engineID)
+		}
+
+		// Validate that network domains are defaults or from known ecosystems (not custom domains)
+		if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
+			strictModeValidationLog.Printf("Validating network domains for engine without LLM gateway support")
+			
+			// Check if allowed domains contain only known ecosystems or "defaults"
+			hasCustomDomain := false
+			for _, domain := range networkPermissions.Allowed {
+				// Skip wildcards (handled below)
+				if domain == "*" {
+					continue
+				}
+				
+				// Check if this is a known ecosystem identifier
+				ecosystemDomains := getEcosystemDomains(domain)
+				if len(ecosystemDomains) > 0 {
+					// This is a known ecosystem identifier
+					strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
+					continue
+				}
+				
+				// Check if this domain belongs to any ecosystem
+				ecosystem := GetDomainEcosystem(domain)
+				if ecosystem != "" {
+					// This domain is from a known ecosystem
+					strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s'", domain, ecosystem)
+					continue
+				}
+				
+				// This is a custom domain
+				strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
+				hasCustomDomain = true
+			}
+			
+			if hasCustomDomain {
+				strictModeValidationLog.Printf("Engine without LLM gateway has custom domains, failing validation")
+				return fmt.Errorf("strict mode: engine '%s' does not support LLM gateway and requires network domains to be from known ecosystems (e.g., 'defaults', 'python', 'node'). Custom domains are not allowed for security. See: https://github.github.com/gh-aw/reference/network/", engineID)
+			}
+		}
+	} else {
+		// For engines with LLM gateway support, still check sandbox.agent at the top level
+		// In strict mode, this is not allowed for any engine as it disables the agent sandbox firewall
+		if sandboxAgentDisabled {
+			strictModeValidationLog.Printf("sandbox.agent: false is set, refusing in strict mode")
+			return fmt.Errorf("strict mode: 'sandbox.agent: false' is not allowed because it disables the agent sandbox firewall. This removes important security protections. Remove 'sandbox.agent: false' or set 'strict: false' to disable strict mode. See: https://github.github.com/gh-aw/reference/sandbox/")
+		}
+	}
+
+	// Only apply firewall validation to copilot and codex engines
 	if engineID != "copilot" && engineID != "codex" {
 		strictModeValidationLog.Printf("Engine '%s' does not support firewall, skipping firewall validation", engineID)
 		return nil
