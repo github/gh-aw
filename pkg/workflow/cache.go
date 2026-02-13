@@ -465,6 +465,12 @@ func generateCacheMemoryValidation(builder *strings.Builder, data *WorkflowData)
 			continue
 		}
 
+		// Skip validation step if allowed extensions is empty (means all files are allowed)
+		if len(cache.AllowedExtensions) == 0 {
+			cacheLog.Printf("Skipping validation step for cache %s (empty allowed-extensions means all files are allowed)", cache.ID)
+			continue
+		}
+
 		// Default cache uses /tmp/gh-aw/cache-memory/ for backward compatibility
 		// Other caches use /tmp/gh-aw/cache-memory-{id}/ to prevent overlaps
 		var cacheDir string
@@ -718,23 +724,28 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		fmt.Fprintf(&downloadStep, "          path: %s\n", cacheDir)
 		steps = append(steps, downloadStep.String())
 
-		// Prepare allowed extensions array for JavaScript
-		allowedExtsJSON, _ := json.Marshal(cache.AllowedExtensions)
+		// Skip validation step if allowed extensions is empty (means all files are allowed)
+		if len(cache.AllowedExtensions) == 0 {
+			cacheLog.Printf("Skipping validation step for cache %s in update job (empty allowed-extensions means all files are allowed)", cache.ID)
+		} else {
+			// Prepare allowed extensions array for JavaScript
+			allowedExtsJSON, _ := json.Marshal(cache.AllowedExtensions)
 
-		// Build validation script
-		var validationScript strings.Builder
-		validationScript.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
-		validationScript.WriteString("            setupGlobals(core, github, context, exec, io);\n")
-		validationScript.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
-		fmt.Fprintf(&validationScript, "            const allowedExtensions = %s;\n", allowedExtsJSON)
-		fmt.Fprintf(&validationScript, "            const result = validateMemoryFiles('%s', 'cache', allowedExtensions);\n", cacheDir)
-		validationScript.WriteString("            if (!result.valid) {\n")
-		fmt.Fprintf(&validationScript, "              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
-		validationScript.WriteString("            }\n")
+			// Build validation script
+			var validationScript strings.Builder
+			validationScript.WriteString("            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');\n")
+			validationScript.WriteString("            setupGlobals(core, github, context, exec, io);\n")
+			validationScript.WriteString("            const { validateMemoryFiles } = require('/opt/gh-aw/actions/validate_memory_files.cjs');\n")
+			fmt.Fprintf(&validationScript, "            const allowedExtensions = %s;\n", allowedExtsJSON)
+			fmt.Fprintf(&validationScript, "            const result = validateMemoryFiles('%s', 'cache', allowedExtensions);\n", cacheDir)
+			validationScript.WriteString("            if (!result.valid) {\n")
+			fmt.Fprintf(&validationScript, "              core.setFailed(`File type validation failed: Found ${result.invalidFiles.length} file(s) with invalid extensions. Only %s are allowed.`);\n", strings.Join(cache.AllowedExtensions, ", "))
+			validationScript.WriteString("            }\n")
 
-		// Generate validation step using helper
-		stepName := fmt.Sprintf("Validate cache-memory file types (%s)", cache.ID)
-		steps = append(steps, generateInlineGitHubScriptStep(stepName, validationScript.String(), ""))
+			// Generate validation step using helper
+			stepName := fmt.Sprintf("Validate cache-memory file types (%s)", cache.ID)
+			steps = append(steps, generateInlineGitHubScriptStep(stepName, validationScript.String(), ""))
+		}
 
 		// Generate cache key (same logic as in generateCacheMemorySteps)
 		cacheKey := cache.Key

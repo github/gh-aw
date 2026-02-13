@@ -6,19 +6,25 @@ const path = require("path");
 
 /**
  * Validate that all files in a memory directory have allowed file extensions
- * Default allowed extensions: .json, .jsonl, .txt, .md, .csv
+ * If allowedExtensions is empty or not provided, all file extensions are allowed
  *
  * @param {string} memoryDir - Path to the memory directory to validate
  * @param {string} memoryType - Type of memory ("cache" or "repo") for error messages
- * @param {string[]} [allowedExtensions] - Optional custom list of allowed extensions (defaults to [".json", ".jsonl", ".txt", ".md", ".csv"])
+ * @param {string[]} [allowedExtensions] - Optional custom list of allowed extensions (empty array or undefined means allow all files)
  * @returns {{valid: boolean, invalidFiles: string[]}} Validation result with list of invalid files
  */
 function validateMemoryFiles(memoryDir, memoryType = "cache", allowedExtensions) {
-  // Use default extensions if not provided or if empty array
-  const defaultExtensions = [".json", ".jsonl", ".txt", ".md", ".csv"];
-  const rawExtensions = allowedExtensions && allowedExtensions.length > 0 ? allowedExtensions : defaultExtensions;
+  // If allowedExtensions is not provided, undefined, or empty array, allow all files
+  const allowAll = !allowedExtensions || allowedExtensions.length === 0;
+  
+  // If allowing all files, skip validation
+  if (allowAll) {
+    core.info(`All file extensions are allowed in ${memoryType}-memory directory`);
+    return { valid: true, invalidFiles: [] };
+  }
+  
   // Normalize extensions to lowercase and trim whitespace
-  const extensions = rawExtensions.map(ext => ext.trim().toLowerCase());
+  const extensions = allowedExtensions.map(ext => ext.trim().toLowerCase());
   const invalidFiles = [];
 
   // Check if directory exists

@@ -43,42 +43,42 @@ describe("validateMemoryFiles", () => {
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts .json files", () => {
+  it("accepts .json files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.json"), '{"test": true}');
     const result = validateMemoryFiles(tempDir, "cache");
     expect(result.valid).toBe(true);
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts .jsonl files", () => {
+  it("accepts .jsonl files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.jsonl"), '{"line": 1}\n{"line": 2}');
     const result = validateMemoryFiles(tempDir, "cache");
     expect(result.valid).toBe(true);
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts .txt files", () => {
+  it("accepts .txt files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "notes.txt"), "Some notes");
     const result = validateMemoryFiles(tempDir, "cache");
     expect(result.valid).toBe(true);
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts .md files", () => {
+  it("accepts .md files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "README.md"), "# Title");
     const result = validateMemoryFiles(tempDir, "cache");
     expect(result.valid).toBe(true);
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts .csv files", () => {
+  it("accepts .csv files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.csv"), "col1,col2\nval1,val2");
     const result = validateMemoryFiles(tempDir, "cache");
     expect(result.valid).toBe(true);
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("accepts multiple valid files", () => {
+  it("accepts multiple valid files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.json"), "{}");
     fs.writeFileSync(path.join(tempDir, "notes.txt"), "notes");
     fs.writeFileSync(path.join(tempDir, "README.md"), "# Title");
@@ -87,56 +87,54 @@ describe("validateMemoryFiles", () => {
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("rejects .log files", () => {
+  it("accepts .log files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "app.log"), "log entry");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual(["app.log"]);
+    expect(result.valid).toBe(true); // Now accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("rejects .yaml files", () => {
+  it("accepts .yaml files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "config.yaml"), "key: value");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual(["config.yaml"]);
+    expect(result.valid).toBe(true); // Now accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("rejects .xml files", () => {
+  it("accepts .xml files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.xml"), "<root></root>");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual(["data.xml"]);
+    expect(result.valid).toBe(true); // Now accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("rejects files without extension", () => {
+  it("accepts files without extension by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "noext"), "content");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual(["noext"]);
+    expect(result.valid).toBe(true); // Now accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("rejects multiple invalid files", () => {
+  it("accepts all files by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "app.log"), "log");
     fs.writeFileSync(path.join(tempDir, "config.yaml"), "yaml");
     fs.writeFileSync(path.join(tempDir, "valid.json"), "{}");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toHaveLength(2);
-    expect(result.invalidFiles).toContain("app.log");
-    expect(result.invalidFiles).toContain("config.yaml");
+    expect(result.valid).toBe(true); // All files accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("validates files in subdirectories", () => {
+  it("validates files in subdirectories by default (allow all)", () => {
     const subdir = path.join(tempDir, "subdir");
     fs.mkdirSync(subdir);
     fs.writeFileSync(path.join(subdir, "valid.json"), "{}");
     fs.writeFileSync(path.join(subdir, "invalid.log"), "log");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual([path.join("subdir", "invalid.log")]);
+    expect(result.valid).toBe(true); // All files accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("validates files in deeply nested directories", () => {
+  it("validates files in deeply nested directories by default (allow all)", () => {
     const level1 = path.join(tempDir, "level1");
     const level2 = path.join(level1, "level2");
     const level3 = path.join(level2, "level3");
@@ -146,11 +144,11 @@ describe("validateMemoryFiles", () => {
     fs.writeFileSync(path.join(level3, "deep.json"), "{}");
     fs.writeFileSync(path.join(level3, "invalid.bin"), "binary");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toEqual([path.join("level1", "level2", "level3", "invalid.bin")]);
+    expect(result.valid).toBe(true); // All files accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
-  it("is case-insensitive for extensions", () => {
+  it("is case-insensitive for extensions by default (allow all)", () => {
     fs.writeFileSync(path.join(tempDir, "data.JSON"), "{}");
     fs.writeFileSync(path.join(tempDir, "notes.TXT"), "text");
     fs.writeFileSync(path.join(tempDir, "README.MD"), "# Title");
@@ -159,7 +157,7 @@ describe("validateMemoryFiles", () => {
     expect(result.invalidFiles).toEqual([]);
   });
 
-  it("handles mixed valid and invalid files in subdirectories", () => {
+  it("handles all files in subdirectories by default (allow all)", () => {
     const subdir1 = path.join(tempDir, "valid-files");
     const subdir2 = path.join(tempDir, "invalid-files");
     fs.mkdirSync(subdir1);
@@ -169,10 +167,8 @@ describe("validateMemoryFiles", () => {
     fs.writeFileSync(path.join(subdir2, "app.log"), "log");
     fs.writeFileSync(path.join(subdir2, "config.ini"), "ini");
     const result = validateMemoryFiles(tempDir, "cache");
-    expect(result.valid).toBe(false);
-    expect(result.invalidFiles).toHaveLength(2);
-    expect(result.invalidFiles).toContain(path.join("invalid-files", "app.log"));
-    expect(result.invalidFiles).toContain(path.join("invalid-files", "config.ini"));
+    expect(result.valid).toBe(true); // All files accepted when no restrictions
+    expect(result.invalidFiles).toEqual([]);
   });
 
   it("accepts custom allowed extensions", () => {
@@ -192,11 +188,22 @@ describe("validateMemoryFiles", () => {
     expect(result.invalidFiles).toEqual(["data.json"]);
   });
 
-  it("uses default extensions when custom array is empty", () => {
+  it("allows all files when custom array is empty", () => {
     fs.writeFileSync(path.join(tempDir, "data.json"), "{}");
     fs.writeFileSync(path.join(tempDir, "notes.txt"), "text");
+    fs.writeFileSync(path.join(tempDir, "app.log"), "log");
+    fs.writeFileSync(path.join(tempDir, "config.yaml"), "key: value");
     const result = validateMemoryFiles(tempDir, "cache", []);
-    expect(result.valid).toBe(true); // Empty array falls back to defaults
+    expect(result.valid).toBe(true); // Empty array means allow all
+    expect(result.invalidFiles).toEqual([]);
+  });
+
+  it("allows all files when allowedExtensions is undefined", () => {
+    fs.writeFileSync(path.join(tempDir, "data.json"), "{}");
+    fs.writeFileSync(path.join(tempDir, "app.log"), "log");
+    fs.writeFileSync(path.join(tempDir, "config.yaml"), "key: value");
+    const result = validateMemoryFiles(tempDir, "cache");
+    expect(result.valid).toBe(true); // undefined means allow all
     expect(result.invalidFiles).toEqual([]);
   });
 });
