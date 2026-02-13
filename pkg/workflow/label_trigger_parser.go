@@ -109,10 +109,11 @@ func expandLabelTriggerShorthand(entityType string, labelNames []string) map[str
 	// For pull_request & discussion: Use `names` field for job condition filtering (no marker)
 	//   Note: The `names` field is an internal representation for job condition generation
 	//   and won't be rendered in the final GitHub Actions YAML for these event types
-	if entityType == "issues" {
+	switch entityType {
+	case "issues":
 		triggerConfig["labels"] = labelNames
 		triggerConfig["__gh_aw_native_label_filter__"] = true // Marker to use native filtering
-	} else if entityType == "pull_request" || entityType == "discussion" {
+	case "pull_request", "discussion":
 		// For pull_request and discussion: add names field for job condition filtering
 		triggerConfig["names"] = labelNames
 		// No marker - this will be filtered via job conditions
