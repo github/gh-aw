@@ -1517,8 +1517,8 @@ tools:
     # (optional)
     scope: "workflow"
 
-    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [] (empty/all
-    # files allowed). When specified, only files with listed extensions can be stored.
+    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [".json",
+    # ".jsonl", ".txt", ".md", ".csv"]
     # (optional)
     allowed-extensions: []
       # Array of strings
@@ -1720,8 +1720,8 @@ tools:
     # (optional)
     create-orphan: true
 
-    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [] (empty/all
-    # files allowed). When specified, only files with listed extensions can be stored.
+    # List of allowed file extensions (e.g., [".json", ".txt"]). Default: [".json",
+    # ".jsonl", ".txt", ".md", ".csv"]
     # (optional)
     allowed-extensions: []
       # Array of strings
