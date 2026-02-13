@@ -32,7 +32,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 90c3b4d6df070a0a84475c6360965f60f624b28729876f2301a1b93433db2897
+# frontmatter-hash: ae44dc4724a0c27395d2fd53a627dad1084871f40b1c2c1d74bef76c77d3a872
 
 name: "Scout"
 "on":
@@ -518,7 +518,6 @@ jobs:
               "github": {
                 "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
-                  "GITHUB_LOCKDOWN_MODE": "1",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN",
                   "GITHUB_READ_ONLY": "1",
                   "GITHUB_TOOLSETS": "context,repos,issues,pull_requests"
