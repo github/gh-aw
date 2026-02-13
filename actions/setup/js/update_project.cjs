@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { loadTemporaryIdMap, resolveIssueNumber, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
+const { loadTemporaryIdMapFromResolved, resolveIssueNumber, isTemporaryId, normalizeTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Normalize agent output keys for update_project.
@@ -1173,12 +1173,14 @@ async function main(config = {}, githubClient = null) {
   /**
    * Message handler function that processes a single update_project message
    * @param {Object} message - The update_project message to process
-   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string, draftItemId?: string}>} temporaryIdMap - Unified map of temporary IDs
    * @param {Object} resolvedTemporaryIds - Plain object version of temporaryIdMap for backward compatibility
+   * @param {Map<string, {repo?: string, number?: number, projectUrl?: string, draftItemId?: string}>} temporaryIdMap - Unified map of temporary IDs
    * @returns {Promise<Object>} Result with success/error status, and optionally temporaryId/draftItemId for draft issue creation
    */
-  return async function handleUpdateProject(message, temporaryIdMap, resolvedTemporaryIds = {}) {
+  return async function handleUpdateProject(message, resolvedTemporaryIds = {}, temporaryIdMap = null) {
     message = normalizeUpdateProjectOutput(message);
+
+    const tempIdMap = temporaryIdMap instanceof Map ? temporaryIdMap : loadTemporaryIdMapFromResolved(resolvedTemporaryIds);
 
     // Check max limit
     if (processedCount >= maxCount) {
@@ -1227,7 +1229,7 @@ async function main(config = {}, githubClient = null) {
         // Check if it's a temporary ID (aw_XXXXXXXXXXXX)
         if (/^aw_[0-9a-f]{12}$/i.test(projectWithoutHash)) {
           // Look up in the unified temporaryIdMap
-          const resolved = temporaryIdMap.get(projectWithoutHash.toLowerCase());
+          const resolved = tempIdMap.get(projectWithoutHash.toLowerCase());
           if (resolved && resolved.projectUrl) {
             core.info(`Resolved temporary project ID ${projectStr} to ${resolved.projectUrl}`);
             effectiveProjectUrl = resolved.projectUrl;
@@ -1261,7 +1263,7 @@ async function main(config = {}, githubClient = null) {
           };
 
           try {
-            await updateProject(fieldsOutput, temporaryIdMap, github);
+            await updateProject(fieldsOutput, tempIdMap, github);
             core.info("✓ Created configured fields");
           } catch (err) {
             // prettier-ignore
@@ -1279,7 +1281,7 @@ async function main(config = {}, githubClient = null) {
       }
 
       // Process the update_project message
-      const updateResult = await updateProject(effectiveMessage, temporaryIdMap, github);
+      const updateResult = await updateProject(effectiveMessage, tempIdMap, github);
 
       // After processing the first message, create configured views if any
       // Views are created after the first item is processed to ensure the project exists
@@ -1304,7 +1306,7 @@ async function main(config = {}, githubClient = null) {
               },
             };
 
-            await updateProject(viewOutput, temporaryIdMap, github);
+            await updateProject(viewOutput, tempIdMap, github);
             core.info(`✓ Created view ${i + 1}/${configuredViews.length}: ${viewConfig.name} (${viewConfig.layout})`);
           } catch (err) {
             // prettier-ignore

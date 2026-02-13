@@ -277,7 +277,7 @@ async function processMessages(messageHandlers, messages) {
       const tempIdMapSizeBefore = temporaryIdMap.size;
 
       // Call the message handler with the individual message and resolved temp IDs
-      const result = await messageHandler(message, resolvedTemporaryIds);
+      const result = await messageHandler(message, resolvedTemporaryIds, temporaryIdMap);
 
       // Check if the handler explicitly returned a failure
       if (result && result.success === false && !result.deferred) {
@@ -399,7 +399,7 @@ async function processMessages(messageHandlers, messages) {
         const tempIdMapSizeBefore = temporaryIdMap.size;
 
         // Call the handler again with updated temp ID map
-        const result = await deferred.handler(deferred.message, resolvedTemporaryIds);
+        const result = await deferred.handler(deferred.message, resolvedTemporaryIds, temporaryIdMap);
 
         // Check if the handler explicitly returned a failure
         if (result && result.success === false && !result.deferred) {

@@ -141,6 +141,37 @@ describe("Safe Output Handler Manager", () => {
       expect(result.results[1].messageIndex).toBe(1);
     });
 
+    it("should pass the shared temporary ID map to handlers", async () => {
+      const messages = [
+        { type: "create_issue", title: "Issue", body: "Body", temporary_id: "aw_abc123def456" },
+        { type: "update_project", project: "https://github.com/orgs/test/projects/1", content_type: "issue", content_number: "aw_abc123def456" },
+      ];
+
+      const mockCreateHandler = vi.fn().mockResolvedValue({
+        repo: "owner/repo",
+        number: 101,
+        temporaryId: "aw_abc123def456",
+      });
+
+      const mockUpdateProjectHandler = vi.fn().mockImplementation((message, resolvedTemporaryIds, temporaryIdMap) => {
+        expect(temporaryIdMap).toBeInstanceOf(Map);
+        expect(temporaryIdMap.get("aw_abc123def456")).toEqual({ repo: "owner/repo", number: 101 });
+        expect(resolvedTemporaryIds["aw_abc123def456"]).toEqual({ repo: "owner/repo", number: 101 });
+        return Promise.resolve({ success: true });
+      });
+
+      const handlers = new Map([
+        ["create_issue", mockCreateHandler],
+        ["update_project", mockUpdateProjectHandler],
+      ]);
+
+      const result = await processMessages(handlers, messages);
+
+      expect(result.success).toBe(true);
+      expect(mockCreateHandler).toHaveBeenCalledTimes(1);
+      expect(mockUpdateProjectHandler).toHaveBeenCalledTimes(1);
+    });
+
     it("should skip messages without type", async () => {
       const messages = [{ type: "create_issue", title: "Issue" }, { title: "No type" }, { type: "add_comment", body: "Comment" }];
 
