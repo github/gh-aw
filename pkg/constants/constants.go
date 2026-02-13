@@ -599,6 +599,8 @@ const (
 	SandboxRuntimeFeatureFlag FeatureFlag = "sandbox-runtime"
 	// DangerousPermissionsWriteFeatureFlag is the feature flag name for allowing write permissions
 	DangerousPermissionsWriteFeatureFlag FeatureFlag = "dangerous-permissions-write"
+	// DisableXPIAPromptFeatureFlag is the feature flag name for disabling XPIA prompt
+	DisableXPIAPromptFeatureFlag FeatureFlag = "disable-xpia-prompt"
 )
 
 // Step IDs for pre-activation job

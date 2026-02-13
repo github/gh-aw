@@ -327,6 +327,7 @@ func TestFeatureFlagConstants(t *testing.T) {
 		{"MCPGatewayFeatureFlag", MCPGatewayFeatureFlag, "mcp-gateway"},
 		{"SandboxRuntimeFeatureFlag", SandboxRuntimeFeatureFlag, "sandbox-runtime"},
 		{"DangerousPermissionsWriteFeatureFlag", DangerousPermissionsWriteFeatureFlag, "dangerous-permissions-write"},
+		{"DisableXPIAPromptFeatureFlag", DisableXPIAPromptFeatureFlag, "disable-xpia-prompt"},
 	}
 
 	for _, tt := range tests {

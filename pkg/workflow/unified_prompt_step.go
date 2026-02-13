@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -220,12 +221,16 @@ func removeConsecutiveEmptyLines(content string) string {
 func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
 	var sections []PromptSection
 
-	// 0. XPia instructions
-	unifiedPromptLog.Print("Adding XPIA section")
-	sections = append(sections, PromptSection{
-		Content: xpiaPromptFile,
-		IsFile:  true,
-	})
+	// 0. XPia instructions (unless disabled by feature flag)
+	if !isFeatureEnabled(constants.DisableXPIAPromptFeatureFlag, data) {
+		unifiedPromptLog.Print("Adding XPIA section")
+		sections = append(sections, PromptSection{
+			Content: xpiaPromptFile,
+			IsFile:  true,
+		})
+	} else {
+		unifiedPromptLog.Print("XPIA section disabled by feature flag")
+	}
 
 	// 1. Temporary folder instructions (always included)
 	unifiedPromptLog.Print("Adding temp folder section")

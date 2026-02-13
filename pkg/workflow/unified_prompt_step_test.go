@@ -462,3 +462,78 @@ func TestGenerateUnifiedPromptStep_EnvVarsSorted(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectPromptSections_DisableXPIA(t *testing.T) {
+	// Test that XPIA section is excluded when disable-xpia-prompt feature flag is set
+	compiler := &Compiler{
+		trialMode:            false,
+		trialLogicalRepoSlug: "",
+	}
+
+	// Test with feature flag disabled (default - XPIA should be included)
+	t.Run("XPIA included by default", func(t *testing.T) {
+		data := &WorkflowData{
+			ParsedTools: NewTools(map[string]any{}),
+			Features:    nil,
+		}
+
+		sections := compiler.collectPromptSections(data)
+		require.NotEmpty(t, sections, "Should collect sections")
+
+		// Check that XPIA section is included (it's the first section)
+		hasXPIA := false
+		for _, section := range sections {
+			if section.IsFile && strings.Contains(section.Content, "xpia") {
+				hasXPIA = true
+				break
+			}
+		}
+		assert.True(t, hasXPIA, "XPIA section should be included by default")
+	})
+
+	// Test with feature flag enabled (XPIA should be excluded)
+	t.Run("XPIA excluded when feature flag enabled", func(t *testing.T) {
+		data := &WorkflowData{
+			ParsedTools: NewTools(map[string]any{}),
+			Features: map[string]any{
+				"disable-xpia-prompt": true,
+			},
+		}
+
+		sections := compiler.collectPromptSections(data)
+		require.NotEmpty(t, sections, "Should still collect other sections")
+
+		// Check that XPIA section is NOT included
+		hasXPIA := false
+		for _, section := range sections {
+			if section.IsFile && strings.Contains(section.Content, "xpia") {
+				hasXPIA = true
+				break
+			}
+		}
+		assert.False(t, hasXPIA, "XPIA section should be excluded when feature flag is enabled")
+	})
+
+	// Test with feature flag explicitly disabled (XPIA should be included)
+	t.Run("XPIA included when feature flag explicitly disabled", func(t *testing.T) {
+		data := &WorkflowData{
+			ParsedTools: NewTools(map[string]any{}),
+			Features: map[string]any{
+				"disable-xpia-prompt": false,
+			},
+		}
+
+		sections := compiler.collectPromptSections(data)
+		require.NotEmpty(t, sections, "Should collect sections")
+
+		// Check that XPIA section is included
+		hasXPIA := false
+		for _, section := range sections {
+			if section.IsFile && strings.Contains(section.Content, "xpia") {
+				hasXPIA = true
+				break
+			}
+		}
+		assert.True(t, hasXPIA, "XPIA section should be included when feature flag is explicitly false")
+	})
+}
