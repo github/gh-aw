@@ -373,15 +373,9 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 
 			// Not an ecosystem identifier - check if it belongs to any ecosystem
 			ecosystem := GetDomainEcosystem(domain)
-			if ecosystem != "" {
-				// This domain belongs to a known ecosystem, but user should use ecosystem identifier instead
-				strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s', but should use ecosystem identifier in strict mode", domain, ecosystem)
-				invalidDomains = append(invalidDomains, domainSuggestion{domain: domain, ecosystem: ecosystem})
-			} else {
-				// This is a truly custom domain (not in any ecosystem)
-				strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
-				invalidDomains = append(invalidDomains, domainSuggestion{domain: domain, ecosystem: ""})
-			}
+			// Add to invalid domains (with or without ecosystem suggestion)
+			strictModeValidationLog.Printf("Domain '%s' ecosystem: '%s'", domain, ecosystem)
+			invalidDomains = append(invalidDomains, domainSuggestion{domain: domain, ecosystem: ecosystem})
 		}
 
 		if len(invalidDomains) > 0 {

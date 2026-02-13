@@ -65,11 +65,17 @@ If using the Copilot CLI, you need a GitHub Actions Secret set to a GitHub Perso
 
 Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new):
 
-- **IMPORTANT:** Select your user account, NOT an organization.
-- **IMPORTANT:** Choose "Public repositories" access, even if adding to a private repo.
-- **IMPORTANT:** Enable "Copilot Requests" permissions.
+1. Select your user account, not an organization.
+2. Choose "Public repositories" access, even if adding to a private repo.
+3. Enable "Copilot Requests" permissions.
 
-You **must** have "Public repositories" selected; otherwise, you will not have access to the Copilot Requests permission option.
+You **must** have "Public repositories" selected; otherwise, the Copilot Requests permission option will not appear.
+
+Then add the PAT to your GitHub Actions repository secrets as `COPILOT_GITHUB_TOKEN`, either by CLI or GitHub UI (see video).
+
+```bash wrap
+gh aw secrets set COPILOT_GITHUB_TOKEN --value "<your-github-pat>"
+```
 
 <Video
   src="/gh-aw/videos/create-pat-user-copilot.mp4"
@@ -85,12 +91,14 @@ You **must** have "Public repositories" selected; otherwise, you will not have a
 If using the Claude by Anthropic engine, you need to configure `ANTHROPIC_API_KEY` with an API key from Anthropic.
 
 **Setup**:
+
 1. Create an API key at https://platform.claude.com/docs/en/get-started
+
 2. Add it to your repository secrets:
 
-```bash wrap
-gh aw secrets set ANTHROPIC_API_KEY --value "YOUR_ANTHROPIC_API_KEY"
-```
+   ```bash wrap
+   gh aw secrets set ANTHROPIC_API_KEY --value "YOUR_ANTHROPIC_API_KEY"
+   ```
 
 See also (/gh-aw/reference/engines/#using-claude-by-anthropic-claude-code) for additional configuration needed when using Claude with GitHub MCP.
 
@@ -101,12 +109,14 @@ See also (/gh-aw/reference/engines/#using-claude-by-anthropic-claude-code) for a
 If using the Codex by OpenAI engine, you need to configure `OPENAI_API_KEY` with an API key from OpenAI.
 
 **Setup**:
+
 1. Create an API key at https://platform.openai.com/api-keys
+
 2. Add it to your repository secrets:
 
-```bash wrap
-gh aw secrets set OPENAI_API_KEY --value "YOUR_OPENAI_API_KEY"
-```
+   ```bash wrap
+   gh aw secrets set OPENAI_API_KEY --value "YOUR_OPENAI_API_KEY"
+   ```
 
 See also (/gh-aw/reference/engines/#using-openai-codex) for additional configuration needed when using Codex with GitHub MCP.
 
