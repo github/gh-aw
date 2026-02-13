@@ -26,6 +26,7 @@ on: push
 permissions:
   contents: read
 engine: copilot
+strict: false
 network:
   allowed:
     - https://secure.example.com
@@ -205,6 +206,7 @@ on: push
 permissions:
   contents: read
 engine: copilot
+strict: false
 network:
   allowed:
     - https://example.com
@@ -249,6 +251,7 @@ on: push
 permissions:
   contents: read
 engine: copilot
+strict: false
 network:
   allowed:
     - example.com

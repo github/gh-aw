@@ -29,7 +29,7 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - defaults
 ---
 
 # Test Workflow`,
@@ -47,7 +47,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - defaults
 ---
 
 # Test Workflow`,
