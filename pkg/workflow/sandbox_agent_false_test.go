@@ -116,6 +116,7 @@ Test workflow to verify sandbox.agent: awf enables firewall.
 
 		markdown := `---
 engine: copilot
+strict: false
 network:
   allowed:
     - defaults

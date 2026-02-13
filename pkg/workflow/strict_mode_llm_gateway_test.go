@@ -9,7 +9,7 @@ import (
 
 // TestValidateStrictFirewall_LLMGatewaySupport tests the LLM gateway validation in strict mode
 func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
-	t.Run("codex engine with LLM gateway support allows custom domains", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway support also rejects custom domains in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -21,8 +21,11 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 
 		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
-		if err != nil {
-			t.Errorf("Expected no error for codex engine (supports LLM gateway) with custom domains, got: %v", err)
+		if err == nil {
+			t.Error("Expected error for codex engine with custom domains in strict mode, got nil")
+		}
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -39,12 +42,9 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for copilot engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for copilot engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
-		}
-		if err != nil && !strings.Contains(err.Error(), "network domains to be from known ecosystems") {
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
 			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
@@ -83,11 +83,11 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("copilot engine without LLM gateway support allows domains from known ecosystems", func(t *testing.T) {
+	t.Run("copilot engine without LLM gateway support rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
-		// These domains are from known ecosystems (python, node)
+		// These domains are from known ecosystems (python, node) but users should use ecosystem identifiers instead
 		networkPerms := &NetworkPermissions{
 			Allowed: []string{"pypi.org", "registry.npmjs.org"},
 			Firewall: &FirewallConfig{
@@ -96,8 +96,57 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 
 		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for individual ecosystem domains in strict mode, got nil")
+		}
+		// Should suggest using ecosystem identifiers instead
+		if !strings.Contains(err.Error(), "python") {
+			t.Errorf("Error should suggest 'python' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "node") {
+			t.Errorf("Error should suggest 'node' ecosystem, got: %v", err)
+		}
+	})
+
+	t.Run("codex engine with LLM gateway also allows known ecosystems", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"python", "node", "github"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
 		if err != nil {
-			t.Errorf("Expected no error for copilot engine with known ecosystem domains, got: %v", err)
+			t.Errorf("Expected no error for codex engine with known ecosystem identifiers, got: %v", err)
+		}
+	})
+
+	t.Run("codex engine with LLM gateway rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		// These domains are from known ecosystems (python, node) but users should use ecosystem identifiers instead
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"pypi.org", "registry.npmjs.org"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("codex", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for individual ecosystem domains in strict mode, got nil")
+		}
+		// Should suggest using ecosystem identifiers instead
+		if !strings.Contains(err.Error(), "python") {
+			t.Errorf("Error should suggest 'python' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "node") {
+			t.Errorf("Error should suggest 'node' ecosystem, got: %v", err)
 		}
 	})
 
@@ -116,8 +165,8 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for copilot engine with mixed ecosystems and custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -134,10 +183,10 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("claude", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for claude engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for claude engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 
@@ -167,7 +216,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine with LLM gateway allows sandbox.agent: false", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway rejects sandbox.agent: false in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -184,13 +233,12 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 			},
 		}
 
-		// Note: This should still fail because sandbox.agent: false is not allowed in strict mode for any engine
-		// But the error should be about sandbox.agent, not about LLM gateway
+		// sandbox.agent: false is not allowed in strict mode for any engine
 		err := compiler.validateStrictFirewall("codex", networkPerms, sandboxConfig)
 		if err == nil {
 			t.Error("Expected error for sandbox.agent: false in strict mode, got nil")
 		}
-		if err != nil && strings.Contains(err.Error(), "LLM gateway") {
+		if err != nil && strings.Contains(err.Error(), "does not support LLM gateway") {
 			t.Errorf("Expected error about sandbox.agent (not LLM gateway), got: %v", err)
 		}
 		if err != nil && !strings.Contains(err.Error(), "sandbox.agent") {
@@ -236,10 +284,10 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 
 		err := compiler.validateStrictFirewall("custom", networkPerms, nil)
 		if err == nil {
-			t.Error("Expected error for custom engine (no LLM gateway) with custom domains, got nil")
+			t.Error("Expected error for custom engine with custom domains, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "network domains must be from known ecosystems") {
+			t.Errorf("Expected error about known ecosystems, got: %v", err)
 		}
 	})
 }
@@ -289,4 +337,173 @@ func TestSupportsLLMGateway(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestValidateStrictFirewall_EcosystemSuggestions tests ecosystem suggestions in error messages
+func TestValidateStrictFirewall_EcosystemSuggestions(t *testing.T) {
+	t.Run("suggests ecosystem when individual domain from ecosystem is used", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"pypi.org"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for individual ecosystem domain in strict mode, got nil")
+		}
+
+		// Should suggest using 'python' ecosystem identifier
+		if !strings.Contains(err.Error(), "pypi.org") {
+			t.Errorf("Error should mention domain 'pypi.org', got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "python") {
+			t.Errorf("Error should suggest 'python' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "Did you mean") {
+			t.Errorf("Error should include 'Did you mean' suggestion, got: %v", err)
+		}
+	})
+
+	t.Run("suggests ecosystem for multiple domains from same ecosystem", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"npmjs.org", "registry.npmjs.com"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for individual ecosystem domains in strict mode, got nil")
+		}
+
+		// Should suggest using 'node' ecosystem identifier for both
+		if !strings.Contains(err.Error(), "npmjs.org") {
+			t.Errorf("Error should mention domain 'npmjs.org', got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "node") {
+			t.Errorf("Error should suggest 'node' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "Did you mean") {
+			t.Errorf("Error should include 'Did you mean' suggestion, got: %v", err)
+		}
+	})
+
+	t.Run("suggests ecosystem for domains from different ecosystems", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"pypi.org", "npmjs.org"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for individual ecosystem domains in strict mode, got nil")
+		}
+
+		// Should suggest both 'python' and 'node' ecosystems
+		if !strings.Contains(err.Error(), "pypi.org") {
+			t.Errorf("Error should mention domain 'pypi.org', got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "python") {
+			t.Errorf("Error should suggest 'python' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "npmjs.org") {
+			t.Errorf("Error should mention domain 'npmjs.org', got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "node") {
+			t.Errorf("Error should suggest 'node' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "Did you mean") {
+			t.Errorf("Error should include 'Did you mean' suggestion, got: %v", err)
+		}
+	})
+
+	t.Run("no suggestion for truly custom domains", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"custom-domain.com"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for custom domain in strict mode, got nil")
+		}
+
+		// Should NOT include "Did you mean" since this is a truly custom domain
+		if strings.Contains(err.Error(), "Did you mean") {
+			t.Errorf("Error should not include 'Did you mean' suggestion for truly custom domain, got: %v", err)
+		}
+	})
+
+	t.Run("mixed custom and ecosystem domains shows suggestions only for ecosystem domains", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"pypi.org", "custom-domain.com"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err == nil {
+			t.Fatal("Expected error for mixed domains in strict mode, got nil")
+		}
+
+		// Should suggest 'python' for pypi.org but not mention custom-domain.com in suggestions
+		if !strings.Contains(err.Error(), "pypi.org") {
+			t.Errorf("Error should mention domain 'pypi.org', got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "python") {
+			t.Errorf("Error should suggest 'python' ecosystem, got: %v", err)
+		}
+		if !strings.Contains(err.Error(), "Did you mean") {
+			t.Errorf("Error should include 'Did you mean' suggestion, got: %v", err)
+		}
+		// custom-domain.com should NOT appear in the "Did you mean" part
+		errMsg := err.Error()
+		didYouMeanIdx := strings.Index(errMsg, "Did you mean")
+		if didYouMeanIdx != -1 {
+			didYouMeanPart := errMsg[didYouMeanIdx:]
+			if strings.Contains(didYouMeanPart, "custom-domain.com") {
+				t.Errorf("Error should not suggest ecosystem for custom-domain.com, got: %v", err)
+			}
+		}
+	})
+
+	t.Run("allows ecosystem identifiers without suggestions", func(t *testing.T) {
+		compiler := NewCompiler()
+		compiler.strictMode = true
+
+		networkPerms := &NetworkPermissions{
+			Allowed: []string{"python", "node"},
+			Firewall: &FirewallConfig{
+				Enabled: true,
+			},
+		}
+
+		err := compiler.validateStrictFirewall("copilot", networkPerms, nil)
+		if err != nil {
+			t.Errorf("Expected no error for ecosystem identifiers in strict mode, got: %v", err)
+		}
+	})
 }

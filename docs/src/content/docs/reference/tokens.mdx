@@ -1,6 +1,6 @@
 ---
-title: GitHub Tokens
-description: Comprehensive reference for all GitHub tokens used in gh-aw, including authentication, token precedence, and security best practices
+title: GitHub Tokens and Secrets
+description: Comprehensive reference for all GitHub tokens (secrets) used in gh-aw, including authentication, token precedence, and security best practices
 sidebar:
   order: 650
 disable-agentic-editing: true
@@ -9,19 +9,24 @@ disable-agentic-editing: true
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import Video from '../../../components/Video.astro';
 
-## Which token(s) do I need?
+## Which tokens/secrets do I need?
 
-GitHub Actions automatically provides a default `GITHUB_TOKEN` that works for most workflows. However, depending on what your workflow needs to do, you may need additional tokens:
+You will need one of the following tokens/secrets:
+
+- **Copilot** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token)
+- **Claude by Anthropic** – Add [`ANTHROPIC_API_KEY`](#anthropic_api_key)
+- **Codex by OpenAI** – Add [`OPENAI_API_KEY`](#openai_api_key)
+
+Depending on what your workflow needs to do, you may need additional tokens:
 
 - **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token)
-- **Copilot engine and agent operations** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token)
 - **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#gh_aw_project_github_token)
 - **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#gh_aw_agent_token)
-- **MCP server with isolated permissions** (optional) – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
+- **MCP server with special permissions** – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
 
-## How do I add tokens to my repository?
+## How do I add tokens/secrets to my repository?
 
-You can set up your tokens manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
+You can set up your tokens/secrets manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
 
 ### Adding tokens using the CLI
 
@@ -52,42 +57,64 @@ gh aw init --tokens --engine <engine>
   <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png" />
 </picture>
 
-## Who owns the resource?
+### `COPILOT_GITHUB_TOKEN`
 
-Ownership affects token requirements for repositories and Projects (v2). If the owner is your personal username, it is user-owned. If the owner is an organization, it is org-owned and managed with shared roles and access controls.
+If using the Copilot CLI, you need a GitHub Actions Secret set to a GitHub Personal Access Token (PAT) with the `copilot-requests` scope to authenticate Copilot CLI.
 
-To confirm ownership, check the owner name and avatar at the top of the page or in the URL (`github.com/owner-name/...`). Clicking the owner takes you to a personal profile or an organization page, which confirms it instantly. Here are examples of both (left: user-owned, right: org-owned):
+**Setup**:
 
-<CardGrid>
-  <Card title="User-owned repository">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/user-owned_dark.png" />
-      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png" />
-    </picture>
-    
-    Avatar shows a personal profile icon, URL includes username
-  </Card>
+Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new):
 
-  <Card title="Organization-owned repository">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/org-owned_dark.png" />
-      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png" />
-    </picture>
-    
-    Avatar shows organization icon, URL includes org name
-  </Card>
-</CardGrid>
+- **IMPORTANT:** Select your user account, NOT an organization.
+- **IMPORTANT:** Choose "Public repositories" access, even if adding to a private repo.
+- **IMPORTANT:** Enable "Copilot Requests" permissions.
 
-## Token Reference
+You **must** have "Public repositories" selected; otherwise, you will not have access to the Copilot Requests permission option.
+
+<Video
+  src="/gh-aw/videos/create-pat-user-copilot.mp4"
+  caption="Creating a fine-grained PAT for user-owned repositories with Copilot permissions"
+  aspectRatio="16:9"
+  silenced={true}
+/>
+
+---
+
+### `ANTHROPIC_API_KEY`
+
+If using the Claude by Anthropic engine, you need to configure `ANTHROPIC_API_KEY` with an API key from Anthropic.
+
+**Setup**:
+1. Create an API key at https://platform.claude.com/docs/en/get-started
+2. Add it to your repository secrets:
+
+```bash wrap
+gh aw secrets set ANTHROPIC_API_KEY --value "YOUR_ANTHROPIC_API_KEY"
+```
+
+See also (/gh-aw/reference/engines/#using-claude-by-anthropic-claude-code) for additional configuration needed when using Claude with GitHub MCP.
+
+---
+
+### `OPENAI_API_KEY`
+
+If using the Codex by OpenAI engine, you need to configure `OPENAI_API_KEY` with an API key from OpenAI.
+
+**Setup**:
+1. Create an API key at https://platform.openai.com/api-keys
+2. Add it to your repository secrets:
+
+```bash wrap
+gh aw secrets set OPENAI_API_KEY --value "YOUR_OPENAI_API_KEY"
+```
+
+See also (/gh-aw/reference/engines/#using-openai-codex) for additional configuration needed when using Codex with GitHub MCP.
+
+---
 
 ### `GITHUB_TOKEN`
 
-**Automatically set** — GitHub Actions automatically provides this token with scoped access to the current repository.
-
-**When to use**:
-
-- Simple workflows that only interact with the current repository.
-- Comments, labels, and issues in the same repository.
+GitHub Actions automatically provides this token with scoped access to the current repository. It is used by default to checkout the repository and for accessing GitHub via the GitHub MCP server running in local mode.
 
 **Setup**:
 
@@ -99,14 +126,14 @@ To confirm ownership, check the owner name and avatar at the top of the page or 
 
 **Notes**:
 
-- Capabilities: read/write access to the current repository; permissions follow workflow `permissions:`.
-- Limitations: no cross-repo access, cannot trigger workflows via API, cannot authenticate Copilot engine, not supported for remote GitHub MCP server mode.
+- Capabilities: read access to the current repository; permissions follow workflow `permissions:`.
+- Limitations: no cross-repo access, cannot trigger workflows via API, not supported for remote GitHub MCP server mode.
 
 ---
 
 ### `GH_AW_GITHUB_TOKEN`
 
-**Personal Access Token** — A fine-grained or classic PAT that enables cross-repo access and remote GitHub tools.
+If using cross-repo access or the remote GitHub MCP server, you need to configure this GitHub Actions secret a Personal Access Token (PAT) with appropriate scopes and permissions.
 
 **When to use**:
 
@@ -139,7 +166,9 @@ Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/n
 
 ### `GH_AW_GITHUB_MCP_SERVER_TOKEN`
 
-**Personal Access Token** — A specialized token for the GitHub MCP server that can override the standard token chain. Use this when you need different permission levels for MCP server operations versus other workflow operations.
+If you need different permissions for the GitHub MCP server than the default token chain, you can configure `GH_AW_GITHUB_MCP_SERVER_TOKEN` with a Personal Access Token (PAT) or use a GitHub App for enhanced security.
+
+This specialized token for the GitHub MCP server that can override the standard token chain. Use this when you need different permission levels for MCP server operations versus other workflow operations.
 
 **When to use**:
 
@@ -254,7 +283,9 @@ This is the same per-job narrowing behavior used by `safe-outputs.app:` - see th
 
 ### `GH_AW_PROJECT_GITHUB_TOKEN`
 
-**Personal Access Token** — A specialized token for [GitHub Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/about-projects) operations, required because the default `GITHUB_TOKEN` cannot access the Projects API.
+If using GitHub Projects v2 operations, you need to configure this GitHub Actions secret with a Personal Access Token (PAT) that has the appropriate scopes and permissions for Projects access.
+
+This is specialized token for [GitHub Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/about-projects) operations, required because the default `GITHUB_TOKEN` cannot access the Projects API.
 
 **When to use**:
 
@@ -361,87 +392,11 @@ safe-outputs:
 
 ---
 
-### `COPILOT_GITHUB_TOKEN`
-
-**Personal Access Token** — The recommended token for Copilot operations including the Copilot engine, agent sessions, and bot assignments.
-
-**When to use**:
-
-- `engine: copilot` workflows.
-- `create-agent-session:` safe outputs.
-- Assigning `copilot` as issue assignee.
-- Adding `copilot` as PR reviewer.
-
-**Setup**:
-
-The required token type depends on whether you own the repository or an organization owns it:
-
-**For User-owned Repositories**:
-
-<Video
-  src="/gh-aw/videos/create-pat-user-copilot.mp4"
-  caption="Creating a fine-grained PAT for user-owned repositories with Copilot permissions"
-  aspectRatio="16:9"
-  silenced={true}
-/>
-
-1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
-   - **Resource owner**: Your user account
-   - **Repository access**: "Public repositories" or select specific repos
-     - **Note**: You should leave "Public repositories" enabled; otherwise, you will not have access to the Copilot Requests permission option.
-   - **Permissions**: 
-     - Copilot Requests: Read-only (required)
-
-**For Organization-owned Repositories**:
-
-<Video
-  src="/gh-aw/videos/create-pat-org-copilot.mp4"
-  caption="Creating a fine-grained PAT for organization-owned repositories with Copilot permissions"
-  aspectRatio="16:9"
-  silenced={true}
-/>
-
-When an organization owns the repository, you need a fine-grained PAT with organization-level permissions:
-
-1. Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
-   - **Resource owner**: The organization that owns the repository
-   - **Repository access**: Select the specific repositories that will use the workflow
-   - **Repository permissions**:
-     - Contents: Read (if needed for repository access)
-     - Issues: Read (if needed for issue-triggered workflows)
-     - Pull requests: Read (if needed for PR-triggered workflows)
-   - **Organization permissions** (must be explicitly granted):
-     - Members: Read-only (required)
-     - GitHub Copilot Business: Read-only (required)
-   - **Important**: You must explicitly grant organization access during token creation
-
-2. Add to repository secrets:
-
-```bash wrap
-gh aw secrets set COPILOT_GITHUB_TOKEN --value "YOUR_COPILOT_PAT"
-```
-
-**Token precedence and fallback**:
-
-per-output -> global safe-outputs -> workflow-level -> `COPILOT_GITHUB_TOKEN` -> `GH_AW_GITHUB_TOKEN` (legacy, deprecated).
-
-**Notes**:
-
-- For organization-owned repositories, the token must have both **Members: Read-only** and **GitHub Copilot Business: Read-only**.
-- These organization permissions must be explicitly granted during token creation and may require administrator approval.
-- `GITHUB_TOKEN` is not included in the fallback chain (lacks "Copilot Requests" permission). `COPILOT_CLI_TOKEN` and `GH_AW_COPILOT_TOKEN` are no longer supported as of v0.26+.
-
-
----
-
 ### `GH_AW_AGENT_TOKEN`
 
-**Personal Access Token** — Primary token used by `assign-to-agent:` safe outputs to programmatically assign Copilot agents to issues or pull requests.
+If you want to programmatically assign Copilot agents to issues or pull requests, you need to configure `GH_AW_AGENT_TOKEN` with a Personal Access Token (PAT) that has the appropriate scopes and permissions for issue and PR management.
 
-**When to use**:
-
-- `assign-to-agent:` safe outputs.
-- Programmatic agent assignment operations.
+Is token/secret is used by `assign-to-agent:` safe outputs to programmatically assign Copilot agents to issues or pull requests.
 
 **Setup**:
 
@@ -524,29 +479,33 @@ See [GitHub's official documentation on assigning issues to Copilot](https://doc
 
 This ensures the token has the appropriate permissions to assign agents to issues and pull requests in the repository.
 
-
 ---
 
-### `GITHUB_MCP_SERVER_TOKEN`
+## Who owns a GitHub token?
 
-**Automatically set** — Environment variable automatically set by gh-aw based on your GitHub tools configuration.
+Ownership affects token requirements for repositories and Projects (v2). If the owner is your personal username, it is user-owned. If the owner is an organization, it is org-owned and managed with shared roles and access controls.
 
-**When to use**:
+To confirm ownership, check the owner name and avatar at the top of the page or in the URL (`github.com/owner-name/...`). Clicking the owner takes you to a personal profile or an organization page, which confirms it instantly. Here are examples of both (left: user-owned, right: org-owned):
 
-- Do not configure manually.
+<CardGrid>
+  <Card title="User-owned repository">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/user-owned_dark.png" />
+      <img alt="User-owned repository example" src="/gh-aw/images/user-owned_light.png" />
+    </picture>
+    
+    Avatar shows a personal profile icon, URL includes username
+  </Card>
 
-**Setup**:
-
-- None. Automatically managed by the gh-aw compiler.
-
-**Token precedence and fallback**:
-
-Derived from GitHub tools configuration and token fallback settings.
-
-**Notes**:
-
-- Configure tokens using `GH_AW_GITHUB_TOKEN`, `GH_AW_GITHUB_MCP_SERVER_TOKEN`, or workflow-level `github-token` instead.
-
+  <Card title="Organization-owned repository">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcSet="/gh-aw/images/org-owned_dark.png" />
+      <img alt="Organization-owned repository example" src="/gh-aw/images/org-owned_light.png" />
+    </picture>
+    
+    Avatar shows organization icon, URL includes org name
+  </Card>
+</CardGrid>
 
 ---
 

@@ -103,22 +103,22 @@ The maintenance workflow searches for items with this expiration format (checked
 
 See [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) for complete documentation.
 
-### Close Older Discussions
+### Close Older Issues
 
-Automatically close older discussions with the same workflow-id marker when creating new ones. This keeps your discussions focused on the latest information.
+Automatically close older issues with the same workflow-id marker when creating new ones. This keeps your issues focused on the latest information.
 
 ```yaml wrap
 safe-outputs:
-  create-discussion:
-    close-older-discussions: true  # Close previous reports
+  create-issue:
+    close-older-issues: true  # Close previous reports
 ```
 
 **How it works**:
-- When a new discussion is created successfully, the system searches for older discussions
-- Matches are identified by the workflow-id marker embedded in the discussion body
-- Up to 10 older discussions are closed as "OUTDATED"
-- Each closed discussion receives a comment linking to the new discussion
-- Only runs if the new discussion creation succeeds
+- When a new issue is created successfully, the system searches for older issues
+- Matches are identified by the workflow-id marker embedded in the issue body
+- Up to 10 older issues are closed as "not planned"
+- Each closed issue receives a comment linking to the new issue
+- Only runs if the new issue creation succeeds
 
 **Requirements**:
 - GH_AW_WORKFLOW_ID environment variable must be set

@@ -31,6 +31,7 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
+strict: false
 network:
   allowed:
     - example.com
@@ -255,6 +256,7 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
+strict: false
 network:
   allowed:
     - example.com
@@ -286,6 +288,7 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
+strict: false
 network:
   allowed:
     - example.com

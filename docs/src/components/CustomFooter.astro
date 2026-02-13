@@ -8,6 +8,9 @@ const heartIcon = octicons.heart.toSVG({ width: 14, height: 14 });
 <Default {...Astro.props} />
 
 <div class="github-next-footer">
+  <div class="community-feedback">
+    <a href="https://github.com/orgs/community/discussions/186451" target="_blank" rel="noopener noreferrer">Community Feedback</a>
+  </div>
   <p>
     <span class="footer-main">
       Made with <span class="heart-icon" set:html={heartIcon} /> by <a href="https://githubnext.com/" target="_blank" rel="noopener noreferrer">GitHub Next</a> & <a href="https://www.microsoft.com/en-us/research/" target="_blank" rel="noopener noreferrer">Microsoft Research</a>
@@ -29,6 +32,31 @@ const heartIcon = octicons.heart.toSVG({ width: 14, height: 14 });
 
   :global([data-theme='light']) .github-next-footer {
     border-top: 1px solid #e6e8eb;
+  }
+
+  .community-feedback {
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .community-feedback a {
+    color: #8d96a0;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  :global([data-theme='light']) .community-feedback a {
+    color: #656d76;
+  }
+
+  .community-feedback a:hover {
+    color: #c06eff;
+  }
+
+  :global([data-theme='light']) .community-feedback a:hover {
+    color: #6b46c1;
   }
 
   .github-next-footer p {

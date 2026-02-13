@@ -29,7 +29,7 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - defaults
 ---
 
 # Test Workflow`,
@@ -47,7 +47,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - defaults
 ---
 
 # Test Workflow`,
@@ -100,7 +100,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "go"
 ---
 
 # Test Workflow`,
@@ -164,7 +164,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "rust"
 tools:
   github: false
   playwright:
@@ -214,7 +214,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "java"
 ---
 
 # Test Workflow`,
@@ -290,7 +290,7 @@ network: defaults
 			expectError: false,
 		},
 		{
-			name: "specific domains allowed in strict mode",
+			name: "specific ecosystem identifiers allowed in strict mode",
 			content: `---
 on: push
 permissions:
@@ -301,8 +301,8 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
-    - "*.trusted.com"
+    - "python"
+    - "node"
 ---
 
 # Test Workflow`,
@@ -444,9 +444,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: ["echo", "ls", "pwd"]
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -464,9 +461,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: []
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -484,9 +478,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: []
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -504,9 +495,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: ["*"]
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -524,9 +512,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: [":*"]
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -544,9 +529,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: ["echo", "ls", "*", "pwd"]
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -564,9 +546,6 @@ timeout-minutes: 10
 engine: copilot
 tools:
   bash: ["git:*", "npm:*"]
-network:
-  allowed:
-    - "api.example.com"
 ---
 
 # Test Workflow`,
@@ -657,7 +636,7 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "python"
 ---
 
 # Test Workflow`,
@@ -693,7 +672,7 @@ timeout-minutes: 10
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "node"
 ---
 
 # Test Workflow`,
@@ -794,7 +773,7 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "ruby"
 ---
 
 # Strict Workflow`
