@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 0bac2c340b44ea7294a8fda4f2dd2a465985b67136517651ad01a0e9e3192397
+# frontmatter-hash: 0c356641b3006617f23fd6e9f85cdcbf37e8c31bb3d5e42bdc61851d0fae913a
 
 name: "Bot Detection"
 "on":
@@ -1205,6 +1205,7 @@ jobs:
 
               let issueComments = [];
               try {
+                let total = 0;
                 issueComments = await github.paginate(
                   github.rest.issues.listComments,
                   {
@@ -1214,7 +1215,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -1224,6 +1226,7 @@ jobs:
 
               let reviewComments = [];
               try {
+                let total = 0;
                 reviewComments = await github.paginate(
                   github.rest.pulls.listReviewComments,
                   {
@@ -1233,7 +1236,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -1243,6 +1247,7 @@ jobs:
 
               let reviews = [];
               try {
+                let total = 0;
                 reviews = await github.paginate(
                   github.rest.pulls.listReviews,
                   {
@@ -1252,7 +1257,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -1305,6 +1311,7 @@ jobs:
               const s = ensureAuthor(login);
 
               try {
+                let total = 0;
                 const files = await github.paginate(
                   github.rest.pulls.listFiles,
                   {
@@ -1314,7 +1321,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );

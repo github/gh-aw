@@ -232,6 +232,7 @@ jobs:
 
               let issueComments = [];
               try {
+                let total = 0;
                 issueComments = await github.paginate(
                   github.rest.issues.listComments,
                   {
@@ -241,7 +242,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -251,6 +253,7 @@ jobs:
 
               let reviewComments = [];
               try {
+                let total = 0;
                 reviewComments = await github.paginate(
                   github.rest.pulls.listReviewComments,
                   {
@@ -260,7 +263,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -270,6 +274,7 @@ jobs:
 
               let reviews = [];
               try {
+                let total = 0;
                 reviews = await github.paginate(
                   github.rest.pulls.listReviews,
                   {
@@ -279,7 +284,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
@@ -332,6 +338,7 @@ jobs:
               const s = ensureAuthor(login);
 
               try {
+                let total = 0;
                 const files = await github.paginate(
                   github.rest.pulls.listFiles,
                   {
@@ -341,7 +348,8 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
-                    if (response.data.length >= 500) done();
+                    total += response.data.length;
+                    if (total >= 500) done();
                     return response.data;
                   }
                 );
