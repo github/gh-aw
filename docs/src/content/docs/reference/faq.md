@@ -183,12 +183,7 @@ See [Network Permissions](/gh-aw/reference/network/) for complete configuration 
 
 **GitHub lockdown mode** is a security feature that filters content in public repositories to only show issues, pull requests, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
 
-Lockdown is **manually enabled** for public repositories. It has no particular effect in private or internal repositories. You can disable lockdown for specific workflows designed to safely process all user input:
-
-- Issue triage and organization workflows
-- Spam detection systems
-- Public status dashboards
-- Command workflows (like `/plan`) that maintainers can use
+Lockdown is **automatically enabled** for public repositories if [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) or [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_mcp_server_token) is configured. It is not in effect for private or internal repositories.
 
 See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for detailed configuration guidance and security considerations.
 

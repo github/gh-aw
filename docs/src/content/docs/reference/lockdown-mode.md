@@ -8,7 +8,7 @@ sidebar:
 **GitHub lockdown mode** is [a security feature of the GitHub MCP server](https://github.com/github/github-mcp-server/blob/main/docs/server-configuration.md#lockdown-mode) that filters content in public repositories to only surface items (issues, pull requests, comments, discussions, etc.) from users with **push access** to the repository. This protects agentic workflows from processing potentially malicious or misleading content from untrusted users.
 
 > [!TIP]
-> **Explicit Lockdown Only**: Lockdown mode must be explicitly enabled by setting `lockdown: true` in your workflow frontmatter and configuring [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) as a repository secret. There is no automatic enablement - lockdown is off by default.
+> **Enabling Lockdown Mode**: Set `lockdown: true` in your workflow frontmatter and configure [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) as a repository secret. For public repositories, this provides enhanced security against untrusted input.
 
 ## Security Benefits
 
