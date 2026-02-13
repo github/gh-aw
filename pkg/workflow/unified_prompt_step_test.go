@@ -480,7 +480,7 @@ func TestCollectPromptSections_DisableXPIA(t *testing.T) {
 		sections := compiler.collectPromptSections(data)
 		require.NotEmpty(t, sections, "Should collect sections")
 
-		// Check that XPIA section is included (it's the first section)
+		// Check that XPIA section is included
 		hasXPIA := false
 		for _, section := range sections {
 			if section.IsFile && section.Content == xpiaPromptFile {
