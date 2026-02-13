@@ -562,27 +562,6 @@ When **lockdown mode is enabled** (automatically the default for public reposito
 - Blocks coding agent from seeing content from other users
 - Has no particular effect for private or internal repos
 
-**Security Benefits:**
-
-- **Input Manipulation Protection**: Prevents attackers from injecting malicious content into workflows
-- **Context Poisoning Prevention**: Blocks spam from overwhelming AI context or manipulating decisions
-- **Social Engineering Defense**: Helps ensure only verified contributors can interact with workflows
-
-**Configuration:**
-
-```yaml wrap
-tools:
-  github:
-    lockdown: true   # Force enable (automatic for public repos)
-    lockdown: false  # Disable for safe public workflows (issue triage, spam detection)
-```
-
-**When to disable lockdown** (public repositories only):
-- Issue triage/labeling workflows with restricted safe outputs
-- Spam detection systems designed to process untrusted content
-- Public status dashboards with read-only operations
-- Command workflows that explicitly verify user permissions
-
 <Aside type="tip">
 See [Lockdown Mode Reference](/gh-aw/reference/lockdown-mode/) for complete configuration guidance, use cases, and security considerations.
 </Aside>
