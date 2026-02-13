@@ -79,8 +79,8 @@ func parseLabelTriggerShorthand(input string) (entityType string, labelNames []s
 
 // expandLabelTriggerShorthand takes an entity type and label names and returns a map that represents
 // the expanded label trigger + workflow_dispatch configuration with item_number input.
-// Note: For discussion events, GitHub Actions doesn't support the `names` field,
-// so we use the native label filter marker but the names will be filtered via job conditions.
+// Note: For discussion events, GitHub Actions doesn't support the `labels` field,
+// so we use the native label filter marker but the labels will be filtered via job conditions.
 func expandLabelTriggerShorthand(entityType string, labelNames []string) map[string]any {
 	// Create the trigger configuration based on entity type
 	var triggerKey string
@@ -104,11 +104,16 @@ func expandLabelTriggerShorthand(entityType string, labelNames []string) map[str
 		"types": []any{"labeled"},
 	}
 
-	// Only add names field for issues and pull_request (GitHub Actions supports it)
-	// For discussions, names field is not supported by GitHub Actions
-	if entityType == "issues" || entityType == "pull_request" {
+	// Add label names for filtering
+	// For issues: GitHub Actions supports native `labels` field - use it with marker
+	// For pull_request & discussions: Use `names` field for job condition filtering (no marker)
+	if entityType == "issues" {
+		triggerConfig["labels"] = labelNames
+		triggerConfig["__gh_aw_native_label_filter__"] = true // Marker to use native filtering
+	} else {
+		// For pull_request and discussion: add names field for job condition filtering
 		triggerConfig["names"] = labelNames
-		triggerConfig["__gh_aw_native_label_filter__"] = true // Marker to prevent commenting out names
+		// No marker - this will be filtered via job conditions
 	}
 
 	// Create workflow_dispatch with item_number input

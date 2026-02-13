@@ -30,8 +30,8 @@
 name: "Code Refiner"
 "on":
   pull_request:
-    names:
-    - refine
+    # names: # Label filtering applied via job conditions
+    # - refine # Label filtering applied via job conditions
     types:
     - labeled
   workflow_dispatch:
@@ -53,7 +53,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id))
+      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
+      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'refine'))))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -1042,7 +1043,9 @@ jobs:
           if-no-files-found: ignore
 
   pre_activation:
-    if: (github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)
+    if: >
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
+      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'refine')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
