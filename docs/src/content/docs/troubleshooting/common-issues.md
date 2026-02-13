@@ -322,9 +322,9 @@ tools:
     key: memory-${{ github.workflow }}-${{ github.run_id }}
 ```
 
-## Lockdown Mode Blocking Expected Content
+## GitHub Lockdown Mode Blocking Expected Content
 
-**Lockdown mode** filters public repository content to only show items from users with push access. This protects workflows from untrusted input but can block legitimate use cases.
+**GitHub lockdown mode** filters public repository content to only show items from users with push access. This protects workflows from untrusted input but can block legitimate use cases.
 
 ### Symptoms
 
@@ -335,7 +335,7 @@ tools:
 
 ### Cause
 
-Lockdown mode is automatically enabled by default for public repositories. The workflow only sees content from users with push, maintain, or admin access.
+GitHub lockdown mode is automatically enabled by default for public repositories. The workflow only sees content from users with push, maintain, or admin access.
 
 This means that, by default, your workflow will not see issues, PRs, or comments from external contributors in a public repository. This is a security measure to prevent untrusted input from influencing the workflow, but it can interfere with workflows that need to process community contributions.
 

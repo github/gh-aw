@@ -743,7 +743,7 @@ func RenderGitHubMCPDockerConfig(yaml *strings.Builder, options GitHubMCPDockerO
 		envVars["GITHUB_READ_ONLY"] = "1"
 	}
 
-	// Lockdown mode
+	// GitHub lockdown mode
 	if options.LockdownFromStep {
 		// Security: Use environment variable instead of template expression to prevent template injection
 		// The GITHUB_MCP_LOCKDOWN env var is set in Start MCP gateway step from step output

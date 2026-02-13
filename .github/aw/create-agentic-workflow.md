@@ -425,9 +425,9 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    - **Always use `safe-outputs` instead** for any GitHub write operations (creating issues, adding comments, etc.)
    - **Mode configuration** - Both `mode: local` (Docker-based, default) and `mode: remote` (hosted) are supported. Remote mode offers faster startup and no Docker requirement.
 
-   **Lockdown Mode (Security Feature)**:
+   **GitHub lockdown Mode (Security Feature)**:
 
-   Lockdown mode is a security feature that filters content in public repositories to only show issues, PRs, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
+   GitHub lockdown mode is a security feature that filters content in public repositories to only show issues, PRs, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
 
    - **Automatic by default** - Lockdown is automatically enabled for public repositories, and has no impact for for private repositories (where all collaborators are trusted)
    - **When to disable**: Only disable lockdown (`lockdown: false`) for specific safe use cases:

@@ -1,18 +1,18 @@
 ---
-title: Lockdown Mode
-description: Security feature that filters public repository content to only show items from users with push access, protecting workflows from unauthorized input manipulation.
+title: GitHub Lockdown Mode
+description: Security feature of GitHub that filters public repository content to only show items from users with push access, protecting workflows from unauthorized input manipulation.
 sidebar:
   order: 660
 ---
 
-**Lockdown mode** is [a security feature of the GitHub MCP server](https://github.com/github/github-mcp-server/blob/main/docs/server-configuration.md#lockdown-mode) that filters content in public repositories to only surface items (issues, pull requests, comments, discussions, etc.) from users with **push access** to the repository. This protects agentic workflows from processing potentially malicious or misleading content from untrusted users.
+**GitHub lockdown mode** is [a security feature of the GitHub MCP server](https://github.com/github/github-mcp-server/blob/main/docs/server-configuration.md#lockdown-mode) that filters content in public repositories to only surface items (issues, pull requests, comments, discussions, etc.) from users with **push access** to the repository. This protects agentic workflows from processing potentially malicious or misleading content from untrusted users.
 
 > [!TIP]
-> **Automatic Protection**: Lockdown mode is **automatically enabled** for public repositories. This provides secure defaults without manual configuration.
+> **Automatic Protection**: GitHub lockdown mode is **automatically enabled** for public repositories. This provides secure defaults without manual configuration.
 
 ## Security Benefits
 
-Lockdown mode protects against several attack vectors:
+GitHub lockdown mode protects against several attack vectors:
 
 ### Input Manipulation
 

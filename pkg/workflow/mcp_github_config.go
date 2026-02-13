@@ -23,7 +23,7 @@
 //
 // Security features:
 //   - Read-only mode: Prevents write operations (default: true)
-//   - Lockdown mode: Restricts access to current repository only
+//   - GitHub lockdown mode: Restricts access to current repository only
 //   - Automatic lockdown: Enables lockdown for private repositories
 //   - Allowed tools: Restricts available GitHub API operations
 //
