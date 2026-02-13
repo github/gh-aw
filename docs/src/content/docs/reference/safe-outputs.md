@@ -19,6 +19,55 @@ safe-outputs:
 
 The agent requests issue creation; a separate job with `issues: write` creates it.
 
+## Required Permissions by Safe Output Type
+
+Each safe output type requires specific GitHub permissions. When using GitHub App tokens (`app:`), permissions are **automatically narrowed per-job** to match only what's needed. The table below shows the minimum permissions required for each safe output type:
+
+| Safe Output Type | `contents` | `issues` | `pull-requests` | `discussions` | `actions` | `security-events` | `organization-projects` | Notes |
+|------------------|------------|----------|-----------------|---------------|-----------|-------------------|-------------------------|-------|
+| `create-issue` | read | write | - | - | - | - | - | |
+| `update-issue` | read | write | - | - | - | - | - | |
+| `close-issue` | read | write | - | - | - | - | - | |
+| `link-sub-issue` | read | write | - | - | - | - | - | |
+| `create-discussion` | read | write | write | - | - | - | - | With `fallback-to-issue: true` (default) |
+| `create-discussion` | read | - | - | write | - | - | - | With `fallback-to-issue: false` |
+| `update-discussion` | read | - | - | write | - | - | - | |
+| `close-discussion` | read | - | - | write | - | - | - | |
+| `add-comment` | read | write | write | write | - | - | - | Supports issues, PRs, and discussions |
+| `hide-comment` | read | write | write | write | - | - | - | Supports issues, PRs, and discussions |
+| `add-labels` | read | write | write | - | - | - | - | For issues and PRs |
+| `remove-labels` | read | write | write | - | - | - | - | For issues and PRs |
+| `create-pull-request` | write | write | write | - | - | - | - | With `fallback-as-issue: true` (default) |
+| `create-pull-request` | write | - | write | - | - | - | - | With `fallback-as-issue: false` |
+| `push-to-pull-request-branch` | write | write | write | - | - | - | - | |
+| `update-pull-request` | read | - | write | - | - | - | - | |
+| `close-pull-request` | read | - | write | - | - | - | - | |
+| `mark-pull-request-as-ready-for-review` | read | - | write | - | - | - | - | |
+| `create-pull-request-review-comment` | read | - | write | - | - | - | - | |
+| `add-reviewer` | read | - | write | - | - | - | - | |
+| `update-release` | write | - | - | - | - | - | - | |
+| `dispatch-workflow` | - | - | - | - | write | - | - | |
+| `assign-to-agent` | read | write | - | - | - | - | - | |
+| `create-agent-session` | read | write | - | - | - | - | - | |
+| `assign-milestone` | read | write | write | - | - | - | - | For issues and PRs |
+| `assign-to-user` | read | write | - | - | - | - | - | |
+| `create-code-scanning-alert` | read | - | - | - | - | write | - | |
+| `autofix-code-scanning-alert` | read | - | - | - | read | write | - | |
+| `create-project` | read | - | - | - | - | - | write | |
+| `update-project` | read | - | - | - | - | - | write | |
+| `create-project-status-update` | read | - | - | - | - | - | write | |
+| `upload-asset` | write | - | - | - | - | - | - | |
+
+> [!NOTE]
+> **Permission Union**: When multiple safe outputs are configured in the same workflow, the safe output job receives the **union** of all required permissions. For example, configuring both `create-issue:` and `create-pull-request:` results in `contents: write`, `issues: write`, and `pull-requests: write`.
+
+> [!TIP]
+> **Fallback Fields**: Some safe output types support fallback mechanisms that affect required permissions:
+> - `create-pull-request`: Set `fallback-as-issue: false` to avoid requiring `issues: write` permission
+> - `create-discussion`: Set `fallback-to-issue: false` to avoid requiring `issues: write` permission
+> 
+> Without these fields set to `false`, the default behavior includes fallback capabilities which require additional permissions.
+
 ## Available Safe Output Types
 
 > [!NOTE]
@@ -628,7 +677,7 @@ Exposes outputs: `status-update-id`, `project-id`, `status`.
 
 ### Pull Request Creation (`create-pull-request:`)
 
-Creates PRs with code changes. Falls back to issue if creation fails (e.g., org settings block it). `expires` field (same-repo only) auto-closes after period: integers (days) or `2h`, `7d`, `2w`, `1m`, `1y` (hours < 24 treated as 1 day).
+Creates PRs with code changes. By default, falls back to creating an issue if PR creation fails (e.g., org settings block it). Set `fallback-as-issue: false` to disable this fallback and avoid requiring `issues: write` permission. `expires` field (same-repo only) auto-closes after period: integers (days) or `2h`, `7d`, `2w`, `1m`, `1y` (hours < 24 treated as 1 day).
 
 ```yaml wrap
 safe-outputs:
@@ -641,6 +690,7 @@ safe-outputs:
     if-no-changes: "warn"         # "warn" (default), "error", or "ignore"
     target-repo: "owner/repo"     # cross-repository
     base-branch: "vnext"          # target branch for PR (default: github.ref_name)
+    fallback-as-issue: false      # disable issue fallback (default: true)
 ```
 
 The `base-branch` field specifies which branch the pull request should target. This is particularly useful for cross-repository PRs where you need to target non-default branches (e.g., `vnext`, `release/v1.0`, `staging`). When not specified, defaults to the workflow's branch (`github.ref_name`).
@@ -656,7 +706,7 @@ safe-outputs:
 ```
 
 > [!NOTE]
-> PR creation may fail if "Allow GitHub Actions to create and approve pull requests" is disabled in Organization Settings. Fallback creates issue with branch link.
+> PR creation may fail if "Allow GitHub Actions to create and approve pull requests" is disabled in Organization Settings. By default (`fallback-as-issue: true`), fallback creates an issue with branch link and requires `issues: write` permission. Set `fallback-as-issue: false` to disable fallback and only require `contents: write` + `pull-requests: write`.
 
 ### Close Pull Request (`close-pull-request:`)
 
@@ -1335,6 +1385,20 @@ safe-outputs:
     repositories: ["repo1", "repo2"] # optional: scope to repos
   create-issue:
 ```
+
+#### How GitHub App Tokens Work
+
+When you configure `app:` for safe outputs, tokens are **automatically managed per-job** for enhanced security:
+
+1. **Per-job token minting**: Each safe output job automatically mints its own token via `actions/create-github-app-token` with permissions explicitly scoped to that job's needs
+2. **Permission narrowing**: Token permissions are narrowed to match the job's `permissions:` block - only the permissions required for the safe outputs in that job are granted
+3. **Automatic revocation**: Tokens are explicitly revoked at job end via `DELETE /installation/token`, even if the job fails
+4. **Safe shared configuration**: A broadly-permissioned GitHub App can be safely shared across workflows because tokens are narrowed per-job
+
+> [!TIP]
+> **Why this matters**: You can configure a single GitHub App at the organization level with broad permissions (e.g., `contents: write`, `issues: write`, `pull-requests: write`), and each workflow job will only receive the specific subset of permissions it needs. This provides least-privilege access without requiring per-workflow App configuration.
+
+**Example**: If your workflow only uses `create-issue:`, the minted token will have `contents: read` + `issues: write`, even if your GitHub App has broader permissions configured.
 
 ### Maximum Patch Size (`max-patch-size:`)
 

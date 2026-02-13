@@ -232,7 +232,9 @@ gh aw secrets set APP_PRIVATE_KEY --value "$(cat path/to/private-key.pem)"
 
 **How it works**:
 
-At workflow start, a token is automatically minted with permissions matching your agent job's `permissions:` field. The token is passed to the GitHub MCP server and automatically revoked at workflow end (even on failure).
+At workflow start, a token is automatically minted with **permissions matching your job's `permissions:` field**. The token is passed to the GitHub MCP server and automatically revoked at workflow end (even on failure).
+
+This is the same per-job narrowing behavior used by `safe-outputs.app:` - see the [Safe Outputs documentation](/gh-aw/reference/safe-outputs/#github-app-token-app) for a detailed explanation of how GitHub App tokens are narrowed per-job.
 
 **Token precedence and fallback**:
 
@@ -243,6 +245,7 @@ At workflow start, a token is automatically minted with permissions matching you
 - The compiler automatically sets `GITHUB_MCP_SERVER_TOKEN` and passes it as `GITHUB_PERSONAL_ACCESS_TOKEN` (local/Docker) or an `Authorization: Bearer` header (remote).
 - In most cases, you do not need to set this token separately. Use `GH_AW_GITHUB_TOKEN` instead.
 - **GitHub App advantages**: Short-lived tokens (auto-revoked at workflow end), no credential rotation needed, automatic permission calculation, better auditability.
+- **Per-job permission narrowing**: When using a GitHub App (via `tools.github.app:` or `safe-outputs.app:`), tokens are automatically narrowed to match the job's `permissions:` block. This means you can safely configure a broadly-permissioned GitHub App at the organization level, and each job will only receive the specific permissions it needs.
 - If using a GitHub App for both safe-outputs and GitHub MCP server, you can configure them independently for different permission levels.
 - Set the resource owner to the organization when the repository is organization-owned.
 - `GITHUB_TOKEN` is not supported in remote mode. Use `GH_AW_GITHUB_TOKEN` or a GitHub App instead.
