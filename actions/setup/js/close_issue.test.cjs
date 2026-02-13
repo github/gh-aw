@@ -126,6 +126,7 @@ describe("close_issue", () => {
       const result = await handler(
         {
           issue_number: 456,
+          body: "Closing this issue",
         },
         {}
       );
@@ -152,7 +153,7 @@ describe("close_issue", () => {
         };
       };
 
-      const result = await handler({}, {});
+      const result = await handler({ body: "Closing from context" }, {});
 
       expect(result.success).toBe(true);
       expect(result.number).toBe(123);
@@ -166,12 +167,13 @@ describe("close_issue", () => {
       const result = await handler(
         {
           issue_number: "invalid",
+          body: "Closing issue",
         },
         {}
       );
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("Invalid issue number")).toBe(true);
+      expect(result.error).toContain("Invalid issue number");
     });
 
     it("should handle missing issue_number and no context", async () => {
@@ -179,25 +181,25 @@ describe("close_issue", () => {
 
       const handler = await main({ max: 10 });
 
-      const result = await handler({}, {});
+      const result = await handler({ body: "Trying to close" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("No issue number available")).toBe(true);
+      expect(result.error).toContain("No issue number available");
     });
 
     it("should respect max count limit", async () => {
       const handler = await main({ max: 2 });
 
       // First call succeeds
-      const result1 = await handler({ issue_number: 1 }, {});
+      const result1 = await handler({ issue_number: 1, body: "Close #1" }, {});
       expect(result1.success).toBe(true);
 
       // Second call succeeds
-      const result2 = await handler({ issue_number: 2 }, {});
+      const result2 = await handler({ issue_number: 2, body: "Close #2" }, {});
       expect(result2.success).toBe(true);
 
       // Third call should fail
-      const result3 = await handler({ issue_number: 3 }, {});
+      const result3 = await handler({ issue_number: 3, body: "Close #3" }, {});
       expect(result3.success).toBe(false);
       expect(result3.error.includes("Max count")).toBe(true);
     });
@@ -263,7 +265,7 @@ describe("close_issue", () => {
         },
       });
 
-      const result = await handler({ issue_number: 100 }, {});
+      const result = await handler({ issue_number: 100, body: "Closing" }, {});
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("Missing required labels");
@@ -286,7 +288,7 @@ describe("close_issue", () => {
         },
       });
 
-      const result = await handler({ issue_number: 100 }, {});
+      const result = await handler({ issue_number: 100, body: "Closing" }, {});
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("doesn't start with");
@@ -317,6 +319,101 @@ describe("close_issue", () => {
       expect(commentCalls[0].body).toContain("This issue is being closed automatically");
     });
 
+    it("should use body field from message over config comment", async () => {
+      const handler = await main({
+        max: 10,
+        comment: "Default comment from config",
+      });
+
+      const commentCalls = [];
+      mockGithub.rest.issues.createComment = async params => {
+        commentCalls.push(params);
+        return {
+          data: {
+            id: 999,
+            html_url: `https://github.com/${params.owner}/${params.repo}/issues/${params.issue_number}#issuecomment-999`,
+          },
+        };
+      };
+
+      const result = await handler(
+        {
+          issue_number: 100,
+          body: "Custom body from message",
+        },
+        {}
+      );
+
+      expect(result.success).toBe(true);
+      expect(commentCalls.length).toBe(1);
+      // Should use the body from message, not the config comment
+      expect(commentCalls[0].body).toBe("Custom body from message");
+      expect(commentCalls[0].body).not.toContain("Default comment from config");
+    });
+
+    it("should require body field when no config comment is set", async () => {
+      const handler = await main({ max: 10 });
+
+      const result = await handler({ issue_number: 100 }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("No comment body provided");
+    });
+
+    it("should fail when body is empty string", async () => {
+      const handler = await main({ max: 10 });
+
+      const result = await handler({ issue_number: 100, body: "" }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("No comment body provided");
+    });
+
+    it("should use body field from message for already closed issues", async () => {
+      const handler = await main({ max: 10 });
+
+      let commentBody = "";
+      let issueUpdateCalled = false;
+
+      mockGithub.rest.issues.get = async () => ({
+        data: {
+          number: 100,
+          title: "Test Issue",
+          labels: [],
+          html_url: "https://github.com/test-owner/test-repo/issues/100",
+          state: "closed",
+        },
+      });
+
+      mockGithub.rest.issues.createComment = async params => {
+        commentBody = params.body;
+        return {
+          data: {
+            id: 456,
+            html_url: "https://github.com/test-owner/test-repo/issues/100#issuecomment-456",
+          },
+        };
+      };
+
+      mockGithub.rest.issues.update = async () => {
+        issueUpdateCalled = true;
+        return {
+          data: {
+            number: 100,
+            title: "Test Issue",
+            html_url: "https://github.com/test-owner/test-repo/issues/100",
+          },
+        };
+      };
+
+      const result = await handler({ issue_number: 100, body: "Closing comment with details" }, {});
+
+      expect(result.success).toBe(true);
+      expect(result.alreadyClosed).toBe(true);
+      expect(commentBody).toBe("Closing comment with details");
+      expect(issueUpdateCalled).toBe(false); // Should not call update for already closed issue
+    });
+
     it("should handle API errors gracefully", async () => {
       const handler = await main({ max: 10 });
 
@@ -324,10 +421,10 @@ describe("close_issue", () => {
         throw new Error("API Error: Not found");
       };
 
-      const result = await handler({ issue_number: 100 }, {});
+      const result = await handler({ issue_number: 100, body: "Closing" }, {});
 
       expect(result.success).toBe(false);
-      expect(result.error.includes("API Error")).toBe(true);
+      expect(result.error).toContain("API Error");
     });
 
     it("should support target-repo from config", async () => {
@@ -358,7 +455,7 @@ describe("close_issue", () => {
         };
       };
 
-      const result = await handler({ issue_number: 100 }, {});
+      const result = await handler({ issue_number: 100, body: "Closing" }, {});
 
       expect(result.success).toBe(true);
       expect(updateCalls[0].owner).toBe("external-org");
@@ -398,6 +495,7 @@ describe("close_issue", () => {
         {
           issue_number: 456,
           repo: "cross-org/cross-repo",
+          body: "Closing cross-repo issue",
         },
         {}
       );
@@ -418,6 +516,7 @@ describe("close_issue", () => {
         {
           issue_number: 100,
           repo: "unauthorized-org/unauthorized-repo",
+          body: "Trying to close",
         },
         {}
       );
@@ -459,6 +558,7 @@ describe("close_issue", () => {
         {
           issue_number: 100,
           repo: "gh-aw", // Bare name without org
+          body: "Closing",
         },
         {}
       );
