@@ -138,6 +138,23 @@ jobs:
               }
             }
 
+            async function loadContributorAccounts() {
+              try {
+                const contributors = await github.paginate(github.rest.repos.listContributors, {
+                  owner,
+                  repo,
+                  per_page: 100,
+                });
+                for (const contributor of contributors) {
+                  if (contributor?.login) {
+                    MEMBER_ACCOUNTS.add(String(contributor.login).toLowerCase());
+                  }
+                }
+              } catch {
+                // If contributor lookup fails, continue without contributor allowlist.
+              }
+            }
+
             async function loadOrgMembers() {
               for (const org of TRUSTED_ORGS) {
                 try {
@@ -198,6 +215,7 @@ jobs:
             }
 
             await loadMemberAccounts();
+            await loadContributorAccounts();
             await loadOrgMembers();
 
             // Search issues + PRs updated in window (API requires is:issue or is:pull-request)
