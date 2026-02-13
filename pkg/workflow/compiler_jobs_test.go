@@ -343,7 +343,7 @@ func TestShouldAddCheckoutStep(t *testing.T) {
 				CustomSteps: "",
 			},
 			actionMode: ActionModeRelease,
-			expected:   false,
+			expected:   true, // Checkout always needed unless already in steps
 		},
 		{
 			name: "dev mode without agent file",

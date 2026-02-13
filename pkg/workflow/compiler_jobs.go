@@ -501,39 +501,21 @@ func (c *Compiler) buildCustomJobs(data *WorkflowData, activationJobCreated bool
 }
 
 // shouldAddCheckoutStep returns true if the workflow requires a checkout step.
-// A checkout is needed when the workflow uses custom agent files, accesses local
-// actions in dev/script mode, or needs to reference .github directory content.
+// The repository checkout is needed in the agent job to access workflow files,
+// custom agent files, and other repository content.
 //
-// The checkout step is skipped in the following cases:
+// The checkout step is only skipped when:
 //   - Custom steps already contain a checkout action
-//   - Workflow is in release mode without a custom agent file
 //
-// The checkout step is always added when:
-//   - A custom agent file is specified (via imports)
-//   - Running in dev or script mode (requires .github and .actions access)
-//   - Action mode is uninitialized (defaults to requiring checkout)
+// Otherwise, checkout is always added to ensure the agent has access to the repository.
 func (c *Compiler) shouldAddCheckoutStep(data *WorkflowData) bool {
-	// Check condition 1: If custom steps already contain checkout, don't add another one
+	// If custom steps already contain checkout, don't add another one
 	if data.CustomSteps != "" && ContainsCheckout(data.CustomSteps) {
 		log.Print("Skipping checkout step: custom steps already contain checkout")
-		return false // Custom steps already have checkout
-	}
-
-	// Check condition 2: If custom agent file is specified (via imports), checkout is required
-	if data.AgentFile != "" {
-		log.Printf("Adding checkout step: custom agent file specified: %s", data.AgentFile)
-		return true // Custom agent file requires checkout to access the file
-	}
-
-	// Check condition 3: Only skip checkout in explicit release mode without agent file
-	// Dev mode, script mode, and uninitialized mode all need checkout for .github and .actions access
-	if c.actionMode.IsRelease() {
-		// In release mode without agent file, checkout is not needed
-		log.Print("Skipping checkout step: release mode without agent file")
 		return false
 	}
 
-	// Default: add checkout for dev/script mode and uninitialized mode
-	log.Printf("Adding checkout step: %s mode requires .github and .actions access", c.actionMode)
+	// Always add checkout to ensure agent has repository access
+	log.Print("Adding checkout step: agent job requires repository access")
 	return true
 }

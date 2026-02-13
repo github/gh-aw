@@ -766,7 +766,7 @@ func TestShouldAddCheckoutStepEdgeCases(t *testing.T) {
 			expectCheckout: true,
 		},
 		{
-			name: "no checkout in release mode without agent file",
+			name: "checkout required in release mode without agent file",
 			setupData: func() *WorkflowData {
 				return &WorkflowData{
 					Name: "Test",
@@ -775,7 +775,7 @@ func TestShouldAddCheckoutStepEdgeCases(t *testing.T) {
 			setupCompiler: func(c *Compiler) {
 				c.actionMode = ActionModeRelease
 			},
-			expectCheckout: false,
+			expectCheckout: true, // Checkout always needed unless already in steps
 		},
 		{
 			name: "checkout required when agent file specified",

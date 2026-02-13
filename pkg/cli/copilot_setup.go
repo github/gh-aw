@@ -13,13 +13,18 @@ import (
 
 var copilotSetupLog = logger.New("cli:copilot_setup")
 
+// getActionRef returns the action reference string based on action mode and version
+func getActionRef(actionMode workflow.ActionMode, version string) string {
+	if actionMode.IsRelease() && version != "" && version != "dev" {
+		return "@" + version
+	}
+	return "@main"
+}
+
 // generateCopilotSetupStepsYAML generates the copilot-setup-steps.yml content based on action mode
 func generateCopilotSetupStepsYAML(actionMode workflow.ActionMode, version string) string {
 	// Determine the action reference - use version tag in release mode, @main in dev mode
-	actionRef := "@main"
-	if actionMode.IsRelease() && version != "" && version != "dev" {
-		actionRef = "@" + version
-	}
+	actionRef := getActionRef(actionMode, version)
 
 	if actionMode.IsRelease() {
 		// Use the actions/setup-cli action in release mode
@@ -247,10 +252,7 @@ func renderCopilotSetupUpdateInstructions(filePath string, actionMode workflow.A
 	fmt.Fprintln(os.Stderr)
 
 	// Determine the action reference
-	actionRef := "@main"
-	if actionMode.IsRelease() && version != "" && version != "dev" {
-		actionRef = "@" + version
-	}
+	actionRef := getActionRef(actionMode, version)
 
 	if actionMode.IsRelease() {
 		fmt.Fprintln(os.Stderr, "      - name: Checkout repository")
@@ -279,10 +281,7 @@ func upgradeSetupCliVersion(workflow *Workflow, actionMode workflow.ActionMode, 
 	}
 
 	upgraded := false
-	actionRef := "@main"
-	if actionMode.IsRelease() && version != "" && version != "dev" {
-		actionRef = "@" + version
-	}
+	actionRef := getActionRef(actionMode, version)
 
 	// Iterate through steps and update any actions/setup-cli steps
 	for i := range job.Steps {
@@ -321,10 +320,7 @@ func injectExtensionInstallStep(workflow *Workflow, actionMode workflow.ActionMo
 	var installStep, checkoutStep CopilotWorkflowStep
 
 	// Determine the action reference - use version tag in release mode, @main in dev mode
-	actionRef := "@main"
-	if actionMode.IsRelease() && version != "" && version != "dev" {
-		actionRef = "@" + version
-	}
+	actionRef := getActionRef(actionMode, version)
 
 	if actionMode.IsRelease() {
 		// In release mode, use the actions/setup-cli action
