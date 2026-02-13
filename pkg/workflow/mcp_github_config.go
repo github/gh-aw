@@ -23,8 +23,7 @@
 //
 // Security features:
 //   - Read-only mode: Prevents write operations (default: true)
-//   - GitHub lockdown mode: Restricts access to current repository only
-//   - Automatic lockdown: Enables lockdown for public repositories with GH_AW_GITHUB_TOKEN
+//   - GitHub lockdown mode: Restricts access to current repository only (explicit only)
 //   - Allowed tools: Restricts available GitHub API operations
 //
 // GitHub toolsets:
@@ -40,12 +39,10 @@
 //  3. Top-level github-token from frontmatter
 //  4. Default GITHUB_TOKEN secret
 //
-// Automatic lockdown detection:
-// When lockdown is not explicitly set, a step is generated to automatically
-// enable lockdown for public repositories ONLY when GH_AW_GITHUB_TOKEN is configured.
-// This provides security by preventing the token from accessing private repositories.
-// Public repos without GH_AW_GITHUB_TOKEN use the default GITHUB_TOKEN (already scoped),
-// so lockdown is not needed.
+// Lockdown mode configuration:
+// Lockdown mode must be explicitly enabled by setting 'lockdown: true' in the workflow.
+// When enabled in a public repository, GH_AW_GITHUB_TOKEN must be configured as a secret.
+// There is no automatic enablement - lockdown is off by default.
 //
 // Related files:
 //   - mcp_renderer.go: Renders GitHub MCP configuration to YAML
@@ -258,58 +255,19 @@ func getGitHubDockerImageVersion(githubTool any) string {
 	return githubDockerImageVersion
 }
 
-// generateGitHubMCPLockdownDetectionStep generates a step to determine automatic lockdown mode
-// for GitHub MCP server based on repository visibility and GH_AW_GITHUB_TOKEN availability.
-// This step is added when:
-// - GitHub tool is enabled AND
-// - lockdown field is not explicitly specified in the workflow configuration
-// 
-// Lockdown mode is automatically enabled for public repositories ONLY when GH_AW_GITHUB_TOKEN
-// is configured as a repository secret. This prevents the token from accessing private repositories.
-// For public repos without GH_AW_GITHUB_TOKEN, lockdown is disabled (default GITHUB_TOKEN is scoped).
+// generateGitHubMCPLockdownDetectionStep is deprecated and no longer generates any steps.
+// Lockdown mode is now explicit only - it must be enabled with 'lockdown: true'.
+// This function is kept for backward compatibility but does nothing.
 func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
-	// Check if GitHub tool is present
-	githubTool, hasGitHub := data.Tools["github"]
-	if !hasGitHub || githubTool == false {
-		return
-	}
-
-	// Check if lockdown is already explicitly set
-	if hasGitHubLockdownExplicitlySet(githubTool) {
-		githubConfigLog.Print("Lockdown explicitly set in workflow, skipping automatic lockdown determination")
-		return
-	}
-
-	githubConfigLog.Print("Generating automatic lockdown determination step for GitHub MCP server")
-
-	// Resolve the latest version of actions/github-script
-	actionRepo := "actions/github-script"
-	actionVersion := string(constants.DefaultGitHubScriptVersion)
-	pinnedAction, err := GetActionPinWithData(actionRepo, actionVersion, data)
-	if err != nil {
-		githubConfigLog.Printf("Failed to resolve %s@%s: %v", actionRepo, actionVersion, err)
-		// In strict mode, this error would have been returned by GetActionPinWithData
-		// In normal mode, we fall back to using the version tag without pinning
-		pinnedAction = fmt.Sprintf("%s@%s", actionRepo, actionVersion)
-	}
-
-	// Generate the step using the determine_automatic_lockdown.cjs action
-	yaml.WriteString("      - name: Determine automatic lockdown mode for GitHub MCP server\n")
-	yaml.WriteString("        id: determine-automatic-lockdown\n")
-	fmt.Fprintf(yaml, "        uses: %s\n", pinnedAction)
-	yaml.WriteString("        env:\n")
-	yaml.WriteString("          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}\n")
-	yaml.WriteString("        with:\n")
-	yaml.WriteString("          script: |\n")
-	yaml.WriteString("            const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');\n")
-	yaml.WriteString("            await determineAutomaticLockdown(github, context, core);\n")
+	// No-op: Lockdown mode is explicit only, no automatic detection needed
+	githubConfigLog.Print("Lockdown mode is explicit only - no automatic detection step generated")
 }
 
 // generateGitHubMCPLockdownValidationStep generates a step to validate lockdown mode requirements
 // This step is added when:
 // - GitHub tool is enabled AND
 // - lockdown field is explicitly set to true
-// 
+//
 // The validation ensures that GH_AW_GITHUB_TOKEN is configured when lockdown mode is explicitly enabled.
 // If the token is missing, the workflow fails with a clear error message.
 func (c *Compiler) generateGitHubMCPLockdownValidationStep(yaml *strings.Builder, data *WorkflowData) {

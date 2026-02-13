@@ -11,17 +11,17 @@ import (
 	"github.com/github/gh-aw/pkg/stringutil"
 )
 
-func TestGitHubLockdownAutodetection(t *testing.T) {
+// TestGitHubLockdownExplicitOnly verifies that lockdown mode is explicit only
+// and no automatic detection steps are generated
+func TestGitHubLockdownExplicitOnly(t *testing.T) {
 	tests := []struct {
 		name               string
 		workflow           string
-		expectedDetectStep bool
-		expectedLockdown   string // "auto" means use step output expression, "true" means hardcoded true, "false" means not present
-		expectIfCondition  bool   // true if step should have if: condition
+		expectedLockdown   string // "true" means hardcoded true, "false" means not present, "none" means no lockdown setting at all
 		description        string
 	}{
 		{
-			name: "Auto-determination enabled when lockdown not specified",
+			name: "No lockdown when not specified",
 			workflow: `---
 on: issues
 engine: copilot
@@ -33,15 +33,13 @@ tools:
 
 # Test Workflow
 
-Test automatic lockdown determination.
+Test that lockdown is not enabled without explicit setting.
 `,
-			expectedDetectStep: true,
-			expectedLockdown:   "auto",
-			expectIfCondition:  false,
-			description:        "When lockdown is not specified, determination step should be added",
+			expectedLockdown: "none",
+			description:      "When lockdown is not specified, no lockdown setting should be present",
 		},
 		{
-			name: "No auto-determination when lockdown explicitly set to true",
+			name: "Lockdown enabled when explicitly set to true",
 			workflow: `---
 on: issues
 engine: copilot
@@ -56,13 +54,11 @@ tools:
 
 Test with explicit lockdown enabled.
 `,
-			expectedDetectStep: false,
-			expectedLockdown:   "true",
-			expectIfCondition:  false,
-			description:        "When lockdown is explicitly true, no determination step and lockdown should be hardcoded",
+			expectedLockdown: "true",
+			description:      "When lockdown is explicitly true, lockdown should be hardcoded",
 		},
 		{
-			name: "No auto-determination when lockdown explicitly set to false",
+			name: "No lockdown when explicitly set to false",
 			workflow: `---
 on: issues
 engine: copilot
@@ -77,10 +73,8 @@ tools:
 
 Test with explicit lockdown disabled.
 `,
-			expectedDetectStep: false,
-			expectedLockdown:   "false",
-			expectIfCondition:  false,
-			description:        "When lockdown is explicitly false, no determination step and no lockdown setting",
+			expectedLockdown: "none",
+			description:      "When lockdown is explicitly false, no lockdown setting should be present",
 		},
 		{
 			name: "Auto-determination with remote mode",

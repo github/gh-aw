@@ -555,7 +555,7 @@ Workflows should use `${{ needs.activation.outputs.text }}` instead of raw `gith
 
 GitHub lockdown mode is a security feature of the GitHub MCP server that filters content in public repositories to only surface items from users with push access. This protects workflows from processing potentially malicious or misleading input from untrusted users.
 
-When **lockdown mode is enabled** (by setting `lockdown: true` and configuring [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token)), the GitHub MCP server:
+Lockdown mode must be explicitly enabled by setting `lockdown: true` in your workflow frontmatter and configuring [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) as a repository secret. When enabled, the GitHub MCP server:
 - Only returns issues, PRs, comments, and discussions from users with push, maintain, or admin access
 - Blocks coding agent from seeing content from other users
 - Has no particular effect for private or internal repos

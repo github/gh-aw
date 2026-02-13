@@ -84,12 +84,7 @@ func collectMCPEnvironmentVariables(tools map[string]any, mcpTools []string, wor
 			envVars["GITHUB_MCP_SERVER_TOKEN"] = effectiveToken
 		}
 
-		// Add lockdown value if it's determined from step output
-		// Security: Pass step output through environment variable to prevent template injection
-		// Convert "true"/"false" to "1"/"0" at the source to avoid shell conversion in templates
-		if !hasGitHubLockdownExplicitlySet(githubTool) {
-			envVars["GITHUB_MCP_LOCKDOWN"] = "${{ steps.determine-automatic-lockdown.outputs.lockdown == 'true' && '1' || '0' }}"
-		}
+		// Lockdown mode is now explicit only - no automatic detection or step outputs
 	}
 
 	// Check for safe-outputs env vars
