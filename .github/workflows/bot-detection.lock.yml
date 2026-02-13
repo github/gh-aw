@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 2178e3732b12824d02944782c3e73dbab22b3c402a400b320ac94f7f77cdb68d
+# frontmatter-hash: dec42b60c0582acafe2c1517cd58ef2d29436bc44d02ae8ef91e3ae6659d3943
 
 name: "Bot Detection"
 "on":
@@ -165,7 +165,7 @@ jobs:
               staged: false,
               allowed_domains: ["defaults"],
               firewall_enabled: true,
-              awf_version: "v0.16.3",
+              awf_version: "v0.16.4",
               awmg_version: "",
               steps: {
                 firewall: "squid"
@@ -189,7 +189,7 @@ jobs:
       - name: Install GitHub Copilot CLI
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.409
       - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.3
+        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.4
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -198,7 +198,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.16.3 ghcr.io/github/gh-aw-firewall/squid:0.16.3 ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.16.4 ghcr.io/github/gh-aw-firewall/squid:0.16.4 ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
@@ -721,7 +721,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -o pipefail
-          sudo -E awf --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.16.3 --skip-pull \
+          sudo -E awf --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.16.4 --skip-pull \
             -- '/usr/local/bin/copilot --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --add-dir "${GITHUB_WORKSPACE}" --disable-builtin-mcps --allow-all-tools --allow-all-paths --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"${GH_AW_MODEL_AGENT_COPILOT:+ --model "$GH_AW_MODEL_AGENT_COPILOT"}' \
             2>&1 | tee /tmp/gh-aw/agent-stdio.log
         env:
@@ -1013,6 +1013,43 @@ jobs:
             const MIN_ACCOUNT_AGE_DAYS = 14;
             const MAX_PR = 50;
             const MAX_COMMENT_EXAMPLES = 10;
+            const ALLOWED_DOMAINS = new Set([
+              // GitHub docs + blog
+              "docs.github.com",
+              "github.blog",
+              // Marketplace + package registries
+              "marketplace.visualstudio.com",
+              "npmjs.com",
+              "pkg.go.dev",
+              // Language vendor sites
+              "golang.org",
+              "go.dev",
+              "nodejs.org",
+            ]);
+            const ALLOWED_ACCOUNTS = new Set([
+              // Bots and service accounts
+              "github-actions[bot]",
+              "dependabot[bot]",
+              "renovate[bot]",
+              "copilot",
+              "copilot-swe-agent",
+            ]);
+            const TRUSTED_ORGS = [
+              // Orgs whose members should be allowlisted
+              "github",
+            ];
+            const MEMBER_ACCOUNTS = new Set();
+
+            function parseJsonList(envName) {
+              try {
+                const raw = process.env[envName];
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            }
 
             function toISO(d) {
               return new Date(d).toISOString();
@@ -1050,7 +1087,47 @@ jobs:
                 "avatars.githubusercontent.com",
                 "api.github.com",
               ]);
-              return host && !allowed.has(host);
+              return host && !allowed.has(host) && !ALLOWED_DOMAINS.has(host);
+            }
+
+            function isAllowedAccount(login) {
+              const normalized = String(login || "").toLowerCase();
+              return ALLOWED_ACCOUNTS.has(normalized) || MEMBER_ACCOUNTS.has(normalized);
+            }
+
+            async function loadMemberAccounts() {
+              try {
+                const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
+                  owner,
+                  repo,
+                  per_page: 100,
+                });
+                for (const collaborator of collaborators) {
+                  if (collaborator?.login) {
+                    MEMBER_ACCOUNTS.add(String(collaborator.login).toLowerCase());
+                  }
+                }
+              } catch {
+                // If collaborator lookup fails, continue without member allowlist.
+              }
+            }
+
+            async function loadOrgMembers() {
+              for (const org of TRUSTED_ORGS) {
+                try {
+                  const members = await github.paginate(github.rest.orgs.listMembers, {
+                    org,
+                    per_page: 100,
+                  });
+                  for (const member of members) {
+                    if (member?.login) {
+                      MEMBER_ACCOUNTS.add(String(member.login).toLowerCase());
+                    }
+                  }
+                } catch {
+                  // If org member lookup fails, continue without org allowlist.
+                }
+              }
             }
 
             function isShortener(host) {
@@ -1089,6 +1166,19 @@ jobs:
 
             const end = await getRunCreatedAt();
             const start = new Date(end.getTime() - HOURS_BACK * 60 * 60 * 1000);
+
+            for (const domain of parseJsonList("BOT_DETECTION_ALLOWED_DOMAINS")) {
+              if (domain) ALLOWED_DOMAINS.add(String(domain).toLowerCase());
+            }
+            for (const account of parseJsonList("BOT_DETECTION_ALLOWED_ACCOUNTS")) {
+              if (account) ALLOWED_ACCOUNTS.add(String(account).toLowerCase());
+            }
+            for (const org of parseJsonList("BOT_DETECTION_TRUSTED_ORGS")) {
+              if (org) TRUSTED_ORGS.push(String(org));
+            }
+
+            await loadMemberAccounts();
+            await loadOrgMembers();
 
             // Search issues + PRs updated in window
             const q = `repo:${owner}/${repo} updated:>=${toISO(start)}`;
@@ -1160,6 +1250,7 @@ jobs:
             for (const it of items) {
               const login = it.author;
               if (!login) continue;
+              if (isAllowedAccount(login)) continue;
               const s = ensureAuthor(login);
               await ensureUserCreatedAt(login);
               s.itemCount += 1;
@@ -1200,6 +1291,7 @@ jobs:
             for (const it of prItems) {
               const login = it.author;
               if (login) {
+                if (isAllowedAccount(login)) continue;
                 await ensureUserCreatedAt(login);
               }
 
@@ -1301,6 +1393,7 @@ jobs:
               for (const c of commentCandidates) {
                 const commenter = c.user?.login || "";
                 if (!commenter) continue;
+                if (isAllowedAccount(commenter)) continue;
                 await ensureUserCreatedAt(commenter);
                 const s = ensureAuthor(commenter);
                 s.commentCount += 1;
@@ -1322,6 +1415,7 @@ jobs:
               for (const r of reviewCandidates) {
                 const reviewer = r.user?.login || "";
                 if (!reviewer) continue;
+                if (isAllowedAccount(reviewer)) continue;
                 await ensureUserCreatedAt(reviewer);
                 const s = ensureAuthor(reviewer);
                 s.reviewCount += 1;
@@ -1335,6 +1429,7 @@ jobs:
             for (const it of prItems) {
               const login = it.author;
               if (!login) continue;
+              if (isAllowedAccount(login)) continue;
               const s = ensureAuthor(login);
 
               try {
@@ -1493,9 +1588,12 @@ jobs:
               }
 
               if (domains.length > 0) {
-                lines.push("## Domains (external)", "", "| Domain | Accounts |", "| --- | ---: |");
+                lines.push("## Domains (external)", "", "| Domain | Accounts | Logins |", "| --- | ---: | --- |");
                 for (const d of domains.slice(0, 20)) {
-                  lines.push(`| ${d.domain} | ${d.count} |`);
+                  const maxLogins = 5;
+                  const shown = d.accounts.slice(0, maxLogins).map(login => `@${login}`);
+                  const overflow = d.accounts.length > maxLogins ? ` +${d.accounts.length - maxLogins} more` : "";
+                  lines.push(`| ${d.domain} | ${d.count} | ${shown.join(", ")}${overflow} |`);
                 }
                 lines.push("");
               }
@@ -1510,6 +1608,16 @@ jobs:
                 for (const a of arr.slice(0, 25)) {
                   const sig = a.signals.join(", ");
                   lines.push(`- @${a.login} — score=${a.risk_score} — ${sig}`);
+                  if (a.examples && a.examples.length > 0) {
+                    lines.push("  <details><summary>Evidence</summary>", "");
+                    for (const ex of a.examples.slice(0, 5)) {
+                      lines.push(`  - ${ex.url}`);
+                    }
+                    if (a.examples.length > 5) {
+                      lines.push(`  - ... and ${a.examples.length - 5} more`);
+                    }
+                    lines.push("", "  </details>");
+                  }
                 }
                 lines.push("");
               }
@@ -1517,30 +1625,6 @@ jobs:
               renderAccounts("Accounts (High)", high);
               renderAccounts("Accounts (Medium)", med);
               renderAccounts("Accounts (Low)", low);
-
-              // Evidence links (bounded)
-              const evidence = [];
-              for (const a of accounts.filter(a => a.severity !== "None").slice(0, 25)) {
-                for (const ex of a.examples) {
-                  evidence.push({ url: ex.url, key: `${a.login}:${ex.url}` });
-                }
-              }
-              const seen = new Set();
-              const deduped = [];
-              for (const e of evidence) {
-                if (seen.has(e.key)) continue;
-                seen.add(e.key);
-                deduped.push(e);
-              }
-              deduped.sort((a, b) => a.url.localeCompare(b.url));
-
-              if (deduped.length > 0) {
-                lines.push("## Evidence", "");
-                for (const e of deduped.slice(0, 30)) {
-                  lines.push(`- ${e.url}`);
-                }
-                lines.push("");
-              }
 
               lines.push("## Notes", "", "- This report is computed deterministically from GitHub Search + PR file listings + PR comments/reviews within the window.");
               return lines.join("\n");
