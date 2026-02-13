@@ -32,7 +32,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: d720039ca3cf1be5054a58eb02146900a08426a0a5997cb88f87e0a937e2ec2b
+# frontmatter-hash: 90c3b4d6df070a0a84475c6360965f60f624b28729876f2301a1b93433db2897
 
 name: "Scout"
 "on":
@@ -287,16 +287,6 @@ jobs:
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.1
       - name: Install Claude Code CLI
         run: npm install -g --silent @anthropic-ai/claude-code@2.1.39
-      - name: Determine automatic lockdown mode for GitHub MCP server
-        id: determine-automatic-lockdown
-        env:
-          TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
-        if: env.TOKEN_CHECK != ''
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        with:
-          script: |
-            const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
-            await determineAutomaticLockdown(github, context, core);
       - name: Download container images
         run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.16.1 ghcr.io/github/gh-aw-firewall/squid:0.16.1 ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 mcp/arxiv-mcp-server mcp/markitdown node:lts-alpine
       - name: Write Safe Outputs Config
@@ -495,7 +485,6 @@ jobs:
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
           GH_AW_SAFE_OUTPUTS_API_KEY: ${{ steps.safe-outputs-start.outputs.api_key }}
           GH_AW_SAFE_OUTPUTS_PORT: ${{ steps.safe-outputs-start.outputs.port }}
-          GITHUB_MCP_LOCKDOWN: ${{ steps.determine-automatic-lockdown.outputs.lockdown == 'true' && '1' || '0' }}
           GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: |
@@ -529,7 +518,7 @@ jobs:
               "github": {
                 "container": "ghcr.io/github/github-mcp-server:v0.30.3",
                 "env": {
-                  "GITHUB_LOCKDOWN_MODE": "$GITHUB_MCP_LOCKDOWN",
+                  "GITHUB_LOCKDOWN_MODE": "1",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_MCP_SERVER_TOKEN",
                   "GITHUB_READ_ONLY": "1",
                   "GITHUB_TOOLSETS": "context,repos,issues,pull_requests"

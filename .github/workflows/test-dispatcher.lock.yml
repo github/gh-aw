@@ -188,9 +188,6 @@ jobs:
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.1
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
-        env:
-          TOKEN_CHECK: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
-        if: env.TOKEN_CHECK != ''
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
