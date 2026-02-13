@@ -117,6 +117,38 @@ async function main(config = {}) {
 
     const item = message;
 
+    // Log message structure for debugging (avoid logging body content)
+    core.info(
+      `Processing close_issue message: ${JSON.stringify({
+        has_body: !!item.body,
+        body_length: item.body ? item.body.length : 0,
+        issue_number: item.issue_number,
+        has_repo: !!item.repo,
+      })}`
+    );
+
+    // Determine comment body - prefer non-empty item.body over non-empty config.comment
+    /** @type {string} */
+    let commentToPost;
+    /** @type {string} */
+    let commentSource = "unknown";
+
+    if (typeof item.body === "string" && item.body.trim() !== "") {
+      commentToPost = item.body;
+      commentSource = "item.body";
+    } else if (typeof comment === "string" && comment.trim() !== "") {
+      commentToPost = comment;
+      commentSource = "config.comment";
+    } else {
+      core.warning("No comment body provided in message and no default comment configured");
+      return {
+        success: false,
+        error: "No comment body provided",
+      };
+    }
+
+    core.info(`Comment body determined: length=${commentToPost.length}, source=${commentSource}`);
+
     // Resolve and validate target repository
     const repoResult = resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, "issue");
     if (!repoResult.success) {
@@ -155,7 +187,9 @@ async function main(config = {}) {
 
     try {
       // Fetch issue details
+      core.info(`Fetching issue details for #${issueNumber} in ${repoParts.owner}/${repoParts.repo}`);
       const issue = await getIssueDetails(github, repoParts.owner, repoParts.repo, issueNumber);
+      core.info(`Issue #${issueNumber} fetched: state=${issue.state}, title="${issue.title}", labels=[${issue.labels.map(l => l.name || l).join(", ")}]`);
 
       // Check if already closed - but still add comment
       const wasAlreadyClosed = issue.state === "closed";
@@ -174,6 +208,7 @@ async function main(config = {}) {
             error: `Missing required labels: ${missingLabels.join(", ")}`,
           };
         }
+        core.info(`Issue #${issueNumber} has all required labels: ${requiredLabels.join(", ")}`);
       }
 
       // Validate required title prefix if configured
@@ -184,22 +219,28 @@ async function main(config = {}) {
           error: `Title doesn't start with "${requiredTitlePrefix}"`,
         };
       }
-
-      // Add comment if configured
-      if (comment) {
-        await addIssueComment(github, repoParts.owner, repoParts.repo, issueNumber, comment);
-        core.info(`Added comment to issue #${issueNumber}`);
+      if (requiredTitlePrefix) {
+        core.info(`Issue #${issueNumber} has required title prefix: "${requiredTitlePrefix}"`);
       }
+
+      // Add comment with the body from the message
+      core.info(`Adding comment to issue #${issueNumber}: length=${commentToPost.length}`);
+      const commentResult = await addIssueComment(github, repoParts.owner, repoParts.repo, issueNumber, commentToPost);
+      core.info(`✓ Comment posted to issue #${issueNumber}: ${commentResult.html_url}`);
+      core.info(`Comment details: id=${commentResult.id}, body_length=${commentToPost.length}`);
 
       // Close the issue if not already closed
       let closedIssue;
       if (wasAlreadyClosed) {
-        core.info(`Issue #${issueNumber} was already closed, comment added`);
+        core.info(`Issue #${issueNumber} was already closed, comment added successfully`);
         closedIssue = issue;
       } else {
+        core.info(`Closing issue #${issueNumber} in ${itemRepo}`);
         closedIssue = await closeIssue(github, repoParts.owner, repoParts.repo, issueNumber);
-        core.info(`Closed issue #${issueNumber} in ${itemRepo}: ${closedIssue.html_url}`);
+        core.info(`✓ Issue #${issueNumber} closed successfully: ${closedIssue.html_url}`);
       }
+
+      core.info(`close_issue completed successfully for issue #${issueNumber}`);
 
       return {
         success: true,
@@ -211,6 +252,15 @@ async function main(config = {}) {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       core.error(`Failed to close issue #${issueNumber}: ${errorMessage}`);
+      core.error(
+        `Error details: ${JSON.stringify({
+          issueNumber,
+          repo: itemRepo,
+          hasBody: !!item.body,
+          bodyLength: item.body ? item.body.length : 0,
+          errorMessage,
+        })}`
+      );
       return {
         success: false,
         error: errorMessage,

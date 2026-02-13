@@ -847,9 +847,8 @@ Creates discussions with optional `category` (slug, name, or ID; defaults to fir
 
 **Category Naming Standard**: Use lowercase, plural category names (e.g., `audits`, `general`, `reports`) for consistency and better searchability. GitHub Discussion category IDs (starting with `DIC_`) are also supported.
 
-:::note[Announcement-Capable Categories]
-When choosing a category automatically, use an **announcement-capable category** (such as the default "Announcements" category). Announcement categories provide enhanced visibility and notification features in GitHub Discussions. If the "Announcements" category is available in your repository, it's recommended to use it for AI-generated content to ensure proper visibility.
-:::
+> [!WARNING]
+> Only announcement-capable category succeeds; all non-announcement categories fail with integration-forbidden.
 
 ```yaml wrap
 safe-outputs:

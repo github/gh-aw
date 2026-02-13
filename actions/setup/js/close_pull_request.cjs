@@ -114,6 +114,37 @@ async function main(config = {}) {
 
     const item = message;
 
+    // Log message structure for debugging (avoid logging body content)
+    core.info(
+      `Processing close_pull_request message: ${JSON.stringify({
+        has_body: !!item.body,
+        body_length: item.body ? item.body.length : 0,
+        pull_request_number: item.pull_request_number,
+      })}`
+    );
+
+    // Determine comment body - prefer non-empty item.body over non-empty config.comment
+    /** @type {string} */
+    let commentToPost;
+    /** @type {string} */
+    let commentSource = "unknown";
+
+    if (typeof item.body === "string" && item.body.trim() !== "") {
+      commentToPost = item.body;
+      commentSource = "item.body";
+    } else if (typeof comment === "string" && comment.trim() !== "") {
+      commentToPost = comment;
+      commentSource = "config.comment";
+    } else {
+      core.warning("No comment body provided in message and no default comment configured");
+      return {
+        success: false,
+        error: "No comment body provided",
+      };
+    }
+
+    core.info(`Comment body determined: length=${commentToPost.length}, source=${commentSource}`);
+
     // Determine PR number
     let prNumber;
     if (item.pull_request_number !== undefined) {
@@ -144,7 +175,9 @@ async function main(config = {}) {
     const { owner, repo } = context.repo;
     let pr;
     try {
+      core.info(`Fetching PR details for #${prNumber} in ${owner}/${repo}`);
       pr = await getPullRequestDetails(github, owner, repo, prNumber);
+      core.info(`PR #${prNumber} fetched: state=${pr.state}, title="${pr.title}", labels=[${pr.labels.map(l => l.name || l).join(", ")}]`);
     } catch (error) {
       const errorMsg = getErrorMessage(error);
       core.warning(`Failed to get PR #${prNumber} details: ${errorMsg}`);
@@ -168,6 +201,9 @@ async function main(config = {}) {
         error: `PR does not match required labels`,
       };
     }
+    if (requiredLabels.length > 0) {
+      core.info(`PR #${prNumber} has all required labels: ${requiredLabels.join(", ")}`);
+    }
 
     // Check title prefix filter
     if (!checkTitlePrefixFilter(pr.title, requiredTitlePrefix)) {
@@ -177,34 +213,56 @@ async function main(config = {}) {
         error: `PR title does not start with required prefix`,
       };
     }
+    if (requiredTitlePrefix) {
+      core.info(`PR #${prNumber} has required title prefix: "${requiredTitlePrefix}"`);
+    }
 
-    // Add comment if requested
-    if (comment && comment.trim()) {
-      try {
-        const triggeringPRNumber = context.payload?.pull_request?.number;
-        const triggeringIssueNumber = context.payload?.issue?.number;
-        const commentBody = buildCommentBody(comment, triggeringIssueNumber, triggeringPRNumber);
-        await addPullRequestComment(github, owner, repo, prNumber, commentBody);
-        core.info(`Added comment to PR #${prNumber}`);
-      } catch (error) {
-        const errorMsg = getErrorMessage(error);
-        core.warning(`Failed to add comment to PR #${prNumber}: ${errorMsg}`);
-        // Continue with closing even if comment fails
-      }
+    // Add comment with the body from the message
+    let commentPosted = false;
+    try {
+      const triggeringPRNumber = context.payload?.pull_request?.number;
+      const triggeringIssueNumber = context.payload?.issue?.number;
+      const commentBody = buildCommentBody(commentToPost, triggeringIssueNumber, triggeringPRNumber);
+      core.info(`Adding comment to PR #${prNumber}: length=${commentBody.length}`);
+      await addPullRequestComment(github, owner, repo, prNumber, commentBody);
+      commentPosted = true;
+      core.info(`✓ Comment posted to PR #${prNumber}`);
+      core.info(`Comment details: body_length=${commentBody.length}`);
+    } catch (error) {
+      const errorMsg = getErrorMessage(error);
+      core.error(`Failed to add comment to PR #${prNumber}: ${errorMsg}`);
+      core.error(
+        `Error details: ${JSON.stringify({
+          prNumber,
+          hasBody: !!item.body,
+          bodyLength: item.body ? item.body.length : 0,
+          errorMessage: errorMsg,
+        })}`
+      );
+      // Continue with closing even if comment fails - but log the error
     }
 
     // Close the PR if not already closed
     let closedPR;
     if (wasAlreadyClosed) {
-      core.info(`PR #${prNumber} was already closed, comment added`);
+      core.info(`PR #${prNumber} was already closed, comment ${commentPosted ? "posted successfully" : "posting attempted"}`);
       closedPR = pr;
     } else {
       try {
+        core.info(`Closing PR #${prNumber}`);
         closedPR = await closePullRequest(github, owner, repo, prNumber);
-        core.info(`✓ Closed PR #${prNumber}: ${closedPR.title}`);
+        core.info(`✓ PR #${prNumber} closed successfully: ${closedPR.title}`);
       } catch (error) {
         const errorMsg = getErrorMessage(error);
-        core.warning(`Failed to close PR #${prNumber}: ${errorMsg}`);
+        core.error(`Failed to close PR #${prNumber}: ${errorMsg}`);
+        core.error(
+          `Error details: ${JSON.stringify({
+            prNumber,
+            hasBody: !!item.body,
+            bodyLength: item.body ? item.body.length : 0,
+            errorMessage: errorMsg,
+          })}`
+        );
         return {
           success: false,
           error: `Failed to close PR #${prNumber}: ${errorMsg}`,
@@ -212,11 +270,14 @@ async function main(config = {}) {
       }
     }
 
+    core.info(`close_pull_request completed for PR #${prNumber}: ${commentPosted ? "comment posted and " : ""}PR ${wasAlreadyClosed ? "was already closed" : "closed successfully"}`);
+
     return {
       success: true,
       pull_request_number: closedPR.number,
       pull_request_url: closedPR.html_url,
       alreadyClosed: wasAlreadyClosed,
+      commentPosted,
     };
   };
 }
