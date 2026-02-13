@@ -1,0 +1,104 @@
+---
+const { 
+  href = "https://github.blog/ai-and-ml/automate-repository-tasks-with-github-agentic-workflows/",
+  mainText = "Learn More on the GitHub Blog",
+  subText = "Automate repository tasks with GitHub Agentic Workflows"
+} = Astro.props;
+---
+
+<div class="prominent-link-wrapper">
+  <a href={href} target="_blank" rel="noopener noreferrer" class="prominent-link-card">
+    <span class="prominent-icon" aria-hidden="true">📖</span>
+    <div class="prominent-text">
+      <strong class="prominent-title">{mainText}</strong>
+      <span class="prominent-subtitle">{subText}</span>
+    </div>
+    <span class="prominent-arrow" aria-hidden="true">→</span>
+  </a>
+</div>
+
+<style>
+  .prominent-link-wrapper {
+    margin: 2.5rem auto;
+    max-width: 720px;
+    padding-inline: 1rem;
+    text-align: center;
+  }
+
+  .prominent-link-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.5rem 2rem;
+    border: 2px solid var(--sl-color-purple-high);
+    border-radius: 0.75rem;
+    background-color: var(--sl-color-bg-nav);
+    color: var(--sl-color-text);
+    text-decoration: none;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .prominent-link-card:hover {
+    border-color: var(--sl-color-purple);
+    background-color: var(--sl-color-bg-sidebar);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.25);
+  }
+
+  .prominent-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .prominent-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    text-align: left;
+  }
+
+  .prominent-title {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--sl-color-text-accent);
+  }
+
+  .prominent-subtitle {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--sl-color-gray-3);
+  }
+
+  .prominent-arrow {
+    font-size: 1.5rem;
+    color: var(--sl-color-purple);
+    flex-shrink: 0;
+  }
+
+  .prominent-link-card:hover .prominent-arrow {
+    transform: translateX(5px);
+  }
+
+  @media (max-width: 640px) {
+    .prominent-link-card {
+      flex-direction: column;
+      text-align: center;
+      padding: 1.25rem;
+      gap: 1rem;
+    }
+
+    .prominent-text {
+      text-align: center;
+    }
+
+    .prominent-arrow {
+      transform: rotate(90deg);
+    }
+
+    .prominent-link-card:hover .prominent-arrow {
+      transform: rotate(90deg) translateX(5px);
+    }
+  }
+</style>
