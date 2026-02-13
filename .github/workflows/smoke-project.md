@@ -98,7 +98,7 @@ Do not re-create draft items but use their returned temporary-ids for the update
       Call `update_project` with the draft issue you created (use the returned temporary-id) to change status to "In Progress":
       - `project`: "https://github.com/orgs/github/projects/24068"
       - `content_type`: "draft_issue"
-      - `draft_issue_id`: The temporary-id returned from step 1a (e.g., "aw_abc123def456")
+      - `draft_issue_id`: The temporary-id returned from step 1a (e.g., "aw_abc123")
       - `fields`: `{"Status": "In Progress"}`
 
    b. **Pull Request Update**:

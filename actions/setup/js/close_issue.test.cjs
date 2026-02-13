@@ -202,8 +202,11 @@ describe("close_issue", () => {
       expect(result3.error.includes("Max count")).toBe(true);
     });
 
-    it("should skip already closed issues", async () => {
-      const handler = await main({ max: 10 });
+    it("should still add comment to already closed issues", async () => {
+      const handler = await main({ max: 10, comment: "Test comment" });
+
+      let commentAdded = false;
+      let issueUpdateCalled = false;
 
       mockGithub.rest.issues.get = async () => ({
         data: {
@@ -215,10 +218,33 @@ describe("close_issue", () => {
         },
       });
 
-      const result = await handler({ issue_number: 100 }, {});
+      mockGithub.rest.issues.createComment = async () => {
+        commentAdded = true;
+        return {
+          data: {
+            id: 456,
+            html_url: "https://github.com/test-owner/test-repo/issues/100#issuecomment-456",
+          },
+        };
+      };
+
+      mockGithub.rest.issues.update = async () => {
+        issueUpdateCalled = true;
+        return {
+          data: {
+            number: 100,
+            title: "Test Issue",
+            html_url: "https://github.com/test-owner/test-repo/issues/100",
+          },
+        };
+      };
+
+      const result = await handler({ issue_number: 100, body: "Test comment" }, {});
 
       expect(result.success).toBe(true);
       expect(result.alreadyClosed).toBe(true);
+      expect(commentAdded).toBe(true);
+      expect(issueUpdateCalled).toBe(false); // Should not call update for already closed issue
     });
 
     it("should validate required labels", async () => {

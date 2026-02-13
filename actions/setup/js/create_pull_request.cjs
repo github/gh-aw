@@ -11,7 +11,7 @@ const { addExpirationComment } = require("./expiration_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { replaceTemporaryIdReferences, isTemporaryId } = require("./temporary_id.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { createExpirationLine, generateFooterWithExpiration } = require("./ephemerals.cjs");
 const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
@@ -133,6 +133,32 @@ async function main(config = {}) {
     processedCount++;
 
     const pullRequestItem = message;
+
+    let temporaryId;
+    if (pullRequestItem.temporary_id !== undefined && pullRequestItem.temporary_id !== null) {
+      if (typeof pullRequestItem.temporary_id !== "string") {
+        core.warning(`Skipping create_pull_request: temporary_id must be a string (got ${typeof pullRequestItem.temporary_id})`);
+        return {
+          success: false,
+          error: `temporary_id must be a string (got ${typeof pullRequestItem.temporary_id})`,
+        };
+      }
+
+      const rawTemporaryId = pullRequestItem.temporary_id.trim();
+      const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
+
+      if (!isTemporaryId(normalized)) {
+        core.warning(
+          `Skipping create_pull_request: Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`
+        );
+        return {
+          success: false,
+          error: `Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`,
+        };
+      }
+
+      temporaryId = normalized.toLowerCase();
+    }
 
     core.info(`Processing create_pull_request: title=${pullRequestItem.title || "No title"}, bodyLength=${pullRequestItem.body?.length || 0}`);
 
@@ -743,7 +769,7 @@ ${patchPreview}`;
         pull_request_number: pullRequest.number,
         pull_request_url: pullRequest.html_url,
         branch_name: branchName,
-        temporary_id: pullRequestItem.temporary_id, // Pass through if present
+        temporary_id: temporaryId,
         repo: itemRepo,
       };
     } catch (prError) {

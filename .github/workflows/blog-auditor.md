@@ -9,7 +9,7 @@ permissions:
   pull-requests: read
 tracker-id: blog-auditor-weekly
 engine: claude
-strict: true
+strict: false
 network:
   allowed:
     - defaults

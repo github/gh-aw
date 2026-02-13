@@ -227,6 +227,7 @@ Test workflow where explicit tools.bash should take precedence over default.
 		// No explicit sandbox.agent, but network restrictions will auto-enable firewall
 		markdown := `---
 engine: copilot
+strict: false
 network:
   allowed:
     - github.com

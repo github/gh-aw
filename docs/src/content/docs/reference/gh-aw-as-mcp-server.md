@@ -1,5 +1,5 @@
 ---
-title: MCP Server
+title: GH-AW as an MCP Server
 description: Use the gh-aw MCP server to expose CLI tools to AI agents via Model Context Protocol, enabling secure workflow management.
 sidebar:
   order: 400

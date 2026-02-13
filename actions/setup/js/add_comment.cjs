@@ -7,7 +7,7 @@
 
 const { generateFooterWithMessages } = require("./messages_footer.cjs");
 const { getRepositoryUrl } = require("./get_repository_url.cjs");
-const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { replaceTemporaryIdReferences, loadTemporaryIdMapFromResolved, resolveRepoIssueTarget } = require("./temporary_id.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTarget } = require("./safe_output_helpers.cjs");
@@ -351,10 +351,21 @@ async function main(config = {}) {
 
     // Check if item_number was explicitly provided in the message
     if (item.item_number !== undefined && item.item_number !== null) {
-      // Use the explicitly provided item_number
-      itemNumber = typeof item.item_number === "number" ? item.item_number : parseInt(String(item.item_number), 10);
+      // Resolve temporary IDs if present
+      const resolvedTarget = resolveRepoIssueTarget(item.item_number, temporaryIdMap, repoParts.owner, repoParts.repo);
 
-      if (isNaN(itemNumber) || itemNumber <= 0) {
+      // Check if this is an unresolved temporary ID
+      if (resolvedTarget.wasTemporaryId && !resolvedTarget.resolved) {
+        core.info(`Deferring add_comment: unresolved temporary ID (${item.item_number})`);
+        return {
+          success: false,
+          deferred: true,
+          error: resolvedTarget.errorMessage || `Unresolved temporary ID: ${item.item_number}`,
+        };
+      }
+
+      // Check for other resolution errors (including null resolved)
+      if (resolvedTarget.errorMessage || !resolvedTarget.resolved) {
         core.warning(`Invalid item_number specified: ${item.item_number}`);
         return {
           success: false,
@@ -362,6 +373,8 @@ async function main(config = {}) {
         };
       }
 
+      // Use the resolved issue number (safe to access because we checked above)
+      itemNumber = resolvedTarget.resolved.number;
       core.info(`Using explicitly provided item_number: #${itemNumber}`);
     } else {
       // Check if this is a discussion context

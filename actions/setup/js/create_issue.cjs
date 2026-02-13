@@ -305,7 +305,31 @@ async function main(config = {}) {
     }
 
     // Get or generate the temporary ID for this issue
-    const temporaryId = message.temporary_id ?? generateTemporaryId();
+    let temporaryId = generateTemporaryId();
+    if (message.temporary_id !== undefined && message.temporary_id !== null) {
+      if (typeof message.temporary_id !== "string") {
+        const error = `temporary_id must be a string (got ${typeof message.temporary_id})`;
+        core.warning(`Skipping issue: ${error}`);
+        return {
+          success: false,
+          error,
+        };
+      }
+
+      const rawTemporaryId = message.temporary_id.trim();
+      const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
+
+      if (!isTemporaryId(normalized)) {
+        const error = `Invalid temporary_id format: '${message.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`;
+        core.warning(`Skipping issue: ${error}`);
+        return {
+          success: false,
+          error,
+        };
+      }
+
+      temporaryId = normalized.toLowerCase();
+    }
     core.info(`Processing create_issue: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
 
     // Resolve parent: check if it's a temporary ID reference
@@ -329,7 +353,7 @@ async function main(config = {}) {
       } else {
         // Check if it looks like a malformed temporary ID
         if (parentWithoutHash.startsWith("aw_")) {
-          core.warning(`Invalid temporary ID format for parent: '${message.parent}'. Temporary IDs must be in format 'aw_' followed by exactly 12 hexadecimal characters (0-9, a-f). Example: 'aw_abc123def456'`);
+          core.warning(`Invalid temporary ID format for parent: '${message.parent}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`);
         } else {
           // It's a real issue number
           const parsed = parseInt(parentWithoutHash, 10);

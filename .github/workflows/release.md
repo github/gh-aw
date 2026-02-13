@@ -21,6 +21,7 @@ roles:
   - admin
   - maintainer
 engine: copilot
+strict: false
 timeout-minutes: 20
 network:
   allowed:

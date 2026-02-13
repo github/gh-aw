@@ -7,7 +7,7 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-strict: true
+strict: false
 engine: claude
 network: 
    allowed: [defaults, node, "api.github.com", "ghcr.io"]

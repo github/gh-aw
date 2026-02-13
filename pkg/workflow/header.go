@@ -57,7 +57,9 @@ func GenerateWorkflowHeader(sourceFile string, generatedBy string, customInstruc
 		header.WriteString("# To regenerate this workflow, run:\n")
 	}
 	header.WriteString("#   " + string(constants.CLIExtensionPrefix) + " compile\n")
-	header.WriteString("# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md\n")
+	header.WriteString("# Not all edits will cause changes to this file.\n")
+	header.WriteString("#\n")
+	header.WriteString("# For more information: https://github.github.com/gh-aw/introduction/overview/\n")
 
 	// Add custom instructions if provided
 	if customInstructions != "" {

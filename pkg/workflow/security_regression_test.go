@@ -560,6 +560,7 @@ on: push
 permissions:
   contents: read
 engine: copilot
+strict: false
 network:
   allowed:
     - example.com

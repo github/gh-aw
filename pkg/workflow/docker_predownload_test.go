@@ -81,6 +81,7 @@ Test workflow with custom MCP container.`,
 			frontmatter: `---
 on: issues
 engine: claude
+strict: false
 safe-outputs:
   create-issue:
 network:

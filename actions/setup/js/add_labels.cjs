@@ -29,7 +29,7 @@ async function main(config = {}) {
   }
   core.info(`Default target repo: ${defaultTargetRepo}`);
   if (allowedRepos.size > 0) {
-    core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
+    core.info(`Allowed repos: ${[...allowedRepos].join(", ")}`);
   }
 
   // Track how many items we've processed for max limit

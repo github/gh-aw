@@ -25,7 +25,7 @@ safe-outputs:
     max: 1
     close-older-discussions: true
 timeout-minutes: 20
-strict: true
+strict: false
 imports:
   - shared/mood.md
   - shared/mcp/arxiv.md

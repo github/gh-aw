@@ -17,7 +17,7 @@ permissions:
 name: Smoke Claude
 engine:
   id: claude
-  max-turns: 15
+  max-turns: 25
 strict: true
 imports:
   - shared/mcp-pagination.md

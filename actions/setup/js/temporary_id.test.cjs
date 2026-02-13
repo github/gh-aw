@@ -21,10 +21,10 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("generateTemporaryId", () => {
-    it("should generate an aw_ prefixed 12-character hex string", async () => {
+    it("should generate an aw_ prefixed 8-character alphanumeric string", async () => {
       const { generateTemporaryId } = await import("./temporary_id.cjs");
       const id = generateTemporaryId();
-      expect(id).toMatch(/^aw_[0-9a-f]{12}$/);
+      expect(id).toMatch(/^aw_[A-Za-z0-9]{8}$/);
     });
 
     it("should generate unique IDs", async () => {
@@ -38,23 +38,27 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("isTemporaryId", () => {
-    it("should return true for valid aw_ prefixed 12-char hex strings", async () => {
+    it("should return true for valid aw_ prefixed 3-8 char alphanumeric strings", async () => {
       const { isTemporaryId } = await import("./temporary_id.cjs");
-      expect(isTemporaryId("aw_abc123def456")).toBe(true);
-      expect(isTemporaryId("aw_000000000000")).toBe(true);
-      expect(isTemporaryId("aw_AABBCCDD1122")).toBe(true);
-      expect(isTemporaryId("aw_aAbBcCdDeEfF")).toBe(true);
+      expect(isTemporaryId("aw_abc")).toBe(true);
+      expect(isTemporaryId("aw_abc1")).toBe(true);
+      expect(isTemporaryId("aw_Test123")).toBe(true);
+      expect(isTemporaryId("aw_A1B2C3D4")).toBe(true);
+      expect(isTemporaryId("aw_12345678")).toBe(true);
+      expect(isTemporaryId("aw_ABCD")).toBe(true);
+      expect(isTemporaryId("aw_xyz9")).toBe(true);
+      expect(isTemporaryId("aw_xyz")).toBe(true);
     });
 
     it("should return false for invalid strings", async () => {
       const { isTemporaryId } = await import("./temporary_id.cjs");
       expect(isTemporaryId("abc123def456")).toBe(false); // Missing aw_ prefix
-      expect(isTemporaryId("aw_abc123")).toBe(false); // Too short
-      expect(isTemporaryId("aw_abc123def4567")).toBe(false); // Too long
-      expect(isTemporaryId("aw_parent123456")).toBe(false); // Contains non-hex chars
-      expect(isTemporaryId("aw_ghijklmnopqr")).toBe(false); // Non-hex letters
+      expect(isTemporaryId("aw_ab")).toBe(false); // Too short (2 chars)
+      expect(isTemporaryId("aw_123456789")).toBe(false); // Too long (9 chars)
+      expect(isTemporaryId("aw_test-id")).toBe(false); // Contains hyphen
+      expect(isTemporaryId("aw_id_123")).toBe(false); // Contains underscore
       expect(isTemporaryId("")).toBe(false);
-      expect(isTemporaryId("temp_abc123def456")).toBe(false); // Wrong prefix
+      expect(isTemporaryId("temp_abc123")).toBe(false); // Wrong prefix
     });
 
     it("should return false for non-string values", async () => {
@@ -69,63 +73,63 @@ describe("temporary_id.cjs", () => {
   describe("normalizeTemporaryId", () => {
     it("should convert to lowercase", async () => {
       const { normalizeTemporaryId } = await import("./temporary_id.cjs");
-      expect(normalizeTemporaryId("aw_ABC123DEF456")).toBe("aw_abc123def456");
-      expect(normalizeTemporaryId("AW_aAbBcCdDeEfF")).toBe("aw_aabbccddeeff");
+      expect(normalizeTemporaryId("aw_ABC123")).toBe("aw_abc123");
+      expect(normalizeTemporaryId("AW_Test123")).toBe("aw_test123");
     });
   });
 
   describe("replaceTemporaryIdReferences", () => {
     it("should replace #aw_ID with issue numbers (same repo)", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const text = "Check #aw_abc123def456 for details";
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const text = "Check #aw_abc123 for details";
       expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #100 for details");
     });
 
     it("should replace #aw_ID with full reference (cross-repo)", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "other/repo", number: 100 }]]);
-      const text = "Check #aw_abc123def456 for details";
+      const map = new Map([["aw_abc123", { repo: "other/repo", number: 100 }]]);
+      const text = "Check #aw_abc123 for details";
       expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check other/repo#100 for details");
     });
 
     it("should handle multiple references", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
       const map = new Map([
-        ["aw_abc123def456", { repo: "owner/repo", number: 100 }],
-        ["aw_111222333444", { repo: "owner/repo", number: 200 }],
+        ["aw_abc123", { repo: "owner/repo", number: 100 }],
+        ["aw_test123", { repo: "owner/repo", number: 200 }],
       ]);
-      const text = "See #aw_abc123def456 and #aw_111222333444";
+      const text = "See #aw_abc123 and #aw_Test123";
       expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("See #100 and #200");
     });
 
     it("should preserve unresolved references", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
       const map = new Map();
-      const text = "Check #aw_000000000000 for details";
-      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_000000000000 for details");
+      const text = "Check #aw_abc123 for details";
+      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_abc123 for details");
     });
 
     it("should be case-insensitive", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const text = "Check #AW_ABC123DEF456 for details";
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const text = "Check #AW_ABC123 for details";
       expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #100 for details");
     });
 
     it("should not match invalid temporary ID formats", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const text = "Check #aw_abc123 and #temp:abc123def456 for details";
-      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_abc123 and #temp:abc123def456 for details");
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const text = "Check #aw_ab and #temp:abc123 for details";
+      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_ab and #temp:abc123 for details");
     });
   });
 
   describe("replaceTemporaryIdReferencesLegacy", () => {
     it("should replace #aw_ID with issue numbers", async () => {
       const { replaceTemporaryIdReferencesLegacy } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", 100]]);
-      const text = "Check #aw_abc123def456 for details";
+      const map = new Map([["aw_abc123", 100]]);
+      const text = "Check #aw_abc123 for details";
       expect(replaceTemporaryIdReferencesLegacy(text, map)).toBe("Check #100 for details");
     });
   });
@@ -145,31 +149,31 @@ describe("temporary_id.cjs", () => {
     });
 
     it("should parse legacy format (number only)", async () => {
-      process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({ aw_abc123def456: 100, aw_111222333444: 200 });
+      process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({ aw_abc123: 100, aw_test123: 200 });
       const { loadTemporaryIdMap } = await import("./temporary_id.cjs");
       const map = loadTemporaryIdMap();
       expect(map.size).toBe(2);
-      expect(map.get("aw_abc123def456")).toEqual({ repo: "testowner/testrepo", number: 100 });
-      expect(map.get("aw_111222333444")).toEqual({ repo: "testowner/testrepo", number: 200 });
+      expect(map.get("aw_abc123")).toEqual({ repo: "testowner/testrepo", number: 100 });
+      expect(map.get("aw_test123")).toEqual({ repo: "testowner/testrepo", number: 200 });
     });
 
     it("should parse new format (repo, number)", async () => {
       process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({
-        aw_abc123def456: { repo: "owner/repo", number: 100 },
-        aw_111222333444: { repo: "other/repo", number: 200 },
+        aw_abc123: { repo: "owner/repo", number: 100 },
+        aw_test123: { repo: "other/repo", number: 200 },
       });
       const { loadTemporaryIdMap } = await import("./temporary_id.cjs");
       const map = loadTemporaryIdMap();
       expect(map.size).toBe(2);
-      expect(map.get("aw_abc123def456")).toEqual({ repo: "owner/repo", number: 100 });
-      expect(map.get("aw_111222333444")).toEqual({ repo: "other/repo", number: 200 });
+      expect(map.get("aw_abc123")).toEqual({ repo: "owner/repo", number: 100 });
+      expect(map.get("aw_test123")).toEqual({ repo: "other/repo", number: 200 });
     });
 
     it("should normalize keys to lowercase", async () => {
-      process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({ AW_ABC123DEF456: { repo: "owner/repo", number: 100 } });
+      process.env.GH_AW_TEMPORARY_ID_MAP = JSON.stringify({ AW_ABC123: { repo: "owner/repo", number: 100 } });
       const { loadTemporaryIdMap } = await import("./temporary_id.cjs");
       const map = loadTemporaryIdMap();
-      expect(map.get("aw_abc123def456")).toEqual({ repo: "owner/repo", number: 100 });
+      expect(map.get("aw_abc123")).toEqual({ repo: "owner/repo", number: 100 });
     });
 
     it("should warn and return empty map on invalid JSON", async () => {
@@ -202,8 +206,8 @@ describe("temporary_id.cjs", () => {
 
     it("should resolve temporary ID from map", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const result = resolveIssueNumber("aw_abc123def456", map);
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const result = resolveIssueNumber("aw_abc123", map);
       expect(result.resolved).toEqual({ repo: "owner/repo", number: 100 });
       expect(result.wasTemporaryId).toBe(true);
       expect(result.errorMessage).toBe(null);
@@ -212,10 +216,10 @@ describe("temporary_id.cjs", () => {
     it("should return error for unresolved temporary ID", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("aw_abc123def456", map);
+      const result = resolveIssueNumber("aw_abc123", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(true);
-      expect(result.errorMessage).toContain("Temporary ID 'aw_abc123def456' not found in map");
+      expect(result.errorMessage).toContain("Temporary ID 'aw_abc123' not found in map");
     });
 
     it("should handle numeric issue numbers", async () => {
@@ -263,41 +267,41 @@ describe("temporary_id.cjs", () => {
       expect(result.errorMessage).toContain("Invalid issue number: -5");
     });
 
-    it("should return specific error for malformed temporary ID (contains non-hex chars)", async () => {
+    it("should return specific error for malformed temporary ID (contains non-alphanumeric chars)", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("aw_d0c5b3e1n3r5", map);
+      const result = resolveIssueNumber("aw_test-id", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
-      expect(result.errorMessage).toContain("aw_d0c5b3e1n3r5");
-      expect(result.errorMessage).toContain("12 hexadecimal characters");
+      expect(result.errorMessage).toContain("aw_test-id");
+      expect(result.errorMessage).toContain("3 to 8 alphanumeric characters");
     });
 
     it("should return specific error for malformed temporary ID (too short)", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("aw_abc123", map);
+      const result = resolveIssueNumber("aw_ab", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
-      expect(result.errorMessage).toContain("aw_abc123");
+      expect(result.errorMessage).toContain("aw_ab");
     });
 
     it("should return specific error for malformed temporary ID (too long)", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("aw_abc123def4567890", map);
+      const result = resolveIssueNumber("aw_abc123456789", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
-      expect(result.errorMessage).toContain("aw_abc123def4567890");
+      expect(result.errorMessage).toContain("aw_abc123456789");
     });
 
     it("should handle temporary ID with # prefix", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const result = resolveIssueNumber("#aw_abc123def456", map);
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const result = resolveIssueNumber("#aw_abc123", map);
       expect(result.resolved).toEqual({ repo: "owner/repo", number: 100 });
       expect(result.wasTemporaryId).toBe(true);
       expect(result.errorMessage).toBe(null);
@@ -315,11 +319,11 @@ describe("temporary_id.cjs", () => {
     it("should handle malformed temporary ID with # prefix", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("#aw_d0c5b3e1n3r5", map);
+      const result = resolveIssueNumber("#aw_test-id", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
-      expect(result.errorMessage).toContain("#aw_d0c5b3e1n3r5");
+      expect(result.errorMessage).toContain("#aw_test-id");
     });
   });
 
@@ -327,14 +331,14 @@ describe("temporary_id.cjs", () => {
     it("should serialize map to JSON", async () => {
       const { serializeTemporaryIdMap } = await import("./temporary_id.cjs");
       const map = new Map([
-        ["aw_abc123def456", { repo: "owner/repo", number: 100 }],
-        ["aw_111222333444", { repo: "other/repo", number: 200 }],
+        ["aw_abc123", { repo: "owner/repo", number: 100 }],
+        ["aw_test123", { repo: "other/repo", number: 200 }],
       ]);
       const result = serializeTemporaryIdMap(map);
       const parsed = JSON.parse(result);
       expect(parsed).toEqual({
-        aw_abc123def456: { repo: "owner/repo", number: 100 },
-        aw_111222333444: { repo: "other/repo", number: 200 },
+        aw_abc123: { repo: "owner/repo", number: 100 },
+        aw_test123: { repo: "other/repo", number: 200 },
       });
     });
   });
@@ -349,40 +353,40 @@ describe("temporary_id.cjs", () => {
     it("should return false when all temporary IDs are resolved", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
       const map = new Map([
-        ["aw_abc123def456", { repo: "owner/repo", number: 100 }],
-        ["aw_111222333444", { repo: "other/repo", number: 200 }],
+        ["aw_abc123", { repo: "owner/repo", number: 100 }],
+        ["aw_test123", { repo: "other/repo", number: 200 }],
       ]);
-      const text = "See #aw_abc123def456 and #aw_111222333444 for details";
+      const text = "See #aw_abc123 and #aw_Test123 for details";
       expect(hasUnresolvedTemporaryIds(text, map)).toBe(false);
     });
 
     it("should return true when text has unresolved temporary IDs", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const text = "See #aw_abc123def456 and #aw_999888777666 for details";
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const text = "See #aw_abc123 and #aw_unresol for details";
       expect(hasUnresolvedTemporaryIds(text, map)).toBe(true);
     });
 
     it("should return true when text has only unresolved temporary IDs", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
       const map = new Map();
-      const text = "Check #aw_abc123def456 for details";
+      const text = "Check #aw_abc123 for details";
       expect(hasUnresolvedTemporaryIds(text, map)).toBe(true);
     });
 
     it("should work with plain object tempIdMap", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
       const obj = {
-        aw_abc123def456: { repo: "owner/repo", number: 100 },
+        aw_abc123: { repo: "owner/repo", number: 100 },
       };
-      const text = "See #aw_abc123def456 and #aw_999888777666 for details";
+      const text = "See #aw_abc123 and #aw_unresol for details";
       expect(hasUnresolvedTemporaryIds(text, obj)).toBe(true);
     });
 
     it("should handle case-insensitive temporary IDs", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", { repo: "owner/repo", number: 100 }]]);
-      const text = "See #AW_ABC123DEF456 for details";
+      const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
+      const text = "See #AW_ABC123 for details";
       expect(hasUnresolvedTemporaryIds(text, map)).toBe(false);
     });
 
@@ -397,7 +401,7 @@ describe("temporary_id.cjs", () => {
     it("should handle multiple unresolved IDs", async () => {
       const { hasUnresolvedTemporaryIds } = await import("./temporary_id.cjs");
       const map = new Map();
-      const text = "See #aw_abc123def456, #aw_111222333444, and #aw_999888777666";
+      const text = "See #aw_abc123, #aw_test123, and #aw_xyz9";
       expect(hasUnresolvedTemporaryIds(text, map)).toBe(true);
     });
   });
@@ -405,32 +409,32 @@ describe("temporary_id.cjs", () => {
   describe("replaceTemporaryProjectReferences", () => {
     it("should replace #aw_ID with project URLs", async () => {
       const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", "https://github.com/orgs/myorg/projects/123"]]);
-      const text = "Project created: #aw_abc123def456";
+      const map = new Map([["aw_abc123", "https://github.com/orgs/myorg/projects/123"]]);
+      const text = "Project created: #aw_abc123";
       expect(replaceTemporaryProjectReferences(text, map)).toBe("Project created: https://github.com/orgs/myorg/projects/123");
     });
 
     it("should handle multiple project references", async () => {
       const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
       const map = new Map([
-        ["aw_abc123def456", "https://github.com/orgs/myorg/projects/123"],
-        ["aw_111222333444", "https://github.com/orgs/myorg/projects/456"],
+        ["aw_abc123", "https://github.com/orgs/myorg/projects/123"],
+        ["aw_test123", "https://github.com/orgs/myorg/projects/456"],
       ]);
-      const text = "See #aw_abc123def456 and #aw_111222333444";
+      const text = "See #aw_abc123 and #aw_Test123";
       expect(replaceTemporaryProjectReferences(text, map)).toBe("See https://github.com/orgs/myorg/projects/123 and https://github.com/orgs/myorg/projects/456");
     });
 
     it("should leave unresolved project references unchanged", async () => {
       const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", "https://github.com/orgs/myorg/projects/123"]]);
-      const text = "See #aw_unresolved";
-      expect(replaceTemporaryProjectReferences(text, map)).toBe("See #aw_unresolved");
+      const map = new Map([["aw_abc123", "https://github.com/orgs/myorg/projects/123"]]);
+      const text = "See #aw_unresol";
+      expect(replaceTemporaryProjectReferences(text, map)).toBe("See #aw_unresol");
     });
 
     it("should be case insensitive", async () => {
       const { replaceTemporaryProjectReferences } = await import("./temporary_id.cjs");
-      const map = new Map([["aw_abc123def456", "https://github.com/orgs/myorg/projects/123"]]);
-      const text = "Project: #AW_ABC123DEF456";
+      const map = new Map([["aw_abc123", "https://github.com/orgs/myorg/projects/123"]]);
+      const text = "Project: #AW_ABC123";
       expect(replaceTemporaryProjectReferences(text, map)).toBe("Project: https://github.com/orgs/myorg/projects/123");
     });
   });
@@ -445,23 +449,23 @@ describe("temporary_id.cjs", () => {
 
     it("should load project map from environment", async () => {
       process.env.GH_AW_TEMPORARY_PROJECT_MAP = JSON.stringify({
-        aw_abc123def456: "https://github.com/orgs/myorg/projects/123",
-        aw_111222333444: "https://github.com/users/jdoe/projects/456",
+        aw_abc123: "https://github.com/orgs/myorg/projects/123",
+        aw_test123: "https://github.com/users/jdoe/projects/456",
       });
       const { loadTemporaryProjectMap } = await import("./temporary_id.cjs");
       const map = loadTemporaryProjectMap();
       expect(map.size).toBe(2);
-      expect(map.get("aw_abc123def456")).toBe("https://github.com/orgs/myorg/projects/123");
-      expect(map.get("aw_111222333444")).toBe("https://github.com/users/jdoe/projects/456");
+      expect(map.get("aw_abc123")).toBe("https://github.com/orgs/myorg/projects/123");
+      expect(map.get("aw_test123")).toBe("https://github.com/users/jdoe/projects/456");
     });
 
     it("should normalize keys to lowercase", async () => {
       process.env.GH_AW_TEMPORARY_PROJECT_MAP = JSON.stringify({
-        AW_ABC123DEF456: "https://github.com/orgs/myorg/projects/123",
+        AW_ABC123: "https://github.com/orgs/myorg/projects/123",
       });
       const { loadTemporaryProjectMap } = await import("./temporary_id.cjs");
       const map = loadTemporaryProjectMap();
-      expect(map.get("aw_abc123def456")).toBe("https://github.com/orgs/myorg/projects/123");
+      expect(map.get("aw_abc123")).toBe("https://github.com/orgs/myorg/projects/123");
     });
   });
 
@@ -472,14 +476,14 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "create_issue",
         title: "Test Issue",
-        body: "See #aw_abc123def456 and #aw_111222333444 for details",
+        body: "See #aw_abc123 and #aw_test123 for details",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(2);
-      expect(refs.has("aw_abc123def456")).toBe(true);
-      expect(refs.has("aw_111222333444")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
+      expect(refs.has("aw_test123")).toBe(true);
     });
 
     it("should extract temporary IDs from title field", async () => {
@@ -487,14 +491,14 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        title: "Follow up to #aw_abc123def456",
+        title: "Follow up to #aw_abc123",
         body: "Details here",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract temporary IDs from direct ID fields", async () => {
@@ -502,15 +506,15 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "link_sub_issue",
-        parent_issue_number: "aw_aaaaaa123456",
-        sub_issue_number: "aw_bbbbbb123456",
+        parent_issue_number: "aw_aaaa12",
+        sub_issue_number: "aw_bbbb12",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(2);
-      expect(refs.has("aw_aaaaaa123456")).toBe(true);
-      expect(refs.has("aw_bbbbbb123456")).toBe(true);
+      expect(refs.has("aw_aaaa12")).toBe(true);
+      expect(refs.has("aw_bbbb12")).toBe(true);
     });
 
     it("should handle # prefix in ID fields", async () => {
@@ -518,14 +522,14 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "add_comment",
-        issue_number: "#aw_abc123def456",
+        issue_number: "#aw_abc123",
         body: "Comment text",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should normalize temporary IDs to lowercase", async () => {
@@ -533,13 +537,13 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        body: "See #AW_ABC123DEF456",
+        body: "See #AW_ABC123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract from items array for bulk operations", async () => {
@@ -548,16 +552,16 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "add_comment",
         items: [
-          { issue_number: "aw_dddddd111111", body: "Comment 1" },
-          { issue_number: "aw_eeeeee222222", body: "Comment 2" },
+          { issue_number: "aw_dddd11", body: "Comment 1" },
+          { issue_number: "aw_eeee22", body: "Comment 2" },
         ],
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(2);
-      expect(refs.has("aw_dddddd111111")).toBe(true);
-      expect(refs.has("aw_eeeeee222222")).toBe(true);
+      expect(refs.has("aw_dddd11")).toBe(true);
+      expect(refs.has("aw_eeee22")).toBe(true);
     });
 
     it("should return empty set for messages without temp IDs", async () => {
@@ -580,13 +584,13 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "create_project",
         title: "Test Project",
-        item_url: "https://github.com/owner/repo/issues/aw_abc123def456",
+        item_url: "https://github.com/owner/repo/issues/aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract temporary IDs from item_url field (with # prefix)", async () => {
@@ -595,13 +599,13 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "create_project",
         title: "Test Project",
-        item_url: "https://github.com/owner/repo/issues/#aw_abc123def456",
+        item_url: "https://github.com/owner/repo/issues/#aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract temporary IDs from item_url field (plain ID format)", async () => {
@@ -610,13 +614,13 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "create_project",
         title: "Test Project",
-        item_url: "aw_abc123def456",
+        item_url: "aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract temporary IDs from item_url field (plain ID with # prefix)", async () => {
@@ -625,13 +629,13 @@ describe("temporary_id.cjs", () => {
       const message = {
         type: "create_project",
         title: "Test Project",
-        item_url: "#aw_abc123def456",
+        item_url: "#aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should not extract from item_url with regular issue number", async () => {
@@ -655,13 +659,13 @@ describe("temporary_id.cjs", () => {
         type: "update_project",
         project: "https://github.com/orgs/myorg/projects/1",
         content_type: "issue",
-        content_number: "aw_abc123def456",
+        content_number: "aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should extract temporary IDs from content_number field (with # prefix)", async () => {
@@ -671,13 +675,13 @@ describe("temporary_id.cjs", () => {
         type: "update_project",
         project: "https://github.com/orgs/myorg/projects/1",
         content_type: "issue",
-        content_number: "#aw_abc123def456",
+        content_number: "#aw_abc123",
       };
 
       const refs = extractTemporaryIdReferences(message);
 
       expect(refs.size).toBe(1);
-      expect(refs.has("aw_abc123def456")).toBe(true);
+      expect(refs.has("aw_abc123")).toBe(true);
     });
 
     it("should ignore invalid temporary ID formats", async () => {
@@ -685,7 +689,7 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        body: "Invalid: #aw_short #aw_toolongxxxxxxxx #temp_123456789012",
+        body: "Invalid: #aw_a #aw- #temp_123456",
       };
 
       const refs = extractTemporaryIdReferences(message);
@@ -700,13 +704,13 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        temporary_id: "aw_abc123def456",
+        temporary_id: "aw_abc123",
         title: "Test",
       };
 
       const created = getCreatedTemporaryId(message);
 
-      expect(created).toBe("aw_abc123def456");
+      expect(created).toBe("aw_abc123");
     });
 
     it("should normalize created temporary ID to lowercase", async () => {
@@ -714,13 +718,13 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        temporary_id: "AW_ABC123DEF456",
+        temporary_id: "AW_ABC123",
         title: "Test",
       };
 
       const created = getCreatedTemporaryId(message);
 
-      expect(created).toBe("aw_abc123def456");
+      expect(created).toBe("aw_abc123");
     });
 
     it("should return null when temporary_id is missing", async () => {

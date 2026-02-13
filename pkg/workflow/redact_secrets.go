@@ -22,6 +22,7 @@ func escapeSingleQuote(s string) string {
 // CollectSecretReferences extracts all secret references from the workflow YAML
 // This scans for patterns like ${{ secrets.SECRET_NAME }} or secrets.SECRET_NAME
 func CollectSecretReferences(yamlContent string) []string {
+	secretMaskingLog.Printf("Scanning workflow YAML (%d bytes) for secret references", len(yamlContent))
 	secretsMap := make(map[string]bool)
 
 	// Pattern to match ${{ secrets.SECRET_NAME }} or secrets.SECRET_NAME
@@ -44,6 +45,8 @@ func CollectSecretReferences(yamlContent string) []string {
 	// Sort for consistent output
 	SortStrings(secrets)
 
+	secretMaskingLog.Printf("Found %d unique secret reference(s) in workflow", len(secrets))
+
 	return secrets
 }
 
@@ -59,11 +62,13 @@ func (c *Compiler) generateSecretRedactionStep(yaml *strings.Builder, yamlConten
 	// If no secrets found, we still generate the step but it will be a no-op at runtime
 	// This ensures consistent step ordering and validation
 	if len(secretReferences) == 0 {
+		secretMaskingLog.Print("No secrets found, generating no-op redaction step")
 		// Generate a minimal no-op redaction step for validation purposes
 		yaml.WriteString("      - name: Redact secrets in logs\n")
 		yaml.WriteString("        if: always()\n")
 		yaml.WriteString("        run: echo 'No secrets to redact'\n")
 	} else {
+		secretMaskingLog.Printf("Generating redaction step for %d secret(s)", len(secretReferences))
 		yaml.WriteString("      - name: Redact secrets in logs\n")
 		yaml.WriteString("        if: always()\n")
 		fmt.Fprintf(yaml, "        uses: %s\n", GetActionPin("actions/github-script"))

@@ -79,8 +79,8 @@ func parseLabelTriggerShorthand(input string) (entityType string, labelNames []s
 
 // expandLabelTriggerShorthand takes an entity type and label names and returns a map that represents
 // the expanded label trigger + workflow_dispatch configuration with item_number input.
-// Note: For discussion events, GitHub Actions doesn't support the `names` field,
-// so we use the native label filter marker but the names will be filtered via job conditions.
+// Note: GitHub Actions doesn't support native label filtering for any event type,
+// so all labels are filtered via job conditions using the internal `names` field.
 func expandLabelTriggerShorthand(entityType string, labelNames []string) map[string]any {
 	// Create the trigger configuration based on entity type
 	var triggerKey string
@@ -96,20 +96,17 @@ func expandLabelTriggerShorthand(entityType string, labelNames []string) map[str
 	}
 
 	// Build the trigger configuration
-	// Add a marker to indicate this uses native GitHub Actions label filtering
-	// (not job condition filtering), so names should not be commented out
-	// Note: For discussion events, GitHub Actions doesn't support names field,
-	// so we don't include it but still use the marker to indicate shorthand expansion
+	// GitHub Actions doesn't support native label filtering for any event type,
+	// so we use the `names` field (internal representation) for job condition filtering
 	triggerConfig := map[string]any{
 		"types": []any{"labeled"},
 	}
 
-	// Only add names field for issues and pull_request (GitHub Actions supports it)
-	// For discussions, names field is not supported by GitHub Actions
-	if entityType == "issues" || entityType == "pull_request" {
-		triggerConfig["names"] = labelNames
-		triggerConfig["__gh_aw_native_label_filter__"] = true // Marker to prevent commenting out names
-	}
+	// Add label names for filtering
+	// All event types use `names` field for job condition filtering
+	// The `names` field is an internal representation for job condition generation
+	// and won't be rendered in the final GitHub Actions YAML for these event types
+	triggerConfig["names"] = labelNames
 
 	// Create workflow_dispatch with item_number input
 	workflowDispatchConfig := map[string]any{

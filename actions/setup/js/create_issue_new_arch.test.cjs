@@ -123,7 +123,7 @@ describe("create_issue.cjs (New Handler Factory Architecture)", () => {
     const result = await handler(message, {});
 
     expect(result.temporaryId).toBeTruthy();
-    expect(result.temporaryId).toMatch(/^aw_[0-9a-f]{12}$/i);
+    expect(result.temporaryId).toMatch(/^aw_[A-Za-z0-9]{4,8}$/i);
   });
 
   it("should use provided temporary ID if available", async () => {
@@ -134,12 +134,12 @@ describe("create_issue.cjs (New Handler Factory Architecture)", () => {
       type: "create_issue",
       title: "Test",
       body: "Test",
-      temporary_id: "aw_aabbccdd1122",
+      temporary_id: "aw_aabbcc",
     };
 
     const result = await handler(message, {});
 
-    expect(result.temporaryId).toBe("aw_aabbccdd1122");
+    expect(result.temporaryId).toBe("aw_aabbcc");
   });
 
   it("should resolve parent temporary ID from resolvedTemporaryIds", async () => {
@@ -150,18 +150,18 @@ describe("create_issue.cjs (New Handler Factory Architecture)", () => {
       type: "create_issue",
       title: "Child Issue",
       body: "This is a child issue",
-      parent: "aw_aabbccdd1122",
+      parent: "aw_aabbcc",
     };
 
     const resolvedIds = {
-      aw_aabbccdd1122: { repo: "testowner/testrepo", number: 100 },
+      aw_aabbcc: { repo: "testowner/testrepo", number: 100 },
     };
 
     await handler(message, resolvedIds);
 
     const callArgs = mockGithub.rest.issues.create.mock.calls[0][0];
     expect(callArgs.body).toContain("Related to #100");
-    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved parent temporary ID 'aw_aabbccdd1122' to testowner/testrepo#100"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Resolved parent temporary ID 'aw_aabbcc' to testowner/testrepo#100"));
   });
 
   it("should handle disabled issues repository gracefully", async () => {

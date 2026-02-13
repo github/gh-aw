@@ -340,7 +340,7 @@ const DefaultCodexVersion Version = "0.101.0"
 const DefaultGitHubMCPServerVersion Version = "v0.30.3"
 
 // DefaultFirewallVersion is the default version of the gh-aw-firewall (AWF) binary
-const DefaultFirewallVersion Version = "v0.16.2"
+const DefaultFirewallVersion Version = "v0.16.4"
 
 // DefaultMCPGatewayVersion is the default version of the MCP Gateway (gh-aw-mcpg) Docker image
 const DefaultMCPGatewayVersion Version = "v0.1.4"
@@ -599,6 +599,8 @@ const (
 	SandboxRuntimeFeatureFlag FeatureFlag = "sandbox-runtime"
 	// DangerousPermissionsWriteFeatureFlag is the feature flag name for allowing write permissions
 	DangerousPermissionsWriteFeatureFlag FeatureFlag = "dangerous-permissions-write"
+	// DisableXPIAPromptFeatureFlag is the feature flag name for disabling XPIA prompt
+	DisableXPIAPromptFeatureFlag FeatureFlag = "disable-xpia-prompt"
 )
 
 // Step IDs for pre-activation job

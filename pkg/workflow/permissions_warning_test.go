@@ -49,11 +49,6 @@ tools:
 on: push
 permissions:
   contents: read
-engine: copilot
-strict: false
-network:
-  allowed:
-    - "api.example.com"
 tools:
   github:
     toolsets: [repos, issues]
@@ -95,11 +90,6 @@ on: push
 permissions:
   contents: read
   issues: read
-engine: copilot
-strict: false
-network:
-  allowed:
-    - "api.example.com"
 tools:
   github:
     toolsets: [repos, issues]

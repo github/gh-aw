@@ -1531,7 +1531,7 @@ describe("collect_ndjson_output.cjs", () => {
         }),
         it("should validate assign_to_agent with temporary_id issue_number", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
-            ndjsonContent = '{"type": "assign_to_agent", "issue_number": "aw_abc123def456"}';
+            ndjsonContent = '{"type": "assign_to_agent", "issue_number": "aw_abc123"}';
           (fs.writeFileSync(testFile, ndjsonContent), (process.env.GH_AW_SAFE_OUTPUTS = testFile));
           const __config = '{"assign_to_agent": true}',
             configPath = "/opt/gh-aw/safeoutputs/config.json";
@@ -1540,7 +1540,7 @@ describe("collect_ndjson_output.cjs", () => {
             outputCall = setOutputCalls.find(call => "output" === call[0]);
           expect(outputCall).toBeDefined();
           const parsedOutput = JSON.parse(outputCall[1]);
-          (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].issue_number).toBe("aw_abc123def456"), expect(parsedOutput.errors).toHaveLength(0));
+          (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].issue_number).toBe("aw_abc123"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should validate assign_to_agent with optional fields", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",
@@ -1591,7 +1591,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].type).toBe("link_sub_issue"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should accept temporary ID (aw_ prefix) for parent_issue_number", async () => {
-          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_abc123def456", sub_issue_number: 50 }),
+          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_abc123", sub_issue_number: 50 }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-temp-id.txt";
           (fs.writeFileSync(outputPath, testInput), (process.env.GH_AW_SAFE_OUTPUTS = outputPath), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const failedCalls = mockCore.setFailed.mock.calls;
@@ -1603,7 +1603,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].type).toBe("link_sub_issue"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should accept temporary ID (aw_ prefix) for sub_issue_number", async () => {
-          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: 100, sub_issue_number: "aw_123456abcdef" }),
+          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: 100, sub_issue_number: "aw_12345678" }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-temp-id-sub.txt";
           (fs.writeFileSync(outputPath, testInput), (process.env.GH_AW_SAFE_OUTPUTS = outputPath), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const failedCalls = mockCore.setFailed.mock.calls;
@@ -1615,7 +1615,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].type).toBe("link_sub_issue"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should accept temporary IDs for both parent and sub issue numbers", async () => {
-          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_abc123def456", sub_issue_number: "aw_fedcba654321" }),
+          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_abc123", sub_issue_number: "aw_fedcba65" }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-both-temp-ids.txt";
           (fs.writeFileSync(outputPath, testInput), (process.env.GH_AW_SAFE_OUTPUTS = outputPath), await eval(`(async () => { ${collectScript}; await main(); })()`));
           const failedCalls = mockCore.setFailed.mock.calls;
@@ -1627,7 +1627,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(1), expect(parsedOutput.items[0].type).toBe("link_sub_issue"), expect(parsedOutput.errors).toHaveLength(0));
         }),
         it("should reject invalid temporary ID format (wrong length)", async () => {
-          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_short", sub_issue_number: 50 }),
+          const testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: "aw_ab", sub_issue_number: 50 }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-invalid-temp-id.txt";
           (fs.writeFileSync(outputPath, testInput),
             (process.env.GH_AW_SAFE_OUTPUTS = outputPath),
@@ -1641,7 +1641,7 @@ describe("collect_ndjson_output.cjs", () => {
           (expect(parsedOutput.items).toHaveLength(0), expect(parsedOutput.errors.length).toBeGreaterThan(0), expect(parsedOutput.errors.some(e => e.includes("must be a positive integer or temporary ID"))).toBe(!0));
         }),
         it("should reject same temporary ID for parent and sub", async () => {
-          const sameId = "aw_abc123def456",
+          const sameId = "aw_abc123",
             testInput = JSON.stringify({ type: "link_sub_issue", parent_issue_number: sameId, sub_issue_number: sameId }),
             outputPath = "/tmp/gh-aw/test-link-sub-issue-same-temp-ids.txt";
           (fs.writeFileSync(outputPath, testInput),

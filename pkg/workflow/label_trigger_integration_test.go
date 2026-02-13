@@ -48,10 +48,11 @@ func TestLabelTriggerIntegrationSimple(t *testing.T) {
 		t.Errorf("issues.names = %v, want [bug enhancement]", names)
 	}
 
-	// Check that the native filter marker is present
-	nativeFilter, ok := issues["__gh_aw_native_label_filter__"].(bool)
-	if !ok || !nativeFilter {
-		t.Errorf("__gh_aw_native_label_filter__ = %v, want true", nativeFilter)
+	// Check that the native filter marker is NOT present
+	// (GitHub Actions doesn't support native label filtering for issues)
+	_, hasMarker := issues["__gh_aw_native_label_filter__"]
+	if hasMarker {
+		t.Errorf("__gh_aw_native_label_filter__ should not be present (no native label filtering support)")
 	}
 
 	// Check workflow_dispatch exists

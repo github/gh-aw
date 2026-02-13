@@ -46,6 +46,7 @@ func NewCopilotEngine() *CopilotEngine {
 			supportsWebSearch:      false, // Copilot CLI does not have built-in web-search support
 			supportsFirewall:       true,  // Copilot supports network firewalling via AWF
 			supportsPlugins:        true,  // Copilot supports plugin installation
+			supportsLLMGateway:     false, // Copilot does not support LLM gateway
 		},
 	}
 }

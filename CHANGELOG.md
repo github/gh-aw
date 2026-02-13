@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## v0.40.1 - 2026-02-03
 
+### Move from githubnext/gh-aw to github/gh-aw
+
+If you were a former user of the githubnext Agentic Workflows you might have to **re-register** the extension to reflect the new location.
+As the gh-aw project moved from githubnext to github please delete the old channel and register the new one. 
+
+Example:
+```text wrap
+gh extension list
+NAME   REPO              VERSION
+gh aw  githubnext/gh-aw  v0.36.0
+
+gh extension upgrade --all
+[aw]: already up to date
+
+
+gh extension remove gh-aw
+
+gh extension install github/gh-aw
+✓ Installed extension github/gh-aw
+
+gh extension list
+NAME   REPO          VERSION
+gh aw  github/gh-aw  v0.40.1
+```
+
 ### Bug Fixes
 
 #### Handle 502 Bad Gateway errors in assign_to_agent handler by treating them as success. The cloud gateway may return 502 errors during agent assignment, but the assignment typically succeeds despite the error. The handler now logs 502 errors for troubleshooting but does not fail the workflow.
