@@ -247,11 +247,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -276,11 +277,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -305,11 +307,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -377,11 +380,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );

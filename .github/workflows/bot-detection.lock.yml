@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 5a2aa2efd24123412162d29a03e86cd5d7708172ea7fc071192e38713f6d3537
+# frontmatter-hash: 2178e3732b12824d02944782c3e73dbab22b3c402a400b320ac94f7f77cdb68d
 
 name: "Bot Detection"
 "on":
@@ -1220,11 +1220,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -1249,11 +1250,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -1278,11 +1280,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
@@ -1350,11 +1353,12 @@ jobs:
                       done();
                       return [];
                     }
-                    total += response.data.length;
-                    if (total >= 500) {
+                    if (total + response.data.length >= 500) {
+                      total = 500;
                       done();
                       return response.data.slice(0, remaining);
                     }
+                    total += response.data.length;
                     return response.data;
                   }
                 );
