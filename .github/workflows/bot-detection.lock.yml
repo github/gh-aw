@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 4c52fe089425a05e8f0c3eb417d76791e70457a80961e818e7ab24ce0b7eb5f1
+# frontmatter-hash: f54859bebf7a13ba4572c7b7a7517c28034a4b338ff8332d2a311c31a425daa4
 
 name: "Bot Detection"
 "on":
@@ -1018,10 +1018,6 @@ jobs:
               return new Date(d).toISOString();
             }
 
-            function safeLower(s) {
-              return (s || "").toString().toLowerCase();
-            }
-
             function normalizeForDup(s) {
               return (s || "")
                 .toString()
@@ -1285,7 +1281,7 @@ jobs:
             }
 
             // PR file touches (sensitive paths) - deterministic and bounded
-            for (const it of items.filter(i => i.is_pr)) {
+            for (const it of prItems) {
               const login = it.author;
               if (!login) continue;
               const s = ensureAuthor(login);
