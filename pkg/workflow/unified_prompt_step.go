@@ -220,6 +220,13 @@ func removeConsecutiveEmptyLines(content string) string {
 func (c *Compiler) collectPromptSections(data *WorkflowData) []PromptSection {
 	var sections []PromptSection
 
+	// 0. XPia instructions
+	unifiedPromptLog.Print("Adding XPIA section")
+	sections = append(sections, PromptSection{
+		Content: xpiaPromptFile,
+		IsFile:  true,
+	})
+
 	// 1. Temporary folder instructions (always included)
 	unifiedPromptLog.Print("Adding temp folder section")
 	sections = append(sections, PromptSection{

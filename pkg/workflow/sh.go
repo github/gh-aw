@@ -17,6 +17,7 @@ const (
 	tempFolderPromptFile       = "temp_folder_prompt.md"
 	playwrightPromptFile       = "playwright_prompt.md"
 	markdownPromptFile         = "markdown.md"
+	xpiaPromptFile             = "xpia.md"
 	cacheMemoryPromptFile      = "cache_memory_prompt.md"
 	cacheMemoryPromptMultiFile = "cache_memory_prompt_multi.md"
 )
