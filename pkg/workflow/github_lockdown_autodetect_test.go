@@ -99,7 +99,7 @@ Test that remote mode uses automatic detection when lockdown not specified.
 		},
 	}
 
-		for _, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary directory for test
 			tmpDir, err := os.MkdirTemp("", "lockdown-autodetect-test-*")
