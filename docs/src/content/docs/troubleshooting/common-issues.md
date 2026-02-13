@@ -322,6 +322,61 @@ tools:
     key: memory-${{ github.workflow }}-${{ github.run_id }}
 ```
 
+## Lockdown Mode Blocking Expected Content
+
+**Lockdown mode** filters public repository content to only show items from users with push access. This protects workflows from untrusted input but can block legitimate use cases.
+
+### Symptoms
+
+- Workflow cannot see newly created issues or pull requests
+- Comments from external contributors are invisible
+- Status reports missing recent activity
+- Triage workflows not processing community contributions
+
+### Cause
+
+Lockdown mode is automatically enabled for public repositories when using custom GitHub tokens (`GH_AW_GITHUB_MCP_SERVER_TOKEN`). The workflow only sees content from users with push, maintain, or admin access.
+
+### Solution
+
+Evaluate if your workflow needs to process content from all users:
+
+**Option 1: Keep Lockdown Enabled (Recommended for most workflows)**
+
+If your workflow performs sensitive operations (code generation, repository updates, web access), keep lockdown enabled. Consider alternative approaches:
+- Use separate workflows: One with lockdown for sensitive operations, another without for public processing
+- Manual triggers: Let maintainers trigger workflows after reviewing external content
+- Approval workflows: Create a two-stage workflow where maintainers approve content before processing
+
+**Option 2: Disable Lockdown (For Safe Public Workflows)**
+
+If your workflow is **specifically designed** to handle untrusted input safely, disable lockdown:
+
+```yaml wrap
+tools:
+  github:
+    lockdown: false
+```
+
+**Only use `lockdown: false` if your workflow**:
+- Has read-only operations (`read-only: true`)
+- Uses restrictive safe outputs with specific allowed values
+- Does not enable bash tools, web-fetch, or playwright
+- Validates/sanitizes all input before processing
+- Does not access secrets or perform sensitive operations
+
+**Safe use cases**: Issue triage/labeling, spam detection, public dashboards, command workflows that verify permissions.
+
+### Verification
+
+After changing lockdown configuration:
+1. Recompile: `gh aw compile <workflow-name>`
+2. Test: Create a test issue from a non-contributor account
+3. Check logs: `gh aw logs --workflow <workflow-name>`
+4. Use `gh aw audit <run-id>` to verify the workflow processed expected content
+
+See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for complete configuration guidance and security considerations.
+
 ## Workflow Failures and Debugging
 
 ### Why Did My Workflow Fail?

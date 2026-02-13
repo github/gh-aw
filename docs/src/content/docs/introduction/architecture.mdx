@@ -553,6 +553,40 @@ XML and HTML tags are converted to a safe parentheses format to prevent injectio
 Workflows should use `${{ needs.activation.outputs.text }}` instead of raw `github.event` fields to ensure proper sanitization of user-provided content.
 </Aside>
 
+## GitHub Lockdown Mode
+
+Lockdown mode is a security feature of the GitHub MCP server that filters content in public repositories to only surface items from users with push access. This protects workflows from processing potentially malicious or misleading input from untrusted users.
+
+When **lockdown mode is enabled** (automatically the default for public repositories with custom tokens), the GitHub MCP server:
+- Only returns issues, PRs, comments, and discussions from users with push, maintain, or admin access
+- Blocks coding agent from seeing content from other users
+- Has no particular effect for private or internal repos
+
+**Security Benefits:**
+
+- **Input Manipulation Protection**: Prevents attackers from injecting malicious content into workflows
+- **Context Poisoning Prevention**: Blocks spam from overwhelming AI context or manipulating decisions
+- **Social Engineering Defense**: Helps ensure only verified contributors can interact with workflows
+
+**Configuration:**
+
+```yaml wrap
+tools:
+  github:
+    lockdown: true   # Force enable (automatic for public repos)
+    lockdown: false  # Disable for safe public workflows (issue triage, spam detection)
+```
+
+**When to disable lockdown** (public repositories only):
+- Issue triage/labeling workflows with restricted safe outputs
+- Spam detection systems designed to process untrusted content
+- Public status dashboards with read-only operations
+- Command workflows that explicitly verify user permissions
+
+<Aside type="tip">
+See [Lockdown Mode Reference](/gh-aw/reference/lockdown-mode/) for complete configuration guidance, use cases, and security considerations.
+</Aside>
+
 ## Secret Redaction
 
 Before workflow artifacts are uploaded, all files in the `/tmp/gh-aw` directory are scanned for secret values and redacted. This mechanism prevents accidental credential leakage through logs, outputs, or artifacts. Secret redaction executes unconditionally (with `if: always()`), ensuring that secrets are protected even if the workflow fails at an earlier stage.
@@ -783,6 +817,7 @@ gh aw status
 | **Configuration** | Action SHA pinning | Supply chain attacks, tag hijacking |
 | **Configuration** | Security scanners (actionlint, zizmor, poutine) | Privilege escalation, misconfigurations, supply chain risks |
 | **Configuration** | Pre-activation checks (role/permission) | Unauthorized users, expired workflows |
+| **Plan** | GitHub lockdown mode | Untrusted user input, context poisoning, social engineering |
 | **Plan** | Content sanitization | @mention abuse, bot triggers |
 | **Plan** | Secret redaction | Credential leakage in logs/artifacts |
 | **Plan** | Threat detection | Malicious patches, secret leaks |
@@ -792,6 +827,7 @@ gh aw status
 
 ## Related Documentation
 
+- [Lockdown Mode](/gh-aw/reference/lockdown-mode/) - GitHub content filtering for public repositories
 - [Threat Detection Guide](/gh-aw/reference/threat-detection/) - Configuring threat analysis
 - [Network Permissions](/gh-aw/reference/network/) - Network access control
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - Output processing configuration
