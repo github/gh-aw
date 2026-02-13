@@ -847,6 +847,9 @@ Creates discussions with optional `category` (slug, name, or ID; defaults to fir
 
 **Category Naming Standard**: Use lowercase, plural category names (e.g., `audits`, `general`, `reports`) for consistency and better searchability. GitHub Discussion category IDs (starting with `DIC_`) are also supported.
 
+> [!WARNING]
+> Only announcement-capable category succeeds; all non-announcement categories fail with integration-forbidden.
+
 ```yaml wrap
 safe-outputs:
   create-discussion:
