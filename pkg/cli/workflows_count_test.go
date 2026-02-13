@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,11 +85,10 @@ func TestWorkflowCounting(t *testing.T) {
 	if userWorkflowCount == 1 {
 		message = "✓ Fetched 1 workflow"
 	} else {
-		message = "✓ Fetched " + string(rune(userWorkflowCount+'0')) + " workflows"
+		message = fmt.Sprintf("✓ Fetched %d workflows", userWorkflowCount)
 	}
 	assert.NotContains(t, message, "internal", "Message should never contain 'internal' - internal workflows are hidden from users")
 	assert.NotContains(t, message, "public", "Message should not contain 'public' - only user workflows are shown")
 
-	t.Logf("User workflows: %d, Expected message: ✓ Fetched %d workflows", userWorkflowCount, userWorkflowCount)
-	t.Logf("Expected message format: %s", message)
+	t.Logf("User workflows: %d, Expected message: %s", userWorkflowCount, message)
 }
