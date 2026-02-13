@@ -354,7 +354,7 @@ func TestStrictModeFirewallValidation(t *testing.T) {
 		compiler.SetStrictMode(true)
 
 		networkPerms := &NetworkPermissions{
-			Allowed:           []string{"example.com"},
+			Allowed:           []string{"python"}, // Use known ecosystem instead of custom domain
 			ExplicitlyDefined: true,
 			// Firewall is NOT enabled
 			Firewall: nil,
@@ -391,7 +391,7 @@ func TestStrictModeFirewallValidation(t *testing.T) {
 		compiler.SetStrictMode(true)
 
 		networkPerms := &NetworkPermissions{
-			Allowed:           []string{"example.com"},
+			Allowed:           []string{"python"}, // Use known ecosystem instead of custom domain
 			ExplicitlyDefined: true,
 			Firewall: &FirewallConfig{
 				Enabled: true,
@@ -409,7 +409,7 @@ func TestStrictModeFirewallValidation(t *testing.T) {
 		compiler.SetStrictMode(true)
 
 		networkPerms := &NetworkPermissions{
-			Allowed:           []string{"example.com"},
+			Allowed:           []string{"python"}, // Use known ecosystem instead of custom domain
 			ExplicitlyDefined: true,
 			Firewall:          nil,
 		}
@@ -478,7 +478,7 @@ func TestStrictModeFirewallValidation(t *testing.T) {
 		compiler.SetStrictMode(true)
 
 		networkPerms := &NetworkPermissions{
-			Allowed:           []string{"example.com"},
+			Allowed:           []string{"python"}, // Use known ecosystem instead of custom domain
 			ExplicitlyDefined: true,
 			Firewall:          nil,
 		}

@@ -123,6 +123,7 @@ func TestCustomAWFCommandExecution(t *testing.T) {
 on:
   workflow_dispatch:
 engine: copilot
+strict: false
 network:
   allowed:
     - "example.com"
@@ -200,6 +201,7 @@ sandbox:
 on:
   workflow_dispatch:
 engine: copilot
+strict: false
 network:
   allowed:
     - "example.com"

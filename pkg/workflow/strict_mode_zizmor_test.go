@@ -33,7 +33,7 @@ permissions:
 engine: copilot
 network:
   allowed:
-    - "api.example.com"
+    - "python"
 ---
 
 # Test Workflow`,
