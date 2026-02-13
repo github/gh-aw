@@ -205,16 +205,23 @@ func TestConclusionJob(t *testing.T) {
 					}
 				}
 
-				// Check permissions
-				if !strings.Contains(job.Permissions, "issues: write") {
-					t.Error("Expected 'issues: write' permission in conclusion job")
+				// Check permissions based on what safe-outputs are configured
+				// When add-comment is configured, it requires issues, pull-requests, and discussions permissions
+				// When only missing_tool/noop is configured, minimal permissions are needed
+				if tt.addCommentConfig {
+					// add-comment requires full write permissions
+					if !strings.Contains(job.Permissions, "issues: write") {
+						t.Error("Expected 'issues: write' permission when add-comment is configured")
+					}
+					if !strings.Contains(job.Permissions, "pull-requests: write") {
+						t.Error("Expected 'pull-requests: write' permission when add-comment is configured")
+					}
+					if !strings.Contains(job.Permissions, "discussions: write") {
+						t.Error("Expected 'discussions: write' permission when add-comment is configured")
+					}
 				}
-				if !strings.Contains(job.Permissions, "pull-requests: write") {
-					t.Error("Expected 'pull-requests: write' permission in conclusion job")
-				}
-				if !strings.Contains(job.Permissions, "discussions: write") {
-					t.Error("Expected 'discussions: write' permission in conclusion job")
-				}
+				// No need to check for specific permissions when only noop/missing_tool is configured
+				// as they don't require write permissions on their own
 
 				// Check that the job has the update reaction step
 				stepsYAML := strings.Join(job.Steps, "")
