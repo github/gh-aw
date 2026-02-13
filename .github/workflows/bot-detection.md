@@ -32,9 +32,14 @@ jobs:
       - name: Precompute deterministic findings
         id: precompute
         uses: actions/github-script@v7
+        env:
+          GH_AW_BOT_DETECTION_TOKEN: ${{ secrets.GH_AW_BOT_DETECTION_TOKEN }}
         with:
           script: |
             const { owner, repo } = context.repo;
+            const { getOctokit } = require("@actions/github");
+            const memberToken = process.env.GH_AW_BOT_DETECTION_TOKEN;
+            const memberGitHub = memberToken ? getOctokit(memberToken) : github;
             const HOURS_BACK = 6;
             const ISSUE_TITLE = "🚨 Bot Detection: Suspicious Activity";
             const MIN_ACCOUNT_AGE_DAYS = 14;
@@ -124,7 +129,7 @@ jobs:
 
             async function loadMemberAccounts() {
               try {
-                const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
+                const collaborators = await memberGitHub.paginate(memberGitHub.rest.repos.listCollaborators, {
                   owner,
                   repo,
                   per_page: 100,
@@ -142,7 +147,7 @@ jobs:
             async function loadOrgMembers() {
               for (const org of TRUSTED_ORGS) {
                 try {
-                  const members = await github.paginate(github.rest.orgs.listMembers, {
+                  const members = await memberGitHub.paginate(memberGitHub.rest.orgs.listMembers, {
                     org,
                     per_page: 100,
                   });
