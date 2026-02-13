@@ -806,7 +806,6 @@ This workflow tests the create-pull-request with default fallback-as-issue behav
 		t.Error("Expected issues: write permission in safe_outputs job when fallback-as-issue defaults to true")
 	}
 
-
 	// Verify handler config defaults fallback_as_issue to true (or omitted means default true)
 	if !strings.Contains(lockContentStr, "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG") {
 		t.Error("Expected GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG environment variable")
