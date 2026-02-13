@@ -141,6 +141,12 @@ describe("create_discussion fallback with close_older_discussions", () => {
       })
     );
 
+    // Verify the fallback note includes the announcement category tip
+    const createCallArgs = mockGithub.rest.issues.create.mock.calls[0][0];
+    expect(createCallArgs.body).toContain("announcement-capable");
+    expect(createCallArgs.body).toContain("Announcements");
+    expect(createCallArgs.body).toContain("category");
+
     // Verify search for older issues was performed
     expect(mockGithub.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
       q: 'repo:test-owner/test-repo is:issue is:open "gh-aw-workflow-id: test-workflow" in:body',
