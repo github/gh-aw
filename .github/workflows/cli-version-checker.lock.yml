@@ -27,7 +27,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 06a1ed687485d95b8fe3d26ba07c4047561ae20018e0e5b010028ab367d63a41
+# frontmatter-hash: 5ba64a336b066094c829be624814308403998169d78a13dfd2d0a72cf32b53d0
 
 name: "CLI Version Checker"
 "on":

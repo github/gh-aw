@@ -27,7 +27,6 @@ name: "Bot Detection"
 "on":
   schedule:
   - cron: "0 */6 * * *"
-    # Friendly format: weekly on wednesday around 12:00 (scattered)
   workflow_dispatch:
 
 permissions: {}

@@ -34,7 +34,7 @@ tools:
   web-fetch:
   bash: [":*"]
 
-strict: true
+strict: false
 
 imports:
   - shared/mood.md

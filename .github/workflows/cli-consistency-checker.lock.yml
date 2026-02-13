@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 948bd131b87880e22a6285b9cda6802fd5d43831b92b3ebae7adbb451b30c112
+# frontmatter-hash: d92140a1be7092dc337eed4a0883757e9b4dbf931aaf2ed9edc22e4f0f67f546
 
 name: "CLI Consistency Checker"
 "on":

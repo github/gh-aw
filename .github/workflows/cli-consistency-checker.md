@@ -10,6 +10,7 @@ permissions:
   issues: read
   pull-requests: read
 engine: copilot
+strict: false
 network:
   allowed: [defaults, node, "api.github.com", "proxy.golang.org", "sum.golang.org"]
 tools:

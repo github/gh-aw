@@ -25,7 +25,7 @@
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: 345a0ec1d7d369d9b1d2c1347c30772b07b102e120f21946dae3e9a03f441306
+# frontmatter-hash: 433bfa55bbcb4c87834b3422b44293afdf688dbe191505559f77f1fdb5154329
 
 name: "Release"
 "on":

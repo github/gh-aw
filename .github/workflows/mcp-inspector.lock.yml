@@ -40,7 +40,7 @@
 #     - shared/mood.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: e0c6d37bdf01af5ab7260bf9618cc1695b606ca0dc3a870801e8cdbffbca1318
+# frontmatter-hash: a6921a13bb643abf9ba88fb54707b78ce0984ca06e486e3ddc30fc3a824293b2
 
 name: "MCP Inspector Agent"
 "on":
