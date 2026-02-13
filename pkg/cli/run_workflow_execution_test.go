@@ -240,11 +240,12 @@ func TestRunWorkflowOnGitHub_FlagCombinations(t *testing.T) {
 			push:         true,
 			repoOverride: "owner/repo",
 			expectError:  true,
-			// Accept either the expected validation error, GH_TOKEN error in CI, or HTTP 404 for non-existent repo
+			// Accept either the expected validation error, GH_TOKEN error in CI, HTTP 404 for non-existent repo, or HTTP 403 for auth issues
 			errorContains: []string{
 				"--push flag is only supported for local workflows",
 				"GH_TOKEN environment variable",
 				"HTTP 404",
+				"HTTP 403",
 			},
 		},
 	}
