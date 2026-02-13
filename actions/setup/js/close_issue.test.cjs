@@ -369,6 +369,36 @@ describe("close_issue", () => {
       expect(result.error).toContain("No comment body provided");
     });
 
+    it("should fail when body is whitespace-only and fall back to config comment", async () => {
+      const handler = await main({ max: 10, comment: "Default close comment" });
+
+      const commentCalls = [];
+      mockGithub.rest.issues.createComment = async params => {
+        commentCalls.push(params);
+        return {
+          data: {
+            id: 999,
+            html_url: `https://github.com/${params.owner}/${params.repo}/issues/${params.issue_number}#issuecomment-999`,
+          },
+        };
+      };
+
+      const result = await handler({ issue_number: 100, body: "   \n\t  " }, {});
+
+      expect(result.success).toBe(true);
+      expect(commentCalls.length).toBe(1);
+      expect(commentCalls[0].body).toContain("Default close comment");
+    });
+
+    it("should fail when body is whitespace-only and no config comment", async () => {
+      const handler = await main({ max: 10 });
+
+      const result = await handler({ issue_number: 100, body: "   " }, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("No comment body provided");
+    });
+
     it("should use body field from message for already closed issues", async () => {
       const handler = await main({ max: 10 });
 

@@ -117,27 +117,37 @@ async function main(config = {}) {
 
     const item = message;
 
-    // Log message structure for debugging
+    // Log message structure for debugging (avoid logging body content)
     core.info(
       `Processing close_issue message: ${JSON.stringify({
         has_body: !!item.body,
         body_length: item.body ? item.body.length : 0,
-        body_preview: item.body ? item.body.substring(0, 100) : "(no body)",
         issue_number: item.issue_number,
         has_repo: !!item.repo,
       })}`
     );
 
-    // Determine comment body - prefer item.body over config.comment
-    let commentToPost = item.body || comment;
-    if (!commentToPost || commentToPost.trim() === "") {
+    // Determine comment body - prefer non-empty item.body over non-empty config.comment
+    /** @type {string} */
+    let commentToPost;
+    /** @type {string} */
+    let commentSource = "unknown";
+
+    if (typeof item.body === "string" && item.body.trim() !== "") {
+      commentToPost = item.body;
+      commentSource = "item.body";
+    } else if (typeof comment === "string" && comment.trim() !== "") {
+      commentToPost = comment;
+      commentSource = "config.comment";
+    } else {
       core.warning("No comment body provided in message and no default comment configured");
       return {
         success: false,
         error: "No comment body provided",
       };
     }
-    core.info(`Comment body determined: length=${commentToPost.length}, source=${item.body ? "item.body" : "config.comment"}`);
+
+    core.info(`Comment body determined: length=${commentToPost.length}, source=${commentSource}`);
 
     // Resolve and validate target repository
     const repoResult = resolveAndValidateRepo(item, defaultTargetRepo, allowedRepos, "issue");

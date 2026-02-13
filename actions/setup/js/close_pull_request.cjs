@@ -114,26 +114,36 @@ async function main(config = {}) {
 
     const item = message;
 
-    // Log message structure for debugging
+    // Log message structure for debugging (avoid logging body content)
     core.info(
       `Processing close_pull_request message: ${JSON.stringify({
         has_body: !!item.body,
         body_length: item.body ? item.body.length : 0,
-        body_preview: item.body ? item.body.substring(0, 100) : "(no body)",
         pull_request_number: item.pull_request_number,
       })}`
     );
 
-    // Determine comment body - prefer item.body over config.comment
-    let commentToPost = item.body || comment;
-    if (!commentToPost || commentToPost.trim() === "") {
+    // Determine comment body - prefer non-empty item.body over non-empty config.comment
+    /** @type {string} */
+    let commentToPost;
+    /** @type {string} */
+    let commentSource = "unknown";
+
+    if (typeof item.body === "string" && item.body.trim() !== "") {
+      commentToPost = item.body;
+      commentSource = "item.body";
+    } else if (typeof comment === "string" && comment.trim() !== "") {
+      commentToPost = comment;
+      commentSource = "config.comment";
+    } else {
       core.warning("No comment body provided in message and no default comment configured");
       return {
         success: false,
         error: "No comment body provided",
       };
     }
-    core.info(`Comment body determined: length=${commentToPost.length}, source=${item.body ? "item.body" : "config.comment"}`);
+
+    core.info(`Comment body determined: length=${commentToPost.length}, source=${commentSource}`);
 
     // Determine PR number
     let prNumber;
@@ -208,12 +218,14 @@ async function main(config = {}) {
     }
 
     // Add comment with the body from the message
+    let commentPosted = false;
     try {
       const triggeringPRNumber = context.payload?.pull_request?.number;
       const triggeringIssueNumber = context.payload?.issue?.number;
       const commentBody = buildCommentBody(commentToPost, triggeringIssueNumber, triggeringPRNumber);
       core.info(`Adding comment to PR #${prNumber}: length=${commentBody.length}`);
       await addPullRequestComment(github, owner, repo, prNumber, commentBody);
+      commentPosted = true;
       core.info(`✓ Comment posted to PR #${prNumber}`);
       core.info(`Comment details: body_length=${commentBody.length}`);
     } catch (error) {
@@ -233,7 +245,7 @@ async function main(config = {}) {
     // Close the PR if not already closed
     let closedPR;
     if (wasAlreadyClosed) {
-      core.info(`PR #${prNumber} was already closed, comment added successfully`);
+      core.info(`PR #${prNumber} was already closed, comment ${commentPosted ? "posted successfully" : "posting attempted"}`);
       closedPR = pr;
     } else {
       try {
@@ -258,13 +270,14 @@ async function main(config = {}) {
       }
     }
 
-    core.info(`close_pull_request completed successfully for PR #${prNumber}`);
+    core.info(`close_pull_request completed for PR #${prNumber}: ${commentPosted ? "comment posted and " : ""}PR ${wasAlreadyClosed ? "was already closed" : "closed successfully"}`);
 
     return {
       success: true,
       pull_request_number: closedPR.number,
       pull_request_url: closedPR.html_url,
       alreadyClosed: wasAlreadyClosed,
+      commentPosted,
     };
   };
 }
