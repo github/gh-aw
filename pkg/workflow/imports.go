@@ -652,6 +652,12 @@ func mergeMessagesConfig(result, imported *SafeOutputMessagesConfig) *SafeOutput
 	if result.FooterInstall == "" && imported.FooterInstall != "" {
 		result.FooterInstall = imported.FooterInstall
 	}
+	if result.FooterWorkflowRecompile == "" && imported.FooterWorkflowRecompile != "" {
+		result.FooterWorkflowRecompile = imported.FooterWorkflowRecompile
+	}
+	if result.FooterWorkflowRecompileComment == "" && imported.FooterWorkflowRecompileComment != "" {
+		result.FooterWorkflowRecompileComment = imported.FooterWorkflowRecompileComment
+	}
 	if result.StagedTitle == "" && imported.StagedTitle != "" {
 		result.StagedTitle = imported.StagedTitle
 	}
@@ -666,6 +672,9 @@ func mergeMessagesConfig(result, imported *SafeOutputMessagesConfig) *SafeOutput
 	}
 	if result.RunFailure == "" && imported.RunFailure != "" {
 		result.RunFailure = imported.RunFailure
+	}
+	if !result.AppendOnlyComments && imported.AppendOnlyComments {
+		result.AppendOnlyComments = imported.AppendOnlyComments
 	}
 	return result
 }
