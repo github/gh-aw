@@ -1,6 +1,6 @@
 ---
-title: GitHub Tokens
-description: Comprehensive reference for all GitHub tokens used in gh-aw, including authentication, token precedence, and security best practices
+title: GitHub Tokens/Secrets
+description: Comprehensive reference for all GitHub tokens (secrets) used in gh-aw, including authentication, token precedence, and security best practices
 sidebar:
   order: 650
 disable-agentic-editing: true
@@ -9,19 +9,24 @@ disable-agentic-editing: true
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import Video from '../../../components/Video.astro';
 
-## Which token(s) do I need?
+## Which tokens/secrets do I need?
 
-GitHub Actions automatically provides a default `GITHUB_TOKEN` that works for most workflows. However, depending on what your workflow needs to do, you may need additional tokens:
+You will need one of the following tokens/secrets:
+
+- **Copilot** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token)
+- **Claude by Anthropic** – Add [`ANTHROPIC_API_KEY`](/gh-aw/reference/engines/#using-claude-by-anthropic-claude-code)
+- **Codex by OpenAI** – Add [`OPENAI_API_KEY`](/gh-aw/reference/engines/#using-openai-codex)
+
+Depending on what your workflow needs to do, you may need additional tokens:
 
 - **Cross-repo access or remote GitHub tools** – Add [`GH_AW_GITHUB_TOKEN`](#gh_aw_github_token)
-- **Copilot engine and agent operations** – Add [`COPILOT_GITHUB_TOKEN`](#copilot_github_token)
 - **GitHub Projects v2 operations** – Add [`GH_AW_PROJECT_GITHUB_TOKEN`](#gh_aw_project_github_token)
 - **Assign Copilot agents to issues/PRs** – Add [`GH_AW_AGENT_TOKEN`](#gh_aw_agent_token)
-- **MCP server with isolated permissions** (optional) – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
+- **MCP server with special permissions** – Add [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](#gh_aw_github_mcp_server_token)
 
-## How do I add tokens to my repository?
+## How do I add tokens/secrets to my repository?
 
-You can set up your tokens manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
+You can set up your tokens/secrets manually in the GitHub UI or use the CLI for a streamlined experience. Note that the CLI also provides commands to check existing secrets and validate token permissions.
 
 ### Adding tokens using the CLI
 
@@ -52,7 +57,7 @@ gh aw init --tokens --engine <engine>
   <img alt="Repository secrets page showing configured tokens" src="/gh-aw/images/actions-secrets_light.png" />
 </picture>
 
-## Who owns the resource?
+## Who owns the token?
 
 Ownership affects token requirements for repositories and Projects (v2). If the owner is your personal username, it is user-owned. If the owner is an organization, it is org-owned and managed with shared roles and access controls.
 
