@@ -446,6 +446,94 @@ func TestEnhanceToolDescription(t *testing.T) {
 			},
 		},
 		{
+			name:            "update_project with max",
+			toolName:        "update_project",
+			baseDescription: "Manage GitHub Projects.",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 10},
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"Maximum 10 project operation(s)",
+			},
+		},
+		{
+			name:            "update_project with project URL",
+			toolName:        "update_project",
+			baseDescription: "Manage GitHub Projects.",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					Project: "https://github.com/orgs/myorg/projects/42",
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				`Default project URL: "https://github.com/orgs/myorg/projects/42"`,
+			},
+		},
+		{
+			name:            "update_project with max and project URL",
+			toolName:        "update_project",
+			baseDescription: "Manage GitHub Projects.",
+			safeOutputs: &SafeOutputsConfig{
+				UpdateProjects: &UpdateProjectConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 5},
+					Project:              "https://github.com/users/username/projects/1",
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"Maximum 5 project operation(s)",
+				`Default project URL: "https://github.com/users/username/projects/1"`,
+			},
+		},
+		{
+			name:            "create_project_status_update with max",
+			toolName:        "create_project_status_update",
+			baseDescription: "Post a status update to a GitHub Project.",
+			safeOutputs: &SafeOutputsConfig{
+				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3},
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"Maximum 3 status update(s)",
+			},
+		},
+		{
+			name:            "create_project_status_update with project URL",
+			toolName:        "create_project_status_update",
+			baseDescription: "Post a status update to a GitHub Project.",
+			safeOutputs: &SafeOutputsConfig{
+				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
+					Project: "https://github.com/orgs/myorg/projects/99",
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				`Default project URL: "https://github.com/orgs/myorg/projects/99"`,
+			},
+		},
+		{
+			name:            "create_project_status_update with max and project URL",
+			toolName:        "create_project_status_update",
+			baseDescription: "Post a status update to a GitHub Project.",
+			safeOutputs: &SafeOutputsConfig{
+				CreateProjectStatusUpdates: &CreateProjectStatusUpdateConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 8},
+					Project:              "https://github.com/orgs/example/projects/50",
+				},
+			},
+			wantContains: []string{
+				"CONSTRAINTS:",
+				"Maximum 8 status update(s)",
+				`Default project URL: "https://github.com/orgs/example/projects/50"`,
+			},
+		},
+		{
 			name:            "noop has no constraints",
 			toolName:        "noop",
 			baseDescription: "Log a message.",

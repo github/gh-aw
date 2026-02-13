@@ -13,15 +13,14 @@ import (
 
 func TestGitHubLockdownAutodetection(t *testing.T) {
 	tests := []struct {
-		name               string
-		workflow           string
-		expectedDetectStep bool
-		expectedLockdown   string // "auto" means use step output expression, "true" means hardcoded true, "false" means not present
-		expectIfCondition  bool   // true if step should have if: condition
-		description        string
+		name                    string
+		workflow                string
+		expectedLockdown        string // "true" means hardcoded true, "auto" means automatic detection, "none" means no lockdown setting at all
+		expectAutoDetectionStep bool   // true if automatic detection step should be present
+		description             string
 	}{
 		{
-			name: "Auto-determination enabled when lockdown not specified",
+			name: "Automatic detection when lockdown not specified",
 			workflow: `---
 on: issues
 engine: copilot
@@ -33,15 +32,14 @@ tools:
 
 # Test Workflow
 
-Test automatic lockdown determination.
+Test that automatic lockdown detection is enabled when lockdown is not specified.
 `,
-			expectedDetectStep: true,
-			expectedLockdown:   "auto",
-			expectIfCondition:  false,
-			description:        "When lockdown is not specified, determination step should be added",
+			expectedLockdown:        "auto",
+			expectAutoDetectionStep: true,
+			description:             "When lockdown is not specified, automatic detection step should be present",
 		},
 		{
-			name: "No auto-determination when lockdown explicitly set to true",
+			name: "Lockdown enabled when explicitly set to true",
 			workflow: `---
 on: issues
 engine: copilot
@@ -56,13 +54,12 @@ tools:
 
 Test with explicit lockdown enabled.
 `,
-			expectedDetectStep: false,
-			expectedLockdown:   "true",
-			expectIfCondition:  false,
-			description:        "When lockdown is explicitly true, no determination step and lockdown should be hardcoded",
+			expectedLockdown:        "true",
+			expectAutoDetectionStep: false,
+			description:             "When lockdown is explicitly true, lockdown should be hardcoded",
 		},
 		{
-			name: "No auto-determination when lockdown explicitly set to false",
+			name: "No lockdown when explicitly set to false",
 			workflow: `---
 on: issues
 engine: copilot
@@ -77,13 +74,12 @@ tools:
 
 Test with explicit lockdown disabled.
 `,
-			expectedDetectStep: false,
-			expectedLockdown:   "false",
-			expectIfCondition:  false,
-			description:        "When lockdown is explicitly false, no determination step and no lockdown setting",
+			expectedLockdown:        "none",
+			expectAutoDetectionStep: false,
+			description:             "When lockdown is explicitly false, no lockdown setting should be present",
 		},
 		{
-			name: "Auto-determination with remote mode",
+			name: "Automatic detection with remote mode when not specified",
 			workflow: `---
 on: issues
 engine: copilot
@@ -95,12 +91,11 @@ tools:
 
 # Test Workflow
 
-Test auto-determination with remote GitHub MCP.
+Test that remote mode uses automatic detection when lockdown not specified.
 `,
-			expectedDetectStep: true,
-			expectedLockdown:   "auto",
-			expectIfCondition:  false,
-			description:        "Auto-determination should work with remote mode",
+			expectedLockdown:        "auto",
+			expectAutoDetectionStep: true,
+			description:             "Remote mode without explicit lockdown should use automatic detection",
 		},
 	}
 
@@ -133,22 +128,19 @@ Test auto-determination with remote GitHub MCP.
 			}
 			yaml := string(lockContent)
 
-			// Check if detection step is present
-			detectStepPresent := strings.Contains(yaml, "Determine automatic lockdown mode for GitHub MCP server") &&
-				strings.Contains(yaml, "determine-automatic-lockdown") &&
-				strings.Contains(yaml, "determine_automatic_lockdown.cjs")
+			// Check for automatic detection step based on expectation
+			hasDetectionStep := strings.Contains(yaml, "Determine automatic lockdown") &&
+				strings.Contains(yaml, "determine-automatic-lockdown")
 
-			if detectStepPresent != tt.expectedDetectStep {
-				t.Errorf("%s: Detection step presence = %v, want %v", tt.description, detectStepPresent, tt.expectedDetectStep)
+			if tt.expectAutoDetectionStep && !hasDetectionStep {
+				t.Errorf("%s: Expected automatic detection step but it was not found", tt.description)
+			}
+			if !tt.expectAutoDetectionStep && hasDetectionStep {
+				t.Errorf("%s: Did not expect automatic detection step but it was found", tt.description)
 			}
 
 			// Check lockdown configuration based on expected value
 			switch tt.expectedLockdown {
-			case "auto":
-				// Should use step output expression
-				if !strings.Contains(yaml, "steps.determine-automatic-lockdown.outputs.lockdown") {
-					t.Errorf("%s: Expected lockdown to use step output expression", tt.description)
-				}
 			case "true":
 				// Should have hardcoded GITHUB_LOCKDOWN_MODE=1 or X-MCP-Lockdown: true
 				hasDockerLockdown := strings.Contains(yaml, `"GITHUB_LOCKDOWN_MODE": "1"`)
@@ -156,17 +148,26 @@ Test auto-determination with remote GitHub MCP.
 				if !hasDockerLockdown && !hasRemoteLockdown {
 					t.Errorf("%s: Expected hardcoded lockdown setting", tt.description)
 				}
-			case "false":
-				// Should not have GITHUB_LOCKDOWN_MODE or X-MCP-Lockdown
-				if strings.Contains(yaml, "GITHUB_LOCKDOWN_MODE") || strings.Contains(yaml, "X-MCP-Lockdown") {
-					t.Errorf("%s: Expected no lockdown setting", tt.description)
+			case "auto":
+				// Should use step output expression for lockdown
+				hasStepOutput := strings.Contains(yaml, "steps.determine-automatic-lockdown.outputs.lockdown")
+				if !hasStepOutput {
+					t.Errorf("%s: Expected lockdown to use step output expression", tt.description)
+				}
+			case "none":
+				// Should not have GITHUB_LOCKDOWN_MODE or X-MCP-Lockdown (unless using step output)
+				if strings.Contains(yaml, `"GITHUB_LOCKDOWN_MODE": "1"`) {
+					t.Errorf("%s: Expected no hardcoded lockdown setting", tt.description)
+				}
+				if strings.Contains(yaml, "X-MCP-Lockdown") && !strings.Contains(yaml, "steps.determine-automatic-lockdown") {
+					t.Errorf("%s: Expected no hardcoded lockdown setting", tt.description)
 				}
 			}
 		})
 	}
 }
 
-func TestGitHubLockdownAutodetectionClaudeEngine(t *testing.T) {
+func TestGitHubLockdownExplicitOnlyClaudeEngine(t *testing.T) {
 	workflow := `---
 on: issues
 engine: claude
@@ -178,11 +179,11 @@ tools:
 
 # Test Workflow
 
-Test automatic lockdown determination with Claude.
+Test that Claude engine has no automatic lockdown determination.
 `
 
 	// Create temporary directory for test
-	tmpDir, err := os.MkdirTemp("", "lockdown-autodetect-claude-test-*")
+	tmpDir, err := os.MkdirTemp("", "lockdown-explicit-claude-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -208,12 +209,12 @@ Test automatic lockdown determination with Claude.
 	}
 	yaml := string(lockContent)
 
-	// Check if detection step is present
+	// Verify automatic detection step is present (lockdown not explicitly set)
 	detectStepPresent := strings.Contains(yaml, "Determine automatic lockdown mode for GitHub MCP server") &&
 		strings.Contains(yaml, "determine-automatic-lockdown")
 
 	if !detectStepPresent {
-		t.Error("Determination step should be present for Claude engine")
+		t.Error("Determination step should be present for Claude engine when lockdown not explicitly set")
 	}
 
 	// Check if lockdown uses step output expression

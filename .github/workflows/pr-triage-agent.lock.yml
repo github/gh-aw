@@ -201,6 +201,17 @@ jobs:
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.409
       - name: Install awf binary
         run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.16.4
+      - name: Validate lockdown mode requirements
+        id: validate-lockdown-requirements
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GITHUB_MCP_LOCKDOWN_EXPLICIT: "true"
+          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
+        with:
+          script: |
+            const validateLockdownRequirements = require('/opt/gh-aw/actions/validate_lockdown_requirements.cjs');
+            validateLockdownRequirements(core);
       - name: Download container images
         run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.16.4 ghcr.io/github/gh-aw-firewall/squid:0.16.4 ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
       - name: Write Safe Outputs Config
