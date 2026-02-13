@@ -619,7 +619,7 @@ This is a test workflow to verify description field rendering.
 				}
 
 				// Verify description comes after standard header and before workflow content
-				headerEndPattern := "# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md"
+				headerEndPattern := "# For more information: https://github.github.com/gh-aw/introduction/overview/"
 				workflowStartPattern := `name: "`
 
 				headerPos := strings.Index(lockContent, headerEndPattern)
