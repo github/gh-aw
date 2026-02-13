@@ -273,7 +273,7 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 		if permissions != nil && len(workflowData.ParsedTools.GitHub.Toolset) == 0 && workflowData.Permissions != "" {
 			log.Print("Auto-inferring compatible GitHub MCP toolsets from permissions")
 			compatibleToolsets := InferCompatibleToolsets(permissions, workflowData.ParsedTools.GitHub.ReadOnly)
-			
+
 			if len(compatibleToolsets) > 0 {
 				log.Printf("Inferred %d compatible toolsets: %v", len(compatibleToolsets), compatibleToolsets)
 				// Set the inferred toolsets in the GitHub tool configuration
@@ -281,7 +281,7 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 				for i, toolset := range compatibleToolsets {
 					workflowData.ParsedTools.GitHub.Toolset[i] = GitHubToolset(toolset)
 				}
-				
+
 				// Also update the raw Tools map so the renderer picks up the inferred toolsets
 				if workflowData.Tools != nil {
 					if githubTool, exists := workflowData.Tools["github"]; exists {
@@ -292,7 +292,7 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 						} else {
 							githubConfig = make(map[string]any)
 						}
-						
+
 						// Convert toolsets to []any for the raw map
 						toolsetsAny := make([]any, len(compatibleToolsets))
 						for i, toolset := range compatibleToolsets {

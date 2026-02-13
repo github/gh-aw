@@ -366,14 +366,14 @@ func formatMissingPermissionsMessage(result *PermissionsValidationResult) string
 //   - A slice of compatible toolset names that can be safely enabled
 func InferCompatibleToolsets(permissions *Permissions, readOnly bool) []string {
 	permissionsValidationLog.Printf("Inferring compatible toolsets from permissions (read-only: %v)", readOnly)
-	
+
 	if permissions == nil {
 		permissionsValidationLog.Print("No permissions provided, returning empty toolset list")
 		return []string{}
 	}
-	
+
 	var compatible []string
-	
+
 	// Check each default toolset for compatibility
 	for _, toolset := range DefaultGitHubToolsets {
 		perms, exists := toolsetPermissionsMap[toolset]
@@ -381,9 +381,9 @@ func InferCompatibleToolsets(permissions *Permissions, readOnly bool) []string {
 			permissionsValidationLog.Printf("Toolset %s not found in permissions map, skipping", toolset)
 			continue
 		}
-		
+
 		isCompatible := true
-		
+
 		// Check read permissions
 		for _, scope := range perms.ReadPermissions {
 			grantedLevel, granted := permissions.Get(scope)
@@ -393,7 +393,7 @@ func InferCompatibleToolsets(permissions *Permissions, readOnly bool) []string {
 				break
 			}
 		}
-		
+
 		// Check write permissions only if not in read-only mode
 		if isCompatible && !readOnly {
 			for _, scope := range perms.WritePermissions {
@@ -405,13 +405,13 @@ func InferCompatibleToolsets(permissions *Permissions, readOnly bool) []string {
 				}
 			}
 		}
-		
+
 		if isCompatible {
 			permissionsValidationLog.Printf("Toolset %s is compatible", toolset)
 			compatible = append(compatible, toolset)
 		}
 	}
-	
+
 	permissionsValidationLog.Printf("Inferred %d compatible toolsets from %d defaults", len(compatible), len(DefaultGitHubToolsets))
 	return compatible
 }
