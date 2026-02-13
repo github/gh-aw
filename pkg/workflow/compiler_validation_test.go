@@ -254,9 +254,9 @@ This is a test workflow.
 	}
 
 	expectedDisclaimer := []string{
-		"# To update this file, edit the corresponding .md file and run:",
+		"# To update this file, edit",
 		"#   gh aw compile",
-		"# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md",
+		"# For more information: https://github.github.com/gh-aw/introduction/overview/",
 	}
 
 	for _, line := range expectedDisclaimer {
