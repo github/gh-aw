@@ -329,20 +329,25 @@ func TestExpandLabelTriggerShorthand(t *testing.T) {
 				t.Errorf("expandLabelTriggerShorthand() types = %v, want [labeled]", types)
 			}
 
-			// Check names field (only for issues and pull_request, not discussion)
+			// Check labels/names field:
+			// - For issues: uses native 'labels' field
+			// - For pull_request & discussion: uses 'names' field for job condition filtering
 			switch tt.entityType {
-			case "issues", "pull_request":
+			case "issues":
+				labels, ok := triggerConfig["labels"].([]string)
+				if !ok {
+					t.Fatalf("expandLabelTriggerShorthand() labels is not a string array for issues")
+				}
+				if !slicesEqual(labels, tt.labelNames) {
+					t.Errorf("expandLabelTriggerShorthand() labels = %v, want %v", labels, tt.labelNames)
+				}
+			case "pull_request", "discussion":
 				names, ok := triggerConfig["names"].([]string)
 				if !ok {
 					t.Fatalf("expandLabelTriggerShorthand() names is not a string array for %s", tt.entityType)
 				}
 				if !slicesEqual(names, tt.labelNames) {
 					t.Errorf("expandLabelTriggerShorthand() names = %v, want %v", names, tt.labelNames)
-				}
-			case "discussion":
-				// Discussion should not have names field (GitHub Actions doesn't support it)
-				if _, hasNames := triggerConfig["names"]; hasNames {
-					t.Errorf("expandLabelTriggerShorthand() discussion should not have names field")
 				}
 			}
 
