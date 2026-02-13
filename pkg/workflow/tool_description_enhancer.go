@@ -290,6 +290,26 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 			}
 		}
 
+	case "update_project":
+		if config := safeOutputs.UpdateProjects; config != nil {
+			if config.Max > 0 {
+				constraints = append(constraints, fmt.Sprintf("Maximum %d project operation(s) can be performed.", config.Max))
+			}
+			if config.Project != "" {
+				constraints = append(constraints, fmt.Sprintf("Default project URL: %q.", config.Project))
+			}
+		}
+
+	case "create_project_status_update":
+		if config := safeOutputs.CreateProjectStatusUpdates; config != nil {
+			if config.Max > 0 {
+				constraints = append(constraints, fmt.Sprintf("Maximum %d status update(s) can be created.", config.Max))
+			}
+			if config.Project != "" {
+				constraints = append(constraints, fmt.Sprintf("Default project URL: %q.", config.Project))
+			}
+		}
+
 	case "noop":
 		// noop has no configurable constraints
 	}
