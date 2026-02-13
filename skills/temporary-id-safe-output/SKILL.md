@@ -14,7 +14,7 @@ When an agent needs to create a parent issue and immediately link sub-issues to 
 
 ## Temporary ID Format
 
-Temporary IDs follow the pattern `aw_XXXXXXXX` where:
+Temporary IDs follow the pattern `aw_[A-Za-z0-9]{3,8}` where:
 - `aw_` is a fixed prefix identifying agentic workflow temporary IDs
 - `XXXXXXXX` is a 3-8 character alphanumeric string (A-Za-z0-9)
 

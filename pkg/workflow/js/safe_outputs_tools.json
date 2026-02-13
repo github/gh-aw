@@ -34,7 +34,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
+          "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 3 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation."
         }
       },
       "additionalProperties": false
@@ -850,7 +850,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 4 to 8 alphanumeric characters."
+          "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 3 to 8 alphanumeric characters."
         },
         "fields": {
           "type": "object",
@@ -990,7 +990,7 @@
         "temporary_id": {
           "type": "string",
           "pattern": "^aw_[A-Za-z0-9]{4,8}$",
-          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 4 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
+          "description": "Optional temporary identifier for referencing this project before it's created. Format: 'aw_' followed by 3 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). If not provided, one will be auto-generated and returned in the response. Use '#aw_ID' in update_project to reference this project by its temporary_id."
         }
       },
       "additionalProperties": false

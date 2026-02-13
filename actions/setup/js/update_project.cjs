@@ -935,7 +935,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         } else {
           // Not a temporary ID - validate as numeric
           if (!/^\d+$/.test(sanitizedContentNumber)) {
-            throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer or a valid temporary ID (format: aw_ followed by 4-8 alphanumeric characters).`);
+            throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer or a valid temporary ID (format: aw_ followed by 3-8 alphanumeric characters).`);
           }
           contentNumber = Number.parseInt(sanitizedContentNumber, 10);
         }
