@@ -164,6 +164,7 @@ on: workflow_dispatch
 permissions:
   contents: read
 engine: copilot
+strict: false
 network:
   allowed:
     - "github.com"
