@@ -128,10 +128,11 @@ network:
   allowed:
     - python           # Ecosystem identifier
     - node             # Ecosystem identifier
-    - "api.example.com"  # Custom domains still allowed
 ````
 
-When strict mode rejects a domain, the error message suggests the correct ecosystem:
+### Error Messages
+
+When strict mode rejects a domain that belongs to a known ecosystem, the error message suggests the ecosystem identifier:
 
 ````text
 error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
@@ -139,14 +140,29 @@ error: strict mode: network domains must be from known ecosystems (e.g., 'defaul
 security. Did you mean: 'pypi.org' belongs to ecosystem 'python'?
 ````
 
-Disable strict mode for development or testing:
+When strict mode rejects a custom domain:
+
+````text
+error: strict mode: network domains must be from known ecosystems (e.g., 'defaults',
+'python', 'node') for all engines in strict mode. Custom domains are not allowed for
+security. Set 'strict: false' to use custom domains.
+````
+
+### Using Custom Domains
+
+To use custom domains (domains not in known ecosystems), disable strict mode:
 
 ````yaml
-strict: false
+---
+strict: false    # Required for custom domains
 network:
   allowed:
-    - "pypi.org"  # Now allowed
+    - python           # Ecosystem identifier
+    - "api.example.com"  # Custom domain (only allowed with strict: false)
+---
 ````
+
+**Security Note**: Custom domains bypass ecosystem validation. Only disable strict mode when necessary and ensure you trust the custom domains you allow.
 
 ## Security Best Practices
 
