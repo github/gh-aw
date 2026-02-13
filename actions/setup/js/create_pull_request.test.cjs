@@ -6,21 +6,21 @@ describe("create_pull_request - fallback-as-issue configuration", () => {
     it("should default fallback_as_issue to true when not specified", () => {
       const config = {};
       const fallbackAsIssue = config.fallback_as_issue !== false;
-      
+
       expect(fallbackAsIssue).toBe(true);
     });
 
     it("should respect fallback_as_issue when set to false", () => {
       const config = { fallback_as_issue: false };
       const fallbackAsIssue = config.fallback_as_issue !== false;
-      
+
       expect(fallbackAsIssue).toBe(false);
     });
 
     it("should respect fallback_as_issue when explicitly set to true", () => {
       const config = { fallback_as_issue: true };
       const fallbackAsIssue = config.fallback_as_issue !== false;
-      
+
       expect(fallbackAsIssue).toBe(true);
     });
   });
