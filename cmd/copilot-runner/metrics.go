@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -134,11 +135,14 @@ func (m *MetricsCollector) BuildOutput(success bool, response string) RunnerOutp
 		m.toolSequences = append(m.toolSequences, m.toolSequence)
 	}
 
-	// Convert tool call map to sorted slice
+	// Convert tool call map to slice sorted by tool name for deterministic output
 	var toolCalls []RunnerToolCall
 	for _, tc := range m.toolCallMap {
 		toolCalls = append(toolCalls, *tc)
 	}
+	sort.Slice(toolCalls, func(i, j int) bool {
+		return toolCalls[i].Name < toolCalls[j].Name
+	})
 
 	return RunnerOutput{
 		Success:  success,
@@ -171,7 +175,13 @@ func WriteOutput(output RunnerOutput, logDir string) error {
 	}
 
 	// Print marker to stdout for log parsing
-	fmt.Printf("COPILOT_RUNNER_OUTPUT:%s\n", string(data))
+	// Use compact (non-indented) JSON for the marker line so that parseRunnerOutput
+	// can reliably extract it by reading a single line.
+	compactData, err := json.Marshal(output)
+	if err != nil {
+		return fmt.Errorf("failed to marshal compact output: %w", err)
+	}
+	fmt.Printf("COPILOT_RUNNER_OUTPUT:%s\n", string(compactData))
 
 	return nil
 }

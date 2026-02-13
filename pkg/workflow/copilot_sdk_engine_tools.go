@@ -20,6 +20,7 @@
 package workflow
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -52,10 +53,24 @@ func (e *CopilotSDKEngine) computeSDKToolConfig(workflowData *WorkflowData) (ava
 		}
 	}
 
-	// Handle bash/shell tools
-	if _, hasBash := tools["bash"]; hasBash {
-		// SDK uses "bash" for the shell tool
-		availableTools = append(availableTools, "bash")
+	// Handle bash/shell tools.
+	// When bash is configured with a specific command allowlist (non-wildcard),
+	// we carry the individual commands through as "bash(<cmd>)" entries so the
+	// runner can translate them into granular --allow-tool shell(<cmd>) flags
+	// in the CLI fallback path. This avoids broadening permissions to full
+	// shell access when only specific commands were configured.
+	if bashConfig, hasBash := tools["bash"]; hasBash {
+		if bashCommands, ok := bashConfig.([]any); ok && len(bashCommands) > 0 {
+			// Specific commands configured - add granular entries
+			for _, cmd := range bashCommands {
+				if cmdStr, ok := cmd.(string); ok {
+					availableTools = append(availableTools, fmt.Sprintf("bash(%s)", cmdStr))
+				}
+			}
+		} else {
+			// Bash with no specific commands or null value - allow all shell
+			availableTools = append(availableTools, "bash")
+		}
 	}
 
 	// Handle edit tools

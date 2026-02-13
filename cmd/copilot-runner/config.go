@@ -13,8 +13,13 @@ import (
 
 // RunnerConfig represents the JSON configuration for the copilot-runner binary.
 type RunnerConfig struct {
-	// CLIPath is the path to the Copilot CLI binary
+	// CLIPath is the path to the Copilot CLI binary.
+	// Must be an actual executable path (no spaces or arguments).
 	CLIPath string `json:"cli_path"`
+
+	// CLIArgs is a list of additional arguments to prepend before other CLI arguments.
+	// Used when the CLI is invoked via a wrapper (e.g., "node" with args ["./node_modules/.bin/copilot"]).
+	CLIArgs []string `json:"cli_args,omitempty"`
 
 	// Model is the LLM model to use
 	Model string `json:"model,omitempty"`
@@ -75,6 +80,22 @@ func LoadConfig(path string) (*RunnerConfig, error) {
 	var config RunnerConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
+	}
+
+	// Expand environment variables in path fields.
+	// The config is generated at compile time with placeholders like ${GITHUB_WORKSPACE}
+	// which need to be resolved at runtime.
+	config.CLIPath = os.ExpandEnv(config.CLIPath)
+	config.PromptFile = os.ExpandEnv(config.PromptFile)
+	config.LogDir = os.ExpandEnv(config.LogDir)
+	config.WorkingDirectory = os.ExpandEnv(config.WorkingDirectory)
+	config.MCPConfigPath = os.ExpandEnv(config.MCPConfigPath)
+	config.ShareFile = os.ExpandEnv(config.ShareFile)
+	for i, dir := range config.AddDirs {
+		config.AddDirs[i] = os.ExpandEnv(dir)
+	}
+	for i, arg := range config.CLIArgs {
+		config.CLIArgs[i] = os.ExpandEnv(arg)
 	}
 
 	// Validate required fields

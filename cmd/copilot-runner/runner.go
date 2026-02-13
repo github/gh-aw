@@ -107,6 +107,11 @@ func (r *Runner) readPrompt() (string, error) {
 func (r *Runner) executeCLIFallback(ctx context.Context, prompt string) (string, error) {
 	var args []string
 
+	// Prepend CLIArgs (e.g., for "node ./node_modules/.bin/copilot" invocation)
+	if len(r.config.CLIArgs) > 0 {
+		args = append(args, r.config.CLIArgs...)
+	}
+
 	// Add directories
 	for _, dir := range r.config.AddDirs {
 		args = append(args, "--add-dir", dir)
@@ -174,7 +179,14 @@ func (r *Runner) executeCLIFallback(ctx context.Context, prompt string) (string,
 }
 
 // mapSDKToolToCLI maps SDK tool names back to CLI --allow-tool values.
+// Handles both simple names ("bash" -> "shell") and parameterized forms
+// ("bash(git)" -> "shell(git)") for granular command permissions.
 func mapSDKToolToCLI(sdkTool string) string {
+	// Handle parameterized bash tools: bash(<cmd>) -> shell(<cmd>)
+	if strings.HasPrefix(sdkTool, "bash(") && strings.HasSuffix(sdkTool, ")") {
+		inner := sdkTool[5 : len(sdkTool)-1]
+		return "shell(" + inner + ")"
+	}
 	switch sdkTool {
 	case "bash":
 		return "shell"

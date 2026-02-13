@@ -30,8 +30,14 @@ var copilotSDKExecLog = logger.New("workflow:copilot_sdk_engine_execution")
 // SDKRunnerConfig represents the JSON configuration for the copilot-runner binary.
 // This is serialized to a JSON file that the runner reads at startup.
 type SDKRunnerConfig struct {
-	// CLIPath is the path to the Copilot CLI binary (still required by the SDK)
+	// CLIPath is the path to the Copilot CLI binary (still required by the SDK).
+	// This must be an actual executable path (not containing spaces or arguments).
 	CLIPath string `json:"cli_path"`
+
+	// CLIArgs is a list of additional arguments to prepend before the Copilot CLI binary.
+	// For example, in SRT mode the CLI is invoked via "node ./node_modules/.bin/copilot",
+	// so CLIPath would be "node" and CLIArgs would be ["./node_modules/.bin/copilot"].
+	CLIArgs []string `json:"cli_args,omitempty"`
 
 	// Model is the LLM model to use for the session
 	Model string `json:"model,omitempty"`
@@ -363,10 +369,12 @@ func (e *CopilotSDKEngine) buildRunnerConfig(workflowData *WorkflowData, sandbox
 		DisableBuiltinMCPs:     true,
 	}
 
-	// Set CLI path based on sandbox mode
+	// Set CLI path based on sandbox mode.
+	// CLIPath must be an actual executable path; any prefix arguments go in CLIArgs.
 	if sandboxEnabled {
 		if isSRTEnabled(workflowData) {
-			config.CLIPath = "node ./node_modules/.bin/copilot"
+			config.CLIPath = "node"
+			config.CLIArgs = []string{"./node_modules/.bin/copilot"}
 		} else {
 			config.CLIPath = "/usr/local/bin/copilot"
 		}

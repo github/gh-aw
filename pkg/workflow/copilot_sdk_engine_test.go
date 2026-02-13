@@ -208,6 +208,40 @@ func TestCopilotSDKEngineToolConfig(t *testing.T) {
 			t.Errorf("Expected 'web_fetch' in available tools, got: %v", available)
 		}
 	})
+
+	t.Run("bash with specific commands uses granular permissions", func(t *testing.T) {
+		workflowData := &WorkflowData{
+			Tools: map[string]any{
+				"bash": []any{"echo", "ls"},
+			},
+		}
+
+		available, _ := engine.computeSDKToolConfig(workflowData)
+
+		expectedTools := map[string]bool{
+			"bash(echo)": false,
+			"bash(ls)":   false,
+		}
+
+		for _, tool := range available {
+			if _, ok := expectedTools[tool]; ok {
+				expectedTools[tool] = true
+			}
+		}
+
+		for tool, found := range expectedTools {
+			if !found {
+				t.Errorf("Expected granular tool '%s' in available tools, got: %v", tool, available)
+			}
+		}
+
+		// Make sure broad "bash" is not present
+		for _, tool := range available {
+			if tool == "bash" {
+				t.Errorf("Expected granular bash(cmd) entries, not broad 'bash', got: %v", available)
+			}
+		}
+	})
 }
 
 func TestCopilotSDKEngineGetExecutionSteps(t *testing.T) {

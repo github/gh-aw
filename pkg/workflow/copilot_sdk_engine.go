@@ -14,7 +14,7 @@
 //   - Generates JSON config instead of shell command flags
 //   - Invokes copilot-runner binary instead of copilot CLI directly
 //   - Tool permissions use AvailableTools/ExcludedTools arrays instead of --allow-tool flags
-//   - MCP config is embedded in JSON config (no file I/O needed at runtime)
+//   - MCP config is written to a config file for the runner to consume
 //   - Structured JSON output from runner replaces log file parsing
 
 package workflow
@@ -117,9 +117,9 @@ func (e *CopilotSDKEngine) GetDeclaredOutputFiles() []string {
 // GetExecutionSteps is implemented in copilot_sdk_engine_execution.go
 
 // RenderMCPConfig generates MCP server configuration for the Copilot SDK engine.
-// Unlike the CLI engine which writes a JSON file to disk, the SDK engine embeds
-// MCP configuration directly in the runner's JSON config file. However, we still
-// need to render the MCP config for the config file generation step.
+// Like the CLI engine, the SDK engine writes MCP configuration to a JSON file on disk
+// that the runner reads at startup. In a future iteration, the MCP config could be
+// embedded directly in the runner's JSON config to avoid separate file I/O.
 func (e *CopilotSDKEngine) RenderMCPConfig(yaml *strings.Builder, tools map[string]any, mcpTools []string, workflowData *WorkflowData) {
 	copilotSDKLog.Printf("Rendering MCP config for Copilot SDK engine: mcpTools=%d", len(mcpTools))
 
