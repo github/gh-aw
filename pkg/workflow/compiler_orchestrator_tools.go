@@ -15,23 +15,24 @@ var orchestratorToolsLog = logger.New("workflow:compiler_orchestrator_tools")
 
 // toolsProcessingResult holds the results of tools and markdown processing
 type toolsProcessingResult struct {
-	tools                map[string]any
-	runtimes             map[string]any
-	pluginInfo           *PluginInfo // Consolidated plugin information
-	toolsTimeout         int
-	toolsStartupTimeout  int
-	markdownContent      string
-	importedMarkdown     string   // Only imports WITH inputs (for compile-time substitution)
-	importPaths          []string // Import paths for runtime-import macro generation (imports without inputs)
-	mainWorkflowMarkdown string   // main workflow markdown without imports (for runtime-import)
-	allIncludedFiles     []string
-	workflowName         string
-	frontmatterName      string
-	needsTextOutput      bool
-	trackerID            string
-	safeOutputs          *SafeOutputsConfig
-	secretMasking        *SecretMaskingConfig
-	parsedFrontmatter    *FrontmatterConfig
+	tools                 map[string]any
+	runtimes              map[string]any
+	pluginInfo            *PluginInfo // Consolidated plugin information
+	toolsTimeout          int
+	toolsStartupTimeout   int
+	markdownContent       string
+	importedMarkdown      string   // Only imports WITH inputs (for compile-time substitution)
+	importPaths           []string // Import paths for runtime-import macro generation (imports without inputs)
+	mainWorkflowMarkdown  string   // main workflow markdown without imports (for runtime-import)
+	allIncludedFiles      []string
+	workflowName          string
+	frontmatterName       string
+	needsTextOutput       bool
+	trackerID             string
+	safeOutputs           *SafeOutputsConfig
+	secretMasking         *SecretMaskingConfig
+	parsedFrontmatter     *FrontmatterConfig
+	hasExplicitGitHubTool bool // true if tools.github was explicitly configured in frontmatter
 }
 
 // processToolsAndMarkdown processes tools configuration, runtimes, and markdown content.
@@ -112,6 +113,23 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 		orchestratorToolsLog.Printf("Tools merge failed: %v", err)
 		return nil, fmt.Errorf("failed to merge tools: %w", err)
 	}
+
+	// Check if GitHub tool was explicitly configured in the original frontmatter
+	// This is needed to determine if permissions validation should be skipped
+	hasExplicitGitHubTool := false
+	if tools != nil {
+		if _, exists := tools["github"]; exists {
+			// GitHub tool exists in merged tools - check if it was explicitly configured
+			// by looking at the original frontmatter before any merging
+			if topTools != nil {
+				if _, existsInTop := topTools["github"]; existsInTop {
+					hasExplicitGitHubTool = true
+					orchestratorToolsLog.Print("GitHub tool was explicitly configured in frontmatter")
+				}
+			}
+		}
+	}
+	orchestratorToolsLog.Printf("hasExplicitGitHubTool: %v", hasExplicitGitHubTool)
 
 	// Extract and validate tools timeout settings
 	toolsTimeout, err := c.extractToolsTimeout(tools)
@@ -302,23 +320,24 @@ func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cle
 	}
 
 	return &toolsProcessingResult{
-		tools:                tools,
-		runtimes:             runtimes,
-		pluginInfo:           pluginInfo,
-		toolsTimeout:         toolsTimeout,
-		toolsStartupTimeout:  toolsStartupTimeout,
-		markdownContent:      markdownContent,
-		importedMarkdown:     importedMarkdown, // Only imports WITH inputs
-		importPaths:          importPaths,      // Import paths for runtime-import macros (imports without inputs)
-		mainWorkflowMarkdown: mainWorkflowMarkdown,
-		allIncludedFiles:     allIncludedFiles,
-		workflowName:         workflowName,
-		frontmatterName:      frontmatterName,
-		needsTextOutput:      needsTextOutput,
-		trackerID:            trackerID,
-		safeOutputs:          safeOutputs,
-		secretMasking:        secretMasking,
-		parsedFrontmatter:    parsedFrontmatter,
+		tools:                 tools,
+		runtimes:              runtimes,
+		pluginInfo:            pluginInfo,
+		toolsTimeout:          toolsTimeout,
+		toolsStartupTimeout:   toolsStartupTimeout,
+		markdownContent:       markdownContent,
+		importedMarkdown:      importedMarkdown, // Only imports WITH inputs
+		importPaths:           importPaths,      // Import paths for runtime-import macros (imports without inputs)
+		mainWorkflowMarkdown:  mainWorkflowMarkdown,
+		allIncludedFiles:      allIncludedFiles,
+		workflowName:          workflowName,
+		frontmatterName:       frontmatterName,
+		needsTextOutput:       needsTextOutput,
+		trackerID:             trackerID,
+		safeOutputs:           safeOutputs,
+		secretMasking:         secretMasking,
+		parsedFrontmatter:     parsedFrontmatter,
+		hasExplicitGitHubTool: hasExplicitGitHubTool,
 	}, nil
 }
 

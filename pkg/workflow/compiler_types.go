@@ -445,8 +445,9 @@ type WorkflowData struct {
 	StrictMode           bool                 // strict mode for action pinning
 	SecretMasking        *SecretMaskingConfig // secret masking configuration
 	ParsedFrontmatter    *FrontmatterConfig   // cached parsed frontmatter configuration (for performance optimization)
-	ActionPinWarnings    map[string]bool      // cache of already-warned action pin failures (key: "repo@version")
-	ActionMode           ActionMode           // action mode for workflow compilation (dev, release, script)
+	ActionPinWarnings       map[string]bool      // cache of already-warned action pin failures (key: "repo@version")
+	ActionMode              ActionMode           // action mode for workflow compilation (dev, release, script)
+	HasExplicitGitHubTool   bool                 // true if tools.github was explicitly configured in frontmatter
 }
 
 // BaseSafeOutputConfig holds common configuration fields for all safe output types
