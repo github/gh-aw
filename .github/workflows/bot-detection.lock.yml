@@ -21,7 +21,7 @@
 #
 # Investigates suspicious repository activity and maintains a single triage issue
 #
-# frontmatter-hash: 0c356641b3006617f23fd6e9f85cdcbf37e8c31bb3d5e42bdc61851d0fae913a
+# frontmatter-hash: 5a2aa2efd24123412162d29a03e86cd5d7708172ea7fc071192e38713f6d3537
 
 name: "Bot Detection"
 "on":
@@ -1215,8 +1215,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -1236,8 +1244,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -1257,8 +1273,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -1321,8 +1345,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );

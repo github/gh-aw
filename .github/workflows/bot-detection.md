@@ -242,8 +242,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -263,8 +271,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -284,8 +300,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
@@ -348,8 +372,16 @@ jobs:
                     per_page: 100,
                   },
                   (response, done) => {
+                    const remaining = 500 - total;
+                    if (remaining <= 0) {
+                      done();
+                      return [];
+                    }
                     total += response.data.length;
-                    if (total >= 500) done();
+                    if (total >= 500) {
+                      done();
+                      return response.data.slice(0, remaining);
+                    }
                     return response.data;
                   }
                 );
