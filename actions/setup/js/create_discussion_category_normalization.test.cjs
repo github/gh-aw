@@ -271,4 +271,136 @@ describe("create_discussion category normalization", () => {
     expect(createMutationCall).toBeDefined();
     expect(createMutationCall[1].categoryId).toBe("DIC_kwDOGFsHUM4BsUn1"); // General (first)
   });
+
+  it("should prefer Announcements category when no category specified", async () => {
+    // Mock categories with Announcements available
+    mockGithub.graphql = vi.fn().mockImplementation((query, variables) => {
+      if (query.includes("discussionCategories")) {
+        return Promise.resolve({
+          repository: {
+            id: "R_test123",
+            discussionCategories: {
+              nodes: [
+                {
+                  id: "DIC_kwDOGFsHUM4BsUn1",
+                  name: "General",
+                  slug: "general",
+                  description: "General discussions",
+                },
+                {
+                  id: "DIC_kwDOGFsHUM4BsUn4",
+                  name: "Announcements",
+                  slug: "announcements",
+                  description: "Announcements",
+                },
+                {
+                  id: "DIC_kwDOGFsHUM4BsUn2",
+                  name: "Audits",
+                  slug: "audits",
+                  description: "Audit reports",
+                },
+              ],
+            },
+          },
+        });
+      }
+      if (query.includes("createDiscussion")) {
+        return Promise.resolve({
+          createDiscussion: {
+            discussion: {
+              id: "D_test456",
+              number: 42,
+              title: variables.title,
+              url: "https://github.com/test-owner/test-repo/discussions/42",
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error("Unknown GraphQL query"));
+    });
+
+    const handler = await createDiscussionMain({
+      max: 5,
+      // No category specified
+    });
+
+    const result = await handler(
+      {
+        title: "Test Discussion",
+        body: "This is a test discussion.",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.number).toBe(42);
+
+    // Verify Announcements category was used (not General which is first)
+    const createMutationCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("createDiscussion"));
+    expect(createMutationCall).toBeDefined();
+    expect(createMutationCall[1].categoryId).toBe("DIC_kwDOGFsHUM4BsUn4"); // Announcements
+  });
+
+  it("should prefer Announcements category when non-existent category specified", async () => {
+    // Mock categories with Announcements available
+    mockGithub.graphql = vi.fn().mockImplementation((query, variables) => {
+      if (query.includes("discussionCategories")) {
+        return Promise.resolve({
+          repository: {
+            id: "R_test123",
+            discussionCategories: {
+              nodes: [
+                {
+                  id: "DIC_kwDOGFsHUM4BsUn1",
+                  name: "General",
+                  slug: "general",
+                  description: "General discussions",
+                },
+                {
+                  id: "DIC_kwDOGFsHUM4BsUn4",
+                  name: "Announcements",
+                  slug: "announcements",
+                  description: "Announcements",
+                },
+              ],
+            },
+          },
+        });
+      }
+      if (query.includes("createDiscussion")) {
+        return Promise.resolve({
+          createDiscussion: {
+            discussion: {
+              id: "D_test456",
+              number: 42,
+              title: variables.title,
+              url: "https://github.com/test-owner/test-repo/discussions/42",
+            },
+          },
+        });
+      }
+      return Promise.reject(new Error("Unknown GraphQL query"));
+    });
+
+    const handler = await createDiscussionMain({
+      max: 5,
+      category: "NonExistentCategory",
+    });
+
+    const result = await handler(
+      {
+        title: "Test Discussion",
+        body: "This is a test discussion.",
+      },
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.number).toBe(42);
+
+    // Verify Announcements category was used (not General which is first)
+    const createMutationCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("createDiscussion"));
+    expect(createMutationCall).toBeDefined();
+    expect(createMutationCall[1].categoryId).toBe("DIC_kwDOGFsHUM4BsUn4"); // Announcements
+  });
 });

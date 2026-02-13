@@ -85,8 +85,21 @@ function resolveCategoryId(categoryConfig, itemCategory, categories) {
     }
   }
 
-  // Fall back to first category if available
+  // Fall back to announcement-capable category if available, otherwise first category
   if (categories.length > 0) {
+    // Try to find an "Announcements" category (case-insensitive)
+    const announcementCategory = categories.find(cat => cat.name.toLowerCase() === "announcements" || cat.slug.toLowerCase() === "announcements");
+
+    if (announcementCategory) {
+      return {
+        id: announcementCategory.id,
+        matchType: "fallback-announcement",
+        name: announcementCategory.name,
+        requestedCategory: categoryToMatch,
+      };
+    }
+
+    // Otherwise use first category
     return {
       id: categories[0].id,
       matchType: "fallback",
