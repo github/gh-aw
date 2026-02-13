@@ -129,6 +129,11 @@ type CapabilityProvider interface {
 	// SupportsPlugins returns true if this engine supports plugin installation
 	// When true, plugins can be installed using the engine's plugin install command
 	SupportsPlugins() bool
+
+	// SupportsLLMGateway returns true if this engine supports an LLM gateway
+	// When true, the engine can use a gateway service to proxy LLM API calls
+	// In strict mode, engines without LLM gateway support require additional security constraints
+	SupportsLLMGateway() bool
 }
 
 // WorkflowExecutor handles workflow compilation and execution
@@ -204,6 +209,7 @@ type BaseEngine struct {
 	supportsWebSearch      bool
 	supportsFirewall       bool
 	supportsPlugins        bool
+	supportsLLMGateway     bool
 }
 
 func (e *BaseEngine) GetID() string {
@@ -248,6 +254,10 @@ func (e *BaseEngine) SupportsFirewall() bool {
 
 func (e *BaseEngine) SupportsPlugins() bool {
 	return e.supportsPlugins
+}
+
+func (e *BaseEngine) SupportsLLMGateway() bool {
+	return e.supportsLLMGateway
 }
 
 // GetDeclaredOutputFiles returns an empty list by default (engines can override)

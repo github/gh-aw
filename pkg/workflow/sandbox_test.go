@@ -364,6 +364,7 @@ func TestSandboxCompilationWithNetworkViaTopLevel(t *testing.T) {
 	content := `---
 on: workflow_dispatch
 engine: copilot
+strict: false
 sandbox:
   agent: awf
 network:

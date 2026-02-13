@@ -268,8 +268,8 @@ func TestParseWorkflowFile_NetworkPermissions(t *testing.T) {
 			networkConfig: `
 network:
   allowed:
-    - github.com
-    - api.example.com`,
+    - python
+    - node`,
 			expectedHasAllowed: true,
 		},
 	}
