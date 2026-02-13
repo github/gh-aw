@@ -345,7 +345,7 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 		// Validate that network domains are defaults or from known ecosystems (not custom domains)
 		if networkPermissions != nil && len(networkPermissions.Allowed) > 0 {
 			strictModeValidationLog.Printf("Validating network domains for engine without LLM gateway support")
-			
+
 			// Check if allowed domains contain only known ecosystems or "defaults"
 			hasCustomDomain := false
 			for _, domain := range networkPermissions.Allowed {
@@ -353,7 +353,7 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 				if domain == "*" {
 					continue
 				}
-				
+
 				// Check if this is a known ecosystem identifier
 				ecosystemDomains := getEcosystemDomains(domain)
 				if len(ecosystemDomains) > 0 {
@@ -361,7 +361,7 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 					strictModeValidationLog.Printf("Domain '%s' is a known ecosystem identifier", domain)
 					continue
 				}
-				
+
 				// Check if this domain belongs to any ecosystem
 				ecosystem := GetDomainEcosystem(domain)
 				if ecosystem != "" {
@@ -369,12 +369,12 @@ func (c *Compiler) validateStrictFirewall(engineID string, networkPermissions *N
 					strictModeValidationLog.Printf("Domain '%s' belongs to ecosystem '%s'", domain, ecosystem)
 					continue
 				}
-				
+
 				// This is a custom domain
 				strictModeValidationLog.Printf("Domain '%s' is a custom domain (not from known ecosystems)", domain)
 				hasCustomDomain = true
 			}
-			
+
 			if hasCustomDomain {
 				strictModeValidationLog.Printf("Engine without LLM gateway has custom domains, failing validation")
 				return fmt.Errorf("strict mode: engine '%s' does not support LLM gateway and requires network domains to be from known ecosystems (e.g., 'defaults', 'python', 'node'). Custom domains are not allowed for security. See: https://github.github.com/gh-aw/reference/network/", engineID)

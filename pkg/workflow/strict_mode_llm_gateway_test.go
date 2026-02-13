@@ -249,9 +249,9 @@ func TestSupportsLLMGateway(t *testing.T) {
 	registry := NewEngineRegistry()
 
 	tests := []struct {
-		engineID            string
-		expectedLLMGateway  bool
-		description         string
+		engineID           string
+		expectedLLMGateway bool
+		description        string
 	}{
 		{
 			engineID:           "codex",

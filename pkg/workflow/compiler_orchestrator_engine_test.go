@@ -22,7 +22,7 @@ on: push
 engine: copilot
 network:
   allowed:
-    - github.com
+    - python
 ---
 
 # Test Workflow
@@ -230,7 +230,7 @@ func TestSetupEngineAndImports_NetworkMerging(t *testing.T) {
 	importContent := `---
 network:
   allowed:
-    - api.github.com
+    - python
 ---
 
 # Imported Workflow
@@ -246,7 +246,7 @@ imports:
   - imported.md
 network:
   allowed:
-    - github.com
+    - node
 ---
 
 # Main Workflow
@@ -384,7 +384,7 @@ on: push
 engine: copilot
 network:
   allowed:
-    - github.com
+    - python
 ---
 
 # Test Workflow
