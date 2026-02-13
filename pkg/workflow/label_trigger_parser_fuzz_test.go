@@ -138,21 +138,13 @@ func FuzzExpandLabelTriggerShorthand(f *testing.F) {
 						t.Errorf("types array is empty for entityType=%q", entityType)
 					}
 
-					// Check for names field (only for issues and pull_request, not discussion)
-					switch entityType {
-					case "issues", "pull_request":
-						if names, hasNames := triggerMap["names"]; !hasNames {
-							t.Errorf("trigger missing names field for entityType=%q", entityType)
-						} else if namesArray, ok := names.([]string); !ok {
-							t.Errorf("names is not a string array for entityType=%q", entityType)
-						} else if len(namesArray) != len(labelNames) {
-							t.Errorf("names array length mismatch: got %d, want %d for entityType=%q", len(namesArray), len(labelNames), entityType)
-						}
-					case "discussion":
-						// Discussion should not have names field (GitHub Actions doesn't support it)
-						if _, hasNames := triggerMap["names"]; hasNames {
-							t.Errorf("discussion trigger should not have names field, but it does")
-						}
+					// Check for names field (all event types use names for job condition filtering)
+					if names, hasNames := triggerMap["names"]; !hasNames {
+						t.Errorf("trigger missing names field for entityType=%q", entityType)
+					} else if namesArray, ok := names.([]string); !ok {
+						t.Errorf("names is not a string array for entityType=%q", entityType)
+					} else if len(namesArray) != len(labelNames) {
+						t.Errorf("names array length mismatch: got %d, want %d for entityType=%q", len(namesArray), len(labelNames), entityType)
 					}
 				}
 			}
