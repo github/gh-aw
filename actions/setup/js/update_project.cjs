@@ -699,11 +699,11 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       // Validate IDs used for draft chaining.
       // Draft issue chaining must use strict temporary IDs to match the unified handler manager.
       if (temporaryId && !isTemporaryId(temporaryId)) {
-        throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 4 to 8 alphanumeric characters (e.g., "aw_abc1", "aw_Test123").`);
+        throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 3 to 8 alphanumeric characters (e.g., "aw_abc", "aw_Test123").`);
       }
 
       if (draftIssueId && !isTemporaryId(draftIssueId)) {
-        throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 4 to 8 alphanumeric characters (e.g., "aw_abc1", "aw_Test123").`);
+        throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 3 to 8 alphanumeric characters (e.g., "aw_abc", "aw_Test123").`);
       }
 
       const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";

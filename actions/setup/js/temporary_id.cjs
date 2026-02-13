@@ -7,9 +7,9 @@ const crypto = require("crypto");
 
 /**
  * Regex pattern for matching temporary ID references in text
- * Format: #aw_XXXX to #aw_XXXXXXXX (aw_ prefix + 4 to 8 alphanumeric characters)
+ * Format: #aw_XXX to #aw_XXXXXXXX (aw_ prefix + 3 to 8 alphanumeric characters)
  */
-const TEMPORARY_ID_PATTERN = /#(aw_[A-Za-z0-9]{4,8})/gi;
+const TEMPORARY_ID_PATTERN = /#(aw_[A-Za-z0-9]{3,8})/gi;
 
 /**
  * @typedef {Object} RepoIssuePair
@@ -33,13 +33,13 @@ function generateTemporaryId() {
 }
 
 /**
- * Check if a value is a valid temporary ID (aw_ prefix + 4 to 8 alphanumeric characters)
+ * Check if a value is a valid temporary ID (aw_ prefix + 3 to 8 alphanumeric characters)
  * @param {any} value - The value to check
  * @returns {boolean} True if the value is a valid temporary ID
  */
 function isTemporaryId(value) {
   if (typeof value === "string") {
-    return /^aw_[A-Za-z0-9]{4,8}$/i.test(value);
+    return /^aw_[A-Za-z0-9]{3,8}$/i.test(value);
   }
   return false;
 }
@@ -222,14 +222,14 @@ function resolveIssueNumber(value, temporaryIdMap) {
     return {
       resolved: null,
       wasTemporaryId: false,
-      errorMessage: `Invalid temporary ID format: '${valueStr}'. Temporary IDs must be in format 'aw_' followed by 4 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc1' or 'aw_abc12345'`,
+      errorMessage: `Invalid temporary ID format: '${valueStr}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_abc12345'`,
     };
   }
 
   // It's a real issue number - use context repo as default
   const issueNumber = typeof value === "number" ? value : parseInt(valueWithoutHash, 10);
   if (isNaN(issueNumber) || issueNumber <= 0) {
-    return { resolved: null, wasTemporaryId: false, errorMessage: `Invalid issue number: ${value}. Expected either a valid temporary ID (format: aw_ followed by 4-8 alphanumeric characters) or a numeric issue number.` };
+    return { resolved: null, wasTemporaryId: false, errorMessage: `Invalid issue number: ${value}. Expected either a valid temporary ID (format: aw_ followed by 3-8 alphanumeric characters) or a numeric issue number.` };
   }
 
   const contextRepo = typeof context !== "undefined" ? `${context.repo.owner}/${context.repo.repo}` : "";
@@ -412,8 +412,8 @@ function extractTemporaryIdReferences(message) {
     const value = message[field];
     if (value !== undefined && value !== null && typeof value === "string") {
       // Extract potential temporary ID from URL or plain ID
-      // Match: https://github.com/owner/repo/issues/#aw_XXXX or #aw_XXXXXXXX
-      const urlMatch = value.match(/issues\/(#?aw_[A-Za-z0-9]{4,8})\s*$/i);
+      // Match: https://github.com/owner/repo/issues/#aw_XXX or #aw_XXXXXXXX
+      const urlMatch = value.match(/issues\/(#?aw_[A-Za-z0-9]{3,8})\s*$/i);
       if (urlMatch) {
         const valueWithoutHash = urlMatch[1].startsWith("#") ? urlMatch[1].substring(1) : urlMatch[1];
         if (isTemporaryId(valueWithoutHash)) {

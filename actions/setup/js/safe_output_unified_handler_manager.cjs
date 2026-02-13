@@ -732,7 +732,7 @@ function normalizeAndValidateTemporaryId(message, messageType, messageIndex) {
   const withoutHash = trimmed.startsWith("#") ? trimmed.substring(1).trim() : trimmed;
 
   if (!isTemporaryId(withoutHash)) {
-    throw new Error(`Message ${messageIndex + 1} (${messageType}): invalid temporary_id '${raw}'. Temporary IDs must be 'aw_' followed by 4 to 8 alphanumeric characters (A-Za-z0-9), e.g. 'aw_abc1' or 'aw_Test123'`);
+    throw new Error(`Message ${messageIndex + 1} (${messageType}): invalid temporary_id '${raw}'. Temporary IDs must be 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9), e.g. 'aw_abc' or 'aw_Test123'`);
   }
 
   // Normalize to the strict bare ID to keep lookups consistent.
