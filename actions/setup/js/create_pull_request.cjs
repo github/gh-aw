@@ -771,7 +771,7 @@ ${patchPreview}`;
         return {
           success: false,
           error: errorMessage,
-          error_type: "permission_denied",
+          error_type: "pr_creation_failed",
         };
       }
 
