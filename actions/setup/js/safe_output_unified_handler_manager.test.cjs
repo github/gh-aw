@@ -45,13 +45,13 @@ describe("Unified Safe Output Handler Manager", () => {
     it("processes dependencies first even if messages are out of order", async () => {
       const createIssueHandler = vi.fn(async message => {
         // Should be normalized by the dispatcher before handler invocation.
-        expect(message.temporary_id).toBe("aw_deadbeefcafe");
+        expect(message.temporary_id).toBe("aw_deadbe");
         return { repo: "testowner/testrepo", number: 123, temporaryId: message.temporary_id };
       });
 
       const addCommentHandler = vi.fn(async (_message, resolvedTemporaryIds) => {
-        expect(resolvedTemporaryIds).toHaveProperty("aw_deadbeefcafe");
-        expect(resolvedTemporaryIds.aw_deadbeefcafe).toEqual({ repo: "testowner/testrepo", number: 123 });
+        expect(resolvedTemporaryIds).toHaveProperty("aw_deadbe");
+        expect(resolvedTemporaryIds.aw_deadbe).toEqual({ repo: "testowner/testrepo", number: 123 });
         return { ok: true };
       });
 
@@ -65,15 +65,15 @@ describe("Unified Safe Output Handler Manager", () => {
         {
           type: "add_comment",
           repo: "testowner/testrepo",
-          issue_number: "#aw_deadbeefcafe",
-          body: "See #aw_deadbeefcafe for details",
+          issue_number: "#aw_deadbe",
+          body: "See #aw_deadbe for details",
         },
         {
           type: "create_issue",
           repo: "testowner/testrepo",
           title: "Create first",
           body: "Body",
-          temporary_id: "aw_deadbeefcafe",
+          temporary_id: "aw_deadbe",
         },
       ];
 
@@ -82,13 +82,13 @@ describe("Unified Safe Output Handler Manager", () => {
       expect(result.success).toBe(true);
       expect(createIssueHandler).toHaveBeenCalledTimes(1);
       expect(addCommentHandler).toHaveBeenCalledTimes(1);
-      expect(result.temporaryIdMap).toHaveProperty("aw_deadbeefcafe");
-      expect(result.temporaryIdMap.aw_deadbeefcafe).toEqual({ repo: "testowner/testrepo", number: 123 });
+      expect(result.temporaryIdMap).toHaveProperty("aw_deadbe");
+      expect(result.temporaryIdMap.aw_deadbe).toEqual({ repo: "testowner/testrepo", number: 123 });
     });
 
     it("normalizes temporaryId camelCase + # prefix + casing to strict lowercase", async () => {
       const createIssueHandler = vi.fn(async message => {
-        expect(message.temporary_id).toBe("aw_abc123def456");
+        expect(message.temporary_id).toBe("aw_abc123");
         return { repo: "testowner/testrepo", number: 321, temporaryId: message.temporary_id };
       });
 
@@ -99,7 +99,7 @@ describe("Unified Safe Output Handler Manager", () => {
           repo: "testowner/testrepo",
           title: "Normalize",
           body: "Body",
-          temporaryId: "  #AW_ABC123DEF456  ",
+          temporaryId: "  #AW_ABC123  ",
         },
       ];
 
@@ -107,12 +107,12 @@ describe("Unified Safe Output Handler Manager", () => {
 
       expect(result.success).toBe(true);
       expect(createIssueHandler).toHaveBeenCalledTimes(1);
-      expect(result.temporaryIdMap).toHaveProperty("aw_abc123def456");
-      expect(result.temporaryIdMap.aw_abc123def456).toEqual({ repo: "testowner/testrepo", number: 321 });
+      expect(result.temporaryIdMap).toHaveProperty("aw_abc123");
+      expect(result.temporaryIdMap.aw_abc123).toEqual({ repo: "testowner/testrepo", number: 321 });
     });
 
     it("rejects malformed temporary_id before invoking handler", async () => {
-      const createIssueHandler = vi.fn(async () => ({ repo: "testowner/testrepo", number: 1, temporaryId: "aw_deadbeefcafe" }));
+      const createIssueHandler = vi.fn(async () => ({ repo: "testowner/testrepo", number: 1, temporaryId: "aw_deadbe" }));
 
       const handlers = new Map([["create_issue", createIssueHandler]]);
       const messages = [
@@ -121,7 +121,7 @@ describe("Unified Safe Output Handler Manager", () => {
           repo: "testowner/testrepo",
           title: "Bad temp ID",
           body: "Body",
-          temporary_id: "aw_bundle_npm001",
+          temporary_id: "aw_bundle_npm001_invalid",
         },
       ];
 
@@ -137,36 +137,36 @@ describe("Unified Safe Output Handler Manager", () => {
       const updateProjectHandler = vi.fn(async (message, temporaryIdMap) => {
         if (message.operation === "create") {
           expect(temporaryIdMap.size).toBe(0);
-          return { temporaryId: "aw_deadbeefcafe", draftItemId: "draft-item-1" };
+          return { temporaryId: "aw_deadbe", draftItemId: "draft-item-1" };
         }
 
-        expect(temporaryIdMap.get("aw_deadbeefcafe")).toEqual({ draftItemId: "draft-item-1" });
+        expect(temporaryIdMap.get("aw_deadbe")).toEqual({ draftItemId: "draft-item-1" });
         return { ok: true };
       });
 
       const handlers = new Map([["update_project", updateProjectHandler]]);
       const messages = [
-        { type: "update_project", operation: "create", temporary_id: "aw_deadbeefcafe" },
-        { type: "update_project", operation: "update", draft_issue_id: "#aw_deadbeefcafe" },
+        { type: "update_project", operation: "create", temporary_id: "aw_deadbe" },
+        { type: "update_project", operation: "update", draft_issue_id: "#aw_deadbe" },
       ];
 
       const result = await processMessages(handlers, messages, {});
 
       expect(result.success).toBe(true);
       expect(updateProjectHandler).toHaveBeenCalledTimes(2);
-      expect(result.temporaryIdMap).toHaveProperty("aw_deadbeefcafe");
-      expect(result.temporaryIdMap.aw_deadbeefcafe).toEqual({ draftItemId: "draft-item-1" });
+      expect(result.temporaryIdMap).toHaveProperty("aw_deadbe");
+      expect(result.temporaryIdMap.aw_deadbe).toEqual({ draftItemId: "draft-item-1" });
     });
 
     it("chains create_issue → update_project via content_number temporary ID", async () => {
       const createIssueHandler = vi.fn(async message => {
-        expect(message.temporary_id).toBe("aw_deadbeefcafe");
+        expect(message.temporary_id).toBe("aw_deadbe");
         return { repo: "testowner/testrepo", number: 456, temporaryId: message.temporary_id };
       });
 
       const updateProjectHandler = vi.fn(async (message, temporaryIdMap) => {
         // Ensure the mapping exists in the live Map for project handlers.
-        expect(temporaryIdMap.get("aw_deadbeefcafe")).toEqual({ repo: "testowner/testrepo", number: 456 });
+        expect(temporaryIdMap.get("aw_deadbe")).toEqual({ repo: "testowner/testrepo", number: 456 });
 
         // And validate that project handlers can resolve it using shared helper.
         const resolved = resolveIssueNumber(message.content_number, temporaryIdMap);
@@ -188,14 +188,14 @@ describe("Unified Safe Output Handler Manager", () => {
           type: "update_project",
           project: "https://github.com/orgs/testowner/projects/60",
           content_type: "issue",
-          content_number: "#aw_deadbeefcafe",
+          content_number: "#aw_deadbe",
         },
         {
           type: "create_issue",
           repo: "testowner/testrepo",
           title: "Create an issue",
           body: "Body",
-          temporary_id: "aw_deadbeefcafe",
+          temporary_id: "aw_deadbe",
         },
       ];
 
@@ -204,7 +204,7 @@ describe("Unified Safe Output Handler Manager", () => {
       expect(result.success).toBe(true);
       expect(createIssueHandler).toHaveBeenCalledTimes(1);
       expect(updateProjectHandler).toHaveBeenCalledTimes(1);
-      expect(result.temporaryIdMap.aw_deadbeefcafe).toEqual({ repo: "testowner/testrepo", number: 456 });
+      expect(result.temporaryIdMap.aw_deadbe).toEqual({ repo: "testowner/testrepo", number: 456 });
     });
   });
 

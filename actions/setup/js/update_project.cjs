@@ -699,11 +699,11 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
       // Validate IDs used for draft chaining.
       // Draft issue chaining must use strict temporary IDs to match the unified handler manager.
       if (temporaryId && !isTemporaryId(temporaryId)) {
-        throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
+        throw new Error(`Invalid temporary_id format: "${temporaryId}". Expected format: aw_ followed by 4 to 8 alphanumeric characters (e.g., "aw_abc1", "aw_Test123").`);
       }
 
       if (draftIssueId && !isTemporaryId(draftIssueId)) {
-        throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 12 hex characters (e.g., "aw_abc123def456").`);
+        throw new Error(`Invalid draft_issue_id format: "${draftIssueId}". Expected format: aw_ followed by 4 to 8 alphanumeric characters (e.g., "aw_abc1", "aw_Test123").`);
       }
 
       const draftTitle = typeof output.draft_title === "string" ? output.draft_title.trim() : "";
@@ -935,7 +935,7 @@ async function updateProject(output, temporaryIdMap = new Map(), githubClient = 
         } else {
           // Not a temporary ID - validate as numeric
           if (!/^\d+$/.test(sanitizedContentNumber)) {
-            throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer or a valid temporary ID (format: aw_XXXXXXXXXXXX).`);
+            throw new Error(`Invalid content number "${rawContentNumber}". Provide a positive integer or a valid temporary ID (format: aw_ followed by 4-8 alphanumeric characters).`);
           }
           contentNumber = Number.parseInt(sanitizedContentNumber, 10);
         }

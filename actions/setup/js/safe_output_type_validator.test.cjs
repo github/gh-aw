@@ -299,11 +299,11 @@ describe("safe_output_type_validator", () => {
     it("should accept temporary ID", async () => {
       const { validateIssueNumberOrTemporaryId } = await import("./safe_output_type_validator.cjs");
 
-      const result = validateIssueNumberOrTemporaryId("aw_abc123def456", "issue_number", 1);
+      const result = validateIssueNumberOrTemporaryId("aw_abc123", "issue_number", 1);
 
       expect(result.isValid).toBe(true);
       expect(result.isTemporary).toBe(true);
-      expect(result.normalizedValue).toBe("aw_abc123def456");
+      expect(result.normalizedValue).toBe("aw_abc123");
     });
 
     it("should reject invalid values", async () => {

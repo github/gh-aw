@@ -149,11 +149,11 @@ async function main(config = {}) {
 
       if (!isTemporaryId(normalized)) {
         core.warning(
-          `Skipping create_pull_request: Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by exactly 12 hexadecimal characters (0-9, a-f). Example: 'aw_abc123def456'`
+          `Skipping create_pull_request: Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 4 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc1' or 'aw_Test123'`
         );
         return {
           success: false,
-          error: `Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by exactly 12 hexadecimal characters (0-9, a-f). Example: 'aw_abc123def456'`,
+          error: `Invalid temporary_id format: '${pullRequestItem.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 4 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc1' or 'aw_Test123'`,
         };
       }
 

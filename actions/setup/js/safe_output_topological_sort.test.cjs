@@ -19,14 +19,14 @@ describe("safe_output_topological_sort.cjs", () => {
       const { buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Parent" },
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Parent" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment" },
       ];
 
       const { dependencies, providers } = buildDependencyGraph(messages);
 
       expect(providers.size).toBe(1);
-      expect(providers.get("aw_dddddd111111")).toBe(0);
+      expect(providers.get("aw_ddd111")).toBe(0);
 
       expect(dependencies.get(0).size).toBe(0); // Message 0 has no dependencies
       expect(dependencies.get(1).size).toBe(1); // Message 1 depends on message 0
@@ -37,9 +37,9 @@ describe("safe_output_topological_sort.cjs", () => {
       const { buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "First" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", body: "Ref #aw_dddddd111111" },
-        { type: "create_issue", temporary_id: "aw_ffffff333333", body: "Ref #aw_eeeeee222222" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "First" },
+        { type: "create_issue", temporary_id: "aw_eee222", body: "Ref #aw_ddd111" },
+        { type: "create_issue", temporary_id: "aw_fff333", body: "Ref #aw_eee222" },
       ];
 
       const { dependencies, providers } = buildDependencyGraph(messages);
@@ -57,12 +57,12 @@ describe("safe_output_topological_sort.cjs", () => {
       const { buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Issue 1" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", title: "Issue 2" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Issue 1" },
+        { type: "create_issue", temporary_id: "aw_eee222", title: "Issue 2" },
         {
           type: "create_issue",
-          temporary_id: "aw_ffffff333333",
-          body: "See #aw_dddddd111111 and #aw_eeeeee222222",
+          temporary_id: "aw_fff333",
+          body: "See #aw_ddd111 and #aw_eee222",
         },
       ];
 
@@ -77,16 +77,16 @@ describe("safe_output_topological_sort.cjs", () => {
       const { buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_abc111def222", title: "First" },
-        { type: "create_issue", temporary_id: "aw_abc111def222", title: "Second" },
+        { type: "create_issue", temporary_id: "aw_abc111", title: "First" },
+        { type: "create_issue", temporary_id: "aw_abc111", title: "Second" },
       ];
 
       const { providers } = buildDependencyGraph(messages);
 
-      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Duplicate temporary_id 'aw_abc111def222'"));
+      expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Duplicate temporary_id 'aw_abc111'"));
 
       // Verify only the first occurrence is used as provider
-      expect(providers.get("aw_abc111def222")).toBe(0);
+      expect(providers.get("aw_abc111")).toBe(0);
       expect(providers.size).toBe(1);
     });
 
@@ -173,8 +173,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { topologicalSort, buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment" },
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Parent" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Parent" },
       ];
 
       const { dependencies } = buildDependencyGraph(messages);
@@ -188,9 +188,9 @@ describe("safe_output_topological_sort.cjs", () => {
       const { topologicalSort, buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Issue 1" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", title: "Issue 2" },
-        { type: "create_issue", temporary_id: "aw_ffffff333333", title: "Issue 3" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Issue 1" },
+        { type: "create_issue", temporary_id: "aw_eee222", title: "Issue 2" },
+        { type: "create_issue", temporary_id: "aw_fff333", title: "Issue 3" },
       ];
 
       const { dependencies } = buildDependencyGraph(messages);
@@ -203,9 +203,9 @@ describe("safe_output_topological_sort.cjs", () => {
       const { topologicalSort, buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_ffffff333333", body: "Ref #aw_eeeeee222222" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", body: "Ref #aw_dddddd111111" },
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "First" },
+        { type: "create_issue", temporary_id: "aw_fff333", body: "Ref #aw_eee222" },
+        { type: "create_issue", temporary_id: "aw_eee222", body: "Ref #aw_ddd111" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "First" },
       ];
 
       const { dependencies } = buildDependencyGraph(messages);
@@ -219,10 +219,10 @@ describe("safe_output_topological_sort.cjs", () => {
       const { topologicalSort, buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Independent 1" },
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment on 1" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", title: "Independent 2" },
-        { type: "add_comment", issue_number: "aw_eeeeee222222", body: "Comment on 2" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Independent 1" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment on 1" },
+        { type: "create_issue", temporary_id: "aw_eee222", title: "Independent 2" },
+        { type: "add_comment", issue_number: "aw_eee222", body: "Comment on 2" },
       ];
 
       const { dependencies } = buildDependencyGraph(messages);
@@ -237,11 +237,11 @@ describe("safe_output_topological_sort.cjs", () => {
       const { topologicalSort, buildDependencyGraph } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Parent" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb111111", body: "Parent: #aw_aaaaaa111111" },
-        { type: "create_issue", temporary_id: "aw_cccccc222222", body: "Parent: #aw_aaaaaa111111" },
-        { type: "link_sub_issue", parent_issue_number: "aw_aaaaaa111111", sub_issue_number: "aw_bbbbbb111111" },
-        { type: "link_sub_issue", parent_issue_number: "aw_aaaaaa111111", sub_issue_number: "aw_cccccc222222" },
+        { type: "create_issue", temporary_id: "aw_aaa111", title: "Parent" },
+        { type: "create_issue", temporary_id: "aw_bbb111", body: "Parent: #aw_aaa111" },
+        { type: "create_issue", temporary_id: "aw_ccc222", body: "Parent: #aw_aaa111" },
+        { type: "link_sub_issue", parent_issue_number: "aw_aaa111", sub_issue_number: "aw_bbb111" },
+        { type: "link_sub_issue", parent_issue_number: "aw_aaa111", sub_issue_number: "aw_ccc222" },
       ];
 
       const { dependencies } = buildDependencyGraph(messages);
@@ -280,8 +280,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment" },
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Issue" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Issue" },
         { type: "create_issue", title: "No temp ID" },
       ];
 
@@ -299,9 +299,9 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_pull_request", temporary_id: "aw_fedcba111111", body: "Fixes #aw_dddddd111111" },
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Bug report" },
-        { type: "create_discussion", temporary_id: "aw_abcdef111111", body: "See #aw_fedcba111111" },
+        { type: "create_pull_request", temporary_id: "aw_fedcba", body: "Fixes #aw_ddd111" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Bug report" },
+        { type: "create_discussion", temporary_id: "aw_abcdef", body: "See #aw_fedcba" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -316,8 +316,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", body: "See #aw_eeeeee222222" },
-        { type: "create_issue", temporary_id: "aw_eeeeee222222", body: "See #aw_dddddd111111" },
+        { type: "create_issue", temporary_id: "aw_ddd111", body: "See #aw_eee222" },
+        { type: "create_issue", temporary_id: "aw_eee222", body: "See #aw_ddd111" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -331,8 +331,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment" },
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Issue" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Issue" },
       ];
 
       sortSafeOutputMessages(messages);
@@ -344,8 +344,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd111111", title: "Issue" },
-        { type: "add_comment", issue_number: "aw_dddddd111111", body: "Comment" },
+        { type: "create_issue", temporary_id: "aw_ddd111", title: "Issue" },
+        { type: "add_comment", issue_number: "aw_ddd111", body: "Comment" },
       ];
 
       sortSafeOutputMessages(messages);
@@ -358,36 +358,36 @@ describe("safe_output_topological_sort.cjs", () => {
 
       // Simulate a real workflow: create parent issue, create sub-issues, link them, add comments
       const messages = [
-        { type: "add_comment", issue_number: "aw_aaaaaa111111", body: "Status update" },
-        { type: "link_sub_issue", parent_issue_number: "aw_aaaaaa111111", sub_issue_number: "aw_cccccc222222" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb111111", title: "Sub-task 1", body: "Parent: #aw_aaaaaa111111" },
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Epic" },
-        { type: "link_sub_issue", parent_issue_number: "aw_aaaaaa111111", sub_issue_number: "aw_bbbbbb111111" },
-        { type: "create_issue", temporary_id: "aw_cccccc222222", title: "Sub-task 2", body: "Parent: #aw_aaaaaa111111" },
-        { type: "add_comment", issue_number: "aw_bbbbbb111111", body: "Work started" },
+        { type: "add_comment", issue_number: "aw_aaa111", body: "Status update" },
+        { type: "link_sub_issue", parent_issue_number: "aw_aaa111", sub_issue_number: "aw_ccc222" },
+        { type: "create_issue", temporary_id: "aw_bbb111", title: "Sub-task 1", body: "Parent: #aw_aaa111" },
+        { type: "create_issue", temporary_id: "aw_aaa111", title: "Epic" },
+        { type: "link_sub_issue", parent_issue_number: "aw_aaa111", sub_issue_number: "aw_bbb111" },
+        { type: "create_issue", temporary_id: "aw_ccc222", title: "Sub-task 2", body: "Parent: #aw_aaa111" },
+        { type: "add_comment", issue_number: "aw_bbb111", body: "Work started" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
 
       // Verify parent is created first
-      const parentIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
+      const parentIndex = sorted.findIndex(m => m.temporary_id === "aw_aaa111");
       expect(parentIndex).toBe(0);
 
       // Verify children come after parent
-      const child1Index = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb111111");
-      const child2Index = sorted.findIndex(m => m.temporary_id === "aw_cccccc222222");
+      const child1Index = sorted.findIndex(m => m.temporary_id === "aw_bbb111");
+      const child2Index = sorted.findIndex(m => m.temporary_id === "aw_ccc222");
       expect(child1Index).toBeGreaterThan(parentIndex);
       expect(child2Index).toBeGreaterThan(parentIndex);
 
       // Verify links come after all creates
-      const link1Index = sorted.findIndex(m => m.type === "link_sub_issue" && m.sub_issue_number === "aw_bbbbbb111111");
-      const link2Index = sorted.findIndex(m => m.type === "link_sub_issue" && m.sub_issue_number === "aw_cccccc222222");
+      const link1Index = sorted.findIndex(m => m.type === "link_sub_issue" && m.sub_issue_number === "aw_bbb111");
+      const link2Index = sorted.findIndex(m => m.type === "link_sub_issue" && m.sub_issue_number === "aw_ccc222");
       expect(link1Index).toBeGreaterThan(child1Index);
       expect(link2Index).toBeGreaterThan(child2Index);
 
       // Verify comments come after their targets
-      const parentCommentIndex = sorted.findIndex(m => m.type === "add_comment" && m.issue_number === "aw_aaaaaa111111");
-      const child1CommentIndex = sorted.findIndex(m => m.type === "add_comment" && m.issue_number === "aw_bbbbbb111111");
+      const parentCommentIndex = sorted.findIndex(m => m.type === "add_comment" && m.issue_number === "aw_aaa111");
+      const child1CommentIndex = sorted.findIndex(m => m.type === "add_comment" && m.issue_number === "aw_bbb111");
       expect(parentCommentIndex).toBeGreaterThan(parentIndex);
       expect(child1CommentIndex).toBeGreaterThan(child1Index);
     });
@@ -398,28 +398,28 @@ describe("safe_output_topological_sort.cjs", () => {
       // Message references a temp ID that's not created in this batch
       // (might be from a previous step)
       const messages = [
-        { type: "create_issue", temporary_id: "aw_abc123456789", title: "New Issue" },
-        { type: "add_comment", issue_number: "aw_def987654321", body: "Comment on external" },
-        { type: "add_comment", issue_number: "aw_abc123456789", body: "Comment on new" },
+        { type: "create_issue", temporary_id: "aw_abc1234", title: "New Issue" },
+        { type: "add_comment", issue_number: "aw_def9876", body: "Comment on external" },
+        { type: "add_comment", issue_number: "aw_abc1234", body: "Comment on new" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
 
       // New issue should come before its comment
-      expect(sorted[0].temporary_id).toBe("aw_abc123456789");
-      expect(sorted[2].issue_number).toBe("aw_abc123456789");
+      expect(sorted[0].temporary_id).toBe("aw_abc1234");
+      expect(sorted[2].issue_number).toBe("aw_abc1234");
 
       // External reference can be anywhere (no dependency in this batch)
       // It should appear but we don't enforce ordering relative to unrelated items
-      expect(sorted.some(m => m.issue_number === "aw_def987654321")).toBe(true);
+      expect(sorted.some(m => m.issue_number === "aw_def9876")).toBe(true);
     });
 
     it("should handle create_project with item_url dependency on create_issue", async () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_project", title: "My Project", item_url: "aw_abc123def456" },
-        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+        { type: "create_project", title: "My Project", item_url: "aw_abc123" },
+        { type: "create_issue", temporary_id: "aw_abc123", title: "Issue" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -433,8 +433,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/aw_abc123def456" },
-        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/aw_abc123" },
+        { type: "create_issue", temporary_id: "aw_abc123", title: "Issue" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -448,8 +448,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/#aw_abc123def456" },
-        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+        { type: "create_project", title: "My Project", item_url: "https://github.com/owner/repo/issues/#aw_abc123" },
+        { type: "create_issue", temporary_id: "aw_abc123", title: "Issue" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -463,8 +463,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "update_project", project: "https://github.com/orgs/org/projects/1", content_type: "issue", content_number: "aw_abc123def456" },
-        { type: "create_issue", temporary_id: "aw_abc123def456", title: "Issue" },
+        { type: "update_project", project: "https://github.com/orgs/org/projects/1", content_type: "issue", content_number: "aw_abc123" },
+        { type: "create_issue", temporary_id: "aw_abc123", title: "Issue" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -531,7 +531,7 @@ describe("safe_output_topological_sort.cjs", () => {
 
       // Create a chain: A -> B -> C -> D -> E -> F
       const messages = [];
-      const ids = ["aw_aaaaaa111111", "aw_bbbbbb222222", "aw_cccccc333333", "aw_dddddd444444", "aw_eeeeee555555", "aw_ffffff666666"];
+      const ids = ["aw_aaa111", "aw_bbb222", "aw_ccc333", "aw_ddd444", "aw_eee555", "aw_fff666"];
 
       // Add in reverse order to test sorting
       for (let i = ids.length - 1; i >= 0; i--) {
@@ -555,31 +555,31 @@ describe("safe_output_topological_sort.cjs", () => {
 
       const messages = [
         // Chain 1: A -> B
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "A" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Ref #aw_aaaaaa111111" },
+        { type: "create_issue", temporary_id: "aw_aaa111", title: "A" },
+        { type: "create_issue", temporary_id: "aw_bbb222", body: "Ref #aw_aaa111" },
 
         // Chain 2: C -> D
-        { type: "create_issue", temporary_id: "aw_cccccc333333", title: "C" },
-        { type: "create_issue", temporary_id: "aw_dddddd444444", body: "Ref #aw_cccccc333333" },
+        { type: "create_issue", temporary_id: "aw_ccc333", title: "C" },
+        { type: "create_issue", temporary_id: "aw_ddd444", body: "Ref #aw_ccc333" },
 
         // Chain 3: E -> F
-        { type: "create_issue", temporary_id: "aw_eeeeee555555", title: "E" },
-        { type: "create_issue", temporary_id: "aw_ffffff666666", body: "Ref #aw_eeeeee555555" },
+        { type: "create_issue", temporary_id: "aw_eee555", title: "E" },
+        { type: "create_issue", temporary_id: "aw_fff666", body: "Ref #aw_eee555" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
 
       // Within each chain, verify dependency order
-      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
-      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaa111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbb222");
       expect(aIndex).toBeLessThan(bIndex);
 
-      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
-      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_dddddd444444");
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_ccc333");
+      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_ddd444");
       expect(cIndex).toBeLessThan(dIndex);
 
-      const eIndex = sorted.findIndex(m => m.temporary_id === "aw_eeeeee555555");
-      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_ffffff666666");
+      const eIndex = sorted.findIndex(m => m.temporary_id === "aw_eee555");
+      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_fff666");
       expect(eIndex).toBeLessThan(fIndex);
     });
 
@@ -588,18 +588,18 @@ describe("safe_output_topological_sort.cjs", () => {
 
       // Diamond: A -> B, A -> C, B -> D, C -> D
       const messages = [
-        { type: "create_issue", temporary_id: "aw_dddddd444444", body: "Needs #aw_bbbbbb222222 and #aw_cccccc333333" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Child of #aw_aaaaaa111111" },
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Root" },
-        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Child of #aw_aaaaaa111111" },
+        { type: "create_issue", temporary_id: "aw_ddd444", body: "Needs #aw_bbb222 and #aw_ccc333" },
+        { type: "create_issue", temporary_id: "aw_bbb222", body: "Child of #aw_aaa111" },
+        { type: "create_issue", temporary_id: "aw_aaa111", title: "Root" },
+        { type: "create_issue", temporary_id: "aw_ccc333", body: "Child of #aw_aaa111" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
 
-      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
-      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
-      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
-      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_dddddd444444");
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaa111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbb222");
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_ccc333");
+      const dIndex = sorted.findIndex(m => m.temporary_id === "aw_ddd444");
 
       // A must come first
       expect(aIndex).toBe(0);
@@ -619,21 +619,21 @@ describe("safe_output_topological_sort.cjs", () => {
       const messages = [
         {
           type: "create_issue",
-          temporary_id: "aw_ffffff666666",
-          body: "Blocks #aw_aaaaaa111111, #aw_bbbbbb222222, and #aw_cccccc333333",
+          temporary_id: "aw_fff666",
+          body: "Blocks #aw_aaa111, #aw_bbb222, and #aw_ccc333",
         },
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "First" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb222222", title: "Second" },
-        { type: "create_issue", temporary_id: "aw_cccccc333333", title: "Third" },
+        { type: "create_issue", temporary_id: "aw_aaa111", title: "First" },
+        { type: "create_issue", temporary_id: "aw_bbb222", title: "Second" },
+        { type: "create_issue", temporary_id: "aw_ccc333", title: "Third" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
 
       // All referenced IDs must come before the message that references them
-      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_ffffff666666");
-      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaaaaa111111");
-      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbbbbb222222");
-      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_cccccc333333");
+      const fIndex = sorted.findIndex(m => m.temporary_id === "aw_fff666");
+      const aIndex = sorted.findIndex(m => m.temporary_id === "aw_aaa111");
+      const bIndex = sorted.findIndex(m => m.temporary_id === "aw_bbb222");
+      const cIndex = sorted.findIndex(m => m.temporary_id === "aw_ccc333");
 
       expect(fIndex).toBeGreaterThan(aIndex);
       expect(fIndex).toBeGreaterThan(bIndex);
@@ -651,7 +651,7 @@ describe("safe_output_topological_sort.cjs", () => {
     it("should handle single message", async () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
-      const messages = [{ type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "Solo" }];
+      const messages = [{ type: "create_issue", temporary_id: "aw_aaa111", title: "Solo" }];
 
       const sorted = sortSafeOutputMessages(messages);
 
@@ -661,8 +661,8 @@ describe("safe_output_topological_sort.cjs", () => {
     it("should preserve message object references", async () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
-      const msg1 = { type: "create_issue", temporary_id: "aw_aaaaaa111111", title: "First" };
-      const msg2 = { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Ref #aw_aaaaaa111111" };
+      const msg1 = { type: "create_issue", temporary_id: "aw_aaa111", title: "First" };
+      const msg2 = { type: "create_issue", temporary_id: "aw_bbb222", body: "Ref #aw_aaa111" };
 
       const sorted = sortSafeOutputMessages([msg2, msg1]);
 
@@ -676,9 +676,9 @@ describe("safe_output_topological_sort.cjs", () => {
 
       // Cycle: A -> B -> C -> A
       const messages = [
-        { type: "create_issue", temporary_id: "aw_aaaaaa111111", body: "Needs #aw_cccccc333333" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb222222", body: "Needs #aw_aaaaaa111111" },
-        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Needs #aw_bbbbbb222222" },
+        { type: "create_issue", temporary_id: "aw_aaa111", body: "Needs #aw_ccc333" },
+        { type: "create_issue", temporary_id: "aw_bbb222", body: "Needs #aw_aaa111" },
+        { type: "create_issue", temporary_id: "aw_ccc333", body: "Needs #aw_bbb222" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -692,8 +692,8 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { temporary_id: "aw_aaaaaa111111", title: "No type" },
-        { type: "create_issue", temporary_id: "aw_bbbbbb222222", title: "Has type" },
+        { temporary_id: "aw_aaa111", title: "No type" },
+        { type: "create_issue", temporary_id: "aw_bbb222", title: "Has type" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
@@ -706,10 +706,10 @@ describe("safe_output_topological_sort.cjs", () => {
       const { sortSafeOutputMessages } = await import("./safe_output_topological_sort.cjs");
 
       const messages = [
-        { type: "create_pull_request", temporary_id: "aw_aaaaaa111111", title: "PR" },
-        { type: "add_comment", issue_number: "aw_aaaaaa111111", body: "Comment on PR" },
-        { type: "create_discussion", temporary_id: "aw_bbbbbb222222", body: "See PR #aw_aaaaaa111111" },
-        { type: "create_issue", temporary_id: "aw_cccccc333333", body: "Related to #aw_bbbbbb222222" },
+        { type: "create_pull_request", temporary_id: "aw_aaa111", title: "PR" },
+        { type: "add_comment", issue_number: "aw_aaa111", body: "Comment on PR" },
+        { type: "create_discussion", temporary_id: "aw_bbb222", body: "See PR #aw_aaa111" },
+        { type: "create_issue", temporary_id: "aw_ccc333", body: "Related to #aw_bbb222" },
       ];
 
       const sorted = sortSafeOutputMessages(messages);
