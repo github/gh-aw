@@ -241,7 +241,7 @@ jobs:
               "name": "create_discussion"
             },
             {
-              "description": "Close a GitHub discussion with a resolution comment and optional reason. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed. CONSTRAINTS: Maximum 10 discussion(s) can be closed.",
+              "description": "Close a GitHub discussion with a resolution comment and optional reason. You can and should always add a comment when closing a discussion to explain the action or provide context. Use this to mark discussions as resolved, answered, or no longer needed. The closing comment should explain why the discussion is being closed. If the discussion is already closed, a comment will still be posted. CONSTRAINTS: Maximum 10 discussion(s) can be closed.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {

@@ -346,7 +346,7 @@ jobs:
               "name": "create_discussion"
             },
             {
-              "description": "Close a pull request WITHOUT merging, adding a closing comment. Use this for PRs that should be abandoned, superseded, or closed for other reasons. The closing comment should explain why the PR is being closed. This does NOT merge the changes. CONSTRAINTS: Maximum 2 pull request(s) can be closed. Target: *. Only PRs with labels [poetry automation] can be closed. Only PRs with title prefix \"[🎨 POETRY]\" can be closed.",
+              "description": "Close a pull request WITHOUT merging, adding a closing comment. You can and should always add a comment when closing a PR to explain the action or provide context. Use this for PRs that should be abandoned, superseded, or closed for other reasons. The closing comment should explain why the PR is being closed. This does NOT merge the changes. If the PR is already closed, a comment will still be posted. CONSTRAINTS: Maximum 2 pull request(s) can be closed. Target: *. Only PRs with labels [poetry automation] can be closed. Only PRs with title prefix \"[🎨 POETRY]\" can be closed.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {

@@ -253,7 +253,7 @@ jobs:
               "name": "create_issue"
             },
             {
-              "description": "Close a GitHub issue with a closing comment. This tool is ONLY for closing issues - use update_issue if you need to change the title, body, labels, or other metadata without closing. Use close_issue when work is complete, the issue is no longer relevant, or it's a duplicate. The closing comment should explain the resolution or reason for closing. CONSTRAINTS: Maximum 20 issue(s) can be closed. Target: *.",
+              "description": "Close a GitHub issue with a closing comment. You can and should always add a comment when closing an issue to explain the action or provide context. This tool is ONLY for closing issues - use update_issue if you need to change the title, body, labels, or other metadata without closing. Use close_issue when work is complete, the issue is no longer relevant, or it's a duplicate. The closing comment should explain the resolution or reason for closing. If the issue is already closed, a comment will still be posted. CONSTRAINTS: Maximum 20 issue(s) can be closed. Target: *.",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
