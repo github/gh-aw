@@ -249,7 +249,7 @@ jobs:
               "name": "noop"
             },
             {
-              "description": "Manage GitHub Projects: add issues/pull requests/draft issues, update item fields (status, priority, effort, dates), manage custom fields, and create project views. Use this to organize work by adding items to projects, updating field values, creating custom fields up-front, and setting up project views (table, board, roadmap).\n\nThree modes: (1) Add or update project items with custom field values; (2) Create project fields; (3) Create project views. This is the primary tool for ProjectOps automation - add items to projects, set custom fields for tracking, and organize project boards.",
+              "description": "Manage GitHub Projects: add issues/pull requests/draft issues, update item fields (status, priority, effort, dates), manage custom fields, and create project views. Use this to organize work by adding items to projects, updating field values, creating custom fields up-front, and setting up project views (table, board, roadmap).\n\nThree modes: (1) Add or update project items with custom field values; (2) Create project fields; (3) Create project views. This is the primary tool for ProjectOps automation - add items to projects, set custom fields for tracking, and organize project boards. CONSTRAINTS: Maximum 5 project operation(s) can be performed. Default project URL: \"https://github.com/orgs/\u003cORG\u003e/projects/\u003cNUMBER\u003e\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -412,7 +412,7 @@ jobs:
               "name": "missing_data"
             },
             {
-              "description": "Post a status update to a GitHub Project to communicate progress and health. Use this to provide stakeholders with regular updates on project status (on-track, at-risk, off-track, complete, inactive), timeline information, and progress summaries. Status updates create a historical record of project progress, enabling tracking over time and informed decision-making.",
+              "description": "Post a status update to a GitHub Project to communicate progress and health. Use this to provide stakeholders with regular updates on project status (on-track, at-risk, off-track, complete, inactive), timeline information, and progress summaries. Status updates create a historical record of project progress, enabling tracking over time and informed decision-making. CONSTRAINTS: Maximum 1 status update(s) can be created. Default project URL: \"https://github.com/orgs/\u003cORG\u003e/projects/\u003cNUMBER\u003e\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
