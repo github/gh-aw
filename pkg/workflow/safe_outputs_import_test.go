@@ -1662,16 +1662,16 @@ This workflow uses the imported safe-output configuration for previously missing
 
 // TestSafeOutputsImportMessagesAllFields tests that all message fields can be imported correctly
 func TestSafeOutputsImportMessagesAllFields(t *testing.T) {
-compiler := NewCompilerWithVersion("1.0.0")
+	compiler := NewCompilerWithVersion("1.0.0")
 
-// Create a temporary directory for test files
-tmpDir := t.TempDir()
-workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-err := os.MkdirAll(workflowsDir, 0755)
-require.NoError(t, err, "Failed to create workflows directory")
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
 
-// Create a shared workflow with ALL message fields defined
-sharedWorkflow := `---
+	// Create a shared workflow with ALL message fields defined
+	sharedWorkflow := `---
 safe-outputs:
   messages:
     append-only-comments: true
@@ -1689,12 +1689,12 @@ safe-outputs:
 # Shared Messages with All Fields
 `
 
-sharedFile := filepath.Join(workflowsDir, "shared-all-messages.md")
-err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
-require.NoError(t, err, "Failed to write shared file")
+	sharedFile := filepath.Join(workflowsDir, "shared-all-messages.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
 
-// Create main workflow that imports all message fields
-mainWorkflow := `---
+	// Create main workflow that imports all message fields
+	mainWorkflow := `---
 on: issues
 permissions:
   contents: read
@@ -1708,48 +1708,48 @@ safe-outputs:
 # Main Workflow Importing All Message Fields
 `
 
-mainFile := filepath.Join(workflowsDir, "main.md")
-err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
-require.NoError(t, err, "Failed to write main file")
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
 
-// Change to the workflows directory for relative path resolution
-oldDir, err := os.Getwd()
-require.NoError(t, err, "Failed to get current directory")
-err = os.Chdir(workflowsDir)
-require.NoError(t, err, "Failed to change directory")
-defer func() { _ = os.Chdir(oldDir) }()
+	// Change to the workflows directory for relative path resolution
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
 
-// Parse the main workflow
-workflowData, err := compiler.ParseWorkflowFile("main.md")
-require.NoError(t, err, "Failed to parse workflow")
-require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+	// Parse the main workflow
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 
-// Verify ALL message fields were imported correctly
-require.NotNil(t, workflowData.SafeOutputs.Messages, "Messages should be imported")
-assert.True(t, workflowData.SafeOutputs.Messages.AppendOnlyComments, "AppendOnlyComments should be imported")
-assert.Equal(t, "> Custom footer", workflowData.SafeOutputs.Messages.Footer, "Footer should be imported")
-assert.Equal(t, "> Install instructions", workflowData.SafeOutputs.Messages.FooterInstall, "FooterInstall should be imported")
-assert.Equal(t, "> Workflow recompile footer", workflowData.SafeOutputs.Messages.FooterWorkflowRecompile, "FooterWorkflowRecompile should be imported")
-assert.Equal(t, "> Workflow recompile comment footer", workflowData.SafeOutputs.Messages.FooterWorkflowRecompileComment, "FooterWorkflowRecompileComment should be imported")
-assert.Equal(t, "## Staged Title", workflowData.SafeOutputs.Messages.StagedTitle, "StagedTitle should be imported")
-assert.Equal(t, "Staged description", workflowData.SafeOutputs.Messages.StagedDescription, "StagedDescription should be imported")
-assert.Equal(t, "Run started", workflowData.SafeOutputs.Messages.RunStarted, "RunStarted should be imported")
-assert.Equal(t, "Run success", workflowData.SafeOutputs.Messages.RunSuccess, "RunSuccess should be imported")
-assert.Equal(t, "Run failure", workflowData.SafeOutputs.Messages.RunFailure, "RunFailure should be imported")
+	// Verify ALL message fields were imported correctly
+	require.NotNil(t, workflowData.SafeOutputs.Messages, "Messages should be imported")
+	assert.True(t, workflowData.SafeOutputs.Messages.AppendOnlyComments, "AppendOnlyComments should be imported")
+	assert.Equal(t, "> Custom footer", workflowData.SafeOutputs.Messages.Footer, "Footer should be imported")
+	assert.Equal(t, "> Install instructions", workflowData.SafeOutputs.Messages.FooterInstall, "FooterInstall should be imported")
+	assert.Equal(t, "> Workflow recompile footer", workflowData.SafeOutputs.Messages.FooterWorkflowRecompile, "FooterWorkflowRecompile should be imported")
+	assert.Equal(t, "> Workflow recompile comment footer", workflowData.SafeOutputs.Messages.FooterWorkflowRecompileComment, "FooterWorkflowRecompileComment should be imported")
+	assert.Equal(t, "## Staged Title", workflowData.SafeOutputs.Messages.StagedTitle, "StagedTitle should be imported")
+	assert.Equal(t, "Staged description", workflowData.SafeOutputs.Messages.StagedDescription, "StagedDescription should be imported")
+	assert.Equal(t, "Run started", workflowData.SafeOutputs.Messages.RunStarted, "RunStarted should be imported")
+	assert.Equal(t, "Run success", workflowData.SafeOutputs.Messages.RunSuccess, "RunSuccess should be imported")
+	assert.Equal(t, "Run failure", workflowData.SafeOutputs.Messages.RunFailure, "RunFailure should be imported")
 }
 
 // TestSafeOutputsImportMessagesAllFieldsPartialOverride tests that main workflow can selectively override imported message fields
 func TestSafeOutputsImportMessagesAllFieldsPartialOverride(t *testing.T) {
-compiler := NewCompilerWithVersion("1.0.0")
+	compiler := NewCompilerWithVersion("1.0.0")
 
-// Create a temporary directory for test files
-tmpDir := t.TempDir()
-workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-err := os.MkdirAll(workflowsDir, 0755)
-require.NoError(t, err, "Failed to create workflows directory")
+	// Create a temporary directory for test files
+	tmpDir := t.TempDir()
+	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
+	err := os.MkdirAll(workflowsDir, 0755)
+	require.NoError(t, err, "Failed to create workflows directory")
 
-// Create a shared workflow with ALL message fields
-sharedWorkflow := `---
+	// Create a shared workflow with ALL message fields
+	sharedWorkflow := `---
 safe-outputs:
   messages:
     append-only-comments: true
@@ -1767,12 +1767,12 @@ safe-outputs:
 # Shared Messages
 `
 
-sharedFile := filepath.Join(workflowsDir, "shared-messages.md")
-err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
-require.NoError(t, err, "Failed to write shared file")
+	sharedFile := filepath.Join(workflowsDir, "shared-messages.md")
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	require.NoError(t, err, "Failed to write shared file")
 
-// Create main workflow that overrides some message fields
-mainWorkflow := `---
+	// Create main workflow that overrides some message fields
+	mainWorkflow := `---
 on: issues
 permissions:
   contents: read
@@ -1790,36 +1790,36 @@ safe-outputs:
 # Main Workflow with Partial Override
 `
 
-mainFile := filepath.Join(workflowsDir, "main.md")
-err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
-require.NoError(t, err, "Failed to write main file")
+	mainFile := filepath.Join(workflowsDir, "main.md")
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	require.NoError(t, err, "Failed to write main file")
 
-// Change to the workflows directory for relative path resolution
-oldDir, err := os.Getwd()
-require.NoError(t, err, "Failed to get current directory")
-err = os.Chdir(workflowsDir)
-require.NoError(t, err, "Failed to change directory")
-defer func() { _ = os.Chdir(oldDir) }()
+	// Change to the workflows directory for relative path resolution
+	oldDir, err := os.Getwd()
+	require.NoError(t, err, "Failed to get current directory")
+	err = os.Chdir(workflowsDir)
+	require.NoError(t, err, "Failed to change directory")
+	defer func() { _ = os.Chdir(oldDir) }()
 
-// Parse the main workflow
-workflowData, err := compiler.ParseWorkflowFile("main.md")
-require.NoError(t, err, "Failed to parse workflow")
-require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
+	// Parse the main workflow
+	workflowData, err := compiler.ParseWorkflowFile("main.md")
+	require.NoError(t, err, "Failed to parse workflow")
+	require.NotNil(t, workflowData.SafeOutputs, "SafeOutputs should not be nil")
 
-// Verify message field merging: main overrides specific fields, shared provides others
-require.NotNil(t, workflowData.SafeOutputs.Messages, "Messages should not be nil")
+	// Verify message field merging: main overrides specific fields, shared provides others
+	require.NotNil(t, workflowData.SafeOutputs.Messages, "Messages should not be nil")
 
-// Main overrides
-assert.Equal(t, "> Main footer (override)", workflowData.SafeOutputs.Messages.Footer, "Footer from main should take precedence")
-assert.Equal(t, "> Main recompile (override)", workflowData.SafeOutputs.Messages.FooterWorkflowRecompile, "FooterWorkflowRecompile from main should take precedence")
-assert.Equal(t, "Main success (override)", workflowData.SafeOutputs.Messages.RunSuccess, "RunSuccess from main should take precedence")
+	// Main overrides
+	assert.Equal(t, "> Main footer (override)", workflowData.SafeOutputs.Messages.Footer, "Footer from main should take precedence")
+	assert.Equal(t, "> Main recompile (override)", workflowData.SafeOutputs.Messages.FooterWorkflowRecompile, "FooterWorkflowRecompile from main should take precedence")
+	assert.Equal(t, "Main success (override)", workflowData.SafeOutputs.Messages.RunSuccess, "RunSuccess from main should take precedence")
 
-// Shared values fill the gaps
-assert.True(t, workflowData.SafeOutputs.Messages.AppendOnlyComments, "AppendOnlyComments should come from shared")
-assert.Equal(t, "> Shared install", workflowData.SafeOutputs.Messages.FooterInstall, "FooterInstall should come from shared")
-assert.Equal(t, "> Shared recompile comment", workflowData.SafeOutputs.Messages.FooterWorkflowRecompileComment, "FooterWorkflowRecompileComment should come from shared")
-assert.Equal(t, "## Shared Title", workflowData.SafeOutputs.Messages.StagedTitle, "StagedTitle should come from shared")
-assert.Equal(t, "Shared description", workflowData.SafeOutputs.Messages.StagedDescription, "StagedDescription should come from shared")
-assert.Equal(t, "Shared started", workflowData.SafeOutputs.Messages.RunStarted, "RunStarted should come from shared")
-assert.Equal(t, "Shared failure", workflowData.SafeOutputs.Messages.RunFailure, "RunFailure should come from shared")
+	// Shared values fill the gaps
+	assert.True(t, workflowData.SafeOutputs.Messages.AppendOnlyComments, "AppendOnlyComments should come from shared")
+	assert.Equal(t, "> Shared install", workflowData.SafeOutputs.Messages.FooterInstall, "FooterInstall should come from shared")
+	assert.Equal(t, "> Shared recompile comment", workflowData.SafeOutputs.Messages.FooterWorkflowRecompileComment, "FooterWorkflowRecompileComment should come from shared")
+	assert.Equal(t, "## Shared Title", workflowData.SafeOutputs.Messages.StagedTitle, "StagedTitle should come from shared")
+	assert.Equal(t, "Shared description", workflowData.SafeOutputs.Messages.StagedDescription, "StagedDescription should come from shared")
+	assert.Equal(t, "Shared started", workflowData.SafeOutputs.Messages.RunStarted, "RunStarted should come from shared")
+	assert.Equal(t, "Shared failure", workflowData.SafeOutputs.Messages.RunFailure, "RunFailure should come from shared")
 }
