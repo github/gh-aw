@@ -29,6 +29,7 @@ network:
   allowed:
     - defaults
     - node
+    - go
 tools:
   bash:
     - "*"
