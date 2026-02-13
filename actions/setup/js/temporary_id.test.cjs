@@ -38,20 +38,22 @@ describe("temporary_id.cjs", () => {
   });
 
   describe("isTemporaryId", () => {
-    it("should return true for valid aw_ prefixed 4-8 char alphanumeric strings", async () => {
+    it("should return true for valid aw_ prefixed 3-8 char alphanumeric strings", async () => {
       const { isTemporaryId } = await import("./temporary_id.cjs");
+      expect(isTemporaryId("aw_abc")).toBe(true);
       expect(isTemporaryId("aw_abc1")).toBe(true);
       expect(isTemporaryId("aw_Test123")).toBe(true);
       expect(isTemporaryId("aw_A1B2C3D4")).toBe(true);
       expect(isTemporaryId("aw_12345678")).toBe(true);
       expect(isTemporaryId("aw_ABCD")).toBe(true);
       expect(isTemporaryId("aw_xyz9")).toBe(true);
+      expect(isTemporaryId("aw_xyz")).toBe(true);
     });
 
     it("should return false for invalid strings", async () => {
       const { isTemporaryId } = await import("./temporary_id.cjs");
       expect(isTemporaryId("abc123def456")).toBe(false); // Missing aw_ prefix
-      expect(isTemporaryId("aw_abc")).toBe(false); // Too short (3 chars)
+      expect(isTemporaryId("aw_ab")).toBe(false); // Too short (2 chars)
       expect(isTemporaryId("aw_123456789")).toBe(false); // Too long (9 chars)
       expect(isTemporaryId("aw_test-id")).toBe(false); // Contains hyphen
       expect(isTemporaryId("aw_id_123")).toBe(false); // Contains underscore
@@ -118,8 +120,8 @@ describe("temporary_id.cjs", () => {
     it("should not match invalid temporary ID formats", async () => {
       const { replaceTemporaryIdReferences } = await import("./temporary_id.cjs");
       const map = new Map([["aw_abc123", { repo: "owner/repo", number: 100 }]]);
-      const text = "Check #aw_abc and #temp:abc123 for details";
-      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_abc and #temp:abc123 for details");
+      const text = "Check #aw_ab and #temp:abc123 for details";
+      expect(replaceTemporaryIdReferences(text, map, "owner/repo")).toBe("Check #aw_ab and #temp:abc123 for details");
     });
   });
 
@@ -273,17 +275,17 @@ describe("temporary_id.cjs", () => {
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
       expect(result.errorMessage).toContain("aw_test-id");
-      expect(result.errorMessage).toContain("4 to 8 alphanumeric characters");
+      expect(result.errorMessage).toContain("3 to 8 alphanumeric characters");
     });
 
     it("should return specific error for malformed temporary ID (too short)", async () => {
       const { resolveIssueNumber } = await import("./temporary_id.cjs");
       const map = new Map();
-      const result = resolveIssueNumber("aw_abc", map);
+      const result = resolveIssueNumber("aw_ab", map);
       expect(result.resolved).toBe(null);
       expect(result.wasTemporaryId).toBe(false);
       expect(result.errorMessage).toContain("Invalid temporary ID format");
-      expect(result.errorMessage).toContain("aw_abc");
+      expect(result.errorMessage).toContain("aw_ab");
     });
 
     it("should return specific error for malformed temporary ID (too long)", async () => {
@@ -687,7 +689,7 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        body: "Invalid: #aw_ab #aw- #temp_123456",
+        body: "Invalid: #aw_a #aw- #temp_123456",
       };
 
       const refs = extractTemporaryIdReferences(message);

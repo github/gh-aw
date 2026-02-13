@@ -43,9 +43,9 @@ timeout-minutes: 10
 This workflow validates that temporary IDs work correctly for:
 1. Creating parent-child issue hierarchies
 2. Cross-referencing issues in bodies
-3. Different temporary ID formats (4-8 alphanumeric characters)
+3. Different temporary ID formats (3-8 alphanumeric characters)
 
-**IMPORTANT**: Use the exact temporary ID format `aw_` followed by 4-8 alphanumeric characters (A-Za-z0-9).
+**IMPORTANT**: Use the exact temporary ID format `aw_` followed by 3-8 alphanumeric characters (A-Za-z0-9).
 
 ## Test 1: Create Parent Issue with Temporary ID
 
@@ -96,7 +96,7 @@ After the issues are created, verify they are properly linked by adding a commen
 {
   "type": "add_comment",
   "issue_number": "aw_test01",
-  "body": "## Test Results\n\n✅ Parent issue created with temporary ID `aw_test01`\n✅ Sub-issue 1 created with temporary ID `aw_test02` and linked to parent\n✅ Sub-issue 2 created with temporary ID `aw_test03` and linked to parent\n✅ Cross-references resolved correctly\n\n**Validation**: Check that:\n1. All temporary ID references (#aw_*) in issue bodies are replaced with actual issue numbers (#123)\n2. Sub-issues show parent relationship in GitHub UI\n3. Parent issue shows sub-issues in task list\n\nTemporary ID format validated: `aw_[A-Za-z0-9]{4,8}`"
+  "body": "## Test Results\n\n✅ Parent issue created with temporary ID `aw_test01`\n✅ Sub-issue 1 created with temporary ID `aw_test02` and linked to parent\n✅ Sub-issue 2 created with temporary ID `aw_test03` and linked to parent\n✅ Cross-references resolved correctly\n\n**Validation**: Check that:\n1. All temporary ID references (#aw_*) in issue bodies are replaced with actual issue numbers (#123)\n2. Sub-issues show parent relationship in GitHub UI\n3. Parent issue shows sub-issues in task list\n\nTemporary ID format validated: `aw_[A-Za-z0-9]{3,8}`"
 }
 ```
 

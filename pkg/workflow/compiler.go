@@ -263,25 +263,38 @@ func (c *Compiler) validateWorkflowData(workflowData *WorkflowData, markdownPath
 	// Validate permissions against GitHub MCP toolsets
 	log.Printf("Validating permissions for GitHub MCP toolsets")
 	if workflowData.ParsedTools != nil && workflowData.ParsedTools.GitHub != nil {
-		// Parse permissions from the workflow data
-		// WorkflowData.Permissions contains the raw YAML string (including "permissions:" prefix)
-		permissions := NewPermissionsParser(workflowData.Permissions).ToPermissions()
+		// Check if GitHub tool was explicitly configured in frontmatter
+		// If permissions exist but tools.github was NOT explicitly configured,
+		// skip validation and let the GitHub MCP server handle permission issues
+		hasPermissions := workflowData.Permissions != ""
 
-		// Validate permissions using the typed GitHub tool configuration
-		validationResult := ValidatePermissions(permissions, workflowData.ParsedTools.GitHub)
+		log.Printf("Permission validation check: hasExplicitGitHubTool=%v, hasPermissions=%v",
+			workflowData.HasExplicitGitHubTool, hasPermissions)
 
-		if validationResult.HasValidationIssues {
-			// Format the validation message
-			message := FormatValidationMessage(validationResult, c.strictMode)
+		// Skip validation if permissions exist but GitHub tool was auto-added (not explicit)
+		if hasPermissions && !workflowData.HasExplicitGitHubTool {
+			log.Printf("Skipping permission validation: permissions exist but tools.github not explicitly configured")
+		} else {
+			// Parse permissions from the workflow data
+			// WorkflowData.Permissions contains the raw YAML string (including "permissions:" prefix)
+			permissions := NewPermissionsParser(workflowData.Permissions).ToPermissions()
 
-			if len(validationResult.MissingPermissions) > 0 {
-				if c.strictMode {
-					// In strict mode, missing permissions are errors
-					return formatCompilerError(markdownPath, "error", message, nil)
-				} else {
-					// In non-strict mode, missing permissions are warnings
-					fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
-					c.IncrementWarningCount()
+			// Validate permissions using the typed GitHub tool configuration
+			validationResult := ValidatePermissions(permissions, workflowData.ParsedTools.GitHub)
+
+			if validationResult.HasValidationIssues {
+				// Format the validation message
+				message := FormatValidationMessage(validationResult, c.strictMode)
+
+				if len(validationResult.MissingPermissions) > 0 {
+					if c.strictMode {
+						// In strict mode, missing permissions are errors
+						return formatCompilerError(markdownPath, "error", message, nil)
+					} else {
+						// In non-strict mode, missing permissions are warnings
+						fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+						c.IncrementWarningCount()
+					}
 				}
 			}
 		}
@@ -321,7 +334,7 @@ Ensure proper audience validation and trust policies are configured.`
 		for _, toolset := range originalToolsets {
 			if toolset == "projects" {
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("The 'projects' toolset requires a GitHub token with organization Projects permissions."))
-				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("See: https://github.github.com/gh-aw/reference/tokens/#gh_aw_project_github_token-github-projects-v2"))
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("See: https://github.github.com/gh-aw/reference/auth/#gh_aw_project_github_token-github-projects-v2"))
 				break
 			}
 		}

@@ -182,7 +182,7 @@ gh aw secrets bootstrap --engine claude    # Check Claude tokens
 
 **Options:** `--engine` (copilot, claude, codex), `--owner`, `--repo`
 
-See [GitHub Tokens reference](/gh-aw/reference/tokens/) for details.
+See [Authentication](/gh-aw/reference/auth/) for details.
 
 ### Building
 
@@ -433,7 +433,7 @@ gh aw mcp-server --validate-actor     # Enable actor validation
 
 **Available Tools:** status, compile, logs, audit, mcp-inspect, add, update
 
-When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/setup/mcp-server/).
+When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
 
 ### Utility Commands
 
@@ -486,7 +486,7 @@ gh aw project new "Bugs" --owner myorg --link myorg/myrepo     # Create and link
 > - **Classic PAT**: `project` scope (user projects) or `project` + `repo` (org projects)
 > - **Fine-grained PAT**: Organization permissions → Projects: Read & Write
 >
-> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or `gh auth login`. See [Tokens Reference](/gh-aw/reference/tokens/).
+> Configure via `GH_AW_PROJECT_GITHUB_TOKEN` environment variable or `gh auth login`. See [Authentication](/gh-aw/reference/auth/).
 
 #### `hash-frontmatter`
 
@@ -573,5 +573,5 @@ See [Common Issues](/gh-aw/troubleshooting/common-issues/) and [Error Reference]
 - [Frontmatter](/gh-aw/reference/frontmatter/) - Configuration options
 - [Packaging & Distribution](/gh-aw/guides/packaging-imports/) - Adding and updating workflows
 - [Security Guide](/gh-aw/introduction/architecture/) - Security best practices
-- [MCP Server Guide](/gh-aw/setup/mcp-server/) - MCP server configuration
+- [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/) - MCP server configuration
 - [Agent Factory](/gh-aw/agent-factory-status/) - Agent factory status
