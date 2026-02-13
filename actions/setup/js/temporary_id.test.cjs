@@ -687,7 +687,7 @@ describe("temporary_id.cjs", () => {
 
       const message = {
         type: "create_issue",
-        body: "Invalid: #aw_abc #aw_123456789 #temp_123456",
+        body: "Invalid: #aw_ab #aw- #temp_123456",
       };
 
       const refs = extractTemporaryIdReferences(message);
