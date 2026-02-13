@@ -85,7 +85,7 @@ Some workflows are **designed** to process content from all users and include ap
 
 ## Related Documentation
 
-- [GitHub Tokens](/gh-aw/reference/authentication/) - Token configuration and security
+- [Authentication](/gh-aw/reference/auth/) - Token configuration and security
 - [Tools](/gh-aw/reference/tools/) - GitHub tools configuration
 - [Safe Outputs](/gh-aw/reference/safe-outputs/) - Write operation controls
 - [Permissions](/gh-aw/reference/permissions/) - GitHub Actions permissions

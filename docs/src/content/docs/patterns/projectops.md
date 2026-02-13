@@ -42,7 +42,7 @@ After creating your token, add it to your repository:
 gh aw secrets set GH_AW_PROJECT_GITHUB_TOKEN --value "YOUR_PROJECT_TOKEN"
 ```
 
-See the [GitHub Projects v2 token reference](/gh-aw/reference/authentication/#gh_aw_project_github_token) for complete details.
+See the [GitHub Projects v2 authentication](/gh-aw/reference/auth/#gh_aw_project_github_token) for complete details.
 
 ## Example: Smart Issue Triage
 
@@ -169,4 +169,4 @@ ProjectOps complements [GitHub's built-in Projects automation](https://docs.gith
 - [Orchestration](/gh-aw/patterns/orchestration/) - Design pattern guide
 - [Trigger Events](/gh-aw/reference/triggers/) - Event trigger configuration options
 - [IssueOps](/gh-aw/patterns/issueops/) - Related issue automation patterns
-- [Token Reference](/gh-aw/reference/authentication/#gh_aw_project_github_token) - GitHub Projects token setup
+- [Token Reference](/gh-aw/reference/auth/#gh_aw_project_github_token) - GitHub Projects token setup

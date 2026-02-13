@@ -197,7 +197,7 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'AI Engines', link: '/reference/engines/' },
-						{ label: 'Authentication', link: '/reference/authentication/' },
+						{ label: 'Authorization', link: '/reference/auth/' },
 						{ label: 'Cache & Memory', link: '/reference/memory/' },
 						{ label: 'Command Triggers', link: '/reference/command-triggers/' },
 						{ label: 'Compilation Process', link: '/reference/compilation-process/' },

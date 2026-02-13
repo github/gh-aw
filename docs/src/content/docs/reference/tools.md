@@ -118,7 +118,7 @@ tools:
     lockdown: false  # Disable (for workflows processing all user input)
 ```
 
-See [GitHub Tokens](/gh-aw/reference/authentication/) for security implications and authentication options.
+See [Authentication](/gh-aw/reference/auth/) for security implications and authentication options.
 
 ### GitHub App Authentication
 
@@ -158,7 +158,7 @@ tools:
 - Works with both local (Docker) and remote (hosted) modes
 - Isolated from safe-outputs token configuration
 
-See [GitHub App Tokens for GitHub MCP Server](/gh-aw/reference/authentication/#gh_aw_github_mcp_server_token) for complete setup and configuration details.
+See [GitHub App Tokens for GitHub MCP Server](/gh-aw/reference/auth/#gh_aw_github_mcp_server_token) for complete setup and configuration details.
 
 **Token precedence**: GitHub App → `github-token` → `GH_AW_GITHUB_MCP_SERVER_TOKEN` → `GH_AW_GITHUB_TOKEN` → `GITHUB_TOKEN`
 

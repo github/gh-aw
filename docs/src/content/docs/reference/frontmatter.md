@@ -91,12 +91,13 @@ github-token: ${{ secrets.CUSTOM_PAT }}
 ```
 
 **Token precedence** (highest to lowest):
+
 1. Individual safe-output `github-token` (e.g., `create-issue.github-token`)
 2. Safe-outputs global `github-token`
 3. Top-level `github-token`
 4. Default: `${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}`
 
-See [GitHub Tokens](/gh-aw/reference/authentication/) for complete documentation.
+See [Authentication](/gh-aw/reference/auth/) for complete documentation.
 
 ### Plugins (`plugins:`)
 

@@ -267,5 +267,5 @@ This configuration ensures:
 - [Triggers Reference](/gh-aw/reference/triggers/) - Complete trigger configuration including `stop-after`
 - [Safe Outputs Reference](/gh-aw/reference/safe-outputs/) - All safe output types and expiration options
 - [SideRepoOps](/gh-aw/patterns/siderepoops/) - Complete setup for side repository operations
-- [Authentication](/gh-aw/reference/authentication/) - Authentication and security considerations
+- [Authentication](/gh-aw/reference/auth/) - Authentication and security considerations
 - [Orchestration](/gh-aw/patterns/orchestration/) - Orchestrating multi-workflow initiatives
