@@ -167,11 +167,15 @@ async function main() {
     if (!outputFile) {
       core.info("GH_AW_SAFE_OUTPUTS not set, no output to collect");
       core.setOutput("output", "");
+      core.setOutput("output_types", "");
+      core.setOutput("has_patch", "false");
       return;
     }
     if (!fs.existsSync(outputFile)) {
       core.info(`Output file does not exist: ${outputFile}`);
       core.setOutput("output", "");
+      core.setOutput("output_types", "");
+      core.setOutput("has_patch", "false");
       return;
     }
     const outputContent = fs.readFileSync(outputFile, "utf8");
@@ -334,6 +338,10 @@ async function main() {
     if (error instanceof Error && error.stack) {
       core.error(`Stack trace: ${error.stack}`);
     }
+    // Set outputs to empty/false even on error to ensure they are always defined
+    core.setOutput("output", "");
+    core.setOutput("output_types", "");
+    core.setOutput("has_patch", "false");
     core.setFailed(`Agent output ingestion failed: ${errorMsg}`);
     throw error;
   }
