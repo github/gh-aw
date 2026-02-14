@@ -98,8 +98,8 @@ jobs:
           }
           EOF
           
-          # Run the client
-          DEBUG=copilot-client cat /tmp/test/config.json | node dist/cli.js
+          # Run the client (using index.js which exports main())
+          DEBUG=copilot-client cat /tmp/test/config.json | node -e "import('./dist/index.js').then(m => m.main())"
           
           # Verify event log was created
           if [ ! -f /tmp/test/events.jsonl ]; then
