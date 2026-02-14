@@ -3,6 +3,7 @@
 package workflow
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -152,4 +153,277 @@ func TestNewToolsWithInvalidBash(t *testing.T) {
 			assert.NoError(t, err, "Expected no validation error for valid config")
 		}
 	})
+}
+
+func TestIsGitToolAllowed(t *testing.T) {
+	tests := []struct {
+		name         string
+		toolsMap     map[string]any
+		expectGitOK  bool
+		description  string
+	}{
+		{
+			name:         "nil tools - git not allowed",
+			toolsMap:     nil,
+			expectGitOK:  false,
+			description:  "No bash configuration means git is not allowed",
+		},
+		{
+			name:         "no bash tool - git not allowed",
+			toolsMap:     map[string]any{},
+			expectGitOK:  false,
+			description:  "No bash tool configured means git is not allowed",
+		},
+		{
+			name: "bash: true - git allowed",
+			toolsMap: map[string]any{
+				"bash": true,
+			},
+			expectGitOK: true,
+			description: "bash: true allows all commands including git",
+		},
+		{
+			name: "bash: false - git not allowed",
+			toolsMap: map[string]any{
+				"bash": false,
+			},
+			expectGitOK: false,
+			description: "bash: false explicitly disables bash",
+		},
+		{
+			name: "bash with empty list - git not allowed",
+			toolsMap: map[string]any{
+				"bash": []any{},
+			},
+			expectGitOK: false,
+			description: "Empty command list means no commands allowed",
+		},
+		{
+			name: "bash with git command - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"git"},
+			},
+			expectGitOK: true,
+			description: "git explicitly in allowed commands",
+		},
+		{
+			name: "bash with git and other commands - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"echo", "git", "ls"},
+			},
+			expectGitOK: true,
+			description: "git in allowed commands list",
+		},
+		{
+			name: "bash with wildcard - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"*"},
+			},
+			expectGitOK: true,
+			description: "Wildcard allows all commands including git",
+		},
+		{
+			name: "bash with wildcard and other commands - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"echo", "*"},
+			},
+			expectGitOK: true,
+			description: "Wildcard in list allows all commands",
+		},
+		{
+			name: "bash with other commands only - git not allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"echo", "ls", "cat"},
+			},
+			expectGitOK: false,
+			description: "git not in allowed commands list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tools := NewTools(tt.toolsMap)
+			result := isGitToolAllowed(tools)
+			assert.Equal(t, tt.expectGitOK, result, tt.description)
+		})
+	}
+}
+
+func TestValidateGitToolForSafeOutputs(t *testing.T) {
+	tests := []struct {
+		name          string
+		toolsMap      map[string]any
+		safeOutputs   *SafeOutputsConfig
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:        "nil safe-outputs - no validation needed",
+			toolsMap:    nil,
+			safeOutputs: nil,
+			expectError: false,
+		},
+		{
+			name:     "safe-outputs without create-pull-request or push-to-pull-request-branch - no validation",
+			toolsMap: nil,
+			safeOutputs: &SafeOutputsConfig{
+				CreateIssues: &CreateIssuesConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name:     "create-pull-request without bash - error",
+			toolsMap: map[string]any{},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request but git tool is not allowed",
+		},
+		{
+			name: "create-pull-request with bash: false - error",
+			toolsMap: map[string]any{
+				"bash": false,
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request but git tool is not allowed",
+		},
+		{
+			name: "create-pull-request with bash: [] - error",
+			toolsMap: map[string]any{
+				"bash": []any{},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request but git tool is not allowed",
+		},
+		{
+			name: "create-pull-request with bash: [echo] - error",
+			toolsMap: map[string]any{
+				"bash": []any{"echo", "ls"},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request but git tool is not allowed",
+		},
+		{
+			name: "create-pull-request with bash: true - valid",
+			toolsMap: map[string]any{
+				"bash": true,
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name: "create-pull-request with bash: [git] - valid",
+			toolsMap: map[string]any{
+				"bash": []any{"git"},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name: "create-pull-request with bash: [*] - valid",
+			toolsMap: map[string]any{
+				"bash": []any{"*"},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name: "create-pull-request with bash: [git, echo] - valid",
+			toolsMap: map[string]any{
+				"bash": []any{"git", "echo", "ls"},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests: &CreatePullRequestsConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name:     "push-to-pull-request-branch without bash - error",
+			toolsMap: map[string]any{},
+			safeOutputs: &SafeOutputsConfig{
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError:   true,
+			errorContains: "push-to-pull-request-branch but git tool is not allowed",
+		},
+		{
+			name: "push-to-pull-request-branch with bash: true - valid",
+			toolsMap: map[string]any{
+				"bash": true,
+			},
+			safeOutputs: &SafeOutputsConfig{
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name: "push-to-pull-request-branch with bash: [git] - valid",
+			toolsMap: map[string]any{
+				"bash": []any{"git"},
+			},
+			safeOutputs: &SafeOutputsConfig{
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name:     "both create-pull-request and push-to-pull-request-branch without bash - error mentions both",
+			toolsMap: map[string]any{},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests:      &CreatePullRequestsConfig{},
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request and push-to-pull-request-branch",
+		},
+		{
+			name: "both create-pull-request and push-to-pull-request-branch with bash: true - valid",
+			toolsMap: map[string]any{
+				"bash": true,
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests:      &CreatePullRequestsConfig{},
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tools := NewTools(tt.toolsMap)
+			err := validateGitToolForSafeOutputs(tools, tt.safeOutputs, "test-workflow")
+
+			if tt.expectError {
+				require.Error(t, err, "Expected validation error")
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains, "Error should contain expected message")
+				}
+				// Verify error message includes helpful suggestions
+				assert.True(t,
+					strings.Contains(err.Error(), "bash: true") ||
+						strings.Contains(err.Error(), "bash: [\"git\"]") ||
+						strings.Contains(err.Error(), "bash: [\"*\"]"),
+					"Error message should include helpful suggestions")
+			} else {
+				assert.NoError(t, err, "Expected no validation error")
+			}
+		})
+	}
 }

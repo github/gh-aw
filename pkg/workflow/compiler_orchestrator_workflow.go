@@ -88,6 +88,11 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 		return nil, err
 	}
 
+	// Validate that git tool is allowed if using create-pull-request or push-to-pull-request-branch
+	if err := validateGitToolForSafeOutputs(workflowData.ParsedTools, workflowData.SafeOutputs, workflowData.Name); err != nil {
+		return nil, fmt.Errorf("%s: %w", cleanPath, err)
+	}
+
 	// Process on section configuration and apply filters
 	if err := c.processOnSectionAndFilters(result.Frontmatter, workflowData, cleanPath); err != nil {
 		return nil, err
