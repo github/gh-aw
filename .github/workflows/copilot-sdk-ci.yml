@@ -58,6 +58,7 @@ jobs:
           
           echo "Copilot server started with PID: $SERVER_PID"
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Install copilot-client dependencies
