@@ -242,7 +242,8 @@ Imported configuration with bash enabled.
 name: Test With Import
 engine: copilot
 on: workflow_dispatch
-import: ./import.md
+imports:
+  - ./import.md
 safe-outputs:
   create-pull-request:
     title-prefix: "[auto] "

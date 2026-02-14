@@ -88,16 +88,16 @@ func (c *Compiler) ParseWorkflowFile(markdownPath string) (*WorkflowData, error)
 		return nil, err
 	}
 
-	// Process on section configuration and apply filters
-	if err := c.processOnSectionAndFilters(result.Frontmatter, workflowData, cleanPath); err != nil {
-		return nil, err
-	}
-
 	// Validate that git tool is allowed if using create-pull-request or push-to-pull-request-branch
-	// This must happen AFTER applyDefaults() which adds git commands automatically for PR features
+	// This must happen BEFORE applyDefaults() modifies the tools map
 	// We're checking if user's explicit bash configuration would prevent git from running
 	if err := validateGitToolForSafeOutputs(workflowData.ParsedTools, workflowData.SafeOutputs, workflowData.Name); err != nil {
 		return nil, fmt.Errorf("%s: %w", cleanPath, err)
+	}
+
+	// Process on section configuration and apply filters
+	if err := c.processOnSectionAndFilters(result.Frontmatter, workflowData, cleanPath); err != nil {
+		return nil, err
 	}
 
 	orchestratorWorkflowLog.Printf("Workflow file parsing completed successfully: %s", markdownPath)
