@@ -46,9 +46,9 @@ func NewCodexEngine() *CodexEngine {
 	}
 }
 
-// SupportsLLMGateway returns the LLM gateway port for Codex engine
+// SupportsLLMGateway returns -1 to indicate Codex engine does not support LLM gateway
 func (e *CodexEngine) SupportsLLMGateway() int {
-	return constants.CodexLLMGatewayPort
+	return -1
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Codex engine
