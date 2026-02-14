@@ -63,10 +63,14 @@ func TestValidateContainerImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Skip test if docker is not available
+			// Skip test if docker daemon is not running
 			if tt.skipIfNoDocker {
 				if _, err := exec.LookPath("docker"); err != nil {
 					t.Skip("docker not available, skipping test")
+				}
+				// Also check if Docker daemon is running (not just if binary exists)
+				if !isDockerDaemonRunning() {
+					t.Skip("docker daemon not running, skipping test")
 				}
 			}
 
@@ -87,6 +91,10 @@ func TestValidateDockerImage(t *testing.T) {
 	// Skip if docker is not available
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker not available, skipping test")
+	}
+	// Also check if Docker daemon is running (not just if binary exists)
+	if !isDockerDaemonRunning() {
+		t.Skip("docker daemon not running, skipping test")
 	}
 
 	tests := []struct {
