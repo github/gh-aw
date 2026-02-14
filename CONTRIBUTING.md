@@ -116,18 +116,18 @@ Use an agent to analyze the source code, identify root causes, propose fixes, an
 For workflow failures, use this prompt with your agent:
 
 ```markdown
-@github-copilot agent
-
 Please debug this workflow failure:
 https://github.com/owner/repo/actions/runs/RUN_ID
 
-Load .github/agents/agentic-workflows.agent.md and investigate:
+Load [https://github.com/github/gh-aw/.github/agents/agentic-workflows.agent.md and](https://github.com/github/gh-aw/blob/main/.github/agents/agentic-workflows.agent.md) investigate:
 - Why the workflow failed
 - What tools were missing
 - How to fix the configuration
+
+Generate an investigation report and a plan to address the issue for an agent.
 ```
 
-The agent will use `gh aw audit <run-id>` and `gh aw logs` to analyze the failure. See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for details.
+The agent will use `gh aw` or the mcp server to analyze the failure. See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for details.
 
 #### 📝 Issue Guidelines
 
