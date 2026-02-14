@@ -83,6 +83,9 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const comment = config.comment || "";
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Close pull request configuration: max=${maxCount}`);
   if (requiredLabels.length > 0) {
     core.info(`Required labels: ${requiredLabels.join(", ")}`);
@@ -215,6 +218,20 @@ async function main(config = {}) {
     }
     if (requiredTitlePrefix) {
       core.info(`PR #${prNumber} has required title prefix: "${requiredTitlePrefix}"`);
+    }
+
+    // If in staged mode, preview the close without executing it
+    if (isStaged) {
+      core.info(`Staged mode: Would close PR #${prNumber}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          number: prNumber,
+          alreadyClosed: wasAlreadyClosed,
+          hasComment: !!commentToPost,
+        },
+      };
     }
 
     // Add comment with the body from the message

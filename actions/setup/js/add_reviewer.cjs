@@ -24,6 +24,9 @@ async function main(config = {}) {
   const allowedReviewers = config.allowed || [];
   const maxCount = config.max || 10;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Add reviewer configuration: max=${maxCount}`);
   if (allowedReviewers.length > 0) {
     core.info(`Allowed reviewers: ${allowedReviewers.join(", ")}`);
@@ -93,6 +96,19 @@ async function main(config = {}) {
     }
 
     core.info(`Adding ${uniqueReviewers.length} reviewers to PR #${prNumber}: ${JSON.stringify(uniqueReviewers)}`);
+
+    // If in staged mode, preview without executing
+    if (isStaged) {
+      core.info(`Staged mode: Would add reviewers to PR #${prNumber}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          number: prNumber,
+          reviewers: uniqueReviewers,
+        },
+      };
+    }
 
     try {
       // Special handling for "copilot" reviewer - separate it from other reviewers in a single pass
