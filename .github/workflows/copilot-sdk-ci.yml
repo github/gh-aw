@@ -29,7 +29,11 @@ jobs:
           cache-dependency-path: copilot-client/package-lock.json
 
       - name: Install Copilot CLI
-        run: npm install -g @github/copilot@0.0.403
+        run: |
+          # Read version from constants.go (skip commented lines)
+          COPILOT_VERSION=$(grep 'DefaultCopilotVersion Version = "' pkg/constants/constants.go | grep -v '^//' | grep -oP '"\K[^"]+')
+          echo "Installing Copilot CLI version: $COPILOT_VERSION"
+          npm install -g @github/copilot@$COPILOT_VERSION
 
       - name: Start Copilot CLI as headless server
         id: copilot_server

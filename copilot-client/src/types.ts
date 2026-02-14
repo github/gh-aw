@@ -72,7 +72,17 @@ export interface CopilotClientConfig {
     systemMessage?: string;
 
     /**
-     * MCP server configuration
+     * MCP server configurations for the session.
+     * Keys are server names, values are server configurations.
+     * Example:
+     * {
+     *   "myserver": {
+     *     "type": "http",
+     *     "url": "https://example.com/mcp",
+     *     "tools": ["*"],
+     *     "headers": { "Authorization": "Bearer token" }
+     *   }
+     * }
      */
     mcpServers?: Record<string, any>;
   };
