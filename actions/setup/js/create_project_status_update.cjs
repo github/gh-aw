@@ -363,6 +363,20 @@ async function main(config = {}, githubClient = null) {
       core.info(`Creating status update: ${status} (${startDate} → ${targetDate})`);
       core.info(`Body preview: ${body.substring(0, 100)}${body.length > 100 ? "..." : ""}`);
 
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would create status update for project ${effectiveProjectUrl}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            projectUrl: effectiveProjectUrl,
+            status,
+            title,
+          },
+        };
+      }
+
       // Create the status update using GraphQL mutation
       const mutation = `
         mutation($projectId: ID!, $body: String!, $startDate: Date, $targetDate: Date, $status: ProjectV2StatusUpdateStatus!) {

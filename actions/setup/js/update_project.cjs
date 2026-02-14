@@ -1278,6 +1278,20 @@ async function main(config = {}, githubClient = null) {
         effectiveMessage.field_definitions = configuredFieldDefinitions;
       }
 
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        const operation = effectiveMessage?.operation || "update";
+        core.info(`Staged mode: Would ${operation} project ${effectiveProjectUrl}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            projectUrl: effectiveProjectUrl,
+            operation,
+          },
+        };
+      }
+
       // Process the update_project message
       const updateResult = await updateProject(effectiveMessage, tempIdMap, github);
 

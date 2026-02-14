@@ -155,6 +155,19 @@ async function main(config = {}) {
 
       core.info(`Resolving review thread: ${threadId} (PR #${triggeringPRNumber})`);
 
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would resolve review thread ${threadId}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            thread_id: threadId,
+            pr_number: triggeringPRNumber,
+          },
+        };
+      }
+
       const resolveResult = await resolveReviewThreadAPI(github, threadId);
 
       if (resolveResult.isResolved) {
