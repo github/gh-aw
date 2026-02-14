@@ -33,18 +33,18 @@ function parseCustomLog(logContent) {
   }
 
   // Try Codex parser as fallback
-  // Codex parser returns a string (markdown only), so wrap it in expected object format
+  // Codex parser now returns an object { markdown, logEntries, mcpFailures, maxTurnsHit }
   try {
     const codexModule = require("./parse_codex_log.cjs");
-    const codexMarkdown = codexModule.parseCodexLog(logContent);
+    const codexResult = codexModule.parseCodexLog(logContent);
 
-    // Codex parser returns a string, so check if we got meaningful content
-    if (codexMarkdown && typeof codexMarkdown === "string" && codexMarkdown.length > 0) {
+    // Check if we got meaningful content
+    if (codexResult && codexResult.markdown && codexResult.markdown.length > 0) {
       return {
-        markdown: "## Custom Engine Log (Codex format)\n\n" + codexMarkdown,
-        mcpFailures: [],
-        maxTurnsHit: false,
-        logEntries: [],
+        markdown: "## Custom Engine Log (Codex format)\n\n" + codexResult.markdown,
+        mcpFailures: codexResult.mcpFailures || [],
+        maxTurnsHit: codexResult.maxTurnsHit || false,
+        logEntries: codexResult.logEntries || [],
       };
     }
   } catch (error) {
