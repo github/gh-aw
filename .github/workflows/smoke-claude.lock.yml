@@ -33,11 +33,12 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 3281c2195a8df8fd666a25f9be9181e7059210c5c909204891b2d627bbdc4140
+# frontmatter-hash: eae98f259e641679161a4afeb78fca985a8b84e777ceb8448f72db87a8b01091
 
 name: "Smoke Claude"
 "on":
   pull_request:
+    # draft: true # Draft filtering applied via job conditions
     # names: # Label filtering applied via job conditions
     # - smoke # Label filtering applied via job conditions
     types:
@@ -58,7 +59,8 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
+      (needs.pre_activation.outputs.activated == 'true') && ((((github.event_name != 'pull_request') || (github.event.pull_request.draft == true)) &&
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id))) &&
       ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'smoke'))))
     runs-on: ubuntu-slim
     permissions:
@@ -2272,8 +2274,9 @@ jobs:
 
   pre_activation:
     if: >
-      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
-      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'smoke')))
+      (((github.event_name != 'pull_request') || (github.event.pull_request.draft == true)) && ((github.event_name != 'pull_request') ||
+      (github.event.pull_request.head.repo.id == github.repository_id))) && ((github.event_name != 'pull_request') ||
+      ((github.event.action != 'labeled') || (github.event.label.name == 'smoke')))
     runs-on: ubuntu-slim
     permissions:
       contents: read

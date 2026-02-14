@@ -6,6 +6,7 @@ on:
   pull_request:
     types: [labeled]
     names: ["smoke"]
+    draft: true
   reaction: "heart"
 permissions:
   contents: read
