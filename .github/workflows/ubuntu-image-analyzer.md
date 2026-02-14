@@ -28,6 +28,7 @@ tools:
   bash:
     - "find .github/workflows -name '*.lock.yml' -type f"
     - "cat research/ubuntulatest.md"
+    - "git"
 
 safe-outputs:
   create-pull-request:

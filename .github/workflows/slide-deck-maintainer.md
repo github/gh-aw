@@ -40,6 +40,7 @@ tools:
     - "cat*"
     - "head*"
     - "tail*"
+    - "git"
 safe-outputs:
   create-pull-request:
     title-prefix: "[slides] "

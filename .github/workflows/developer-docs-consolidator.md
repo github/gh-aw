@@ -45,6 +45,7 @@ tools:
     - "find specs -maxdepth 1 -ls"
     - "grep -r '*' specs"
     - "wc -l scratchpad/*.md"
+    - "git"
 
 timeout-minutes: 30
 

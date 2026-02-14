@@ -54,6 +54,7 @@ tools:
     - "find docs/src/content/docs -name '*.md'"
     - "wc -l *"
     - "grep -n *"
+    - "git"
     - "cat *"
     - "head *"
     - "tail *"

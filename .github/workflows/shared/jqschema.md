@@ -3,6 +3,7 @@ tools:
   bash:
     - "jq *"
     - "/tmp/gh-aw/jqschema.sh"
+    - "git"
 steps:
   - name: Setup jq utilities directory
     run: |

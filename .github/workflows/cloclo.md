@@ -25,6 +25,7 @@ tools:
   serena: ["go"]
   edit:
   playwright:
+  bash: true
   cache-memory:
     key: cloclo-memory-${{ github.workflow }}-${{ github.run_id }}
 safe-outputs:

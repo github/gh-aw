@@ -40,6 +40,7 @@ tools:
     - "find docs -maxdepth 1 -ls"
     - "find docs -name '*.md' -exec cat {} +"
     - "grep -r '*' docs"
+    - "git"
 
 timeout-minutes: 45
 

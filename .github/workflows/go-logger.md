@@ -48,6 +48,7 @@ tools:
     - "make build"
     - "make recompile"
     - "./gh-aw compile *"
+    - "git"
   cache-memory:
 
 imports:
