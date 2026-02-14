@@ -350,6 +350,7 @@
         },
         "thread_id": {
           "type": "string",
+          "minLength": 1,
           "description": "The node ID of the review thread to resolve (e.g., 'PRRT_kwDOABCD...'). This is the GraphQL node ID, not a numeric ID."
         }
       },

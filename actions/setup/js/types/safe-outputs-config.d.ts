@@ -100,7 +100,7 @@ interface CreatePullRequestReviewCommentConfig extends SafeOutputConfig {
 interface ResolvePullRequestReviewThreadConfig extends SafeOutputConfig {
   target?: string;
   "target-repo"?: string;
-  allowed_repos?: string[];
+  "allowed-repos"?: string[];
 }
 
 /**

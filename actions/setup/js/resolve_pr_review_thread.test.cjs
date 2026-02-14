@@ -38,6 +38,7 @@ describe("resolve_pr_review_thread", () => {
   let handler;
 
   beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
 
     mockGraphql.mockResolvedValue({
