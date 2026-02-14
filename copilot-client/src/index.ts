@@ -44,18 +44,29 @@ export async function runCopilotSession(config: CopilotClientConfig): Promise<vo
 
   // Create Copilot client
   debug('Creating Copilot client');
-  const client = new CopilotClient({
-    cliPath: config.cliPath,
-    cliArgs: config.cliArgs,
-    cliUrl: config.cliUrl,
-    port: config.port,
-    useStdio: config.useStdio ?? true,
+  
+  // When connecting to an existing server (cliUrl), don't pass options for starting a new process
+  // These options are mutually exclusive per the Copilot SDK
+  const clientOptions: any = {
     logLevel: config.logLevel ?? 'info',
-    autoStart: config.autoStart ?? true,
-    autoRestart: config.autoRestart ?? true,
     githubToken: config.githubToken,
     useLoggedInUser: config.useLoggedInUser
-  });
+  };
+  
+  if (config.cliUrl) {
+    // Connecting to existing server - only pass cliUrl
+    clientOptions.cliUrl = config.cliUrl;
+  } else {
+    // Starting new process - pass process-related options
+    clientOptions.cliPath = config.cliPath;
+    clientOptions.cliArgs = config.cliArgs;
+    clientOptions.port = config.port;
+    clientOptions.useStdio = config.useStdio ?? true;
+    clientOptions.autoStart = config.autoStart ?? true;
+    clientOptions.autoRestart = config.autoRestart ?? true;
+  }
+  
+  const client = new CopilotClient(clientOptions);
 
   logEvent('client.created', {
     cliPath: config.cliPath,
