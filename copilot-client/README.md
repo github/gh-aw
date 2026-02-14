@@ -42,8 +42,9 @@ The client accepts a JSON configuration object with the following properties:
 - `promptFile` (required): Path to the file containing the prompt
 - `eventLogFile` (required): Path where events will be logged in JSONL format
 - `githubToken` (optional): GitHub token for authentication
-- `cliPath` (optional): Path to copilot CLI executable
-- `cliUrl` (optional): URL of existing CLI server
+- `cliPath` (optional): Path to copilot CLI executable (mutually exclusive with `cliUrl`)
+- `cliUrl` (optional): URL of existing CLI server (mutually exclusive with `cliPath`/`useStdio`)
+- `useStdio` (optional): Use stdio transport instead of TCP (default: true, mutually exclusive with `cliUrl`)
 - `session` (optional): Session configuration
   - `model` (optional): Model to use (e.g., "gpt-5", "claude-sonnet-4.5")
   - `reasoningEffort` (optional): "low" | "medium" | "high" | "xhigh"
@@ -82,6 +83,8 @@ You can configure MCP servers to provide additional tools to the Copilot session
   }
 }
 ```
+
+**Note:** When using `cliUrl` to connect to an existing server, do not specify `cliPath`, `useStdio`, `autoStart`, or `autoRestart`. These options are mutually exclusive.
 
 ## Testing
 
