@@ -103,6 +103,20 @@ async function main(config = {}) {
 
     core.info(`Unassigning ${uniqueAssignees.length} users from issue #${issueNumber} in ${targetRepo}: ${JSON.stringify(uniqueAssignees)}`);
 
+    // If in staged mode, preview without executing
+    if (isStaged) {
+      core.info(`Staged mode: Would unassign users from issue #${issueNumber} in ${targetRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          issueNumber,
+          repo: targetRepo,
+          assignees: uniqueAssignees,
+        },
+      };
+    }
+
     try {
       // Remove assignees from the issue
       await github.rest.issues.removeAssignees({

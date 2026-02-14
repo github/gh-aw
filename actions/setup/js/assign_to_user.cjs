@@ -99,6 +99,20 @@ async function main(config = {}) {
 
     core.info(`Assigning ${uniqueAssignees.length} users to issue #${issueNumber} in ${itemRepo}: ${JSON.stringify(uniqueAssignees)}`);
 
+    // If in staged mode, preview without executing
+    if (isStaged) {
+      core.info(`Staged mode: Would assign users to issue #${issueNumber} in ${itemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          issueNumber,
+          repo: itemRepo,
+          assignees: uniqueAssignees,
+        },
+      };
+    }
+
     try {
       // Add assignees to the issue
       await github.rest.issues.addAssignees({

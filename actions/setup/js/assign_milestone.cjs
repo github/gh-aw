@@ -20,6 +20,9 @@ async function main(config = {}) {
   const allowedMilestones = config.allowed || [];
   const maxCount = config.max || 10;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Assign milestone configuration: max=${maxCount}`);
   if (allowedMilestones.length > 0) {
     core.info(`Allowed milestones: ${allowedMilestones.join(", ")}`);
@@ -116,6 +119,19 @@ async function main(config = {}) {
 
     // Assign the milestone to the issue
     try {
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would assign milestone #${milestoneNumber} to issue #${issueNumber}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            issue_number: issueNumber,
+            milestone_number: milestoneNumber,
+          },
+        };
+      }
+
       await github.rest.issues.update({
         owner: context.repo.owner,
         repo: context.repo.repo,
