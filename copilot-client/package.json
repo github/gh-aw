@@ -1,0 +1,31 @@
+{
+  "name": "@github/gh-aw-copilot-client",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "TypeScript client for GitHub Copilot SDK integration with gh-aw",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "copilot-client": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.23",
+    "debug": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

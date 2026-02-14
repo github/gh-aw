@@ -1,0 +1,77 @@
+# Copilot SDK Client
+
+TypeScript client for running GitHub Copilot agentic sessions using the `@github/copilot-sdk` Node.js package.
+
+## Features
+
+- ES6 JavaScript with TypeScript annotations
+- Async/await for Node 24
+- ESM module format
+- JSONL event logging with timestamps
+- Debug package for logging
+- Configuration from stdin for testability
+
+## Building
+
+```bash
+npm install
+npm run build
+```
+
+The compiled output will be in the `dist/` directory.
+
+## Usage
+
+Create a configuration file and pipe it to the client:
+
+```bash
+echo '{
+  "promptFile": "/path/to/prompt.txt",
+  "eventLogFile": "/tmp/events.jsonl",
+  "githubToken": "ghp_...",
+  "session": {
+    "model": "gpt-5"
+  }
+}' | node dist/cli.js
+```
+
+## Configuration
+
+The client accepts a JSON configuration object with the following properties:
+
+- `promptFile` (required): Path to the file containing the prompt
+- `eventLogFile` (required): Path where events will be logged in JSONL format
+- `githubToken` (optional): GitHub token for authentication
+- `cliPath` (optional): Path to copilot CLI executable
+- `cliUrl` (optional): URL of existing CLI server
+- `session` (optional): Session configuration
+  - `model` (optional): Model to use (e.g., "gpt-5", "claude-sonnet-4.5")
+  - `reasoningEffort` (optional): "low" | "medium" | "high" | "xhigh"
+  - `systemMessage` (optional): Custom system message
+
+## Testing
+
+```bash
+npm test
+```
+
+Integration tests require `COPILOT_GITHUB_TOKEN` environment variable.
+
+## Debugging
+
+Enable debug logging:
+
+```bash
+DEBUG=copilot-client npm run build
+DEBUG=copilot-client node dist/cli.js < config.json
+```
+
+## Event Logging
+
+All events are logged to the specified JSONL file with timestamps:
+
+```jsonl
+{"timestamp":"2026-02-14T03:50:00.000Z","type":"prompt.loaded","data":{"file":"/path/to/prompt.txt","length":123}}
+{"timestamp":"2026-02-14T03:50:01.000Z","type":"client.created","data":{"cliPath":"copilot","useStdio":true}}
+{"timestamp":"2026-02-14T03:50:02.000Z","type":"session.created","sessionId":"abc123","data":{"model":"gpt-5"}}
+```

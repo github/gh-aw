@@ -203,9 +203,26 @@ bundle-js:
 	@echo "✓ bundle-js tool built"
 	@echo "To bundle a JavaScript file: ./bundle-js <input-file> [output-file]"
 
-# Test all code (Go and JavaScript)
+# Install copilot-client dependencies
+.PHONY: deps-copilot-client
+deps-copilot-client: check-node-version
+	cd copilot-client && npm ci
+
+# Build copilot-client TypeScript project
+.PHONY: copilot-client
+copilot-client: deps-copilot-client
+	@echo "Building copilot-client..."
+	cd copilot-client && npm run build
+	@echo "✓ Copilot client built"
+
+# Test copilot-client
+.PHONY: test-copilot-client
+test-copilot-client: copilot-client
+	cd copilot-client && npm test
+
+# Test all code (Go, JavaScript, and copilot-client)
 .PHONY: test-all
-test-all: test test-js
+test-all: test test-js test-copilot-client
 
 # Run tests with coverage
 .PHONY: test-coverage
