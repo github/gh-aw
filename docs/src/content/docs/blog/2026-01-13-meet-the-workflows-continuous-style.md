@@ -14,35 +14,6 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-continuous-improvement/
   label: "Continuous Improvement Workflows"
-head:
-  - tag: meta
-    attrs:
-      property: og:title
-      content: "Meet the Workflows: Continuous Style"
-  - tag: meta
-    attrs:
-      property: og:description
-      content: "The agent that makes console output beautiful and consistent"
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://github.github.com/gh-aw/peli.png
-  - tag: meta
-    attrs:
-      property: og:type
-      content: article
-  - tag: meta
-    attrs:
-      property: og:url
-      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-style/
-  - tag: meta
-    attrs:
-      name: twitter:card
-      content: summary_large_image
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />

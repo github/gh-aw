@@ -7,12 +7,12 @@ const { entry } = Astro.props;
 const isBlogPost = Astro.url.pathname.includes('/blog/');
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
-// Default social images
-const defaultSocialImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
-const blogSocialImage = 'https://github.github.com/gh-aw/peli.png';
+// Social images
+const heroImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
+const blogCombinedImage = 'https://github.github.com/gh-aw/blog-combined.png';
 
-// Use blog image for blog posts, default for everything else
-const socialImage = isBlogPost ? blogSocialImage : defaultSocialImage;
+// Blog posts use combined image (hero + Peli), non-blog pages use hero only
+const socialImage = isBlogPost ? blogCombinedImage : heroImage;
 
 // Default site info
 const siteTitle = 'GitHub Agentic Workflows';

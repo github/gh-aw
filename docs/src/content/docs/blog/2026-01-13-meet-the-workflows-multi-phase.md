@@ -14,35 +14,6 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-organization/
   label: "Organization & Cross-Repo Workflows"
-head:
-  - tag: meta
-    attrs:
-      property: og:title
-      content: "Meet the Workflows: Multi-Phase Improvers"
-  - tag: meta
-    attrs:
-      property: og:description
-      content: "A curated tour of multi-phase agentic workflows that tackle long-running projects"
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://github.github.com/gh-aw/peli.png
-  - tag: meta
-    attrs:
-      property: og:type
-      content: article
-  - tag: meta
-    attrs:
-      property: og:url
-      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-multi-phase/
-  - tag: meta
-    attrs:
-      name: twitter:card
-      content: summary_large_image
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />

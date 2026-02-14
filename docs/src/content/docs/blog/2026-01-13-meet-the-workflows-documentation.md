@@ -14,35 +14,6 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-issue-management/
   label: "Issue & PR Management Workflows"
-head:
-  - tag: meta
-    attrs:
-      property: og:title
-      content: "Meet the Workflows: Continuous Documentation"
-  - tag: meta
-    attrs:
-      property: og:description
-      content: "A curated tour of agentic workflows that maintain high-quality documentation"
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://github.github.com/gh-aw/peli.png
-  - tag: meta
-    attrs:
-      property: og:type
-      content: article
-  - tag: meta
-    attrs:
-      property: og:url
-      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-documentation/
-  - tag: meta
-    attrs:
-      name: twitter:card
-      content: summary_large_image
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />
