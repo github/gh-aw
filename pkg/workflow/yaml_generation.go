@@ -4,15 +4,30 @@ import "fmt"
 
 // generateGitConfigurationSteps generates standardized git credential setup as string steps
 func (c *Compiler) generateGitConfigurationSteps() []string {
-	return c.generateGitConfigurationStepsWithToken("${{ github.token }}")
+	return c.generateGitConfigurationStepsWithToken("${{ github.token }}", "")
 }
 
 // generateGitConfigurationStepsWithToken generates git credential setup with a custom token
-func (c *Compiler) generateGitConfigurationStepsWithToken(token string) []string {
+// and optional target repository for cross-repo operations
+// Parameters:
+//   - token: GitHub token to use for authentication
+//   - targetRepoSlug: optional target repository (e.g., "org/repo") for cross-repo operations
+//     If empty, uses source repository (github.repository)
+//     If set, configures git remote to point to the target repository
+func (c *Compiler) generateGitConfigurationStepsWithToken(token string, targetRepoSlug string) []string {
+	// Determine which repository to configure git remote for
+	// Priority: targetRepoSlug > trialLogicalRepoSlug > default (source repo)
+	repoNameValue := "${{ github.repository }}"
+	if targetRepoSlug != "" {
+		repoNameValue = fmt.Sprintf("%q", targetRepoSlug)
+	} else if c.trialMode && c.trialLogicalRepoSlug != "" {
+		repoNameValue = fmt.Sprintf("%q", c.trialLogicalRepoSlug)
+	}
+
 	return []string{
 		"      - name: Configure Git credentials\n",
 		"        env:\n",
-		"          REPO_NAME: ${{ github.repository }}\n",
+		fmt.Sprintf("          REPO_NAME: %s\n", repoNameValue),
 		"          SERVER_URL: ${{ github.server_url }}\n",
 		"        run: |\n",
 		"          git config --global user.email \"github-actions[bot]@users.noreply.github.com\"\n",

@@ -14,6 +14,35 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-documentation/
   label: "Meet the Workflows: Continuous Documentation"
+head:
+  - tag: meta
+    attrs:
+      property: og:title
+      content: "Meet the Workflows: Continuous Improvement"
+  - tag: meta
+    attrs:
+      property: og:description
+      content: "Agentic workflows that take a holistic view of repository health"
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://github.github.com/gh-aw/peli.png
+  - tag: meta
+    attrs:
+      property: og:type
+      content: article
+  - tag: meta
+    attrs:
+      property: og:url
+      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-continuous-improvement/
+  - tag: meta
+    attrs:
+      name: twitter:card
+      content: summary_large_image
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />
@@ -140,7 +169,7 @@ gh aw add-wizard https://github.com/github/gh-aw/blob/main/.github/workflows/fun
 gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/repository-quality-improver.md
 ```
 
-Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
+Then edit and remix the workflow specifications to meet your needs, regenerate the lock file using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
 
 You can also [create your own workflows](/gh-aw/setup/creating-workflows).
 

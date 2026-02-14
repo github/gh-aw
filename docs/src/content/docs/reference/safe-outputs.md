@@ -143,7 +143,7 @@ In this example, if the workflow creates 5 issues, all will be automatically gro
 
 #### Temporary IDs for Issue References
 
-Use temporary IDs (`aw_` + 4-8 alphanumeric chars) to reference parent issues before creation. References like `#aw_abc123` in bodies are replaced with actual numbers. The `parent` field creates sub-issue relationships.
+Use temporary IDs (`aw_` + 3-8 alphanumeric chars) to reference parent issues before creation. References like `#aw_abc123` in bodies are replaced with actual numbers. The `parent` field creates sub-issue relationships.
 
 #### Auto-Close Older Issues
 
@@ -406,7 +406,7 @@ Agent output includes `parent_issue_number` and `sub_issue_number`. Validation e
 
 ### Project Creation (`create-project:`)
 
-Creates new GitHub Projects V2 boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access. Supports optional view configuration to create custom project views at creation time.
+Creates new GitHub Projects V2 boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access. Supports optional view configuration to create custom project views at creation time.
 
 ```yaml wrap
 safe-outputs:
@@ -459,7 +459,7 @@ Optionally include `item_url` (GitHub issue URL) to add the issue as the first p
 
 ### Project Board Updates (`update-project:`)
 
-Manages GitHub Projects boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access. Update-only by default; set `create_if_missing: true` to create boards (requires appropriate token permissions).
+Manages GitHub Projects boards. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access. Update-only by default; set `create_if_missing: true` to create boards (requires appropriate token permissions).
 
 ```yaml wrap
 safe-outputs:
@@ -554,7 +554,7 @@ Views are created automatically during workflow execution. The workflow must inc
 
 ### Project Status Updates (`create-project-status-update:`)
 
-Creates status updates on GitHub Projects boards to communicate progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/tokens/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access.
+Creates status updates on GitHub Projects boards to communicate progress, findings, and trends. Status updates appear in the project's Updates tab and provide a historical record of execution. Requires PAT or GitHub App token ([`GH_AW_PROJECT_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_project_github_token))-default `GITHUB_TOKEN` lacks Projects v2 access.
 
 ```yaml wrap
 safe-outputs:
@@ -691,7 +691,7 @@ safe-outputs:
 
 Submits a consolidated pull request review with a status decision. All `create-pull-request-review-comment` outputs are automatically collected and included as inline comments in the review.
 
-If the agent calls `submit_pull_request_review`, it can specify a review `body` and `event` (APPROVE, REQUEST_CHANGES, or COMMENT). Both fields are optional — `event` defaults to COMMENT when omitted, and `body` is only required for APPROVE and REQUEST_CHANGES decisions. The agent can also submit a body-only review (e.g., APPROVE) without any inline comments.
+If the agent calls `submit_pull_request_review`, it can specify a review `body` and `event` (APPROVE, REQUEST_CHANGES, or COMMENT). Both fields are optional — `event` defaults to COMMENT when omitted, and `body` is only required for REQUEST_CHANGES. The agent can also submit a body-only review (e.g., APPROVE) without any inline comments.
 
 If the agent does not call `submit_pull_request_review` at all, buffered comments are still submitted as a COMMENT review automatically.
 
@@ -700,7 +700,8 @@ safe-outputs:
   create-pull-request-review-comment:
     max: 10
   submit-pull-request-review:
-    max: 1  # max reviews to submit (default: 1)
+    max: 1            # max reviews to submit (default: 1)
+    footer: false     # omit AI-generated footer from review body (default: true)
 ```
 
 ### Code Scanning Alerts (`create-code-scanning-alert:`)
@@ -847,15 +848,18 @@ Creates discussions with optional `category` (slug, name, or ID; defaults to fir
 
 **Category Naming Standard**: Use lowercase, plural category names (e.g., `audits`, `general`, `reports`) for consistency and better searchability. GitHub Discussion category IDs (starting with `DIC_`) are also supported.
 
+> [!WARNING]
+> Only announcement-capable category succeeds; all non-announcement categories fail with integration-forbidden.
+
 ```yaml wrap
 safe-outputs:
   create-discussion:
-    title-prefix: "[ai] "     # prefix for titles
-    category: "general"       # category slug, name, or ID (use lowercase)
-    expires: 3                # auto-close after 3 days (or false to disable)
-    max: 3                    # max discussions (default: 1)
-    target-repo: "owner/repo" # cross-repository
-    fallback-to-issue: true   # fallback to issue creation on permission errors (default: true)
+    title-prefix: "[ai] "        # prefix for titles
+    category: "announcements"    # category slug, name, or ID (use lowercase, prefer announcement-capable)
+    expires: 3                   # auto-close after 3 days (or false to disable)
+    max: 3                       # max discussions (default: 1)
+    target-repo: "owner/repo"    # cross-repository
+    fallback-to-issue: true      # fallback to issue creation on permission errors (default: true)
 ```
 
 #### Fallback to Issue Creation
@@ -1265,7 +1269,7 @@ When `allowed` list is configured, existing agent assignees not in the list are 
 > 
 > **Important**: Both methods use the **same token** (`GH_AW_AGENT_TOKEN`) and **same GraphQL API** (`replaceActorsForAssignable` mutation) to assign copilot. When you use `assignees: copilot` in create-issue, the copilot assignee is automatically filtered out and assigned in a separate post-step using the agent token and GraphQL, identical to the `assign-to-agent` safe output.
 > 
-> Both methods result in the same outcome as [manually assigning issues to Copilot through the GitHub UI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot). See [GitHub Tokens reference](/gh-aw/reference/tokens/#gh_aw_agent_token) for token configuration details and [GitHub's official Copilot coding agent documentation](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent) for more about the Copilot agent.
+> Both methods result in the same outcome as [manually assigning issues to Copilot through the GitHub UI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/create-a-pr#assigning-an-issue-to-copilot). See [Authentication](/gh-aw/reference/auth/#gh_aw_agent_token) for token configuration details and [GitHub's official Copilot coding agent documentation](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent) for more about the Copilot agent.
 
 ### Assign to User (`assign-to-user:`)
 

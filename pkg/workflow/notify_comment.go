@@ -57,8 +57,8 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 
 	// Add GitHub App token minting step if app is configured
 	if data.SafeOutputs.App != nil {
-		// Use permissions for the conclusion job
-		permissions := NewPermissionsContentsReadIssuesWritePRWriteDiscussionsWrite()
+		// Compute permissions based on configured safe outputs (principle of least privilege)
+		permissions := computePermissionsForSafeOutputs(data.SafeOutputs)
 		steps = append(steps, c.buildGitHubAppTokenMintStep(data.SafeOutputs.App, permissions)...)
 	}
 
@@ -409,11 +409,14 @@ func (c *Compiler) buildConclusionJob(data *WorkflowData, mainJobName string, sa
 		outputs["total_count"] = "${{ steps.missing_tool.outputs.total_count }}"
 	}
 
+	// Compute permissions based on configured safe outputs (principle of least privilege)
+	permissions := computePermissionsForSafeOutputs(data.SafeOutputs)
+
 	job := &Job{
 		Name:        "conclusion",
 		If:          condition.Render(),
 		RunsOn:      c.formatSafeOutputsRunsOn(data.SafeOutputs),
-		Permissions: NewPermissionsContentsReadIssuesWritePRWriteDiscussionsWrite().RenderToYAML(),
+		Permissions: permissions.RenderToYAML(),
 		Steps:       steps,
 		Needs:       needs,
 		Outputs:     outputs,

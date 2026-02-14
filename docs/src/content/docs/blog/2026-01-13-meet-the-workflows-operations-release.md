@@ -14,6 +14,35 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-security-compliance/
   label: "Security-related Workflows"
+head:
+  - tag: meta
+    attrs:
+      property: og:title
+      content: "Meet the Workflows: Operations & Release"
+  - tag: meta
+    attrs:
+      property: og:description
+      content: "A curated tour of operations and release agentic workflows that ship software"
+  - tag: meta
+    attrs:
+      property: og:image
+      content: https://github.github.com/gh-aw/peli.png
+  - tag: meta
+    attrs:
+      property: og:type
+      content: article
+  - tag: meta
+    attrs:
+      property: og:url
+      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-operations-release/
+  - tag: meta
+    attrs:
+      name: twitter:card
+      content: summary_large_image
+  - tag: meta
+    attrs:
+      name: twitter:image
+      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />
@@ -45,7 +74,7 @@ You can add these workflows to your own repository and remix them. Get going wit
 gh aw add-wizard https://github.com/github/gh-aw/blob/v0.42.13/.github/workflows/changeset.md
 ```
 
-Then edit and remix the workflow specifications to meet your needs, recompile using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
+Then edit and remix the workflow specifications to meet your needs, regenerate the lock file using `gh aw compile`, and push to your repository. See our [Quick Start](https://github.github.com/gh-aw/setup/quick-start/) for further installation and setup instructions.
 
 You can also [create your own workflows](/gh-aw/setup/creating-workflows).
 

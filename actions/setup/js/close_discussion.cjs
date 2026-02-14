@@ -13,7 +13,7 @@ const { getErrorMessage } = require("./error_helpers.cjs");
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
  * @param {number} discussionNumber - Discussion number
- * @returns {Promise<{id: string, title: string, category: {name: string}, labels: {nodes: Array<{name: string}>}, url: string}>} Discussion details
+ * @returns {Promise<{id: string, title: string, closed: boolean, category: {name: string}, labels: {nodes: Array<{name: string}>}, url: string}>} Discussion details
  */
 async function getDiscussionDetails(github, owner, repo, discussionNumber) {
   // Fetch all labels with pagination
@@ -30,6 +30,7 @@ async function getDiscussionDetails(github, owner, repo, discussionNumber) {
           discussion(number: $num) {
             id
             title
+            closed
             category {
               name
             }
@@ -58,6 +59,7 @@ async function getDiscussionDetails(github, owner, repo, discussionNumber) {
       discussion = {
         id: query.repository.discussion.id,
         title: query.repository.discussion.title,
+        closed: query.repository.discussion.closed,
         category: query.repository.discussion.category,
         url: query.repository.discussion.url,
       };
@@ -77,6 +79,7 @@ async function getDiscussionDetails(github, owner, repo, discussionNumber) {
   return {
     id: discussion.id,
     title: discussion.title,
+    closed: discussion.closed,
     category: discussion.category,
     url: discussion.url,
     labels: {
@@ -235,6 +238,12 @@ async function main(config = {}) {
         };
       }
 
+      // Check if already closed - but still add comment
+      const wasAlreadyClosed = discussion.closed;
+      if (wasAlreadyClosed) {
+        core.info(`Discussion #${discussionNumber} is already closed, but will still add comment`);
+      }
+
       // Add comment if body is provided
       let commentUrl;
       if (item.body) {
@@ -243,17 +252,22 @@ async function main(config = {}) {
         commentUrl = comment.url;
       }
 
-      // Close the discussion
-      const reason = item.reason || undefined;
-      core.info(`Closing discussion #${discussionNumber} with reason: ${reason || "none"}`);
-      const closedDiscussion = await closeDiscussion(github, discussion.id, reason);
-      core.info(`Closed discussion #${discussionNumber}: ${closedDiscussion.url}`);
+      // Close the discussion if not already closed
+      if (wasAlreadyClosed) {
+        core.info(`Discussion #${discussionNumber} was already closed, comment added`);
+      } else {
+        const reason = item.reason || undefined;
+        core.info(`Closing discussion #${discussionNumber} with reason: ${reason || "none"}`);
+        const closedDiscussion = await closeDiscussion(github, discussion.id, reason);
+        core.info(`Closed discussion #${discussionNumber}: ${closedDiscussion.url}`);
+      }
 
       return {
         success: true,
         number: discussionNumber,
         url: discussion.url,
         commentUrl: commentUrl,
+        alreadyClosed: wasAlreadyClosed,
       };
     } catch (error) {
       const errorMessage = getErrorMessage(error);

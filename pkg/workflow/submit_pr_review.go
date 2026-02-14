@@ -12,6 +12,7 @@ var submitPRReviewLog = logger.New("workflow:submit_pr_review")
 // If this safe output type is not configured, review comments default to event: "COMMENT".
 type SubmitPullRequestReviewConfig struct {
 	BaseSafeOutputConfig `yaml:",inline"`
+	Footer               *bool `yaml:"footer,omitempty"` // Controls whether AI-generated footer is added to the review body. When false, footer is omitted.
 }
 
 // parseSubmitPullRequestReviewConfig handles submit-pull-request-review configuration
@@ -29,6 +30,14 @@ func (c *Compiler) parseSubmitPullRequestReviewConfig(outputMap map[string]any) 
 	if configMap, ok := configData.(map[string]any); ok {
 		// Parse common base fields with default max of 1
 		c.parseBaseSafeOutputConfig(configMap, &config.BaseSafeOutputConfig, 1)
+
+		// Parse footer flag
+		if footer, exists := configMap["footer"]; exists {
+			if footerBool, ok := footer.(bool); ok {
+				config.Footer = &footerBool
+				submitPRReviewLog.Printf("Footer control: %t", footerBool)
+			}
+		}
 	} else {
 		// If configData is nil or not a map, set the default max
 		config.Max = 1

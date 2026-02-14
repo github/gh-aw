@@ -61,13 +61,14 @@ async function main(config = {}) {
       };
     }
 
-    // Body is required for APPROVE and REQUEST_CHANGES
+    // Body is required for REQUEST_CHANGES per GitHub API docs;
+    // optional for APPROVE and COMMENT
     const body = message.body || "";
-    if ((event === "APPROVE" || event === "REQUEST_CHANGES") && !body) {
-      core.warning(`Review body is required for event type ${event}`);
+    if (event === "REQUEST_CHANGES" && !body) {
+      core.warning("Review body is required for REQUEST_CHANGES");
       return {
         success: false,
-        error: `Review body is required for event type ${event}`,
+        error: "Review body is required for REQUEST_CHANGES",
       };
     }
 

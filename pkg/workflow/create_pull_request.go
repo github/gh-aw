@@ -64,10 +64,12 @@ func (c *Compiler) buildCreateOutputPullRequestJob(data *WorkflowData, mainJobNa
 	preSteps = append(preSteps, "          path: /tmp/gh-aw/\n")
 
 	// Step 2: Checkout repository
-	preSteps = buildCheckoutRepository(preSteps, c)
+	preSteps = buildCheckoutRepository(preSteps, c, data.SafeOutputs.CreatePullRequests.TargetRepoSlug)
 
 	// Step 3: Configure Git credentials
-	preSteps = append(preSteps, c.generateGitConfigurationSteps()...)
+	// Pass the target repo to configure git remote correctly for cross-repo operations
+	gitToken := "${{ github.token }}"
+	preSteps = append(preSteps, c.generateGitConfigurationStepsWithToken(gitToken, data.SafeOutputs.CreatePullRequests.TargetRepoSlug)...)
 
 	// Build custom environment variables specific to create-pull-request
 	var customEnvVars []string

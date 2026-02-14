@@ -125,7 +125,7 @@ describe("submit_pr_review (Handler Factory Architecture)", () => {
     expect(result.error).toContain("Invalid review event");
   });
 
-  it("should require body for APPROVE event", async () => {
+  it("should allow empty body for APPROVE event", async () => {
     const message = {
       type: "submit_pull_request_review",
       body: "",
@@ -134,8 +134,9 @@ describe("submit_pr_review (Handler Factory Architecture)", () => {
 
     const result = await handler(message, {});
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Review body is required");
+    expect(result.success).toBe(true);
+    expect(result.event).toBe("APPROVE");
+    expect(result.body_length).toBe(0);
   });
 
   it("should require body for REQUEST_CHANGES event", async () => {
@@ -221,12 +222,12 @@ describe("submit_pr_review (Handler Factory Architecture)", () => {
     expect(result2.event).toBe("APPROVE");
   });
 
-  it("should not consume max count slot when body is missing for APPROVE", async () => {
-    // Missing body for APPROVE should not consume a slot
+  it("should not consume max count slot when body is missing for REQUEST_CHANGES", async () => {
+    // Missing body for REQUEST_CHANGES should not consume a slot
     const noBodyMessage = {
       type: "submit_pull_request_review",
       body: "",
-      event: "APPROVE",
+      event: "REQUEST_CHANGES",
     };
 
     const result1 = await handler(noBodyMessage, {});
@@ -236,7 +237,7 @@ describe("submit_pr_review (Handler Factory Architecture)", () => {
     const validMessage = {
       type: "submit_pull_request_review",
       body: "Now with body",
-      event: "APPROVE",
+      event: "REQUEST_CHANGES",
     };
 
     const result2 = await handler(validMessage, {});

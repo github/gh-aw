@@ -1,9 +1,40 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
 import Default from '@astrojs/starlight/components/Head.astro';
+
+const { entry } = Astro.props;
+// Detect blog posts by URL path - more reliable than entry.id
+const isBlogPost = Astro.url.pathname.includes('/blog/');
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+// Default social images
+const defaultSocialImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
+const blogSocialImage = 'https://github.github.com/gh-aw/peli.png';
+
+// Use blog image for blog posts, default for everything else
+const socialImage = isBlogPost ? blogSocialImage : defaultSocialImage;
+
+// Default site info
+const siteTitle = 'GitHub Agentic Workflows';
+const pageTitle = entry?.data?.title ?? siteTitle;
+const pageDescription = entry?.data?.description || 'Write agentic workflows in natural language using markdown files and run them as GitHub Actions workflows.';
 ---
 
 <Default {...Astro.props}><slot /></Default>
+
+<!-- Default Open Graph tags for all pages -->
+<meta property="og:type" content={isBlogPost ? 'article' : 'website'} />
+<meta property="og:url" content={canonicalURL} />
+<meta property="og:site_name" content={siteTitle} />
+<meta property="og:title" content={pageTitle} />
+<meta property="og:description" content={pageDescription} />
+<meta property="og:image" content={socialImage} />
+
+<!-- Default Twitter Card tags for all pages -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={pageTitle} />
+<meta name="twitter:description" content={pageDescription} />
+<meta name="twitter:image" content={socialImage} />
 
 <link
   rel="preload"

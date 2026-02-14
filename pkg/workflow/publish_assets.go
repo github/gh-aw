@@ -102,7 +102,7 @@ func (c *Compiler) buildUploadAssetsJob(data *WorkflowData, mainJobName string, 
 	}
 
 	// Step 1: Checkout repository
-	preSteps = buildCheckoutRepository(preSteps, c)
+	preSteps = buildCheckoutRepository(preSteps, c, "")
 
 	// Step 2: Configure Git credentials
 	preSteps = append(preSteps, c.generateGitConfigurationSteps()...)

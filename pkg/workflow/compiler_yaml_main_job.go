@@ -211,6 +211,9 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 	// Add GitHub MCP lockdown detection step if needed
 	c.generateGitHubMCPLockdownDetectionStep(yaml, data)
 
+	// Add GitHub MCP lockdown validation step if lockdown is explicitly enabled
+	c.generateGitHubMCPLockdownValidationStep(yaml, data)
+
 	// Add GitHub MCP app token minting step if configured
 	c.generateGitHubMCPAppTokenMintingStep(yaml, data)
 

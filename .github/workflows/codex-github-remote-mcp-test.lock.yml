@@ -17,7 +17,9 @@
 #
 # To update this file, edit the corresponding .md file and run:
 #   gh aw compile
-# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
+# Not all edits will cause changes to this file.
+#
+# For more information: https://github.github.com/gh-aw/introduction/overview/
 #
 # Test Codex engine with GitHub remote MCP server
 #
@@ -184,6 +186,9 @@ jobs:
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
         with:
           script: |
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');

@@ -31,7 +31,7 @@ function createAuthors(authors) {
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://github.github.io',
+	site: 'https://github.github.com',
 	base: '/gh-aw/',
 	markdown: {
 		remarkPlugins: [remarkStripEmojis],
@@ -55,6 +55,7 @@ export default defineConfig({
 		mermaid(),
 		starlight({
 			title: 'GitHub Agentic Workflows',
+			description: 'Write agentic workflows in natural language using markdown files and run them as GitHub Actions workflows.',
 			logo: {
 				src: './src/assets/agentic-workflow.svg',
 				replacesTitle: false,
@@ -197,6 +198,7 @@ export default defineConfig({
 					label: 'Reference',
 					items: [
 						{ label: 'AI Engines', link: '/reference/engines/' },
+						{ label: 'Authorization', link: '/reference/auth/' },
 						{ label: 'Cache & Memory', link: '/reference/memory/' },
 						{ label: 'Command Triggers', link: '/reference/command-triggers/' },
 						{ label: 'Compilation Process', link: '/reference/compilation-process/' },
@@ -210,7 +212,7 @@ export default defineConfig({
 						{ label: 'Frontmatter (Full)', link: '/reference/frontmatter-full/' },
 						{ label: 'GitHub Lockdown Mode', link: '/reference/lockdown-mode/' },
 						{ label: 'GH-AW Agent', link: '/reference/custom-agent-for-aw/' },
-						{ label: 'GH-AW as MCP Server', link: '/setup/mcp-server/' },
+						{ label: 'GH-AW as MCP Server', link: '/reference/gh-aw-as-mcp-server/' },
 						{ label: 'Glossary', link: '/reference/glossary/' },
 						{ label: 'Imports', link: '/reference/imports/' },
 						{ label: 'Markdown', link: '/reference/markdown/' },
@@ -224,7 +226,6 @@ export default defineConfig({
 						{ label: 'Schedule Syntax', link: '/reference/schedule-syntax/' },
 						{ label: 'Templating', link: '/reference/templating/' },
 						{ label: 'Threat Detection', link: '/reference/threat-detection/' },
-						{ label: 'Tokens', link: '/reference/tokens/' },
 						{ label: 'Tools', link: '/reference/tools/' },
 						{ label: 'Triggers', link: '/reference/triggers/' },
 						{ label: 'Workflow Structure', link: '/reference/workflow-structure/' },

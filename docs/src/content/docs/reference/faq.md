@@ -183,12 +183,7 @@ See [Network Permissions](/gh-aw/reference/network/) for complete configuration 
 
 **GitHub lockdown mode** is a security feature that filters content in public repositories to only show issues, pull requests, and comments from users with push access. This protects workflows from processing potentially malicious input from untrusted users.
 
-Lockdown is **automatically enabled** for public repositories. It has no particular effect in private or internal repositories. You can disable lockdown for specific workflows designed to safely process all user input:
-
-- Issue triage and organization workflows
-- Spam detection systems
-- Public status dashboards
-- Command workflows (like `/plan`) that maintainers can use
+Lockdown is **automatically enabled** for public repositories if [`GH_AW_GITHUB_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_token) or [`GH_AW_GITHUB_MCP_SERVER_TOKEN`](/gh-aw/reference/auth/#gh_aw_github_mcp_server_token) is configured. It is not in effect for private or internal repositories.
 
 See [Lockdown Mode](/gh-aw/reference/lockdown-mode/) for detailed configuration guidance and security considerations.
 
@@ -211,7 +206,7 @@ When the workflow runs, the prompt itself is taken from the markdown file at run
 
 ### Why do I need a token or key?
 
-When using **GitHub Copilot CLI**, a Personal Access Token (PAT) with "Copilot Requests" permission authenticates and associates automation work with your GitHub account. This ensures usage tracking against your subscription, appropriate AI permissions, and auditable actions. In the future, this may support organization-level association. See [GitHub Tokens](/gh-aw/reference/tokens/).
+When using **GitHub Copilot CLI**, a Personal Access Token (PAT) with "Copilot Requests" permission authenticates and associates automation work with your GitHub account. This ensures usage tracking against your subscription, appropriate AI permissions, and auditable actions. In the future, this may support organization-level association. See [Authentication](/gh-aw/reference/auth/).
 
 ### What hidden runtime dependencies does this have?
 
@@ -228,6 +223,17 @@ Yes! Use [TrialOps](/gh-aw/patterns/trialops/) to test workflows in isolated tri
 ### Where can I find help with common issues?
 
 See [Common Issues](/gh-aw/troubleshooting/common-issues/) for detailed troubleshooting guidance including workflow failures, debugging strategies, permission issues, and network problems.
+
+### Why is my create-discussion workflow failing with integration-forbidden?
+
+Discussion creation requires announcement-capable categories. If your workflow fails with an `integration-forbidden` error, ensure the `category` field in your configuration specifies a category that has announcement capabilities enabled in your repository's discussion settings.
+
+Common issues:
+- **Non-announcement categories**: Only categories configured to support announcements can be used for automated discussion creation. Check your repository's discussion settings to verify which categories have announcement capabilities.
+- **Category name typos**: Verify the category name spelling in your workflow configuration matches exactly with your repository's discussion categories. Category names are case-sensitive.
+- **Category slugs**: Use lowercase category slugs (e.g., `general`, `announcements`) rather than display names for better reliability.
+
+If discussions are not enabled or the category lacks announcement capabilities, consider using `fallback-to-issue: true` (the default) to automatically create an issue instead. See [Discussion Creation](/gh-aw/reference/safe-outputs/#discussion-creation-create-discussion) for configuration details.
 
 ## Workflow Design
 

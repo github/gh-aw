@@ -8,7 +8,7 @@ sidebar:
 
 ## What are Agentic Workflows?
 
-**[Agentic workflows](/gh-aw/reference/glossary/#agentic-workflow)** (AI-powered workflows that can make decisions and adapt to situations) are AI-powered automation that can understand context, make decisions, and take meaningful actions-all from natural language instructions you write in markdown.
+**[Agentic workflows](/gh-aw/reference/glossary/#agentic-workflow)** are AI-powered automation that can understand context, make decisions, and take meaningful actions-all from natural language instructions you write in markdown.
 
 Unlike traditional automation with fixed if-then rules, agentic workflows use coding agents (like Copilot CLI, Claude by Anthropic, or Codex) to:
 - **Understand context**: Read your repository, issues, and pull requests to grasp the current situation
@@ -28,7 +28,9 @@ Here's a simple example:
 on:                        # Trigger: when to run
   issues:
     types: [opened]
+
 permissions: read-all      # Security: read-only by default
+
 safe-outputs:              # Allowed write operations
   add-comment:
 ---
@@ -39,7 +41,7 @@ Analyze the current issue and ask for additional details if the issue is unclear
 
 The YAML section at the top is called [**frontmatter**](/gh-aw/reference/frontmatter/)-it configures when the workflow runs and what it can do. The markdown body contains your natural language instructions. See [Workflow Structure](/gh-aw/reference/workflow-structure/) for details.
 
-The `gh aw compile` command transforms this markdown into a secure [GitHub Actions Workflow](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflows#about-workflows) ([`.lock.yml` file](/gh-aw/reference/glossary/#workflow-lock-file-lockyml), the compiled workflow that GitHub Actions runs) that runs an AI agent in a containerized environment whenever a new issue is opened. 
+The `gh aw compile` command this markdown file into a hardened [GitHub Actions Workflow](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflows#about-workflows) [`.lock.yml` file](/gh-aw/reference/glossary/#workflow-lock-file-lockyml)  (the compiled workflow that GitHub Actions runs) that embeds the frontmatter and loads the markdown body at runtime. This runs an AI agent in a containerized environment whenever a new issue is opened. 
 
 [Compilation](/gh-aw/reference/glossary/#compilation) (converting markdown to GitHub Actions YAML) validates your configuration, applies security hardening, and generates the final workflow file that GitHub Actions can execute. Think of it like compiling code-you write human-friendly markdown, the compiler produces machine-ready YAML.
 

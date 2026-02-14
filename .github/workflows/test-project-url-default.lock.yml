@@ -17,7 +17,9 @@
 #
 # To update this file, edit the corresponding .md file and run:
 #   gh aw compile
-# For more information: https://github.com/github/gh-aw/blob/main/.github/aw/github-agentic-workflows.md
+# Not all edits will cause changes to this file.
+#
+# For more information: https://github.github.com/gh-aw/introduction/overview/
 #
 #
 # Resolved workflow manifest:
@@ -188,6 +190,9 @@ jobs:
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+          GH_AW_GITHUB_MCP_SERVER_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN }}
         with:
           script: |
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
@@ -247,7 +252,7 @@ jobs:
               "name": "noop"
             },
             {
-              "description": "Manage GitHub Projects: add issues/pull requests/draft issues, update item fields (status, priority, effort, dates), manage custom fields, and create project views. Use this to organize work by adding items to projects, updating field values, creating custom fields up-front, and setting up project views (table, board, roadmap).\n\nThree modes: (1) Add or update project items with custom field values; (2) Create project fields; (3) Create project views. This is the primary tool for ProjectOps automation - add items to projects, set custom fields for tracking, and organize project boards.",
+              "description": "Manage GitHub Projects: add issues/pull requests/draft issues, update item fields (status, priority, effort, dates), manage custom fields, and create project views. Use this to organize work by adding items to projects, updating field values, creating custom fields up-front, and setting up project views (table, board, roadmap).\n\nThree modes: (1) Add or update project items with custom field values; (2) Create project fields; (3) Create project views. This is the primary tool for ProjectOps automation - add items to projects, set custom fields for tracking, and organize project boards. CONSTRAINTS: Maximum 5 project operation(s) can be performed. Default project URL: \"https://github.com/orgs/\u003cORG\u003e/projects/\u003cNUMBER\u003e\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -338,7 +343,7 @@ jobs:
                     "type": "string"
                   },
                   "temporary_id": {
-                    "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 4 to 8 alphanumeric characters.",
+                    "description": "Unique temporary identifier for this draft issue (e.g., 'aw_abc1', 'aw_Test123'). Provide this when creating a new draft to enable future updates via draft_issue_id. Format: 'aw_' followed by 3 to 8 alphanumeric characters.",
                     "pattern": "^aw_[A-Za-z0-9]{4,8}$",
                     "type": "string"
                   },
@@ -410,7 +415,7 @@ jobs:
               "name": "missing_data"
             },
             {
-              "description": "Post a status update to a GitHub Project to communicate progress and health. Use this to provide stakeholders with regular updates on project status (on-track, at-risk, off-track, complete, inactive), timeline information, and progress summaries. Status updates create a historical record of project progress, enabling tracking over time and informed decision-making.",
+              "description": "Post a status update to a GitHub Project to communicate progress and health. Use this to provide stakeholders with regular updates on project status (on-track, at-risk, off-track, complete, inactive), timeline information, and progress summaries. Status updates create a historical record of project progress, enabling tracking over time and informed decision-making. CONSTRAINTS: Maximum 1 status update(s) can be created. Default project URL: \"https://github.com/orgs/\u003cORG\u003e/projects/\u003cNUMBER\u003e\".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
@@ -705,14 +710,14 @@ jobs:
           
           **IMPORTANT - temporary_id format rules:**
           - If you DON'T need to reference the item later, OMIT the temporary_id field entirely (it will be auto-generated if needed)
-          - If you DO need cross-references/chaining, you MUST match this EXACT validation regex: /^aw_[A-Za-z0-9]{4,8}$/i
-          - Format: aw_ prefix followed by 4 to 8 alphanumeric characters (A-Z, a-z, 0-9, case-insensitive)
+          - If you DO need cross-references/chaining, you MUST match this EXACT validation regex: /^aw_[A-Za-z0-9]{3,8}$/i
+          - Format: aw_ prefix followed by 3 to 8 alphanumeric characters (A-Z, a-z, 0-9, case-insensitive)
           - Valid alphanumeric characters: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
-          - INVALID examples: aw_abc (too short), aw_123456789 (too long), aw_test-id (contains hyphen), aw_id_123 (contains underscore)
-          - VALID examples: aw_abc1, aw_Test123, aw_A1B2C3D4, aw_12345678
-          - To generate valid IDs: use 4-8 random alphanumeric characters or omit the field to let the system auto-generate
+          - INVALID examples: aw_ab (too short), aw_123456789 (too long), aw_test-id (contains hyphen), aw_id_123 (contains underscore)
+          - VALID examples: aw_abc, aw_abc1, aw_Test123, aw_A1B2C3D4, aw_12345678
+          - To generate valid IDs: use 3-8 random alphanumeric characters or omit the field to let the system auto-generate
           
-          Do NOT invent other aw_* formats — downstream steps will reject them with validation errors matching against /^aw_[A-Za-z0-9]{4,8}$/i.
+          Do NOT invent other aw_* formats — downstream steps will reject them with validation errors matching against /^aw_[A-Za-z0-9]{3,8}$/i.
           
           Discover available tools from the safeoutputs MCP server.
           
@@ -973,9 +978,6 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: read
-      discussions: write
-      issues: write
-      pull-requests: write
     outputs:
       noop_message: ${{ steps.noop.outputs.noop_message }}
       tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}

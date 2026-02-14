@@ -1991,7 +1991,7 @@ safe-outputs:
   # agent output field create_if_missing=true. Requires a Personal Access Token
   # (PAT) or GitHub App token with Projects permissions (default GITHUB_TOKEN cannot
   # be used). Agent output includes: project (full URL or temporary project ID like
-  # aw_XXXXXXXX or #aw_XXXXXXXX from create_project), content_type
+  # aw_XXXXXXXXXXXX or #aw_XXXXXXXXXXXX from create_project), content_type
   # (issue|pull_request|draft_issue), content_number, fields, create_if_missing. For
   # specialized operations, agent can also provide: operation
   # (create_fields|create_view), field_definitions (array of field configs when
@@ -2191,6 +2191,9 @@ safe-outputs:
     # available category. Matched first against category IDs, then against category
     # names, then against category slugs. Numeric values are automatically converted
     # to strings at runtime.
+    # 
+    # Best Practice: Use announcement-capable categories (such as "announcements")
+    # for AI-generated content to ensure proper visibility and notification features.
     # (optional)
     category: null
 
@@ -2697,6 +2700,11 @@ safe-outputs:
     # Maximum number of reviews to submit (default: 1)
     # (optional)
     max: 1
+
+    # Controls whether AI-generated footer is added to the review body. When false,
+    # the footer is omitted. Defaults to true.
+    # (optional)
+    footer: true
 
     # GitHub token to use for this specific output type. Overrides global github-token
     # if specified.
