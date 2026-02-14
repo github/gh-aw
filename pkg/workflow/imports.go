@@ -688,3 +688,56 @@ func mergeMessagesConfig(result, imported *SafeOutputMessagesConfig) *SafeOutput
 	}
 	return result
 }
+
+// MergeFeatures merges features configurations from imports with top-level features
+// Features from top-level take precedence over imported features
+func (c *Compiler) MergeFeatures(topFeatures map[string]any, importedFeaturesJSON string) (map[string]any, error) {
+	importsLog.Print("Merging features from imports")
+
+	// If no imported features, return top-level features as-is
+	if importedFeaturesJSON == "" || importedFeaturesJSON == "{}" {
+		importsLog.Print("No imported features to merge")
+		return topFeatures, nil
+	}
+
+	// Start with top-level features or create a new map
+	result := make(map[string]any)
+	if topFeatures != nil {
+		for k, v := range topFeatures {
+			result[k] = v
+		}
+		importsLog.Printf("Starting with %d top-level features", len(topFeatures))
+	}
+
+	// Split by newlines to handle multiple JSON objects from different imports
+	lines := strings.Split(importedFeaturesJSON, "\n")
+	importsLog.Printf("Processing %d feature definition lines", len(lines))
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "{}" {
+			continue
+		}
+
+		// Parse JSON line to features map
+		var importedFeatures map[string]any
+		if err := json.Unmarshal([]byte(line), &importedFeatures); err != nil {
+			importsLog.Printf("Skipping malformed feature entry: %v", err)
+			continue // Skip invalid lines
+		}
+
+		// Merge features - top-level features take precedence over imported ones
+		for featureName, featureValue := range importedFeatures {
+			// Only add feature if it's not already defined in top-level
+			if _, exists := result[featureName]; !exists {
+				importsLog.Printf("Merging feature from import: %s", featureName)
+				result[featureName] = featureValue
+			} else {
+				importsLog.Printf("Skipping imported feature (top-level takes precedence): %s", featureName)
+			}
+		}
+	}
+
+	importsLog.Printf("Successfully merged features: total=%d", len(result))
+	return result, nil
+}

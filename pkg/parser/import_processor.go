@@ -35,6 +35,7 @@ type ImportsResult struct {
 	MergedLabels        []string // Merged labels from all imports (union of label names)
 	MergedCaches        []string // Merged cache configurations from all imports (appended in order)
 	MergedJobs          string   // Merged jobs from imported YAML workflows (JSON format)
+	MergedFeatures      string   // Merged features configuration from all imports (JSON format)
 	ImportedFiles       []string // List of imported file paths (for manifest)
 	AgentFile           string   // Path to custom agent file (if imported)
 	AgentImportSpec     string   // Original import specification for agent file (e.g., "owner/repo/path@ref")
@@ -189,6 +190,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 	labelsSet := make(map[string]bool)   // Set for deduplicating labels
 	var caches []string                  // Track cache configurations (appended in order)
 	var jobsBuilder strings.Builder      // Track jobs from imported YAML workflows
+	var featuresBuilder strings.Builder  // Track features configurations from imports
 	var agentFile string                 // Track custom agent file
 	var agentImportSpec string           // Track agent import specification for remote imports
 	var repositoryImports []string       // Track repository-only imports for .github folder merging
@@ -638,6 +640,12 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		if err == nil && cacheContent != "" && cacheContent != "{}" {
 			caches = append(caches, cacheContent)
 		}
+
+		// Extract features from imported file
+		featuresContent, err := extractFeaturesFromContent(string(content))
+		if err == nil && featuresContent != "" && featuresContent != "{}" {
+			featuresBuilder.WriteString(featuresContent + "\n")
+		}
 	}
 
 	log.Printf("Completed BFS traversal. Processed %d imports in total", len(processedOrder))
@@ -667,6 +675,7 @@ func processImportsFromFrontmatterWithManifestAndSource(frontmatter map[string]a
 		MergedLabels:        labels,
 		MergedCaches:        caches,
 		MergedJobs:          jobsBuilder.String(),
+		MergedFeatures:      featuresBuilder.String(),
 		ImportedFiles:       topologicalOrder,
 		AgentFile:           agentFile,
 		AgentImportSpec:     agentImportSpec,

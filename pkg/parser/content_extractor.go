@@ -182,6 +182,11 @@ func extractCacheFromContent(content string) (string, error) {
 	return extractFrontmatterField(content, "cache", "{}")
 }
 
+// extractFeaturesFromContent extracts features section from frontmatter as JSON string
+func extractFeaturesFromContent(content string) (string, error) {
+	return extractFrontmatterField(content, "features", "{}")
+}
+
 // extractFrontmatterField extracts a specific field from frontmatter as JSON string
 func extractFrontmatterField(content, fieldName, emptyValue string) (string, error) {
 	contentExtractorLog.Printf("Extracting field: %s", fieldName)
