@@ -718,6 +718,109 @@ describe("pr_review_buffer (factory pattern)", () => {
       expect(callArgs.body).not.toContain("test-workflow");
     });
 
+    it("should normalize boolean false to 'none' mode", async () => {
+      buffer.addComment({ path: "test.js", line: 1, body: "comment" });
+      buffer.setReviewMetadata("Review body", "COMMENT");
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      buffer.setFooterContext({
+        workflowName: "test-workflow",
+        runUrl: "https://github.com/owner/repo/actions/runs/123",
+        workflowSource: "owner/repo/workflows/test.md@v1",
+        workflowSourceURL: "https://github.com/owner/repo/blob/main/test.md",
+      });
+      buffer.setFooterMode(false);
+
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: {
+          id: 505,
+          html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-505",
+        },
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(result.success).toBe(true);
+      const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
+      // Footer should NOT be included because false maps to "none"
+      expect(callArgs.body).toBe("Review body");
+      expect(callArgs.body).not.toContain("test-workflow");
+      // Verify normalization was logged
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Normalized boolean footer config (false) to mode: "none"'));
+    });
+
+    it("should normalize boolean true to 'always' mode", async () => {
+      buffer.addComment({ path: "test.js", line: 1, body: "comment" });
+      buffer.setReviewMetadata("", "APPROVE"); // Empty body
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      buffer.setFooterContext({
+        workflowName: "test-workflow",
+        runUrl: "https://github.com/owner/repo/actions/runs/123",
+        workflowSource: "owner/repo/workflows/test.md@v1",
+        workflowSourceURL: "https://github.com/owner/repo/blob/main/test.md",
+      });
+      buffer.setFooterMode(true);
+
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: {
+          id: 506,
+          html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-506",
+        },
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(result.success).toBe(true);
+      const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
+      // Footer should be included because true maps to "always"
+      expect(callArgs.body).toContain("test-workflow");
+      // Verify normalization was logged
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining('Normalized boolean footer config (true) to mode: "always"'));
+    });
+
+    it("should handle setIncludeFooter(false) backward compatibility", async () => {
+      buffer.addComment({ path: "test.js", line: 1, body: "comment" });
+      buffer.setReviewMetadata("Review body", "COMMENT");
+      buffer.setReviewContext({
+        repo: "owner/repo",
+        repoParts: { owner: "owner", repo: "repo" },
+        pullRequestNumber: 42,
+        pullRequest: { head: { sha: "abc123" } },
+      });
+      buffer.setFooterContext({
+        workflowName: "test-workflow",
+        runUrl: "https://github.com/owner/repo/actions/runs/123",
+        workflowSource: "owner/repo/workflows/test.md@v1",
+        workflowSourceURL: "https://github.com/owner/repo/blob/main/test.md",
+      });
+      // Use the backward-compatible alias with boolean (the original API contract)
+      buffer.setIncludeFooter(false);
+
+      mockGithub.rest.pulls.createReview.mockResolvedValue({
+        data: {
+          id: 508,
+          html_url: "https://github.com/owner/repo/pull/42#pullrequestreview-508",
+        },
+      });
+
+      const result = await buffer.submitReview();
+
+      expect(result.success).toBe(true);
+      const callArgs = mockGithub.rest.pulls.createReview.mock.calls[0][0];
+      // Footer should NOT be included because false maps to "none"
+      expect(callArgs.body).toBe("Review body");
+      expect(callArgs.body).not.toContain("test-workflow");
+    });
+
     it("should default to 'always' for invalid string mode", async () => {
       buffer.addComment({ path: "test.js", line: 1, body: "comment" });
       buffer.setReviewMetadata("", "APPROVE");

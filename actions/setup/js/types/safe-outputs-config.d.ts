@@ -106,6 +106,17 @@ interface ReplyToPullRequestReviewCommentConfig extends SafeOutputConfig {
 }
 
 /**
+ * Configuration for resolving pull request review threads.
+ * Resolution is scoped to the triggering PR only.
+ *
+ * Inherits common fields (e.g. "github-token") from SafeOutputConfig.
+ * The only new field explicitly supported on this interface is "max".
+ */
+interface ResolvePullRequestReviewThreadConfig extends SafeOutputConfig {
+  // "max" is the only field added beyond those inherited from SafeOutputConfig
+}
+
+/**
  * Configuration for creating code scanning alerts
  */
 interface CreateCodeScanningAlertConfig extends SafeOutputConfig {
@@ -294,7 +305,8 @@ type SpecificSafeOutputConfig =
   | MissingToolConfig
   | LinkSubIssueConfig
   | ReplyToPullRequestReviewCommentConfig
-  | ThreatDetectionConfig;
+  | ThreatDetectionConfig
+  | ResolvePullRequestReviewThreadConfig;
 
 type SafeOutputConfigs = Record<string, SafeOutputConfig | SpecificSafeOutputConfig>;
 
@@ -328,6 +340,7 @@ export {
   LinkSubIssueConfig,
   ReplyToPullRequestReviewCommentConfig,
   ThreatDetectionConfig,
+  ResolvePullRequestReviewThreadConfig,
   SpecificSafeOutputConfig,
   // Safe job configuration types
   SafeJobInput,

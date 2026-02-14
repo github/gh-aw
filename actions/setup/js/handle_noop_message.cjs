@@ -22,13 +22,13 @@ async function ensureAgentRunsIssue() {
   const searchQuery = `repo:${owner}/${repo} is:issue is:open label:${parentLabel} in:title "${parentTitle}"`;
 
   try {
-    const searchResult = await github.rest.search.issuesAndPullRequests({
+    const { data } = await github.rest.search.issuesAndPullRequests({
       q: searchQuery,
       per_page: 1,
     });
 
-    if (searchResult.data.total_count > 0) {
-      const existingIssue = searchResult.data.items[0];
+    if (data.total_count > 0) {
+      const existingIssue = data.items[0];
       core.info(`Found existing no-op runs issue #${existingIssue.number}: ${existingIssue.html_url}`);
 
       return {
@@ -54,24 +54,19 @@ async function ensureAgentRunsIssue() {
   });
   const parentBody = footer;
 
-  try {
-    const newIssue = await github.rest.issues.create({
-      owner,
-      repo,
-      title: parentTitle,
-      body: parentBody,
-      labels: [parentLabel],
-    });
+  const { data: newIssue } = await github.rest.issues.create({
+    owner,
+    repo,
+    title: parentTitle,
+    body: parentBody,
+    labels: [parentLabel],
+  });
 
-    core.info(`✓ Created no-op runs issue #${newIssue.data.number}: ${newIssue.data.html_url}`);
-    return {
-      number: newIssue.data.number,
-      node_id: newIssue.data.node_id,
-    };
-  } catch (error) {
-    core.error(`Failed to create no-op runs issue: ${getErrorMessage(error)}`);
-    throw error;
-  }
+  core.info(`✓ Created no-op runs issue #${newIssue.number}: ${newIssue.html_url}`);
+  return {
+    number: newIssue.number,
+    node_id: newIssue.node_id,
+  };
 }
 
 /**
@@ -123,7 +118,7 @@ async function main() {
     }
 
     // Check if there are any non-noop outputs
-    const nonNoopItems = agentOutputResult.items.filter(item => item.type !== "noop");
+    const nonNoopItems = agentOutputResult.items.filter(({ type }) => type !== "noop");
     if (nonNoopItems.length > 0) {
       core.info(`Found ${nonNoopItems.length} non-noop output(s), skipping no-op message posting`);
       return;

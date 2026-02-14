@@ -125,11 +125,20 @@ function createReviewBuffer() {
    *   - "always" (default): Always include footer
    *   - "none": Never include footer
    *   - "if-body": Only include footer if review body is non-empty
-   * Note: Boolean values are converted to strings in the Go compiler before reaching JavaScript.
-   * @param {string} value - Footer mode string
+   * Also accepts boolean values for backward compatibility:
+   *   - true → "always"
+   *   - false → "none"
+   * Note: create-pull-request-review-comment.footer is converted to a string in Go,
+   * but submit-pull-request-review.footer and global footer are still emitted as booleans.
+   * @param {string|boolean} value - Footer mode string or boolean
    */
   function setFooterMode(value) {
-    if (typeof value === "string") {
+    if (typeof value === "boolean") {
+      // Normalize boolean to string mode (backward compatibility)
+      const normalized = value ? "always" : "none";
+      core.info(`Normalized boolean footer config (${value}) to mode: "${normalized}"`);
+      footerMode = normalized;
+    } else if (typeof value === "string") {
       // Validate string mode
       if (value === "always" || value === "none" || value === "if-body") {
         footerMode = value;

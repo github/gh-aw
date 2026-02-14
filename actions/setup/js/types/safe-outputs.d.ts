@@ -364,6 +364,15 @@ interface AutofixCodeScanningAlertItem extends BaseSafeOutputItem {
 }
 
 /**
+ * JSONL item for resolving a review thread on a pull request
+ */
+interface ResolvePullRequestReviewThreadItem extends BaseSafeOutputItem {
+  type: "resolve_pull_request_review_thread";
+  /** The node ID of the review thread to resolve (e.g., 'PRRT_kwDOABCD...') */
+  thread_id: string;
+}
+
+/**
  * Union type of all possible safe output items
  */
 type SafeOutputItem =
@@ -394,7 +403,8 @@ type SafeOutputItem =
   | HideCommentItem
   | ReplyToPullRequestReviewCommentItem
   | CreateProjectItem
-  | AutofixCodeScanningAlertItem;
+  | AutofixCodeScanningAlertItem
+  | ResolvePullRequestReviewThreadItem;
 
 /**
  * Sanitized safe output items
@@ -434,6 +444,7 @@ export {
   HideCommentItem,
   ReplyToPullRequestReviewCommentItem,
   AutofixCodeScanningAlertItem,
+  ResolvePullRequestReviewThreadItem,
   SafeOutputItem,
   SafeOutputItems,
 };

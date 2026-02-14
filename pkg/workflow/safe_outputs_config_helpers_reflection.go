@@ -23,6 +23,7 @@ var safeOutputFieldMapping = map[string]string{
 	"CreatePullRequestReviewComments": "create_pull_request_review_comment",
 	"SubmitPullRequestReview":         "submit_pull_request_review",
 	"ReplyToPullRequestReviewComment": "reply_to_pull_request_review_comment",
+	"ResolvePullRequestReviewThread":  "resolve_pull_request_review_thread",
 	"CreateCodeScanningAlerts":        "create_code_scanning_alert",
 	"AddLabels":                       "add_labels",
 	"RemoveLabels":                    "remove_labels",

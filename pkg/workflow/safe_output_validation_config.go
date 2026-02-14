@@ -167,6 +167,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"body":       {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
 		},
 	},
+	"resolve_pull_request_review_thread": {
+		DefaultMax: 10,
+		Fields: map[string]FieldValidation{
+			"thread_id": {Required: true, Type: "string"},
+		},
+	},
 	"create_discussion": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

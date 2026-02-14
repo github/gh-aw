@@ -65,7 +65,7 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig) *Permissio
 		permissions.Merge(NewPermissionsContentsWrite())
 	}
 	if safeOutputs.CreatePullRequestReviewComments != nil || safeOutputs.SubmitPullRequestReview != nil ||
-		safeOutputs.ReplyToPullRequestReviewComment != nil {
+		safeOutputs.ReplyToPullRequestReviewComment != nil || safeOutputs.ResolvePullRequestReviewThread != nil {
 		safeOutputsPermissionsLog.Print("Adding permissions for PR review operations")
 		permissions.Merge(NewPermissionsContentsReadPRWrite())
 	}
