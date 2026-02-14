@@ -16,6 +16,7 @@ const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_titl
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { createExpirationLine, generateFooterWithExpiration } = require("./ephemerals.cjs");
 const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
+const { sanitizeLabelContent } = require("./sanitize_label_content.cjs");
 
 /**
  * Fetch repository ID and discussion categories for a repository
@@ -109,6 +110,113 @@ function resolveCategoryId(categoryConfig, itemCategory, categories) {
   }
 
   return undefined;
+}
+
+/**
+ * Fetches label node IDs for the given label names
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {string[]} labelNames - Array of label names to fetch IDs for
+ * @returns {Promise<Array<{name: string, id: string}>>} Array of label objects with name and ID
+ */
+async function fetchLabelIds(owner, repo, labelNames) {
+  if (!labelNames || labelNames.length === 0) {
+    return [];
+  }
+
+  try {
+    // Fetch first 100 labels from the repository
+    const labelsQuery = `
+      query($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          labels(first: 100) {
+            nodes {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    const queryResult = await github.graphql(labelsQuery, {
+      owner: owner,
+      repo: repo,
+    });
+
+    const repoLabels = queryResult?.repository?.labels?.nodes || [];
+    const labelMap = new Map(repoLabels.map(label => [label.name.toLowerCase(), label]));
+
+    // Match requested labels (case-insensitive)
+    const matchedLabels = [];
+    const unmatchedLabels = [];
+
+    for (const requestedLabel of labelNames) {
+      const normalizedName = requestedLabel.toLowerCase();
+      const matchedLabel = labelMap.get(normalizedName);
+      if (matchedLabel) {
+        matchedLabels.push({ name: matchedLabel.name, id: matchedLabel.id });
+      } else {
+        unmatchedLabels.push(requestedLabel);
+      }
+    }
+
+    if (unmatchedLabels.length > 0) {
+      core.warning(`Could not find label IDs for: ${unmatchedLabels.join(", ")}`);
+      core.info(`These labels may not exist in the repository. Available labels: ${repoLabels.map(l => l.name).join(", ")}`);
+    }
+
+    return matchedLabels;
+  } catch (error) {
+    core.warning(`Failed to fetch label IDs: ${getErrorMessage(error)}`);
+    return [];
+  }
+}
+
+/**
+ * Applies labels to a discussion using GraphQL
+ * @param {string} discussionId - Discussion node ID
+ * @param {string[]} labelIds - Array of label node IDs to add
+ * @returns {Promise<boolean>} True if labels were applied successfully
+ */
+async function applyLabelsToDiscussion(discussionId, labelIds) {
+  if (!labelIds || labelIds.length === 0) {
+    return true; // Nothing to do
+  }
+
+  try {
+    const addLabelsMutation = `
+      mutation($labelableId: ID!, $labelIds: [ID!]!) {
+        addLabelsToLabelable(input: {
+          labelableId: $labelableId,
+          labelIds: $labelIds
+        }) {
+          labelable {
+            ... on Discussion {
+              id
+              labels(first: 10) {
+                nodes {
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const mutationResult = await github.graphql(addLabelsMutation, {
+      labelableId: discussionId,
+      labelIds: labelIds,
+    });
+
+    const appliedLabels = mutationResult?.addLabelsToLabelable?.labelable?.labels?.nodes || [];
+    core.info(`Successfully applied ${appliedLabels.length} labels to discussion`);
+    return true;
+  } catch (error) {
+    core.warning(`Failed to apply labels to discussion: ${getErrorMessage(error)}`);
+    return false;
+  }
 }
 
 /**
@@ -349,6 +457,16 @@ async function main(config = {}) {
     const categoryId = resolvedCategory.id;
     core.info(`Using category: ${resolvedCategory.name} (${resolvedCategory.matchType})`);
 
+    // Build labels array (merge config labels with item-specific labels)
+    const discussionLabels = [...labels, ...(Array.isArray(item.labels) ? item.labels : [])]
+      .filter(Boolean)
+      .map(label => String(label).trim())
+      .filter(Boolean)
+      .map(label => sanitizeLabelContent(label))
+      .filter(Boolean)
+      .map(label => (label.length > 64 ? label.substring(0, 64) : label))
+      .filter((label, index, arr) => arr.indexOf(label) === index);
+
     // Build title
     let title = item.title ? item.title.trim() : "";
     let processedBody = replaceTemporaryIdReferences(item.body || "", temporaryIdMap, qualifiedItemRepo);
@@ -438,6 +556,21 @@ async function main(config = {}) {
       }
 
       core.info(`Created discussion ${qualifiedItemRepo}#${discussion.number}: ${discussion.url}`);
+
+      // Apply labels if configured
+      if (discussionLabels.length > 0) {
+        core.info(`Applying ${discussionLabels.length} labels to discussion: ${discussionLabels.join(", ")}`);
+        const labelIdsData = await fetchLabelIds(repoParts.owner, repoParts.repo, discussionLabels);
+        if (labelIdsData.length > 0) {
+          const labelIds = labelIdsData.map(l => l.id);
+          const labelsApplied = await applyLabelsToDiscussion(discussion.id, labelIds);
+          if (labelsApplied) {
+            core.info(`✓ Applied labels: ${labelIdsData.map(l => l.name).join(", ")}`);
+          }
+        } else if (discussionLabels.length > 0) {
+          core.warning(`⚠ No matching labels found in repository for: ${discussionLabels.join(", ")}`);
+        }
+      }
 
       return {
         success: true,
