@@ -41,7 +41,7 @@ func NewCodexEngine() *CodexEngine {
 			supportsWebFetch:       false, // Codex does not have built-in web-fetch support
 			supportsWebSearch:      true,  // Codex has built-in web-search support
 			supportsFirewall:       true,  // Codex supports network firewalling via AWF
-			supportsLLMGateway:     true,  // Codex supports LLM gateway
+			supportsLLMGateway:     false, // Codex does not support LLM gateway
 		},
 	}
 }
@@ -246,6 +246,13 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// Skip pulling images since they are pre-downloaded in the Download container images step
 		awfArgs = append(awfArgs, "--skip-pull")
 		codexEngineLog.Print("Using --skip-pull since images are pre-downloaded")
+
+		// Enable API proxy sidecar if this engine supports LLM gateway
+		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
+		if e.SupportsLLMGateway() {
+			awfArgs = append(awfArgs, "--enable-api-proxy")
+			codexEngineLog.Print("Added --enable-api-proxy for LLM API proxying")
+		}
 
 		// Note: No --tty flag for Codex (it's not a TUI, it outputs to stdout/stderr)
 
