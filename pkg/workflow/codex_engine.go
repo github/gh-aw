@@ -247,12 +247,6 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		awfArgs = append(awfArgs, "--skip-pull")
 		codexEngineLog.Print("Using --skip-pull since images are pre-downloaded")
 
-		// Enable API proxy sidecar for secure credential management
-		// The api-proxy container holds the OPENAI_API_KEY and proxies
-		// requests to api.openai.com through the firewall
-		awfArgs = append(awfArgs, "--enable-api-proxy")
-		codexEngineLog.Print("Added --enable-api-proxy for Codex API proxying")
-
 		// Note: No --tty flag for Codex (it's not a TUI, it outputs to stdout/stderr)
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
