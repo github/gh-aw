@@ -329,6 +329,10 @@
         "body": {
           "type": "string",
           "description": "The reply text in Markdown format. Provide a clear response to the review comment."
+        },
+        "pull_request_number": {
+          "type": ["number", "string"],
+          "description": "Pull request number to reply on. This is the numeric ID from the GitHub URL (e.g., 876 in github.com/owner/repo/pull/876). If omitted, replies on the PR that triggered this workflow."
         }
       },
       "additionalProperties": false

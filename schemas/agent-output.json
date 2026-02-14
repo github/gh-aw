@@ -360,6 +360,10 @@
           "type": "string",
           "description": "The reply body text",
           "minLength": 1
+        },
+        "pull_request_number": {
+          "oneOf": [{ "type": "number" }, { "type": "string" }],
+          "description": "Pull request number (optional - uses triggering PR if not provided)"
         }
       },
       "required": ["type", "comment_id", "body"],
