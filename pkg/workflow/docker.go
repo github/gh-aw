@@ -83,7 +83,7 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 	}
 
 	// Collect AWF (firewall) container images when firewall is enabled
-	// AWF uses two containers: squid (proxy) and agent
+	// AWF uses three containers: squid (proxy), agent, and api-proxy (for Claude/Codex)
 	if isFirewallEnabled(workflowData) {
 		// Get the firewall version for image tags
 		firewallConfig := getFirewallConfig(workflowData)
@@ -103,6 +103,19 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 			images = append(images, agentImage)
 			imageSet[agentImage] = true
 			dockerLog.Printf("Added AWF agent container: %s", agentImage)
+		}
+
+		// Add api-proxy sidecar container for engines that use --enable-api-proxy
+		// The api-proxy holds LLM API keys securely and proxies requests through Squid:
+		//   - Port 10000: OpenAI API proxy (for Codex)
+		//   - Port 10001: Anthropic API proxy (for Claude)
+		if workflowData != nil && (workflowData.AI == "claude" || workflowData.AI == "codex") {
+			apiProxyImage := constants.DefaultFirewallRegistry + "/api-proxy:" + awfImageTag
+			if !imageSet[apiProxyImage] {
+				images = append(images, apiProxyImage)
+				imageSet[apiProxyImage] = true
+				dockerLog.Printf("Added AWF api-proxy sidecar container: %s", apiProxyImage)
+			}
 		}
 	}
 

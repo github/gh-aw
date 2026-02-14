@@ -135,7 +135,7 @@ When a user interacts with you:
 # Initialize repository for agentic workflows
 gh aw init
 
-# Compile workflows
+# Generate the lock file for a workflow
 gh aw compile [workflow-name]
 
 # Debug workflow runs
