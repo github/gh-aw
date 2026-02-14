@@ -82,6 +82,9 @@ async function main(config = {}) {
   const comment = config.comment || "";
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Close issue configuration: max=${maxCount}`);
   if (requiredLabels.length > 0) {
     core.info(`Required labels: ${requiredLabels.join(", ")}`);
@@ -221,6 +224,21 @@ async function main(config = {}) {
       }
       if (requiredTitlePrefix) {
         core.info(`Issue #${issueNumber} has required title prefix: "${requiredTitlePrefix}"`);
+      }
+
+      // If in staged mode, preview the close without executing it
+      if (isStaged) {
+        core.info(`Staged mode: Would close issue #${issueNumber} in ${itemRepo}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            number: issueNumber,
+            repo: itemRepo,
+            alreadyClosed: wasAlreadyClosed,
+            hasComment: !!commentToPost,
+          },
+        };
       }
 
       // Add comment with the body from the message
