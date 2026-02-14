@@ -53,7 +53,6 @@ runtimes:
   go:
     version: "1.25"
 safe-outputs:
-    staged: true
     add-comment:
       hide-older-comments: true
       max: 2
@@ -69,7 +68,7 @@ safe-outputs:
       max: 1
       target: "*"
     close-pull-request:
-      target: "*"
+      staged: true
       max: 1
     create-pull-request-review-comment:
       max: 5
@@ -81,6 +80,7 @@ safe-outputs:
     resolve-pull-request-review-thread:
       max: 5
     push-to-pull-request-branch:
+      staged: true
       target: "*"
       if-no-changes: "warn"
     add-reviewer:
