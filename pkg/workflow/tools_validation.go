@@ -28,9 +28,14 @@ func validateBashToolConfig(tools *Tools, workflowName string) error {
 
 // isGitToolAllowed checks if git commands are allowed in bash tool configuration
 func isGitToolAllowed(tools *Tools) bool {
-	if tools == nil || tools.Bash == nil {
-		// No bash tool configured = git not allowed
-		return false
+	if tools == nil {
+		// No tools configured - defaults will be applied which include git for PR operations
+		return true
+	}
+
+	if tools.Bash == nil {
+		// No bash tool configured - defaults will be applied which include git for PR operations
+		return true
 	}
 
 	// If AllowedCommands is nil or empty, check which case it is:
@@ -42,7 +47,7 @@ func isGitToolAllowed(tools *Tools) bool {
 	}
 
 	if len(tools.Bash.AllowedCommands) == 0 {
-		// bash: false - explicitly disabled
+		// bash: false or bash: [] - explicitly disabled or no commands
 		return false
 	}
 
@@ -60,7 +65,7 @@ func isGitToolAllowed(tools *Tools) bool {
 	return false
 }
 
-// validateGitToolForSafeOutputs validates that workflows using create-pull-request or 
+// validateGitToolForSafeOutputs validates that workflows using create-pull-request or
 // push-to-pull-request-branch have git tool allowed in their bash configuration
 func validateGitToolForSafeOutputs(tools *Tools, safeOutputs *SafeOutputsConfig, workflowName string) error {
 	if safeOutputs == nil {

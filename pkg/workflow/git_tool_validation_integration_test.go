@@ -20,7 +20,7 @@ func TestCompilerDetectsGitToolRequirement(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "create-pull-request without bash tool - error",
+			name: "create-pull-request without bash tool - OK (defaults apply)",
 			workflow: `---
 name: Test Create PR Without Git
 engine: copilot
@@ -32,8 +32,7 @@ safe-outputs:
 
 Test workflow that uses create-pull-request without bash tool.
 `,
-			expectError:   true,
-			errorContains: "create-pull-request but git tool is not allowed",
+			expectError: false,
 		},
 		{
 			name: "create-pull-request with bash: false - error",
@@ -123,7 +122,7 @@ Test workflow that uses create-pull-request with wildcard bash.
 			expectError: false,
 		},
 		{
-			name: "push-to-pull-request-branch without bash - error",
+			name: "push-to-pull-request-branch without bash - OK (defaults apply)",
 			workflow: `---
 name: Test Push To Branch Without Git
 engine: copilot
@@ -135,8 +134,7 @@ safe-outputs:
 
 Test workflow that uses push-to-pull-request-branch without bash tool.
 `,
-			expectError:   true,
-			errorContains: "push-to-pull-request-branch but git tool is not allowed",
+			expectError: false,
 		},
 		{
 			name: "push-to-pull-request-branch with bash: true - valid",
@@ -156,7 +154,7 @@ Test workflow that uses push-to-pull-request-branch with bash enabled.
 			expectError: false,
 		},
 		{
-			name: "both create-pull-request and push-to-pull-request-branch without bash - error mentions both",
+			name: "both create-pull-request and push-to-pull-request-branch without bash - OK (defaults apply)",
 			workflow: `---
 name: Test Both PR Features Without Git
 engine: copilot
@@ -170,8 +168,7 @@ safe-outputs:
 
 Test workflow that uses both PR features without bash tool.
 `,
-			expectError:   true,
-			errorContains: "create-pull-request and push-to-pull-request-branch",
+			expectError: false,
 		},
 		{
 			name: "workflow without PR features - no validation",
@@ -209,7 +206,7 @@ Test workflow that doesn't use PR features.
 			if tt.expectError {
 				require.Error(t, err, "Expected compilation error")
 				assert.Contains(t, err.Error(), tt.errorContains, "Error should contain expected message")
-				
+
 				// Verify error message includes helpful suggestions
 				assert.True(t,
 					strings.Contains(err.Error(), "bash: true") ||

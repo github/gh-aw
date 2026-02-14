@@ -157,22 +157,22 @@ func TestNewToolsWithInvalidBash(t *testing.T) {
 
 func TestIsGitToolAllowed(t *testing.T) {
 	tests := []struct {
-		name         string
-		toolsMap     map[string]any
-		expectGitOK  bool
-		description  string
+		name        string
+		toolsMap    map[string]any
+		expectGitOK bool
+		description string
 	}{
 		{
-			name:         "nil tools - git not allowed",
-			toolsMap:     nil,
-			expectGitOK:  false,
-			description:  "No bash configuration means git is not allowed",
+			name:        "nil tools - git allowed (defaults will apply)",
+			toolsMap:    nil,
+			expectGitOK: true,
+			description: "No tools configuration means defaults will apply which include git for PR operations",
 		},
 		{
-			name:         "no bash tool - git not allowed",
-			toolsMap:     map[string]any{},
-			expectGitOK:  false,
-			description:  "No bash tool configured means git is not allowed",
+			name:        "no bash tool - git allowed (defaults will apply)",
+			toolsMap:    map[string]any{},
+			expectGitOK: true,
+			description: "No bash tool configured means defaults will apply which include git for PR operations",
 		},
 		{
 			name: "bash: true - git allowed",
@@ -272,13 +272,12 @@ func TestValidateGitToolForSafeOutputs(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:     "create-pull-request without bash - error",
+			name:     "create-pull-request without bash - OK (defaults will apply)",
 			toolsMap: map[string]any{},
 			safeOutputs: &SafeOutputsConfig{
 				CreatePullRequests: &CreatePullRequestsConfig{},
 			},
-			expectError:   true,
-			errorContains: "create-pull-request but git tool is not allowed",
+			expectError: false,
 		},
 		{
 			name: "create-pull-request with bash: false - error",
@@ -354,13 +353,12 @@ func TestValidateGitToolForSafeOutputs(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:     "push-to-pull-request-branch without bash - error",
+			name:     "push-to-pull-request-branch without bash - OK (defaults will apply)",
 			toolsMap: map[string]any{},
 			safeOutputs: &SafeOutputsConfig{
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
 			},
-			expectError:   true,
-			errorContains: "push-to-pull-request-branch but git tool is not allowed",
+			expectError: false,
 		},
 		{
 			name: "push-to-pull-request-branch with bash: true - valid",
@@ -383,8 +381,31 @@ func TestValidateGitToolForSafeOutputs(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:     "both create-pull-request and push-to-pull-request-branch without bash - error mentions both",
+			name:     "both create-pull-request and push-to-pull-request-branch without bash - OK (defaults will apply)",
 			toolsMap: map[string]any{},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests:      &CreatePullRequestsConfig{},
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError: false,
+		},
+		{
+			name: "both features with bash: false - error mentions both",
+			toolsMap: map[string]any{
+				"bash": false,
+			},
+			safeOutputs: &SafeOutputsConfig{
+				CreatePullRequests:      &CreatePullRequestsConfig{},
+				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
+			},
+			expectError:   true,
+			errorContains: "create-pull-request and push-to-pull-request-branch",
+		},
+		{
+			name: "both features with bash: [echo] - error mentions both",
+			toolsMap: map[string]any{
+				"bash": []any{"echo", "ls"},
+			},
 			safeOutputs: &SafeOutputsConfig{
 				CreatePullRequests:      &CreatePullRequestsConfig{},
 				PushToPullRequestBranch: &PushToPullRequestBranchConfig{},
