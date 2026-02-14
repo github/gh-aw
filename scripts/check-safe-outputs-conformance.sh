@@ -357,16 +357,36 @@ echo "Running IMP-003: Schema Validation Consistency..."
 check_schema_consistency() {
     local failed=0
     
-    # Check if safe outputs config Go file exists
-    if [ -f "pkg/workflow/safe_outputs_config.go" ]; then
-        # Check for schema generation functions
-        if ! grep -q "generateSchema\|buildSchema\|toolSchema" "pkg/workflow/safe_outputs_config.go"; then
-            log_medium "IMP-003: Schema generation functions may be missing"
+    # Check if safe outputs config generation file exists with schema functions
+    if [ -f "pkg/workflow/safe_outputs_config_generation.go" ]; then
+        # Check for schema generation functions (custom job tool definition generation)
+        if ! grep -q "generateCustomJobToolDefinition" "pkg/workflow/safe_outputs_config_generation.go"; then
+            log_medium "IMP-003: Dynamic schema generation function missing"
             failed=1
         fi
     else
-        log_medium "IMP-003: Safe outputs config file missing"
+        log_medium "IMP-003: Safe outputs config generation file missing"
         failed=1
+    fi
+    
+    # Check if static schemas file exists (embedded JSON)
+    if [ -f "pkg/workflow/js/safe_outputs_tools.json" ]; then
+        # Verify it contains MCP tool definitions with inputSchema
+        if ! grep -q '"inputSchema"' "pkg/workflow/js/safe_outputs_tools.json"; then
+            log_medium "IMP-003: Static schema definitions missing inputSchema"
+            failed=1
+        fi
+    else
+        log_medium "IMP-003: Static safe outputs tools schema missing"
+        failed=1
+    fi
+    
+    # Check if safe_outputs_config.go has documentation about schema architecture
+    if [ -f "pkg/workflow/safe_outputs_config.go" ]; then
+        if ! grep -q "Schema Generation Architecture" "pkg/workflow/safe_outputs_config.go"; then
+            log_medium "IMP-003: Schema architecture documentation missing"
+            failed=1
+        fi
     fi
     
     if [ $failed -eq 0 ]; then

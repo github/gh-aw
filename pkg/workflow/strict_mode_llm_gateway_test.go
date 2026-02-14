@@ -5,6 +5,8 @@ package workflow
 import (
 	"strings"
 	"testing"
+
+	"github.com/github/gh-aw/pkg/constants"
 )
 
 // TestValidateStrictFirewall_LLMGatewaySupport tests the LLM gateway validation in strict mode
@@ -303,18 +305,18 @@ func TestSupportsLLMGateway(t *testing.T) {
 	}{
 		{
 			engineID:     "codex",
-			expectedPort: 10001,
-			description:  "Codex engine uses port 10001 for LLM gateway",
+			expectedPort: constants.CodexLLMGatewayPort,
+			description:  "Codex engine uses dedicated port for LLM gateway",
 		},
 		{
 			engineID:     "claude",
-			expectedPort: 10000,
-			description:  "Claude engine uses port 10000 for LLM gateway",
+			expectedPort: constants.ClaudeLLMGatewayPort,
+			description:  "Claude engine uses dedicated port for LLM gateway",
 		},
 		{
 			engineID:     "copilot-sdk",
-			expectedPort: 10002,
-			description:  "Copilot SDK engine uses port 10002 for LLM gateway",
+			expectedPort: constants.CopilotSDKLLMGatewayPort,
+			description:  "Copilot SDK engine uses dedicated port for LLM gateway",
 		},
 		{
 			engineID:     "copilot",

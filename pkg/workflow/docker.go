@@ -106,9 +106,8 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 		}
 
 		// Add api-proxy sidecar container for engines that support LLM gateway
-		// The api-proxy holds LLM API keys securely and proxies requests through Squid:
-		//   - Port 10000: OpenAI API proxy (for Codex)
-		//   - Port 10001: Anthropic API proxy (for Claude)
+		// The api-proxy holds LLM API keys securely and proxies requests through Squid
+		// Each engine uses its own dedicated port for communication
 		// Check if the engine supports LLM gateway by querying the engine registry
 		if workflowData != nil && workflowData.AI != "" {
 			registry := GetGlobalEngineRegistry()

@@ -37,7 +37,7 @@ func NewClaudeEngine() *ClaudeEngine {
 
 // SupportsLLMGateway returns the LLM gateway port for Claude engine
 func (e *ClaudeEngine) SupportsLLMGateway() int {
-	return 10000 // Claude uses port 10000 for LLM gateway
+	return constants.ClaudeLLMGatewayPort
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Claude engine
