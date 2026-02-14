@@ -1540,6 +1540,21 @@ This section provides complete normative definitions for all safe output types. 
 - Cross-repo validation against allowed-repos
 - Expires implemented via scheduled workflow (not client-side)
 
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and file access
+- `issues: write` - Issue creation and modification
+
+*GitHub App* (if using `safe-outputs.app` configuration):
+- `issues: write` - Issue creation and modification  
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Both permission modes require the same write scopes
+- GitHub App permissions enable cross-repository operations beyond `allowed-repos` when properly configured
+- The `contents: read` permission is always included for repository context access
+
 ---
 
 #### Type: add_comment
@@ -1584,6 +1599,25 @@ This section provides complete normative definitions for all safe output types. 
 - `hide-older-comments`: Hide previous workflow comments
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and file access
+- `issues: write` - Comment creation on issues
+- `pull-requests: write` - Comment creation on pull requests
+- `discussions: write` - Comment creation on discussions
+
+*GitHub App* (if using `safe-outputs.app` configuration):
+- `issues: write` - Comment creation on issues
+- `pull-requests: write` - Comment creation on pull requests
+- `discussions: write` - Comment creation on discussions
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Requires write permissions for all three entity types (issues, PRs, discussions) since comments can be added to any type
+- Cross-repository commenting requires appropriate permissions in target repository
+- The `contents: read` permission is always included for repository context access
 
 ---
 
@@ -1639,6 +1673,34 @@ This section provides complete normative definitions for all safe output types. 
 - Patch content validation
 - Size limits on commits
 
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: write` - Branch creation and commit operations
+- `pull-requests: write` - Pull request creation
+
+**With `fallback-as-issue: true`** (default):
+- `contents: write` - Branch creation and commit operations
+- `issues: write` - Issue creation fallback when PR creation fails
+- `pull-requests: write` - Pull request creation
+
+*GitHub App* (if using `safe-outputs.app` configuration):
+- `contents: write` - Branch creation and commit operations
+- `pull-requests: write` - Pull request creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**With `fallback-as-issue: true`** (default):
+- `contents: write` - Branch creation and commit operations
+- `issues: write` - Issue creation fallback when PR creation fails
+- `pull-requests: write` - Pull request creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Permission requirements vary based on `fallback-as-issue` configuration
+- When `fallback-as-issue: true` (default), requires `issues: write` for fallback issue creation if PR creation fails
+- When `fallback-as-issue: false`, only requires `contents: write` and `pull-requests: write`
+- Cross-repository pull requests are not supported - operations are limited to same repository
+
 ---
 
 ### 7.2 System Types
@@ -1674,59 +1736,791 @@ This section provides complete normative definitions for all safe output types. 
 3. **No Side Effects**: Creates no GitHub resources.
 4. **Transparency**: Provides clear indication of normal completion vs. error states.
 
----
+**Required Permissions**:
 
-(Additional type definitions for remaining 30+ types would continue with same structure, but due to space constraints, I'm including representative samples and summarizing the rest)
+*GitHub Actions Token*:
+- No additional permissions required beyond base workflow permissions
+
+*GitHub App* (if using `safe-outputs.app` configuration):
+- No additional permissions required beyond base app installation
+
+**Notes**:
+- The `noop` type performs no GitHub API operations and requires no special permissions
+- Only logs completion message to workflow output
+- Always available regardless of permission configuration
+
+---
 
 ### 7.3 Additional Safe Output Types
 
-The specification defines these additional types with full schemas and semantics:
+This section provides complete definitions for all remaining safe output types. Each follows the same format as Section 7.1 with full schemas, operational semantics, and permission requirements.
 
-**Issue Management**:
-- `update_issue` - Modify issue properties
-- `close_issue` - Close issues with comment
-- `link_sub_issue` - Create parent-child relationships
+#### Type: update_issue
 
-**Discussion Management**:
-- `create_discussion` - Create discussions
-- `update_discussion` - Modify discussions
-- `close_discussion` - Close with resolution
+**Purpose**: Modify existing issue properties (title, body, state, labels, assignees, milestone).
 
-**Pull Request Management**:
-- `update_pull_request` - Modify PR properties
-- `close_pull_request` - Close without merging
-- `create_pull_request_review_comment` - Inline code review
-- `resolve_pull_request_review_thread` - Resolve review threads
-- `push_to_pull_request_branch` - Push changes to PR branch
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
 
-**Labels and Assignments**:
-- `add_labels` - Apply labels
-- `remove_labels` - Remove labels
-- `add_reviewer` - Request reviewers
-- `assign_milestone` - Assign to milestone
-- `assign_to_agent` - Assign Copilot agents
-- `assign_to_user` - Assign users
-- `unassign_from_user` - Remove assignments
+**Required Permissions**:
 
-**Projects and Assets**:
-- `create_project` - Create project boards
-- `update_project` - Manage projects
-- `create_project_status_update` - Project status
-- `update_release` - Update releases
-- `upload_asset` - Upload files to branch
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Issue modification operations
 
-**Security and Workflows**:
-- `dispatch_workflow` - Trigger workflows
-- `create_code_scanning_alert` - Generate SARIF alerts
-- `autofix_code_scanning_alert` - Create automated fixes
-- `create_agent_session` - Delegate to Copilot agents
+*GitHub App*:
+- `issues: write` - Issue modification operations
+- `metadata: read` - Repository metadata (automatically granted)
 
-**System Types**:
-- `missing_tool` - Report missing capabilities
-- `missing_data` - Report data gaps
-- `hide_comment` - Hide comments
+**Notes**:
+- Only specified fields are updated; unspecified fields remain unchanged
+- Same permissions as `create_issue`
 
-Each type includes complete tool schema, operational guarantees, configuration parameters, and security requirements. Full definitions available in implementation documentation.
+---
+
+#### Type: close_issue
+
+**Purpose**: Close issues with closing comment explaining resolution.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Issue state modification and comment creation
+
+*GitHub App*:
+- `issues: write` - Issue state modification and comment creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: link_sub_issue
+
+**Purpose**: Create parent-child relationships between issues using task list entries.
+
+**Default Max**: 1  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Issue body modification for task list entries
+
+*GitHub App*:
+- `issues: write` - Issue body modification for task list entries
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Creates bidirectional navigation links between parent and child issues
+- Enforces maximum sub-issue count limit (default: 50)
+
+---
+
+#### Type: create_discussion
+
+**Purpose**: Create GitHub discussions for announcements, Q&A, reports, or community conversations.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Fallback issue creation when discussion creation fails
+- `discussions: write` - Discussion creation operations
+
+*GitHub App*:
+- `discussions: write` - Discussion creation operations
+- `issues: write` - Fallback issue creation when discussion creation fails
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Includes `issues: write` for fallback-to-issue functionality
+- If discussion categories are not enabled, may fall back to creating an issue
+
+---
+
+#### Type: update_discussion
+
+**Purpose**: Modify existing discussion title or body.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `discussions: write` - Discussion modification operations
+
+*GitHub App*:
+- `discussions: write` - Discussion modification operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: close_discussion
+
+**Purpose**: Close discussions with resolution reason and closing comment.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `discussions: write` - Discussion state modification and comment creation
+
+*GitHub App*:
+- `discussions: write` - Discussion state modification and comment creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: update_pull_request
+
+**Purpose**: Modify existing pull request title, body, state, base branch, or draft status.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Pull request modification operations
+
+*GitHub App*:
+- `pull-requests: write` - Pull request modification operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Only specified fields are updated; unspecified fields remain unchanged
+- Base branch changes are validated for safety
+
+---
+
+#### Type: close_pull_request
+
+**Purpose**: Close pull requests WITHOUT merging, with closing comment.
+
+**Default Max**: 10  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Pull request state modification and comment creation
+
+*GitHub App*:
+- `pull-requests: write` - Pull request state modification and comment creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Higher default max (10) enables bulk PR cleanup operations
+- Does NOT merge changes - use GitHub's merge functionality for that
+
+---
+
+#### Type: mark_pull_request_as_ready_for_review
+
+**Purpose**: Convert draft pull request to ready-for-review status.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Pull request draft status modification
+
+*GitHub App*:
+- `pull-requests: write` - Pull request draft status modification
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: push_to_pull_request_branch
+
+**Purpose**: Push commits to pull request branch for automated code changes.
+
+**Default Max**: 1  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: write` - Branch push operations and commit creation
+- `issues: write` - Comment creation for push notifications
+- `pull-requests: write` - Pull request metadata access
+
+*GitHub App*:
+- `contents: write` - Branch push operations and commit creation
+- `issues: write` - Comment creation for push notifications  
+- `pull-requests: write` - Pull request metadata access
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Requires `contents: write` for git push operations
+- Enforces maximum patch size limit (default: 1024 KB)
+- Validates changes don't exceed size limits before pushing
+
+---
+
+#### Type: create_pull_request_review_comment
+
+**Purpose**: Create review comments on specific lines of code in pull requests.
+
+**Default Max**: 10  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and diff access
+- `pull-requests: write` - Review comment creation
+
+*GitHub App*:
+- `pull-requests: write` - Review comment creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Comments buffered via PR review buffer for batch submission
+- Higher default max (10) enables comprehensive code review
+
+---
+
+#### Type: submit_pull_request_review
+
+**Purpose**: Submit formal pull request review with status (APPROVE, REQUEST_CHANGES, COMMENT).
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Review submission operations
+
+*GitHub App*:
+- `pull-requests: write` - Review submission operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Submits all buffered review comments from `create_pull_request_review_comment`
+- Review status affects PR merge requirements
+
+---
+
+#### Type: resolve_pull_request_review_thread
+
+**Purpose**: Mark pull request review threads as resolved after addressing feedback.
+
+**Default Max**: 10  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Review thread resolution operations
+
+*GitHub App*:
+- `pull-requests: write` - Review thread resolution operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Higher default max (10) enables resolving multiple threads per review cycle
+
+---
+
+#### Type: add_labels
+
+**Purpose**: Add labels to issues or pull requests.
+
+**Default Max**: 3  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Label addition to issues
+- `pull-requests: write` - Label addition to pull requests
+
+*GitHub App*:
+- `issues: write` - Label addition to issues
+- `pull-requests: write` - Label addition to pull requests
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Requires both `issues: write` and `pull-requests: write` to support labeling both entity types
+- Labels must exist in repository; non-existent labels generate warnings
+
+---
+
+#### Type: remove_labels
+
+**Purpose**: Remove labels from issues or pull requests.
+
+**Default Max**: 3  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Label removal from issues
+- `pull-requests: write` - Label removal from pull requests
+
+*GitHub App*:
+- `issues: write` - Label removal from issues
+- `pull-requests: write` - Label removal from pull requests
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Same permissions as `add_labels`
+- Missing labels are silently ignored (no error)
+
+---
+
+#### Type: add_reviewer
+
+**Purpose**: Add reviewers (users or teams) to pull requests.
+
+**Default Max**: 3  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Reviewer assignment operations
+
+*GitHub App*:
+- `pull-requests: write` - Reviewer assignment operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Teams are expanded to individual members based on repository configuration
+- Invalid reviewers generate warnings but don't fail the operation
+
+---
+
+#### Type: assign_milestone
+
+**Purpose**: Assign issues to repository milestones for release planning.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Milestone assignment operations
+
+*GitHub App*:
+- `issues: write` - Milestone assignment operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Milestone must exist in repository
+- Replaces any existing milestone assignment
+
+---
+
+#### Type: assign_to_agent
+
+**Purpose**: Assign GitHub Copilot agents to issues or pull requests.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Agent assignment operations
+
+*GitHub App*:
+- `issues: write` - Agent assignment operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Uses special assignee syntax for Copilot agent assignment
+- Agent must be enabled in repository settings
+
+---
+
+#### Type: assign_to_user
+
+**Purpose**: Assign users to issues or pull requests.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - User assignment operations (for issues)
+- `pull-requests: write` - User assignment operations (for pull requests)
+
+*GitHub App*:
+- `issues: write` - User assignment operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Users must have repository access to be assigned
+- Invalid users generate warnings
+
+---
+
+#### Type: unassign_from_user
+
+**Purpose**: Remove user assignments from issues or pull requests.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - User unassignment operations
+
+*GitHub App*:
+- `issues: write` - User unassignment operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: hide_comment
+
+**Purpose**: Hide (minimize) comments on issues, pull requests, or discussions.
+
+**Default Max**: 5  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Comment hiding on issues
+- `pull-requests: write` - Comment hiding on pull requests
+- `discussions: write` - Comment hiding on discussions
+
+*GitHub App*:
+- `issues: write` - Comment hiding on issues
+- `pull-requests: write` - Comment hiding on pull requests
+- `discussions: write` - Comment hiding on discussions
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Requires all three write permissions to support hiding comments across all entity types
+- Comments are minimized, not deleted - reversible by moderators
+
+---
+
+#### Type: create_project
+
+**Purpose**: Create GitHub Projects V2 boards for project management.
+
+**Default Max**: 1  
+**Cross-Repository Support**: Yes (organization or user projects)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `organization-projects: write` - Project creation operations (note: only valid for GitHub Apps)
+
+*GitHub App*:
+- `organization-projects: write` - Project creation operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- `organization-projects` permission is ONLY available for GitHub App tokens, not standard GitHub Actions tokens
+- GitHub Actions workflows should use GitHub App authentication for project operations
+- Projects can be created at organization or user level based on app installation
+
+---
+
+#### Type: update_project
+
+**Purpose**: Manage GitHub Projects V2 boards (add items, update fields, remove items).
+
+**Default Max**: 10  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `organization-projects: write` - Project management operations (note: only valid for GitHub Apps)
+
+*GitHub App*:
+- `organization-projects: write` - Project management operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Same permission requirements as `create_project`
+- Higher default max (10) enables batch project board updates
+
+---
+
+#### Type: create_project_status_update
+
+**Purpose**: Create status updates for GitHub Projects V2 boards.
+
+**Default Max**: 1  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `organization-projects: write` - Project status update operations (note: only valid for GitHub Apps)
+
+*GitHub App*:
+- `organization-projects: write` - Project status update operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Same permission requirements as `create_project` and `update_project`
+
+---
+
+#### Type: update_release
+
+**Purpose**: Update GitHub release descriptions and metadata.
+
+**Default Max**: 1  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: write` - Release modification operations
+
+*GitHub App*:
+- `contents: write` - Release modification operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Only updates release notes and metadata; does NOT modify release assets
+- Release must already exist (identified by tag name)
+
+---
+
+#### Type: upload_asset
+
+**Purpose**: Upload files to orphaned git branch for artifact storage.
+
+**Default Max**: 10  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: write` - Branch creation, commit operations, and file uploads
+
+*GitHub App*:
+- `contents: write` - Branch creation, commit operations, and file uploads
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Creates or updates orphaned branch for asset storage
+- Enforces maximum file size limit (default: 10 MB = 10240 KB)
+- Files accessible via raw.githubusercontent.com URLs
+
+---
+
+#### Type: dispatch_workflow
+
+**Purpose**: Trigger workflow_dispatch events to invoke other workflows.
+
+**Default Max**: 3  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `actions: write` - Workflow dispatch operations
+
+*GitHub App*:
+- `actions: write` - Workflow dispatch operations
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Requires ONLY `actions: write` permission (no `contents: read` needed)
+- Target workflow must support `workflow_dispatch` trigger
+- Workflow inputs are validated against target workflow's input schema
+
+---
+
+#### Type: create_code_scanning_alert
+
+**Purpose**: Generate SARIF security reports and code scanning alerts.
+
+**Default Max**: unlimited  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `security-events: write` - SARIF report upload and alert creation
+
+*GitHub App*:
+- `security-events: write` - SARIF report upload and alert creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Unlimited max enables comprehensive security scanning
+- Alerts appear in repository Security tab
+- SARIF format validation performed before upload
+
+---
+
+#### Type: autofix_code_scanning_alert
+
+**Purpose**: Create automated pull requests to fix code scanning alerts.
+
+**Default Max**: 10  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `security-events: write` - Alert metadata access
+- `actions: read` - Workflow run metadata for alert correlation
+
+*GitHub App*:
+- `security-events: write` - Alert metadata access
+- `contents: write` - Pull request branch creation
+- `pull-requests: write` - Pull request creation
+- `actions: read` - Workflow run metadata for alert correlation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Most complex permission set - requires security-events, contents, pull-requests, and actions scopes
+- Creates pull request with proposed fix referencing the alert
+- Alert must exist and be fixable
+
+---
+
+#### Type: create_agent_session
+
+**Purpose**: Create GitHub Copilot agent sessions for code change delegation.
+
+**Default Max**: 1  
+**Cross-Repository Support**: No (same repository only)  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `issues: write` - Issue creation and agent assignment
+
+*GitHub App*:
+- `issues: write` - Issue creation and agent assignment
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Creates issue with special agent assignment that triggers Copilot coding agent
+- Agent must be enabled in repository settings
+
+---
+
+#### Type: missing_tool
+
+**Purpose**: Report when AI requests unavailable functionality for feature discovery.
+
+**Default Max**: unlimited  
+**Cross-Repository Support**: N/A (logging only)  
+**Mandatory**: Yes (always enabled, cannot be disabled)
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- No additional permissions required beyond base workflow permissions
+- When `create-issue: true` configured, requires `issues: write` for issue creation
+
+*GitHub App*:
+- No additional permissions required beyond base app installation
+- When `create-issue: true` configured, requires `issues: write` for issue creation
+
+**Notes**:
+- Base functionality requires no permissions (logging only)
+- Optional issue creation requires `issues: write` when `create-issue: true`
+- Always enabled to capture AI's unmet capability requests
+
+---
+
+#### Type: missing_data
+
+**Purpose**: Report when AI lacks required information to complete goals.
+
+**Default Max**: unlimited  
+**Cross-Repository Support**: N/A (logging only)  
+**Mandatory**: Yes (always enabled, cannot be disabled)
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- No additional permissions required beyond base workflow permissions
+- When `create-issue: true` configured, requires `issues: write` for issue creation
+
+*GitHub App*:
+- No additional permissions required beyond base app installation
+- When `create-issue: true` configured, requires `issues: write` for issue creation
+
+**Notes**:
+- Same permission model as `missing_tool`
+- Base functionality requires no permissions (logging only)
+- Optional issue creation requires `issues: write` when `create-issue: true`
 
 ---
 
