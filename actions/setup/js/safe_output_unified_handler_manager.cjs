@@ -44,6 +44,7 @@ const HANDLER_MAP = {
   update_release: "./update_release.cjs",
   create_pull_request_review_comment: "./create_pr_review_comment.cjs",
   submit_pull_request_review: "./submit_pr_review.cjs",
+  resolve_pull_request_review_thread: "./resolve_pr_review_thread.cjs",
   create_pull_request: "./create_pull_request.cjs",
   push_to_pull_request_branch: "./push_to_pull_request_branch.cjs",
   update_pull_request: "./update_pull_request.cjs",

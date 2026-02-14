@@ -316,6 +316,18 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
 			Build()
 	},
+	"resolve_pull_request_review_thread": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.ResolvePullRequestReviewThread == nil {
+			return nil
+		}
+		c := cfg.ResolvePullRequestReviewThread
+		return newHandlerConfigBuilder().
+			AddIfPositive("max", c.Max).
+			AddIfNotEmpty("target", c.Target).
+			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
+			AddStringSlice("allowed_repos", c.AllowedRepos).
+			Build()
+	},
 	"create_pull_request": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.CreatePullRequests == nil {
 			return nil

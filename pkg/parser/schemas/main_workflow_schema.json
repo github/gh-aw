@@ -4999,6 +4999,45 @@
           ],
           "description": "Enable AI agents to submit consolidated pull request reviews with a status decision. Works with create-pull-request-review-comment to batch inline comments into a single review."
         },
+        "resolve-pull-request-review-thread": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Configuration for resolving review threads on pull requests. Allows AI agents to mark review conversations as resolved after addressing feedback.",
+              "properties": {
+                "max": {
+                  "type": "integer",
+                  "description": "Maximum number of review threads to resolve (default: 10)",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target for review thread resolution. Use 'triggering' (default) for the triggering PR, '*' for any PR, or a specific PR number."
+                },
+                "target-repo": {
+                  "type": "string",
+                  "description": "Default target repository for cross-repo thread resolution (format: 'owner/repo')"
+                },
+                "allowed-repos": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Allowed repositories for cross-repo thread resolution (format: 'owner/repo')"
+                },
+                "github-token": {
+                  "$ref": "#/$defs/github_token",
+                  "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null",
+              "description": "Enable review thread resolution with default configuration"
+            }
+          ],
+          "description": "Enable AI agents to resolve review threads on pull requests after addressing feedback."
+        },
         "create-code-scanning-alert": {
           "oneOf": [
             {

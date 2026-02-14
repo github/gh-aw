@@ -95,6 +95,15 @@ interface CreatePullRequestReviewCommentConfig extends SafeOutputConfig {
 }
 
 /**
+ * Configuration for resolving pull request review threads
+ */
+interface ResolvePullRequestReviewThreadConfig extends SafeOutputConfig {
+  target?: string;
+  "target-repo"?: string;
+  allowed_repos?: string[];
+}
+
+/**
  * Configuration for creating code scanning alerts
  */
 interface CreateCodeScanningAlertConfig extends SafeOutputConfig {
@@ -282,7 +291,8 @@ type SpecificSafeOutputConfig =
   | NoOpConfig
   | MissingToolConfig
   | LinkSubIssueConfig
-  | ThreatDetectionConfig;
+  | ThreatDetectionConfig
+  | ResolvePullRequestReviewThreadConfig;
 
 type SafeOutputConfigs = Record<string, SafeOutputConfig | SpecificSafeOutputConfig>;
 
@@ -315,6 +325,7 @@ export {
   MissingToolConfig,
   LinkSubIssueConfig,
   ThreatDetectionConfig,
+  ResolvePullRequestReviewThreadConfig,
   SpecificSafeOutputConfig,
   // Safe job configuration types
   SafeJobInput,

@@ -87,6 +87,9 @@ func validateSafeOutputsTarget(config *SafeOutputsConfig) error {
 	if config.PushToPullRequestBranch != nil {
 		configs = append(configs, targetConfig{"push-to-pull-request-branch", config.PushToPullRequestBranch.Target})
 	}
+	if config.ResolvePullRequestReviewThread != nil {
+		configs = append(configs, targetConfig{"resolve-pull-request-review-thread", config.ResolvePullRequestReviewThread.Target})
+	}
 
 	// Validate each target field
 	for _, cfg := range configs {

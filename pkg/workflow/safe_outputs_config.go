@@ -107,6 +107,12 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.SubmitPullRequestReview = submitPRReviewConfig
 			}
 
+			// Handle resolve-pull-request-review-thread
+			resolvePRReviewThreadConfig := c.parseResolvePullRequestReviewThreadConfig(outputMap)
+			if resolvePRReviewThreadConfig != nil {
+				config.ResolvePullRequestReviewThread = resolvePRReviewThreadConfig
+			}
+
 			// Handle create-code-scanning-alert
 			securityReportsConfig := c.parseCodeScanningAlertsConfig(outputMap)
 			if securityReportsConfig != nil {

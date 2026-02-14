@@ -257,6 +257,21 @@
     }
   },
   {
+    "name": "resolve_pull_request_review_thread",
+    "description": "Resolve a review thread on a pull request. Use this to mark a review conversation as resolved after addressing the feedback. The thread_id must be the node ID of the review thread (e.g., PRRT_kwDO...).",
+    "inputSchema": {
+      "type": "object",
+      "required": ["thread_id"],
+      "properties": {
+        "thread_id": {
+          "type": "string",
+          "description": "The node ID of the review thread to resolve (e.g., 'PRRT_kwDOABCD...'). This is the GraphQL node ID, not a numeric ID."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "create_code_scanning_alert",
     "description": "Create a code scanning alert for security vulnerabilities, code quality issues, or other findings. Alerts appear in the repository's Security tab and integrate with GitHub's security features. Use this for automated security analysis results.",
     "inputSchema": {

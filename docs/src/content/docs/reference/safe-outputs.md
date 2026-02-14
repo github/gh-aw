@@ -704,6 +704,26 @@ safe-outputs:
     footer: false     # omit AI-generated footer from review body (default: true)
 ```
 
+### Resolve PR Review Thread (`resolve-pull-request-review-thread:`)
+
+Resolves review threads on pull requests. Allows AI agents to mark review conversations as resolved after addressing the feedback. Uses the GitHub GraphQL API with the `resolveReviewThread` mutation.
+
+```yaml wrap
+safe-outputs:
+  resolve-pull-request-review-thread:
+    max: 10           # max threads to resolve (default: 10)
+    target: "*"       # "triggering" (default), "*", or PR number
+    target-repo: "owner/repo"  # cross-repository
+    allowed-repos:    # allowed repos for cross-repo resolution
+      - "org/repo1"
+```
+
+**Agent output format:**
+
+```json
+{"type": "resolve_pull_request_review_thread", "thread_id": "PRRT_kwDOABCD..."}
+```
+
 ### Code Scanning Alerts (`create-code-scanning-alert:`)
 
 Creates security advisories in SARIF format and submits to GitHub Code Scanning. Supports severity: error, warning, info, note.

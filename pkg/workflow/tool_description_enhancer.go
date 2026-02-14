@@ -165,6 +165,13 @@ func enhanceToolDescription(toolName, baseDescription string, safeOutputs *SafeO
 			}
 		}
 
+	case "resolve_pull_request_review_thread":
+		if config := safeOutputs.ResolvePullRequestReviewThread; config != nil {
+			if config.Max > 0 {
+				constraints = append(constraints, fmt.Sprintf("Maximum %d review thread(s) can be resolved.", config.Max))
+			}
+		}
+
 	case "create_code_scanning_alert":
 		if config := safeOutputs.CreateCodeScanningAlerts; config != nil {
 			if config.Max > 0 {
