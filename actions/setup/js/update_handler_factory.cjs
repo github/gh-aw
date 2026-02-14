@@ -44,6 +44,9 @@ function createUpdateHandlerFactory(handlerConfig) {
     const updateTarget = config.target || "triggering";
     const maxCount = config.max || 10;
 
+    // Check if we're in staged mode
+    const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
     // Build configuration log message
     const configParts = [`max=${maxCount}`, `target=${updateTarget}`];
 
@@ -132,6 +135,20 @@ function createUpdateHandlerFactory(handlerConfig) {
       }
 
       core.info(`Updating ${itemTypeName} #${itemNumber} with: ${JSON.stringify(updateFields)}`);
+
+      // If in staged mode, preview the update without applying it
+      if (isStaged) {
+        core.info(`Staged mode: Would update ${itemTypeName} #${itemNumber} with fields: ${JSON.stringify(updateFields)}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            number: itemNumber,
+            updateFields,
+            hasRawBody,
+          },
+        };
+      }
 
       // Execute the update
       try {

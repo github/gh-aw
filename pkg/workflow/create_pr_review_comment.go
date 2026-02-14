@@ -15,6 +15,7 @@ type CreatePullRequestReviewCommentsConfig struct {
 	Target               string   `yaml:"target,omitempty"`        // Target for comments: "triggering" (default), "*" (any PR), or explicit PR number
 	TargetRepoSlug       string   `yaml:"target-repo,omitempty"`   // Target repository in format "owner/repo" for cross-repository PR review comments
 	AllowedRepos         []string `yaml:"allowed-repos,omitempty"` // List of additional repositories that PR review comments can be added to (additionally to the target-repo)
+	Footer               *string  `yaml:"footer,omitempty"`        // Controls when to show footer in PR review: "always" (default), "none", or "if-body" (only when review has body text)
 }
 
 // buildCreateOutputPullRequestReviewCommentJob creates the create_pr_review_comment job
@@ -118,6 +119,30 @@ func (c *Compiler) parsePullRequestReviewCommentsConfig(outputMap map[string]any
 			return nil // Invalid configuration, return nil to cause validation error
 		}
 		prReviewCommentsConfig.TargetRepoSlug = targetRepoSlug
+
+		// Parse footer configuration
+		if footer, exists := configMap["footer"]; exists {
+			switch f := footer.(type) {
+			case string:
+				// Validate string values: "always", "none", "if-body"
+				if f == "always" || f == "none" || f == "if-body" {
+					prReviewCommentsConfig.Footer = &f
+					createPRReviewCommentLog.Printf("Footer control: %s", f)
+				} else {
+					createPRReviewCommentLog.Printf("Invalid footer value: %s (must be 'always', 'none', or 'if-body')", f)
+				}
+			case bool:
+				// Map boolean to string: true -> "always", false -> "none"
+				var footerStr string
+				if f {
+					footerStr = "always"
+				} else {
+					footerStr = "none"
+				}
+				prReviewCommentsConfig.Footer = &footerStr
+				createPRReviewCommentLog.Printf("Footer control (mapped from bool): %s", footerStr)
+			}
+		}
 
 		// Parse common base fields with default max of 10
 		c.parseBaseSafeOutputConfig(configMap, &prReviewCommentsConfig.BaseSafeOutputConfig, 10)

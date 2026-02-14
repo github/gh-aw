@@ -2478,7 +2478,7 @@
       ]
     },
     "plugins": {
-      "description": "⚠️  EXPERIMENTAL: Plugin configuration for installing plugins before workflow execution. Supports array format (list of repos/plugin configs) and object format (repos + custom token). Note: Plugin support is experimental and may change in future releases.",
+      "description": "\u26a0\ufe0f  EXPERIMENTAL: Plugin configuration for installing plugins before workflow execution. Supports array format (list of repos/plugin configs) and object format (repos + custom token). Note: Plugin support is experimental and may change in future releases.",
       "examples": [
         ["github/copilot-plugin", "acme/custom-tools"],
         [
@@ -2675,7 +2675,7 @@
             [
               {
                 "name": "Verify Post-Steps Execution",
-                "run": "echo \"✅ Post-steps are executing correctly\"\necho \"This step runs after the AI agent completes\"\n"
+                "run": "echo \"\u2705 Post-steps are executing correctly\"\necho \"This step runs after the AI agent completes\"\n"
               },
               {
                 "name": "Upload Test Results",
@@ -3847,7 +3847,7 @@
     },
     "safe-outputs": {
       "type": "object",
-      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, submit-pull-request-review, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
+      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, resolve-pull-request-review-thread, submit-pull-request-review, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
       "description": "Safe output processing configuration that automatically creates GitHub issues, comments, and pull requests from AI workflow output without requiring write permissions in the main job",
       "examples": [
         {
@@ -4659,6 +4659,11 @@
                 "github-token": {
                   "$ref": "#/$defs/github_token",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                },
+                "staged": {
+                  "type": "boolean",
+                  "description": "If true, emit step summary messages instead of making GitHub API calls for this specific output type (preview mode)",
+                  "examples": [true, false]
                 }
               },
               "additionalProperties": false,
@@ -4998,6 +5003,32 @@
             }
           ],
           "description": "Enable AI agents to submit consolidated pull request reviews with a status decision. Works with create-pull-request-review-comment to batch inline comments into a single review."
+        },
+        "resolve-pull-request-review-thread": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Configuration for resolving review threads on pull requests. Resolution is scoped to the triggering PR only \u2014 threads on other PRs cannot be resolved.",
+              "properties": {
+                "max": {
+                  "type": "integer",
+                  "description": "Maximum number of review threads to resolve (default: 10)",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "github-token": {
+                  "$ref": "#/$defs/github_token",
+                  "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null",
+              "description": "Enable review thread resolution with default configuration"
+            }
+          ],
+          "description": "Enable AI agents to resolve review threads on the triggering pull request after addressing feedback."
         },
         "create-code-scanning-alert": {
           "oneOf": [
@@ -5552,6 +5583,11 @@
                 "github-token": {
                   "$ref": "#/$defs/github_token",
                   "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                },
+                "staged": {
+                  "type": "boolean",
+                  "description": "If true, emit step summary messages instead of making GitHub API calls for this specific output type (preview mode)",
+                  "examples": [true, false]
                 }
               },
               "additionalProperties": false
@@ -6111,8 +6147,8 @@
             },
             "staged-title": {
               "type": "string",
-              "description": "Custom title template for staged mode preview. Available placeholders: {operation}. Example: '🎭 Preview: {operation}'",
-              "examples": ["🎭 Preview: {operation}", "## Staged Mode: {operation}"]
+              "description": "Custom title template for staged mode preview. Available placeholders: {operation}. Example: '\ud83c\udfad Preview: {operation}'",
+              "examples": ["\ud83c\udfad Preview: {operation}", "## Staged Mode: {operation}"]
             },
             "staged-description": {
               "type": "string",
@@ -6126,18 +6162,18 @@
             },
             "run-success": {
               "type": "string",
-              "description": "Custom message template for successful workflow completion. Available placeholders: {workflow_name}, {run_url}. Default: '✅ Agentic [{workflow_name}]({run_url}) completed successfully.'",
-              "examples": ["✅ Agentic [{workflow_name}]({run_url}) completed successfully.", "✅ [{workflow_name}]({run_url}) finished."]
+              "description": "Custom message template for successful workflow completion. Available placeholders: {workflow_name}, {run_url}. Default: '\u2705 Agentic [{workflow_name}]({run_url}) completed successfully.'",
+              "examples": ["\u2705 Agentic [{workflow_name}]({run_url}) completed successfully.", "\u2705 [{workflow_name}]({run_url}) finished."]
             },
             "run-failure": {
               "type": "string",
-              "description": "Custom message template for failed workflow. Available placeholders: {workflow_name}, {run_url}, {status}. Default: '❌ Agentic [{workflow_name}]({run_url}) {status} and wasn't able to produce a result.'",
-              "examples": ["❌ Agentic [{workflow_name}]({run_url}) {status} and wasn't able to produce a result.", "❌ [{workflow_name}]({run_url}) {status}."]
+              "description": "Custom message template for failed workflow. Available placeholders: {workflow_name}, {run_url}, {status}. Default: '\u274c Agentic [{workflow_name}]({run_url}) {status} and wasn't able to produce a result.'",
+              "examples": ["\u274c Agentic [{workflow_name}]({run_url}) {status} and wasn't able to produce a result.", "\u274c [{workflow_name}]({run_url}) {status}."]
             },
             "detection-failure": {
               "type": "string",
-              "description": "Custom message template for detection job failure. Available placeholders: {workflow_name}, {run_url}. Default: '⚠️ Security scanning failed for [{workflow_name}]({run_url}). Review the logs for details.'",
-              "examples": ["⚠️ Security scanning failed for [{workflow_name}]({run_url}). Review the logs for details.", "⚠️ Detection job failed in [{workflow_name}]({run_url})."]
+              "description": "Custom message template for detection job failure. Available placeholders: {workflow_name}, {run_url}. Default: '\u26a0\ufe0f Security scanning failed for [{workflow_name}]({run_url}). Review the logs for details.'",
+              "examples": ["\u26a0\ufe0f Security scanning failed for [{workflow_name}]({run_url}). Review the logs for details.", "\u26a0\ufe0f Detection job failed in [{workflow_name}]({run_url})."]
             },
             "append-only-comments": {
               "type": "boolean",
@@ -6223,12 +6259,12 @@
       "additionalProperties": false
     },
     "roles": {
-      "description": "Repository access roles required to trigger agentic workflows. Defaults to ['admin', 'maintainer', 'write'] for security. Use 'all' to allow any authenticated user (⚠️ security consideration).",
+      "description": "Repository access roles required to trigger agentic workflows. Defaults to ['admin', 'maintainer', 'write'] for security. Use 'all' to allow any authenticated user (\u26a0\ufe0f security consideration).",
       "oneOf": [
         {
           "type": "string",
           "enum": ["all"],
-          "description": "Allow any authenticated user to trigger the workflow (⚠️ disables permission checking entirely - use with caution)"
+          "description": "Allow any authenticated user to trigger the workflow (\u26a0\ufe0f disables permission checking entirely - use with caution)"
         },
         {
           "type": "array",

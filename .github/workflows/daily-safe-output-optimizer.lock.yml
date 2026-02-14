@@ -34,7 +34,7 @@
 name: "Daily Safe Output Tool Optimizer"
 "on":
   schedule:
-  - cron: "15 21 * * *"
+  - cron: "26 15 * * *"
     # Friendly format: daily (scattered)
   # skip-if-match: is:issue is:open in:title "[safeoutputs]" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:

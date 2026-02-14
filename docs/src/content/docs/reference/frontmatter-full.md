@@ -2191,9 +2191,6 @@ safe-outputs:
     # available category. Matched first against category IDs, then against category
     # names, then against category slugs. Numeric values are automatically converted
     # to strings at runtime.
-    # 
-    # Best Practice: Use announcement-capable categories (such as "announcements")
-    # for AI-generated content to ensure proper visibility and notification features.
     # (optional)
     category: null
 
@@ -2713,6 +2710,27 @@ safe-outputs:
 
   # Option 2: Enable PR review submission with default configuration
   submit-pull-request-review: null
+
+  # Enable AI agents to resolve review threads on the triggering pull request after
+  # addressing feedback.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for resolving review threads on pull requests.
+  # Resolution is scoped to the triggering PR only — threads on other PRs cannot be
+  # resolved.
+  resolve-pull-request-review-thread:
+    # Maximum number of review threads to resolve (default: 10)
+    # (optional)
+    max: 1
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable review thread resolution with default configuration
+  resolve-pull-request-review-thread: null
 
   # Enable AI agents to create GitHub Advanced Security code scanning alerts for
   # detected vulnerabilities or security issues.

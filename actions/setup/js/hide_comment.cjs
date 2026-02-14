@@ -48,6 +48,9 @@ async function main(config = {}) {
   const allowedReasons = config.allowed_reasons || [];
   const maxCount = config.max || 5;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Hide comment configuration: max=${maxCount}`);
   if (allowedReasons.length > 0) {
     core.info(`Allowed reasons: ${allowedReasons.join(", ")}`);
@@ -104,6 +107,19 @@ async function main(config = {}) {
       }
 
       core.info(`Hiding comment: ${commentId} (reason: ${normalizedReason})`);
+
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would hide comment ${commentId}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            commentId,
+            reason: normalizedReason,
+          },
+        };
+      }
 
       const hideResult = await hideCommentAPI(github, commentId, normalizedReason);
 

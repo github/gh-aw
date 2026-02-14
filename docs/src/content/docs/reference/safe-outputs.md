@@ -40,6 +40,7 @@ The agent requests issue creation; a separate job with `issues: write` creates i
 - [**Update PR**](#pull-request-updates-update-pull-request) (`update-pull-request`) - Update PR title or body (max: 1)
 - [**Close PR**](#close-pull-request-close-pull-request) (`close-pull-request`) - Close pull requests without merging (max: 10)
 - [**PR Review Comments**](#pr-review-comments-create-pull-request-review-comment) (`create-pull-request-review-comment`) - Create review comments on code lines (max: 10)
+- [**Resolve PR Review Thread**](#resolve-pr-review-thread-resolve-pull-request-review-thread) (`resolve-pull-request-review-thread`) - Resolve review threads after addressing feedback (max: 10)
 - [**Push to PR Branch**](#push-to-pr-branch-push-to-pull-request-branch) (`push-to-pull-request-branch`) - Push changes to PR branch (max: 1, same-repo only)
 
 ### Labels, Assignments & Reviews
@@ -685,7 +686,31 @@ safe-outputs:
     side: "RIGHT"             # "LEFT" or "RIGHT" (default: "RIGHT")
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
+    footer: "if-body"         # footer control: "always", "none", or "if-body"
 ```
+
+#### Footer Control for Review Comments
+
+The `footer` field controls whether AI-generated footers are added to PR review comments:
+
+- `"always"` (default) - Always include footer on review comments
+- `"none"` - Never include footer on review comments
+- `"if-body"` - Only include footer when the review has a body text
+
+You can also use boolean values which are automatically converted:
+- `true` → `"always"`
+- `false` → `"none"`
+
+This is particularly useful for clean approval reviews without body text, where you want to avoid footer noise:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request-review-comment:
+    footer: "if-body"  # Only show footer when review has body text
+  submit-pull-request-review:
+```
+
+With `footer: "if-body"`, approval reviews without body text appear clean without the AI-generated footer, while reviews with explanatory text still include the footer for attribution.
 
 ### Submit PR Review (`submit-pull-request-review:`)
 
@@ -702,6 +727,24 @@ safe-outputs:
   submit-pull-request-review:
     max: 1            # max reviews to submit (default: 1)
     footer: false     # omit AI-generated footer from review body (default: true)
+```
+
+### Resolve PR Review Thread (`resolve-pull-request-review-thread:`)
+
+Resolves review threads on pull requests. Allows AI agents to mark review conversations as resolved after addressing the feedback. Uses the GitHub GraphQL API with the `resolveReviewThread` mutation.
+
+Resolution is scoped to the triggering PR only — the handler validates that each thread belongs to the triggering pull request before resolving it.
+
+```yaml wrap
+safe-outputs:
+  resolve-pull-request-review-thread:
+    max: 10           # max threads to resolve (default: 10)
+```
+
+**Agent output format:**
+
+```json
+{"type": "resolve_pull_request_review_thread", "thread_id": "PRRT_kwDOABCD..."}
 ```
 
 ### Code Scanning Alerts (`create-code-scanning-alert:`)

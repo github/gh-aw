@@ -53,7 +53,8 @@
         { "$ref": "#/$defs/HideCommentOutput" },
         { "$ref": "#/$defs/DispatchWorkflowOutput" },
         { "$ref": "#/$defs/AutofixCodeScanningAlertOutput" },
-        { "$ref": "#/$defs/SubmitPullRequestReviewOutput" }
+        { "$ref": "#/$defs/SubmitPullRequestReviewOutput" },
+        { "$ref": "#/$defs/ResolvePullRequestReviewThreadOutput" }
       ]
     },
     "CreateIssueOutput": {
@@ -338,6 +339,23 @@
           }
         }
       ]
+    },
+    "ResolvePullRequestReviewThreadOutput": {
+      "title": "Resolve Pull Request Review Thread Output",
+      "description": "Output for resolving a review thread on a pull request. Marks a review conversation as resolved after the feedback has been addressed.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "resolve_pull_request_review_thread"
+        },
+        "thread_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The node ID of the review thread to resolve (e.g., 'PRRT_kwDOABCD...'). This is the GraphQL node ID, not a numeric ID."
+        }
+      },
+      "required": ["type", "thread_id"],
+      "additionalProperties": false
     },
     "CreateDiscussionOutput": {
       "title": "Create Discussion Output",

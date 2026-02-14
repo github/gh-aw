@@ -303,6 +303,7 @@ var handlerRegistry = map[string]handlerBuilder{
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
+			AddStringPtr("footer", c.Footer).
 			Build()
 	},
 	"submit_pull_request_review": func(cfg *SafeOutputsConfig) map[string]any {
@@ -313,6 +314,15 @@ var handlerRegistry = map[string]handlerBuilder{
 		return newHandlerConfigBuilder().
 			AddIfPositive("max", c.Max).
 			AddBoolPtr("footer", getEffectiveFooter(c.Footer, cfg.Footer)).
+			Build()
+	},
+	"resolve_pull_request_review_thread": func(cfg *SafeOutputsConfig) map[string]any {
+		if cfg.ResolvePullRequestReviewThread == nil {
+			return nil
+		}
+		c := cfg.ResolvePullRequestReviewThread
+		return newHandlerConfigBuilder().
+			AddIfPositive("max", c.Max).
 			Build()
 	},
 	"create_pull_request": func(cfg *SafeOutputsConfig) map[string]any {

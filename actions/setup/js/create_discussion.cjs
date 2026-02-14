@@ -301,6 +301,9 @@ async function main(config = {}) {
   const closeOlderDiscussions = config.close_older_discussions === true || config.close_older_discussions === "true";
   const includeFooter = config.footer !== false; // Default to true (include footer)
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   // Parse labels from config
   const labelsConfig = config.labels || [];
   const labels = Array.isArray(labelsConfig)
@@ -518,6 +521,21 @@ async function main(config = {}) {
     const body = bodyLines.join("\n").trim();
 
     core.info(`Creating discussion in ${qualifiedItemRepo} with title: ${title}`);
+
+    // If in staged mode, preview the discussion without creating it
+    if (isStaged) {
+      core.info(`Staged mode: Would create discussion in ${qualifiedItemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          repo: qualifiedItemRepo,
+          title,
+          bodyLength: body.length,
+          temporaryId,
+        },
+      };
+    }
 
     try {
       const createDiscussionMutation = `

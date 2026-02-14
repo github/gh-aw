@@ -990,6 +990,13 @@ func TestSlashCommandShorthand(t *testing.T) {
 // TestFuzzyScheduleScatteringWithRepositorySlug verifies that the repository slug (org/repo)
 // is properly included in the hash computation for schedule scattering across an organization
 func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
+	// Save and restore the global isReleaseBuild flag
+	oldIsRelease := IsRelease()
+	defer SetIsRelease(oldIsRelease)
+
+	// This test verifies release mode behavior (using repo slugs)
+	SetIsRelease(true)
+
 	tests := []struct {
 		name               string
 		workflowIdentifier string
@@ -1104,6 +1111,13 @@ func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
 // TestFuzzyScheduleScatteringAcrossOrganization verifies that workflows with the same name
 // in different repositories get different scattered schedules
 func TestFuzzyScheduleScatteringAcrossOrganization(t *testing.T) {
+	// Save and restore the global isReleaseBuild flag
+	oldIsRelease := IsRelease()
+	defer SetIsRelease(oldIsRelease)
+
+	// This test verifies release mode behavior (using repo slugs)
+	SetIsRelease(true)
+
 	// Simulate multiple repositories in an organization with same workflow name
 	repositories := []struct {
 		slug         string
@@ -1182,8 +1196,15 @@ func TestFuzzyScheduleScatteringAcrossOrganization(t *testing.T) {
 }
 
 // TestFuzzyScheduleScatteringWarningWithoutRepoSlug verifies that a warning is shown
-// when fuzzy schedule scattering occurs without repository slug
+// when fuzzy schedule scattering occurs without repository slug (in release mode)
 func TestFuzzyScheduleScatteringWarningWithoutRepoSlug(t *testing.T) {
+	// Save and restore the global isReleaseBuild flag
+	oldIsRelease := IsRelease()
+	defer SetIsRelease(oldIsRelease)
+
+	// This test verifies release mode behavior (warnings when repo slug is missing)
+	SetIsRelease(true)
+
 	frontmatter := map[string]any{
 		"on": map[string]any{
 			"schedule": []any{
@@ -1342,4 +1363,193 @@ func TestFriendlyFormatDeterminism(t *testing.T) {
 	if result1 != result3 {
 		t.Errorf("expected identical results for same workflow, got:\n===First===\n%s\n===Third===\n%s", result1, result3)
 	}
+}
+
+// TestFuzzyScheduleDevModeVsReleaseMode tests that fuzzy schedules use different seeds
+// in dev mode vs release mode
+func TestFuzzyScheduleDevModeVsReleaseMode(t *testing.T) {
+	workflowID := "test-workflow.md"
+	repoSlug := "github/gh-aw"
+
+	tests := []struct {
+		name          string
+		isRelease     bool
+		repoSlug      string
+		expectedSeed  string
+		expectWarning bool
+	}{
+		{
+			name:          "dev mode with repo slug - uses dev prefix",
+			isRelease:     false,
+			repoSlug:      repoSlug,
+			expectedSeed:  "dev/" + workflowID,
+			expectWarning: false,
+		},
+		{
+			name:          "dev mode without repo slug - uses dev prefix",
+			isRelease:     false,
+			repoSlug:      "",
+			expectedSeed:  "dev/" + workflowID,
+			expectWarning: false,
+		},
+		{
+			name:          "release mode with repo slug - uses repo slug",
+			isRelease:     true,
+			repoSlug:      repoSlug,
+			expectedSeed:  repoSlug + "/" + workflowID,
+			expectWarning: false,
+		},
+		{
+			name:          "release mode without repo slug - uses workflow ID only with warning",
+			isRelease:     true,
+			repoSlug:      "",
+			expectedSeed:  workflowID,
+			expectWarning: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore the global isReleaseBuild flag
+			oldIsRelease := IsRelease()
+			defer SetIsRelease(oldIsRelease)
+
+			// Set the isRelease flag for this test
+			SetIsRelease(tt.isRelease)
+
+			// Create compiler and set identifiers
+			compiler := NewCompiler()
+			compiler.SetWorkflowIdentifier(workflowID)
+			if tt.repoSlug != "" {
+				compiler.SetRepositorySlug(tt.repoSlug)
+			}
+
+			// Create a frontmatter with a fuzzy daily schedule
+			frontmatter := map[string]any{
+				"on": map[string]any{
+					"schedule": "daily",
+				},
+			}
+
+			// Process the schedule
+			err := compiler.preprocessScheduleFields(frontmatter, "", "")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Check for warnings
+			if tt.expectWarning && len(compiler.scheduleWarnings) == 0 {
+				t.Error("expected warning about missing repository slug, got none")
+			}
+			if !tt.expectWarning && len(compiler.scheduleWarnings) > 0 {
+				t.Errorf("unexpected warning: %v", compiler.scheduleWarnings)
+			}
+
+			// Extract the scattered cron expression
+			onMap := frontmatter["on"].(map[string]any)
+			scheduleArray := onMap["schedule"].([]any)
+			firstSchedule := scheduleArray[0].(map[string]any)
+			actualCron := firstSchedule["cron"].(string)
+
+			// Verify it's a valid scattered cron (not fuzzy)
+			if strings.HasPrefix(actualCron, "FUZZY:") {
+				t.Errorf("expected scattered cron, got fuzzy: %s", actualCron)
+			}
+
+			// Store the result for comparison
+			result := actualCron
+
+			// Now verify that the same seed produces the same result
+			compiler2 := NewCompiler()
+			compiler2.SetWorkflowIdentifier(workflowID)
+			if tt.repoSlug != "" {
+				compiler2.SetRepositorySlug(tt.repoSlug)
+			}
+
+			frontmatter2 := map[string]any{
+				"on": map[string]any{
+					"schedule": "daily",
+				},
+			}
+
+			err = compiler2.preprocessScheduleFields(frontmatter2, "", "")
+			if err != nil {
+				t.Fatalf("unexpected error on second compilation: %v", err)
+			}
+
+			onMap2 := frontmatter2["on"].(map[string]any)
+			scheduleArray2 := onMap2["schedule"].([]any)
+			firstSchedule2 := scheduleArray2[0].(map[string]any)
+			result2 := firstSchedule2["cron"].(string)
+
+			// Results should be identical (deterministic)
+			if result != result2 {
+				t.Errorf("scattering not deterministic: first=%s, second=%s", result, result2)
+			}
+		})
+	}
+}
+
+// TestFuzzyScheduleDevModeDifferentFromReleaseMode tests that the same workflow
+// produces different scattered times in dev mode vs release mode
+func TestFuzzyScheduleDevModeDifferentFromReleaseMode(t *testing.T) {
+	workflowID := "test-workflow.md"
+	repoSlug := "github/gh-aw"
+
+	// Save and restore the global isReleaseBuild flag
+	oldIsRelease := IsRelease()
+	defer SetIsRelease(oldIsRelease)
+
+	// Test in dev mode
+	SetIsRelease(false)
+	compilerDev := NewCompiler()
+	compilerDev.SetWorkflowIdentifier(workflowID)
+	compilerDev.SetRepositorySlug(repoSlug)
+
+	frontmatterDev := map[string]any{
+		"on": map[string]any{
+			"schedule": "daily",
+		},
+	}
+
+	err := compilerDev.preprocessScheduleFields(frontmatterDev, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error in dev mode: %v", err)
+	}
+
+	onMapDev := frontmatterDev["on"].(map[string]any)
+	scheduleArrayDev := onMapDev["schedule"].([]any)
+	firstScheduleDev := scheduleArrayDev[0].(map[string]any)
+	devResult := firstScheduleDev["cron"].(string)
+
+	// Test in release mode
+	SetIsRelease(true)
+	compilerRelease := NewCompiler()
+	compilerRelease.SetWorkflowIdentifier(workflowID)
+	compilerRelease.SetRepositorySlug(repoSlug)
+
+	frontmatterRelease := map[string]any{
+		"on": map[string]any{
+			"schedule": "daily",
+		},
+	}
+
+	err = compilerRelease.preprocessScheduleFields(frontmatterRelease, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error in release mode: %v", err)
+	}
+
+	onMapRelease := frontmatterRelease["on"].(map[string]any)
+	scheduleArrayRelease := onMapRelease["schedule"].([]any)
+	firstScheduleRelease := scheduleArrayRelease[0].(map[string]any)
+	releaseResult := firstScheduleRelease["cron"].(string)
+
+	// Results should be different because different seeds are used
+	// Dev mode uses "dev/test-workflow.md" and release mode uses "github/gh-aw/test-workflow.md"
+	if devResult == releaseResult {
+		t.Errorf("expected different scattered times for dev vs release mode, both got: %s", devResult)
+	}
+
+	t.Logf("Dev mode result: %s", devResult)
+	t.Logf("Release mode result: %s", releaseResult)
 }

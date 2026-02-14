@@ -157,6 +157,9 @@ async function main(config = {}) {
   const requiredTitlePrefix = config.required_title_prefix || "";
   const maxCount = config.max || 10;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Close discussion configuration: max=${maxCount}`);
   if (requiredLabels.length > 0) {
     core.info(`Required labels: ${requiredLabels.join(", ")}`);
@@ -242,6 +245,20 @@ async function main(config = {}) {
       const wasAlreadyClosed = discussion.closed;
       if (wasAlreadyClosed) {
         core.info(`Discussion #${discussionNumber} is already closed, but will still add comment`);
+      }
+
+      // If in staged mode, preview the close without executing it
+      if (isStaged) {
+        core.info(`Staged mode: Would close discussion #${discussionNumber}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            number: discussionNumber,
+            alreadyClosed: wasAlreadyClosed,
+            hasComment: !!item.body,
+          },
+        };
       }
 
       // Add comment if body is provided

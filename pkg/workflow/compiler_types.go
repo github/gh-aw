@@ -454,6 +454,7 @@ type WorkflowData struct {
 type BaseSafeOutputConfig struct {
 	Max         int    `yaml:"max,omitempty"`          // Maximum number of items to create
 	GitHubToken string `yaml:"github-token,omitempty"` // GitHub token for this specific output type
+	Staged      bool   `yaml:"staged,omitempty"`       // If true, emit step summary messages instead of making GitHub API calls for this specific output type
 }
 
 // SafeOutputsConfig holds configuration for automatic output routes
@@ -468,7 +469,8 @@ type SafeOutputsConfig struct {
 	AddComments                     *AddCommentsConfig                     `yaml:"add-comments,omitempty"`
 	CreatePullRequests              *CreatePullRequestsConfig              `yaml:"create-pull-requests,omitempty"`
 	CreatePullRequestReviewComments *CreatePullRequestReviewCommentsConfig `yaml:"create-pull-request-review-comments,omitempty"`
-	SubmitPullRequestReview         *SubmitPullRequestReviewConfig         `yaml:"submit-pull-request-review,omitempty"` // Submit a PR review with status (APPROVE, REQUEST_CHANGES, COMMENT)
+	SubmitPullRequestReview         *SubmitPullRequestReviewConfig         `yaml:"submit-pull-request-review,omitempty"`         // Submit a PR review with status (APPROVE, REQUEST_CHANGES, COMMENT)
+	ResolvePullRequestReviewThread  *ResolvePullRequestReviewThreadConfig  `yaml:"resolve-pull-request-review-thread,omitempty"` // Resolve a review thread on a pull request
 	CreateCodeScanningAlerts        *CreateCodeScanningAlertsConfig        `yaml:"create-code-scanning-alerts,omitempty"`
 	AutofixCodeScanningAlert        *AutofixCodeScanningAlertConfig        `yaml:"autofix-code-scanning-alert,omitempty"`
 	AddLabels                       *AddLabelsConfig                       `yaml:"add-labels,omitempty"`

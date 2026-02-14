@@ -88,6 +88,15 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 			expectedTools: []string{"submit_pull_request_review"},
 		},
 		{
+			name: "resolve pull request review thread enabled",
+			safeOutputs: &SafeOutputsConfig{
+				ResolvePullRequestReviewThread: &ResolvePullRequestReviewThreadConfig{
+					BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 10},
+				},
+			},
+			expectedTools: []string{"resolve_pull_request_review_thread"},
+		},
+		{
 			name: "create code scanning alerts enabled",
 			safeOutputs: &SafeOutputsConfig{
 				CreateCodeScanningAlerts: &CreateCodeScanningAlertsConfig{
@@ -162,6 +171,7 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 				CreatePullRequests:              &CreatePullRequestsConfig{},
 				CreatePullRequestReviewComments: &CreatePullRequestReviewCommentsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 5}},
 				SubmitPullRequestReview:         &SubmitPullRequestReviewConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 1}},
+				ResolvePullRequestReviewThread:  &ResolvePullRequestReviewThreadConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 10}},
 				CreateCodeScanningAlerts:        &CreateCodeScanningAlertsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 100}},
 				AddLabels:                       &AddLabelsConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3}},
 				AddReviewer:                     &AddReviewerConfig{BaseSafeOutputConfig: BaseSafeOutputConfig{Max: 3}},
@@ -178,6 +188,7 @@ func TestGenerateFilteredToolsJSON(t *testing.T) {
 				"create_pull_request",
 				"create_pull_request_review_comment",
 				"submit_pull_request_review",
+				"resolve_pull_request_review_thread",
 				"create_code_scanning_alert",
 				"add_labels",
 				"add_reviewer",
@@ -295,6 +306,7 @@ func TestGetSafeOutputsToolsJSON(t *testing.T) {
 		"create_pull_request",
 		"create_pull_request_review_comment",
 		"submit_pull_request_review",
+		"resolve_pull_request_review_thread",
 		"create_code_scanning_alert",
 		"add_labels",
 		"remove_labels",

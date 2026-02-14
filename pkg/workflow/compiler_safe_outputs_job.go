@@ -135,6 +135,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 		data.SafeOutputs.UpdateRelease != nil ||
 		data.SafeOutputs.CreatePullRequestReviewComments != nil ||
 		data.SafeOutputs.SubmitPullRequestReview != nil ||
+		data.SafeOutputs.ResolvePullRequestReviewThread != nil ||
 		data.SafeOutputs.CreatePullRequests != nil ||
 		data.SafeOutputs.PushToPullRequestBranch != nil ||
 		data.SafeOutputs.UpdatePullRequests != nil ||

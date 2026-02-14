@@ -204,6 +204,9 @@ async function main(config = {}) {
   // Check if copilot assignment is enabled
   const assignCopilot = process.env.GH_AW_ASSIGN_COPILOT === "true";
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Default target repo: ${defaultTargetRepo}`);
   if (allowedRepos.size > 0) {
     core.info(`Allowed repos: ${Array.from(allowedRepos).join(", ")}`);
@@ -464,6 +467,24 @@ async function main(config = {}) {
       core.info(`Assignees: ${assignees.join(", ")}`);
     }
     core.info(`Body length: ${body.length}`);
+
+    // If in staged mode, preview the issue without creating it
+    if (isStaged) {
+      core.info(`Staged mode: Would create issue in ${qualifiedItemRepo} with title: ${title}`);
+      // Return success with staged flag and preview info
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          repo: qualifiedItemRepo,
+          title,
+          labels,
+          assignees,
+          bodyLength: body.length,
+          temporaryId,
+        },
+      };
+    }
 
     try {
       const { data: issue } = await github.rest.issues.create({

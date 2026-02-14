@@ -122,6 +122,8 @@ interface CreatePullRequestItem extends BaseSafeOutputItem {
   branch?: string;
   /** Optional labels to add to the PR */
   labels?: string[];
+  /** Whether to create the PR as a draft (default: true) */
+  draft?: boolean;
 }
 
 /**
@@ -221,6 +223,8 @@ interface UpdatePullRequestItem extends BaseSafeOutputItem {
   operation?: "replace" | "append" | "prepend";
   /** Optional pull request number for target "*" */
   pull_request_number?: number | string;
+  /** Whether the PR should be a draft (true) or ready for review (false) */
+  draft?: boolean;
 }
 
 /**
@@ -351,6 +355,15 @@ interface AutofixCodeScanningAlertItem extends BaseSafeOutputItem {
 }
 
 /**
+ * JSONL item for resolving a review thread on a pull request
+ */
+interface ResolvePullRequestReviewThreadItem extends BaseSafeOutputItem {
+  type: "resolve_pull_request_review_thread";
+  /** The node ID of the review thread to resolve (e.g., 'PRRT_kwDOABCD...') */
+  thread_id: string;
+}
+
+/**
  * Union type of all possible safe output items
  */
 type SafeOutputItem =
@@ -380,7 +393,8 @@ type SafeOutputItem =
   | LinkSubIssueItem
   | HideCommentItem
   | CreateProjectItem
-  | AutofixCodeScanningAlertItem;
+  | AutofixCodeScanningAlertItem
+  | ResolvePullRequestReviewThreadItem;
 
 /**
  * Sanitized safe output items
@@ -419,6 +433,7 @@ export {
   LinkSubIssueItem,
   HideCommentItem,
   AutofixCodeScanningAlertItem,
+  ResolvePullRequestReviewThreadItem,
   SafeOutputItem,
   SafeOutputItems,
 };

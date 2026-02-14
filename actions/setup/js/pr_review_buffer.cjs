@@ -61,8 +61,8 @@ function createReviewBuffer() {
   /** @type {{workflowName: string, runUrl: string, workflowSource: string, workflowSourceURL: string, triggeringIssueNumber: number|undefined, triggeringPRNumber: number|undefined, triggeringDiscussionNumber: number|undefined} | null} */
   let footerContext = null;
 
-  /** @type {boolean} Whether to include footer in review body (default: true, controlled by config.footer) */
-  let includeFooter = true;
+  /** @type {string} Footer mode: "always" (default), "none", or "if-body" */
+  let footerMode = "always";
 
   /**
    * Add a validated comment to the buffer.
@@ -120,13 +120,37 @@ function createReviewBuffer() {
   }
 
   /**
-   * Set whether to include footer in review body.
-   * Controlled by the `footer` config option (default: true).
-   * @param {boolean} value - Whether to include footer
+   * Set the footer mode for review body.
+   * Supported modes:
+   *   - "always" (default): Always include footer
+   *   - "none": Never include footer
+   *   - "if-body": Only include footer if review body is non-empty
+   * Also accepts boolean values for backward compatibility:
+   *   - true → "always"
+   *   - false → "none"
+   * Note: create-pull-request-review-comment.footer is converted to a string in Go,
+   * but submit-pull-request-review.footer and global footer are still emitted as booleans.
+   * @param {string|boolean} value - Footer mode string or boolean
    */
-  function setIncludeFooter(value) {
-    includeFooter = value;
-    core.info(`PR review footer ${value ? "enabled" : "disabled"}`);
+  function setFooterMode(value) {
+    if (typeof value === "boolean") {
+      // Normalize boolean to string mode (backward compatibility)
+      const normalized = value ? "always" : "none";
+      core.info(`Normalized boolean footer config (${value}) to mode: "${normalized}"`);
+      footerMode = normalized;
+    } else if (typeof value === "string") {
+      // Validate string mode
+      if (value === "always" || value === "none" || value === "if-body") {
+        footerMode = value;
+        core.info(`PR review footer mode set to "${footerMode}"`);
+      } else {
+        core.warning(`Invalid footer mode: "${value}". Using default "always". Valid values: "always", "none", "if-body"`);
+        footerMode = "always";
+      }
+    } else {
+      core.warning(`Invalid footer mode type: ${typeof value}. Using default "always".`);
+      footerMode = "always";
+    }
   }
 
   /**
@@ -182,9 +206,20 @@ function createReviewBuffer() {
     const event = reviewMetadata ? reviewMetadata.event : "COMMENT";
     let body = reviewMetadata ? reviewMetadata.body : "";
 
-    // Add footer to review body if enabled and we have footer context.
-    // Footer is always added (even for body-less reviews) to track which workflow submitted the review.
-    if (includeFooter && footerContext) {
+    // Determine if we should add footer based on footer mode
+    let shouldAddFooter = false;
+    if (footerMode === "always") {
+      shouldAddFooter = true;
+    } else if (footerMode === "none") {
+      shouldAddFooter = false;
+    } else if (footerMode === "if-body") {
+      // Only add footer if body is non-empty (has meaningful content)
+      shouldAddFooter = body.trim().length > 0;
+      core.info(`Footer mode "if-body": body is ${body.trim().length > 0 ? "non-empty" : "empty"}, ${shouldAddFooter ? "adding" : "skipping"} footer`);
+    }
+
+    // Add footer to review body if we should and we have footer context
+    if (shouldAddFooter && footerContext) {
       body += generateFooterWithMessages(
         footerContext.workflowName,
         footerContext.runUrl,
@@ -224,6 +259,34 @@ function createReviewBuffer() {
     });
 
     core.info(`Submitting PR review on ${repo}#${pullRequestNumber}: event=${event}, comments=${comments.length}, bodyLength=${body.length}`);
+
+    // If in staged mode, preview the review without submitting
+    const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+    if (isStaged) {
+      let summaryContent = "## 🎭 Staged Mode: PR Review Preview\n\n";
+      summaryContent += "The following PR review would be submitted if staged mode was disabled:\n\n";
+      summaryContent += `**Target PR:** ${repo}#${pullRequestNumber}\n\n`;
+      summaryContent += `**Review Event:** ${event}\n\n`;
+
+      if (body) {
+        summaryContent += `**Review Body:**\n${body}\n\n`;
+      }
+
+      if (comments.length > 0) {
+        summaryContent += `**Inline Comments:** ${comments.length}\n\n`;
+        for (let i = 0; i < comments.length; i++) {
+          const comment = comments[i];
+          summaryContent += `${i + 1}. \`${comment.path}:${comment.line}\` (${comment.side || "RIGHT"})\n`;
+          summaryContent += `   ${comment.body.substring(0, 100)}${comment.body.length > 100 ? "..." : ""}\n\n`;
+        }
+      }
+
+      summaryContent += "---\n\n";
+
+      await core.summary.addRaw(summaryContent).write();
+      core.info("📝 PR review preview written to step summary (staged mode)");
+      return { success: true, staged: true };
+    }
 
     try {
       /** @type {any} */
@@ -275,7 +338,7 @@ function createReviewBuffer() {
     reviewMetadata = null;
     reviewContext = null;
     footerContext = null;
-    includeFooter = true;
+    footerMode = "always";
   }
 
   return {
@@ -284,7 +347,8 @@ function createReviewBuffer() {
     setReviewContext,
     getReviewContext,
     setFooterContext,
-    setIncludeFooter,
+    setFooterMode,
+    setIncludeFooter: setFooterMode, // Backward compatibility alias
     hasBufferedComments,
     hasReviewMetadata,
     getBufferedCount,

@@ -44,18 +44,27 @@ func (c *Compiler) normalizeScheduleString(scheduleStr string, itemIndex int) (p
 
 	// Scatter fuzzy schedules if workflow identifier is set
 	if parser.IsFuzzyCron(parsedCron) && c.workflowIdentifier != "" {
-		// Combine repo slug and workflow identifier for scattering seed
+		// Combine repo slug/dev prefix and workflow identifier for scattering seed
 		// This ensures workflows with the same name in different repositories
 		// get different execution times, distributing load across an organization.
-		// Format: "owner/repo/workflow-path" or just "workflow-path" if no repo slug
+		// Format:
+		// - Dev mode: "dev/workflow-path"
+		// - Release mode: "owner/repo/workflow-path" or just "workflow-path" if no repo slug
 		seed := c.workflowIdentifier
-		if c.repositorySlug != "" {
-			seed = c.repositorySlug + "/" + c.workflowIdentifier
+		if IsRelease() {
+			// Release mode: use repository slug if available
+			if c.repositorySlug != "" {
+				seed = c.repositorySlug + "/" + c.workflowIdentifier
+			} else {
+				// Warn if repository slug is not available - scattering will not be org-aware
+				schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")
+				c.IncrementWarningCount()
+				c.addScheduleWarning("Fuzzy schedule scattering without repository context. Workflows with the same name in different repositories may collide. Ensure you are in a git repository with a configured remote.")
+			}
 		} else {
-			// Warn if repository slug is not available - scattering will not be org-aware
-			schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")
-			c.IncrementWarningCount()
-			c.addScheduleWarning("Fuzzy schedule scattering without repository context. Workflows with the same name in different repositories may collide. Ensure you are in a git repository with a configured remote.")
+			// Dev mode: use "dev" prefix for consistent scattering across all workflows
+			seed = "dev/" + c.workflowIdentifier
+			schedulePreprocessingLog.Printf("Using dev mode seed for fuzzy schedule scattering: %s", seed)
 		}
 		scatteredCron, err := parser.ScatterSchedule(parsedCron, seed)
 		if err != nil {

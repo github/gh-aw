@@ -160,6 +160,12 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"event": {Type: "string", Enum: []string{"APPROVE", "REQUEST_CHANGES", "COMMENT"}},
 		},
 	},
+	"resolve_pull_request_review_thread": {
+		DefaultMax: 10,
+		Fields: map[string]FieldValidation{
+			"thread_id": {Required: true, Type: "string"},
+		},
+	},
 	"create_discussion": {
 		DefaultMax: 1,
 		Fields: map[string]FieldValidation{

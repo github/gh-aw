@@ -445,6 +445,8 @@ func hasSafeOutputType(config *SafeOutputsConfig, key string) bool {
 		return config.CreatePullRequestReviewComments != nil
 	case "submit-pull-request-review":
 		return config.SubmitPullRequestReview != nil
+	case "resolve-pull-request-review-thread":
+		return config.ResolvePullRequestReviewThread != nil
 	case "create-code-scanning-alert":
 		return config.CreateCodeScanningAlerts != nil
 	case "add-labels":
@@ -530,6 +532,9 @@ func mergeSafeOutputConfig(result *SafeOutputsConfig, config map[string]any, c *
 	}
 	if result.SubmitPullRequestReview == nil && importedConfig.SubmitPullRequestReview != nil {
 		result.SubmitPullRequestReview = importedConfig.SubmitPullRequestReview
+	}
+	if result.ResolvePullRequestReviewThread == nil && importedConfig.ResolvePullRequestReviewThread != nil {
+		result.ResolvePullRequestReviewThread = importedConfig.ResolvePullRequestReviewThread
 	}
 	if result.CreateCodeScanningAlerts == nil && importedConfig.CreateCodeScanningAlerts != nil {
 		result.CreateCodeScanningAlerts = importedConfig.CreateCodeScanningAlerts
