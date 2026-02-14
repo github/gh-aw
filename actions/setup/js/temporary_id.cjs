@@ -97,6 +97,48 @@ function replaceTemporaryIdReferencesLegacy(text, tempIdMap) {
 }
 
 /**
+ * Validate and process a temporary_id from a message
+ * Auto-generates a temporary ID if not provided, or validates and normalizes if provided
+ *
+ * @param {Object} message - The message object that may contain a temporary_id field
+ * @param {string} entityType - Type of entity (e.g., "issue", "discussion", "project") for error messages
+ * @returns {{temporaryId: string, error: null} | {temporaryId: null, error: string}} Result with temporaryId or error
+ */
+function getOrGenerateTemporaryId(message, entityType = "item") {
+  // Auto-generate if not provided
+  if (message.temporary_id === undefined || message.temporary_id === null) {
+    return {
+      temporaryId: generateTemporaryId(),
+      error: null,
+    };
+  }
+
+  // Validate type
+  if (typeof message.temporary_id !== "string") {
+    return {
+      temporaryId: null,
+      error: `temporary_id must be a string (got ${typeof message.temporary_id})`,
+    };
+  }
+
+  // Normalize and validate format
+  const rawTemporaryId = message.temporary_id.trim();
+  const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
+
+  if (!isTemporaryId(normalized)) {
+    return {
+      temporaryId: null,
+      error: `Invalid temporary_id format: '${message.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`,
+    };
+  }
+
+  return {
+    temporaryId: normalized.toLowerCase(),
+    error: null,
+  };
+}
+
+/**
  * Load the temporary ID map from environment variable
  * Supports both old format (temporary_id -> number) and new format (temporary_id -> {repo, number})
  * @returns {Map<string, RepoIssuePair>} Map of temporary_id to {repo, number}
@@ -470,6 +512,7 @@ module.exports = {
   generateTemporaryId,
   isTemporaryId,
   normalizeTemporaryId,
+  getOrGenerateTemporaryId,
   replaceTemporaryIdReferences,
   replaceTemporaryIdReferencesLegacy,
   loadTemporaryIdMap,

@@ -10,7 +10,7 @@ const HANDLER_TYPE = "create_discussion";
 
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
-const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, getOrGenerateTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { parseAllowedRepos, getDefaultTargetRepo, validateRepo, parseRepoSlug } = require("./repo_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -461,31 +461,16 @@ async function main(config = {}) {
     core.info(`Using category: ${resolvedCategory.name} (${resolvedCategory.matchType})`);
 
     // Get or generate the temporary ID for this discussion
-    let temporaryId = generateTemporaryId();
-    if (message.temporary_id !== undefined && message.temporary_id !== null) {
-      if (typeof message.temporary_id !== "string") {
-        const error = `temporary_id must be a string (got ${typeof message.temporary_id})`;
-        core.warning(`Skipping discussion: ${error}`);
-        return {
-          success: false,
-          error,
-        };
-      }
-
-      const rawTemporaryId = message.temporary_id.trim();
-      const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
-
-      if (!isTemporaryId(normalized)) {
-        const error = `Invalid temporary_id format: '${message.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`;
-        core.warning(`Skipping discussion: ${error}`);
-        return {
-          success: false,
-          error,
-        };
-      }
-
-      temporaryId = normalized.toLowerCase();
+    const tempIdResult = getOrGenerateTemporaryId(message, "discussion");
+    if (tempIdResult.error) {
+      core.warning(`Skipping discussion: ${tempIdResult.error}`);
+      return {
+        success: false,
+        error: tempIdResult.error,
+      };
     }
+    // At this point, temporaryId is guaranteed to be a string (not null)
+    const temporaryId = /** @type {string} */ tempIdResult.temporaryId;
     core.info(`Processing create_discussion: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
 
     // Build labels array (merge config labels with item-specific labels)
