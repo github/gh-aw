@@ -44,18 +44,39 @@ func (c *Compiler) normalizeScheduleString(scheduleStr string, itemIndex int) (p
 
 	// Scatter fuzzy schedules if workflow identifier is set
 	if parser.IsFuzzyCron(parsedCron) && c.workflowIdentifier != "" {
-		// Combine repo slug and workflow identifier for scattering seed
+		// Combine repo identifier and workflow identifier for scattering seed
 		// This ensures workflows with the same name in different repositories
 		// get different execution times, distributing load across an organization.
-		// Format: "owner/repo/workflow-path" or just "workflow-path" if no repo slug
-		seed := c.workflowIdentifier
-		if c.repositorySlug != "" {
-			seed = c.repositorySlug + "/" + c.workflowIdentifier
+		//
+		// Strategy for repository identification (in priority order):
+		// 1. For shallow clones: Use repository slug from git remote (initial commit is unstable)
+		// 2. For full clones: Use initial commit SHA (most stable, never changes)
+		// 3. Fallback: Use repository slug if available, or directory hash
+		//
+		// This ensures stability across git remote changes for full clones, while
+		// handling shallow clones appropriately.
+		var repoIdentifier string
+		if c.gitRoot != "" {
+			// Get stable identifier, passing repository slug for shallow clone handling
+			repoIdentifier = getStableRepositoryIdentifier(c.gitRoot, c.repositorySlug)
+			schedulePreprocessingLog.Printf("Using repository identifier for scattering: %s", repoIdentifier)
+		} else if c.repositorySlug != "" {
+			// No git root but we have a repository slug - use it
+			repoIdentifier = c.repositorySlug
+			schedulePreprocessingLog.Printf("Using repository slug for scattering: %s", repoIdentifier)
 		} else {
-			// Warn if repository slug is not available - scattering will not be org-aware
-			schedulePreprocessingLog.Printf("Warning: repository slug not available for fuzzy schedule scattering")
+			// No git root or repository slug available - fall back to workflow identifier only
+			// This may cause schedule changes if moved to a different repository
+			schedulePreprocessingLog.Printf("Warning: git root and repository slug not available for fuzzy schedule scattering")
 			c.IncrementWarningCount()
 			c.addScheduleWarning("Fuzzy schedule scattering without repository context. Workflows with the same name in different repositories may collide. Ensure you are in a git repository with a configured remote.")
+			repoIdentifier = ""
+		}
+
+		// Construct the seed
+		seed := c.workflowIdentifier
+		if repoIdentifier != "" {
+			seed = repoIdentifier + "/" + c.workflowIdentifier
 		}
 		scatteredCron, err := parser.ScatterSchedule(parsedCron, seed)
 		if err != nil {

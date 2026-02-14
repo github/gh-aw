@@ -1181,9 +1181,9 @@ func TestFuzzyScheduleScatteringAcrossOrganization(t *testing.T) {
 	}
 }
 
-// TestFuzzyScheduleScatteringWarningWithoutRepoSlug verifies that a warning is shown
-// when fuzzy schedule scattering occurs without repository slug
-func TestFuzzyScheduleScatteringWarningWithoutRepoSlug(t *testing.T) {
+// TestFuzzyScheduleScatteringWithoutRepoSlug verifies that fuzzy schedule scattering
+// works even without repository slug by using git root's initial commit as fallback
+func TestFuzzyScheduleScatteringWithoutRepoSlug(t *testing.T) {
 	frontmatter := map[string]any{
 		"on": map[string]any{
 			"schedule": []any{
@@ -1197,16 +1197,14 @@ func TestFuzzyScheduleScatteringWarningWithoutRepoSlug(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.SetWorkflowIdentifier("test-workflow.md")
 	// Explicitly NOT setting repository slug
-
-	// Get initial warning count
-	initialWarnings := compiler.GetWarningCount()
+	// However, gitRoot is auto-detected by NewCompiler(), so scattering will work
 
 	err := compiler.preprocessScheduleFields(frontmatter, "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify schedule was still scattered
+	// Verify schedule was scattered (not left as FUZZY:)
 	onMap := frontmatter["on"].(map[string]any)
 	scheduleArray := onMap["schedule"].([]any)
 	firstSchedule := scheduleArray[0].(map[string]any)
@@ -1216,24 +1214,39 @@ func TestFuzzyScheduleScatteringWarningWithoutRepoSlug(t *testing.T) {
 		t.Errorf("expected scattered schedule, got fuzzy: %s", actualCron)
 	}
 
-	// Verify warning was added
-	finalWarnings := compiler.GetWarningCount()
-	if finalWarnings <= initialWarnings {
-		t.Errorf("expected warning count to increase, got initial=%d, final=%d", initialWarnings, finalWarnings)
+	// Verify the cron is a valid 5-field cron expression
+	fields := strings.Fields(actualCron)
+	if len(fields) != 5 {
+		t.Errorf("expected 5-field cron expression, got: %s", actualCron)
 	}
 
-	// Verify warning message was added
-	warnings := compiler.GetScheduleWarnings()
-	foundWarning := false
-	for _, warning := range warnings {
-		if strings.Contains(warning, "repository context") && strings.Contains(warning, "Fuzzy schedule scattering") {
-			foundWarning = true
-			break
-		}
+	// Verify scattering is deterministic - compile again with same parameters
+	frontmatter2 := map[string]any{
+		"on": map[string]any{
+			"schedule": []any{
+				map[string]any{
+					"cron": "daily",
+				},
+			},
+		},
 	}
 
-	if !foundWarning {
-		t.Errorf("expected warning about missing repository context, got warnings: %v", warnings)
+	compiler2 := NewCompiler()
+	compiler2.SetWorkflowIdentifier("test-workflow.md")
+
+	err = compiler2.preprocessScheduleFields(frontmatter2, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error on second compilation: %v", err)
+	}
+
+	onMap2 := frontmatter2["on"].(map[string]any)
+	scheduleArray2 := onMap2["schedule"].([]any)
+	firstSchedule2 := scheduleArray2[0].(map[string]any)
+	actualCron2 := firstSchedule2["cron"].(string)
+
+	// Verify determinism
+	if actualCron != actualCron2 {
+		t.Errorf("expected deterministic scattering: got %s and %s", actualCron, actualCron2)
 	}
 }
 
