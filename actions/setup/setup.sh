@@ -273,6 +273,18 @@ fi
 
 echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUTPUTS_DEST}"
 
+# Copy copilot-client.js to /opt/gh-aw/copilot/ directory
+COPILOT_DEST="/opt/gh-aw/copilot"
+echo "Copying copilot-client.js to ${COPILOT_DEST}"
+mkdir -p "${COPILOT_DEST}"
+
+if [ -f "${JS_SOURCE_DIR}/copilot-client.js" ]; then
+  cp "${JS_SOURCE_DIR}/copilot-client.js" "${COPILOT_DEST}/copilot-client.js"
+  echo "✓ Successfully copied copilot-client.js to ${COPILOT_DEST}"
+else
+  echo "::warning::copilot-client.js not found in ${JS_SOURCE_DIR}"
+fi
+
 # Install @actions/github package ONLY if safe-output-projects flag is enabled
 # This package is needed by the unified handler manager to create separate Octokit clients
 # for project operations that require GH_AW_PROJECT_GITHUB_TOKEN
