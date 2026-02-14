@@ -20,11 +20,6 @@ func TestCollectDockerImages_APIProxyForClaude(t *testing.T) {
 			expectAPIProxy: true,
 		},
 		{
-			name:           "Codex engine includes api-proxy image",
-			engine:         "codex",
-			expectAPIProxy: true,
-		},
-		{
 			name:           "Copilot engine does not include api-proxy image",
 			engine:         "copilot",
 			expectAPIProxy: false,

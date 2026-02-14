@@ -107,9 +107,8 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 
 		// Add api-proxy sidecar container for engines that use --enable-api-proxy
 		// The api-proxy holds LLM API keys securely and proxies requests through Squid:
-		//   - Port 10000: OpenAI API proxy (for Codex)
 		//   - Port 10001: Anthropic API proxy (for Claude)
-		if workflowData != nil && (workflowData.AI == "claude" || workflowData.AI == "codex") {
+		if workflowData != nil && workflowData.AI == "claude" {
 			apiProxyImage := constants.DefaultFirewallRegistry + "/api-proxy:" + awfImageTag
 			if !imageSet[apiProxyImage] {
 				images = append(images, apiProxyImage)
