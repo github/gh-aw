@@ -30,7 +30,7 @@ func NewClaudeEngine() *ClaudeEngine {
 			supportsWebFetch:       true,  // Claude has built-in WebFetch support
 			supportsWebSearch:      true,  // Claude has built-in WebSearch support
 			supportsFirewall:       true,  // Claude supports network firewalling via AWF
-			supportsLLMGateway:     false, // Claude does not support LLM gateway
+			supportsLLMGateway:     true, // Claude supports LLM gateway via AWF api-proxy
 		},
 	}
 }
@@ -328,11 +328,12 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		awfArgs = append(awfArgs, "--skip-pull")
 		claudeLog.Print("Using --skip-pull since images are pre-downloaded")
 
-		// Enable API proxy sidecar for secure credential management
-		// The api-proxy container holds the ANTHROPIC_API_KEY and proxies
-		// requests to api.anthropic.com through the firewall
-		awfArgs = append(awfArgs, "--enable-api-proxy")
-		claudeLog.Print("Added --enable-api-proxy for Claude API proxying")
+		// Enable API proxy sidecar if this engine supports LLM gateway
+		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
+		if e.SupportsLLMGateway() {
+			awfArgs = append(awfArgs, "--enable-api-proxy")
+			claudeLog.Print("Added --enable-api-proxy for LLM API proxying")
+		}
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
 		sslBumpArgs := getSSLBumpArgs(firewallConfig)

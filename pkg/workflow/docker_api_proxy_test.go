@@ -6,7 +6,7 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
-func TestCollectDockerImages_APIProxyForClaude(t *testing.T) {
+func TestCollectDockerImages_APIProxyForEnginesWithLLMGateway(t *testing.T) {
 	awfImageTag := "0.16.5"
 
 	tests := []struct {
@@ -15,13 +15,18 @@ func TestCollectDockerImages_APIProxyForClaude(t *testing.T) {
 		expectAPIProxy bool
 	}{
 		{
-			name:           "Claude engine includes api-proxy image",
+			name:           "Claude engine includes api-proxy image (supportsLLMGateway: true)",
 			engine:         "claude",
 			expectAPIProxy: true,
 		},
 		{
-			name:           "Copilot engine does not include api-proxy image",
+			name:           "Copilot engine does not include api-proxy image (supportsLLMGateway: false)",
 			engine:         "copilot",
+			expectAPIProxy: false,
+		},
+		{
+			name:           "Codex engine does not include api-proxy image (supportsLLMGateway: false)",
+			engine:         "codex",
 			expectAPIProxy: false,
 		},
 	}

@@ -83,7 +83,7 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 	}
 
 	// Collect AWF (firewall) container images when firewall is enabled
-	// AWF uses three containers: squid (proxy), agent, and api-proxy (for Claude/Codex)
+	// AWF uses three containers: squid (proxy), agent, and api-proxy (for engines with LLM gateway support)
 	if isFirewallEnabled(workflowData) {
 		// Get the firewall version for image tags
 		firewallConfig := getFirewallConfig(workflowData)
@@ -105,15 +105,21 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 			dockerLog.Printf("Added AWF agent container: %s", agentImage)
 		}
 
-		// Add api-proxy sidecar container for engines that use --enable-api-proxy
+		// Add api-proxy sidecar container for engines that support LLM gateway
 		// The api-proxy holds LLM API keys securely and proxies requests through Squid:
+		//   - Port 10000: OpenAI API proxy (for Codex)
 		//   - Port 10001: Anthropic API proxy (for Claude)
-		if workflowData != nil && workflowData.AI == "claude" {
-			apiProxyImage := constants.DefaultFirewallRegistry + "/api-proxy:" + awfImageTag
-			if !imageSet[apiProxyImage] {
-				images = append(images, apiProxyImage)
-				imageSet[apiProxyImage] = true
-				dockerLog.Printf("Added AWF api-proxy sidecar container: %s", apiProxyImage)
+		// Check if the engine supports LLM gateway by querying the engine registry
+		if workflowData != nil && workflowData.AI != "" {
+			registry := GetGlobalEngineRegistry()
+			engine, err := registry.GetEngine(workflowData.AI)
+			if err == nil && engine.SupportsLLMGateway() {
+				apiProxyImage := constants.DefaultFirewallRegistry + "/api-proxy:" + awfImageTag
+				if !imageSet[apiProxyImage] {
+					images = append(images, apiProxyImage)
+					imageSet[apiProxyImage] = true
+					dockerLog.Printf("Added AWF api-proxy sidecar container for engine with LLM gateway support: %s", apiProxyImage)
+				}
 			}
 		}
 	}
