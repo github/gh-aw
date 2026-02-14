@@ -9,6 +9,43 @@ var safeOutputsConfigLog = logger.New("workflow:safe_outputs_config")
 // ========================================
 // Safe Output Configuration Extraction
 // ========================================
+//
+// ## Schema Generation Architecture
+//
+// MCP tool schemas for Safe Outputs are managed through a hybrid approach:
+//
+// ### Static Schemas (30+ built-in safe output types)
+// Defined in: pkg/workflow/js/safe_outputs_tools.json
+// - Embedded at compile time via //go:embed directive in pkg/workflow/js.go
+// - Contains complete MCP tool definitions with inputSchema for all built-in types
+// - Examples: create_issue, create_pull_request, add_comment, update_project, etc.
+// - Accessed via GetSafeOutputsToolsJSON() function
+//
+// ### Dynamic Schema Generation (custom safe-jobs)
+// Implemented in: pkg/workflow/safe_outputs_config_generation.go
+// - generateCustomJobToolDefinition() builds MCP tool schemas from SafeJobConfig
+// - Converts job input definitions to JSON Schema format
+// - Supports type mapping (string, boolean, number, choice/enum)
+// - Enforces required fields and additionalProperties: false
+// - Custom job tools are merged with static tools at runtime
+//
+// ### Schema Filtering
+// Implemented in: pkg/workflow/safe_outputs_config_generation.go
+// - generateFilteredToolsJSON() filters tools based on enabled safe-outputs
+// - Only includes tools that are configured in the workflow frontmatter
+// - Reduces MCP gateway overhead by exposing only necessary tools
+//
+// ### Validation
+// Implemented in: pkg/workflow/safe_outputs_tools_schema_test.go
+// - TestSafeOutputsToolsJSONCompliesWithMCPSchema validates against MCP spec
+// - TestEachToolHasRequiredMCPFields checks name, description, inputSchema
+// - TestNoTopLevelOneOfAllOfAnyOf prevents unsupported schema constructs
+//
+// This architecture ensures schema consistency by:
+// 1. Using embedded JSON for static schemas (single source of truth)
+// 2. Programmatic generation for dynamic schemas (type-safe)
+// 3. Automated validation in CI (regression prevention)
+//
 
 // extractSafeOutputsConfig extracts output configuration from frontmatter
 func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOutputsConfig {
