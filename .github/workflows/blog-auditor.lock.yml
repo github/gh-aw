@@ -33,7 +33,7 @@
 name: "Blog Auditor"
 "on":
   schedule:
-  - cron: "57 12 * * 3"
+  - cron: "26 11 * * 3"
     # Friendly format: weekly on wednesday around 12:00 (scattered)
   workflow_dispatch:
 

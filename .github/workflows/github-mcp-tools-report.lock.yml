@@ -33,7 +33,7 @@
 name: "GitHub MCP Remote Server Tools Report Generator"
 "on":
   schedule:
-  - cron: "1 12 * * 0"
+  - cron: "20 12 * * 0"
     # Friendly format: weekly on sunday around 12:00 (scattered)
   workflow_dispatch:
 

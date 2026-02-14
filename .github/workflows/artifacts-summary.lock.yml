@@ -34,7 +34,7 @@
 name: "Artifacts Summary"
 "on":
   schedule:
-  - cron: "24 6 * * 0"
+  - cron: "33 5 * * 0"
     # Friendly format: weekly on sunday around 06:00 (scattered)
   workflow_dispatch:
 
