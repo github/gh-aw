@@ -80,18 +80,20 @@ describe("git_helpers.cjs", () => {
       };
 
       try {
-        // Try a git command with a URL containing credentials (will fail but that's ok)
+        // Use a git command that doesn't require network access
+        // We'll use 'ls-remote' with --exit-code and a URL with credentials
+        // This will fail quickly without attempting network access
         try {
-          execGitSync(["fetch", "https://user:token@github.com/repo.git", "main"]);
+          execGitSync(["config", "--get", "remote.https://user:token@github.com/repo.git.url"]);
         } catch (e) {
           // Expected to fail, we're just checking the logging
         }
 
         // Check that credentials were redacted in the log
-        const fetchLog = debugLogs.find(log => log.includes("git fetch"));
-        expect(fetchLog).toBeDefined();
-        expect(fetchLog).toContain("https://***@github.com/repo.git");
-        expect(fetchLog).not.toContain("user:token");
+        const configLog = debugLogs.find(log => log.includes("git config"));
+        expect(configLog).toBeDefined();
+        expect(configLog).toContain("https://***@github.com/repo.git");
+        expect(configLog).not.toContain("user:token");
       } finally {
         global.core = originalCore;
       }
