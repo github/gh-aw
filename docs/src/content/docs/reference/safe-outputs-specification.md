@@ -11,7 +11,7 @@ sidebar:
 **Status**: Working Draft  
 **Publication Date**: 2025-02-14  
 **Editor**: GitHub Agentic Workflows Team  
-**This Version**: [safe-outputs-mcp-gateway-specification](/gh-aw/reference/safe-outputs-mcp-gateway-specification/)  
+**This Version**: [safe-outputs-specification](/gh-aw/reference/safe-outputs-specification/)  
 **Latest Published Version**: This document
 
 ---
