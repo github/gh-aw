@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * CLI entry point for the Copilot SDK client
  * Reads configuration from stdin and runs a Copilot session
