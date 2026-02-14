@@ -194,6 +194,12 @@ func (c *Compiler) generateMainJobSteps(yaml *strings.Builder, data *WorkflowDat
 		return err
 	}
 
+	// Ensure MCP gateway defaults are set before generating aw_info.json
+	// This is needed so that awmg_version is populated correctly
+	if HasMCPServers(data) {
+		ensureDefaultMCPGatewayConfig(data)
+	}
+
 	// Generate aw_info.json with agentic run metadata (must run before secret validation and workflow overview)
 	c.generateCreateAwInfo(yaml, data, engine)
 
