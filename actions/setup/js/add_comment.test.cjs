@@ -1098,4 +1098,136 @@ describe("add_comment", () => {
       expect(capturedBody).not.toContain("aw_test02");
     });
   });
+
+  // Test enforceCommentLimits function
+  describe("enforceCommentLimits", () => {
+    let enforceCommentLimits, MAX_COMMENT_LENGTH, MAX_MENTIONS, MAX_LINKS;
+
+    beforeEach(async () => {
+      const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+      const exports = await eval(`(async () => { ${addCommentScript}; return { enforceCommentLimits, MAX_COMMENT_LENGTH, MAX_MENTIONS, MAX_LINKS }; })()`);
+      enforceCommentLimits = exports.enforceCommentLimits;
+      MAX_COMMENT_LENGTH = exports.MAX_COMMENT_LENGTH;
+      MAX_MENTIONS = exports.MAX_MENTIONS;
+      MAX_LINKS = exports.MAX_LINKS;
+    });
+
+    describe("body length validation", () => {
+      it("should allow comments within length limit", () => {
+        const body = "This is a normal comment";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should allow empty comments", () => {
+        expect(() => enforceCommentLimits("")).not.toThrow();
+      });
+
+      it("should allow null/undefined comments", () => {
+        expect(() => enforceCommentLimits(null)).not.toThrow();
+        expect(() => enforceCommentLimits(undefined)).not.toThrow();
+      });
+
+      it("should reject comments exceeding maximum length", () => {
+        const body = "a".repeat(MAX_COMMENT_LENGTH + 1);
+        expect(() => enforceCommentLimits(body)).toThrow(`E002: Comment body exceeds maximum length of ${MAX_COMMENT_LENGTH} characters (got ${MAX_COMMENT_LENGTH + 1})`);
+      });
+
+      it("should allow comments exactly at maximum length", () => {
+        const body = "a".repeat(MAX_COMMENT_LENGTH);
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+    });
+
+    describe("mentions validation", () => {
+      it("should allow comments with no mentions", () => {
+        const body = "This comment has no mentions";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should allow comments within mention limit", () => {
+        const body = "Hello @user1 @user2 @user3";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should allow exactly MAX_MENTIONS mentions", () => {
+        const mentions = Array.from({ length: MAX_MENTIONS }, (_, i) => `@user${i}`).join(" ");
+        const body = `Comment with ${mentions}`;
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should reject comments exceeding mention limit", () => {
+        const mentions = Array.from({ length: MAX_MENTIONS + 1 }, (_, i) => `@user${i}`).join(" ");
+        const body = `Comment with ${mentions}`;
+        expect(() => enforceCommentLimits(body)).toThrow(`E002: Comment contains ${MAX_MENTIONS + 1} @mentions, maximum exceeded`);
+      });
+    });
+
+    describe("links validation", () => {
+      it("should allow comments with no links", () => {
+        const body = "This comment has no links";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should allow comments within link limit", () => {
+        const body = "Check [link1](https://example.com) and [link2](https://github.com)";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should count markdown links", () => {
+        const links = Array.from({ length: 5 }, (_, i) => `[link${i}](https://example${i}.com)`).join(" ");
+        const body = `Comment with ${links}`;
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should count bare URLs", () => {
+        const body = "Visit https://github.com and https://example.com for more info";
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should allow exactly MAX_LINKS links", () => {
+        const links = Array.from({ length: MAX_LINKS }, (_, i) => `https://example${i}.com`).join(" ");
+        const body = `Comment with ${links}`;
+        expect(() => enforceCommentLimits(body)).not.toThrow();
+      });
+
+      it("should reject comments exceeding link limit", () => {
+        const links = Array.from({ length: MAX_LINKS + 1 }, (_, i) => `https://example${i}.com`).join(" ");
+        const body = `Comment with ${links}`;
+        expect(() => enforceCommentLimits(body)).toThrow(`E002: Comment contains ${MAX_LINKS + 1} links, maximum exceeded`);
+      });
+    });
+
+    describe("error code format", () => {
+      it("should use E002 error code for length limit", () => {
+        const body = "a".repeat(MAX_COMMENT_LENGTH + 1);
+        expect(() => enforceCommentLimits(body)).toThrow(/^E002:/);
+      });
+
+      it("should use E002 error code for mention limit", () => {
+        const mentions = Array.from({ length: MAX_MENTIONS + 1 }, (_, i) => `@user${i}`).join(" ");
+        const body = `Comment with ${mentions}`;
+        expect(() => enforceCommentLimits(body)).toThrow(/^E002:/);
+      });
+
+      it("should use E002 error code for link limit", () => {
+        const links = Array.from({ length: MAX_LINKS + 1 }, (_, i) => `https://example${i}.com`).join(" ");
+        const body = `Comment with ${links}`;
+        expect(() => enforceCommentLimits(body)).toThrow(/^E002:/);
+      });
+    });
+
+    describe("constants", () => {
+      it("should export MAX_COMMENT_LENGTH as 65536", () => {
+        expect(MAX_COMMENT_LENGTH).toBe(65536);
+      });
+
+      it("should export MAX_MENTIONS as 10", () => {
+        expect(MAX_MENTIONS).toBe(10);
+      });
+
+      it("should export MAX_LINKS as 50", () => {
+        expect(MAX_LINKS).toBe(50);
+      });
+    });
+  });
 });

@@ -18,6 +18,57 @@ const { getMessages } = require("./messages_core.cjs");
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "add_comment";
 
+/**
+ * Maximum body length for GitHub comments (GitHub's API limit)
+ * Reference: https://github.com/dead-claudia/github-limits
+ */
+const MAX_COMMENT_LENGTH = 65536;
+
+/**
+ * Maximum number of @mentions allowed in a single comment
+ * Prevents abuse and excessive notifications
+ */
+const MAX_MENTIONS = 10;
+
+/**
+ * Maximum number of links allowed in a single comment
+ * Prevents spam and resource exhaustion
+ */
+const MAX_LINKS = 50;
+
+/**
+ * Enforce comment limits to prevent resource exhaustion attacks
+ * @param {string} body - Comment body to validate
+ * @throws {Error} If any limit is exceeded (with E002 error code)
+ */
+function enforceCommentLimits(body) {
+  if (!body || typeof body !== "string") {
+    // Empty or non-string bodies are allowed (will be handled elsewhere)
+    return;
+  }
+
+  // Check maximum body length
+  if (body.length > MAX_COMMENT_LENGTH) {
+    throw new Error(`E002: Comment body exceeds maximum length of ${MAX_COMMENT_LENGTH} characters (got ${body.length})`);
+  }
+
+  // Count @mentions (username mentions)
+  const mentions = (body.match(/@\w+/g) || []).length;
+  if (mentions > MAX_MENTIONS) {
+    throw new Error(`E002: Comment contains ${mentions} @mentions, maximum exceeded (max: ${MAX_MENTIONS})`);
+  }
+
+  // Count links (markdown links and bare URLs)
+  // Match markdown links: [text](url) and bare URLs: http(s)://...
+  const markdownLinks = (body.match(/\[([^\]]+)\]\(([^)]+)\)/g) || []).length;
+  const bareUrls = (body.match(/https?:\/\/[^\s)]+/g) || []).length;
+  const totalLinks = markdownLinks + bareUrls;
+
+  if (totalLinks > MAX_LINKS) {
+    throw new Error(`E002: Comment contains ${totalLinks} links, maximum exceeded (max: ${MAX_LINKS})`);
+  }
+}
+
 // Copy helper functions from original file
 async function minimizeComment(github, nodeId, reason = "outdated") {
   const query = /* GraphQL */ `
@@ -441,6 +492,18 @@ async function main(config = {}) {
       processedBody += missingInfoSections;
     }
 
+    // Enforce comment limits before API call
+    try {
+      enforceCommentLimits(processedBody);
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.error(`Comment limit enforcement failed: ${errorMessage}`);
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
     core.info(`Adding comment to ${isDiscussion ? "discussion" : "issue/PR"} #${itemNumber} in ${itemRepo}`);
 
     // If in staged mode, preview the comment without creating it
@@ -632,4 +695,10 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main };
+module.exports = {
+  main,
+  enforceCommentLimits,
+  MAX_COMMENT_LENGTH,
+  MAX_MENTIONS,
+  MAX_LINKS,
+};
