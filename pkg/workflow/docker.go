@@ -30,9 +30,9 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 		}
 	}
 
-	// Check for Playwright tool (uses Docker image - no version tag, only one image)
+	// Check for Playwright tool (uses versioned Docker image)
 	if _, hasPlaywright := tools["playwright"]; hasPlaywright {
-		image := "mcr.microsoft.com/playwright/mcp"
+		image := "mcr.microsoft.com/playwright/mcp:" + string(constants.DefaultPlaywrightMCPVersion)
 		if !imageSet[image] {
 			images = append(images, image)
 			imageSet[image] = true

@@ -583,7 +583,7 @@ jobs:
                 }
               },
               "playwright": {
-                "container": "mcr.microsoft.com/playwright/mcp",
+                "container": "mcr.microsoft.com/playwright/mcp:0.0.64",
                 "args": [
                   "--init",
                   "--network",
