@@ -53,7 +53,7 @@ cat /tmp/copilot-client-test/config.json
 # Run the client with debug logging
 echo ""
 echo "Running copilot-client..."
-DEBUG=copilot-client cat /tmp/copilot-client-test/config.json | node dist/cli.js
+DEBUG=copilot-client cat /tmp/copilot-client-test/config.json | node -e "import('./dist/index.js').then(m => m.main())"
 
 # Check results
 echo ""
