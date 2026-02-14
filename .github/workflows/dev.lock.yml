@@ -632,8 +632,8 @@ jobs:
         run: bash /opt/gh-aw/actions/clean_git_credentials.sh
       - name: Start Copilot CLI in headless mode
         run: |
-          # Start Copilot CLI in headless mode on port 3312
-          copilot --headless --port 3312 &
+          # Start Copilot CLI in headless mode on port 10002
+          copilot --headless --port 10002 &
           COPILOT_PID=$!
           echo "COPILOT_PID=${COPILOT_PID}" >> $GITHUB_ENV
           
@@ -646,14 +646,14 @@ jobs:
             exit 1
           fi
           
-          echo "✓ Copilot CLI started in headless mode on port 3312"
+          echo "✓ Copilot CLI started in headless mode on port 10002"
       - name: Configure Copilot SDK client
         run: |
           # Create directory for event log
           mkdir -p /tmp/gh-aw/copilot-sdk/
           
           # Set configuration via environment variable
-          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:3312","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
+          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:10002","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
       - name: Execute Copilot SDK client
         id: agentic_execution
         run: |
@@ -958,8 +958,8 @@ jobs:
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.409
       - name: Start Copilot CLI in headless mode
         run: |
-          # Start Copilot CLI in headless mode on port 3312
-          copilot --headless --port 3312 &
+          # Start Copilot CLI in headless mode on port 10002
+          copilot --headless --port 10002 &
           COPILOT_PID=$!
           echo "COPILOT_PID=${COPILOT_PID}" >> $GITHUB_ENV
           
@@ -972,14 +972,14 @@ jobs:
             exit 1
           fi
           
-          echo "✓ Copilot CLI started in headless mode on port 3312"
+          echo "✓ Copilot CLI started in headless mode on port 10002"
       - name: Configure Copilot SDK client
         run: |
           # Create directory for event log
           mkdir -p /tmp/gh-aw/copilot-sdk/
           
           # Set configuration via environment variable
-          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:3312","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
+          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:10002","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
       - name: Execute Copilot SDK client
         id: agentic_execution
         run: |

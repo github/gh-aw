@@ -6,7 +6,7 @@
 // the copilot-client.js wrapper to communicate with it.
 //
 // Key differences from the standard Copilot engine:
-//   - Starts Copilot CLI in headless mode on port 3312
+//   - Starts Copilot CLI in headless mode on port 10002
 //   - Uses copilot-client.js wrapper via Node.js
 //   - Passes configuration via GH_AW_COPILOT_CONFIG environment variable
 //   - Uses Docker internal host domain for MCP server connections
@@ -115,7 +115,7 @@ func (e *CopilotSDKEngine) GetExecutionSteps(workflowData *WorkflowData, logFile
 
 	var steps []GitHubActionStep
 
-	// Step 1: Start Copilot CLI in headless mode on port 3312
+	// Step 1: Start Copilot CLI in headless mode on port 10002
 	steps = append(steps, e.generateCopilotHeadlessStep())
 
 	// Step 2: Prepare copilot-client configuration
@@ -132,8 +132,8 @@ func (e *CopilotSDKEngine) generateCopilotHeadlessStep() GitHubActionStep {
 	var stepLines []string
 	stepLines = append(stepLines, "      - name: Start Copilot CLI in headless mode")
 	stepLines = append(stepLines, "        run: |")
-	stepLines = append(stepLines, "          # Start Copilot CLI in headless mode on port 3312")
-	stepLines = append(stepLines, "          copilot --headless --port 3312 &")
+	stepLines = append(stepLines, "          # Start Copilot CLI in headless mode on port 10002")
+	stepLines = append(stepLines, "          copilot --headless --port 10002 &")
 	stepLines = append(stepLines, "          COPILOT_PID=$!")
 	stepLines = append(stepLines, "          echo \"COPILOT_PID=${COPILOT_PID}\" >> $GITHUB_ENV")
 	stepLines = append(stepLines, "          ")
@@ -146,7 +146,7 @@ func (e *CopilotSDKEngine) generateCopilotHeadlessStep() GitHubActionStep {
 	stepLines = append(stepLines, "            exit 1")
 	stepLines = append(stepLines, "          fi")
 	stepLines = append(stepLines, "          ")
-	stepLines = append(stepLines, "          echo \"✓ Copilot CLI started in headless mode on port 3312\"")
+	stepLines = append(stepLines, "          echo \"✓ Copilot CLI started in headless mode on port 10002\"")
 
 	return GitHubActionStep(stepLines)
 }
@@ -155,7 +155,7 @@ func (e *CopilotSDKEngine) generateCopilotHeadlessStep() GitHubActionStep {
 func (e *CopilotSDKEngine) generateConfigurationStep(workflowData *WorkflowData) GitHubActionStep {
 	// Build the configuration JSON
 	config := map[string]any{
-		"cliUrl":       "http://host.docker.internal:3312", // Use Docker internal host
+		"cliUrl":       "http://host.docker.internal:10002", // Use Docker internal host with LLM gateway port
 		"promptFile":   "/tmp/gh-aw/aw-prompts/prompt.txt",
 		"eventLogFile": "/tmp/gh-aw/copilot-sdk/event-log.jsonl",
 		"githubToken":  "${{ secrets.COPILOT_GITHUB_TOKEN }}",
@@ -173,8 +173,12 @@ func (e *CopilotSDKEngine) generateConfigurationStep(workflowData *WorkflowData)
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		copilotSDKLog.Printf("Error marshaling config: %v", err)
-		// Create a minimal valid config as fallback
-		configJSON = []byte(`{"cliUrl":"http://host.docker.internal:3312","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl"}`)
+		return []string{
+			"      - name: Configure Copilot SDK client",
+			"        run: |",
+			fmt.Sprintf("          echo \"::error::Failed to marshal Copilot SDK configuration: %v\"", err),
+			"          exit 1",
+		}
 	}
 
 	var stepLines []string

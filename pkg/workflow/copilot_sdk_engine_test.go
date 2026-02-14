@@ -90,14 +90,14 @@ func TestCopilotSDKEngineGetExecutionSteps(t *testing.T) {
 	// Check first step (start headless)
 	step1 := strings.Join(steps[0], "\n")
 	assert.Contains(t, step1, "Start Copilot CLI in headless mode")
-	assert.Contains(t, step1, "copilot --headless --port 3312")
+	assert.Contains(t, step1, "copilot --headless --port 10002")
 	assert.Contains(t, step1, "COPILOT_PID")
 
 	// Check second step (configuration)
 	step2 := strings.Join(steps[1], "\n")
 	assert.Contains(t, step2, "Configure Copilot SDK client")
 	assert.Contains(t, step2, "GH_AW_COPILOT_CONFIG")
-	assert.Contains(t, step2, "host.docker.internal:3312")
+	assert.Contains(t, step2, "host.docker.internal:10002")
 
 	// Check third step (execution)
 	step3 := strings.Join(steps[2], "\n")
