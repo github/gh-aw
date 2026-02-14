@@ -190,19 +190,29 @@ describe("frontmatter_hash with GitHub API", () => {
       // Compute hash using JavaScript implementation with default file reader
       const jsHash = await computeFrontmatterHash(workflowPath);
 
-      // This hash was computed by the Go implementation:
-      // go test -run TestHashWithRealWorkflow ./pkg/parser/
-      // Output: "Hash for audit-workflows.md: 4d50f091b80261759bdbabc83490e5ed25d3ff07b5bf4a9c989d643f4c5a1a72"
-      // Note: Hash changed when imports were migrated to use runtime-import macros
-      // Updated: 2026-02-14 - Hash changed again due to workflow file modifications
-      const goHash = "4d50f091b80261759bdbabc83490e5ed25d3ff07b5bf4a9c989d643f4c5a1a72";
+      // Dynamically compute the hash using Go implementation to avoid hardcoded values
+      // that become invalid when workflow files change
+      const { execSync } = await import("child_process");
+      const goTestOutput = execSync("go test -v -run TestHashWithRealWorkflow ./pkg/parser/", {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+
+      // Extract hash from Go test output
+      // Expected format: "frontmatter_hash_cross_language_test.go:126: Hash for audit-workflows.md: <hash>"
+      const hashMatch = goTestOutput.match(/Hash for audit-workflows\.md:\s+([a-f0-9]{64})/);
+      if (!hashMatch) {
+        throw new Error(`Failed to extract hash from Go test output. Output:\n${goTestOutput}`);
+      }
+      const goHash = hashMatch[1];
 
       // Verify JavaScript hash matches Go hash
       expect(jsHash).toBe(goHash);
 
       // Log the hash for reference
       console.log(`JavaScript hash for audit-workflows.md: ${jsHash}`);
-      console.log(`Go hash matches: ${jsHash === goHash}`);
+      console.log(`Go hash for audit-workflows.md: ${goHash}`);
+      console.log(`Hashes match: ${jsHash === goHash}`);
     });
 
     it("should produce deterministic hashes across multiple calls", async () => {
