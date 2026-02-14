@@ -57,6 +57,32 @@ npm test
 
 Integration tests require `COPILOT_GITHUB_TOKEN` environment variable.
 
+### Running Tests Locally
+
+The copilot-client includes a test script that can be run locally:
+
+```bash
+# Set your GitHub token
+export COPILOT_GITHUB_TOKEN=ghp_your_token_here
+
+# Run the local test script
+cd copilot-client
+./test-local.sh
+```
+
+This script:
+1. Builds the copilot-client
+2. Creates a test prompt
+3. Runs the client with the copilot CLI
+4. Verifies event logging
+
+You can also run tests through Make:
+
+```bash
+cd ..
+make test-copilot-client
+```
+
 ## Debugging
 
 Enable debug logging:

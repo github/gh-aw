@@ -227,6 +227,7 @@ The project has several test targets optimized for different scenarios:
 | `test-integration-workflow` | Varies | Workflow package integration | Testing workflow compilation end-to-end |
 | `test-all` | ~30s | Go + JavaScript tests | Complete test coverage |
 | `test-js` | Varies | JavaScript-only tests | Testing JS action code |
+| `test-copilot-client` | Varies | Copilot SDK client tests | Testing TypeScript copilot client |
 | `test-security` | Varies | Security regression tests | Validating security fixes |
 | `test-coverage` | Varies | Tests with coverage report | Analyzing test coverage |
 | `test-perf` | Varies | All tests + timing analysis | Finding slow tests |
@@ -236,6 +237,7 @@ The project has several test targets optimized for different scenarios:
 - **Ready to commit?** → `make test` or `make agent-finish`
 - **Changed compiler code?** → `make test-integration-compile`
 - **Working on JavaScript?** → `make test-js`
+- **Working on copilot-client?** → `make test-copilot-client`
 - **Security-sensitive change?** → `make test-security`
 
 ### Expected Output and Timing
@@ -399,6 +401,105 @@ make install
 # Verify installation
 gh aw --help
 ```
+
+## Copilot SDK Client
+
+The `copilot-client` directory contains a TypeScript client for programmatic control of GitHub Copilot CLI via the `@github/copilot-sdk` Node.js package.
+
+### Overview
+
+The copilot-client provides:
+- **TypeScript implementation** with ES6/ESM support for Node.js 24+
+- **Async/await** programming model for handling Copilot sessions
+- **JSONL event logging** with timestamps for debugging and auditing
+- **Stdin configuration** for easy testing and integration
+- **Debug logging** using the `debug` npm package
+
+### Building the Client
+
+```bash
+# Install dependencies and build
+make copilot-client
+
+# Or manually:
+cd copilot-client
+npm ci
+npm run build
+```
+
+The compiled JavaScript will be in `copilot-client/dist/`.
+
+### Running Tests
+
+```bash
+# Run unit tests
+make test-copilot-client
+
+# Or manually:
+cd copilot-client
+npm test
+
+# Run integration tests locally (requires COPILOT_GITHUB_TOKEN)
+export COPILOT_GITHUB_TOKEN=ghp_your_token_here
+./test-local.sh
+```
+
+### Usage Example
+
+The client accepts configuration via stdin:
+
+```bash
+cat > config.json << 'EOF'
+{
+  "promptFile": "/tmp/prompt.txt",
+  "eventLogFile": "/tmp/events.jsonl",
+  "githubToken": "ghp_...",
+  "session": {
+    "model": "gpt-5"
+  }
+}
+EOF
+
+node copilot-client/dist/cli.js < config.json
+```
+
+### Configuration Options
+
+See `copilot-client/src/types.ts` for complete configuration schema:
+
+- `promptFile` (required): Path to prompt text file
+- `eventLogFile` (required): Path for JSONL event output
+- `githubToken`: GitHub token for authentication
+- `cliPath`: Custom copilot CLI path
+- `cliUrl`: Connect to existing server (e.g., "localhost:8080")
+- `session.model`: Model selection ("gpt-5", "claude-sonnet-4.5", etc.)
+- `session.reasoningEffort`: Effort level ("low", "medium", "high", "xhigh")
+- `logLevel`: Debug level ("none", "error", "warning", "info", "debug", "all")
+
+### Debugging
+
+Enable debug output:
+
+```bash
+DEBUG=copilot-client node copilot-client/dist/cli.js < config.json
+```
+
+### CI Integration
+
+The client is tested in CI via `.github/workflows/copilot-sdk-ci.yml`:
+1. Starts Copilot CLI as headless server
+2. Builds and tests the TypeScript client
+3. Runs integration tests with event logging verification
+4. Uploads logs and artifacts
+
+### Development Workflow
+
+1. **Make changes** to TypeScript files in `copilot-client/src/`
+2. **Build**: `make copilot-client`
+3. **Test**: `make test-copilot-client`
+4. **Integration test**: Run `./test-local.sh` with token
+
+For more details, see `copilot-client/README.md`.
 
 ## Testing
 
