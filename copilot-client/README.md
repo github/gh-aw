@@ -48,6 +48,40 @@ The client accepts a JSON configuration object with the following properties:
   - `model` (optional): Model to use (e.g., "gpt-5", "claude-sonnet-4.5")
   - `reasoningEffort` (optional): "low" | "medium" | "high" | "xhigh"
   - `systemMessage` (optional): Custom system message
+  - `mcpServers` (optional): MCP server configurations (see example below)
+
+### MCP Server Configuration
+
+You can configure MCP servers to provide additional tools to the Copilot session:
+
+```json
+{
+  "promptFile": "/path/to/prompt.txt",
+  "eventLogFile": "/tmp/events.jsonl",
+  "session": {
+    "model": "gpt-5",
+    "mcpServers": {
+      "myserver": {
+        "type": "http",
+        "url": "https://example.com/mcp",
+        "tools": ["*"],
+        "headers": {
+          "Authorization": "Bearer token"
+        }
+      },
+      "localserver": {
+        "type": "local",
+        "command": "/path/to/server",
+        "args": ["--port", "8080"],
+        "tools": ["tool1", "tool2"],
+        "env": {
+          "API_KEY": "secret"
+        }
+      }
+    }
+  }
+}
+```
 
 ## Testing
 

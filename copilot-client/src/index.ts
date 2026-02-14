@@ -79,7 +79,8 @@ export async function runCopilotSession(config: CopilotClientConfig): Promise<vo
       systemMessage: config.session?.systemMessage ? {
         mode: 'replace',
         content: config.session.systemMessage
-      } : undefined
+      } : undefined,
+      mcpServers: config.session?.mcpServers
     });
 
     logEvent('session.created', {
@@ -116,11 +117,6 @@ export async function runCopilotSession(config: CopilotClientConfig): Promise<vo
         debug('Session error:', event.data);
         reject(new Error(event.data.message || 'Session error'));
       });
-
-      // Set timeout (5 minutes default)
-      setTimeout(() => {
-        reject(new Error('Session timeout after 5 minutes'));
-      }, 5 * 60 * 1000);
     });
 
     // Send the prompt
