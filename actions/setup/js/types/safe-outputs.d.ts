@@ -122,6 +122,8 @@ interface CreatePullRequestItem extends BaseSafeOutputItem {
   branch?: string;
   /** Optional labels to add to the PR */
   labels?: string[];
+  /** Whether to create the PR as a draft (default: true) */
+  draft?: boolean;
 }
 
 /**
@@ -221,6 +223,8 @@ interface UpdatePullRequestItem extends BaseSafeOutputItem {
   operation?: "replace" | "append" | "prepend";
   /** Optional pull request number for target "*" */
   pull_request_number?: number | string;
+  /** Whether the PR should be a draft (true) or ready for review (false) */
+  draft?: boolean;
 }
 
 /**

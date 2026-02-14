@@ -200,6 +200,10 @@
             "type": "string"
           },
           "description": "Labels to categorize the PR (e.g., 'enhancement', 'bugfix'). Labels must exist in the repository."
+        },
+        "draft": {
+          "type": "boolean",
+          "description": "Whether to create the PR as a draft. Draft PRs cannot be merged until marked as ready for review. Use mark_pull_request_as_ready_for_review to convert a draft PR. Default: true."
         }
       },
       "additionalProperties": false
@@ -518,6 +522,10 @@
         "pull_request_number": {
           "type": ["number", "string"],
           "description": "Pull request number to update. This is the numeric ID from the GitHub URL (e.g., 234 in github.com/owner/repo/pull/234). Required when the workflow target is '*' (any PR)."
+        },
+        "draft": {
+          "type": "boolean",
+          "description": "Whether the PR should be a draft (true) or ready for review (false). Use to convert between draft and ready states."
         }
       },
       "additionalProperties": false
