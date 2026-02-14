@@ -24,7 +24,7 @@ engine:
   id: claude
 
 tools:
-  bash: ["echo", "ls"]
+  bash: ["echo", "ls", "git"]
   web-fetch:
   web-search:
   edit:
