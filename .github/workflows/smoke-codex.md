@@ -47,12 +47,6 @@ safe-outputs:
     create-issue:
       expires: 2h
       close-older-issues: true
-    create-discussion:
-      category: announcements
-      labels: [codex-was-here]
-      expires: 1d
-      close-older-discussions: true
-      max: 1
     add-labels:
       allowed: [smoke-codex]
     remove-labels:
@@ -87,13 +81,12 @@ timeout-minutes: 15
 4. **File Writing Testing**: Create a test file `/tmp/gh-aw/agent/smoke-test-codex-${{ github.run_id }}.txt` with content "Smoke test passed for Codex at $(date)" (create the directory if it doesn't exist)
 5. **Bash Tool Testing**: Execute bash commands to verify file creation was successful (use `cat` to read the file back)
 6. **Build gh-aw**: Run `GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod make build` to verify the agent can successfully build the gh-aw project (both caches must be set to /tmp because the default cache locations are not writable). If the command fails, mark this test as ❌ and report the failure.
-7. **Discussion Creation Testing**: Use the `create_discussion` safe-output tool to create a discussion in the announcements category titled "codex was here" with the label "codex-was-here"
 
 ## Output
 
 Add a **very brief** comment (max 5-10 lines) to the current pull request with:
 - PR titles only (no descriptions)
-- ✅ or ❌ for each test result (including discussion creation)
+- ✅ or ❌ for each test result
 - Overall status: PASS or FAIL
 
 If all tests pass:
