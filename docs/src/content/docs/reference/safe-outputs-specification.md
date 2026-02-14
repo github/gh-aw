@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.8.0  
+**Version**: 1.9.0  
 **Status**: Working Draft  
-**Publication Date**: 2025-02-14  
+**Publication Date**: 2026-02-14  
 **Editor**: GitHub Agentic Workflows Team  
 **This Version**: [safe-outputs-specification](/gh-aw/reference/safe-outputs-specification/)  
 **Latest Published Version**: This document
@@ -39,6 +39,34 @@ This specification follows World Wide Web Consortium (W3C) formatting convention
 9. [Content Integrity Mechanisms](#9-content-integrity-mechanisms)
 10. [Execution Guarantees](#10-execution-guarantees)
 11. [Appendices](#appendices)
+
+---
+
+## Terminology
+
+This specification uses the following terms with precise definitions:
+
+**Agent**: The AI-powered process executing in an untrusted context with read-only GitHub permissions.
+
+**Safe Output Type**: A category of GitHub operation (e.g., `create_issue`, `add_comment`) with a corresponding MCP tool definition and handler implementation.
+
+**MCP Gateway**: The HTTP server accepting MCP tool invocation requests and recording operations to NDJSON format. Runs in the same context as the agent.
+
+**Safe Output Processor**: The privileged execution context that reads NDJSON artifacts, validates operations, and executes GitHub API calls.
+
+**Handler**: JavaScript implementation processing operations of a specific safe output type.
+
+**Validation**: Pre-execution verification of operation structure, limits, and authorization. Includes schema validation, limit enforcement, and allowlist checking.
+
+**Sanitization**: Content transformation pipeline removing potentially malicious patterns while preserving legitimate content.
+
+**Verification**: Post-compilation checking of configuration integrity through hash validation.
+
+**Staged Mode**: Preview execution mode where operations are simulated without creating permanent GitHub resources.
+
+**Temporary ID**: A placeholder identifier (format: `aw_<id>`) used to reference not-yet-created resources. Resolved to actual resource numbers during processing.
+
+**Provenance**: Metadata identifying the workflow and run that created a GitHub resource. Included in footers or API metadata fields.
 
 ---
 
@@ -405,6 +433,78 @@ This specification addresses five primary threat scenarios:
 
 *Residual Risk*: Misconfigured allowlists may permit unintended targets. Mitigation: principle of least privilege in configuration, periodic review.
 
+### 3.2.6 Cross-Repository Security Model
+
+**Repository Reference Format**
+
+Target repositories MUST be specified in `owner/repo` format. Implementations MUST validate:
+- Format matches regex: `^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$`
+- Owner and repo components are non-empty
+- No protocol prefix (https://, git://, etc.)
+
+**Allowlist Resolution Order**
+
+When evaluating cross-repository operations, implementations MUST apply these rules in order:
+
+1. **Extract target-repo**: Parse from operation arguments or configuration
+2. **Check type-specific allowlist**: If safe output type defines `allowed-repos`:
+   - MUST match against this list
+   - Type-specific allowlist OVERRIDES global allowlist
+   - If match fails, REJECT with E004
+3. **Check global allowlist**: If no type-specific allowlist and `allowed-github-references` is defined:
+   - MUST match against this list
+   - If match fails, REJECT with E004
+4. **Default deny**: If no allowlists are defined:
+   - MUST reject cross-repository operations
+   - Same-repository operations are permitted
+
+**Matching Rules**
+
+- Matching is EXACT (case-sensitive)
+- Wildcards (*, ?) are NOT supported
+- Pattern matching is NOT supported
+- Each repository MUST be explicitly listed
+
+**Security Properties**
+
+**Property SP6: Cross-Repository Containment**
+
+For all cross-repository operations:
+```
+∀ op ∈ operations:
+  op.target_repo ≠ null ⇒ 
+    (op.target_repo ∈ type_allowlist ∨ 
+     (type_allowlist = null ∧ op.target_repo ∈ global_allowlist))
+```
+
+**Property SP7: Deny-by-Default**
+
+Without explicit allowlist configuration:
+```
+allowed_repos = null ∧ allowed_github_references = null ⇒
+  ∀ op ∈ operations: op.target_repo = workflow.repository
+```
+
+**Example Configurations**
+
+```yaml
+# Example 1: Type-specific allowlist (overrides global)
+safe-outputs:
+  allowed-github-references: [owner/repo-a, owner/repo-b]
+  
+  create-issue:
+    allowed-repos: [owner/repo-c]  # Only repo-c permitted for issues
+    
+  add-comment:
+    # No type-specific list, uses global: repo-a, repo-b
+
+# Example 2: Explicit same-repository only
+safe-outputs:
+  create-issue:
+    # No allowlist = same repository only
+    max: 5
+```
+
 ### 3.3 Security Property Guarantees
 
 Conforming implementations MUST maintain these security invariants:
@@ -432,6 +532,67 @@ Conforming implementations MUST maintain these security invariants:
 ```
 
 *Verification*: Code review of safe output processor. Unit tests confirming validation rejects before API calls.
+
+#### Validation Pipeline Requirements
+
+Implementations MUST execute validation steps in this exact sequence for all safe output operations:
+
+**Stage 1: Schema Validation (REQUIRED)**
+- Input: Raw MCP tool arguments
+- Check: JSON schema validation against type-specific schema
+- On failure: Reject immediately with E001 (INVALID_SCHEMA) error
+- Output: Schema-validated operation data
+
+**Stage 2: Limit Enforcement (REQUIRED)**
+- Input: Count of operations of each type in current batch
+- Check: Compare count against configured `max` for each type
+- On failure: Reject entire batch with E002 (LIMIT_EXCEEDED) error
+- Output: Limit-validated operation set
+
+**Stage 3: Content Sanitization (REQUIRED)**
+- Input: All text fields (title, body, description, etc.)
+- Transform: Apply sanitization pipeline (see Section 9.2)
+- On failure: Reject with E008 (SANITIZATION_FAILED) if unsafe content cannot be sanitized
+- Output: Sanitized operation data
+
+**Stage 4: Domain Filtering (CONDITIONAL)**
+- Input: All URLs in markdown links and images
+- Check: Validate against `allowed-domains` if configured
+- Transform: Redact unauthorized URLs
+- Output: Domain-filtered operation data
+
+**Stage 5: Cross-Repository Validation (CONDITIONAL)**
+- Input: `target-repo` parameter if present
+- Check: Validate against `allowed-repos` or `allowed-github-references`
+- On failure: Reject with E004 (INVALID_TARGET_REPO)
+- Output: Authorized target repository
+
+**Stage 6: Dependency Resolution (CONDITIONAL)**
+- Input: Temporary IDs, parent references
+- Check: Resolve references to actual GitHub resource numbers
+- On failure: Reject with E005 (MISSING_PARENT)
+- Output: Fully-resolved operation data
+
+**Stage 7: GitHub API Invocation (EXECUTION)**
+- Input: Validated, sanitized, authorized operation data
+- Action: Execute GitHub API calls
+- On failure: Return E007 (API_ERROR) with details
+
+**Requirement VL1: Sequential Execution**
+
+Stages MUST execute in the order specified above. A failure at any stage (1-6) MUST prevent Stage 7 from executing for that operation.
+
+**Requirement VL2: Atomic Validation**
+
+For single-operation types (max=1), validation failure MUST prevent any API calls. For batch operations, validation failure of one operation MUST NOT cause rejection of the entire batch unless it's a limit enforcement failure.
+
+**Requirement VL3: Error Propagation**
+
+Validation errors MUST include:
+- Error code (E001-E008)
+- Human-readable message
+- Operation index (for batch operations)
+- Field name (for schema validation errors)
 
 **Property SP3: Limit Enforceability Invariant**
 
@@ -2644,6 +2805,146 @@ Operations requiring repository features must validate availability:
 
 Validation occurs during execution, not tool invocation.
 
+### 9.4 Content Sanitization Pipeline
+
+**Applicability**
+
+Content sanitization MUST be applied to all user-provided text fields in safe output operations. Text fields include:
+- `title` (issues, PRs, discussions, projects)
+- `body` (issues, PRs, discussions, comments)
+- `description` (projects, status updates)
+- `comment` (review comments)
+
+**Sanitization Stages**
+
+Implementations MUST apply these transformations in order:
+
+**S1: Null Byte Removal**
+- Remove all null bytes (`\0`, `\x00`) from strings
+- Rationale: Prevents string truncation attacks
+
+**S2: Markdown Link Validation**
+- Pattern: `[text](url)` and `<url>`
+- For each URL:
+  - Extract domain
+  - If `allowed-domains` is configured:
+    - Check domain against allowlist
+    - If not allowed: Replace with `[text]([URL redacted: unauthorized domain])`
+  - Log redacted URLs to `/tmp/gh-aw/safeoutputs/redacted-domains.log`
+
+**S3: Markdown Image Validation**
+- Pattern: `![alt](url)`
+- For each image URL:
+  - Extract domain
+  - If `allowed-domains` is configured:
+    - Check domain against allowlist
+    - If not allowed: Replace with `![alt]([Image URL redacted: unauthorized domain])`
+
+**S4: HTML Tag Filtering** (Optional, depends on field type)
+- Remove potentially dangerous tags:
+  - `<script>`, `</script>`
+  - `<iframe>`, `</iframe>`
+  - `<object>`, `</object>`
+  - `<embed>`, `</embed>`
+- Remove event handlers:
+  - `on*` attributes in HTML tags (onclick, onerror, etc.)
+- Preserve safe GitHub Flavored Markdown tags:
+  - `<details>`, `<summary>`, `<sub>`, `<sup>`, `<kbd>`
+
+**S5: Command Injection Prevention**
+- Do NOT execute or interpret code blocks
+- Do NOT evaluate template expressions
+- Preserve code blocks verbatim (no escaping needed in markdown)
+
+**Excluded Content**
+
+The following content MUST NOT be sanitized:
+- Code blocks (` ``` `)
+- Inline code (`` `code` ``)
+- System-generated footers
+- System-generated metadata
+
+**Sanitization Reversibility**
+
+Sanitization transformations are LOSSY and NOT reversible. Original content is not preserved after sanitization. This is intentional to prevent attempts to bypass sanitization.
+
+**Conformance Requirement CR1: Pre-API Sanitization**
+
+All content MUST be sanitized BEFORE GitHub API invocation. Unsanitized content MUST NEVER be passed to GitHub APIs.
+
+*Verification*: Inspect handler code to confirm sanitization occurs before `octokit.*` calls.
+
+### 9.5 Error Code Catalog
+
+Implementations MUST use standardized error codes for validation and execution failures.
+
+**Error Code Table**
+
+| Code | Name | Description | When to Use | HTTP Status Equivalent |
+|------|------|-------------|-------------|------------------------|
+| E001 | INVALID_SCHEMA | Operation failed JSON schema validation | Input does not match type-specific schema | 400 Bad Request |
+| E002 | LIMIT_EXCEEDED | Operation count exceeds configured max | Batch contains more operations than allowed | 429 Too Many Requests |
+| E003 | UNAUTHORIZED_DOMAIN | URL contains non-allowlisted domain | Domain filtering rejected URL | 403 Forbidden |
+| E004 | INVALID_TARGET_REPO | target-repo not in allowed-repos | Cross-repository validation failed | 403 Forbidden |
+| E005 | MISSING_PARENT | Referenced parent issue/PR not found | Temporary ID or parent reference cannot be resolved | 404 Not Found |
+| E006 | INVALID_LABEL | Label does not exist in repository | Label validation failed | 404 Not Found |
+| E007 | API_ERROR | GitHub API returned error | GitHub API call failed | 502 Bad Gateway |
+| E008 | SANITIZATION_FAILED | Content contains unsanitizable unsafe patterns | Sanitization pipeline detected unremovable threats | 422 Unprocessable Entity |
+| E009 | CONFIG_HASH_MISMATCH | Configuration hash verification failed | Workflow YAML was modified after compilation | 403 Forbidden |
+| E010 | RATE_LIMIT_EXCEEDED | GitHub API rate limit exceeded | Too many API calls | 429 Too Many Requests |
+
+**Error Message Format**
+
+All errors MUST conform to this JSON structure:
+
+```json
+{
+  "error": {
+    "code": "E002",
+    "name": "LIMIT_EXCEEDED",
+    "message": "Operation count exceeds configured limit",
+    "details": {
+      "type": "create_issue",
+      "attempted": 5,
+      "max": 3,
+      "operation_index": 3
+    },
+    "timestamp": "2026-02-14T16:39:20.948Z",
+    "workflow_run": "https://github.com/owner/repo/actions/runs/12345"
+  }
+}
+```
+
+**Required Fields**:
+- `code`: Error code from table above (E001-E010)
+- `name`: Error name from table above
+- `message`: Human-readable description
+- `timestamp`: ISO 8601 timestamp
+
+**Optional Fields**:
+- `details`: Type-specific error context (operation_index, field names, etc.)
+- `workflow_run`: URL to workflow run for provenance
+
+**Error Handling Requirements**
+
+**Requirement EH1: Early Failure Detection**
+
+Validation errors (E001-E006) MUST be detected before any GitHub API calls are made.
+
+**Requirement EH2: Clear Error Messages**
+
+Error messages MUST:
+- Clearly state what went wrong
+- Include enough context to debug (field names, values)
+- Suggest remediation when possible
+
+**Requirement EH3: Error Logging**
+
+All errors MUST be logged to:
+- GitHub Actions step output (visible in workflow run)
+- Job summary (visible in workflow run summary)
+- STDERR (for local development)
+
 ---
 
 ## 10. Execution Guarantees
@@ -2678,6 +2979,108 @@ Operations execute in:
 **Fail-Safe Principle**: One operation's failure doesn't prevent others from attempting.
 
 **Error Reporting**: All errors collected; execution summary reports per-type results.
+
+### 10.5 Edge Case Behavior
+
+This section defines required behavior for unusual or boundary conditions.
+
+**Empty Operations**
+
+*Scenario*: NDJSON artifact contains zero operations
+
+*Behavior*:
+- Safe output job MUST succeed (exit code 0)
+- Job summary SHOULD display: "✅ No operations to process"
+- No GitHub API calls are made
+- No errors are raised
+
+*Rationale*: Empty operations are valid (agent may determine no action is needed).
+
+**Zero Max Limit**
+
+*Scenario*: Configuration specifies `max: 0` for a safe output type
+
+*Behavior*:
+- Type is DISABLED (MCP tool is not registered)
+- Attempts to invoke disabled type MUST return MCP error:
+  ```json
+  {"error": {"code": -32601, "message": "Method not found"}}
+  ```
+- No configuration is generated for disabled types
+
+*Rationale*: `max: 0` is an explicit disable signal.
+
+**API Rate Limiting**
+
+*Scenario*: GitHub API returns 429 (rate limit exceeded) or 403 with X-RateLimit-Remaining: 0
+
+*Behavior*:
+- Processor MUST retry with exponential backoff:
+  - 1st retry: After 60 seconds
+  - 2nd retry: After 120 seconds  
+  - 3rd retry: After 240 seconds
+- After 3 retries, MUST fail with E010 error
+- Error details MUST include rate limit reset time from `X-RateLimit-Reset` header
+
+*Rationale*: Transient rate limits should not fail workflows unnecessarily.
+
+**Workflow Cancellation**
+
+*Scenario*: Workflow is manually cancelled during agent execution
+
+*Behavior*:
+- Safe output job MUST NOT execute if artifact upload was interrupted
+- Partial NDJSON artifacts MUST NOT be processed
+- GitHub Actions automatically handles cleanup
+- No additional logic required in handlers
+
+*Rationale*: GitHub Actions cancellation is handled at platform level.
+
+**Concurrent Workflow Runs**
+
+*Scenario*: Multiple workflow runs execute concurrently for the same workflow
+
+*Behavior*:
+- Each run operates independently
+- Max limits are per-run (NOT global across runs)
+- No coordination or locking between runs
+- Operations in separate runs do NOT affect each other's limits
+
+*Rationale*: Simplicity and avoiding distributed coordination complexity.
+
+**Malformed NDJSON**
+
+*Scenario*: NDJSON artifact contains invalid JSON on one or more lines
+
+*Behavior*:
+- Parser MUST skip invalid lines with warning
+- Valid lines MUST be processed
+- Job summary MUST show: "⚠️ Skipped N malformed entries"
+- Invalid lines MUST be logged to STDERR
+
+*Rationale*: Partial failure should not prevent valid operations from executing.
+
+**Missing Artifact**
+
+*Scenario*: Safe output job cannot download artifact (artifact not found)
+
+*Behavior*:
+- Job MUST fail with clear error message
+- Error MUST suggest checking agent job completion
+- Exit code MUST be non-zero
+
+*Rationale*: Missing artifact indicates upstream failure that must be addressed.
+
+**Duplicate Temporary IDs**
+
+*Scenario*: Multiple operations use the same `temporary_id`
+
+*Behavior*:
+- First operation using the ID succeeds and establishes mapping
+- Subsequent operations using the same ID MUST reference the first operation's result
+- If this creates ambiguity (e.g., two issues both want to be "aw_parent"), MUST reject with E005
+
+*Rationale*: Deterministic behavior prevents confusion.
 
 ---
 
@@ -2780,7 +3183,225 @@ Detailed threat analysis and mitigation effectiveness assessment for all five pr
 
 ---
 
+## Appendix G: Configuration Patterns
+
+This appendix provides common configuration patterns for safe outputs.
+
+### Pattern 1: Simple Issue Tracking
+
+Basic configuration for automated issue creation:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 1
+    labels: [automated]
+```
+
+**Use case**: Single automated issue per workflow run with consistent labeling.
+
+### Pattern 2: Multi-Type with Global Footer
+
+Configuration with multiple output types sharing global settings:
+
+```yaml
+safe-outputs:
+  footer: true  # Applied to all types
+  
+  create-issue:
+    max: 3
+    labels: [bug, automated]
+  
+  add-comment:
+    max: 2
+    hide-older-comments: true
+```
+
+**Use case**: Workflow creating multiple issues and comments with attribution footers.
+
+### Pattern 3: Cross-Repository Operations
+
+Secure cross-repository issue creation:
+
+```yaml
+safe-outputs:
+  allowed-github-references:
+    - owner/repo-a
+    - owner/repo-b
+  
+  create-issue:
+    max: 5
+    target-repo: owner/repo-a
+```
+
+**Use case**: Creating issues in a central tracking repository from multiple workflow repositories.
+
+**Security note**: Explicit allowlist prevents unauthorized repository targeting.
+
+### Pattern 4: Staged Mode Development
+
+Safe testing in preview mode:
+
+```yaml
+safe-outputs:
+  staged: true  # Enable preview mode globally
+  
+  create-issue:
+    max: 10  # Safe to set high in staged mode
+  
+  add-comment:
+    max: 5
+```
+
+**Use case**: Testing workflow behavior without creating real GitHub resources.
+
+**Workflow**: Test with `staged: true`, verify previews, then deploy with `staged: false`.
+
+### Pattern 5: Type-Specific Allowlists
+
+Fine-grained cross-repository control:
+
+```yaml
+safe-outputs:
+  allowed-github-references: [owner/repo-a, owner/repo-b]
+  
+  create-issue:
+    allowed-repos: [owner/repo-c]  # Overrides global
+    max: 3
+    
+  add-comment:
+    # No type-specific list, uses global: repo-a, repo-b
+    max: 2
+```
+
+**Use case**: Different safe output types target different repositories.
+
+**Security note**: Type-specific allowlists override global allowlists.
+
+### Pattern 6: Domain Filtering for Security
+
+Restrict URLs in safe output content:
+
+```yaml
+safe-outputs:
+  allowed-domains:
+    - github.com
+    - "*.github.io"
+    - docs.github.com
+  
+  create-issue:
+    max: 5
+```
+
+**Use case**: Prevent agents from including unauthorized URLs in created content.
+
+**Effect**: URLs to non-allowlisted domains are redacted during sanitization.
+
+### Pattern 7: Temporary Resource Cleanup
+
+Auto-close temporary issues:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 10
+    expires: 7  # Auto-close after 7 days
+    labels: [temporary, automated]
+```
+
+**Use case**: Issues for transient notifications that should auto-clean.
+
+**Implementation**: Scheduled workflow checks issue age and closes expired issues.
+
+### Pattern 8: Review Comment Workflow
+
+Pull request review automation:
+
+```yaml
+safe-outputs:
+  create-pr-review-comment:
+    max: 20
+    
+  submit-pr-review:
+    max: 1
+    
+  resolve-pr-review-thread:
+    max: 10
+```
+
+**Use case**: Automated code review with multiple comments and thread resolution.
+
+**Workflow**: Create review comments, submit bundled review, resolve addressed threads.
+
+### Pattern 9: Project Management
+
+Automated project creation and updates:
+
+```yaml
+safe-outputs:
+  create-project:
+    max: 1
+    
+  update-project:
+    max: 5
+    
+  create-project-status-update:
+    max: 3
+```
+
+**Use case**: Creating and maintaining project boards automatically.
+
+### Pattern 10: Grouped Issues with Parent
+
+Create related issues under a parent:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 10
+    group: true
+```
+
+**Use case**: Workflow creates parent issue and multiple sub-issues linked via tasklists.
+
+**Effect**: First issue becomes parent, subsequent issues link to it.
+
+### Best Practices
+
+**Start Conservative**:
+- Begin with low `max` values
+- Enable `staged: true` for testing
+- Use explicit `allowed-repos` lists
+
+**Use Domain Filtering**:
+- Always configure `allowed-domains` when agents process external input
+- Include only trusted domains
+
+**Enable Footers**:
+- Keep `footer: true` (default) for transparency
+- Only disable when absolutely necessary
+
+**Temporary Resources**:
+- Use `expires` for transient issues
+- Clean up with `close-older-issues` for superseded content
+
+**Cross-Repository Security**:
+- Use type-specific `allowed-repos` for fine-grained control
+- Prefer explicit lists over broad permissions
+
+---
+
 ## Appendix F: Document History
+
+**Version 1.9.0** (2026-02-14):
+- Added comprehensive validation pipeline ordering (7 stages)
+- Added cross-repository security model with explicit allowlist rules
+- Added content sanitization pipeline specification (5 stages)
+- Added standardized error code catalog (E001-E010)
+- Added edge case behavior specifications
+- Added terminology section for consistency
+- Enhanced security properties (SP6, SP7)
+- Improved requirements testability
 
 **Version 1.8.0** (2025-02-14):
 - Initial W3C-style specification release

@@ -1851,3 +1851,54 @@ jobs:
         if: always()
         run: |
           rm -rf test-workspace
+
+  safe-outputs-conformance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Run Safe Outputs Conformance Checker
+        id: conformance
+        continue-on-error: true
+        run: |
+          echo "## Safe Outputs Conformance Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Run the conformance checker and capture output
+          if ./scripts/check-safe-outputs-conformance.sh > conformance-output.txt 2>&1; then
+            echo "✅ All conformance checks passed" >> $GITHUB_STEP_SUMMARY
+            EXIT_CODE=0
+          else
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 2 ]; then
+              echo "⚠️ Critical conformance issues found (treated as warning)" >> $GITHUB_STEP_SUMMARY
+            elif [ $EXIT_CODE -eq 1 ]; then
+              echo "⚠️ High priority conformance issues found (treated as warning)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Conformance check completed with warnings" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Conformance Check Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat conformance-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Also output to console for visibility
+          echo "=== Conformance Check Results ==="
+          cat conformance-output.txt
+          
+          # Always succeed (treat as warning only)
+          exit 0
+
+      - name: Upload conformance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-outputs-conformance-report
+          path: conformance-output.txt
+          retention-days: 7
