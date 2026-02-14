@@ -90,6 +90,9 @@ async function main(config = {}) {
   // Determine the triggering PR number from context
   const triggeringPRNumber = getTriggeringPRNumber(context.payload);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Resolve PR review thread configuration: max=${maxCount}, triggeringPR=${triggeringPRNumber || "none"}`);
 
   // Track how many items we've processed for max limit

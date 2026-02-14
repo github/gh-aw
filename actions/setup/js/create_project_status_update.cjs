@@ -281,6 +281,9 @@ function formatDate(date) {
 async function main(config = {}, githubClient = null) {
   const maxCount = config.max || 10;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   // Use the provided github client, or fall back to the global github object
   // @ts-ignore - global.github is set by setupGlobals() from github-script context
   const github = githubClient || global.github;
