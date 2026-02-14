@@ -175,30 +175,17 @@ export async function runCopilotSession(config: CopilotClientConfig): Promise<vo
 }
 
 /**
- * Main entry point - reads config from stdin and runs the session
+ * Main entry point - reads config from environment variable
  */
 export async function main(): Promise<void> {
-  debug('Reading configuration from stdin');
+  debug('Reading configuration from GH_AW_COPILOT_CONFIG environment variable');
   
-  // Read config from stdin
-  const stdinBuffer: Buffer[] = [];
-  
-  await new Promise<void>((resolve, reject) => {
-    process.stdin.on('data', (chunk) => {
-      stdinBuffer.push(chunk);
-    });
-
-    process.stdin.on('end', () => {
-      resolve();
-    });
-
-    process.stdin.on('error', (error) => {
-      reject(error);
-    });
-  });
-
-  const configJson = Buffer.concat(stdinBuffer).toString('utf-8');
-  debug('Received config:', configJson);
+  const configJson = process.env.GH_AW_COPILOT_CONFIG;
+  if (!configJson) {
+    console.error('Error: GH_AW_COPILOT_CONFIG environment variable is not set');
+    console.error('Please set the GH_AW_COPILOT_CONFIG environment variable with JSON configuration');
+    process.exit(1);
+  }
 
   let config: CopilotClientConfig;
   try {

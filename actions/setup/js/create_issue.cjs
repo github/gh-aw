@@ -30,7 +30,7 @@ const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
 const { generateFooterWithMessages } = require("./messages_footer.cjs");
 const { generateWorkflowIdMarker } = require("./generate_footer.cjs");
 const { getTrackerID } = require("./get_tracker_id.cjs");
-const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, getOrGenerateTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { parseAllowedRepos, getDefaultTargetRepo, validateRepo, parseRepoSlug } = require("./repo_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -309,31 +309,16 @@ async function main(config = {}) {
     }
 
     // Get or generate the temporary ID for this issue
-    let temporaryId = generateTemporaryId();
-    if (message.temporary_id !== undefined && message.temporary_id !== null) {
-      if (typeof message.temporary_id !== "string") {
-        const error = `temporary_id must be a string (got ${typeof message.temporary_id})`;
-        core.warning(`Skipping issue: ${error}`);
-        return {
-          success: false,
-          error,
-        };
-      }
-
-      const rawTemporaryId = message.temporary_id.trim();
-      const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
-
-      if (!isTemporaryId(normalized)) {
-        const error = `Invalid temporary_id format: '${message.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`;
-        core.warning(`Skipping issue: ${error}`);
-        return {
-          success: false,
-          error,
-        };
-      }
-
-      temporaryId = normalized.toLowerCase();
+    const tempIdResult = getOrGenerateTemporaryId(message, "issue");
+    if (tempIdResult.error) {
+      core.warning(`Skipping issue: ${tempIdResult.error}`);
+      return {
+        success: false,
+        error: tempIdResult.error,
+      };
     }
+    // At this point, temporaryId is guaranteed to be a string (not null)
+    const temporaryId = /** @type {string} */ tempIdResult.temporaryId;
     core.info(`Processing create_issue: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
 
     // Resolve parent: check if it's a temporary ID reference
@@ -500,7 +485,9 @@ async function main(config = {}) {
       createdIssues.push({ ...issue, _repo: qualifiedItemRepo });
 
       // Store the mapping of temporary_id -> {repo, number}
-      temporaryIdMap.set(normalizeTemporaryId(temporaryId), { repo: qualifiedItemRepo, number: issue.number });
+      // temporaryId is guaranteed to be non-null because we checked tempIdResult.error above
+      const normalizedTempId = normalizeTemporaryId(String(temporaryId));
+      temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
 
       // Track issue for copilot assignment if needed

@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { normalizeTemporaryId, isTemporaryId } = require("./temporary_id.cjs");
+const { normalizeTemporaryId, isTemporaryId, generateTemporaryId, getOrGenerateTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -342,6 +342,18 @@ async function main(config = {}, githubClient = null) {
 
     try {
       let { title, owner, owner_type, item_url } = message;
+
+      // Get or generate the temporary ID for this project
+      const tempIdResult = getOrGenerateTemporaryId(message, "project");
+      if (tempIdResult.error) {
+        core.warning(`Skipping project: ${tempIdResult.error}`);
+        return {
+          success: false,
+          error: tempIdResult.error,
+        };
+      }
+      // At this point, temporaryId is guaranteed to be a string (not null)
+      const temporaryId = /** @type {string} */ tempIdResult.temporaryId;
 
       // Resolve temporary ID in item_url if present
       if (item_url && typeof item_url === "string") {

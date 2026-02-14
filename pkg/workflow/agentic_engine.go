@@ -130,10 +130,12 @@ type CapabilityProvider interface {
 	// When true, plugins can be installed using the engine's plugin install command
 	SupportsPlugins() bool
 
-	// SupportsLLMGateway returns true if this engine supports an LLM gateway
-	// When true, the engine can use a gateway service to proxy LLM API calls
+	// SupportsLLMGateway returns the LLM gateway port number for this engine
+	// Returns the port number (e.g., 10000) if the engine supports an LLM gateway
+	// Returns -1 if the engine does not support an LLM gateway
+	// The port is used to configure AWF api-proxy sidecar container
 	// In strict mode, engines without LLM gateway support require additional security constraints
-	SupportsLLMGateway() bool
+	SupportsLLMGateway() int
 }
 
 // WorkflowExecutor handles workflow compilation and execution
@@ -256,8 +258,10 @@ func (e *BaseEngine) SupportsPlugins() bool {
 	return e.supportsPlugins
 }
 
-func (e *BaseEngine) SupportsLLMGateway() bool {
-	return e.supportsLLMGateway
+func (e *BaseEngine) SupportsLLMGateway() int {
+	// Engines that support LLM gateway must override this method
+	// to return their specific port number (e.g., 10000, 10001, 10002)
+	return -1
 }
 
 // GetDeclaredOutputFiles returns an empty list by default (engines can override)
@@ -312,6 +316,7 @@ func NewEngineRegistry() *EngineRegistry {
 	registry.Register(NewClaudeEngine())
 	registry.Register(NewCodexEngine())
 	registry.Register(NewCopilotEngine())
+	registry.Register(NewCopilotSDKEngine())
 	registry.Register(NewCustomEngine())
 
 	agenticEngineLog.Printf("Registered %d engines", len(registry.engines))

@@ -9,7 +9,7 @@ import (
 
 // TestValidateStrictFirewall_LLMGatewaySupport tests the LLM gateway validation in strict mode
 func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
-	t.Run("codex engine without LLM gateway support also rejects custom domains in strict mode", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway support also rejects custom domains in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -108,7 +108,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway also allows known ecosystems", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway also allows known ecosystems", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -125,7 +125,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -216,7 +216,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway requires sandbox.agent to be enabled in strict mode", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway rejects sandbox.agent: false in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -233,13 +233,13 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 			},
 		}
 
-		// sandbox.agent: false is not allowed in strict mode for engines without LLM gateway
+		// sandbox.agent: false is not allowed in strict mode for any engine
 		err := compiler.validateStrictFirewall("codex", networkPerms, sandboxConfig)
 		if err == nil {
 			t.Error("Expected error for sandbox.agent: false in strict mode, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway support requirement, got: %v", err)
+		if err != nil && strings.Contains(err.Error(), "does not support LLM gateway") {
+			t.Errorf("Expected error about sandbox.agent (not LLM gateway), got: %v", err)
 		}
 		if err != nil && !strings.Contains(err.Error(), "sandbox.agent") {
 			t.Errorf("Expected error about sandbox.agent, got: %v", err)
@@ -297,29 +297,34 @@ func TestSupportsLLMGateway(t *testing.T) {
 	registry := NewEngineRegistry()
 
 	tests := []struct {
-		engineID           string
-		expectedLLMGateway bool
-		description        string
+		engineID     string
+		expectedPort int
+		description  string
 	}{
 		{
-			engineID:           "codex",
-			expectedLLMGateway: false,
-			description:        "Codex engine does not support LLM gateway",
+			engineID:     "codex",
+			expectedPort: 10001,
+			description:  "Codex engine uses port 10001 for LLM gateway",
 		},
 		{
-			engineID:           "copilot",
-			expectedLLMGateway: false,
-			description:        "Copilot engine does not support LLM gateway",
+			engineID:     "claude",
+			expectedPort: 10000,
+			description:  "Claude engine uses port 10000 for LLM gateway",
 		},
 		{
-			engineID:           "claude",
-			expectedLLMGateway: false,
-			description:        "Claude engine does not support LLM gateway",
+			engineID:     "copilot-sdk",
+			expectedPort: 10002,
+			description:  "Copilot SDK engine uses port 10002 for LLM gateway",
 		},
 		{
-			engineID:           "custom",
-			expectedLLMGateway: false,
-			description:        "Custom engine does not support LLM gateway",
+			engineID:     "copilot",
+			expectedPort: -1,
+			description:  "Copilot engine does not support LLM gateway",
+		},
+		{
+			engineID:     "custom",
+			expectedPort: -1,
+			description:  "Custom engine does not support LLM gateway",
 		},
 	}
 
@@ -330,10 +335,10 @@ func TestSupportsLLMGateway(t *testing.T) {
 				t.Fatalf("Failed to get engine '%s': %v", tt.engineID, err)
 			}
 
-			supportsLLMGateway := engine.SupportsLLMGateway()
-			if supportsLLMGateway != tt.expectedLLMGateway {
-				t.Errorf("Engine '%s': expected SupportsLLMGateway() = %v, got %v",
-					tt.engineID, tt.expectedLLMGateway, supportsLLMGateway)
+			llmGatewayPort := engine.SupportsLLMGateway()
+			if llmGatewayPort != tt.expectedPort {
+				t.Errorf("Engine '%s': expected SupportsLLMGateway() = %d, got %d",
+					tt.engineID, tt.expectedPort, llmGatewayPort)
 			}
 		})
 	}

@@ -21,16 +21,18 @@
 #
 # For more information: https://github.github.com/gh-aw/introduction/overview/
 #
-# Build and test this project
+# Daily status report for gh-aw project
 #
 # Resolved workflow manifest:
 #   Imports:
 #     - shared/mood.md
 #
-# frontmatter-hash: cf9aa8ef718e4e141587441cc4dd1f3b3fa7d48154269b347ec4569e4705b766
+# frontmatter-hash: 49266e50774d7e6a8b1c50f64b2f790c214dcdcf7b75b6bc8478bb43257b9863
 
 name: "Dev"
 "on":
+  schedule:
+  - cron: "0 9 * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -78,7 +80,7 @@ jobs:
       issues: read
       pull-requests: read
     concurrency:
-      group: "gh-aw-copilot-${{ github.workflow }}"
+      group: "gh-aw-copilot-sdk-${{ github.workflow }}"
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       GH_AW_ASSETS_ALLOWED_EXTS: ""
@@ -146,13 +148,13 @@ jobs:
             const fs = require('fs');
             
             const awInfo = {
-              engine_id: "copilot",
-              engine_name: "GitHub Copilot CLI",
-              model: process.env.GH_AW_MODEL_AGENT_COPILOT || "",
+              engine_id: "copilot-sdk",
+              engine_name: "GitHub Copilot SDK",
+              model: process.env.GH_AW_MODEL_AGENT_CUSTOM || "",
               version: "",
-              agent_version: "0.0.409",
+              agent_version: "",
               workflow_name: "Dev",
-              experimental: false,
+              experimental: true,
               supports_tools_allowlist: true,
               supports_http_transport: true,
               run_id: context.runId,
@@ -164,12 +166,12 @@ jobs:
               actor: context.actor,
               event_name: context.eventName,
               staged: false,
-              allowed_domains: ["defaults","ghcr.io","pkg-containers.githubusercontent.com","proxy.golang.org","sum.golang.org","storage.googleapis.com","objects.githubusercontent.com","codeload.github.com"],
-              firewall_enabled: true,
-              awf_version: "v0.17.0",
+              allowed_domains: ["defaults"],
+              firewall_enabled: false,
+              awf_version: "",
               awmg_version: "",
               steps: {
-                firewall: "squid"
+                firewall: ""
               },
               created_at: new Date().toISOString()
             };
@@ -189,8 +191,6 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.409
-      - name: Install awf binary
-        run: bash /opt/gh-aw/actions/install_awf_binary.sh v0.17.0
       - name: Determine automatic lockdown mode for GitHub MCP server
         id: determine-automatic-lockdown
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -202,39 +202,47 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-firewall/agent:0.17.0 ghcr.io/github/gh-aw-firewall/squid:0.17.0 ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
       - name: Write Safe Outputs Config
         run: |
           mkdir -p /opt/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > /opt/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"create_pull_request":{"expires":2},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"create_issue":{"expires":168,"max":1},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
           cat > /opt/gh-aw/safeoutputs/tools.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_EOF'
           [
             {
-              "description": "Create a new GitHub pull request to propose code changes. Use this after making file edits to submit them for review and merging. The PR will be created from the current branch with your committed changes. For code review comments on an existing PR, use create_pull_request_review_comment instead. CONSTRAINTS: Maximum 1 pull request(s) can be created. Title will be prefixed with \"[dev] \". PRs will be created as drafts.",
+              "description": "Create a new GitHub issue for tracking bugs, feature requests, or tasks. Use this for actionable work items that need assignment, labeling, and status tracking. For reports, announcements, or status updates that don't require task tracking, use create_discussion instead. CONSTRAINTS: Maximum 1 issue(s) can be created. Title will be prefixed with \"[Daily Report] \".",
               "inputSchema": {
                 "additionalProperties": false,
                 "properties": {
                   "body": {
-                    "description": "Detailed PR description in Markdown. Include what changes were made, why, testing notes, and any breaking changes. Do NOT repeat the title as a heading.",
-                    "type": "string"
-                  },
-                  "branch": {
-                    "description": "Source branch name containing the changes. If omitted, uses the current working branch.",
+                    "description": "Detailed issue description in Markdown. Do NOT repeat the title as a heading since it already appears as the issue's h1. Include context, reproduction steps, or acceptance criteria as appropriate.",
                     "type": "string"
                   },
                   "labels": {
-                    "description": "Labels to categorize the PR (e.g., 'enhancement', 'bugfix'). Labels must exist in the repository.",
+                    "description": "Labels to categorize the issue (e.g., 'bug', 'enhancement'). Labels must exist in the repository.",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
                   },
+                  "parent": {
+                    "description": "Parent issue number for creating sub-issues. This is the numeric ID from the GitHub URL (e.g., 42 in github.com/owner/repo/issues/42). Can also be a temporary_id (e.g., 'aw_abc123', 'aw_Test123') from a previously created issue in the same workflow run.",
+                    "type": [
+                      "number",
+                      "string"
+                    ]
+                  },
+                  "temporary_id": {
+                    "description": "Unique temporary identifier for referencing this issue before it's created. Format: 'aw_' followed by 3 to 8 alphanumeric characters (e.g., 'aw_abc1', 'aw_Test123'). Use '#aw_ID' in body text to reference other issues by their temporary_id; these are replaced with actual issue numbers after creation.",
+                    "pattern": "^aw_[A-Za-z0-9]{4,8}$",
+                    "type": "string"
+                  },
                   "title": {
-                    "description": "Concise PR title describing the changes. Follow repository conventions (e.g., conventional commits). The title appears as the main heading.",
+                    "description": "Concise issue title summarizing the bug, feature, or task. The title appears as the main heading, so keep it brief and descriptive.",
                     "type": "string"
                   }
                 },
@@ -244,7 +252,7 @@ jobs:
                 ],
                 "type": "object"
               },
-              "name": "create_pull_request"
+              "name": "create_issue"
             },
             {
               "description": "Report that a tool or capability needed to complete the task is not available, or share any information you deem important about missing functionality or limitations. Use this when you cannot accomplish what was requested because the required functionality is missing or access is restricted.",
@@ -319,7 +327,7 @@ jobs:
           GH_AW_SAFE_OUTPUTS_TOOLS_EOF
           cat > /opt/gh-aw/safeoutputs/validation.json << 'GH_AW_SAFE_OUTPUTS_VALIDATION_EOF'
           {
-            "create_pull_request": {
+            "create_issue": {
               "defaultMax": 1,
               "fields": {
                 "body": {
@@ -328,17 +336,21 @@ jobs:
                   "sanitize": true,
                   "maxLength": 65000
                 },
-                "branch": {
-                  "required": true,
-                  "type": "string",
-                  "sanitize": true,
-                  "maxLength": 256
-                },
                 "labels": {
                   "type": "array",
                   "itemType": "string",
                   "itemSanitize": true,
                   "itemMaxLength": 128
+                },
+                "parent": {
+                  "issueOrPRNumber": true
+                },
+                "repo": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "temporary_id": {
+                  "type": "string"
                 },
                 "title": {
                   "required": true,
@@ -442,7 +454,7 @@ jobs:
           mkdir -p "${MCP_GATEWAY_PAYLOAD_DIR}"
           export DEBUG="*"
           
-          export GH_AW_ENGINE="copilot"
+          export GH_AW_ENGINE="copilot-sdk"
           export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_API_KEY -e MCP_GATEWAY_PAYLOAD_DIR -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_LOCKDOWN -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e GH_AW_SAFE_OUTPUTS_PORT -e GH_AW_SAFE_OUTPUTS_API_KEY -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw ghcr.io/github/gh-aw-mcpg:v0.1.4'
           
           mkdir -p /home/runner/.copilot
@@ -618,27 +630,46 @@ jobs:
         run: bash /opt/gh-aw/actions/print_prompt_summary.sh
       - name: Clean git credentials
         run: bash /opt/gh-aw/actions/clean_git_credentials.sh
-      - name: Execute GitHub Copilot CLI
-        id: agentic_execution
-        # Copilot CLI tool arguments (sorted):
-        timeout-minutes: 30
+      - name: Start Copilot CLI in headless mode
         run: |
-          set -o pipefail
-          sudo -E awf --env-all --container-workdir "${GITHUB_WORKSPACE}" --allow-domains api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,ghcr.io,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pkg-containers.githubusercontent.com,ppa.launchpad.net,proxy.golang.org,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,storage.googleapis.com,sum.golang.org,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com --log-level info --proxy-logs-dir /tmp/gh-aw/sandbox/firewall/logs --enable-host-access --image-tag 0.17.0 --skip-pull \
-            -- '/usr/local/bin/copilot --add-dir /tmp/gh-aw/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --add-dir "${GITHUB_WORKSPACE}" --disable-builtin-mcps --allow-all-tools --allow-all-paths --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"${GH_AW_MODEL_AGENT_COPILOT:+ --model "$GH_AW_MODEL_AGENT_COPILOT"}' \
-            2>&1 | tee /tmp/gh-aw/agent-stdio.log
+          # Start Copilot CLI in headless mode on port 10002
+          copilot --headless --port 10002 &
+          COPILOT_PID=$!
+          echo "COPILOT_PID=${COPILOT_PID}" >> $GITHUB_ENV
+          
+          # Wait for Copilot to be ready
+          sleep 5
+          
+          # Verify Copilot is running
+          if ! kill -0 ${COPILOT_PID} 2>/dev/null; then
+            echo "::error::Copilot CLI failed to start"
+            exit 1
+          fi
+          
+          echo "✓ Copilot CLI started in headless mode on port 10002"
+      - name: Configure Copilot SDK client
+        run: |
+          # Create directory for event log
+          mkdir -p /tmp/gh-aw/copilot-sdk/
+          
+          # Set configuration via environment variable
+          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:10002","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
+      - name: Execute Copilot SDK client
+        id: agentic_execution
+        run: |
+          # Execute copilot-client.js with Node.js
+          # Configuration is read from GH_AW_COPILOT_CONFIG environment variable
+          node /opt/gh-aw/copilot/copilot-client.js
+          
+          # Check exit code
+          if [ $? -ne 0 ]; then
+            echo "::error::Copilot SDK client execution failed"
+            exit 1
+          fi
+          
+          echo "✓ Copilot SDK client execution completed"
         env:
-          COPILOT_AGENT_RUNNER_TYPE: STANDALONE
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GH_AW_MCP_CONFIG: /home/runner/.copilot/mcp-config.json
-          GH_AW_MODEL_AGENT_COPILOT: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || '' }}
-          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-          XDG_CONFIG_HOME: /home/runner
+          GH_AW_COPILOT_CONFIG: ${{ env.GH_AW_COPILOT_CONFIG }}
       - name: Configure Git credentials
         env:
           REPO_NAME: ${{ github.repository }}
@@ -650,23 +681,6 @@ jobs:
           SERVER_URL_STRIPPED="${SERVER_URL#https://}"
           git remote set-url origin "https://x-access-token:${{ github.token }}@${SERVER_URL_STRIPPED}/${REPO_NAME}.git"
           echo "Git configured with standard GitHub Actions identity"
-      - name: Copy Copilot session state files to logs
-        if: always()
-        continue-on-error: true
-        run: |
-          # Copy Copilot session state files to logs folder for artifact collection
-          # This ensures they are in /tmp/gh-aw/ where secret redaction can scan them
-          SESSION_STATE_DIR="$HOME/.copilot/session-state"
-          LOGS_DIR="/tmp/gh-aw/sandbox/agent/logs"
-          
-          if [ -d "$SESSION_STATE_DIR" ]; then
-            echo "Copying Copilot session state files from $SESSION_STATE_DIR to $LOGS_DIR"
-            mkdir -p "$LOGS_DIR"
-            cp -v "$SESSION_STATE_DIR"/*.jsonl "$LOGS_DIR/" 2>/dev/null || true
-            echo "Session state files copied successfully"
-          else
-            echo "No session-state directory found at $SESSION_STATE_DIR"
-          fi
       - name: Stop MCP gateway
         if: always()
         continue-on-error: true
@@ -704,7 +718,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
-          GH_AW_ALLOWED_DOMAINS: "api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,codeload.github.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,ghcr.io,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,objects.githubusercontent.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,pkg-containers.githubusercontent.com,ppa.launchpad.net,proxy.golang.org,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,storage.googleapis.com,sum.golang.org,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
+          GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
         with:
@@ -725,19 +739,19 @@ jobs:
         with:
           name: agent_outputs
           path: |
-            /tmp/gh-aw/sandbox/agent/logs/
+            /tmp/gh-aw/copilot-sdk/event-log.jsonl
             /tmp/gh-aw/redacted-urls.log
           if-no-files-found: ignore
       - name: Parse agent logs for step summary
         if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          GH_AW_AGENT_OUTPUT: /tmp/gh-aw/sandbox/agent/logs/
+          GH_AW_AGENT_OUTPUT: /tmp/gh-aw/copilot-sdk/event-log.jsonl
         with:
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/parse_copilot_log.cjs');
+            const { main } = require('/opt/gh-aw/actions/parse-copilot-log.cjs');
             await main();
       - name: Parse MCP gateway logs for step summary
         if: always()
@@ -748,16 +762,6 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/parse_mcp_gateway_log.cjs');
             await main();
-      - name: Print firewall logs
-        if: always()
-        continue-on-error: true
-        env:
-          AWF_LOGS_DIR: /tmp/gh-aw/sandbox/firewall/logs
-        run: |
-          # Fix permissions on firewall logs so they can be uploaded as artifacts
-          # AWF runs with sudo, creating files owned by root
-          sudo chmod -R a+r /tmp/gh-aw/sandbox/firewall/logs 2>/dev/null || true
-          awf logs summary | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload agent artifacts
         if: always()
         continue-on-error: true
@@ -768,10 +772,8 @@ jobs:
             /tmp/gh-aw/aw-prompts/prompt.txt
             /tmp/gh-aw/aw_info.json
             /tmp/gh-aw/mcp-logs/
-            /tmp/gh-aw/sandbox/firewall/logs/
             /tmp/gh-aw/agent-stdio.log
             /tmp/gh-aw/agent/
-            /tmp/gh-aw/aw.patch
           if-no-files-found: ignore
 
   conclusion:
@@ -783,9 +785,8 @@ jobs:
     if: (always()) && (needs.agent.result != 'skipped')
     runs-on: ubuntu-slim
     permissions:
-      contents: write
+      contents: read
       issues: write
-      pull-requests: write
     outputs:
       noop_message: ${{ steps.noop.outputs.noop_message }}
       tools_reported: ${{ steps.missing_tool.outputs.tools_reported }}
@@ -874,20 +875,6 @@ jobs:
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/handle_noop_message.cjs');
             await main();
-      - name: Handle Create Pull Request Error
-        id: handle_create_pr_error
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-        env:
-          GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_WORKFLOW_NAME: "Dev"
-          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          script: |
-            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
-            setupGlobals(core, github, context, exec, io);
-            const { main } = require('/opt/gh-aw/actions/handle_create_pr_error.cjs');
-            await main();
       - name: Update reaction comment with completion status
         id: conclusion
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -914,7 +901,7 @@ jobs:
     permissions:
       contents: read
     concurrency:
-      group: "gh-aw-copilot-${{ github.workflow }}"
+      group: "gh-aw-copilot-sdk-${{ github.workflow }}"
     timeout-minutes: 10
     outputs:
       success: ${{ steps.parse_results.outputs.success }}
@@ -950,7 +937,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           WORKFLOW_NAME: "Dev"
-          WORKFLOW_DESCRIPTION: "Build and test this project"
+          WORKFLOW_DESCRIPTION: "Daily status report for gh-aw project"
           HAS_PATCH: ${{ needs.agent.outputs.has_patch }}
         with:
           script: |
@@ -969,35 +956,46 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
       - name: Install GitHub Copilot CLI
         run: /opt/gh-aw/actions/install_copilot_cli.sh 0.0.409
-      - name: Execute GitHub Copilot CLI
-        id: agentic_execution
-        # Copilot CLI tool arguments (sorted):
-        # --allow-tool shell(cat)
-        # --allow-tool shell(grep)
-        # --allow-tool shell(head)
-        # --allow-tool shell(jq)
-        # --allow-tool shell(ls)
-        # --allow-tool shell(tail)
-        # --allow-tool shell(wc)
-        timeout-minutes: 20
+      - name: Start Copilot CLI in headless mode
         run: |
-          set -o pipefail
-          COPILOT_CLI_INSTRUCTION="$(cat /tmp/gh-aw/aw-prompts/prompt.txt)"
-          mkdir -p /tmp/
-          mkdir -p /tmp/gh-aw/
-          mkdir -p /tmp/gh-aw/agent/
-          mkdir -p /tmp/gh-aw/sandbox/agent/logs/
-          copilot --add-dir /tmp/ --add-dir /tmp/gh-aw/ --add-dir /tmp/gh-aw/agent/ --log-level all --log-dir /tmp/gh-aw/sandbox/agent/logs/ --disable-builtin-mcps --allow-tool 'shell(cat)' --allow-tool 'shell(grep)' --allow-tool 'shell(head)' --allow-tool 'shell(jq)' --allow-tool 'shell(ls)' --allow-tool 'shell(tail)' --allow-tool 'shell(wc)' --share /tmp/gh-aw/sandbox/agent/logs/conversation.md --prompt "$COPILOT_CLI_INSTRUCTION"${GH_AW_MODEL_DETECTION_COPILOT:+ --model "$GH_AW_MODEL_DETECTION_COPILOT"} 2>&1 | tee /tmp/gh-aw/threat-detection/detection.log
+          # Start Copilot CLI in headless mode on port 10002
+          copilot --headless --port 10002 &
+          COPILOT_PID=$!
+          echo "COPILOT_PID=${COPILOT_PID}" >> $GITHUB_ENV
+          
+          # Wait for Copilot to be ready
+          sleep 5
+          
+          # Verify Copilot is running
+          if ! kill -0 ${COPILOT_PID} 2>/dev/null; then
+            echo "::error::Copilot CLI failed to start"
+            exit 1
+          fi
+          
+          echo "✓ Copilot CLI started in headless mode on port 10002"
+      - name: Configure Copilot SDK client
+        run: |
+          # Create directory for event log
+          mkdir -p /tmp/gh-aw/copilot-sdk/
+          
+          # Set configuration via environment variable
+          echo 'GH_AW_COPILOT_CONFIG={"cliUrl":"http://host.docker.internal:10002","eventLogFile":"/tmp/gh-aw/copilot-sdk/event-log.jsonl","githubToken":"${{ secrets.COPILOT_GITHUB_TOKEN }}","logLevel":"info","promptFile":"/tmp/gh-aw/aw-prompts/prompt.txt"}' >> $GITHUB_ENV
+      - name: Execute Copilot SDK client
+        id: agentic_execution
+        run: |
+          # Execute copilot-client.js with Node.js
+          # Configuration is read from GH_AW_COPILOT_CONFIG environment variable
+          node /opt/gh-aw/copilot/copilot-client.js
+          
+          # Check exit code
+          if [ $? -ne 0 ]; then
+            echo "::error::Copilot SDK client execution failed"
+            exit 1
+          fi
+          
+          echo "✓ Copilot SDK client execution completed"
         env:
-          COPILOT_AGENT_RUNNER_TYPE: STANDALONE
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GH_AW_MODEL_DETECTION_COPILOT: ${{ vars.GH_AW_MODEL_DETECTION_COPILOT || '' }}
-          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-          XDG_CONFIG_HOME: /home/runner
+          GH_AW_COPILOT_CONFIG: ${{ env.GH_AW_COPILOT_CONFIG }}
       - name: Parse threat detection results
         id: parse_results
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -1017,18 +1015,16 @@ jobs:
 
   safe_outputs:
     needs:
-      - activation
       - agent
       - detection
     if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (needs.detection.outputs.success == 'true')
     runs-on: ubuntu-slim
     permissions:
-      contents: write
+      contents: read
       issues: write
-      pull-requests: write
     timeout-minutes: 15
     env:
-      GH_AW_ENGINE_ID: "copilot"
+      GH_AW_ENGINE_ID: "copilot-sdk"
       GH_AW_WORKFLOW_ID: "dev"
       GH_AW_WORKFLOW_NAME: "Dev"
     outputs:
@@ -1058,38 +1054,12 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs/
           find "/tmp/gh-aw/safeoutputs/" -type f -print
           echo "GH_AW_AGENT_OUTPUT=/tmp/gh-aw/safeoutputs/agent_output.json" >> "$GITHUB_ENV"
-      - name: Download patch artifact
-        continue-on-error: true
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          name: agent-artifacts
-          path: /tmp/gh-aw/
-      - name: Checkout repository
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          token: ${{ github.token }}
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Configure Git credentials
-        if: ((!cancelled()) && (needs.agent.result != 'skipped')) && (contains(needs.agent.outputs.output_types, 'create_pull_request'))
-        env:
-          REPO_NAME: ${{ github.repository }}
-          SERVER_URL: ${{ github.server_url }}
-          GIT_TOKEN: ${{ github.token }}
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          # Re-authenticate git with GitHub token
-          SERVER_URL_STRIPPED="${SERVER_URL#https://}"
-          git remote set-url origin "https://x-access-token:${GIT_TOKEN}@${SERVER_URL_STRIPPED}/${REPO_NAME}.git"
-          echo "Git configured with standard GitHub Actions identity"
       - name: Process Safe Outputs
         id: process_safe_outputs
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_pull_request\":{\"base_branch\":\"${{ github.ref_name }}\",\"draft\":true,\"expires\":2,\"max\":1,\"max_patch_size\":1024,\"title_prefix\":\"[dev] \"},\"missing_data\":{},\"missing_tool\":{}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"expires\":168,\"max\":1,\"title_prefix\":\"[Daily Report] \"},\"missing_data\":{},\"missing_tool\":{}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

@@ -92,7 +92,7 @@ func validateDockerImage(image string, verbose bool) error {
 	_, err := exec.LookPath("docker")
 	if err != nil {
 		dockerValidationLog.Print("Docker not installed, cannot validate image")
-		return fmt.Errorf("Docker not installed - could not validate container image '%s'. Install Docker or remove container-based tools", image)
+		return fmt.Errorf("docker not installed - could not validate container image '%s'. Install Docker or remove container-based tools", image)
 	}
 
 	// Check if Docker daemon is actually running (cached check with short timeout).
@@ -100,7 +100,7 @@ func validateDockerImage(image string, verbose bool) error {
 	// which is common on macOS development machines.
 	if !isDockerDaemonRunning() {
 		dockerValidationLog.Print("Docker daemon not running, cannot validate image")
-		return fmt.Errorf("Docker daemon not running - could not validate container image '%s'. Start Docker Desktop or remove container-based tools", image)
+		return fmt.Errorf("docker daemon not running - could not validate container image '%s'. Start Docker Desktop or remove container-based tools", image)
 	}
 
 	// Try to inspect the image (will succeed if image exists locally)

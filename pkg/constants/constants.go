@@ -629,6 +629,8 @@ const DefaultRateLimitWindow = 60 // Default time window in minutes (1 hour)
 const (
 	// CopilotEngine is the GitHub Copilot engine identifier
 	CopilotEngine EngineName = "copilot"
+	// CopilotSDKEngine is the GitHub Copilot SDK engine identifier
+	CopilotSDKEngine EngineName = "copilot-sdk"
 	// ClaudeEngine is the Anthropic Claude engine identifier
 	ClaudeEngine EngineName = "claude"
 	// CodexEngine is the OpenAI Codex engine identifier
@@ -639,7 +641,7 @@ const (
 
 // AgenticEngines lists all supported agentic engine names
 // Note: This remains a string slice for backward compatibility with existing code
-var AgenticEngines = []string{string(ClaudeEngine), string(CodexEngine), string(CopilotEngine)}
+var AgenticEngines = []string{string(ClaudeEngine), string(CodexEngine), string(CopilotEngine), string(CopilotSDKEngine)}
 
 // EngineOption represents a selectable AI engine with its display metadata and secret configuration
 type EngineOption struct {
@@ -654,6 +656,7 @@ type EngineOption struct {
 // EngineOptions provides the list of available AI engines for user selection
 var EngineOptions = []EngineOption{
 	{string(CopilotEngine), "GitHub Copilot", "GitHub Copilot CLI with agent support", "COPILOT_GITHUB_TOKEN", "", ""},
+	{string(CopilotSDKEngine), "GitHub Copilot SDK", "GitHub Copilot SDK with headless mode", "COPILOT_GITHUB_TOKEN", "", ""},
 	{string(ClaudeEngine), "Claude", "Anthropic Claude Code coding agent", "ANTHROPIC_API_KEY", "", "https://console.anthropic.com/settings/keys"},
 	{string(CodexEngine), "Codex", "OpenAI Codex/GPT engine", "OPENAI_API_KEY", "", "https://platform.openai.com/api-keys"},
 }

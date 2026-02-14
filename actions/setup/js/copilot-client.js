@@ -5446,21 +5446,13 @@ async function runCopilotSession(config) {
   }
 }
 async function main() {
-  debug("Reading configuration from stdin");
-  const stdinBuffer = [];
-  await new Promise((resolve, reject) => {
-    process.stdin.on("data", (chunk) => {
-      stdinBuffer.push(chunk);
-    });
-    process.stdin.on("end", () => {
-      resolve();
-    });
-    process.stdin.on("error", (error) => {
-      reject(error);
-    });
-  });
-  const configJson = Buffer.concat(stdinBuffer).toString("utf-8");
-  debug("Received config:", configJson);
+  debug("Reading configuration from GH_AW_COPILOT_CONFIG environment variable");
+  const configJson = process.env.GH_AW_COPILOT_CONFIG;
+  if (!configJson) {
+    console.error("Error: GH_AW_COPILOT_CONFIG environment variable is not set");
+    console.error("Please set the GH_AW_COPILOT_CONFIG environment variable with JSON configuration");
+    process.exit(1);
+  }
   let config;
   try {
     config = JSON.parse(configJson);

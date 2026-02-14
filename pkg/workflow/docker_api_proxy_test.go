@@ -15,9 +15,9 @@ func TestCollectDockerImages_APIProxyForEnginesWithLLMGateway(t *testing.T) {
 		expectAPIProxy bool
 	}{
 		{
-			name:           "Claude engine does not include api-proxy image (supportsLLMGateway: false)",
+			name:           "Claude engine includes api-proxy image (supportsLLMGateway: 10000)",
 			engine:         "claude",
-			expectAPIProxy: false,
+			expectAPIProxy: true,
 		},
 		{
 			name:           "Copilot engine does not include api-proxy image (supportsLLMGateway: false)",
@@ -25,9 +25,9 @@ func TestCollectDockerImages_APIProxyForEnginesWithLLMGateway(t *testing.T) {
 			expectAPIProxy: false,
 		},
 		{
-			name:           "Codex engine does not include api-proxy image (supportsLLMGateway: false)",
+			name:           "Codex engine includes api-proxy image (supportsLLMGateway: 10001)",
 			engine:         "codex",
-			expectAPIProxy: false,
+			expectAPIProxy: true,
 		},
 	}
 

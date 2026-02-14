@@ -113,7 +113,7 @@ func collectDockerImages(tools map[string]any, workflowData *WorkflowData, actio
 		if workflowData != nil && workflowData.AI != "" {
 			registry := GetGlobalEngineRegistry()
 			engine, err := registry.GetEngine(workflowData.AI)
-			if err == nil && engine.SupportsLLMGateway() {
+			if err == nil && engine.SupportsLLMGateway() > 0 {
 				apiProxyImage := constants.DefaultFirewallRegistry + "/api-proxy:" + awfImageTag
 				if !imageSet[apiProxyImage] {
 					images = append(images, apiProxyImage)

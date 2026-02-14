@@ -1,23 +1,13 @@
 ---
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'  # Daily at 9 AM UTC
 name: Dev
-description: Build and test this project
+description: Daily status report for gh-aw project
 timeout-minutes: 30
 strict: false
-sandbox:
-  agent: awf
-engine: copilot
-network:
-  allowed:
-    - defaults
-    - ghcr.io
-    - pkg-containers.githubusercontent.com
-    - proxy.golang.org
-    - sum.golang.org
-    - storage.googleapis.com
-    - objects.githubusercontent.com
-    - codeload.github.com
+engine: copilot-sdk
 
 permissions:
   contents: read
@@ -25,21 +15,22 @@ permissions:
   pull-requests: read
 
 safe-outputs:
-  create-pull-request:
-    expires: 2h
-    title-prefix: "[dev] "
-    draft: true
+  create-issue:
+    expires: 7d
+    title-prefix: "[Daily Report] "
 imports:
   - shared/mood.md
 ---
 
-# Build, Test, and Add Poem
+# Daily Status Report
 
-Build and test the gh-aw project, then add a single line poem to poems.txt.
+Generate a daily status report for the gh-aw project.
 
 **Requirements:**
-1. Run `make build` to build the binary (this handles Go module downloads automatically)
-2. Run `make test` to run the test suite
-3. Report any failures with details about what went wrong
-4. If all steps pass, create a file called poems.txt with a single line poem
-5. Create a pull request with the poem
+1. Analyze the current state of the repository
+2. Check for recent commits, pull requests, and issues
+3. Identify any potential issues or areas needing attention
+4. Create a comprehensive daily status report
+5. Post the report as an issue with the date in the title
+
+Keep the report informative but concise.
