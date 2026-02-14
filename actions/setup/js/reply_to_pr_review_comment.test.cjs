@@ -88,13 +88,13 @@ describe("reply_to_pr_review_comment", () => {
     expect(result.comment_id).toBe(123);
     expect(result.reply_id).toBe(999);
     expect(result.reply_url).toContain("discussion_r999");
-    expect(mockCreateReplyForReviewComment).toHaveBeenCalledWith({
-      owner: "test-owner",
-      repo: "test-repo",
-      pull_number: 42,
-      comment_id: 123,
-      body: "Thanks for the feedback, I've updated the code.",
-    });
+    // Footer is enabled by default, so body will include footer text
+    const calledWith = mockCreateReplyForReviewComment.mock.calls[0][0];
+    expect(calledWith.owner).toBe("test-owner");
+    expect(calledWith.repo).toBe("test-repo");
+    expect(calledWith.pull_number).toBe(42);
+    expect(calledWith.comment_id).toBe(123);
+    expect(calledWith.body).toContain("Thanks for the feedback, I've updated the code.");
   });
 
   it("should accept comment_id as a string", async () => {
@@ -282,6 +282,51 @@ describe("reply_to_pr_review_comment", () => {
     const result = await defaultHandler(message, {});
     expect(result.success).toBe(false);
     expect(result.error).toContain("Max count of 10 reached");
+  });
+
+  it("should append footer to reply body by default", async () => {
+    process.env.GH_AW_WORKFLOW_NAME = "Test Workflow";
+
+    const { main } = require("./reply_to_pr_review_comment.cjs");
+    const footerHandler = await main({ max: 10 });
+
+    const message = {
+      type: "reply_to_pull_request_review_comment",
+      comment_id: 123,
+      body: "Great point, fixed.",
+    };
+
+    const result = await footerHandler(message, {});
+
+    expect(result.success).toBe(true);
+    const calledBody = mockCreateReplyForReviewComment.mock.calls[0][0].body;
+    expect(calledBody).toContain("Great point, fixed.");
+    // Footer should include workflow metadata (XML marker)
+    expect(calledBody).toContain("<!-- ");
+
+    delete process.env.GH_AW_WORKFLOW_NAME;
+  });
+
+  it("should omit footer when footer config is false", async () => {
+    const { main } = require("./reply_to_pr_review_comment.cjs");
+    const noFooterHandler = await main({ max: 10, footer: false });
+
+    const message = {
+      type: "reply_to_pull_request_review_comment",
+      comment_id: 123,
+      body: "Acknowledged, thanks!",
+    };
+
+    const result = await noFooterHandler(message, {});
+
+    expect(result.success).toBe(true);
+    expect(mockCreateReplyForReviewComment).toHaveBeenCalledWith({
+      owner: "test-owner",
+      repo: "test-repo",
+      pull_number: 42,
+      comment_id: 123,
+      body: "Acknowledged, thanks!",
+    });
   });
 
   it("should handle API errors gracefully", async () => {

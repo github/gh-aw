@@ -7,6 +7,7 @@
 
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
+const { generateFooterWithMessages } = require("./messages_footer.cjs");
 
 /**
  * Type constant for handler identification
@@ -37,12 +38,21 @@ async function main(config = {}) {
   // Extract configuration
   const maxCount = config.max || 10;
   const replyTarget = config.target || "triggering";
+  const includeFooter = config.footer !== false; // Default to true
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
   // Determine the triggering PR number from context
   const triggeringPRNumber = getTriggeringPRNumber(context.payload);
 
-  core.info(`Reply to PR review comment configuration: max=${maxCount}, target=${replyTarget}, triggeringPR=${triggeringPRNumber || "none"}`);
+  // Extract workflow context for footer generation
+  const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
+  const workflowSource = process.env.GH_AW_WORKFLOW_SOURCE || "";
+  const workflowSourceURL = process.env.GH_AW_WORKFLOW_SOURCE_URL || "";
+  const runId = context.runId;
+  const githubServer = process.env.GITHUB_SERVER_URL || "https://github.com";
+  const runUrl = context.payload?.repository?.html_url ? `${context.payload.repository.html_url}/actions/runs/${runId}` : `${githubServer}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+  core.info(`Reply to PR review comment configuration: max=${maxCount}, target=${replyTarget}, footer=${includeFooter}, triggeringPR=${triggeringPRNumber || "none"}`);
   core.info(`Default target repo: ${defaultTargetRepo}`);
 
   // Track how many items we've processed for max limit
@@ -143,6 +153,13 @@ async function main(config = {}) {
       // Validation passed — count this message against the max quota
       processedCount++;
 
+      // Append footer with workflow information when enabled
+      let finalBody = body;
+      if (includeFooter) {
+        const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, undefined, triggeringPRNumber, undefined);
+        finalBody = body.trimEnd() + footer;
+      }
+
       core.info(`Replying to review comment ${numericCommentId} on PR #${targetPRNumber} (${owner}/${repo})`);
 
       const result = await github.rest.pulls.createReplyForReviewComment({
@@ -150,7 +167,7 @@ async function main(config = {}) {
         repo,
         pull_number: targetPRNumber,
         comment_id: numericCommentId,
-        body,
+        body: finalBody,
       });
 
       core.info(`Successfully replied to review comment ${numericCommentId}: ${result.data?.html_url}`);
