@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/github/gh-aw/pkg/logger"
 )
@@ -58,6 +59,11 @@ func isGitToolAllowed(tools *Tools) bool {
 			return true
 		}
 		if cmd == "git" {
+			// Exact match for git command
+			return true
+		}
+		// Check for git with wildcards: "git *", "git:*", "git checkout:*", etc.
+		if strings.HasPrefix(cmd, "git ") || strings.HasPrefix(cmd, "git:") {
 			return true
 		}
 	}

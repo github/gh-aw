@@ -231,6 +231,30 @@ func TestIsGitToolAllowed(t *testing.T) {
 			description: "Wildcard in list allows all commands",
 		},
 		{
+			name: "bash with git and space wildcard - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"git *"},
+			},
+			expectGitOK: true,
+			description: "git * pattern allows all git commands",
+		},
+		{
+			name: "bash with git colon wildcard - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"git:*"},
+			},
+			expectGitOK: true,
+			description: "git:* pattern allows all git commands",
+		},
+		{
+			name: "bash with git subcommand wildcard - git allowed",
+			toolsMap: map[string]any{
+				"bash": []any{"git checkout:*", "git status"},
+			},
+			expectGitOK: true,
+			description: "git <subcommand>:* pattern allows git commands",
+		},
+		{
 			name: "bash with other commands only - git not allowed",
 			toolsMap: map[string]any{
 				"bash": []any{"echo", "ls", "cat"},

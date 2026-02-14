@@ -33,6 +33,7 @@ name: "Daily Fact About gh-aw"
 "on":
   schedule:
   - cron: "0 11 * * 1-5"
+    # Friendly format: daily (scattered)
   workflow_dispatch:
 
 permissions: {}
