@@ -111,89 +111,11 @@ Before filing an issue, **use an agent to perform thorough analysis and research
 
 **Bug reports submitted with minimal analysis or research are likely to be ignored.**
 
-Instead of filing a minimal bug report, use an agent to:
-
-1. **Analyze the source code** - Scan relevant files to understand the root cause
-2. **Identify execution patterns** - Trace how the bug manifests in the codebase
-3. **Propose specific fixes** - Include concrete code changes or approaches
-4. **Research similar issues** - Check if the problem has been addressed before
-
-**Example of a good bug report with agent analysis:**
-
-```markdown
-## Bug: Workflow compilation fails with custom MCP server timeout
-
-### Analysis Performed
-Used GitHub Copilot Agent to analyze the issue:
-- Traced error to `pkg/workflow/mcp_validation.go:234`
-- Root cause: timeout validation expects integer, receives string
-- Similar issue fixed in #456 for different field
-- Proposed fix: Add type coercion in validation layer
-
-### Steps to Reproduce
-1. Create workflow with `mcp_servers.my_server.timeout: "30s"`
-2. Run `gh aw compile workflow.md`
-3. Compilation fails with type error
-
-### Expected vs Actual
-- Expected: Parse "30s" as 30 second timeout
-- Actual: Type error "expected int, got string"
-
-### Proposed Solution
-Add duration parsing in `validateMCPServerConfig()` similar to
-the approach used for cache-memory duration parsing.
-```
-
-**Example of a minimal bug report (will likely be ignored):**
-
-```markdown
-## Bug: Compilation fails
-
-Workflow doesn't compile. Please fix.
-```
+Use an agent to analyze the source code, identify root causes, propose fixes, and research similar issues before filing a bug report.
 
 #### 🐛 Debugging Workflow Failures
 
-If an agentic workflow fails, **use the agentic debugging experience** to quickly identify the root cause:
-
-1. **Start your preferred agent** - Use GitHub Copilot Agent, Claude, or another AI assistant
-2. **Load the custom agent** - Reference `.github/agents/agentic-workflows.agent.md`
-3. **Ask it to debug the workflow** - Provide the workflow run URL
-
-**Example debugging session:**
-
-```markdown
-@github-copilot agent
-
-Please debug this workflow failure:
-https://github.com/owner/repo/actions/runs/12345678
-
-Load .github/agents/agentic-workflows.agent.md and investigate:
-- Why the workflow failed
-- What tools were missing
-- How to fix the configuration
-```
-
-The agent will:
-- Use `gh aw audit <run-id>` to analyze the failure
-- Inspect logs for missing tools or permission errors
-- Identify configuration issues (MCP servers, permissions, safe-outputs)
-- Provide specific fixes with code examples
-
-**Available debugging commands:**
-
-```bash
-# Audit a specific workflow run
-gh aw audit <run-id>
-
-# Download and analyze logs for a workflow
-gh aw logs workflow-name
-
-# Inspect MCP server configuration
-gh aw mcp inspect workflow-name
-```
-
-See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for the full debugging guide.
+For workflow failures, load `.github/agents/agentic-workflows.agent.md` in your agent and provide the run URL. The agent will use `gh aw audit <run-id>` and `gh aw logs` to analyze failures. See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for details.
 
 #### 📝 Issue Guidelines
 
