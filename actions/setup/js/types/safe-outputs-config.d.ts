@@ -97,9 +97,12 @@ interface CreatePullRequestReviewCommentConfig extends SafeOutputConfig {
 /**
  * Configuration for resolving pull request review threads.
  * Resolution is scoped to the triggering PR only.
+ *
+ * Inherits common fields (e.g. "github-token") from SafeOutputConfig.
+ * The only new field explicitly supported on this interface is "max".
  */
 interface ResolvePullRequestReviewThreadConfig extends SafeOutputConfig {
-  // Only max is supported — resolution is always scoped to the triggering PR
+  // "max" is the only field added beyond those inherited from SafeOutputConfig
 }
 
 /**

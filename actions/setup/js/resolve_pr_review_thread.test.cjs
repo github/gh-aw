@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const mockCore = {
   debug: vi.fn(),
@@ -62,6 +62,7 @@ function mockGraphqlForThread(lookupPRNumber) {
 
 describe("resolve_pr_review_thread", () => {
   let handler;
+  const originalPayload = mockContext.payload;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -72,6 +73,11 @@ describe("resolve_pr_review_thread", () => {
 
     const { main } = require("./resolve_pr_review_thread.cjs");
     handler = await main({ max: 10 });
+  });
+
+  afterEach(() => {
+    // Always restore the global context payload, even if assertions threw
+    global.context.payload = originalPayload;
   });
 
   it("should return a function from main()", async () => {
@@ -139,8 +145,7 @@ describe("resolve_pr_review_thread", () => {
   });
 
   it("should reject when not in a pull request context", async () => {
-    // Override context to non-PR event
-    const savedPayload = global.context.payload;
+    // Override context to non-PR event (afterEach restores the original payload)
     global.context.payload = {
       repository: { html_url: "https://github.com/test-owner/test-repo" },
     };
@@ -157,9 +162,6 @@ describe("resolve_pr_review_thread", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("pull request context");
-
-    // Restore
-    global.context.payload = savedPayload;
   });
 
   it("should fail when thread_id is missing", async () => {
@@ -296,8 +298,7 @@ describe("resolve_pr_review_thread", () => {
   });
 
   it("should work when triggered from issue_comment on a PR", async () => {
-    // Simulate issue_comment event on a PR
-    const savedPayload = global.context.payload;
+    // Simulate issue_comment event on a PR (afterEach restores the original payload)
     global.context.payload = {
       issue: { number: 42, pull_request: { url: "https://api.github.com/..." } },
       repository: { html_url: "https://github.com/test-owner/test-repo" },
@@ -314,8 +315,5 @@ describe("resolve_pr_review_thread", () => {
     const result = await freshHandler(message, {});
 
     expect(result.success).toBe(true);
-
-    // Restore
-    global.context.payload = savedPayload;
   });
 });

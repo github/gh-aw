@@ -64,6 +64,17 @@ async function resolveReviewThreadAPI(github, threadId) {
 }
 
 /**
+ * Extract the triggering pull request number from the GitHub Actions event payload.
+ * Supports both pull_request events (payload.pull_request.number) and issue_comment
+ * events on PRs (payload.issue.number when payload.issue.pull_request is present).
+ * @param {any} payload - The context.payload from the GitHub Actions event
+ * @returns {number|undefined} The PR number, or undefined if not in a PR context
+ */
+function getTriggeringPRNumber(payload) {
+  return payload?.pull_request?.number || (payload?.issue?.pull_request ? payload.issue.number : undefined);
+}
+
+/**
  * Main handler factory for resolve_pull_request_review_thread
  * Returns a message handler function that processes individual resolve messages.
  *
@@ -77,7 +88,7 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
 
   // Determine the triggering PR number from context
-  const triggeringPRNumber = context.payload?.pull_request?.number || (context.payload?.issue?.pull_request ? context.payload.issue.number : undefined);
+  const triggeringPRNumber = getTriggeringPRNumber(context.payload);
 
   core.info(`Resolve PR review thread configuration: max=${maxCount}, triggeringPR=${triggeringPRNumber || "none"}`);
 
