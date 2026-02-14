@@ -18,7 +18,7 @@ func TestSafeOutputsImport(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with create-issue configuration
@@ -37,7 +37,7 @@ This shared workflow provides create-issue configuration.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-create-issue.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the create-issue configuration
@@ -55,7 +55,7 @@ This workflow uses the imported create-issue configuration.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -83,7 +83,7 @@ func TestSafeOutputsImportMultipleTypes(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with multiple safe-output types
@@ -103,7 +103,7 @@ This shared workflow provides multiple safe-output types.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-outputs.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the safe-outputs
@@ -119,7 +119,7 @@ imports:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -150,7 +150,7 @@ func TestSafeOutputsImportOverride(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with create-issue configuration
@@ -164,7 +164,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-create-issue.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that also defines create-issue (main overrides imported)
@@ -183,7 +183,7 @@ safe-outputs:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -210,7 +210,7 @@ func TestSafeOutputsImportConflictBetweenImports(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create first shared workflow with create-issue
@@ -224,7 +224,7 @@ safe-outputs:
 `
 
 	sharedFile1 := filepath.Join(workflowsDir, "shared-create-issue1.md")
-	err = os.WriteFile(sharedFile1, []byte(sharedWorkflow1), 0644)
+	err = os.WriteFile(sharedFile1, []byte(sharedWorkflow1), 0o644)
 	require.NoError(t, err, "Failed to write shared file 1")
 
 	// Create second shared workflow with create-issue (conflict)
@@ -238,7 +238,7 @@ safe-outputs:
 `
 
 	sharedFile2 := filepath.Join(workflowsDir, "shared-create-issue2.md")
-	err = os.WriteFile(sharedFile2, []byte(sharedWorkflow2), 0644)
+	err = os.WriteFile(sharedFile2, []byte(sharedWorkflow2), 0o644)
 	require.NoError(t, err, "Failed to write shared file 2")
 
 	// Create main workflow that imports both (conflict between imports)
@@ -255,7 +255,7 @@ imports:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -279,7 +279,7 @@ func TestSafeOutputsImportNoConflictDifferentTypes(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with create-discussion configuration
@@ -294,7 +294,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-create-discussion.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow with create-issue (different type, no conflict)
@@ -313,7 +313,7 @@ safe-outputs:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -344,7 +344,7 @@ func TestSafeOutputsImportFromMultipleWorkflows(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create first shared workflow with create-issue
@@ -358,7 +358,7 @@ safe-outputs:
 `
 
 	sharedFile1 := filepath.Join(workflowsDir, "shared-issue.md")
-	err = os.WriteFile(sharedFile1, []byte(sharedWorkflow1), 0644)
+	err = os.WriteFile(sharedFile1, []byte(sharedWorkflow1), 0o644)
 	require.NoError(t, err, "Failed to write shared file 1")
 
 	// Create second shared workflow with add-comment
@@ -372,7 +372,7 @@ safe-outputs:
 `
 
 	sharedFile2 := filepath.Join(workflowsDir, "shared-comment.md")
-	err = os.WriteFile(sharedFile2, []byte(sharedWorkflow2), 0644)
+	err = os.WriteFile(sharedFile2, []byte(sharedWorkflow2), 0o644)
 	require.NoError(t, err, "Failed to write shared file 2")
 
 	// Create main workflow that imports both
@@ -389,7 +389,7 @@ imports:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -626,7 +626,7 @@ func TestSafeOutputsImportMetaFields(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with meta fields
@@ -649,7 +649,7 @@ This shared workflow provides meta configuration fields.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-meta.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the meta configuration
@@ -670,7 +670,7 @@ This workflow uses the imported meta configuration.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -707,7 +707,7 @@ func TestSafeOutputsImportMetaFieldsMainTakesPrecedence(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with meta fields
@@ -723,7 +723,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-meta.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that has its own meta fields
@@ -748,7 +748,7 @@ This workflow has its own meta configuration that should take precedence.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -776,7 +776,7 @@ func TestSafeOutputsImportMetaFieldsFromOnlyImport(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with meta fields and create-issue
@@ -796,7 +796,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-full.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that has NO safe-outputs section (only imports)
@@ -814,7 +814,7 @@ This workflow uses only imported safe-outputs configuration.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -848,7 +848,7 @@ func TestSafeOutputsImportJobsFromSharedWorkflow(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with safe-outputs.jobs configuration
@@ -872,7 +872,7 @@ This shared workflow provides custom safe-job definitions.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-safe-jobs.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the safe-jobs configuration
@@ -890,7 +890,7 @@ This workflow imports safe-jobs from a shared workflow.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -925,7 +925,7 @@ func TestSafeOutputsImportJobsWithMainWorkflowJobs(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with safe-outputs.jobs configuration
@@ -944,7 +944,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-jobs.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that has its own jobs AND imports jobs
@@ -970,7 +970,7 @@ This workflow has its own jobs and imports more jobs.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1005,7 +1005,7 @@ func TestSafeOutputsImportJobsConflict(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with safe-outputs.jobs configuration
@@ -1024,7 +1024,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-duplicate.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that has the same job name (conflict)
@@ -1048,7 +1048,7 @@ safe-outputs:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1072,7 +1072,7 @@ func TestSafeOutputsImportMessagesFromSharedWorkflow(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with messages configuration
@@ -1094,7 +1094,7 @@ This shared workflow provides custom messages templates.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-messages.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the messages configuration
@@ -1115,7 +1115,7 @@ This workflow imports messages from a shared workflow.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1148,7 +1148,7 @@ func TestSafeOutputsImportMessagesMainOverrides(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with messages configuration
@@ -1168,7 +1168,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-messages.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow with partial messages configuration (some fields only)
@@ -1192,7 +1192,7 @@ Main workflow defines some messages that should take precedence.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1229,7 +1229,7 @@ func TestSafeOutputsImportMessagesWithNoMainSafeOutputs(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with messages and a safe output type
@@ -1246,7 +1246,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-full.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow with NO safe-outputs section
@@ -1264,7 +1264,7 @@ Uses only imported safe-outputs including messages.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1411,7 +1411,7 @@ func TestMergeSafeOutputsWithJobsIntegration(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with both jobs and safe-output types
@@ -1434,7 +1434,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-all.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports everything
@@ -1453,7 +1453,7 @@ This workflow imports jobs and safe-outputs.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1490,7 +1490,7 @@ func TestProjectSafeOutputsImport(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with all project-related safe-output types
@@ -1514,7 +1514,7 @@ This shared workflow provides project-related safe-output configuration.
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-project.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the project configuration
@@ -1532,7 +1532,7 @@ This workflow uses the imported project safe-output configuration.
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1571,7 +1571,7 @@ func TestAllMissingSafeOutputTypesImport(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with all the previously missing safe-output types
@@ -1601,7 +1601,7 @@ This shared workflow provides additional safe-output types that were missing fro
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-additional.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports the configuration
@@ -1619,7 +1619,7 @@ This workflow uses the imported safe-output configuration for previously missing
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1667,7 +1667,7 @@ func TestSafeOutputsImportMessagesAllFields(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with ALL message fields defined
@@ -1690,7 +1690,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-all-messages.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that imports all message fields
@@ -1709,7 +1709,7 @@ safe-outputs:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution
@@ -1745,7 +1745,7 @@ func TestSafeOutputsImportMessagesAllFieldsPartialOverride(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a shared workflow with ALL message fields
@@ -1768,7 +1768,7 @@ safe-outputs:
 `
 
 	sharedFile := filepath.Join(workflowsDir, "shared-messages.md")
-	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write shared file")
 
 	// Create main workflow that overrides some message fields
@@ -1791,7 +1791,7 @@ safe-outputs:
 `
 
 	mainFile := filepath.Join(workflowsDir, "main.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main file")
 
 	// Change to the workflows directory for relative path resolution

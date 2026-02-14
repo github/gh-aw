@@ -44,7 +44,7 @@ This is a valid workflow.
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowYAML), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowYAML), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

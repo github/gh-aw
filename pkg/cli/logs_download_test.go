@@ -22,7 +22,6 @@ func TestDownloadWorkflowLogs(t *testing.T) {
 	// This should either fail with auth error (if not authenticated)
 	// or succeed with no results (if authenticated but no workflows match)
 	err := DownloadWorkflowLogs(context.Background(), "", 1, "", "", "./test-logs", "", "", 0, 0, "", false, false, false, false, false, false, false, 0, "summary.json", "")
-
 	// If GitHub CLI is authenticated, the function may succeed but find no results
 	// If not authenticated, it should return an auth error
 	if err != nil {
@@ -56,7 +55,7 @@ func TestDirExists(t *testing.T) {
 
 	// Test file vs directory
 	testFile := filepath.Join(tmpDir, "testfile")
-	err := os.WriteFile(testFile, []byte("test"), 0644)
+	err := os.WriteFile(testFile, []byte("test"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -71,7 +70,7 @@ func TestIsDirEmpty(t *testing.T) {
 
 	// Test empty directory
 	emptyDir := filepath.Join(tmpDir, "empty")
-	err := os.Mkdir(emptyDir, 0755)
+	err := os.Mkdir(emptyDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
@@ -82,13 +81,13 @@ func TestIsDirEmpty(t *testing.T) {
 
 	// Test directory with files
 	nonEmptyDir := filepath.Join(tmpDir, "nonempty")
-	err = os.Mkdir(nonEmptyDir, 0755)
+	err = os.Mkdir(nonEmptyDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create non-empty directory: %v", err)
 	}
 
 	testFile := filepath.Join(nonEmptyDir, "testfile")
-	err = os.WriteFile(testFile, []byte("test"), 0644)
+	err = os.WriteFile(testFile, []byte("test"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -274,7 +273,7 @@ func TestUnzipFile(t *testing.T) {
 
 	// Create a destination directory
 	destDir := filepath.Join(tmpDir, "extracted")
-	err = os.MkdirAll(destDir, 0755)
+	err = os.MkdirAll(destDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create destination directory: %v", err)
 	}
@@ -342,7 +341,7 @@ func TestUnzipFileZipSlipPrevention(t *testing.T) {
 
 	// Create a destination directory
 	destDir := filepath.Join(tmpDir, "safe-extraction")
-	err = os.MkdirAll(destDir, 0755)
+	err = os.MkdirAll(destDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create destination directory: %v", err)
 	}
@@ -405,20 +404,20 @@ func TestDownloadWorkflowRunLogsStructure(t *testing.T) {
 
 	// Create a run directory (simulating logs/run-12345)
 	runDir := filepath.Join(tmpDir, "run-12345")
-	err = os.MkdirAll(runDir, 0755)
+	err = os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create run directory: %v", err)
 	}
 
 	// Create some other artifacts in the run directory (to verify they don't get mixed with logs)
-	err = os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"engine_id": "claude"}`), 0644)
+	err = os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"engine_id": "claude"}`), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create aw_info.json: %v", err)
 	}
 
 	// Create the workflow-logs subdirectory and extract logs there
 	workflowLogsDir := filepath.Join(runDir, "workflow-logs")
-	err = os.MkdirAll(workflowLogsDir, 0755)
+	err = os.MkdirAll(workflowLogsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create workflow-logs directory: %v", err)
 	}

@@ -47,7 +47,7 @@ jobs:
         run: npm run build`
 
 	yamlFile := filepath.Join(tmpDir, "ci-workflow.yml")
-	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0644)
+	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0o644)
 	require.NoError(t, err, "Should create YAML workflow file")
 
 	// Create a markdown workflow that imports the YAML workflow
@@ -70,7 +70,7 @@ jobs:
 This workflow imports a YAML workflow and adds additional jobs.`
 
 	mdFile := filepath.Join(tmpDir, "main-workflow.md")
-	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0644)
+	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0o644)
 	require.NoError(t, err, "Should create markdown workflow file")
 
 	// Extract frontmatter and process imports
@@ -157,7 +157,7 @@ jobs:
         run: npm run test:db`
 
 	yamlFile := filepath.Join(tmpDir, "db-test.yml")
-	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0644)
+	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0o644)
 	require.NoError(t, err, "Should create YAML workflow file")
 
 	// Create a markdown workflow that imports the YAML workflow
@@ -173,7 +173,7 @@ imports:
 This workflow imports a YAML workflow with services.`
 
 	mdFile := filepath.Join(tmpDir, "main-workflow.md")
-	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0644)
+	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0o644)
 	require.NoError(t, err, "Should create markdown workflow file")
 
 	// Extract frontmatter and process imports

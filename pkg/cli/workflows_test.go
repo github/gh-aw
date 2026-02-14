@@ -174,7 +174,7 @@ func TestGetMarkdownWorkflowFilesExcludesREADME(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -192,7 +192,7 @@ func TestGetMarkdownWorkflowFilesExcludesREADME(t *testing.T) {
 
 	for filename, content := range testFiles {
 		path := filepath.Join(workflowsDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write test file %s: %v", filename, err)
 		}
 	}

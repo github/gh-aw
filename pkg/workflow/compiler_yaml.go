@@ -364,6 +364,7 @@ func (c *Compiler) generatePrompt(yaml *strings.Builder, data *WorkflowData) {
 	yaml.WriteString("          GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt\n")
 	yaml.WriteString("        run: bash /opt/gh-aw/actions/print_prompt_summary.sh\n")
 }
+
 func (c *Compiler) generatePostSteps(yaml *strings.Builder, data *WorkflowData) {
 	if data.PostSteps != "" {
 		// Remove "post-steps:" line and adjust indentation, similar to CustomSteps processing
@@ -630,5 +631,4 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	fmt.Fprintf(yaml, "          name: %s\n", constants.AgentOutputArtifactName)
 	yaml.WriteString("          path: ${{ env.GH_AW_AGENT_OUTPUT }}\n")
 	yaml.WriteString("          if-no-files-found: warn\n")
-
 }

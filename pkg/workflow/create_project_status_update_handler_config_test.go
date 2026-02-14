@@ -35,7 +35,7 @@ Test workflow
 
 	// Write test markdown file
 	mdFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	err := os.WriteFile(mdFile, []byte(testContent), 0o600)
 	require.NoError(t, err, "Failed to write test markdown file")
 
 	// Compile the workflow
@@ -86,7 +86,7 @@ Test workflow
 
 	// Write test markdown file
 	mdFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	err := os.WriteFile(mdFile, []byte(testContent), 0o600)
 	require.NoError(t, err, "Failed to write test markdown file")
 
 	// Compile the workflow
@@ -150,7 +150,7 @@ Test workflow
 
 	// Write test markdown file
 	mdFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	err := os.WriteFile(mdFile, []byte(testContent), 0o600)
 	require.NoError(t, err, "Failed to write test markdown file")
 
 	// Compile the workflow
@@ -216,7 +216,7 @@ Test workflow
 `
 
 	mdFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(mdFile, []byte(testContent), 0600)
+	err := os.WriteFile(mdFile, []byte(testContent), 0o600)
 	require.NoError(t, err, "Failed to write test markdown file")
 
 	compiler := NewCompiler()

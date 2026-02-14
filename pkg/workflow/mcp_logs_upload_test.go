@@ -34,7 +34,7 @@ Please navigate to example.com and take a screenshot.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-mcp-logs.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -137,7 +137,7 @@ This workflow does not use Playwright but should still have MCP logs upload.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-no-playwright.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 

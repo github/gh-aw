@@ -40,7 +40,7 @@ Test workflow with neutral tools format.
 `
 
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
@@ -131,7 +131,7 @@ Test workflow with legacy Claude tools format.
 `
 
 	workflowPath := filepath.Join(tempDir, "legacy-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}

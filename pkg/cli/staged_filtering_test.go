@@ -24,7 +24,7 @@ func TestParseAwInfo(t *testing.T) {
 		}
 		infoBytes, _ := json.Marshal(infoData)
 		infoPath := filepath.Join(tmpDir, "aw_info_staged_true.json")
-		err := os.WriteFile(infoPath, infoBytes, 0644)
+		err := os.WriteFile(infoPath, infoBytes, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
@@ -53,7 +53,7 @@ func TestParseAwInfo(t *testing.T) {
 		}
 		infoBytes, _ := json.Marshal(infoData)
 		infoPath := filepath.Join(tmpDir, "aw_info_staged_false.json")
-		err := os.WriteFile(infoPath, infoBytes, 0644)
+		err := os.WriteFile(infoPath, infoBytes, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
@@ -75,7 +75,7 @@ func TestParseAwInfo(t *testing.T) {
 		}
 		infoBytes, _ := json.Marshal(infoData)
 		infoPath := filepath.Join(tmpDir, "aw_info_no_staged.json")
-		err := os.WriteFile(infoPath, infoBytes, 0644)
+		err := os.WriteFile(infoPath, infoBytes, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestParseAwInfo(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		// Create invalid JSON file
 		invalidPath := filepath.Join(tmpDir, "invalid.json")
-		err := os.WriteFile(invalidPath, []byte("invalid json content"), 0644)
+		err := os.WriteFile(invalidPath, []byte("invalid json content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
@@ -115,7 +115,7 @@ func TestParseAwInfo(t *testing.T) {
 	t.Run("staged as directory with nested file", func(t *testing.T) {
 		// Create a directory with the same name and nested aw_info.json
 		dirPath := filepath.Join(tmpDir, "aw_info_dir")
-		err := os.MkdirAll(dirPath, 0755)
+		err := os.MkdirAll(dirPath, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create directory: %v", err)
 		}
@@ -128,7 +128,7 @@ func TestParseAwInfo(t *testing.T) {
 		}
 		infoBytes, _ := json.Marshal(infoData)
 		nestedPath := filepath.Join(dirPath, "aw_info.json")
-		err = os.WriteFile(nestedPath, infoBytes, 0644)
+		err = os.WriteFile(nestedPath, infoBytes, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write nested test file: %v", err)
 		}
@@ -158,7 +158,7 @@ func TestParseAwInfo(t *testing.T) {
 		}
 		infoBytes, _ := json.Marshal(infoData)
 		infoPath := filepath.Join(tmpDir, "aw_info_complete.json")
-		err := os.WriteFile(infoPath, infoBytes, 0644)
+		err := os.WriteFile(infoPath, infoBytes, 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}

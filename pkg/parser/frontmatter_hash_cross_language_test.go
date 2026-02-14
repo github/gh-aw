@@ -80,7 +80,7 @@ bots:
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Write test workflow
-			err := os.WriteFile(workflowFile, []byte(tc.content), 0644)
+			err := os.WriteFile(workflowFile, []byte(tc.content), 0o644)
 			require.NoError(t, err, "Should write test file")
 
 			// Compute hash with Go implementation
@@ -148,7 +148,7 @@ Use config variable: ${{ vars.MY_CONFIG }}
 Use github context: ${{ github.repository }}
 `
 
-	err := os.WriteFile(workflowFile, []byte(content), 0644)
+	err := os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Should write test file")
 
 	cache := NewImportCache("")
@@ -171,7 +171,7 @@ Use github context: ${{ github.repository }}
 `
 
 	workflowFile2 := filepath.Join(tempDir, "test-with-different-expressions.md")
-	err = os.WriteFile(workflowFile2, []byte(content2), 0644)
+	err = os.WriteFile(workflowFile2, []byte(content2), 0o644)
 	require.NoError(t, err, "Should write second test file")
 
 	hash2, err := ComputeFrontmatterHashFromFile(workflowFile2, cache)
@@ -192,7 +192,7 @@ Use github context: ${{ github.repository_owner }}
 `
 
 	workflowFile3 := filepath.Join(tempDir, "test-with-github-expression.md")
-	err = os.WriteFile(workflowFile3, []byte(content3), 0644)
+	err = os.WriteFile(workflowFile3, []byte(content3), 0o644)
 	require.NoError(t, err, "Should write third test file")
 
 	hash3, err := ComputeFrontmatterHashFromFile(workflowFile3, cache)

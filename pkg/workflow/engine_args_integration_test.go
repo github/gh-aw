@@ -29,7 +29,7 @@ This is a test workflow to verify engine args injection.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -83,7 +83,7 @@ This is a test workflow to verify multiple engine args injection.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -139,7 +139,7 @@ This is a test workflow without engine args.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -188,7 +188,7 @@ This is a test workflow to verify claude engine args injection.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -235,7 +235,7 @@ This is a test workflow to verify codex engine args injection.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

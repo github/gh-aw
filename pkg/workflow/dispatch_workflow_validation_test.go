@@ -21,7 +21,7 @@ func TestDispatchWorkflowErrorMessage_EmptyList(t *testing.T) {
 	tmpDir := t.TempDir()
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
 
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
@@ -62,9 +62,9 @@ func TestDispatchWorkflowErrorMessage_NotFound(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a dispatcher workflow that references a non-existent workflow
@@ -85,7 +85,7 @@ safe-outputs:
 This workflow references a non-existent workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -125,9 +125,9 @@ func TestDispatchWorkflowErrorMessage_SelfReference(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a dispatcher workflow that references itself
@@ -148,7 +148,7 @@ safe-outputs:
 This workflow tries to dispatch to itself.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -185,9 +185,9 @@ func TestDispatchWorkflowErrorMessage_MustCompile(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create an uncompiled workflow (only .md file, no .lock.yml)
@@ -203,7 +203,7 @@ permissions:
 This workflow needs to be compiled.
 `
 	targetFile := filepath.Join(workflowsDir, "target.md")
-	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0644)
+	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write target workflow")
 
 	// Create a dispatcher workflow that references the uncompiled workflow
@@ -224,7 +224,7 @@ safe-outputs:
 This workflow references an uncompiled workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -264,9 +264,9 @@ func TestDispatchWorkflowErrorMessage_MultipleErrors(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create dispatcher workflow with multiple errors
@@ -286,7 +286,7 @@ safe-outputs:
 # Dispatcher Workflow
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory

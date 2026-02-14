@@ -314,7 +314,7 @@ Test workflow with release mode.
 `
 
 	workflowPath := tempDir + "/test-workflow.md"
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -403,7 +403,7 @@ Test
 `
 
 	workflowPath := tempDir + "/test-workflow.md"
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow: %v", err)
 	}
 

@@ -45,7 +45,7 @@ func TestCompileDoesNotWriteInstructions(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -64,7 +64,7 @@ engine: claude
 This is a test workflow for compilation.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -149,7 +149,7 @@ func TestCompileDoesNotWriteInstructionsWhenCompilingAll(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -168,7 +168,7 @@ engine: claude
 This is a test workflow for compilation.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

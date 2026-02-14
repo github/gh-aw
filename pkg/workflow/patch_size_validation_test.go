@@ -79,7 +79,7 @@ This workflow tests custom 2MB patch size configuration.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create markdown file
 			mdFile := filepath.Join(tmpDir, tt.name+".md")
-			err := os.WriteFile(mdFile, []byte(tt.frontmatterContent), 0644)
+			err := os.WriteFile(mdFile, []byte(tt.frontmatterContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -167,7 +167,7 @@ This workflow tests large valid patch size configuration.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create markdown file
 			mdFile := filepath.Join(tmpDir, tt.name+".md")
-			err := os.WriteFile(mdFile, []byte(tt.frontmatterContent), 0644)
+			err := os.WriteFile(mdFile, []byte(tt.frontmatterContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}

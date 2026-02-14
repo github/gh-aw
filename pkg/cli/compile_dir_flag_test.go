@@ -42,7 +42,7 @@ func TestCompileWithDirFlag(t *testing.T) {
 
 	// Create custom workflow directory
 	customDir := "my-workflows"
-	if err := os.MkdirAll(customDir, 0755); err != nil {
+	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -56,7 +56,7 @@ on: push
 This is a test workflow in a custom directory.
 `
 	workflowFile := filepath.Join(customDir, "test.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 
@@ -146,7 +146,7 @@ func TestCompileDirFlagValidation(t *testing.T) {
 				if expectedDir == "" {
 					expectedDir = ".github/workflows"
 				}
-				if err := os.MkdirAll(expectedDir, 0755); err != nil {
+				if err := os.MkdirAll(expectedDir, 0o755); err != nil {
 					t.Fatalf("Failed to create workflow directory: %v", err)
 				}
 				// Create a placeholder workflow file
@@ -157,7 +157,7 @@ on: push
 
 # Test Workflow
 `
-				if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+				if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 					t.Fatalf("Failed to create test workflow file: %v", err)
 				}
 			}

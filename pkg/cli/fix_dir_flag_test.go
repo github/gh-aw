@@ -14,7 +14,7 @@ func TestFixWithDirFlag(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir := t.TempDir()
 	customDir := filepath.Join(tmpDir, "custom-workflows")
-	if err := os.MkdirAll(customDir, 0755); err != nil {
+	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -34,7 +34,7 @@ permissions:
 This is a test workflow with deprecated timeout_minutes field.
 `
 	workflowFile := filepath.Join(customDir, "test.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 
@@ -71,7 +71,7 @@ func TestFixWithDirFlagAndSpecificWorkflow(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir := t.TempDir()
 	customDir := filepath.Join(tmpDir, "custom-workflows")
-	if err := os.MkdirAll(customDir, 0755); err != nil {
+	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -83,7 +83,7 @@ timeout_minutes: 30
 # Workflow 1
 `
 	workflow1File := filepath.Join(customDir, "workflow1.md")
-	if err := os.WriteFile(workflow1File, []byte(workflow1Content), 0644); err != nil {
+	if err := os.WriteFile(workflow1File, []byte(workflow1Content), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow1 file: %v", err)
 	}
 
@@ -94,7 +94,7 @@ timeout_minutes: 60
 # Workflow 2
 `
 	workflow2File := filepath.Join(customDir, "workflow2.md")
-	if err := os.WriteFile(workflow2File, []byte(workflow2Content), 0644); err != nil {
+	if err := os.WriteFile(workflow2File, []byte(workflow2Content), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow2 file: %v", err)
 	}
 
@@ -137,7 +137,7 @@ func TestFixDirFlagDefaultBehavior(t *testing.T) {
 	// Create a temporary directory for test
 	tmpDir := t.TempDir()
 	defaultDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(defaultDir, 0755); err != nil {
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
 		t.Fatalf("Failed to create default workflow directory: %v", err)
 	}
 
@@ -149,7 +149,7 @@ timeout_minutes: 30
 # Test Workflow
 `
 	workflowFile := filepath.Join(defaultDir, "test.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 

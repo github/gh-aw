@@ -25,7 +25,7 @@ func TestCopilotLogParsingAfterFlattening(t *testing.T) {
 	// gh run download creates: agent_outputs/sandbox/agent/logs/session-*.log
 	agentOutputsDir := filepath.Join(tmpDir, "agent_outputs")
 	sessionLogsDir := filepath.Join(agentOutputsDir, "sandbox", "agent", "logs")
-	err := os.MkdirAll(sessionLogsDir, 0755)
+	err := os.MkdirAll(sessionLogsDir, 0o755)
 	require.NoError(t, err)
 
 	sessionLogPath := filepath.Join(sessionLogsDir, "session-copilot-20701642088.log")
@@ -53,7 +53,7 @@ func TestCopilotLogParsingAfterFlattening(t *testing.T) {
   }
 }
 2025-01-04T10:00:02Z [DEBUG] Tool execution completed`
-	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0644)
+	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0o644)
 	require.NoError(t, err)
 
 	// Verify agent_outputs exists before flattening
@@ -103,7 +103,7 @@ func TestCopilotLogParsingDirectFlattening(t *testing.T) {
 
 	// Step 1: Simulate downloaded artifacts structure (before flattening)
 	agentOutputsDir := filepath.Join(tmpDir, "agent_outputs")
-	err := os.MkdirAll(agentOutputsDir, 0755)
+	err := os.MkdirAll(agentOutputsDir, 0o755)
 	require.NoError(t, err)
 
 	// Create session log directly in agent_outputs
@@ -132,7 +132,7 @@ func TestCopilotLogParsingDirectFlattening(t *testing.T) {
   }
 }
 2025-01-05T10:00:02Z [DEBUG] Done`
-	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0644)
+	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0o644)
 	require.NoError(t, err)
 
 	// Step 2: Flatten the artifact
@@ -172,7 +172,7 @@ func TestCopilotLogParsingMultipleSessionFiles(t *testing.T) {
 
 	// Create flattened session logs directory with multiple files
 	sessionLogsDir := filepath.Join(tmpDir, "sandbox", "agent", "logs")
-	err := os.MkdirAll(sessionLogsDir, 0755)
+	err := os.MkdirAll(sessionLogsDir, 0o755)
 	require.NoError(t, err)
 
 	// Create multiple session log files
@@ -184,7 +184,7 @@ func TestCopilotLogParsingMultipleSessionFiles(t *testing.T) {
 
 	for _, filename := range sessionFiles {
 		filePath := filepath.Join(sessionLogsDir, filename)
-		err = os.WriteFile(filePath, []byte("test content for "+filename), 0644)
+		err = os.WriteFile(filePath, []byte("test content for "+filename), 0o644)
 		require.NoError(t, err)
 	}
 
@@ -205,11 +205,11 @@ func TestCopilotLogParsingBackwardCompatibility(t *testing.T) {
 
 	// Create old-style agent_output directory (without 's')
 	agentOutputDir := filepath.Join(tmpDir, "agent_output")
-	err := os.MkdirAll(agentOutputDir, 0755)
+	err := os.MkdirAll(agentOutputDir, 0o755)
 	require.NoError(t, err)
 
 	oldLogPath := filepath.Join(agentOutputDir, "debug.log")
-	err = os.WriteFile(oldLogPath, []byte("old style debug log"), 0644)
+	err = os.WriteFile(oldLogPath, []byte("old style debug log"), 0o644)
 	require.NoError(t, err)
 
 	// Test that findAgentLogFile still finds logs in the old location

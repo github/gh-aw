@@ -163,7 +163,7 @@ tools:
 			// Create temporary test file
 			tmpDir := t.TempDir()
 			testFile := tmpDir + "/test.md"
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			require.NoError(t, err)
 
 			// Parse the workflow

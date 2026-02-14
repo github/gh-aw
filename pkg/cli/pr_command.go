@@ -250,7 +250,7 @@ func createPatchFromPR(sourceOwner, sourceRepo string, prInfo *PRInfo, verbose b
 	// Add the actual diff content
 	patchBuilder.Write(diffContent)
 
-	if err := os.WriteFile(patchFile, []byte(patchBuilder.String()), 0644); err != nil {
+	if err := os.WriteFile(patchFile, []byte(patchBuilder.String()), 0o644); err != nil {
 		return "", fmt.Errorf("failed to write patch file: %w", err)
 	}
 

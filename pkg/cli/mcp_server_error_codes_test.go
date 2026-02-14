@@ -90,7 +90,6 @@ func TestMCPServer_ErrorCodes_InvalidParams(t *testing.T) {
 			t.Logf("✓ Correct error for conflicting parameters: %s", errMsg)
 		}
 	})
-
 }
 
 // TestMCPServer_ErrorCodes_InternalError tests that InternalError code is returned for execution failures

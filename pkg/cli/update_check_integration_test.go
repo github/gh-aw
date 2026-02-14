@@ -13,7 +13,6 @@ import (
 
 // TestUpdateCheckIntegration tests the update check feature in an end-to-end scenario
 func TestUpdateCheckIntegration(t *testing.T) {
-
 	// Build the binary for testing
 	tempDir := t.TempDir()
 	binaryPath := filepath.Join(tempDir, "gh-aw")
@@ -33,14 +32,14 @@ func TestUpdateCheckIntegration(t *testing.T) {
 	}
 
 	// Make binary executable
-	if err := os.Chmod(binaryPath, 0755); err != nil {
+	if err := os.Chmod(binaryPath, 0o755); err != nil {
 		t.Fatalf("Failed to make binary executable: %v", err)
 	}
 
 	t.Run("update check disabled in CI mode", func(t *testing.T) {
 		// Create a test workflow directory
 		workflowDir := filepath.Join(tempDir, "test-ci", ".github", "workflows")
-		if err := os.MkdirAll(workflowDir, 0755); err != nil {
+		if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 			t.Fatalf("Failed to create workflow directory: %v", err)
 		}
 
@@ -57,7 +56,7 @@ engine: copilot
 Test workflow content.
 `
 		workflowFile := filepath.Join(workflowDir, "test.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
 
@@ -83,7 +82,7 @@ Test workflow content.
 	t.Run("update check disabled with --no-check-update flag", func(t *testing.T) {
 		// Create a test workflow directory
 		workflowDir := filepath.Join(tempDir, "test-flag", ".github", "workflows")
-		if err := os.MkdirAll(workflowDir, 0755); err != nil {
+		if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 			t.Fatalf("Failed to create workflow directory: %v", err)
 		}
 
@@ -100,7 +99,7 @@ engine: copilot
 Test workflow content.
 `
 		workflowFile := filepath.Join(workflowDir, "test.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
 
@@ -128,7 +127,7 @@ Test workflow content.
 	t.Run("update check respects last check timestamp", func(t *testing.T) {
 		// Create a test workflow directory
 		workflowDir := filepath.Join(tempDir, "test-timestamp", ".github", "workflows")
-		if err := os.MkdirAll(workflowDir, 0755); err != nil {
+		if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 			t.Fatalf("Failed to create workflow directory: %v", err)
 		}
 
@@ -145,20 +144,20 @@ engine: copilot
 Test workflow content.
 `
 		workflowFile := filepath.Join(workflowDir, "test.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
 
 		// Create a custom temp directory for last check file
 		checkTempDir := filepath.Join(tempDir, "gh-aw-check")
-		if err := os.MkdirAll(checkTempDir, 0755); err != nil {
+		if err := os.MkdirAll(checkTempDir, 0o755); err != nil {
 			t.Fatalf("Failed to create check temp directory: %v", err)
 		}
 
 		// Write a recent timestamp (less than 24 hours ago)
 		lastCheckFile := filepath.Join(checkTempDir, "gh-aw-last-update-check")
 		recentTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
-		if err := os.WriteFile(lastCheckFile, []byte(recentTime), 0644); err != nil {
+		if err := os.WriteFile(lastCheckFile, []byte(recentTime), 0o644); err != nil {
 			t.Fatalf("Failed to write last check file: %v", err)
 		}
 
@@ -192,7 +191,7 @@ Test workflow content.
 	t.Run("update check runs for development builds", func(t *testing.T) {
 		// Create a test workflow directory
 		workflowDir := filepath.Join(tempDir, "test-devbuild", ".github", "workflows")
-		if err := os.MkdirAll(workflowDir, 0755); err != nil {
+		if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 			t.Fatalf("Failed to create workflow directory: %v", err)
 		}
 
@@ -209,7 +208,7 @@ engine: copilot
 Test workflow content.
 `
 		workflowFile := filepath.Join(workflowDir, "test.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
 
@@ -238,7 +237,6 @@ Test workflow content.
 
 // TestUpdateCheckFlagHelp verifies the --no-check-update flag appears in help text
 func TestUpdateCheckFlagHelp(t *testing.T) {
-
 	// Build the binary for testing
 	tempDir := t.TempDir()
 	binaryPath := filepath.Join(tempDir, "gh-aw")
@@ -258,7 +256,7 @@ func TestUpdateCheckFlagHelp(t *testing.T) {
 	}
 
 	// Make binary executable
-	if err := os.Chmod(binaryPath, 0755); err != nil {
+	if err := os.Chmod(binaryPath, 0o755); err != nil {
 		t.Fatalf("Failed to make binary executable: %v", err)
 	}
 

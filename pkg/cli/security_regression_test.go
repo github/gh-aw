@@ -300,7 +300,7 @@ permissions:
 			tmpDir := testutil.TempDir(t, "size-limit-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
 
-			err := os.WriteFile(testFile, []byte(content), 0644)
+			err := os.WriteFile(testFile, []byte(content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -442,7 +442,7 @@ Test content.`,
 			tmpDir := testutil.TempDir(t, "workflow-validation-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
 
-			err := os.WriteFile(testFile, []byte(tt.workflow), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflow), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}

@@ -25,7 +25,7 @@ func TestAccessLogParsing(t *testing.T) {
 
 	// Write test log file
 	accessLogPath := filepath.Join(tempDir, "access.log")
-	err := os.WriteFile(accessLogPath, []byte(testLogContent), 0644)
+	err := os.WriteFile(accessLogPath, []byte(testLogContent), 0o644)
 	require.NoError(t, err, "should create test access log file")
 
 	// Test parsing
@@ -47,7 +47,7 @@ func TestMultipleAccessLogAnalysis(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	accessLogsDir := filepath.Join(tempDir, "access.log")
-	err := os.MkdirAll(accessLogsDir, 0755)
+	err := os.MkdirAll(accessLogsDir, 0o755)
 	require.NoError(t, err, "should create access.log directory")
 
 	// Create test access log content for multiple MCP servers
@@ -59,11 +59,11 @@ func TestMultipleAccessLogAnalysis(t *testing.T) {
 
 	// Write separate log files for different MCP servers
 	fetchLogPath := filepath.Join(accessLogsDir, "access-fetch.log")
-	err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0644)
+	err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0o644)
 	require.NoError(t, err, "should create test access-fetch.log")
 
 	browserLogPath := filepath.Join(accessLogsDir, "access-browser.log")
-	err = os.WriteFile(browserLogPath, []byte(browserLogContent), 0644)
+	err = os.WriteFile(browserLogPath, []byte(browserLogContent), 0o644)
 	require.NoError(t, err, "should create test access-browser.log")
 
 	// Test analysis of multiple access logs
@@ -92,12 +92,12 @@ func TestAnalyzeAccessLogsDirectory(t *testing.T) {
 	t.Run("multiple access logs in subdirectory", func(t *testing.T) {
 		// Test case 1: Multiple access logs in access-logs subdirectory
 		accessLogsDir := filepath.Join(tempDir, "run1", "access.log")
-		err := os.MkdirAll(accessLogsDir, 0755)
+		err := os.MkdirAll(accessLogsDir, 0o755)
 		require.NoError(t, err, "should create access.log directory")
 
 		fetchLogContent := `1701234567.123    180 192.168.1.100 TCP_MISS/200 1234 GET http://example.com/api/data - HIER_DIRECT/93.184.216.34 text/html`
 		fetchLogPath := filepath.Join(accessLogsDir, "access-fetch.log")
-		err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0644)
+		err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0o644)
 		require.NoError(t, err, "should create test access-fetch.log")
 
 		analysis, err := analyzeAccessLogs(filepath.Join(tempDir, "run1"), false)
@@ -109,7 +109,7 @@ func TestAnalyzeAccessLogsDirectory(t *testing.T) {
 	t.Run("no access logs - returns nil", func(t *testing.T) {
 		// Test case 2: No access logs
 		run2Dir := filepath.Join(tempDir, "run2")
-		err := os.MkdirAll(run2Dir, 0755)
+		err := os.MkdirAll(run2Dir, 0o755)
 		require.NoError(t, err, "should create run2 directory")
 
 		analysis, err := analyzeAccessLogs(run2Dir, false)
@@ -120,13 +120,13 @@ func TestAnalyzeAccessLogsDirectory(t *testing.T) {
 	t.Run("access logs in sandbox/firewall/logs/ (new path)", func(t *testing.T) {
 		// Test case 3: Access logs in sandbox/firewall/logs/ directory after artifact download
 		sandboxLogsDir := filepath.Join(tempDir, "run3", "sandbox", "firewall", "logs")
-		err := os.MkdirAll(sandboxLogsDir, 0755)
+		err := os.MkdirAll(sandboxLogsDir, 0o755)
 		require.NoError(t, err, "should create sandbox/firewall/logs directory")
 
 		fetchLogContent := `1701234567.123    180 192.168.1.100 TCP_MISS/200 1234 GET http://example.com/api/data - HIER_DIRECT/93.184.216.34 text/html
 1701234568.456    250 192.168.1.100 TCP_HIT/200 5678 GET http://api.github.com/repos - HIER_DIRECT/140.82.112.6 application/json`
 		fetchLogPath := filepath.Join(sandboxLogsDir, "access-1.log")
-		err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0644)
+		err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0o644)
 		require.NoError(t, err, "should create test access log in sandbox path")
 
 		analysis, err := analyzeAccessLogs(filepath.Join(tempDir, "run3"), false)

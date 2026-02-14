@@ -327,7 +327,7 @@ func processWorkflowFileWithInfo(filePath string, codemods []Codemod, write bool
 	fileName := filepath.Base(filePath)
 	if write {
 		// Write the file with owner-only read/write permissions (0600) for security best practices
-		if err := os.WriteFile(filePath, []byte(currentContent), 0600); err != nil {
+		if err := os.WriteFile(filePath, []byte(currentContent), 0o600); err != nil {
 			return false, nil, fmt.Errorf("failed to write file: %w", err)
 		}
 

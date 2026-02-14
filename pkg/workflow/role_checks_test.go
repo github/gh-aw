@@ -30,7 +30,7 @@ roles: [admin, maintainer]
 Test that role membership check uses GITHUB_TOKEN.`
 
 	workflowPath := filepath.Join(tmpDir, "role-membership-token.md")
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -122,7 +122,7 @@ bots: ["dependabot[bot]"]
 Test that role membership check uses GITHUB_TOKEN with bots.`
 
 	workflowPath := filepath.Join(tmpDir, "role-membership-token-bots.md")
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

@@ -167,7 +167,7 @@ func TestAggregateLogFilesWithAccessLogs(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	accessLogsDir := filepath.Join(tempDir, "access.log")
-	err := os.MkdirAll(accessLogsDir, 0755)
+	err := os.MkdirAll(accessLogsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create access.log directory: %v", err)
 	}
@@ -181,13 +181,13 @@ func TestAggregateLogFilesWithAccessLogs(t *testing.T) {
 
 	// Write separate log files
 	fetchLogPath := filepath.Join(accessLogsDir, "access-fetch.log")
-	err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0644)
+	err = os.WriteFile(fetchLogPath, []byte(fetchLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test access-fetch.log: %v", err)
 	}
 
 	browserLogPath := filepath.Join(accessLogsDir, "access-browser.log")
-	err = os.WriteFile(browserLogPath, []byte(browserLogContent), 0644)
+	err = os.WriteFile(browserLogPath, []byte(browserLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test access-browser.log: %v", err)
 	}
@@ -207,7 +207,6 @@ func TestAggregateLogFilesWithAccessLogs(t *testing.T) {
 			}
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to aggregate access logs: %v", err)
 	}
@@ -242,7 +241,7 @@ func TestAggregateLogFilesWithFirewallLogs(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	logsDir := filepath.Join(tempDir, "firewall-logs")
-	err := os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create firewall-logs directory: %v", err)
 	}
@@ -256,13 +255,13 @@ func TestAggregateLogFilesWithFirewallLogs(t *testing.T) {
 
 	// Write separate log files
 	log1Path := filepath.Join(logsDir, "firewall-1.log")
-	err = os.WriteFile(log1Path, []byte(log1Content), 0644)
+	err = os.WriteFile(log1Path, []byte(log1Content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall-1.log: %v", err)
 	}
 
 	log2Path := filepath.Join(logsDir, "firewall-2.log")
-	err = os.WriteFile(log2Path, []byte(log2Content), 0644)
+	err = os.WriteFile(log2Path, []byte(log2Content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall-2.log: %v", err)
 	}
@@ -283,7 +282,6 @@ func TestAggregateLogFilesWithFirewallLogs(t *testing.T) {
 			}
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to aggregate firewall logs: %v", err)
 	}
@@ -332,7 +330,6 @@ func TestAggregateLogFilesNoFiles(t *testing.T) {
 			}
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Expected no error for empty directory, got %v", err)
 	}
@@ -346,7 +343,7 @@ func TestAggregateLogFilesWithParseErrors(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	logsDir := filepath.Join(tempDir, "logs")
-	err := os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create logs directory: %v", err)
 	}
@@ -354,14 +351,14 @@ func TestAggregateLogFilesWithParseErrors(t *testing.T) {
 	// Create a valid log file
 	validLogContent := `1701234567.123    180 192.168.1.100 TCP_MISS/200 1234 GET http://example.com/api/data - HIER_DIRECT/93.184.216.34 text/html`
 	validLogPath := filepath.Join(logsDir, "access-valid.log")
-	err = os.WriteFile(validLogPath, []byte(validLogContent), 0644)
+	err = os.WriteFile(validLogPath, []byte(validLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create valid log file: %v", err)
 	}
 
 	// Create an invalid log file (malformed content)
 	invalidLogPath := filepath.Join(logsDir, "access-invalid.log")
-	err = os.WriteFile(invalidLogPath, []byte("invalid log content"), 0644)
+	err = os.WriteFile(invalidLogPath, []byte("invalid log content"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create invalid log file: %v", err)
 	}
@@ -381,7 +378,6 @@ func TestAggregateLogFilesWithParseErrors(t *testing.T) {
 			}
 		},
 	)
-
 	if err != nil {
 		t.Fatalf("Failed to aggregate logs with errors: %v", err)
 	}

@@ -79,12 +79,12 @@ jobs:
 			lockFile := filepath.Join(tmpDir, "test-workflow.lock.yml")
 
 			// Create markdown file (content doesn't matter)
-			if err := os.WriteFile(tmpFile, []byte("# Test"), 0644); err != nil {
+			if err := os.WriteFile(tmpFile, []byte("# Test"), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 
 			// Create lock file with the actual workflow content
-			if err := os.WriteFile(lockFile, []byte(tt.lockContent), 0644); err != nil {
+			if err := os.WriteFile(lockFile, []byte(tt.lockContent), 0o644); err != nil {
 				t.Fatalf("Failed to write lock file: %v", err)
 			}
 
@@ -268,12 +268,12 @@ jobs:
 			lockFile := filepath.Join(tmpDir, "test-workflow.lock.yml")
 
 			// Create markdown file (content doesn't matter)
-			if err := os.WriteFile(tmpFile, []byte("# Test"), 0644); err != nil {
+			if err := os.WriteFile(tmpFile, []byte("# Test"), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 
 			// Create lock file with the actual workflow content
-			if err := os.WriteFile(lockFile, []byte(tt.lockContent), 0644); err != nil {
+			if err := os.WriteFile(lockFile, []byte(tt.lockContent), 0o644); err != nil {
 				t.Fatalf("Failed to write lock file: %v", err)
 			}
 

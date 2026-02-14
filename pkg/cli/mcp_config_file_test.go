@@ -135,7 +135,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 			// Create .vscode directory and existing config if specified
 			if tt.existingConfig != nil {
 				vscodeDir := ".vscode"
-				if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+				if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
 					t.Fatalf("Failed to create .vscode directory: %v", err)
 				}
 
@@ -145,7 +145,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 				}
 
 				mcpConfigPath := filepath.Join(vscodeDir, "mcp.json")
-				if err := os.WriteFile(mcpConfigPath, data, 0644); err != nil {
+				if err := os.WriteFile(mcpConfigPath, data, 0o644); err != nil {
 					t.Fatalf("Failed to write existing config: %v", err)
 				}
 			}
@@ -377,7 +377,7 @@ func TestMCPConfigFilePermissions(t *testing.T) {
 
 	// Verify file is readable and writable (at minimum)
 	mode := info.Mode()
-	if mode.Perm()&0600 != 0600 {
+	if mode.Perm()&0o600 != 0o600 {
 		t.Errorf("Expected file to have at least 0600 permissions, got %o", mode.Perm())
 	}
 }

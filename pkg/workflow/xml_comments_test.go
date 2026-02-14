@@ -317,7 +317,7 @@ strict: false
 This is a normal-sized workflow that should compile successfully.`
 
 	normalFile := filepath.Join(tmpDir, "normal-workflow.md")
-	if err := os.WriteFile(normalFile, []byte(normalContent), 0644); err != nil {
+	if err := os.WriteFile(normalFile, []byte(normalContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -348,16 +348,16 @@ This is a normal-sized workflow that should compile successfully.`
 
 	// Create shared directory and dummy import file
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	dummyFile := filepath.Join(sharedDir, "dummy.md")
-	if err := os.WriteFile(dummyFile, []byte("# Dummy\n\nDummy content.\n"), 0644); err != nil {
+	if err := os.WriteFile(dummyFile, []byte("# Dummy\n\nDummy content.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	longFile := filepath.Join(tmpDir, "long-workflow.md")
-	if err := os.WriteFile(longFile, []byte(longContent), 0644); err != nil {
+	if err := os.WriteFile(longFile, []byte(longContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

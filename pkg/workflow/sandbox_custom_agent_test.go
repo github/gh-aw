@@ -143,7 +143,7 @@ sandbox:
 `
 
 		testFile := filepath.Join(tmpDir, "test-workflow.md")
-		err = os.WriteFile(testFile, []byte(markdown), 0644)
+		err = os.WriteFile(testFile, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,7 +215,7 @@ sandbox:
 `
 
 		testFile := filepath.Join(tmpDir, "test-workflow.md")
-		err = os.WriteFile(testFile, []byte(markdown), 0644)
+		err = os.WriteFile(testFile, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -278,7 +278,7 @@ sandbox:
 `
 
 		testFile := filepath.Join(tmpDir, "test-workflow.md")
-		err = os.WriteFile(testFile, []byte(markdown), 0644)
+		err = os.WriteFile(testFile, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}

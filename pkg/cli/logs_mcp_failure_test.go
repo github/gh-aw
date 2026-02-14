@@ -20,14 +20,14 @@ func TestExtractMCPFailuresFromSafeOutputsServer(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-17701181429")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create run directory: %v", err)
 	}
 
 	// Create the log file
 	logFile := filepath.Join(runDir, "test-safe-output-missing-tool.log")
-	err = os.WriteFile(logFile, []byte(logContent), 0644)
+	err = os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write log file: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestExtractMCPFailuresFromLogFileDirectly(t *testing.T) {
 
 	// Create a temporary file for this test
 	tmpFile := filepath.Join(testutil.TempDir(t, "test-*"), "test.log")
-	err := os.WriteFile(tmpFile, []byte(logContent), 0644)
+	err := os.WriteFile(tmpFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write temporary log file: %v", err)
 	}

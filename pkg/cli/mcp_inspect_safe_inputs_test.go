@@ -16,7 +16,7 @@ func TestSpawnSafeInputsInspector_NoSafeInputs(t *testing.T) {
 	// Create temporary directory with a workflow file
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -30,7 +30,7 @@ engine: copilot
 This workflow has no safe-inputs configuration.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -59,7 +59,7 @@ func TestSpawnSafeInputsInspector_WithSafeInputs(t *testing.T) {
 	// Create temporary directory with a workflow file
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -83,7 +83,7 @@ safe-inputs:
 This workflow has safe-inputs configuration.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -143,7 +143,7 @@ func TestSpawnSafeInputsInspector_WithImportedSafeInputs(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -163,7 +163,7 @@ safe-inputs:
 # Shared Workflow
 `
 	sharedPath := filepath.Join(sharedDir, "shared.md")
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -189,7 +189,7 @@ safe-inputs:
 This workflow imports safe-inputs from shared/shared.md.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

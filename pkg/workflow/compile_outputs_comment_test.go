@@ -38,7 +38,7 @@ This workflow tests the output.add-comment configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-comment.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,7 +87,7 @@ This workflow tests the output.add-comment configuration parsing with null value
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-comment-null.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -137,7 +137,7 @@ This workflow tests the output.add-comment target configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-comment-target.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +192,7 @@ This workflow tests the add-comment max and target configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-comment-max-target.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -252,7 +252,7 @@ This workflow tests the safe_outputs job generation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-comment.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -347,7 +347,7 @@ This workflow tests that issue comment job is skipped for non-issue/PR events.
 `
 
 	testFile := filepath.Join(tmpDir, "test-comment-skip.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

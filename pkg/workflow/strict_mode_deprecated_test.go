@@ -79,7 +79,7 @@ strict: false
 			defer os.RemoveAll(tmpDir)
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -128,7 +128,7 @@ network:
 	defer os.RemoveAll(tmpDir)
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

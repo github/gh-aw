@@ -64,7 +64,6 @@ func checkGHAuthStatusShared(verbose bool) error {
 	preconditionsLog.Print("Checking GitHub CLI authentication status")
 
 	output, err := workflow.RunGHCombined("Checking GitHub authentication...", "auth", "status")
-
 	if err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage("You are not logged in to GitHub CLI."))
 		fmt.Fprintln(os.Stderr, "")

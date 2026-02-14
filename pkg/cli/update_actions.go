@@ -141,7 +141,7 @@ func UpdateActions(allowMajor, verbose bool) error {
 		// Add trailing newline for prettier compliance
 		updatedData = append(updatedData, '\n')
 
-		if err := os.WriteFile(actionsLockPath, updatedData, 0644); err != nil {
+		if err := os.WriteFile(actionsLockPath, updatedData, 0o644); err != nil {
 			return fmt.Errorf("failed to write updated actions lock file: %w", err)
 		}
 

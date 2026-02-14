@@ -39,7 +39,7 @@ runtimes:
 Test workflow with runtime overrides.
 `
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -92,7 +92,7 @@ func TestCompileWorkflowWithRuntimesFromImports(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tempDir, ".github", "workflows", "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
@@ -106,7 +106,7 @@ runtimes:
 ---
 `
 	sharedPath := filepath.Join(sharedDir, "shared-runtimes.md")
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -131,10 +131,10 @@ Test workflow with imported runtimes.
 `
 	workflowPath := filepath.Join(tempDir, ".github", "workflows", "test-workflow.md")
 	workflowDir := filepath.Dir(workflowPath)
-	if err := os.MkdirAll(workflowDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflow directory: %v", err)
 	}
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -219,7 +219,7 @@ runtimes:
 Test workflow with runtime overrides applied to steps.
 `
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -278,7 +278,7 @@ runtimes:
 Test workflow with custom setup action.
 `
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -332,7 +332,7 @@ steps:
 Test workflow that uses Go without go.mod file.
 `
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

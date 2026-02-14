@@ -28,10 +28,10 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 			name: "single file artifact gets flattened",
 			setup: func(dir string) error {
 				artifactDir := filepath.Join(dir, "my-artifact")
-				if err := os.MkdirAll(artifactDir, 0755); err != nil {
+				if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(artifactDir, "output.json"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(artifactDir, "output.json"), []byte("test"), 0o644)
 			},
 			expectedFiles:   []string{"output.json"},
 			unexpectedDirs:  []string{"my-artifact"},
@@ -41,13 +41,13 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 			name: "multi-file artifact not flattened",
 			setup: func(dir string) error {
 				artifactDir := filepath.Join(dir, "multi-artifact")
-				if err := os.MkdirAll(artifactDir, 0755); err != nil {
+				if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 					return err
 				}
-				if err := os.WriteFile(filepath.Join(artifactDir, "file1.txt"), []byte("test1"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(artifactDir, "file1.txt"), []byte("test1"), 0o644); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(artifactDir, "file2.txt"), []byte("test2"), 0644)
+				return os.WriteFile(filepath.Join(artifactDir, "file2.txt"), []byte("test2"), 0o644)
 			},
 			expectedDirs:    []string{"multi-artifact"},
 			expectedFiles:   []string{"multi-artifact/file1.txt", "multi-artifact/file2.txt"},
@@ -57,13 +57,13 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 			name: "artifact with subdirectory not flattened",
 			setup: func(dir string) error {
 				artifactDir := filepath.Join(dir, "nested-artifact")
-				if err := os.MkdirAll(filepath.Join(artifactDir, "subdir"), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Join(artifactDir, "subdir"), 0o755); err != nil {
 					return err
 				}
-				if err := os.WriteFile(filepath.Join(artifactDir, "file.txt"), []byte("test"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(artifactDir, "file.txt"), []byte("test"), 0o644); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(artifactDir, "subdir", "nested.txt"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(artifactDir, "subdir", "nested.txt"), []byte("test"), 0o644)
 			},
 			expectedDirs:    []string{"nested-artifact"},
 			expectedFiles:   []string{"nested-artifact/file.txt", "nested-artifact/subdir/nested.txt"},
@@ -74,10 +74,10 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 			setup: func(dir string) error {
 				for i := 1; i <= 3; i++ {
 					artifactDir := filepath.Join(dir, fmt.Sprintf("artifact-%d", i))
-					if err := os.MkdirAll(artifactDir, 0755); err != nil {
+					if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 						return err
 					}
-					if err := os.WriteFile(filepath.Join(artifactDir, fmt.Sprintf("file%d.txt", i)), []byte("test"), 0644); err != nil {
+					if err := os.WriteFile(filepath.Join(artifactDir, fmt.Sprintf("file%d.txt", i)), []byte("test"), 0o644); err != nil {
 						return err
 					}
 				}
@@ -89,7 +89,7 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 		{
 			name: "empty artifact directory not touched",
 			setup: func(dir string) error {
-				return os.MkdirAll(filepath.Join(dir, "empty-artifact"), 0755)
+				return os.MkdirAll(filepath.Join(dir, "empty-artifact"), 0o755)
 			},
 			expectedDirs: []string{"empty-artifact"},
 		},
@@ -97,15 +97,15 @@ func TestFlattenSingleFileArtifacts(t *testing.T) {
 			name: "regular files in output dir not affected",
 			setup: func(dir string) error {
 				// Create a regular file in output dir
-				if err := os.WriteFile(filepath.Join(dir, "standalone.txt"), []byte("test"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, "standalone.txt"), []byte("test"), 0o644); err != nil {
 					return err
 				}
 				// Create a single-file artifact
 				artifactDir := filepath.Join(dir, "single-artifact")
-				if err := os.MkdirAll(artifactDir, 0755); err != nil {
+				if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(artifactDir, "artifact.json"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(artifactDir, "artifact.json"), []byte("test"), 0o644)
 			},
 			expectedFiles:  []string{"standalone.txt", "artifact.json"},
 			unexpectedDirs: []string{"single-artifact"},
@@ -180,7 +180,7 @@ func TestFlattenSingleFileArtifactsWithAuditFiles(t *testing.T) {
 	// Create unified agent-artifacts structure as it would be downloaded by gh run download
 	// All single-file artifacts are now in agent-artifacts/tmp/gh-aw/
 	nestedPath := filepath.Join(tmpDir, "agent-artifacts", "tmp", "gh-aw")
-	if err := os.MkdirAll(nestedPath, 0755); err != nil {
+	if err := os.MkdirAll(nestedPath, 0o755); err != nil {
 		t.Fatalf("Failed to create agent-artifacts directory: %v", err)
 	}
 
@@ -192,7 +192,7 @@ func TestFlattenSingleFileArtifactsWithAuditFiles(t *testing.T) {
 
 	for filename, content := range unifiedArtifacts {
 		fullPath := filepath.Join(nestedPath, filename)
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write file %s: %v", filename, err)
 		}
 	}
@@ -206,10 +206,10 @@ func TestFlattenSingleFileArtifactsWithAuditFiles(t *testing.T) {
 
 	for path, content := range multiFileArtifacts {
 		fullPath := filepath.Join(tmpDir, path)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 			t.Fatalf("Failed to create directory for %s: %v", path, err)
 		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write file %s: %v", path, err)
 		}
 	}
@@ -282,7 +282,7 @@ func TestAuditCanFindFlattenedArtifacts(t *testing.T) {
 
 	// Create realistic unified artifact structure before flattening
 	nestedPath := filepath.Join(tmpDir, "agent-artifacts", "tmp", "gh-aw")
-	if err := os.MkdirAll(nestedPath, 0755); err != nil {
+	if err := os.MkdirAll(nestedPath, 0o755); err != nil {
 		t.Fatalf("Setup failed: %v", err)
 	}
 
@@ -294,7 +294,7 @@ func TestAuditCanFindFlattenedArtifacts(t *testing.T) {
 
 	for filename, content := range testArtifacts {
 		fullPath := filepath.Join(nestedPath, filename)
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Setup failed: %v", err)
 		}
 	}
@@ -355,29 +355,29 @@ func TestFlattenUnifiedArtifact(t *testing.T) {
 			setup: func(dir string) error {
 				// Create the structure: agent-artifacts/tmp/gh-aw/...
 				nestedPath := filepath.Join(dir, "agent-artifacts", "tmp", "gh-aw")
-				if err := os.MkdirAll(nestedPath, 0755); err != nil {
+				if err := os.MkdirAll(nestedPath, 0o755); err != nil {
 					return err
 				}
 
 				// Create test files
-				if err := os.WriteFile(filepath.Join(nestedPath, "aw_info.json"), []byte("test"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(nestedPath, "aw_info.json"), []byte("test"), 0o644); err != nil {
 					return err
 				}
 
 				// Create subdirectories with files
 				promptDir := filepath.Join(nestedPath, "aw-prompts")
-				if err := os.MkdirAll(promptDir, 0755); err != nil {
+				if err := os.MkdirAll(promptDir, 0o755); err != nil {
 					return err
 				}
-				if err := os.WriteFile(filepath.Join(promptDir, "prompt.txt"), []byte("test"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(promptDir, "prompt.txt"), []byte("test"), 0o644); err != nil {
 					return err
 				}
 
 				mcpLogsDir := filepath.Join(nestedPath, "mcp-logs")
-				if err := os.MkdirAll(mcpLogsDir, 0755); err != nil {
+				if err := os.MkdirAll(mcpLogsDir, 0o755); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(mcpLogsDir, "log.txt"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(mcpLogsDir, "log.txt"), []byte("test"), 0o644)
 			},
 			expectedFiles: []string{
 				"aw_info.json",
@@ -398,7 +398,7 @@ func TestFlattenUnifiedArtifact(t *testing.T) {
 			name: "no agent-artifacts directory - no-op",
 			setup: func(dir string) error {
 				// Create a regular file structure without agent-artifacts
-				return os.WriteFile(filepath.Join(dir, "regular.txt"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(dir, "regular.txt"), []byte("test"), 0o644)
 			},
 			expectedFiles: []string{"regular.txt"},
 		},
@@ -407,19 +407,19 @@ func TestFlattenUnifiedArtifact(t *testing.T) {
 			setup: func(dir string) error {
 				// Create agent-artifacts with new structure (files directly in agent-artifacts/)
 				artifactDir := filepath.Join(dir, "agent-artifacts")
-				if err := os.MkdirAll(artifactDir, 0755); err != nil {
+				if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 					return err
 				}
 				// Create file directly in agent-artifacts (new structure)
-				if err := os.WriteFile(filepath.Join(artifactDir, "file.txt"), []byte("test"), 0644); err != nil {
+				if err := os.WriteFile(filepath.Join(artifactDir, "file.txt"), []byte("test"), 0o644); err != nil {
 					return err
 				}
 				// Create a subdirectory with a file
 				subDir := filepath.Join(artifactDir, "subdir")
-				if err := os.MkdirAll(subDir, 0755); err != nil {
+				if err := os.MkdirAll(subDir, 0o755); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested"), 0644)
+				return os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested"), 0o644)
 			},
 			expectedDirs:    []string{"subdir"},
 			expectedFiles:   []string{"file.txt", "subdir/nested.txt"},

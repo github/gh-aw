@@ -35,7 +35,7 @@ Create an issue with title "Test" and body "Test body".
 `
 
 	testFile := filepath.Join(tmpDir, "test-handler-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -146,7 +146,7 @@ Create an issue.
 `
 
 	testFile := filepath.Join(tmpDir, "test-single.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -228,7 +228,7 @@ Create an issue.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-assignees.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

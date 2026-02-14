@@ -66,7 +66,7 @@ This workflow includes external tools.`,
 
 			// Create shared directory and files for imports/includes
 			sharedDir := filepath.Join(tmpDir, "shared")
-			err := os.MkdirAll(sharedDir, 0755)
+			err := os.MkdirAll(sharedDir, 0o755)
 			require.NoError(t, err, "Failed to create shared directory")
 
 			// Create shared/common.md (shared workflow - minimal valid content)
@@ -74,7 +74,7 @@ This workflow includes external tools.`,
 
 This is a shared workflow.`
 			commonFile := filepath.Join(sharedDir, "common.md")
-			err = os.WriteFile(commonFile, []byte(commonContent), 0644)
+			err = os.WriteFile(commonFile, []byte(commonContent), 0o644)
 			require.NoError(t, err, "Failed to create common.md")
 
 			// Create shared/reporting.md (shared workflow - minimal valid content)
@@ -82,7 +82,7 @@ This is a shared workflow.`
 
 This is a shared workflow.`
 			reportingFile := filepath.Join(sharedDir, "reporting.md")
-			err = os.WriteFile(reportingFile, []byte(reportingContent), 0644)
+			err = os.WriteFile(reportingFile, []byte(reportingContent), 0o644)
 			require.NoError(t, err, "Failed to create reporting.md")
 
 			// Create shared/tools.md (shared workflow - minimal valid content)
@@ -90,17 +90,17 @@ This is a shared workflow.`
 
 This is a shared workflow.`
 			toolsFile := filepath.Join(sharedDir, "tools.md")
-			err = os.WriteFile(toolsFile, []byte(toolsContent), 0644)
+			err = os.WriteFile(toolsFile, []byte(toolsContent), 0o644)
 			require.NoError(t, err, "Failed to create tools.md")
 
 			// Create workflows directory for source path
 			workflowsDir := filepath.Join(tmpDir, "workflows")
-			err = os.MkdirAll(workflowsDir, 0755)
+			err = os.MkdirAll(workflowsDir, 0o755)
 			require.NoError(t, err, "Failed to create workflows directory")
 
 			// Write markdown file
 			markdownPath := filepath.Join(tmpDir, "test-workflow.md")
-			err = os.WriteFile(markdownPath, []byte(tt.markdownContent), 0644)
+			err = os.WriteFile(markdownPath, []byte(tt.markdownContent), 0o644)
 			require.NoError(t, err, "Failed to write markdown file")
 
 			// Compile the workflow
@@ -184,7 +184,7 @@ func TestPathNormalizationInIncludedFiles(t *testing.T) {
 
 	// Create nested directory structure: shared/nested/deep
 	deepDir := filepath.Join(tmpDir, "shared", "nested", "deep")
-	err := os.MkdirAll(deepDir, 0755)
+	err := os.MkdirAll(deepDir, 0o755)
 	require.NoError(t, err, "Failed to create deep directory")
 
 	// Create shared/nested/deep/config.md (shared workflow - minimal valid content)
@@ -192,7 +192,7 @@ func TestPathNormalizationInIncludedFiles(t *testing.T) {
 
 This is a deeply nested shared workflow.`
 	configFile := filepath.Join(deepDir, "config.md")
-	err = os.WriteFile(configFile, []byte(configContent), 0644)
+	err = os.WriteFile(configFile, []byte(configContent), 0o644)
 	require.NoError(t, err, "Failed to create config.md")
 
 	// Create workflow that includes the deep file
@@ -207,7 +207,7 @@ on: push
 This workflow includes a deeply nested file.`
 
 	markdownPath := filepath.Join(tmpDir, "test-workflow.md")
-	err = os.WriteFile(markdownPath, []byte(markdownContent), 0644)
+	err = os.WriteFile(markdownPath, []byte(markdownContent), 0o644)
 	require.NoError(t, err, "Failed to write markdown file")
 
 	// Compile the workflow

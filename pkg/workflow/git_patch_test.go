@@ -49,7 +49,7 @@ Please do the following tasks:
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-git-patch.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 

@@ -50,7 +50,7 @@ func TestParseAgentLogNoEngine(t *testing.T) {
 	tempDir := testutil.TempDir(t, "test-*")
 
 	agentStdioPath := filepath.Join(tempDir, "agent-stdio.log")
-	if err := os.WriteFile(agentStdioPath, []byte("[]"), 0644); err != nil {
+	if err := os.WriteFile(agentStdioPath, []byte("[]"), 0o644); err != nil {
 		t.Fatalf("Failed to create mock agent-stdio.log: %v", err)
 	}
 

@@ -125,7 +125,6 @@ func WaitForWorkflowCompletion(repoSlug, runID string, timeoutMinutes int, verbo
 		PollFunc: func() (PollResult, error) {
 			// Check workflow status
 			output, err := workflow.RunGH("Checking workflow status...", "run", "view", runID, "--repo", repoSlug, "--json", "status,conclusion")
-
 			if err != nil {
 				return PollFailure, fmt.Errorf("failed to check workflow status: %w", err)
 			}

@@ -218,7 +218,7 @@ This is a test workflow for GitHub remote mode configuration.
 `
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -414,7 +414,7 @@ This tests that GITHUB_PERSONAL_ACCESS_TOKEN is exported and passed to Docker.
 `
 
 	testFile := filepath.Join(tmpDir, "copilot-github-remote-pat-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -481,7 +481,7 @@ This tests that GITHUB_PERSONAL_ACCESS_TOKEN is NOT exported for Claude.
 `
 
 	testFile := filepath.Join(tmpDir, "claude-github-remote-no-pat-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -17,7 +17,7 @@ func TestMissingToolDetectionIntegration(t *testing.T) {
 	// Create a temporary directory structure mimicking a real workflow run
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-18635648039")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestMissingToolDetectionIntegration(t *testing.T) {
 }`
 
 	agentOutputPath := filepath.Join(runDir, constants.AgentOutputArtifactName)
-	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0644)
+	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write agent_output.json: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestMissingToolDetectionIntegration(t *testing.T) {
   "staged": false
 }`
 	awInfoPath := filepath.Join(runDir, "aw_info.json")
-	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write aw_info.json: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestMissingToolDetectionIntegration(t *testing.T) {
 func TestMissingToolTypeConsistency(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "test-run")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestMissingToolTypeConsistency(t *testing.T) {
   ]
 }`
 	agentOutputPath := filepath.Join(runDir, constants.AgentOutputArtifactName)
-	err = os.WriteFile(agentOutputPath, []byte(correctTypeContent), 0644)
+	err = os.WriteFile(agentOutputPath, []byte(correctTypeContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestMissingToolTypeConsistency(t *testing.T) {
     }
   ]
 }`
-	err = os.WriteFile(agentOutputPath, []byte(incorrectTypeContent), 0644)
+	err = os.WriteFile(agentOutputPath, []byte(incorrectTypeContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestMissingToolTypeConsistency(t *testing.T) {
 func TestMissingToolFlattenedStructure(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-flattened")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestMissingToolFlattenedStructure(t *testing.T) {
 
 	// Use the actual filename: agent_output.json (with underscore and .json extension)
 	agentOutputPath := filepath.Join(runDir, "agent_output.json")
-	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0644)
+	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write agent_output.json: %v", err)
 	}

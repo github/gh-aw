@@ -46,7 +46,7 @@ func TestGetCurrentBranch(t *testing.T) {
 	exec.Command("git", "config", "user.email", "test@example.com").Run()
 
 	// Create initial commit to establish branch
-	if err := os.WriteFile("test.txt", []byte("test"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	exec.Command("git", "add", "test.txt").Run()
@@ -118,7 +118,7 @@ func TestCreateAndSwitchBranch(t *testing.T) {
 	exec.Command("git", "config", "user.email", "test@example.com").Run()
 
 	// Create initial commit
-	if err := os.WriteFile("test.txt", []byte("test"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	exec.Command("git", "add", "test.txt").Run()
@@ -169,7 +169,7 @@ func TestSwitchBranch(t *testing.T) {
 	exec.Command("git", "config", "user.email", "test@example.com").Run()
 
 	// Create initial commit
-	if err := os.WriteFile("test.txt", []byte("test"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	exec.Command("git", "add", "test.txt").Run()
@@ -231,7 +231,7 @@ func TestCommitChanges(t *testing.T) {
 	exec.Command("git", "config", "user.email", "test@example.com").Run()
 
 	// Create and stage a file
-	if err := os.WriteFile("test.txt", []byte("test content"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test content"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	if err := exec.Command("git", "add", "test.txt").Run(); err != nil {
@@ -316,7 +316,7 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowDir := ".github/workflows"
-	if err := os.MkdirAll(workflowDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflow directory: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 	})
 
 	// Create and commit a workflow file
-	if err := os.WriteFile(workflowFile, []byte("# Test Workflow\n"), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte("# Test Workflow\n"), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 	exec.Command("git", "add", workflowFile).Run()
@@ -355,7 +355,7 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 
 	// Test 3: Modified file (unstaged changes)
 	t.Run("modified_file", func(t *testing.T) {
-		if err := os.WriteFile(workflowFile, []byte("# Modified Workflow\n"), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte("# Modified Workflow\n"), 0o644); err != nil {
 			t.Fatalf("Failed to modify workflow file: %v", err)
 		}
 
@@ -377,7 +377,7 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 
 	// Test 4: Staged file
 	t.Run("staged_file", func(t *testing.T) {
-		if err := os.WriteFile(workflowFile, []byte("# Staged Workflow\n"), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte("# Staged Workflow\n"), 0o644); err != nil {
 			t.Fatalf("Failed to modify workflow file: %v", err)
 		}
 		exec.Command("git", "add", workflowFile).Run()
@@ -399,13 +399,13 @@ func TestCheckWorkflowFileStatus(t *testing.T) {
 	// Test 5: Both staged and modified
 	t.Run("staged_and_modified", func(t *testing.T) {
 		// Modify and stage
-		if err := os.WriteFile(workflowFile, []byte("# Staged content\n"), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte("# Staged content\n"), 0o644); err != nil {
 			t.Fatalf("Failed to modify workflow file: %v", err)
 		}
 		exec.Command("git", "add", workflowFile).Run()
 
 		// Modify again (unstaged change)
-		if err := os.WriteFile(workflowFile, []byte("# Staged and modified\n"), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte("# Staged and modified\n"), 0o644); err != nil {
 			t.Fatalf("Failed to modify workflow file again: %v", err)
 		}
 
@@ -467,19 +467,19 @@ func TestToGitRootRelativePath(t *testing.T) {
 
 	// Create .github directory structure
 	githubDir := tmpDir + "/.github/workflows"
-	if err := os.MkdirAll(githubDir, 0755); err != nil {
+	if err := os.MkdirAll(githubDir, 0o755); err != nil {
 		t.Fatalf("Failed to create .github directory: %v", err)
 	}
 
 	// Create a test file in .github/workflows
 	testFile := githubDir + "/test.campaign.md"
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	// Create a subdirectory for testing from different working directories
 	subDir := tmpDir + "/pkg/cli"
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
 
@@ -572,12 +572,12 @@ func TestToGitRootRelativePathWithoutGithubDir(t *testing.T) {
 
 	// Create a subdirectory but NO .github directory
 	subDir := tmpDir + "/subdir"
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
 
 	testFile := subDir + "/test.md"
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -612,18 +612,18 @@ func TestToGitRootRelativePathWithNestedGithubDir(t *testing.T) {
 
 	// Create nested structure: root/.github and root/subproject/.github
 	rootGithubDir := tmpDir + "/.github/workflows"
-	if err := os.MkdirAll(rootGithubDir, 0755); err != nil {
+	if err := os.MkdirAll(rootGithubDir, 0o755); err != nil {
 		t.Fatalf("Failed to create root .github directory: %v", err)
 	}
 
 	subprojectGithubDir := tmpDir + "/subproject/.github/workflows"
-	if err := os.MkdirAll(subprojectGithubDir, 0755); err != nil {
+	if err := os.MkdirAll(subprojectGithubDir, 0o755); err != nil {
 		t.Fatalf("Failed to create subproject .github directory: %v", err)
 	}
 
 	// Create test file in subproject
 	testFile := subprojectGithubDir + "/test.md"
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 

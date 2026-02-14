@@ -52,7 +52,7 @@ This workflow tests the poutine security scanner integration.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "poutine-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -133,7 +133,7 @@ This workflow tests running both poutine and zizmor together.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "both-scanners-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 

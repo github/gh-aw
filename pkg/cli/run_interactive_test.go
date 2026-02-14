@@ -17,7 +17,7 @@ func TestFindRunnableWorkflows(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tempDir := t.TempDir()
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files
 	tests := []struct {
@@ -109,12 +109,12 @@ jobs:
 	for _, tt := range tests {
 		// Write markdown file
 		mdPath := filepath.Join(workflowsDir, tt.name)
-		require.NoError(t, os.WriteFile(mdPath, []byte(tt.mdContent), 0600))
+		require.NoError(t, os.WriteFile(mdPath, []byte(tt.mdContent), 0o600))
 
 		// Write lock file
 		lockName := strings.TrimSuffix(tt.name, ".md") + ".lock.yml"
 		lockPath := filepath.Join(workflowsDir, lockName)
-		require.NoError(t, os.WriteFile(lockPath, []byte(tt.lockContent), 0600))
+		require.NoError(t, os.WriteFile(lockPath, []byte(tt.lockContent), 0o600))
 	}
 
 	// Change to temp directory
@@ -302,7 +302,7 @@ func TestFindRunnableWorkflows_WithInputs(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tempDir := t.TempDir()
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create workflow with inputs (markdown file)
 	workflowContent := `---
@@ -323,7 +323,7 @@ on:
 `
 
 	workflowPath := filepath.Join(workflowsDir, "test-inputs.md")
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o600))
 
 	// Create corresponding lock file
 	lockContent := `name: "Test Workflow"
@@ -346,7 +346,7 @@ jobs:
       - run: echo "test"
 `
 	lockPath := filepath.Join(workflowsDir, "test-inputs.lock.yml")
-	require.NoError(t, os.WriteFile(lockPath, []byte(lockContent), 0600))
+	require.NoError(t, os.WriteFile(lockPath, []byte(lockContent), 0o600))
 
 	// Change to temp directory
 	oldWd, err := os.Getwd()

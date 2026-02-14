@@ -36,7 +36,7 @@ Analyze the issue: ${{ needs.activation.outputs.text }}
 `
 
 	testFile := filepath.Join(tmpDir, "simple.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -97,7 +97,7 @@ Review the pull request: ${{ github.event.pull_request.number }}
 `
 
 	testFile := filepath.Join(tmpDir, "complex.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -148,7 +148,7 @@ Review and test the pull request with multiple tools.
 `
 
 	testFile := filepath.Join(tmpDir, "mcp.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -201,7 +201,7 @@ Standard workflow for memory profiling.
 `
 
 	testFile := filepath.Join(tmpDir, "memory.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -242,7 +242,7 @@ Test parsing performance.
 `
 
 	testFile := filepath.Join(tmpDir, "parse.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -287,7 +287,7 @@ Test validation performance.
 `
 
 	testFile := filepath.Join(tmpDir, "validate.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -324,7 +324,7 @@ Test YAML generation.
 `
 
 	testFile := filepath.Join(tmpDir, "yaml.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 

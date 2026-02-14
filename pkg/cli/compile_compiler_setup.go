@@ -68,7 +68,7 @@ func resetActionPinsFile() error {
 	data = append(data, '\n')
 
 	// Write the file
-	if err := os.WriteFile(actionPinsPath, data, 0644); err != nil {
+	if err := os.WriteFile(actionPinsPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write action_pins.json: %w", err)
 	}
 

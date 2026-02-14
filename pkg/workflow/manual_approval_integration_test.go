@@ -77,7 +77,7 @@ strict: false
 
 			// Write the workflow file
 			content := tt.frontmatter + "\n\n# Test Workflow\n\nTest content.\n"
-			err := os.WriteFile(mdFile, []byte(content), 0644)
+			err := os.WriteFile(mdFile, []byte(content), 0o644)
 			if err != nil {
 				t.Fatalf("failed to write test workflow: %v", err)
 			}

@@ -69,7 +69,7 @@ INFO: Configuration loaded`,
 			// Create a temporary log file
 			tempDir := t.TempDir()
 			logFile := filepath.Join(tempDir, "test.log")
-			err := os.WriteFile(logFile, []byte(tt.logContent), 0644)
+			err := os.WriteFile(logFile, []byte(tt.logContent), 0o644)
 			require.NoError(t, err, "Failed to create test log file")
 
 			// Parse the log file without an engine (fallback mode)
@@ -89,7 +89,7 @@ ERROR: Generic error
 
 	tempDir := t.TempDir()
 	logFile := filepath.Join(tempDir, "test.log")
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Test 1: No engine (fallback parser)
@@ -116,7 +116,7 @@ Done`
 
 	tempDir := t.TempDir()
 	logFile := filepath.Join(tempDir, "agent-stdio.log")
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Parse without engine (simulating missing aw_info.json)

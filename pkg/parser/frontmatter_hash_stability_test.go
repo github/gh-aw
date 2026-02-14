@@ -119,7 +119,7 @@ async function main() {
 main();
 `
 
-	if err := os.WriteFile(testScript, []byte(scriptContent), 0644); err != nil {
+	if err := os.WriteFile(testScript, []byte(scriptContent), 0o644); err != nil {
 		return "", err
 	}
 
@@ -158,7 +158,7 @@ tools:
 Use env: ${{ env.TEST_VAR }}
 `
 
-	err := os.WriteFile(workflowFile, []byte(content), 0644)
+	err := os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Should write test file")
 
 	cache := NewImportCache("")

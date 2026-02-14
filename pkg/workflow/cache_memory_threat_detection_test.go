@@ -189,7 +189,7 @@ Test workflow with restore-only cache-memory and threat detection enabled.`,
 			lockPath := filepath.Join(tmpDir, "test.lock.yml")
 
 			// Write markdown to temp file
-			if err := os.WriteFile(mdPath, []byte(tt.frontmatter), 0644); err != nil {
+			if err := os.WriteFile(mdPath, []byte(tt.frontmatter), 0o644); err != nil {
 				t.Fatalf("Failed to write markdown file: %v", err)
 			}
 

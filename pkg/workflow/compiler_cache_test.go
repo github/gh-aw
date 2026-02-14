@@ -157,7 +157,7 @@ tools:
 			// Create test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
 			testContent := tt.frontmatter + "\n\n# Test Cache Workflow\n\nThis is a test workflow.\n"
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -217,7 +217,7 @@ This workflow should get default permissions applied automatically.
 `
 
 	testFile := filepath.Join(tmpDir, "test-default-permissions.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -335,7 +335,7 @@ This workflow has custom permissions that should override defaults.
 `
 
 	testFile := filepath.Join(tmpDir, "test-custom-permissions.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

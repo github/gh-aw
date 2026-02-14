@@ -95,7 +95,7 @@ tools:
 			tmpDir := testutil.TempDir(t, "permissions-no-github-tool-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(testFile, []byte(tt.content), 0644)
+			err := os.WriteFile(testFile, []byte(tt.content), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Capture stderr to check for warnings
@@ -153,7 +153,7 @@ permissions:
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(testFile, []byte(content), 0644)
+	err := os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Capture stderr
@@ -227,7 +227,7 @@ permissions:
 			}
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			err := os.WriteFile(testFile, []byte(content), 0644)
+			err := os.WriteFile(testFile, []byte(content), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Capture stderr

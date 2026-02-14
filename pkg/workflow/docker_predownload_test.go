@@ -162,7 +162,7 @@ Test workflow with both GitHub and Serena tools.`,
 
 			// Write test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -218,7 +218,7 @@ Test workflow.`
 
 	// Write test workflow file
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -38,7 +38,7 @@ This workflow has a secret reference and safe-outputs.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflowWithSecrets), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowWithSecrets), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ This workflow has no secret references.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflowNoSecrets), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowNoSecrets), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +153,7 @@ This workflow uploads artifacts.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflow), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflow), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

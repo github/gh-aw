@@ -12,7 +12,6 @@ import (
 // the version is set to the actual version, not "dev"
 func TestVersionIsSetDuringBuild(t *testing.T) {
 	t.Run("version variable can be overridden at build time", func(t *testing.T) {
-
 		// Build a test binary with a specific version
 		testVersion := "v0.0.0-test"
 

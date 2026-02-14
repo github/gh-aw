@@ -19,7 +19,7 @@ func TestAwInfoResolution(t *testing.T) {
 
 	// Step 1: Simulate gh run download - creates artifact directories
 	awInfoDir := filepath.Join(tempDir, "aw-info")
-	err := os.MkdirAll(awInfoDir, 0755)
+	err := os.MkdirAll(awInfoDir, 0o755)
 	require.NoError(t, err)
 
 	awInfoContent := `{
@@ -29,13 +29,13 @@ func TestAwInfoResolution(t *testing.T) {
 		"workflow_name": "Test Workflow"
 	}`
 	awInfoPath := filepath.Join(awInfoDir, "aw_info.json")
-	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Also create a log file
 	logContent := `::error::Test error message
 ::warning::Test warning message`
-	err = os.WriteFile(filepath.Join(tempDir, "agent-stdio.log"), []byte(logContent), 0644)
+	err = os.WriteFile(filepath.Join(tempDir, "agent-stdio.log"), []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Step 2: Flatten single-file artifacts (simulates what happens after download)
@@ -66,7 +66,7 @@ func TestAwInfoResolutionWithoutFlattening(t *testing.T) {
 
 	// Artifact still in directory (not flattened)
 	awInfoDir := filepath.Join(tempDir, "aw-info")
-	err := os.MkdirAll(awInfoDir, 0755)
+	err := os.MkdirAll(awInfoDir, 0o755)
 	require.NoError(t, err)
 
 	awInfoContent := `{
@@ -76,13 +76,13 @@ func TestAwInfoResolutionWithoutFlattening(t *testing.T) {
 		"workflow_name": "Test Workflow"
 	}`
 	awInfoPath := filepath.Join(awInfoDir, "aw_info.json")
-	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err = os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a log file
 	logContent := `::error::Test error message
 ::warning::Test warning message`
-	err = os.WriteFile(filepath.Join(tempDir, "agent-stdio.log"), []byte(logContent), 0644)
+	err = os.WriteFile(filepath.Join(tempDir, "agent-stdio.log"), []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Test that extractLogMetrics FAILS to find aw_info.json because it's not at root
@@ -99,7 +99,7 @@ func TestMultipleArtifactFlattening(t *testing.T) {
 	// Create unified agent-artifacts structure as it would be downloaded
 	// All artifacts are now in a single agent-artifacts/tmp/gh-aw/ directory
 	nestedPath := filepath.Join(tempDir, "agent-artifacts", "tmp", "gh-aw")
-	err := os.MkdirAll(nestedPath, 0755)
+	err := os.MkdirAll(nestedPath, 0o755)
 	require.NoError(t, err)
 
 	artifacts := map[string]string{
@@ -111,7 +111,7 @@ func TestMultipleArtifactFlattening(t *testing.T) {
 
 	for filename, content := range artifacts {
 		fullPath := filepath.Join(nestedPath, filename)
-		err := os.WriteFile(fullPath, []byte(content), 0644)
+		err := os.WriteFile(fullPath, []byte(content), 0o644)
 		require.NoError(t, err)
 	}
 

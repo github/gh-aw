@@ -235,7 +235,7 @@ jobs:
         run: echo "test3"
 `
 	lockFilePath := filepath.Join(tempDir, "test.lock.yml")
-	err := os.WriteFile(lockFilePath, []byte(testYAML), 0644)
+	err := os.WriteFile(lockFilePath, []byte(testYAML), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestCollectWorkflowStats_InvalidYAML(t *testing.T) {
 	// Create an invalid YAML file
 	invalidYAML := `this is not: valid: yaml: at: all:`
 	lockFilePath := filepath.Join(tempDir, "invalid.lock.yml")
-	err := os.WriteFile(lockFilePath, []byte(invalidYAML), 0644)
+	err := os.WriteFile(lockFilePath, []byte(invalidYAML), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

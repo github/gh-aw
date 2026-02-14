@@ -42,7 +42,7 @@ This is a test workflow for compilation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,7 +232,7 @@ Brief content`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tt.name+".md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -281,7 +281,6 @@ func TestWorkflowDataStructure(t *testing.T) {
 	if data.MarkdownContent != "# Test Content" {
 		t.Errorf("Expected MarkdownContent '# Test Content', got '%s'", data.MarkdownContent)
 	}
-
 }
 
 func TestWorkflowNameWithColon(t *testing.T) {
@@ -307,7 +306,7 @@ This is a test workflow with a colon in the header.
 `
 
 	testFile := filepath.Join(tmpDir, "test-colon-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

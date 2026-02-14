@@ -66,13 +66,13 @@ func InstallPackage(repoSpec string, verbose bool) error {
 	}
 
 	// Create packages directory
-	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+	if err := os.MkdirAll(packagesDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create packages directory: %w", err)
 	}
 
 	// Create target directory for this repository
 	targetDir := filepath.Join(packagesDir, spec.RepoSlug)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create package directory: %w", err)
 	}
 
@@ -85,7 +85,7 @@ func InstallPackage(repoSpec string, verbose bool) error {
 			if err := os.RemoveAll(targetDir); err != nil {
 				return fmt.Errorf("failed to remove existing package: %w", err)
 			}
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
+			if err := os.MkdirAll(targetDir, 0o755); err != nil {
 				return fmt.Errorf("failed to recreate package directory: %w", err)
 			}
 		}
@@ -191,7 +191,7 @@ func downloadWorkflows(repo, version, targetDir string, verbose bool) error {
 
 	// Store the commit SHA in a metadata file for later retrieval
 	metadataPath := filepath.Join(targetDir, ".commit-sha")
-	if err := os.WriteFile(metadataPath, []byte(commitSHA), 0644); err != nil {
+	if err := os.WriteFile(metadataPath, []byte(commitSHA), 0o644); err != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write commit SHA metadata: %v", err)))
 		}
@@ -223,7 +223,7 @@ func copyMarkdownFiles(sourceDir, targetDir string, verbose bool) error {
 
 		// Create target directory if needed
 		targetFileDir := filepath.Dir(targetFile)
-		if err := os.MkdirAll(targetFileDir, 0755); err != nil {
+		if err := os.MkdirAll(targetFileDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create target directory %s: %w", targetFileDir, err)
 		}
 
@@ -237,7 +237,7 @@ func copyMarkdownFiles(sourceDir, targetDir string, verbose bool) error {
 			return fmt.Errorf("failed to read source file %s: %w", path, err)
 		}
 
-		if err := os.WriteFile(targetFile, content, 0644); err != nil {
+		if err := os.WriteFile(targetFile, content, 0o644); err != nil {
 			return fmt.Errorf("failed to write target file %s: %w", targetFile, err)
 		}
 
@@ -383,7 +383,6 @@ func listWorkflowsWithMetadata(repoSlug string, verbose bool) ([]WorkflowInfo, e
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan package directory: %w", err)
 	}
@@ -440,7 +439,6 @@ func extractWorkflowMetadata(filePath string) (name string, description string) 
 
 // findWorkflowInPackageForRepo searches for a workflow in installed packages
 func findWorkflowInPackageForRepo(workflow *WorkflowSpec, verbose bool) ([]byte, *WorkflowSourceInfo, error) {
-
 	packagesDir, err := getPackagesDir()
 	if err != nil {
 		if verbose {
@@ -548,7 +546,6 @@ func findWorkflowInPackageForRepo(workflow *WorkflowSpec, verbose bool) ([]byte,
 	}
 
 	return content, sourceInfo, nil
-
 }
 
 // collectPackageIncludeDependencies collects dependencies for package-based workflows
@@ -642,7 +639,7 @@ func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependenc
 
 		// Create target directory if it doesn't exist
 		targetDir := filepath.Dir(targetPath)
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
 		}
 
@@ -693,7 +690,7 @@ func copyIncludeDependenciesFromPackageWithForce(dependencies []IncludeDependenc
 		}
 
 		// Write to target
-		if err := os.WriteFile(targetPath, sourceContent, 0644); err != nil {
+		if err := os.WriteFile(targetPath, sourceContent, 0o644); err != nil {
 			return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
 		}
 
@@ -772,7 +769,6 @@ func discoverWorkflowsInPackage(repoSlug, version string, verbose bool) ([]*Work
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk package directory: %w", err)
 	}

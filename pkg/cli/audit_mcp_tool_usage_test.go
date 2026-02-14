@@ -72,7 +72,7 @@ func TestExtractMCPToolUsageData(t *testing.T) {
 			// Only create gateway.jsonl if there's content
 			if tt.logContent != "" {
 				gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-				err := os.WriteFile(gatewayLogPath, []byte(tt.logContent), 0644)
+				err := os.WriteFile(gatewayLogPath, []byte(tt.logContent), 0o644)
 				require.NoError(t, err, "Failed to write test gateway.jsonl")
 			}
 
@@ -125,7 +125,7 @@ func TestMCPToolSummaryCalculations(t *testing.T) {
 `
 
 	gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	mcpData, err := extractMCPToolUsageData(tmpDir, false)
@@ -165,7 +165,7 @@ func TestBuildAuditDataWithMCPToolUsage(t *testing.T) {
 	logContent := `{"timestamp":"2024-01-12T10:00:00Z","level":"info","type":"request","event":"tool_call","server_name":"github","tool_name":"search_issues","duration":100.0,"input_size":1024,"output_size":5120,"status":"success"}
 `
 	gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract MCP data

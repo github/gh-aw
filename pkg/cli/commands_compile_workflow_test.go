@@ -44,13 +44,13 @@ permissions:
 This is a test workflow for compilation.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return "", err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "test.md")
-				err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 				return workflowFile, err
 			},
 			verbose:        false,
@@ -79,13 +79,13 @@ features:
 Test workflow with verbose compilation.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return "", err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "verbose-test.md")
-				err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 				return workflowFile, err
 			},
 			verbose:        true,
@@ -111,13 +111,13 @@ permissions:
 Test compilation with specific engine.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return "", err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "engine-test.md")
-				err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 				return workflowFile, err
 			},
 			verbose:        false,
@@ -136,13 +136,13 @@ invalid yaml: [unclosed
 This workflow has invalid frontmatter.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return "", err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "invalid.md")
-				err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 				return workflowFile, err
 			},
 			verbose:        false,
@@ -177,13 +177,13 @@ permissions:
 Test compilation with invalid engine.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return "", err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "invalid-engine.md")
-				err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 				return workflowFile, err
 			},
 			verbose:        false,
@@ -264,12 +264,12 @@ func TestStageWorkflowChanges(t *testing.T) {
 
 				// Create workflows directory with test files
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					return err
 				}
 
 				testFile := filepath.Join(workflowsDir, "test.lock.yml")
-				return os.WriteFile(testFile, []byte("test: content"), 0644)
+				return os.WriteFile(testFile, []byte("test: content"), 0o644)
 			},
 			expectNoError: true,
 		},
@@ -285,12 +285,12 @@ func TestStageWorkflowChanges(t *testing.T) {
 			setupRepo: func(tmpDir string) error {
 				// Don't initialize git repo - should use fallback
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					return err
 				}
 
 				testFile := filepath.Join(workflowsDir, "test.lock.yml")
-				return os.WriteFile(testFile, []byte("test: content"), 0644)
+				return os.WriteFile(testFile, []byte("test: content"), 0o644)
 			},
 			expectNoError: true,
 		},
@@ -352,7 +352,7 @@ func TestStageGitAttributesIfChanged(t *testing.T) {
 
 				// Create .gitattributes file
 				gitattributesPath := filepath.Join(tmpDir, ".gitattributes")
-				return os.WriteFile(gitattributesPath, []byte("*.lock.yml linguist-generated=true"), 0644)
+				return os.WriteFile(gitattributesPath, []byte("*.lock.yml linguist-generated=true"), 0o644)
 			},
 			expectError: false,
 		},
@@ -446,13 +446,13 @@ permissions:
 This is a test workflow for compilation.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
-				return os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				return os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 			},
 			expectError: false,
 		},
@@ -462,7 +462,7 @@ This is a test workflow for compilation.
 			setupWorkflow: func(tmpDir string) error {
 				// Create workflows directory but no file
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				return os.MkdirAll(workflowsDir, 0755)
+				return os.MkdirAll(workflowsDir, 0o755)
 			},
 			expectError:   true,
 			errorContains: "workflow 'nonexistent' not found",
@@ -487,13 +487,13 @@ permissions:
 This is a test workflow for backward compatibility.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				err := os.MkdirAll(workflowsDir, 0755)
+				err := os.MkdirAll(workflowsDir, 0o755)
 				if err != nil {
 					return err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
-				return os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				return os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 			},
 			expectError: false,
 		},
@@ -599,12 +599,12 @@ permissions:
 This is a test workflow.
 `
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					return err
 				}
 
 				workflowFile := filepath.Join(workflowsDir, "test.md")
-				return os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+				return os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 			},
 			workflowIDs:    []string{"test.md"},
 			expectError:    false,
@@ -616,7 +616,7 @@ This is a test workflow.
 			name: "summary with compilation errors",
 			setupWorkflows: func(tmpDir string) error {
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				return os.MkdirAll(workflowsDir, 0755)
+				return os.MkdirAll(workflowsDir, 0o755)
 			},
 			workflowIDs:    []string{"nonexistent.md"},
 			expectError:    true,
@@ -628,7 +628,7 @@ This is a test workflow.
 			name: "summary with multiple workflows",
 			setupWorkflows: func(tmpDir string) error {
 				workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					return err
 				}
 
@@ -649,7 +649,7 @@ This is a test workflow.
 `
 				for i := 1; i <= 3; i++ {
 					workflowFile := filepath.Join(workflowsDir, "test"+string(rune('0'+i))+".md")
-					if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+					if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 						return err
 					}
 				}

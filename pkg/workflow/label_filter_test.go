@@ -192,7 +192,7 @@ tools:
 			// Create test file
 			testFile := tmpDir + "/test-label-filter.md"
 			content := tt.frontmatter + "\n\n# Test Workflow\n\nTest label filtering."
-			if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -256,7 +256,7 @@ tools:
 
 	testFile := tmpDir + "/test-comment.md"
 	content := frontmatter + "\n\n# Test Workflow\n\nTest comment."
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -79,7 +79,6 @@ func fetchGitHubWorkflows(repoOverride string, verbose bool) (map[string]*GitHub
 	}
 	cmd := workflow.ExecGH(args...)
 	output, err := cmd.Output()
-
 	if err != nil {
 		// Stop spinner on error
 		if !verbose {

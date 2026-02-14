@@ -77,13 +77,13 @@ func TestArtifactNamingBackwardCompatibility(t *testing.T) {
 
 			// Create artifact directory structure as it would be downloaded by gh run download
 			artifactDir := filepath.Join(tmpDir, tt.artifactDirName)
-			if err := os.MkdirAll(artifactDir, 0755); err != nil {
+			if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 				t.Fatalf("Failed to create artifact directory: %v", err)
 			}
 
 			// Create file inside artifact directory
 			artifactFile := filepath.Join(artifactDir, tt.fileNameInArtifact)
-			if err := os.WriteFile(artifactFile, []byte("test content"), 0644); err != nil {
+			if err := os.WriteFile(artifactFile, []byte("test content"), 0o644); err != nil {
 				t.Fatalf("Failed to create artifact file: %v", err)
 			}
 
@@ -131,10 +131,10 @@ func TestAuditCommandFindsNewArtifacts(t *testing.T) {
 
 	for path, content := range newArtifacts {
 		fullPath := filepath.Join(tmpDir, path)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 			t.Fatalf("Failed to create directory for %s: %v", path, err)
 		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write file %s: %v", path, err)
 		}
 	}

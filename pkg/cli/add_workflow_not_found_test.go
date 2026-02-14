@@ -23,7 +23,7 @@ func TestDisplayAvailableWorkflows(t *testing.T) {
 	// Create a mock package structure
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -43,7 +43,7 @@ on: push
 
 	for _, wf := range workflows {
 		wfPath := filepath.Join(workflowsDir, wf)
-		if err := os.WriteFile(wfPath, []byte(validWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(wfPath, []byte(validWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", wf, err)
 		}
 	}
@@ -96,7 +96,7 @@ func TestDisplayAvailableWorkflowsWithVersion(t *testing.T) {
 	// Create a mock package structure
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -108,7 +108,7 @@ on: push
 # Test Workflow
 `
 	wfPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(wfPath, []byte(validWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(wfPath, []byte(validWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 
@@ -147,7 +147,7 @@ func TestDisplayAvailableWorkflowsNoWorkflows(t *testing.T) {
 
 	// Create an empty package structure
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
-	if err := os.MkdirAll(packagePath, 0755); err != nil {
+	if err := os.MkdirAll(packagePath, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -186,7 +186,7 @@ func TestDisplayAvailableWorkflowsPackageNotFound(t *testing.T) {
 
 	// Create packages directory but don't create the specific package
 	packagesDir := filepath.Join(tempDir, ".aw", "packages")
-	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+	if err := os.MkdirAll(packagesDir, 0o755); err != nil {
 		t.Fatalf("Failed to create packages directory: %v", err)
 	}
 

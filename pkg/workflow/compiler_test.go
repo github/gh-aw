@@ -43,7 +43,7 @@ This is a test workflow for compilation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflow(testFile)
@@ -156,7 +156,7 @@ Content with <tags> and & symbols.
 			if tt.setupFile {
 				tmpDir := testutil.TempDir(t, "compiler-error-test")
 				testFile = filepath.Join(tmpDir, "test.md")
-				require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0644), "Failed to write test file")
+				require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0o644), "Failed to write test file")
 			} else {
 				testFile = tt.filePath
 			}
@@ -252,7 +252,7 @@ engine: copilot
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "compiler-edge-case")
 			testFile := filepath.Join(tmpDir, "test.md")
-			require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0644), "Failed to write test file")
+			require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0o644), "Failed to write test file")
 
 			compiler := NewCompiler()
 			err := compiler.CompileWorkflow(testFile)
@@ -300,7 +300,7 @@ engine: copilot
 
 Test content
 `
-	require.NoError(t, os.WriteFile(markdownPath, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(markdownPath, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflowData(workflowData, markdownPath)
@@ -330,7 +330,7 @@ This is a normal workflow that should generate a reasonable-sized lock file.
 `
 
 	testFile := filepath.Join(tmpDir, "size-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflow(testFile)
@@ -361,7 +361,7 @@ This workflow is missing the required 'on' field.
 `
 
 	testFile := filepath.Join(tmpDir, "invalid.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	err := compiler.CompileWorkflow(testFile)
@@ -401,7 +401,7 @@ engine: copilot
 
 # Test 1
 `
-	require.NoError(t, os.WriteFile(markdownPath, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(markdownPath, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -428,7 +428,7 @@ engine: copilot
 
 # Test 2
 `
-	require.NoError(t, os.WriteFile(markdownPath2, []byte(testContent2), 0644))
+	require.NoError(t, os.WriteFile(markdownPath2, []byte(testContent2), 0o644))
 
 	err = compiler.CompileWorkflowData(workflowData2, markdownPath2)
 	require.NoError(t, err)
@@ -737,7 +737,7 @@ func TestWriteWorkflowOutput_ContentUnchanged(t *testing.T) {
 	yamlContent := "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n"
 
 	// Write initial content
-	require.NoError(t, os.WriteFile(lockFile, []byte(yamlContent), 0644))
+	require.NoError(t, os.WriteFile(lockFile, []byte(yamlContent), 0o644))
 
 	// Get initial modification time
 	initialInfo, err := os.Stat(lockFile)
@@ -783,7 +783,7 @@ This is a test workflow for concurrent compilation.
 	var workflowFiles []string
 	for i := 0; i < numWorkers*workflowsPerWorker; i++ {
 		testFile := filepath.Join(tmpDir, fmt.Sprintf("workflow-%d.md", i))
-		require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644), "Failed to write test file %d", i)
+		require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644), "Failed to write test file %d", i)
 		workflowFiles = append(workflowFiles, testFile)
 	}
 
@@ -892,7 +892,7 @@ network:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "perf-test")
 			testFile := filepath.Join(tmpDir, "test.md")
-			require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0644), "Failed to write test file")
+			require.NoError(t, os.WriteFile(testFile, []byte(tt.fileContent), 0o644), "Failed to write test file")
 
 			compiler := NewCompiler()
 

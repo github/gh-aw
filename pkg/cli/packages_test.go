@@ -107,10 +107,10 @@ on: push
 			for path, content := range tt.setupFiles {
 				fullPath := filepath.Join(tmpDir, path)
 				dir := filepath.Dir(fullPath)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatalf("Failed to create directory %s: %v", dir, err)
 				}
-				if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 					t.Fatalf("Failed to write file %s: %v", fullPath, err)
 				}
 			}
@@ -157,10 +157,10 @@ func TestCollectPackageIncludesRecursive_CircularReference(t *testing.T) {
 	bContent := `@include a.md
 # File B`
 
-	if err := os.WriteFile(filepath.Join(tmpDir, "a.md"), []byte(aContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "a.md"), []byte(aContent), 0o644); err != nil {
 		t.Fatalf("Failed to write a.md: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "b.md"), []byte(bContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "b.md"), []byte(bContent), 0o644); err != nil {
 		t.Fatalf("Failed to write b.md: %v", err)
 	}
 
@@ -168,7 +168,6 @@ func TestCollectPackageIncludesRecursive_CircularReference(t *testing.T) {
 	var dependencies []IncludeDependency
 	seen := make(map[string]bool)
 	err := collectPackageIncludesRecursive(aContent, tmpDir, &dependencies, seen, false)
-
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -308,10 +307,10 @@ func TestCopyIncludeDependenciesFromPackageWithForce(t *testing.T) {
 			for path, content := range tt.setupSourceFiles {
 				fullPath := filepath.Join(sourceDir, path)
 				dir := filepath.Dir(fullPath)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatalf("Failed to create source directory %s: %v", dir, err)
 				}
-				if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 					t.Fatalf("Failed to write source file %s: %v", fullPath, err)
 				}
 			}
@@ -321,10 +320,10 @@ func TestCopyIncludeDependenciesFromPackageWithForce(t *testing.T) {
 			for path, content := range tt.setupTargetFiles {
 				fullPath := filepath.Join(targetDir, path)
 				dir := filepath.Dir(fullPath)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatalf("Failed to create target directory %s: %v", dir, err)
 				}
-				if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 					t.Fatalf("Failed to write target file %s: %v", fullPath, err)
 				}
 				oldContent[path] = content
@@ -394,7 +393,7 @@ func TestCopyIncludeDependenciesFromPackageWithForce_FileTracker(t *testing.T) {
 
 	// Create source file
 	sourceFile := filepath.Join(sourceDir, "file.md")
-	if err := os.WriteFile(sourceFile, []byte("Content"), 0644); err != nil {
+	if err := os.WriteFile(sourceFile, []byte("Content"), 0o644); err != nil {
 		t.Fatalf("Failed to write source file: %v", err)
 	}
 
@@ -435,7 +434,7 @@ func TestCopyIncludeDependenciesFromPackageWithForce_FileTracker(t *testing.T) {
 		t.Fatalf("Failed to create file tracker: %v", err)
 	}
 	// Update source content
-	if err := os.WriteFile(sourceFile, []byte("New Content"), 0644); err != nil {
+	if err := os.WriteFile(sourceFile, []byte("New Content"), 0o644); err != nil {
 		t.Fatalf("Failed to update source file: %v", err)
 	}
 

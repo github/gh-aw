@@ -12,7 +12,6 @@ import (
 
 // TestCompileWorkflowsWithCustomWorkflowDir tests the --workflows-dir flag functionality
 func TestCompileWorkflowsWithCustomWorkflowDir(t *testing.T) {
-
 	// Save current directory and defer restoration
 	originalWd, err := os.Getwd()
 	if err != nil {
@@ -43,7 +42,7 @@ func TestCompileWorkflowsWithCustomWorkflowDir(t *testing.T) {
 
 	// Create custom workflow directory
 	customDir := "my-workflows"
-	if err := os.MkdirAll(customDir, 0755); err != nil {
+	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -57,7 +56,7 @@ on: push
 This is a test workflow in a custom directory.
 `
 	workflowFile := filepath.Join(customDir, "test.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 
@@ -111,11 +110,11 @@ This is a test workflow in a custom directory.
 	// Test 3: Empty workflows-dir should default to .github/workflows
 	// Create the default directory and a file
 	defaultDir := ".github/workflows"
-	if err := os.MkdirAll(defaultDir, 0755); err != nil {
+	if err := os.MkdirAll(defaultDir, 0o755); err != nil {
 		t.Fatalf("Failed to create default workflow directory: %v", err)
 	}
 	defaultWorkflowFile := filepath.Join(defaultDir, "default.md")
-	if err := os.WriteFile(defaultWorkflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(defaultWorkflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create default workflow file: %v", err)
 	}
 
@@ -146,7 +145,6 @@ This is a test workflow in a custom directory.
 
 // TestCompileWorkflowsCustomDirValidation tests the validation of workflow directory paths
 func TestCompileWorkflowsCustomDirValidation(t *testing.T) {
-
 	tests := []struct {
 		name        string
 		workflowDir string
@@ -210,7 +208,7 @@ func TestCompileWorkflowsCustomDirValidation(t *testing.T) {
 				if expectedDir == "" {
 					expectedDir = ".github/workflows"
 				}
-				if err := os.MkdirAll(expectedDir, 0755); err != nil {
+				if err := os.MkdirAll(expectedDir, 0o755); err != nil {
 					t.Fatalf("Failed to create workflow directory: %v", err)
 				}
 				// Create a placeholder workflow file
@@ -221,7 +219,7 @@ on: push
 
 # Test Workflow
 `
-				if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+				if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 					t.Fatalf("Failed to create test workflow file: %v", err)
 				}
 			}

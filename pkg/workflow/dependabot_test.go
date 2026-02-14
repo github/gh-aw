@@ -216,7 +216,7 @@ func TestGeneratePackageJSON_MergeExisting(t *testing.T) {
 		},
 	}
 	existingData, _ := json.MarshalIndent(existingPkg, "", "  ")
-	os.WriteFile(packageJSONPath, existingData, 0644)
+	os.WriteFile(packageJSONPath, existingData, 0o644)
 
 	// Generate with new dependencies
 	newDeps := []NpmDependency{
@@ -325,7 +325,7 @@ func TestGenerateDependabotConfig_PreserveExisting(t *testing.T) {
 	}
 	existingConfig.Updates[0].Schedule.Interval = "weekly"
 	existingData, _ := yaml.Marshal(&existingConfig)
-	os.WriteFile(dependabotPath, existingData, 0644)
+	os.WriteFile(dependabotPath, existingData, 0o644)
 
 	ecosystems := map[string]bool{"npm": true}
 
@@ -371,7 +371,7 @@ func TestGenerateDependabotManifests_WithDependencies(t *testing.T) {
 	compiler := NewCompiler()
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowDir := filepath.Join(tempDir, ".github", "workflows")
-	os.MkdirAll(workflowDir, 0755)
+	os.MkdirAll(workflowDir, 0o755)
 
 	// Workflow with npm dependencies
 	workflows := []*WorkflowData{
@@ -408,7 +408,7 @@ func TestGenerateDependabotManifests_StrictMode(t *testing.T) {
 	compiler.SetStrictMode(true)
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowDir := filepath.Join(tempDir, ".github", "workflows")
-	os.MkdirAll(workflowDir, 0755)
+	os.MkdirAll(workflowDir, 0o755)
 
 	// Workflow with npm dependencies
 	workflows := []*WorkflowData{
@@ -825,7 +825,7 @@ func TestGenerateDependabotManifests_AllEcosystems(t *testing.T) {
 	compiler := NewCompiler()
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowDir := filepath.Join(tempDir, ".github", "workflows")
-	os.MkdirAll(workflowDir, 0755)
+	os.MkdirAll(workflowDir, 0o755)
 
 	// Workflow with npm, pip, and go dependencies
 	workflows := []*WorkflowData{

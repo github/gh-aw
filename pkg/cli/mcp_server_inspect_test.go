@@ -73,7 +73,6 @@ func TestMCPServer_InspectTool(t *testing.T) {
 
 // TestMCPServer_InspectToolInvocation tests calling the mcp-inspect tool
 func TestMCPServer_InspectToolInvocation(t *testing.T) {
-
 	// Skip if the binary doesn't exist
 	binaryPath := "../../gh-aw"
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
@@ -89,7 +88,7 @@ func TestMCPServer_InspectToolInvocation(t *testing.T) {
 	// Create a temporary directory with a workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -107,7 +106,7 @@ tools:
 This is a test workflow with MCP configuration.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -148,7 +147,6 @@ This is a test workflow with MCP configuration.
 			"workflow_file": "",
 		},
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to call mcp-inspect tool: %v", err)
 	}

@@ -17,7 +17,7 @@ func TestBlockedDomainsIntegration(t *testing.T) {
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -44,7 +44,7 @@ Test workflow with blocked domains.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-blocked-domains.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -94,7 +94,7 @@ Test workflow with blocked domains.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -120,7 +120,7 @@ Test workflow with blocked ecosystem.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-blocked-ecosystem.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -165,7 +165,7 @@ Test workflow with blocked ecosystem.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -189,7 +189,7 @@ Test workflow without blocked domains.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-no-blocked.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -226,7 +226,7 @@ Test workflow without blocked domains.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -251,7 +251,7 @@ Test Claude workflow with blocked domains.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-claude-blocked.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -288,7 +288,7 @@ Test Claude workflow with blocked domains.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -313,7 +313,7 @@ Test Codex workflow with blocked domains.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-codex-blocked.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}

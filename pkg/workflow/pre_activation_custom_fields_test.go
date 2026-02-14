@@ -38,7 +38,7 @@ Test workflow with custom pre-activation steps
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-custom-steps.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -88,7 +88,7 @@ Test workflow with custom pre-activation outputs
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-custom-outputs.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -137,7 +137,7 @@ Test workflow with both custom steps and outputs
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-steps-and-outputs.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -182,7 +182,7 @@ Test workflow with unsupported field in pre-activation
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-unsupported-field.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -219,7 +219,7 @@ Test that pre-activation is not added as a custom job
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-not-custom-job.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -278,7 +278,7 @@ Test that both pre-activation and pre_activation are imported
 `
 
 		workflowFile := filepath.Join(tmpDir, "test-both-variants.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

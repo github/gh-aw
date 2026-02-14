@@ -67,7 +67,6 @@ func TestRepositoryFeaturesValidationIntegration(t *testing.T) {
 
 		compiler := NewCompiler()
 		err := compiler.validateRepositoryFeatures(workflowData)
-
 		// After the fix, validation should never return an error for discussions
 		// It should only issue warnings and let runtime handle the actual creation
 		if err != nil {
@@ -148,7 +147,7 @@ safe-outputs:
 Test workflow for discussions validation.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -157,7 +156,6 @@ Test workflow for discussions validation.
 	compiler.SetNoEmit(true) // Don't write lock file
 
 	err = compiler.CompileWorkflow(workflowPath)
-
 	// After the fix, compilation should always succeed for discussions
 	// Validation now only issues warnings and lets runtime handle creation attempts
 	if err != nil {

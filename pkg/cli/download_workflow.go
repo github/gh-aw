@@ -388,13 +388,13 @@ func downloadWorkflowContentViaGitClone(repo, path, ref string, verbose bool) ([
 
 	// Set sparse-checkout pattern to only include the file we need
 	sparseInfoDir := filepath.Join(tmpDir, ".git", "info")
-	if err := os.MkdirAll(sparseInfoDir, 0755); err != nil {
+	if err := os.MkdirAll(sparseInfoDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create sparse-checkout directory: %w", err)
 	}
 
 	sparseCheckoutFile := filepath.Join(sparseInfoDir, "sparse-checkout")
 	// Use owner-only read/write permissions (0600) for security best practices
-	if err := os.WriteFile(sparseCheckoutFile, []byte(path+"\n"), 0600); err != nil {
+	if err := os.WriteFile(sparseCheckoutFile, []byte(path+"\n"), 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write sparse-checkout file: %w", err)
 	}
 

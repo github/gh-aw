@@ -33,7 +33,7 @@ func TestAddCommandUpdatesGitAttributes(t *testing.T) {
 	}
 
 	// Initialize a git repository
-	if err := os.WriteFile("test.txt", []byte("test"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	if cmd := exec.Command("git", "init"); cmd.Run() != nil {
@@ -48,7 +48,7 @@ func TestAddCommandUpdatesGitAttributes(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create .github/workflows directory: %v", err)
 	}
 
@@ -65,7 +65,7 @@ engine: copilot
 This is a test workflow.`
 
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 
@@ -133,7 +133,7 @@ This is a test workflow.`
 		// Create a .gitattributes file with existing content
 		existingContent := "*.txt linguist-vendored=true\n"
 		gitAttributesPath := filepath.Join(tmpDir, ".gitattributes")
-		if err := os.WriteFile(gitAttributesPath, []byte(existingContent), 0644); err != nil {
+		if err := os.WriteFile(gitAttributesPath, []byte(existingContent), 0o644); err != nil {
 			t.Fatalf("Failed to create .gitattributes: %v", err)
 		}
 

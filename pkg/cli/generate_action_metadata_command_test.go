@@ -308,7 +308,7 @@ func TestGenerateActionYml(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			actionDir := filepath.Join(tmpDir, tt.metadata.ActionName)
-			err := os.MkdirAll(actionDir, 0755)
+			err := os.MkdirAll(actionDir, 0o755)
 			require.NoError(t, err, "Failed to create action directory")
 
 			err = generateActionYml(actionDir, tt.metadata)
@@ -359,7 +359,7 @@ func TestGenerateReadme(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			actionDir := filepath.Join(tmpDir, tt.metadata.ActionName)
-			err := os.MkdirAll(actionDir, 0755)
+			err := os.MkdirAll(actionDir, 0o755)
 			require.NoError(t, err, "Failed to create action directory")
 
 			err = generateReadme(actionDir, tt.metadata)

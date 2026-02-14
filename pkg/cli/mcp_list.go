@@ -232,7 +232,8 @@ func showInteractiveMCPWorkflowSelection(workflows []struct {
 	name        string
 	serverCount int
 	serverNames []string
-}, verbose bool) (string, error) {
+}, verbose bool,
+) (string, error) {
 	mcpListLog.Printf("Showing interactive MCP workflow selection: workflows=%d", len(workflows))
 
 	// Convert workflow data to ListItems

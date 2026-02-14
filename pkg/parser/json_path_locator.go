@@ -310,7 +310,7 @@ func findAdditionalPropertyInNestedContext(yamlContent string, jsonPath string, 
 	subYAMLLines := make([]string, 0, nestedSection.endLine-nestedSection.startLine+1)
 
 	// Extract lines from the nested section, maintaining relative indentation
-	var baseIndent = -1
+	baseIndent := -1
 	for lineNum := nestedSection.startLine; lineNum <= nestedSection.endLine && lineNum < len(lines); lineNum++ {
 		line := lines[lineNum]
 
@@ -378,8 +378,8 @@ func findNestedSection(yamlContent string, pathSegments []PathSegment) NestedSec
 
 	// Start from the beginning and traverse the path
 	currentLevel := 0
-	var foundLine = -1
-	var baseIndentLevel = 0
+	foundLine := -1
+	baseIndentLevel := 0
 
 	for lineNum, line := range lines {
 		trimmedLine := strings.TrimSpace(line)

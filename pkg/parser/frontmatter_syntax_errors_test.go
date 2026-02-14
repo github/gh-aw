@@ -332,7 +332,7 @@ This workflow may have schema validation errors.`,
 			// Write test file with frontmatter and markdown content
 			testFile := filepath.Join(tempDir, "test.md")
 			fullContent := tt.frontmatterContent + "\n\n" + tt.markdownContent
-			if err := os.WriteFile(testFile, []byte(fullContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(fullContent), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 

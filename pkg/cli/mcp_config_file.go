@@ -30,7 +30,7 @@ func ensureMCPConfig(verbose bool) error {
 
 	// Create .vscode directory if it doesn't exist
 	vscodeDir := ".vscode"
-	if err := os.MkdirAll(vscodeDir, 0755); err != nil {
+	if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create .vscode directory: %w", err)
 	}
 	mcpConfigLog.Printf("Ensured directory exists: %s", vscodeDir)
@@ -87,7 +87,7 @@ func ensureMCPConfig(verbose bool) error {
 		return fmt.Errorf("failed to marshal mcp.json: %w", err)
 	}
 
-	if err := os.WriteFile(mcpConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(mcpConfigPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write mcp.json: %w", err)
 	}
 	mcpConfigLog.Printf("Created new file: %s", mcpConfigPath)

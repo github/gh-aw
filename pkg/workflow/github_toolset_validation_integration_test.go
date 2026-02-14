@@ -218,13 +218,13 @@ Test content.
 
 			// Create the .github/workflows directory
 			workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-			if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+			if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 				t.Fatalf("Failed to create workflows dir: %v", err)
 			}
 
 			// Write the test workflow
 			workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-			if err := os.WriteFile(workflowPath, []byte(tt.frontmatter), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(tt.frontmatter), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 
@@ -282,13 +282,13 @@ Test content.
 
 	// Create the .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows dir: %v", err)
 	}
 
 	// Write the test workflow
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -339,13 +339,13 @@ Test content.
 
 	// Create the .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows dir: %v", err)
 	}
 
 	// Write the test workflow
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

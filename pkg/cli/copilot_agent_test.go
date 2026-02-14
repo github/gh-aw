@@ -46,7 +46,7 @@ func TestCopilotAgentDetector_IsGitHubCopilotAgent(t *testing.T) {
 			name: "aw_info.json present means agentic workflow, not copilot agent",
 			setupFunc: func(dir string) error {
 				awInfo := `{"workflow_name": "copilot-swe-agent-session", "workflow_file": "test.yml"}`
-				return os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(awInfo), 0644)
+				return os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(awInfo), 0o644)
 			},
 			workflowPath:   ".github/workflows/copilot-swe-agent.yml",
 			expectedResult: false,
@@ -55,7 +55,7 @@ func TestCopilotAgentDetector_IsGitHubCopilotAgent(t *testing.T) {
 			name: "aw_info.json present with any workflow name means agentic workflow",
 			setupFunc: func(dir string) error {
 				awInfo := `{"workflow_name": "test", "workflow_file": "copilot_swe_agent.yml"}`
-				return os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(awInfo), 0644)
+				return os.WriteFile(filepath.Join(dir, "aw_info.json"), []byte(awInfo), 0o644)
 			},
 			expectedResult: false,
 		},
@@ -67,7 +67,7 @@ func TestCopilotAgentDetector_IsGitHubCopilotAgent(t *testing.T) {
 2024-01-15 10:00:01 Initializing agent session execution
 2024-01-15 10:00:02 Processing request
 `
-				return os.WriteFile(filepath.Join(dir, "agent.log"), []byte(logContent), 0644)
+				return os.WriteFile(filepath.Join(dir, "agent.log"), []byte(logContent), 0o644)
 			},
 			expectedResult: true,
 		},
@@ -75,14 +75,14 @@ func TestCopilotAgentDetector_IsGitHubCopilotAgent(t *testing.T) {
 			name: "detects copilot-swe-agent in log without aw_info.json",
 			setupFunc: func(dir string) error {
 				logContent := `Using @github/copilot-swe-agent for task execution`
-				return os.WriteFile(filepath.Join(dir, "execution.log"), []byte(logContent), 0644)
+				return os.WriteFile(filepath.Join(dir, "execution.log"), []byte(logContent), 0o644)
 			},
 			expectedResult: true,
 		},
 		{
 			name: "detects agent artifact without aw_info.json",
 			setupFunc: func(dir string) error {
-				return os.Mkdir(filepath.Join(dir, "copilot-agent-output"), 0755)
+				return os.Mkdir(filepath.Join(dir, "copilot-agent-output"), 0o755)
 			},
 			expectedResult: true,
 		},
@@ -309,7 +309,7 @@ ERROR: Failed to write to protected file
 Task iteration 3: Completing task
 Tool call: github_create_pr
 `
-	if err := os.WriteFile(filepath.Join(tmpDir, "agent-stdio.log"), []byte(agentLog), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "agent-stdio.log"), []byte(agentLog), 0o644); err != nil {
 		t.Fatalf("Failed to write log file: %v", err)
 	}
 
@@ -350,7 +350,7 @@ func TestReadLogHeader(t *testing.T) {
 
 	testFile := filepath.Join(tmpDir, "test.log")
 	content := strings.Repeat("x", 20000) // 20KB file
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -375,7 +375,7 @@ ERROR: Test error
 	metrics := ParseCopilotAgentLogMetrics(logContent, false)
 
 	// Verify the returned type is workflow.LogMetrics
-	var _ = metrics
+	_ = metrics
 
 	// Verify fields are properly set
 	if metrics.Turns != 1 {

@@ -184,20 +184,20 @@ func TestFindAgentLogFile(t *testing.T) {
 
 		// Create agent_output directory with a log file
 		agentOutputDir := filepath.Join(tmpDir, "copilot_test", "agent_output")
-		err := os.MkdirAll(agentOutputDir, 0755)
+		err := os.MkdirAll(agentOutputDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create agent_output directory: %v", err)
 		}
 
 		logFile := filepath.Join(agentOutputDir, "debug.log")
-		err = os.WriteFile(logFile, []byte("test log content"), 0644)
+		err = os.WriteFile(logFile, []byte("test log content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create log file: %v", err)
 		}
 
 		// Create agent-stdio.log as well (should be ignored for Copilot)
 		stdioLog := filepath.Join(tmpDir, "copilot_test", "agent-stdio.log")
-		err = os.WriteFile(stdioLog, []byte("stdio content"), 0644)
+		err = os.WriteFile(stdioLog, []byte("stdio content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create agent-stdio.log: %v", err)
 		}
@@ -218,21 +218,21 @@ func TestFindAgentLogFile(t *testing.T) {
 	// After flattening, session logs are at sandbox/agent/logs/ in the root
 	t.Run("copilot_engine_flattened_location", func(t *testing.T) {
 		copilotDir := filepath.Join(tmpDir, "copilot_flattened_test")
-		err := os.MkdirAll(copilotDir, 0755)
+		err := os.MkdirAll(copilotDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create test directory: %v", err)
 		}
 
 		// Create flattened session logs directory (after flattenAgentOutputsArtifact)
 		sessionLogsDir := filepath.Join(copilotDir, "sandbox", "agent", "logs")
-		err = os.MkdirAll(sessionLogsDir, 0755)
+		err = os.MkdirAll(sessionLogsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create flattened session logs directory: %v", err)
 		}
 
 		// Create a test session log file
 		sessionLog := filepath.Join(sessionLogsDir, "session-test-123.log")
-		err = os.WriteFile(sessionLog, []byte("test session log content"), 0644)
+		err = os.WriteFile(sessionLog, []byte("test session log content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create session log file: %v", err)
 		}
@@ -261,7 +261,7 @@ func TestFindAgentLogFile(t *testing.T) {
 	// This handles cases where artifact structure differs from expected
 	t.Run("copilot_engine_recursive_search", func(t *testing.T) {
 		copilotDir := filepath.Join(tmpDir, "copilot_recursive_test")
-		err := os.MkdirAll(copilotDir, 0755)
+		err := os.MkdirAll(copilotDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create test directory: %v", err)
 		}
@@ -269,7 +269,7 @@ func TestFindAgentLogFile(t *testing.T) {
 		// Create session log directly in the run directory
 		// This simulates the case where the artifact was flattened differently
 		sessionLog := filepath.Join(copilotDir, "session-direct-456.log")
-		err = os.WriteFile(sessionLog, []byte("test session log content"), 0644)
+		err = os.WriteFile(sessionLog, []byte("test session log content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create session log file: %v", err)
 		}
@@ -297,7 +297,7 @@ func TestFindAgentLogFile(t *testing.T) {
 	// Copilot changed from session-*.log to process-*.log
 	t.Run("copilot_engine_process_log", func(t *testing.T) {
 		copilotDir := filepath.Join(tmpDir, "copilot_process_test")
-		err := os.MkdirAll(copilotDir, 0755)
+		err := os.MkdirAll(copilotDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create test directory: %v", err)
 		}
@@ -305,7 +305,7 @@ func TestFindAgentLogFile(t *testing.T) {
 		// Create process log directly in the run directory
 		// This simulates the new naming convention for Copilot logs
 		processLog := filepath.Join(copilotDir, "process-12345.log")
-		err = os.WriteFile(processLog, []byte("test process log content"), 0644)
+		err = os.WriteFile(processLog, []byte("test process log content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create process log file: %v", err)
 		}
@@ -332,21 +332,21 @@ func TestFindAgentLogFile(t *testing.T) {
 	// Test Copilot engine with process log in nested directory
 	t.Run("copilot_engine_process_log_nested", func(t *testing.T) {
 		copilotDir := filepath.Join(tmpDir, "copilot_process_nested_test")
-		err := os.MkdirAll(copilotDir, 0755)
+		err := os.MkdirAll(copilotDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create test directory: %v", err)
 		}
 
 		// Create nested directory structure
 		processLogsDir := filepath.Join(copilotDir, "sandbox", "agent", "logs")
-		err = os.MkdirAll(processLogsDir, 0755)
+		err = os.MkdirAll(processLogsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create process logs directory: %v", err)
 		}
 
 		// Create a test process log file
 		processLog := filepath.Join(processLogsDir, "process-test-789.log")
-		err = os.WriteFile(processLog, []byte("test process log content"), 0644)
+		err = os.WriteFile(processLog, []byte("test process log content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create process log file: %v", err)
 		}
@@ -377,13 +377,13 @@ func TestFindAgentLogFile(t *testing.T) {
 
 		// Create only agent-stdio.log
 		claudeDir := filepath.Join(tmpDir, "claude_test")
-		err := os.MkdirAll(claudeDir, 0755)
+		err := os.MkdirAll(claudeDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create claude test directory: %v", err)
 		}
 
 		stdioLog := filepath.Join(claudeDir, "agent-stdio.log")
-		err = os.WriteFile(stdioLog, []byte("stdio content"), 0644)
+		err = os.WriteFile(stdioLog, []byte("stdio content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create agent-stdio.log: %v", err)
 		}
@@ -403,7 +403,7 @@ func TestFindAgentLogFile(t *testing.T) {
 	// Test 3: No logs found
 	t.Run("No logs found returns false", func(t *testing.T) {
 		emptyDir := filepath.Join(tmpDir, "empty_test")
-		err := os.MkdirAll(emptyDir, 0755)
+		err := os.MkdirAll(emptyDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create empty test directory: %v", err)
 		}
@@ -421,13 +421,13 @@ func TestFindAgentLogFile(t *testing.T) {
 
 		// Create only agent-stdio.log
 		codexDir := filepath.Join(tmpDir, "codex_test")
-		err := os.MkdirAll(codexDir, 0755)
+		err := os.MkdirAll(codexDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create codex test directory: %v", err)
 		}
 
 		stdioLog := filepath.Join(codexDir, "agent-stdio.log")
-		err = os.WriteFile(stdioLog, []byte("stdio content"), 0644)
+		err = os.WriteFile(stdioLog, []byte("stdio content"), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create agent-stdio.log: %v", err)
 		}

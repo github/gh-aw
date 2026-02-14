@@ -37,7 +37,7 @@ Fetch content from the web.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -100,7 +100,7 @@ Fetch content from the web.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -165,7 +165,7 @@ Fetch content from the web.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -228,7 +228,7 @@ Run some bash commands.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 

@@ -28,10 +28,13 @@ func TestValidateServerSecrets(t *testing.T) {
 		},
 		{
 			name: "valid environment variable",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Env: map[string]string{
-					"TEST_VAR": "test_value",
-				}}, Name: "env-tool",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "stdio",
+					Env: map[string]string{
+						"TEST_VAR": "test_value",
+					},
+				}, Name: "env-tool",
 			},
 			envVars: map[string]string{
 				"TEST_VAR": "actual_value",
@@ -40,28 +43,37 @@ func TestValidateServerSecrets(t *testing.T) {
 		},
 		{
 			name: "missing environment variable",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Env: map[string]string{
-					"MISSING_VAR": "test_value",
-				}}, Name: "missing-env-tool",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "stdio",
+					Env: map[string]string{
+						"MISSING_VAR": "test_value",
+					},
+				}, Name: "missing-env-tool",
 			},
 			expectError: true,
 			errorMsg:    "environment variable 'MISSING_VAR' not set",
 		},
 		{
 			name: "secrets reference (handled gracefully)",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Env: map[string]string{
-					"API_KEY": "${secrets.API_KEY}",
-				}}, Name: "secrets-tool",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "stdio",
+					Env: map[string]string{
+						"API_KEY": "${secrets.API_KEY}",
+					},
+				}, Name: "secrets-tool",
 			},
 			expectError: false,
 		},
 		{
 			name: "github remote mode requires GH_AW_GITHUB_TOKEN",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "http",
-				URL: "https://api.githubcopilot.com/mcp/",
-				Env: map[string]string{}}, Name: "github",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "http",
+					URL:  "https://api.githubcopilot.com/mcp/",
+					Env:  map[string]string{},
+				}, Name: "github",
 			},
 			envVars: map[string]string{
 				"GH_AW_GITHUB_TOKEN": "test_token",
@@ -70,18 +82,24 @@ func TestValidateServerSecrets(t *testing.T) {
 		},
 		{
 			name: "github remote mode with custom token",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "http",
-				URL: "https://api.githubcopilot.com/mcp/",
-				Env: map[string]string{
-					"GITHUB_TOKEN": "${{ secrets.CUSTOM_PAT }}",
-				}}, Name: "github",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "http",
+					URL:  "https://api.githubcopilot.com/mcp/",
+					Env: map[string]string{
+						"GITHUB_TOKEN": "${{ secrets.CUSTOM_PAT }}",
+					},
+				}, Name: "github",
 			},
 			expectError: false,
 		},
 		{
 			name: "github local mode does not require GH_AW_GITHUB_TOKEN",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "docker",
-				Env: map[string]string{}}, Name: "github",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "docker",
+					Env:  map[string]string{},
+				}, Name: "github",
 			},
 			expectError: false,
 		},

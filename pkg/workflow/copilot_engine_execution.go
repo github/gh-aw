@@ -247,7 +247,7 @@ func (e *CopilotEngine) GetExecutionSteps(workflowData *WorkflowData, logFile st
 		// Build the AWF-wrapped command - no mkdir needed, AWF handles it
 		firewallConfig := getFirewallConfig(workflowData)
 		agentConfig := getAgentConfig(workflowData)
-		var awfLogLevel = "info"
+		awfLogLevel := "info"
 		if firewallConfig != nil && firewallConfig.LogLevel != "" {
 			awfLogLevel = firewallConfig.LogLevel
 		}

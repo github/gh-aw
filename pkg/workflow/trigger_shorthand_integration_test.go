@@ -63,7 +63,7 @@ Test workflow for manual dispatch`,
 			lockFile := filepath.Join(tmpDir, "test.lock.yml")
 
 			// Write the markdown to a file
-			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0644); err != nil {
+			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0o644); err != nil {
 				t.Fatalf("Failed to write test markdown: %v", err)
 			}
 
@@ -167,7 +167,7 @@ Test`,
 			lockFile := filepath.Join(tmpDir, "test.lock.yml")
 
 			// Write the markdown to a file
-			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0644); err != nil {
+			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0o644); err != nil {
 				t.Fatalf("Failed to write test markdown: %v", err)
 			}
 
@@ -238,7 +238,7 @@ Test`,
 			mdFile := filepath.Join(tmpDir, "test.md")
 
 			// Write the markdown to a file
-			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0644); err != nil {
+			if err := os.WriteFile(mdFile, []byte(tt.markdown), 0o644); err != nil {
 				t.Fatalf("Failed to write test markdown: %v", err)
 			}
 

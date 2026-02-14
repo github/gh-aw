@@ -193,7 +193,7 @@ This test validates that command conditions are applied correctly based on event
 `
 
 			testFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -347,8 +347,10 @@ tools:
 ---`,
 			filename:       "command-all-events.md",
 			expectedEvents: []string{"issues:", "issue_comment:", "pull_request:", "pull_request_review_comment:"},
-			expectedBodyChecks: []string{"github.event.issue.body", "github.event.comment.body",
-				"github.event.pull_request.body"},
+			expectedBodyChecks: []string{
+				"github.event.issue.body", "github.event.comment.body",
+				"github.event.pull_request.body",
+			},
 		},
 		{
 			name: "command with events: [pull_request]",
@@ -430,7 +432,7 @@ This test validates that command events filtering works correctly.
 `
 
 			testFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

@@ -33,7 +33,7 @@ This is a valid main workflow with an 'on' field.
 `
 
 	testFile := filepath.Join(tmpDir, "main-workflow.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -61,7 +61,7 @@ This can be imported by other workflows.
 `
 
 	testFile := filepath.Join(tmpDir, "shared-workflow.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -86,7 +86,7 @@ This file has no frontmatter section.
 `
 
 	testFile := filepath.Join(tmpDir, "no-frontmatter.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -112,7 +112,7 @@ Content
 `
 
 	testFile := filepath.Join(tmpDir, "invalid-yaml.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -151,7 +151,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "no-markdown.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -199,7 +199,7 @@ on: push
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := tt.frontmatter + "\n\n# Workflow\n\nContent\n"
 			testFile := filepath.Join(tmpDir, "engine-test-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -232,7 +232,7 @@ Content
 `
 
 	testFile := filepath.Join(tmpDir, "override-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Create compiler with engine override
 	compiler := NewCompiler(
@@ -284,7 +284,7 @@ network:
 
 			testContent := frontmatter + "\n\n# Workflow\n\nContent\n"
 			testFile := filepath.Join(tmpDir, "network-test-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -355,7 +355,7 @@ func TestParseWorkflowFile_StrictMode(t *testing.T) {
 
 			testContent := frontmatter + "\n\n# Workflow\n\nContent\n"
 			testFile := filepath.Join(tmpDir, "strict-test-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			_, err := compiler.ParseWorkflowFile(testFile)
@@ -540,7 +540,7 @@ Test content
 `
 
 	testFile := filepath.Join(tmpDir, "yaml-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -585,7 +585,7 @@ post-steps:
 `
 
 	testFile := filepath.Join(tmpDir, "post-steps.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -620,7 +620,7 @@ bots:
 `
 
 	testFile := filepath.Join(tmpDir, "configs.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -648,7 +648,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "filters.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -679,7 +679,7 @@ Test content
 `
 
 	testFile := filepath.Join(tmpDir, "initial.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)

@@ -113,7 +113,7 @@ func TestDiscoverWorkflowsInPackage(t *testing.T) {
 	// Create a mock package structure (use .aw/packages, not .gh-aw/packages)
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -134,10 +134,10 @@ on: push
 	for _, wf := range workflows {
 		filePath := filepath.Join(packagePath, wf)
 		dir := filepath.Dir(filePath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", dir, err)
 		}
-		if err := os.WriteFile(filePath, []byte(validWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(validWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create test workflow %s: %v", wf, err)
 		}
 	}
@@ -204,7 +204,7 @@ func TestDiscoverWorkflowsInPackage_EmptyPackage(t *testing.T) {
 
 	// Create an empty package directory (use .aw/packages, not .gh-aw/packages)
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "empty-owner", "empty-repo")
-	if err := os.MkdirAll(packagePath, 0755); err != nil {
+	if err := os.MkdirAll(packagePath, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -230,7 +230,7 @@ func TestExpandWildcardWorkflows(t *testing.T) {
 	// Create a mock package with workflows
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-org", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -249,7 +249,7 @@ on: push
 
 	for _, wf := range workflows {
 		filePath := filepath.Join(packagePath, wf)
-		if err := os.WriteFile(filePath, []byte(validWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(validWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create test workflow %s: %v", wf, err)
 		}
 	}
@@ -425,7 +425,7 @@ func TestAddWorkflowWithTracking_WildcardDuplicateHandling(t *testing.T) {
 	t.Chdir(tempDir)
 
 	// Initialize a git repository
-	if err := os.MkdirAll(filepath.Join(tempDir, ".git"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(tempDir, ".git"), 0o755); err != nil {
 		t.Fatalf("Failed to create .git directory: %v", err)
 	}
 
@@ -438,7 +438,7 @@ func TestAddWorkflowWithTracking_WildcardDuplicateHandling(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -450,7 +450,7 @@ on: push
 
 # Test Workflow
 `
-	if err := os.WriteFile(existingWorkflow, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(existingWorkflow, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to create existing workflow: %v", err)
 	}
 
@@ -467,11 +467,11 @@ on: push
 
 	// Create a mock package structure with the workflow
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-org", "test-repo", "workflows")
-	if err := os.MkdirAll(packagePath, 0755); err != nil {
+	if err := os.MkdirAll(packagePath, 0o755); err != nil {
 		t.Fatalf("Failed to create package directory: %v", err)
 	}
 	mockWorkflow := filepath.Join(packagePath, "test-workflow.md")
-	if err := os.WriteFile(mockWorkflow, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(mockWorkflow, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to create mock workflow: %v", err)
 	}
 

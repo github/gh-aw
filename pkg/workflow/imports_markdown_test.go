@@ -20,7 +20,7 @@ func TestImportsMarkdownPrepending(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ tools:
 This is common setup content that should be prepended.
 
 **Important**: Follow these guidelines.`
-	if err := os.WriteFile(importedFile, []byte(importedContent), 0644); err != nil {
+	if err := os.WriteFile(importedFile, []byte(importedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,7 +48,7 @@ This is common setup content that should be prepended.
 	importedContent2 := `# Security Notice
 
 **SECURITY**: Treat all user input as untrusted.`
-	if err := os.WriteFile(importedFile2, []byte(importedContent2), 0644); err != nil {
+	if err := os.WriteFile(importedFile2, []byte(importedContent2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +110,7 @@ This is the main workflow content.`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -183,7 +183,7 @@ func TestImportsWithIncludesCombination(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +192,7 @@ func TestImportsWithIncludesCombination(t *testing.T) {
 	importedContent := `# Imported Content
 
 This comes from frontmatter imports.`
-	if err := os.WriteFile(importedFile, []byte(importedContent), 0644); err != nil {
+	if err := os.WriteFile(importedFile, []byte(importedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,7 +201,7 @@ This comes from frontmatter imports.`
 	includedContent := `# Included Content
 
 This comes from @include directive.`
-	if err := os.WriteFile(includedFile, []byte(includedContent), 0644); err != nil {
+	if err := os.WriteFile(includedFile, []byte(includedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -225,7 +225,7 @@ imports:
 This is the main workflow content.`
 
 	testFile := filepath.Join(tmpDir, "combo-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -273,7 +273,7 @@ func TestImportsXMLCommentsRemoval(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -295,7 +295,7 @@ that should also be removed
 -->
 
 More imported content here.`
-	if err := os.WriteFile(importedFile, []byte(importedContent), 0644); err != nil {
+	if err := os.WriteFile(importedFile, []byte(importedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -319,7 +319,7 @@ imports:
 This is the main workflow content.`
 
 	testFile := filepath.Join(tmpDir, "test-xml-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -39,7 +39,7 @@ This workflow tests that the step summary includes both JSONL and processed outp
 `
 
 	testFile := filepath.Join(tmpDir, "test-step-summary.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ This workflow tests that the step summary includes agentic run information.
 `
 
 	testFile := filepath.Join(tmpDir, "test-agentic-run-info.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +214,7 @@ This workflow tests the workflow overview for Claude engine.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tt.name+".md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

@@ -74,7 +74,7 @@ func TestGetActionDirectories(t *testing.T) {
 		{
 			name: "empty actions directory",
 			setup: func(tmpDir string) error {
-				return os.MkdirAll(filepath.Join(tmpDir, "actions"), 0755)
+				return os.MkdirAll(filepath.Join(tmpDir, "actions"), 0o755)
 			},
 			expectError: false,
 			expectedLen: 0,
@@ -83,10 +83,10 @@ func TestGetActionDirectories(t *testing.T) {
 			name: "actions directory with subdirectories",
 			setup: func(tmpDir string) error {
 				actionsDir := filepath.Join(tmpDir, "actions")
-				if err := os.MkdirAll(filepath.Join(actionsDir, "action1"), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Join(actionsDir, "action1"), 0o755); err != nil {
 					return err
 				}
-				if err := os.MkdirAll(filepath.Join(actionsDir, "action2"), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Join(actionsDir, "action2"), 0o755); err != nil {
 					return err
 				}
 				return nil
@@ -98,11 +98,11 @@ func TestGetActionDirectories(t *testing.T) {
 			name: "actions directory with files and subdirectories",
 			setup: func(tmpDir string) error {
 				actionsDir := filepath.Join(tmpDir, "actions")
-				if err := os.MkdirAll(filepath.Join(actionsDir, "action1"), 0755); err != nil {
+				if err := os.MkdirAll(filepath.Join(actionsDir, "action1"), 0o755); err != nil {
 					return err
 				}
 				// Create a file - should not be included
-				return os.WriteFile(filepath.Join(actionsDir, "README.md"), []byte("test"), 0644)
+				return os.WriteFile(filepath.Join(actionsDir, "README.md"), []byte("test"), 0o644)
 			},
 			expectError: false,
 			expectedLen: 1,
@@ -197,12 +197,12 @@ runs:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			actionPath := filepath.Join(tmpDir, "test-action")
-			err := os.MkdirAll(actionPath, 0755)
+			err := os.MkdirAll(actionPath, 0o755)
 			require.NoError(t, err, "Failed to create action directory")
 
 			if tt.actionYmlContent != "" {
 				ymlPath := filepath.Join(actionPath, "action.yml")
-				err = os.WriteFile(ymlPath, []byte(tt.actionYmlContent), 0644)
+				err = os.WriteFile(ymlPath, []byte(tt.actionYmlContent), 0o644)
 				require.NoError(t, err, "Failed to write action.yml")
 			}
 
@@ -250,7 +250,7 @@ func TestActionsBuildCommand_EmptyActionsDir(t *testing.T) {
 	// Create a temporary directory with empty actions/
 	tmpDir := t.TempDir()
 	actionsDir := filepath.Join(tmpDir, "actions")
-	err := os.MkdirAll(actionsDir, 0755)
+	err := os.MkdirAll(actionsDir, 0o755)
 	require.NoError(t, err, "Failed to create actions directory")
 
 	originalDir, err := os.Getwd()
@@ -269,7 +269,7 @@ func TestActionsValidateCommand_EmptyActionsDir(t *testing.T) {
 	// Create a temporary directory with empty actions/
 	tmpDir := t.TempDir()
 	actionsDir := filepath.Join(tmpDir, "actions")
-	err := os.MkdirAll(actionsDir, 0755)
+	err := os.MkdirAll(actionsDir, 0o755)
 	require.NoError(t, err, "Failed to create actions directory")
 
 	originalDir, err := os.Getwd()
@@ -288,7 +288,7 @@ func TestActionsCleanCommand_EmptyActionsDir(t *testing.T) {
 	// Create a temporary directory with empty actions/
 	tmpDir := t.TempDir()
 	actionsDir := filepath.Join(tmpDir, "actions")
-	err := os.MkdirAll(actionsDir, 0755)
+	err := os.MkdirAll(actionsDir, 0o755)
 	require.NoError(t, err, "Failed to create actions directory")
 
 	originalDir, err := os.Getwd()
@@ -353,12 +353,12 @@ runs:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			actionPath := filepath.Join(tmpDir, "test-action")
-			err := os.MkdirAll(actionPath, 0755)
+			err := os.MkdirAll(actionPath, 0o755)
 			require.NoError(t, err, "Failed to create action directory")
 
 			if tt.actionYmlContent != "" {
 				ymlPath := filepath.Join(actionPath, "action.yml")
-				err = os.WriteFile(ymlPath, []byte(tt.actionYmlContent), 0644)
+				err = os.WriteFile(ymlPath, []byte(tt.actionYmlContent), 0o644)
 				require.NoError(t, err, "Failed to write action.yml")
 			}
 
@@ -386,7 +386,7 @@ func TestBuildAction_CompositeAction(t *testing.T) {
 
 	actionsDir := filepath.Join(tmpDir, "actions")
 	compositeActionPath := filepath.Join(actionsDir, "test-composite")
-	err = os.MkdirAll(compositeActionPath, 0755)
+	err = os.MkdirAll(compositeActionPath, 0o755)
 	require.NoError(t, err, "Failed to create composite action directory")
 
 	// Create action.yml for composite action
@@ -397,7 +397,7 @@ runs:
   steps:
     - run: echo "test"
       shell: bash`
-	err = os.WriteFile(filepath.Join(compositeActionPath, "action.yml"), []byte(actionYml), 0644)
+	err = os.WriteFile(filepath.Join(compositeActionPath, "action.yml"), []byte(actionYml), 0o644)
 	require.NoError(t, err, "Failed to write action.yml")
 
 	// Build the composite action (should succeed without src/index.js)

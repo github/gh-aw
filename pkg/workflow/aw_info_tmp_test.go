@@ -39,7 +39,7 @@ This workflow tests that aw_info.json is generated in /tmp directory.
 `
 
 	testFile := filepath.Join(tmpDir, "test-aw-info-tmp.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

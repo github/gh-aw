@@ -138,7 +138,7 @@ tools:
 			// Create all test files
 			for filename, content := range tt.files {
 				filePath := filepath.Join(tempDir, filename)
-				err := os.WriteFile(filePath, []byte(content), 0644)
+				err := os.WriteFile(filePath, []byte(content), 0o644)
 				require.NoError(t, err, "Failed to create test file %s", filename)
 			}
 
@@ -193,7 +193,7 @@ Tool configuration here.`,
 
 	for filename, content := range files {
 		filePath := filepath.Join(tempDir, filename)
-		err := os.WriteFile(filePath, []byte(content), 0644)
+		err := os.WriteFile(filePath, []byte(content), 0o644)
 		require.NoError(t, err)
 	}
 
@@ -233,7 +233,7 @@ tools:
 
 	for filename, content := range files {
 		filePath := filepath.Join(tempDir, filename)
-		err := os.WriteFile(filePath, []byte(content), 0644)
+		err := os.WriteFile(filePath, []byte(content), 0o644)
 		require.NoError(t, err)
 	}
 

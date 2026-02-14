@@ -85,7 +85,7 @@ invalid json line
 
 			// Write the test log content
 			gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-			err := os.WriteFile(gatewayLogPath, []byte(tt.logContent), 0644)
+			err := os.WriteFile(gatewayLogPath, []byte(tt.logContent), 0o644)
 			require.NoError(t, err, "Failed to write test gateway.jsonl")
 
 			// Parse the gateway logs
@@ -128,7 +128,7 @@ func TestGatewayToolMetrics(t *testing.T) {
 `
 
 	gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	metrics, err := parseGatewayLogs(tmpDir, false)
@@ -357,7 +357,7 @@ func TestGatewayLogsWithMethodField(t *testing.T) {
 `
 
 	gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	metrics, err := parseGatewayLogs(tmpDir, false)
@@ -391,7 +391,7 @@ func TestGatewayLogsParsingIntegration(t *testing.T) {
 `
 
 	gatewayLogPath := filepath.Join(tmpDir, "gateway.jsonl")
-	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(gatewayLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	metrics, err := parseGatewayLogs(tmpDir, false)
@@ -459,7 +459,7 @@ func TestParseGatewayLogsFromMCPLogsSubdirectory(t *testing.T) {
 
 	// Create mcp-logs subdirectory (path after artifact download)
 	mcpLogsDir := filepath.Join(tmpDir, "mcp-logs")
-	err := os.MkdirAll(mcpLogsDir, 0755)
+	err := os.MkdirAll(mcpLogsDir, 0o755)
 	require.NoError(t, err, "should create mcp-logs directory")
 
 	// Create test gateway.jsonl in mcp-logs subdirectory
@@ -468,7 +468,7 @@ func TestParseGatewayLogsFromMCPLogsSubdirectory(t *testing.T) {
 {"timestamp":"2024-01-15T10:00:02Z","level":"error","event":"tool_call","server_name":"github","tool_name":"create_issue","duration":100}
 `
 	gatewayLogPath := filepath.Join(mcpLogsDir, "gateway.jsonl")
-	err = os.WriteFile(gatewayLogPath, []byte(testLogContent), 0644)
+	err = os.WriteFile(gatewayLogPath, []byte(testLogContent), 0o644)
 	require.NoError(t, err, "should write test gateway.jsonl in mcp-logs")
 
 	// Test parsing from mcp-logs subdirectory

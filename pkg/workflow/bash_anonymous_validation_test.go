@@ -31,7 +31,7 @@ This is a test workflow with anonymous bash syntax.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Create compiler
@@ -86,7 +86,7 @@ This is a test workflow.
 `
 
 			workflowPath := filepath.Join(tmpDir, strings.ReplaceAll(tt.name, " ", "-")+".md")
-			err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+			err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 			require.NoError(t, err, "Failed to create test workflow file")
 
 			compiler := NewCompiler()

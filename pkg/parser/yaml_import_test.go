@@ -131,7 +131,7 @@ jobs:
       - run: echo "build"`
 
 		workflowFile := filepath.Join(tmpDir, "test-workflow.yml")
-		err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+		err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 		require.NoError(t, err, "Should write test workflow file")
 
 		jobs, services, err := processYAMLWorkflowImport(workflowFile)
@@ -157,7 +157,7 @@ jobs:
       - run: echo "test"`
 
 		workflowFile := filepath.Join(tmpDir, "test-services.yml")
-		err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+		err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 		require.NoError(t, err, "Should write test workflow file")
 
 		jobs, services, err := processYAMLWorkflowImport(workflowFile)
@@ -174,7 +174,7 @@ runs:
   main: index.js`
 
 		actionFile := filepath.Join(tmpDir, "action.yml")
-		err := os.WriteFile(actionFile, []byte(actionContent), 0644)
+		err := os.WriteFile(actionFile, []byte(actionContent), 0o644)
 		require.NoError(t, err, "Should write test action file")
 
 		_, _, err = processYAMLWorkflowImport(actionFile)
@@ -187,7 +187,7 @@ runs:
 description: This is not a valid workflow`
 
 		invalidFile := filepath.Join(tmpDir, "invalid.yml")
-		err := os.WriteFile(invalidFile, []byte(invalidContent), 0644)
+		err := os.WriteFile(invalidFile, []byte(invalidContent), 0o644)
 		require.NoError(t, err, "Should write test invalid file")
 
 		_, _, err = processYAMLWorkflowImport(invalidFile)
@@ -210,7 +210,7 @@ jobs:
       - run: npm test`
 
 	yamlFile := filepath.Join(tmpDir, "ci.yml")
-	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0644)
+	err := os.WriteFile(yamlFile, []byte(yamlWorkflow), 0o644)
 	require.NoError(t, err, "Should create YAML workflow file")
 
 	// Create a markdown workflow that imports the YAML workflow
@@ -225,7 +225,7 @@ imports:
 This imports a YAML workflow.`
 
 	mdFile := filepath.Join(tmpDir, "main.md")
-	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0644)
+	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0o644)
 	require.NoError(t, err, "Should create markdown workflow file")
 
 	// Process imports
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-latest`
 
 	lockFile := filepath.Join(tmpDir, "workflow.lock.yml")
-	err := os.WriteFile(lockFile, []byte(lockContent), 0644)
+	err := os.WriteFile(lockFile, []byte(lockContent), 0o644)
 	require.NoError(t, err, "Should create lock file")
 
 	// Create a markdown workflow that tries to import the lock file
@@ -265,7 +265,7 @@ imports:
 # Main Workflow`
 
 	mdFile := filepath.Join(tmpDir, "main.md")
-	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0644)
+	err = os.WriteFile(mdFile, []byte(mdWorkflow), 0o644)
 	require.NoError(t, err, "Should create markdown workflow file")
 
 	// Process imports - should fail

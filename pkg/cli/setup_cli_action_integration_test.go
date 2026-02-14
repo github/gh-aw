@@ -30,7 +30,7 @@ func TestSetupCLIAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to stat install.sh: %v", err)
 	}
-	if info.Mode()&0111 == 0 {
+	if info.Mode()&0o111 == 0 {
 		t.Errorf("install.sh is not executable")
 	}
 

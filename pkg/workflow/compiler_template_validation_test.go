@@ -110,7 +110,7 @@ Second template
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a test workflow file
 			workflowPath := filepath.Join(tempDir, "test-workflow.md")
-			err := os.WriteFile(workflowPath, []byte(tt.content), 0644)
+			err := os.WriteFile(workflowPath, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}

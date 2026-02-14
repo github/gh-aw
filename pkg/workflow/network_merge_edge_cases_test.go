@@ -28,7 +28,7 @@ network:
     - example.com
 ---
 `
-		if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+		if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -53,7 +53,7 @@ imports:
 
 # Test
 `
-		if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -103,7 +103,7 @@ imports:
 network: {}
 ---
 `
-		if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+		if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -125,7 +125,7 @@ imports:
 
 # Test
 `
-		if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

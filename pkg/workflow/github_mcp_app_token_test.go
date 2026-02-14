@@ -41,7 +41,7 @@ Test workflow with GitHub MCP server app configuration.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -82,7 +82,7 @@ Test workflow with GitHub MCP app token minting.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -140,7 +140,7 @@ Test that app token overrides custom token.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -185,7 +185,7 @@ Test app token with remote GitHub MCP server.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow

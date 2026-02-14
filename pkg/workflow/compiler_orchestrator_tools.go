@@ -44,8 +44,8 @@ type toolsProcessingResult struct {
 // - Markdown content expansion
 // - Workflow name extraction
 func (c *Compiler) processToolsAndMarkdown(result *parser.FrontmatterResult, cleanPath string, markdownDir string,
-	agenticEngine CodingAgentEngine, engineSetting string, importsResult *parser.ImportsResult) (*toolsProcessingResult, error) {
-
+	agenticEngine CodingAgentEngine, engineSetting string, importsResult *parser.ImportsResult,
+) (*toolsProcessingResult, error) {
 	orchestratorToolsLog.Printf("Processing tools and markdown")
 	log.Print("Processing tools and includes...")
 

@@ -14,7 +14,7 @@ import (
 func TestDependencyGraph_IsTopLevelWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestDependencyGraph_BuildGraphAndGetAffectedWorkflows(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestDependencyGraph_BuildGraphAndGetAffectedWorkflows(t *testing.T) {
 description: Helper workflow
 ---
 # Helper`
-	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +78,7 @@ imports:
   - shared/helper.md
 ---
 # Main`
-	if err := os.WriteFile(topWorkflow1, []byte(topContent1), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow1, []byte(topContent1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ imports:
   - shared/helper.md
 ---
 # Secondary`
-	if err := os.WriteFile(topWorkflow2, []byte(topContent2), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow2, []byte(topContent2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ imports:
 description: Standalone workflow
 ---
 # Standalone`
-	if err := os.WriteFile(topWorkflow3, []byte(topContent3), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow3, []byte(topContent3), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -166,7 +166,7 @@ func TestDependencyGraph_UpdateAndRemoveWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -176,7 +176,7 @@ func TestDependencyGraph_UpdateAndRemoveWorkflow(t *testing.T) {
 description: Helper workflow
 ---
 # Helper`
-	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -188,7 +188,7 @@ imports:
   - shared/helper.md
 ---
 # Main`
-	if err := os.WriteFile(topWorkflow, []byte(topContent), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow, []byte(topContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,7 +206,7 @@ imports:
 description: Main workflow
 ---
 # Main (no imports)`
-		if err := os.WriteFile(topWorkflow, []byte(newContent), 0644); err != nil {
+		if err := os.WriteFile(topWorkflow, []byte(newContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -243,7 +243,7 @@ func TestDependencyGraph_NestedImports(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -253,7 +253,7 @@ func TestDependencyGraph_NestedImports(t *testing.T) {
 description: Base workflow
 ---
 # Base`
-	if err := os.WriteFile(baseWorkflow, []byte(baseContent), 0644); err != nil {
+	if err := os.WriteFile(baseWorkflow, []byte(baseContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +265,7 @@ imports:
   - base.md
 ---
 # Intermediate`
-	if err := os.WriteFile(intermediateWorkflow, []byte(intermediateContent), 0644); err != nil {
+	if err := os.WriteFile(intermediateWorkflow, []byte(intermediateContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,7 +277,7 @@ imports:
   - shared/intermediate.md
 ---
 # Main`
-	if err := os.WriteFile(topWorkflow, []byte(topContent), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow, []byte(topContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -308,7 +308,7 @@ func TestDependencyGraph_MultipleTopLevelImporters(t *testing.T) {
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
 	mcpDir := filepath.Join(sharedDir, "mcp")
-	if err := os.MkdirAll(mcpDir, 0755); err != nil {
+	if err := os.MkdirAll(mcpDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -318,7 +318,7 @@ func TestDependencyGraph_MultipleTopLevelImporters(t *testing.T) {
 description: MCP Tool
 ---
 # Tool`
-	if err := os.WriteFile(deepShared, []byte(deepContent), 0644); err != nil {
+	if err := os.WriteFile(deepShared, []byte(deepContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -332,7 +332,7 @@ imports:
   - shared/mcp/tool.md
 ---
 # Workflow %d`, i, i)
-		if err := os.WriteFile(workflows[i], []byte(content), 0644); err != nil {
+		if err := os.WriteFile(workflows[i], []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -368,7 +368,7 @@ func TestDependencyGraph_CircularImportDetection(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -380,7 +380,7 @@ imports:
   - b.md
 ---
 # A`
-	if err := os.WriteFile(workflowA, []byte(contentA), 0644); err != nil {
+	if err := os.WriteFile(workflowA, []byte(contentA), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -392,7 +392,7 @@ imports:
   - a.md
 ---
 # B`
-	if err := os.WriteFile(workflowB, []byte(contentB), 0644); err != nil {
+	if err := os.WriteFile(workflowB, []byte(contentB), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -404,7 +404,7 @@ imports:
   - shared/a.md
 ---
 # Main`
-	if err := os.WriteFile(topWorkflow, []byte(topContent), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow, []byte(topContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -431,7 +431,7 @@ func TestDependencyGraph_NewFileAddition(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -441,7 +441,7 @@ func TestDependencyGraph_NewFileAddition(t *testing.T) {
 description: Helper workflow
 ---
 # Helper`
-	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -461,7 +461,7 @@ imports:
   - shared/helper.md
 ---
 # New`
-		if err := os.WriteFile(newWorkflow, []byte(newContent), 0644); err != nil {
+		if err := os.WriteFile(newWorkflow, []byte(newContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -486,7 +486,7 @@ imports:
 description: Main workflow
 ---
 # Main`
-		if err := os.WriteFile(topWorkflow, []byte(topContent), 0644); err != nil {
+		if err := os.WriteFile(topWorkflow, []byte(topContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -501,7 +501,7 @@ description: Main workflow
 description: New shared workflow
 ---
 # New Shared`
-		if err := os.WriteFile(newShared, []byte(newSharedContent), 0644); err != nil {
+		if err := os.WriteFile(newShared, []byte(newSharedContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -518,7 +518,7 @@ description: New shared workflow
 func TestDependencyGraph_EmptyGraph(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -544,7 +544,7 @@ func TestDependencyGraph_EmptyGraph(t *testing.T) {
 description: First workflow
 ---
 # First`
-		if err := os.WriteFile(firstWorkflow, []byte(firstContent), 0644); err != nil {
+		if err := os.WriteFile(firstWorkflow, []byte(firstContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -569,7 +569,7 @@ func TestDependencyGraph_ComplexDependencyChain(t *testing.T) {
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
 	mcpDir := filepath.Join(sharedDir, "mcp")
-	if err := os.MkdirAll(mcpDir, 0755); err != nil {
+	if err := os.MkdirAll(mcpDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -584,7 +584,7 @@ func TestDependencyGraph_ComplexDependencyChain(t *testing.T) {
 description: Workflow C
 ---
 # C`
-	if err := os.WriteFile(workflowC, []byte(contentC), 0644); err != nil {
+	if err := os.WriteFile(workflowC, []byte(contentC), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -596,7 +596,7 @@ imports:
   - mcp/c.md
 ---
 # B`
-	if err := os.WriteFile(workflowB, []byte(contentB), 0644); err != nil {
+	if err := os.WriteFile(workflowB, []byte(contentB), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -608,7 +608,7 @@ imports:
   - b.md
 ---
 # A`
-	if err := os.WriteFile(workflowA, []byte(contentA), 0644); err != nil {
+	if err := os.WriteFile(workflowA, []byte(contentA), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -620,7 +620,7 @@ imports:
   - shared/a.md
 ---
 # Top 1`
-	if err := os.WriteFile(top1, []byte(content1), 0644); err != nil {
+	if err := os.WriteFile(top1, []byte(content1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -631,7 +631,7 @@ imports:
   - shared/a.md
 ---
 # Top 2`
-	if err := os.WriteFile(top2, []byte(content2), 0644); err != nil {
+	if err := os.WriteFile(top2, []byte(content2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -642,7 +642,7 @@ imports:
   - shared/b.md
 ---
 # Top 3`
-	if err := os.WriteFile(top3, []byte(content3), 0644); err != nil {
+	if err := os.WriteFile(top3, []byte(content3), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -716,7 +716,7 @@ func TestDependencyGraph_ImportsWithInputs(t *testing.T) {
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -726,7 +726,7 @@ func TestDependencyGraph_ImportsWithInputs(t *testing.T) {
 description: Parameterized workflow
 ---
 # Parameterized`
-	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflow, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -740,7 +740,7 @@ imports:
       key: value
 ---
 # Main`
-	if err := os.WriteFile(topWorkflow, []byte(topContent), 0644); err != nil {
+	if err := os.WriteFile(topWorkflow, []byte(topContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

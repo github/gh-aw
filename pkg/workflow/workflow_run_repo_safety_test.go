@@ -91,7 +91,7 @@ Do something on issue.`,
 
 			// Write the test workflow file
 			workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-			err = os.WriteFile(workflowFile, []byte(tt.workflowContent), 0644)
+			err = os.WriteFile(workflowFile, []byte(tt.workflowContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -180,7 +180,7 @@ This workflow runs when CI workflows fail to help diagnose issues.`
 
 	// Write the test workflow file
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -267,7 +267,7 @@ Do something on push.`
 
 	// Write the test workflow file
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -319,7 +319,7 @@ Test workflow with workflow_run trigger.`
 
 	// Write the test workflow file
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

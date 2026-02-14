@@ -35,7 +35,7 @@ network:
 
 This is a reusable shared workflow component.
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -85,7 +85,7 @@ invalid_field: "This field should not be allowed"
 
 # Invalid Shared Workflow
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -129,14 +129,13 @@ permissions:
 
 This is a main workflow with an on trigger.
 `
-	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainPath, []byte(mainContent), 0o644); err != nil {
 		t.Fatalf("Failed to write main workflow file: %v", err)
 	}
 
 	// Parse the workflow - it should succeed
 	compiler := workflow.NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(mainPath)
-
 	// Check that we got no error
 	if err != nil {
 		t.Fatalf("Expected no error for valid main workflow, got: %v", err)
@@ -172,7 +171,7 @@ engine:
 
 # Shared Engine Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -208,7 +207,7 @@ mcp-servers:
 
 # Shared MCP Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -241,7 +240,7 @@ mcp-servers:
       - read_wiki_structure
 ---
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -282,7 +281,7 @@ on: issues
 engine: copilot
 ---
 `
-	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainPath, []byte(mainContent), 0o644); err != nil {
 		t.Fatalf("Failed to write main workflow file: %v", err)
 	}
 

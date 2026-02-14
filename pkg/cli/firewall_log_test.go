@@ -316,7 +316,7 @@ func TestParseFirewallLog(t *testing.T) {
 
 	// Write test log file
 	logPath := filepath.Join(tempDir, "firewall.log")
-	err := os.WriteFile(logPath, []byte(testLogContent), 0644)
+	err := os.WriteFile(logPath, []byte(testLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall.log: %v", err)
 	}
@@ -391,7 +391,7 @@ Invalid line with not enough fields
 
 	// Write test log file
 	logPath := filepath.Join(tempDir, "firewall.log")
-	err := os.WriteFile(logPath, []byte(testLogContent), 0644)
+	err := os.WriteFile(logPath, []byte(testLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall.log: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestParseFirewallLogPartialMissingFields(t *testing.T) {
 
 	// Write test log file
 	logPath := filepath.Join(tempDir, "firewall.log")
-	err := os.WriteFile(logPath, []byte(testLogContent), 0644)
+	err := os.WriteFile(logPath, []byte(testLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall.log: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestAnalyzeMultipleFirewallLogs(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	logsDir := filepath.Join(tempDir, "firewall-logs")
-	err := os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create firewall-logs directory: %v", err)
 	}
@@ -471,13 +471,13 @@ func TestAnalyzeMultipleFirewallLogs(t *testing.T) {
 
 	// Write separate log files
 	log1Path := filepath.Join(logsDir, "firewall-1.log")
-	err = os.WriteFile(log1Path, []byte(log1Content), 0644)
+	err = os.WriteFile(log1Path, []byte(log1Content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall-1.log: %v", err)
 	}
 
 	log2Path := filepath.Join(logsDir, "firewall-2.log")
-	err = os.WriteFile(log2Path, []byte(log2Content), 0644)
+	err = os.WriteFile(log2Path, []byte(log2Content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test firewall-2.log: %v", err)
 	}
@@ -577,7 +577,7 @@ func TestAnalyzeFirewallLogsWithWorkflowSuffix(t *testing.T) {
 
 	// Create a directory with workflow-specific suffix (like squid-logs-smoke-copilot-firewall)
 	logsDir := filepath.Join(tmpDir, "squid-logs-smoke-copilot-firewall")
-	err := os.MkdirAll(logsDir, 0755)
+	err := os.MkdirAll(logsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create logs directory: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestAnalyzeFirewallLogsWithWorkflowSuffix(t *testing.T) {
 1761332531.123 172.30.0.20:35289 blocked.example.com:443 140.82.112.23:443 1.1 CONNECT 403 NONE_NONE:HIER_NONE blocked.example.com:443 "-"
 1761332532.456 172.30.0.20:35290 api.github.com:443 140.82.112.5:443 1.1 CONNECT 200 TCP_TUNNEL:HIER_DIRECT api.github.com:443 "-"
 `
-	err = os.WriteFile(accessLog, []byte(logContent), 0644)
+	err = os.WriteFile(accessLog, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write access.log: %v", err)
 	}

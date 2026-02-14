@@ -144,7 +144,7 @@ This is a test workflow with nested env.
 `
 
 	testFile := filepath.Join(tmpDir, "test-nested-env.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -224,7 +224,7 @@ This is a test workflow.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -405,6 +405,7 @@ jobs:
 		})
 	}
 }
+
 func TestValidationCanBeSkipped(t *testing.T) {
 	compiler := NewCompiler()
 
@@ -418,7 +419,7 @@ on: push
 # Test workflow`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -453,7 +454,7 @@ This workflow tests that frontmatter is NOT embedded in the lock file (removed p
 `
 
 	testFile := filepath.Join(tmpDir, "test-frontmatter.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -569,7 +570,7 @@ This is a test workflow to verify description field rendering.
 `
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

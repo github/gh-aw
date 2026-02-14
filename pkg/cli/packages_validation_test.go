@@ -109,7 +109,7 @@ author: Someone
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, tt.name+".md")
-			err := os.WriteFile(testFile, []byte(tt.content), 0644)
+			err := os.WriteFile(testFile, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
@@ -199,7 +199,7 @@ on: push
 	for _, tc := range testCases {
 		t.Run(tc.filename, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tc.filename)
-			err := os.WriteFile(testFile, []byte(tc.content), 0644)
+			err := os.WriteFile(testFile, []byte(tc.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

@@ -18,7 +18,7 @@ func TestActionSHAValidationIntegration(t *testing.T) {
 
 	// Create an actions-lock.json cache file with test data
 	cacheDir := filepath.Join(tmpDir, ".github", "aw")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("Failed to create cache directory: %v", err)
 	}
 
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}
 
@@ -72,7 +72,7 @@ jobs:
       - uses: actions/setup-node@1111111111111111111111111111111111111111
 `
 
-	if err := os.WriteFile(outdatedLockFile, []byte(outdatedContent), 0644); err != nil {
+	if err := os.WriteFile(outdatedLockFile, []byte(outdatedContent), 0o644); err != nil {
 		t.Fatalf("Failed to create outdated lock file: %v", err)
 	}
 
@@ -102,7 +102,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}
 
@@ -162,7 +162,7 @@ jobs:
           path: ./dist
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}
 
@@ -210,7 +210,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}
 
@@ -242,7 +242,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}
 

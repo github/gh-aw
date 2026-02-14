@@ -37,7 +37,7 @@ This workflow tests the update-issue configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +112,7 @@ This workflow tests the update-issue configuration with all options.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue-full.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,7 +189,7 @@ This workflow tests the update-issue target configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue-target.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -246,7 +246,7 @@ This workflow tests body: true configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue-body-true.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +296,7 @@ This workflow tests body: false configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue-body-false.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -346,7 +346,7 @@ This workflow tests body: (null) for backward compatibility.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-issue-body-null.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

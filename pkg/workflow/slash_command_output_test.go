@@ -36,7 +36,7 @@ Test workflow content
 `
 
 	workflowPath := filepath.Join(tempDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Compile the workflow

@@ -33,7 +33,7 @@ Test workflow with lock-for-agent enabled.
 `
 
 	testFile := filepath.Join(tmpDir, "test-lock-for-agent.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +110,7 @@ Test workflow with lock-for-agent but no reaction.
 `
 
 	testFile := filepath.Join(tmpDir, "test-lock-no-reaction.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,7 +181,7 @@ Test workflow without lock-for-agent.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-lock.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -246,7 +246,7 @@ Test workflow without lock-for-agent and without reaction.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-lock-no-reaction.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -306,7 +306,7 @@ Test that lock-for-agent on issues doesn't break PR workflows.
 `
 
 	testFile := filepath.Join(tmpDir, "test-pr.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -352,7 +352,7 @@ Test workflow with lock-for-agent enabled for issue_comment events.
 `
 
 	testFile := filepath.Join(tmpDir, "test-lock-for-agent-issue-comment.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -452,7 +452,7 @@ Test that lock-for-agent is commented out in generated YAML.
 `
 
 	testFile := filepath.Join(tmpDir, "test-lock-for-agent-commented.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -521,7 +521,7 @@ Test that issue is unlocked in safe_outputs job before processing safe outputs.
 `
 
 	testFile := filepath.Join(tmpDir, "test-lock-for-agent-safe-outputs.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

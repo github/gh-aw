@@ -205,7 +205,6 @@ func addGitHubTokenSecret(repoSlug string, tracker *TrialSecretTracker, verbose 
 
 	// Add the token as a repository secret
 	output, err := workflow.RunGHCombined("Adding secret...", "secret", "set", secretName, "--repo", repoSlug, "--body", token)
-
 	if err != nil {
 		return fmt.Errorf("failed to set repository secret: %w (output: %s)", err, string(output))
 	}
@@ -266,7 +265,7 @@ func cleanupTrialSecrets(repoSlug string, tracker *TrialSecretTracker, verbose b
 // TrialArtifacts represents all artifacts downloaded from a workflow run
 type TrialArtifacts struct {
 	SafeOutputs map[string]any `json:"safe_outputs"`
-	//AgentStdioLogs      []string               `json:"agent_stdio_logs,omitempty"`
+	// AgentStdioLogs      []string               `json:"agent_stdio_logs,omitempty"`
 	AgenticRunInfo      map[string]any `json:"agentic_run_info,omitempty"`
 	AdditionalArtifacts map[string]any `json:"additional_artifacts,omitempty"`
 }
@@ -355,7 +354,6 @@ func downloadAllArtifacts(hostRepoSlug, runID string, verbose bool) (*TrialArtif
 
 		return nil
 	})
-
 	if err != nil {
 		if verbose {
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Error walking artifact directory: %v", err)))

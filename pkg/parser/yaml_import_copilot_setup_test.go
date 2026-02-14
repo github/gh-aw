@@ -341,7 +341,7 @@ jobs:
 `
 
 	workflowFile := filepath.Join(tmpDir, "copilot-setup-steps.yml")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write workflow file")
 
 	// Process the file
@@ -385,7 +385,7 @@ jobs:
 `
 
 	workflowFile := filepath.Join(tmpDir, "test.yml")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write workflow file")
 
 	// Process the file
@@ -407,7 +407,7 @@ func TestImportCopilotSetupStepsInWorkflow(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create copilot-setup-steps.yml
@@ -427,7 +427,7 @@ jobs:
           node-version: "20"
 `
 	copilotSetupFile := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0600)
+	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0o600)
 	require.NoError(t, err, "Failed to write copilot-setup-steps.yml")
 
 	// Create a workflow that imports copilot-setup-steps.yml
@@ -444,7 +444,7 @@ engine: copilot
 This workflow imports copilot-setup-steps.yml.
 `
 	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Read the workflow content

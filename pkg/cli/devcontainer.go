@@ -66,7 +66,7 @@ func ensureDevcontainerConfig(verbose bool, additionalRepos []string) error {
 
 	// Create .devcontainer directory if it doesn't exist
 	devcontainerDir := ".devcontainer"
-	if err := os.MkdirAll(devcontainerDir, 0755); err != nil {
+	if err := os.MkdirAll(devcontainerDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create .devcontainer directory: %w", err)
 	}
 	devcontainerLog.Printf("Ensured directory exists: %s", devcontainerDir)
@@ -201,7 +201,7 @@ func ensureDevcontainerConfig(verbose bool, additionalRepos []string) error {
 	data = append(data, '\n')
 
 	// Use owner-only read/write permissions (0600) for security best practices
-	if err := os.WriteFile(devcontainerPath, data, 0600); err != nil {
+	if err := os.WriteFile(devcontainerPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write devcontainer.json: %w", err)
 	}
 	devcontainerLog.Printf("Wrote file: %s", devcontainerPath)

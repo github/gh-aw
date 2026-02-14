@@ -772,7 +772,7 @@ Actor: ${{ github.actor }}`
 	// Write to temp file
 	tmpDir := t.TempDir()
 	workflowFile := tmpDir + "/test.md"
-	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0644)
+	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0o644)
 	require.NoError(t, err, "Should write test workflow file")
 
 	// Compile workflow
@@ -826,7 +826,7 @@ Do something simple.`
 
 	tmpDir := t.TempDir()
 	workflowFile := tmpDir + "/minimal.md"
-	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0644)
+	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()
@@ -871,7 +871,7 @@ Manage issues based on comments.`
 
 	tmpDir := t.TempDir()
 	workflowFile := tmpDir + "/safe-outputs.md"
-	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0644)
+	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()
@@ -914,7 +914,7 @@ Actor: ${{ github.actor }}`
 
 	tmpDir := t.TempDir()
 	workflowFile := tmpDir + "/expressions.md"
-	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0644)
+	err := os.WriteFile(workflowFile, []byte(testWorkflow), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()

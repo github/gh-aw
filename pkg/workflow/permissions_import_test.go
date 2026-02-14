@@ -98,7 +98,7 @@ func TestPermissionsImportIntegration(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir := testutil.TempDir(t, "test-*")
 	sharedDir := filepath.Join(tempDir, ".github", "workflows", "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
@@ -111,7 +111,7 @@ permissions:
 # Shared workflow with permissions
 `
 	sharedWorkflowPath := filepath.Join(sharedDir, "shared-permissions.md")
-	if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create shared workflow file: %v", err)
 	}
 
@@ -136,7 +136,7 @@ tools:
 # Main workflow
 `
 		mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-workflow.md")
-		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create main workflow file: %v", err)
 		}
 
@@ -187,7 +187,7 @@ tools:
 # Main workflow missing actions: read
 `
 		mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-missing.md")
-		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create main workflow file: %v", err)
 		}
 
@@ -219,7 +219,7 @@ permissions:
 # Shared workflow with write permission
 `
 		sharedWorkflowUpgradePath := filepath.Join(sharedDir, "shared-upgrade.md")
-		if err := os.WriteFile(sharedWorkflowUpgradePath, []byte(sharedWorkflowUpgradeContent), 0644); err != nil {
+		if err := os.WriteFile(sharedWorkflowUpgradePath, []byte(sharedWorkflowUpgradeContent), 0o644); err != nil {
 			t.Fatalf("Failed to create shared upgrade workflow file: %v", err)
 		}
 
@@ -241,7 +241,7 @@ tools:
 # Main workflow with insufficient permission
 `
 		mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-insufficient.md")
-		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create main workflow file: %v", err)
 		}
 
@@ -281,7 +281,7 @@ tools:
 # Main workflow with write satisfying read requirement
 `
 		mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-write-satisfies-read.md")
-		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+		if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 			t.Fatalf("Failed to create main workflow file: %v", err)
 		}
 

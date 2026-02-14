@@ -17,7 +17,6 @@ import (
 // the collectWorkflowFiles function compiles the workflow and creates one.
 // This is an integration test because it invokes the full workflow compilation.
 func TestCollectWorkflowFiles_NoLockFile(t *testing.T) {
-
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 
@@ -30,7 +29,7 @@ on: workflow_dispatch
 # Test Workflow
 This is a test workflow without a lock file.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Test collecting files - should now compile the workflow and create lock file

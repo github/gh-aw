@@ -20,7 +20,7 @@ func TestManifestRendering(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -33,7 +33,7 @@ tools:
     allowed:
       - list_commits
 ---`
-	if err := os.WriteFile(toolsFile, []byte(toolsContent), 0644); err != nil {
+	if err := os.WriteFile(toolsFile, []byte(toolsContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -42,7 +42,7 @@ tools:
 	instructionsContent := `# Shared Instructions
 
 Be helpful and concise.`
-	if err := os.WriteFile(instructionsFile, []byte(instructionsContent), 0644); err != nil {
+	if err := os.WriteFile(instructionsFile, []byte(instructionsContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ Handle the issue.`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -206,7 +206,7 @@ func TestManifestIncludeOrdering(t *testing.T) {
 
 	// Create shared directory
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.Mkdir(sharedDir, 0755); err != nil {
+	if err := os.Mkdir(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -221,7 +221,7 @@ func TestManifestIncludeOrdering(t *testing.T) {
 	for _, filename := range includeFiles {
 		content := "# " + filename + "\n\nSome content."
 		filePath := filepath.Join(sharedDir, filename)
-		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -243,7 +243,7 @@ Handle the issue.`
 
 	compiler := NewCompiler()
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

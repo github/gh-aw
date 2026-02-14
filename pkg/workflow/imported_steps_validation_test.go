@@ -17,7 +17,7 @@ import (
 func TestValidateImportedStepsNoAgenticSecrets_Copilot(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755), "Failed to create workflows directory")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755), "Failed to create workflows directory")
 
 	// Create an import file with custom engine using COPILOT_GITHUB_TOKEN
 	importContent := `---
@@ -35,8 +35,8 @@ engine:
 This shared config uses Copilot CLI with the agentic secret.
 `
 	importFile := filepath.Join(workflowsDir, "shared", "copilot-custom-engine.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow that imports this
 	mainContent := `---
@@ -50,7 +50,7 @@ imports:
 This workflow imports a custom engine with agentic secrets.
 `
 	mainFile := filepath.Join(workflowsDir, "test-copilot-secret.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode - should fail
 	t.Run("strict mode error", func(t *testing.T) {
@@ -86,7 +86,7 @@ imports:
 This workflow imports a custom engine with agentic secrets.
 `
 		mainFileNonStrict := filepath.Join(workflowsDir, "test-copilot-secret-nonstrict.md")
-		require.NoError(t, os.WriteFile(mainFileNonStrict, []byte(mainContentNonStrict), 0644))
+		require.NoError(t, os.WriteFile(mainFileNonStrict, []byte(mainContentNonStrict), 0o644))
 
 		compiler := NewCompiler()
 		err := compiler.CompileWorkflow(mainFileNonStrict)
@@ -99,7 +99,7 @@ This workflow imports a custom engine with agentic secrets.
 func TestValidateImportedStepsNoAgenticSecrets_Anthropic(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create an import file with custom engine using ANTHROPIC_API_KEY
 	importContent := `---
@@ -115,8 +115,8 @@ engine:
 # Shared Custom Engine
 `
 	importFile := filepath.Join(workflowsDir, "shared", "claude-custom-engine.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow
 	mainContent := `---
@@ -129,7 +129,7 @@ imports:
 # Test
 `
 	mainFile := filepath.Join(workflowsDir, "test-anthropic-secret.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode
 	compiler := NewCompiler()
@@ -146,7 +146,7 @@ imports:
 func TestValidateImportedStepsNoAgenticSecrets_Codex(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create an import file with custom engine using both CODEX_API_KEY and OPENAI_API_KEY
 	importContent := `---
@@ -164,8 +164,8 @@ engine:
 # Shared Custom Engine
 `
 	importFile := filepath.Join(workflowsDir, "shared", "codex-custom-engine.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow
 	mainContent := `---
@@ -178,7 +178,7 @@ imports:
 # Test
 `
 	mainFile := filepath.Join(workflowsDir, "test-codex-secret.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode
 	compiler := NewCompiler()
@@ -199,7 +199,7 @@ imports:
 func TestValidateImportedStepsNoAgenticSecrets_SafeSecrets(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create an import file with custom engine using non-agentic secrets (should be fine)
 	importContent := `---
@@ -219,8 +219,8 @@ engine:
 This uses safe, non-agentic secrets.
 `
 	importFile := filepath.Join(workflowsDir, "shared", "safe-custom-engine.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow
 	mainContent := `---
@@ -238,7 +238,7 @@ imports:
 # Test
 `
 	mainFile := filepath.Join(workflowsDir, "test-safe-secrets.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode - should succeed
 	compiler := NewCompiler()
@@ -252,7 +252,7 @@ imports:
 func TestValidateImportedStepsNoAgenticSecrets_NonCustomEngine(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create workflow with non-custom engine (copilot) - should not validate
 	mainContent := `---
@@ -270,7 +270,7 @@ permissions:
 This uses the standard copilot engine, not custom.
 `
 	mainFile := filepath.Join(workflowsDir, "test-copilot-engine.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode - should succeed (validation doesn't apply)
 	compiler := NewCompiler()
@@ -283,7 +283,7 @@ This uses the standard copilot engine, not custom.
 func TestValidateImportedStepsNoAgenticSecrets_MultipleSecrets(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create an import file with custom engine using multiple agentic secrets
 	importContent := `---
@@ -306,8 +306,8 @@ engine:
 # Shared Custom Engine
 `
 	importFile := filepath.Join(workflowsDir, "shared", "multi-secret-engine.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow
 	mainContent := `---
@@ -320,7 +320,7 @@ imports:
 # Test
 `
 	mainFile := filepath.Join(workflowsDir, "test-multi-secrets.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode
 	compiler := NewCompiler()
@@ -344,7 +344,7 @@ imports:
 func TestValidateImportedStepsNoAgenticSecrets_OpenCodeExemption(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create an import file with OpenCode custom engine using agentic secrets
 	importContent := `---
@@ -370,8 +370,8 @@ engine:
 This is a custom agentic engine wrapper.
 `
 	importFile := filepath.Join(workflowsDir, "shared", "opencode.md")
-	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0755))
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(importFile), 0o755))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Create main workflow with strict mode
 	mainContent := `---
@@ -390,7 +390,7 @@ imports:
 This workflow uses OpenCode which is a custom agentic engine.
 `
 	mainFile := filepath.Join(workflowsDir, "test-opencode.md")
-	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainFile, []byte(mainContent), 0o644))
 
 	// Test in strict mode - should succeed because OpenCode is exempt
 	compiler := NewCompiler()

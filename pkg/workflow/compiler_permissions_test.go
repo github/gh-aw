@@ -71,7 +71,7 @@ This is a test workflow.
 `
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -123,7 +123,7 @@ strict: false
 This is a test workflow without network permissions.
 `
 		testFile := filepath.Join(tmpDir, "no-network-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -160,7 +160,7 @@ network: defaults
 This is a test workflow with explicit defaults network permissions.
 `
 		testFile := filepath.Join(tmpDir, "defaults-network-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -196,7 +196,7 @@ network: {}
 This is a test workflow with empty network permissions (deny all).
 `
 		testFile := filepath.Join(tmpDir, "deny-all-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -235,7 +235,7 @@ network:
 This is a test workflow with explicit network permissions.
 `
 		testFile := filepath.Join(tmpDir, "allowed-domains-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -281,7 +281,7 @@ network:
 This is a test workflow with network permissions and codex engine.
 `
 		testFile := filepath.Join(tmpDir, "codex-network-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

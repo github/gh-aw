@@ -95,7 +95,7 @@ func TestCompileWorkflowsPurgeFlag(t *testing.T) {
 		// Create temporary directory structure for testing
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Change to temp directory to simulate being in a git repo
 		originalDir, _ := os.Getwd()
@@ -103,7 +103,7 @@ func TestCompileWorkflowsPurgeFlag(t *testing.T) {
 		os.Chdir(tempDir)
 
 		// Create .git directory to make it look like a git repo
-		os.MkdirAll(".git", 0755)
+		os.MkdirAll(".git", 0o755)
 
 		// Test should not error when no specific files are provided with purge flag
 		// Note: This will still error because there are no .md files, but it shouldn't
@@ -122,7 +122,6 @@ func TestCompileWorkflowsPurgeFlag(t *testing.T) {
 			TrialLogicalRepoSlug: "",
 		}
 		_, err := CompileWorkflows(context.Background(), config)
-
 		if err != nil {
 			// The error should NOT be about purge flag validation
 			if strings.Contains(err.Error(), "--purge flag can only be used") {
@@ -136,7 +135,7 @@ func TestCompileWorkflowsWithNoEmit(t *testing.T) {
 	defer os.RemoveAll(".github")
 
 	// Create test directory and workflow
-	err := os.MkdirAll(".github/workflows", 0755)
+	err := os.MkdirAll(".github/workflows", 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -155,7 +154,7 @@ permissions:
 
 This is a test workflow to verify the --no-emit flag functionality.`
 
-	err = os.WriteFile(".github/workflows/no-emit-test.md", []byte(workflowContent), 0644)
+	err = os.WriteFile(".github/workflows/no-emit-test.md", []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
@@ -214,7 +213,6 @@ This is a test workflow to verify the --no-emit flag functionality.`
 
 func TestRemoveWorkflows(t *testing.T) {
 	err := RemoveWorkflows("test-pattern", false)
-
 	// Should not error since it's a stub implementation
 	if err != nil {
 		t.Errorf("RemoveWorkflows should not return error for valid input, got: %v", err)
@@ -223,7 +221,6 @@ func TestRemoveWorkflows(t *testing.T) {
 
 func TestStatusWorkflows(t *testing.T) {
 	err := StatusWorkflows("test-pattern", false, false, "", "", "")
-
 	// Should not error since it's a stub implementation
 	if err != nil {
 		t.Errorf("StatusWorkflows should not return error for valid input, got: %v", err)
@@ -434,7 +431,7 @@ func TestAllCommandsExist(t *testing.T) {
 	// Create a minimal test environment to avoid expensive workflow compilation
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github/workflows")
-	os.MkdirAll(workflowsDir, 0755)
+	os.MkdirAll(workflowsDir, 0o755)
 
 	// Change to temp directory
 	originalDir, _ := os.Getwd()
@@ -449,7 +446,7 @@ permissions:
 ---
 # Test
 Test workflow for command existence.`
-	os.WriteFile(filepath.Join(workflowsDir, "test.md"), []byte(minimalWorkflow), 0644)
+	os.WriteFile(filepath.Join(workflowsDir, "test.md"), []byte(minimalWorkflow), 0o644)
 
 	// Test that all expected functions exist and can be called
 	// This helps ensure the interface is stable
@@ -501,7 +498,6 @@ Test workflow for command existence.`
 
 // TestInstallPackage tests the InstallPackage function
 func TestInstallPackage(t *testing.T) {
-
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "gh-aw-test-*")
 	if err != nil {
@@ -612,8 +608,8 @@ func TestNewWorkflow(t *testing.T) {
 			expectedError: true,
 			setup: func(t *testing.T) {
 				// Create an existing workflow file
-				os.MkdirAll(".github/workflows", 0755)
-				os.WriteFile(".github/workflows/existing-workflow.md", []byte("test"), 0644)
+				os.MkdirAll(".github/workflows", 0o755)
+				os.WriteFile(".github/workflows/existing-workflow.md", []byte("test"), 0o644)
 			},
 		},
 		{
@@ -623,10 +619,10 @@ func TestNewWorkflow(t *testing.T) {
 			expectedError: false,
 			setup: func(t *testing.T) {
 				// Create an existing workflow file
-				if err := os.MkdirAll(".github/workflows", 0755); err != nil {
+				if err := os.MkdirAll(".github/workflows", 0o755); err != nil {
 					t.Fatalf("Failed to create workflows directory: %v", err)
 				}
-				if err := os.WriteFile(".github/workflows/force-workflow.md", []byte("old content"), 0644); err != nil {
+				if err := os.WriteFile(".github/workflows/force-workflow.md", []byte("old content"), 0o644); err != nil {
 					t.Fatalf("Failed to create existing workflow file: %v", err)
 				}
 			},
@@ -744,13 +740,13 @@ func TestCleanupOrphanedIncludes(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create shared subdirectory
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -766,7 +762,7 @@ on:
 
 This is a root workflow.
 `, strings.TrimSuffix(name, ".md"))
-		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -782,7 +778,7 @@ tools:
 
 This is an include file.
 `
-		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -799,7 +795,7 @@ on:
 
 This workflow uses an include.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow-with-include.md"), []byte(workflowWithInclude), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow-with-include.md"), []byte(workflowWithInclude), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -859,13 +855,13 @@ func TestPreviewOrphanedIncludes(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create shared subdirectory
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -881,7 +877,7 @@ on:
 
 This workflow uses common include.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow1.md"), []byte(workflow1), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow1.md"), []byte(workflow1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -896,7 +892,7 @@ on:
 
 This workflow uses tools include.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow2.md"), []byte(workflow2), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow2.md"), []byte(workflow2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -911,7 +907,7 @@ on:
 
 This workflow also uses common include.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow3.md"), []byte(workflow3), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow3.md"), []byte(workflow3), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -922,7 +918,7 @@ This workflow also uses common include.
 		"shared/unused.md": "Unused include content",
 	}
 	for name, content := range includeFiles {
-		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(workflowsDir, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1003,13 +999,13 @@ func TestRemoveWorkflowsWithNoOrphansFlag(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create shared subdirectory
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1025,13 +1021,13 @@ on:
 
 This workflow uses an include.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "test-workflow.md"), []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "test-workflow.md"), []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create the include file
 	includeContent := `This is a shared include file.`
-	if err := os.WriteFile(filepath.Join(sharedDir, "common.md"), []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedDir, "common.md"), []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1147,7 +1143,6 @@ func TestRunWorkflowOnGitHubWithEnable(t *testing.T) {
 }
 
 func TestGetWorkflowStatus(t *testing.T) {
-
 	// Test with non-existent workflow
 	_, err := getWorkflowStatus("nonexistent-workflow", "", false)
 	if err == nil {

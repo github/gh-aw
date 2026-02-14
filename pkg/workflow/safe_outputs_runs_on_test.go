@@ -58,7 +58,7 @@ This is a test workflow.`,
 
 			testFile := filepath.Join(tmpDir, "test.md")
 			var err error
-			err = os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err = os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -104,7 +104,7 @@ This is a test workflow.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
 	var err error
-	err = os.WriteFile(testFile, []byte(frontmatter), 0644)
+	err = os.WriteFile(testFile, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -57,7 +57,6 @@ func TestDownloadRunArtifactsConcurrent_ResultOrdering(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_AllProcessed tests that all runs in batch are processed
 func TestDownloadRunArtifactsConcurrent_AllProcessed(t *testing.T) {
-
 	ctx := context.Background()
 
 	runs := []WorkflowRun{
@@ -89,7 +88,6 @@ func TestDownloadRunArtifactsConcurrent_AllProcessed(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_ContextCancellation tests graceful handling of cancelled context
 func TestDownloadRunArtifactsConcurrent_ContextCancellation(t *testing.T) {
-
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -115,7 +113,6 @@ func TestDownloadRunArtifactsConcurrent_ContextCancellation(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_PartialCancellation tests cancellation during execution
 func TestDownloadRunArtifactsConcurrent_PartialCancellation(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
@@ -152,7 +149,6 @@ func TestDownloadRunArtifactsConcurrent_PartialCancellation(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_NoResourceLeaks tests that goroutines complete properly
 func TestDownloadRunArtifactsConcurrent_NoResourceLeaks(t *testing.T) {
-
 	ctx := context.Background()
 
 	// Get goroutine count before
@@ -182,7 +178,6 @@ func TestDownloadRunArtifactsConcurrent_NoResourceLeaks(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_ConcurrencyLimit tests max goroutines enforcement
 func TestDownloadRunArtifactsConcurrent_ConcurrencyLimit(t *testing.T) {
-
 	// This test verifies that getMaxConcurrentDownloads() is respected
 	// and the pool doesn't exceed the limit
 
@@ -262,7 +257,6 @@ func TestDownloadRunArtifactsConcurrent_ConcurrencyLimit(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_LogsPath tests that LogsPath is set correctly
 func TestDownloadRunArtifactsConcurrent_LogsPath(t *testing.T) {
-
 	ctx := context.Background()
 
 	runs := []WorkflowRun{
@@ -285,7 +279,6 @@ func TestDownloadRunArtifactsConcurrent_LogsPath(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_ErrorHandling tests error propagation
 func TestDownloadRunArtifactsConcurrent_ErrorHandling(t *testing.T) {
-
 	ctx := context.Background()
 
 	// These runs will fail to download (no actual artifacts available)
@@ -312,7 +305,6 @@ func TestDownloadRunArtifactsConcurrent_ErrorHandling(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_MixedConclusions tests handling of different run conclusions
 func TestDownloadRunArtifactsConcurrent_MixedConclusions(t *testing.T) {
-
 	ctx := context.Background()
 
 	runs := []WorkflowRun{
@@ -343,7 +335,6 @@ func TestDownloadRunArtifactsConcurrent_MixedConclusions(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_VerboseMode tests verbose output doesn't break functionality
 func TestDownloadRunArtifactsConcurrent_VerboseMode(t *testing.T) {
-
 	ctx := context.Background()
 
 	runs := []WorkflowRun{
@@ -377,7 +368,6 @@ func TestDownloadRunArtifactsConcurrent_VerboseMode(t *testing.T) {
 
 // TestDownloadRunArtifactsConcurrent_ResultStructure tests that DownloadResult has expected fields
 func TestDownloadRunArtifactsConcurrent_ResultStructure(t *testing.T) {
-
 	ctx := context.Background()
 
 	run := WorkflowRun{
@@ -423,7 +413,6 @@ func countGoroutines() int {
 // Note: This test documents expected behavior but can't easily test actual panic recovery
 // without modifying the implementation or using mocks
 func TestDownloadRunArtifactsConcurrent_PanicRecovery(t *testing.T) {
-
 	// The conc pool library automatically handles panic recovery
 	// Panics in one goroutine don't affect others
 	// This test documents the expected behavior

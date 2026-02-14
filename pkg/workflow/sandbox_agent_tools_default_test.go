@@ -28,7 +28,7 @@ Test workflow to verify sandbox.agent: awf enables edit and bash tools.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-awf.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow
@@ -70,7 +70,7 @@ Test workflow to verify sandbox.agent: srt enables edit and bash tools.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-srt.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow
@@ -107,7 +107,7 @@ Test workflow to verify default sandbox.agent (awf) does not enable extra tools.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-default-awf-tools.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow
@@ -152,7 +152,7 @@ Test workflow without sandbox config.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-no-sandbox.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow
@@ -195,7 +195,7 @@ Test workflow where explicit tools.bash should take precedence over default.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-explicit-bash.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow
@@ -238,7 +238,7 @@ Test workflow where firewall is auto-enabled via network restrictions.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-auto-firewall.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err, "Failed to write workflow file")
 
 		// Compile the workflow

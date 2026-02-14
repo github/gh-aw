@@ -32,7 +32,7 @@ This workflow has a stop-after field that should be removed.`
 
 	// Write test workflow
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(testWorkflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(testWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
@@ -71,7 +71,7 @@ This workflow has a stop-after field that should be removed.`
 	}
 
 	// Write back the cleaned content
-	err = os.WriteFile(workflowPath, []byte(cleanedContent), 0644)
+	err = os.WriteFile(workflowPath, []byte(cleanedContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write cleaned workflow: %v", err)
 	}

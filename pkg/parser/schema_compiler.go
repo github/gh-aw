@@ -205,7 +205,7 @@ func validateWithSchemaAndLocation(frontmatter map[string]any, schemaJSON, conte
 	// Try to read the actual file content for better context
 	var contextLines []string
 	var frontmatterContent string
-	var frontmatterStart = 2 // Default: frontmatter starts at line 2
+	frontmatterStart := 2 // Default: frontmatter starts at line 2
 
 	// Sanitize the path to prevent path traversal attacks
 	cleanPath := filepath.Clean(filePath)

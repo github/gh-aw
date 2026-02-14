@@ -35,7 +35,7 @@ mcp-servers:
     allowed: ["*"]
 ---
 `
-	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0644); err != nil {
+	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0o644); err != nil {
 		t.Fatalf("Failed to write included file: %v", err)
 	}
 
@@ -56,7 +56,7 @@ imports:
 
 This workflow imports an MCP server with headers and url fields.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -96,7 +96,7 @@ mcp-servers:
     allowed: ["test_function"]
 ---
 `
-	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0644); err != nil {
+	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0o644); err != nil {
 		t.Fatalf("Failed to write included file: %v", err)
 	}
 
@@ -114,7 +114,7 @@ imports:
 
 # Test entrypointArgs
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -148,7 +148,7 @@ mcp-servers:
     allowed: ["get_data"]
 ---
 `
-	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0644); err != nil {
+	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0o644); err != nil {
 		t.Fatalf("Failed to write included file: %v", err)
 	}
 
@@ -166,7 +166,7 @@ imports:
 
 # Test headers
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -196,7 +196,7 @@ mcp-servers:
     allowed: ["fetch_resource"]
 ---
 `
-	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0644); err != nil {
+	if err := os.WriteFile(includedFilePath, []byte(includedFileContent), 0o644); err != nil {
 		t.Fatalf("Failed to write included file: %v", err)
 	}
 
@@ -214,7 +214,7 @@ imports:
 
 # Test url
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

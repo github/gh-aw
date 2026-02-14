@@ -54,7 +54,7 @@ func TestTempDir(t *testing.T) {
 
 	// Create a file in the temp directory to verify it's writable
 	testFile := filepath.Join(tempDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
 		t.Errorf("failed to write to temp directory: %v", err)
 	}
 

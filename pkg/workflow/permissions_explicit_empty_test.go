@@ -84,7 +84,7 @@ Test content`,
 			// Create temporary test file
 			tmpDir := t.TempDir()
 			testFile := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

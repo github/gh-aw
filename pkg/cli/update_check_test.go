@@ -106,7 +106,7 @@ func TestShouldCheckForUpdate(t *testing.T) {
 			}
 
 			if tt.lastCheckTime != "" {
-				err := os.WriteFile(lastCheckFile, []byte(tt.lastCheckTime), 0644)
+				err := os.WriteFile(lastCheckFile, []byte(tt.lastCheckTime), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}

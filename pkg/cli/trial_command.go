@@ -27,7 +27,7 @@ type WorkflowTrialResult struct {
 	WorkflowName string         `json:"workflow_name"`
 	RunID        string         `json:"run_id"`
 	SafeOutputs  map[string]any `json:"safe_outputs"`
-	//AgentStdioLogs      []string               `json:"agent_stdio_logs,omitempty"`
+	// AgentStdioLogs      []string               `json:"agent_stdio_logs,omitempty"`
 	AgenticRunInfo      map[string]any `json:"agentic_run_info,omitempty"`
 	AdditionalArtifacts map[string]any `json:"additional_artifacts,omitempty"`
 	Timestamp           time.Time      `json:"timestamp"`
@@ -253,7 +253,6 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 	} else if opts.Repos.LogicalRepo != "" {
 		// Use logical-repo mode: simulate the workflow running against the specified repo
 		logicalRepo, err := parseRepoSpec(opts.Repos.LogicalRepo)
-
 		if err != nil {
 			return fmt.Errorf("invalid --logical-repo specification '%s': %w", opts.Repos.LogicalRepo, err)
 		}
@@ -290,7 +289,6 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 	if opts.Repos.HostRepo != "" {
 
 		hostRepo, err := parseRepoSpec(opts.Repos.HostRepo)
-
 		if err != nil {
 			return fmt.Errorf("invalid --host-repo specification '%s': %w", opts.Repos.HostRepo, err)
 		}
@@ -433,7 +431,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		}()
 
 		// Step 4: Create trials directory
-		if err := os.MkdirAll("trials", 0755); err != nil {
+		if err := os.MkdirAll("trials", 0o755); err != nil {
 			return fmt.Errorf("failed to create trials directory: %w", err)
 		}
 
@@ -496,7 +494,7 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 				WorkflowName: parsedSpec.WorkflowName,
 				RunID:        runID,
 				SafeOutputs:  artifacts.SafeOutputs,
-				//AgentStdioLogs:      artifacts.AgentStdioLogs,
+				// AgentStdioLogs:      artifacts.AgentStdioLogs,
 				AgenticRunInfo:      artifacts.AgenticRunInfo,
 				AdditionalArtifacts: artifacts.AdditionalArtifacts,
 				Timestamp:           time.Now(),
@@ -581,7 +579,6 @@ func RunWorkflowTrials(ctx context.Context, workflowSpecs []string, opts TrialOp
 		},
 		UseStderr: true,
 	})
-
 }
 
 // getCurrentGitHubUsername gets the current GitHub username from gh CLI
@@ -848,7 +845,6 @@ func triggerWorkflowRun(repoSlug, workflowName string, triggerContext string, ve
 	}
 
 	output, err := workflow.RunGHCombined("Triggering workflow...", args...)
-
 	if err != nil {
 		return "", fmt.Errorf("failed to trigger workflow run: %w (output: %s)", err, string(output))
 	}
@@ -904,7 +900,7 @@ func saveTrialResult(filename string, result any, verbose bool) error {
 		return fmt.Errorf("failed to marshal result to JSON: %w", err)
 	}
 
-	if err := os.WriteFile(filename, jsonBytes, 0644); err != nil {
+	if err := os.WriteFile(filename, jsonBytes, 0o644); err != nil {
 		return fmt.Errorf("failed to write result file: %w", err)
 	}
 
@@ -923,7 +919,7 @@ func copyTrialResultsToHostRepo(tempDir, dateTimeID string, workflowNames []stri
 
 	// Create trials directory in the host repository
 	trialsDir := filepath.Join(tempDir, "trials")
-	if err := os.MkdirAll(trialsDir, 0755); err != nil {
+	if err := os.MkdirAll(trialsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create trials directory in repository: %w", err)
 	}
 

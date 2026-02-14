@@ -567,12 +567,14 @@ var DangerousPropertyNames = []string{
 	"toLocaleString",
 }
 
-const AgentJobName JobName = "agent"
-const ActivationJobName JobName = "activation"
-const PreActivationJobName JobName = "pre_activation"
-const DetectionJobName JobName = "detection"
-const SafeOutputArtifactName = "safe-output"
-const AgentOutputArtifactName = "agent-output"
+const (
+	AgentJobName            JobName = "agent"
+	ActivationJobName       JobName = "activation"
+	PreActivationJobName    JobName = "pre_activation"
+	DetectionJobName        JobName = "detection"
+	SafeOutputArtifactName          = "safe-output"
+	AgentOutputArtifactName         = "agent-output"
+)
 
 // AgentOutputFilename is the filename of the agent output JSON file
 const AgentOutputFilename = "agent_output.json"
@@ -604,26 +606,32 @@ const (
 )
 
 // Step IDs for pre-activation job
-const CheckMembershipStepID StepID = "check_membership"
-const CheckStopTimeStepID StepID = "check_stop_time"
-const CheckSkipIfMatchStepID StepID = "check_skip_if_match"
-const CheckSkipIfNoMatchStepID StepID = "check_skip_if_no_match"
-const CheckCommandPositionStepID StepID = "check_command_position"
-const CheckRateLimitStepID StepID = "check_rate_limit"
+const (
+	CheckMembershipStepID      StepID = "check_membership"
+	CheckStopTimeStepID        StepID = "check_stop_time"
+	CheckSkipIfMatchStepID     StepID = "check_skip_if_match"
+	CheckSkipIfNoMatchStepID   StepID = "check_skip_if_no_match"
+	CheckCommandPositionStepID StepID = "check_command_position"
+	CheckRateLimitStepID       StepID = "check_rate_limit"
+)
 
 // Output names for pre-activation job steps
-const IsTeamMemberOutput = "is_team_member"
-const StopTimeOkOutput = "stop_time_ok"
-const SkipCheckOkOutput = "skip_check_ok"
-const SkipNoMatchCheckOkOutput = "skip_no_match_check_ok"
-const CommandPositionOkOutput = "command_position_ok"
-const MatchedCommandOutput = "matched_command"
-const RateLimitOkOutput = "rate_limit_ok"
-const ActivatedOutput = "activated"
+const (
+	IsTeamMemberOutput       = "is_team_member"
+	StopTimeOkOutput         = "stop_time_ok"
+	SkipCheckOkOutput        = "skip_check_ok"
+	SkipNoMatchCheckOkOutput = "skip_no_match_check_ok"
+	CommandPositionOkOutput  = "command_position_ok"
+	MatchedCommandOutput     = "matched_command"
+	RateLimitOkOutput        = "rate_limit_ok"
+	ActivatedOutput          = "activated"
+)
 
 // Rate limit defaults
-const DefaultRateLimitMax = 5     // Default maximum runs per time window
-const DefaultRateLimitWindow = 60 // Default time window in minutes (1 hour)
+const (
+	DefaultRateLimitMax    = 5  // Default maximum runs per time window
+	DefaultRateLimitWindow = 60 // Default time window in minutes (1 hour)
+)
 
 // Agentic engine name constants using EngineName type for type safety
 const (

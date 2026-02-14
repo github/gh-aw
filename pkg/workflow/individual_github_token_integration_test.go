@@ -34,7 +34,7 @@ This workflow tests that create-issue uses the safe-outputs global github-token.
 `
 
 		testFile := filepath.Join(tmpDir, "test-issue-token.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -88,7 +88,7 @@ This workflow tests that create-pull-request uses the safe-outputs global github
 `
 
 		testFile := filepath.Join(tmpDir, "test-pr-fallback.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -140,7 +140,7 @@ This workflow tests that add-labels uses the safe-outputs global github-token.
 `
 
 		testFile := filepath.Join(tmpDir, "test-labels-token.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -193,7 +193,7 @@ This workflow tests that the global github-token still works when no individual 
 `
 
 		testFile := filepath.Join(tmpDir, "test-backward-compatibility.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

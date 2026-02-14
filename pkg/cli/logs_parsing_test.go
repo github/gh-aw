@@ -24,7 +24,7 @@ func TestParseLogFileWithoutAwInfo(t *testing.T) {
 2024-01-15T10:30:45Z Cost: $0.025
 2024-01-15T10:31:30Z Workflow completed successfully`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -128,7 +128,7 @@ Regular log line: tokens: 1000
 {"cost": 0.035}
 2024-01-15T10:31:30Z Workflow completed successfully`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -244,7 +244,7 @@ Claude processing request...
 ` + claudeResultJSON + `
 2024-01-15T10:32:30Z Workflow completed successfully`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -294,7 +294,7 @@ Now I need to wait for the user's response.
 [2025-08-13T00:24:50] tokens used: 13934
 [2025-08-13T00:24:55] Workflow completed successfully`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -336,7 +336,7 @@ I've posted the PR summary comment with analysis and recommendations. Let me kno
 [2025-08-13T04:38:10] Processing complete
 [2025-08-13T04:38:15] tokens used: 5000`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -385,7 +385,7 @@ tool safe_outputs.create_issue({"title": "PR Summary", "body": "..."})
 tokens used: 15234
 2025-01-15T10:30:10.234567Z  INFO codex: Execution complete`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -450,7 +450,7 @@ tool github.create_issue({"title": "Test", "body": "Body"})
 tokens used: 10000
 2025-01-15T10:30:10.234567Z  INFO codex: Execution complete`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -505,7 +505,7 @@ tokens: 5000
 [2025-08-13T04:38:06] tokens used: 2000
 token_count: 10000`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -554,7 +554,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 		"created_at": "2025-08-13T13:36:39.704Z"
 	}`
 
-	err := os.WriteFile(awInfoFile, []byte(awInfoContent), 0644)
+	err := os.WriteFile(awInfoFile, []byte(awInfoContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create aw_info.json file: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 
 	// Test Case 2: aw_info.json as a directory containing the actual file
 	awInfoDir := filepath.Join(tmpDir, "aw_info.json")
-	err = os.Mkdir(awInfoDir, 0755)
+	err = os.Mkdir(awInfoDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create aw_info.json directory: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 		"created_at": "2025-08-13T13:36:39.704Z"
 	}`
 
-	err = os.WriteFile(nestedAwInfoFile, []byte(awInfoContentCodex), 0644)
+	err = os.WriteFile(nestedAwInfoFile, []byte(awInfoContentCodex), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create nested aw_info.json file: %v", err)
 	}
@@ -621,7 +621,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 
 	// Test Case 4: Directory without nested aw_info.json should return nil
 	emptyDir := filepath.Join(tmpDir, "empty_aw_info.json")
-	err = os.Mkdir(emptyDir, 0755)
+	err = os.Mkdir(emptyDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
@@ -634,7 +634,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 	// Test Case 5: Invalid JSON should return nil
 	invalidAwInfoFile := filepath.Join(tmpDir, "invalid_aw_info.json")
 	invalidContent := `{invalid json content`
-	err = os.WriteFile(invalidAwInfoFile, []byte(invalidContent), 0644)
+	err = os.WriteFile(invalidAwInfoFile, []byte(invalidContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create invalid aw_info.json file: %v", err)
 	}
@@ -650,7 +650,7 @@ func TestExtractEngineFromAwInfoNestedDirectory(t *testing.T) {
 		"workflow_name": "Test Workflow",
 		"run_id": 123456789
 	}`
-	err = os.WriteFile(missingEngineIDFile, []byte(missingEngineIDContent), 0644)
+	err = os.WriteFile(missingEngineIDFile, []byte(missingEngineIDContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create aw_info.json file without engine_id: %v", err)
 	}
@@ -671,7 +671,7 @@ func TestParseLogFileWithNonCodexTokensOnly(t *testing.T) {
 token_count: 10000
 input_tokens: 2000`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}
@@ -692,7 +692,7 @@ func TestExtractLogMetricsWithAwOutputFile(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := testutil.TempDir(t, "test-*")
 	logsDir := filepath.Join(tmpDir, "run-123456")
-	err := os.Mkdir(logsDir, 0755)
+	err := os.Mkdir(logsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create logs directory: %v", err)
 	}
@@ -700,7 +700,7 @@ func TestExtractLogMetricsWithAwOutputFile(t *testing.T) {
 	// Create aw_info.json to specify copilot engine
 	awInfoFile := filepath.Join(logsDir, "aw_info.json")
 	awInfoContent := `{"engine_id": "copilot"}`
-	err = os.WriteFile(awInfoFile, []byte(awInfoContent), 0644)
+	err = os.WriteFile(awInfoFile, []byte(awInfoContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create aw_info.json file: %v", err)
 	}
@@ -711,7 +711,7 @@ func TestExtractLogMetricsWithAwOutputFile(t *testing.T) {
 		"items": [],
 		"errors": []
 	}`
-	err = os.WriteFile(awOutputFile, []byte(awOutputContent), 0644)
+	err = os.WriteFile(awOutputFile, []byte(awOutputContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create agent_output.json file: %v", err)
 	}
@@ -742,7 +742,7 @@ func TestExtractLogMetricsWithAwOutputFile(t *testing.T) {
 2024-01-15T10:30:00Z [DEBUG]   }
 2024-01-15T10:30:00Z [DEBUG] }
 2024-01-15T10:30:00Z [DEBUG] Workflow completed`
-	err = os.WriteFile(logFile, []byte(logContent), 0644)
+	err = os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create log file: %v", err)
 	}
@@ -773,7 +773,7 @@ Tokens used: 3456
 Estimated cost: $0.067
 2024-01-15T10:31:30Z Workflow completed`
 
-	err := os.WriteFile(logFile, []byte(logContent), 0644)
+	err := os.WriteFile(logFile, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test log file: %v", err)
 	}

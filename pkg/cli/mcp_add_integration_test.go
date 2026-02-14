@@ -229,7 +229,7 @@ This is a test workflow for MCP server integration.
 		t.Run("server_"+serverName, func(t *testing.T) {
 			// Create a unique workflow file for this server
 			workflowFile := filepath.Join(setup.workflowsDir, "test-mcp-"+strconv.Itoa(i)+".md")
-			if err := os.WriteFile(workflowFile, []byte(baseWorkflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(baseWorkflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}
 

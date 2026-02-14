@@ -584,7 +584,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -639,7 +639,7 @@ safe-outputs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -714,7 +714,7 @@ safe-outputs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -767,7 +767,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -819,7 +819,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -868,7 +868,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -938,7 +938,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -999,7 +999,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1064,7 +1064,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1266,7 +1266,7 @@ jobs: {}
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1318,7 +1318,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1357,7 +1357,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1423,7 +1423,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1504,7 +1504,7 @@ safe-outputs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1591,7 +1591,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1700,7 +1700,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1759,7 +1759,7 @@ jobs:
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

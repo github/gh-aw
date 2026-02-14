@@ -342,7 +342,7 @@ Base content with upstream notes.`
 
 	// Write merged content to verify it's valid
 	testFile := filepath.Join(tmpDir, "merged.md")
-	if err := os.WriteFile(testFile, []byte(merged), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(merged), 0o644); err != nil {
 		t.Fatalf("Failed to write merged file: %v", err)
 	}
 
@@ -365,7 +365,7 @@ func TestFindWorkflowsWithSource_CustomDirectory(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := testutil.TempDir(t, "test-*")
 	customWorkflowDir := filepath.Join(tmpDir, "custom", "workflows")
-	if err := os.MkdirAll(customWorkflowDir, 0755); err != nil {
+	if err := os.MkdirAll(customWorkflowDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -381,7 +381,7 @@ source: test/repo/workflow.md@v1.0.0
 Test content.`
 
 	workflowPath := filepath.Join(customWorkflowDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -396,7 +396,7 @@ engine: claude
 No source field.`
 
 	workflowPath2 := filepath.Join(customWorkflowDir, "no-source.md")
-	if err := os.WriteFile(workflowPath2, []byte(workflowWithoutSource), 0644); err != nil {
+	if err := os.WriteFile(workflowPath2, []byte(workflowWithoutSource), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -426,7 +426,7 @@ func TestUpdateWorkflows_CustomDirectory(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := testutil.TempDir(t, "test-*")
 	customWorkflowDir := filepath.Join(tmpDir, "custom", "workflows")
-	if err := os.MkdirAll(customWorkflowDir, 0755); err != nil {
+	if err := os.MkdirAll(customWorkflowDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflow directory: %v", err)
 	}
 
@@ -442,7 +442,7 @@ source: test/repo/workflow.md@v1.0.0
 Test content.`
 
 	workflowPath := filepath.Join(customWorkflowDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -653,7 +653,6 @@ source: test/repo/workflow.md@v1.0.0
 
 // TestCompileWorkflowWithRefresh tests that compileWorkflowWithRefresh properly passes refreshStopTime
 func TestCompileWorkflowWithRefresh(t *testing.T) {
-
 	// Create a temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 
@@ -672,7 +671,7 @@ engine: copilot
 
 This is a test workflow.
 `
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
@@ -798,7 +797,6 @@ func TestMarshalActionsLockSorted(t *testing.T) {
 
 // TestGetActionSHAForTag tests that we can look up action SHAs (requires network)
 func TestGetActionSHAForTag(t *testing.T) {
-
 	// This test requires network access and GitHub API, so skip in CI
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping network test in CI")
@@ -848,7 +846,7 @@ func TestUpdateActions_EmptyFile(t *testing.T) {
 
 	// Create .github/aw directory
 	awDir := filepath.Join(tmpDir, ".github", "aw")
-	if err := os.MkdirAll(awDir, 0755); err != nil {
+	if err := os.MkdirAll(awDir, 0o755); err != nil {
 		t.Fatalf("Failed to create .github/aw directory: %v", err)
 	}
 
@@ -857,7 +855,7 @@ func TestUpdateActions_EmptyFile(t *testing.T) {
 	emptyLock := `{
   "entries": {}
 }`
-	if err := os.WriteFile(actionsLockPath, []byte(emptyLock), 0644); err != nil {
+	if err := os.WriteFile(actionsLockPath, []byte(emptyLock), 0o644); err != nil {
 		t.Fatalf("Failed to write empty actions-lock.json: %v", err)
 	}
 
@@ -879,14 +877,14 @@ func TestUpdateActions_InvalidJSON(t *testing.T) {
 
 	// Create .github/aw directory
 	awDir := filepath.Join(tmpDir, ".github", "aw")
-	if err := os.MkdirAll(awDir, 0755); err != nil {
+	if err := os.MkdirAll(awDir, 0o755); err != nil {
 		t.Fatalf("Failed to create .github/aw directory: %v", err)
 	}
 
 	// Create an invalid actions-lock.json
 	actionsLockPath := filepath.Join(awDir, "actions-lock.json")
 	invalidJSON := `{ invalid json`
-	if err := os.WriteFile(actionsLockPath, []byte(invalidJSON), 0644); err != nil {
+	if err := os.WriteFile(actionsLockPath, []byte(invalidJSON), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid actions-lock.json: %v", err)
 	}
 
@@ -953,7 +951,7 @@ func TestUpdateWorkflowsWithExtensionCheck_FixIntegration(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -974,7 +972,7 @@ This is a test workflow with deprecated field.
 `
 
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -1032,7 +1030,6 @@ func TestUpdateWorkflowsWithExtensionCheck_FixNonFatal(t *testing.T) {
 
 	// The fix should handle missing workflows gracefully
 	err := RunFix(fixConfig)
-
 	// The error might be about no workflows found, which is acceptable
 	if err != nil {
 		if !strings.Contains(err.Error(), "No workflow files found") {

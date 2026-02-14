@@ -100,7 +100,7 @@ This is a test workflow.
 `
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -211,7 +211,7 @@ This is a test workflow for command triggering.
 `
 
 			testFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -428,7 +428,7 @@ This is a test workflow for command merging with other events.
 `
 
 			testFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

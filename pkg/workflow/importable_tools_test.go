@@ -36,7 +36,7 @@ network:
 
 # Shared Playwright Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -57,7 +57,7 @@ permissions:
 
 Uses imported playwright tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -111,7 +111,7 @@ tools:
 
 # Shared Serena Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -132,7 +132,7 @@ permissions:
 
 Uses imported serena tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -188,7 +188,7 @@ permissions:
 
 # Shared Agentic Workflows Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -210,7 +210,7 @@ permissions:
 
 Uses imported agentic-workflows tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -294,7 +294,7 @@ network:
 
 # Shared All Tools Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -316,7 +316,7 @@ permissions:
 
 Uses all imported tools.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -379,7 +379,7 @@ tools:
 
 # Shared Serena Language Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -400,7 +400,7 @@ permissions:
 
 Uses imported serena with language config.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -464,7 +464,7 @@ network:
 
 # Shared Playwright with Args
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -485,7 +485,7 @@ permissions:
 
 Uses imported playwright with custom args.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -534,7 +534,7 @@ permissions:
 
 # Shared Agentic Workflows Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -555,7 +555,7 @@ permissions:
 
 Missing actions:read permission.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -587,7 +587,7 @@ tools:
 
 # Shared Edit Tool Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -606,7 +606,7 @@ permissions:
 
 Uses imported edit tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -646,7 +646,7 @@ tools:
 
 # Shared Web Fetch Tool Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -665,7 +665,7 @@ permissions:
 
 Uses imported web-fetch tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -702,7 +702,7 @@ tools:
 
 # Shared Web Search Tool Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -722,7 +722,7 @@ permissions:
 
 Uses imported web-search tool.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -762,7 +762,7 @@ tools:
 
 # Shared Timeout Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -781,7 +781,7 @@ permissions:
 
 Uses imported timeout setting.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -824,7 +824,7 @@ tools:
 
 # Shared Startup Timeout Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -843,7 +843,7 @@ permissions:
 
 Uses imported startup-timeout setting.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -890,7 +890,7 @@ tools:
 
 # Shared Neutral Tools Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -909,7 +909,7 @@ permissions:
 
 Uses all imported neutral tools.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -970,7 +970,7 @@ tools:
 
 # Shared Serena Local Mode Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -991,7 +991,7 @@ permissions:
 
 Uses imported serena in local mode.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -1071,7 +1071,7 @@ tools:
 
 # Shared Serena Local Mode Multiple Languages
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -1089,7 +1089,7 @@ permissions:
 
 # Main Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

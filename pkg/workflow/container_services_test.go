@@ -101,7 +101,7 @@ This is a test without container.`,
 			defer os.RemoveAll(tmpDir)
 
 			workflowFile := tmpDir + "/test.md"
-			err = os.WriteFile(workflowFile, []byte(tt.frontmatter), 0644)
+			err = os.WriteFile(workflowFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -258,7 +258,7 @@ This is a test without services.`,
 			defer os.RemoveAll(tmpDir)
 
 			workflowFile := tmpDir + "/test.md"
-			err = os.WriteFile(workflowFile, []byte(tt.frontmatter), 0644)
+			err = os.WriteFile(workflowFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -351,7 +351,7 @@ This workflow uses both container and services.`
 	defer os.RemoveAll(tmpDir)
 
 	workflowFile := tmpDir + "/test.md"
-	err = os.WriteFile(workflowFile, []byte(frontmatter), 0644)
+	err = os.WriteFile(workflowFile, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

@@ -22,7 +22,6 @@ func TestPollWithSignalHandling_Success(t *testing.T) {
 		},
 		Verbose: false,
 	})
-
 	if err != nil {
 		t.Errorf("Expected success, got error: %v", err)
 	}
@@ -82,7 +81,6 @@ func TestPollWithSignalHandling_ImmediateSuccess(t *testing.T) {
 		},
 		Verbose: false,
 	})
-
 	if err != nil {
 		t.Errorf("Expected success, got error: %v", err)
 	}

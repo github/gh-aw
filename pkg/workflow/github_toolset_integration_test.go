@@ -129,7 +129,7 @@ This workflow combines toolsets with read-only mode.
 			mdPath := filepath.Join(tempDir, "test-workflow.md")
 
 			// Write workflow file
-			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0644)
+			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test workflow: %v", err)
 			}
@@ -187,7 +187,7 @@ This workflow tests remote mode with array toolsets.
 	mdPath := filepath.Join(tempDir, "test-workflow.md")
 
 	// Write workflow file
-	err := os.WriteFile(mdPath, []byte(workflowMD), 0644)
+	err := os.WriteFile(mdPath, []byte(workflowMD), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
@@ -325,7 +325,7 @@ Remote mode with toolsets and read-only.
 			mdPath := filepath.Join(tempDir, "test-workflow.md")
 
 			// Write workflow file
-			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0644)
+			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test workflow: %v", err)
 			}

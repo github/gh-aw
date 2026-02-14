@@ -85,7 +85,7 @@ func TestValidateRuntimeImportFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	githubDir := filepath.Join(tmpDir, ".github")
 	sharedDir := filepath.Join(githubDir, "shared")
-	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
 
 	// Create test files with different content
 	validFile := filepath.Join(sharedDir, "valid.md")
@@ -96,7 +96,7 @@ This file has safe expressions:
 - Repository: ${{ github.repository }}
 - Issue number: ${{ github.event.issue.number }}
 `
-	require.NoError(t, os.WriteFile(validFile, []byte(validContent), 0644))
+	require.NoError(t, os.WriteFile(validFile, []byte(validContent), 0o644))
 
 	invalidFile := filepath.Join(sharedDir, "invalid.md")
 	invalidContent := `# Invalid Content
@@ -105,7 +105,7 @@ This file has unsafe expressions:
 - Secret: ${{ secrets.MY_TOKEN }}
 - Runner: ${{ runner.os }}
 `
-	require.NoError(t, os.WriteFile(invalidFile, []byte(invalidContent), 0644))
+	require.NoError(t, os.WriteFile(invalidFile, []byte(invalidContent), 0o644))
 
 	multilineFile := filepath.Join(sharedDir, "multiline.md")
 	multilineContent := `# Multiline Expression
@@ -114,7 +114,7 @@ This has a multiline expression:
 ${{ github.actor
     && github.run_id }}
 `
-	require.NoError(t, os.WriteFile(multilineFile, []byte(multilineContent), 0644))
+	require.NoError(t, os.WriteFile(multilineFile, []byte(multilineContent), 0o644))
 
 	tests := []struct {
 		name        string
@@ -184,12 +184,12 @@ func TestValidateRuntimeImportFiles_PathNormalization(t *testing.T) {
 	tmpDir := t.TempDir()
 	githubDir := filepath.Join(tmpDir, ".github")
 	sharedDir := filepath.Join(githubDir, "shared")
-	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
 
 	// Create a valid test file
 	validFile := filepath.Join(sharedDir, "test.md")
 	validContent := "# Test\n\nActor: ${{ github.actor }}"
-	require.NoError(t, os.WriteFile(validFile, []byte(validContent), 0644))
+	require.NoError(t, os.WriteFile(validFile, []byte(validContent), 0o644))
 
 	tests := []struct {
 		name        string
@@ -233,8 +233,8 @@ func TestCompilerIntegration_RuntimeImportValidation(t *testing.T) {
 	githubDir := filepath.Join(tmpDir, ".github")
 	workflowsDir := filepath.Join(githubDir, "workflows")
 	sharedDir := filepath.Join(githubDir, "shared")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
-	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
 
 	// Create a shared file with invalid expression
 	sharedFile := filepath.Join(sharedDir, "instructions.md")
@@ -242,7 +242,7 @@ func TestCompilerIntegration_RuntimeImportValidation(t *testing.T) {
 
 Use this token: ${{ secrets.GITHUB_TOKEN }}
 `
-	require.NoError(t, os.WriteFile(sharedFile, []byte(sharedContent), 0644))
+	require.NoError(t, os.WriteFile(sharedFile, []byte(sharedContent), 0o644))
 
 	// Create a workflow file that imports the shared file
 	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
@@ -259,7 +259,7 @@ engine: copilot
 
 Please process the issue.
 `
-	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0o644))
 
 	// Create compiler and attempt to compile
 	compiler := NewCompiler()
@@ -279,8 +279,8 @@ func TestCompilerIntegration_RuntimeImportValidation_Valid(t *testing.T) {
 	githubDir := filepath.Join(tmpDir, ".github")
 	workflowsDir := filepath.Join(githubDir, "workflows")
 	sharedDir := filepath.Join(githubDir, "shared")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
-	require.NoError(t, os.MkdirAll(sharedDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
 
 	// Create a shared file with valid expressions
 	sharedFile := filepath.Join(sharedDir, "instructions.md")
@@ -290,7 +290,7 @@ Actor: ${{ github.actor }}
 Repository: ${{ github.repository }}
 Issue: ${{ github.event.issue.number }}
 `
-	require.NoError(t, os.WriteFile(sharedFile, []byte(sharedContent), 0644))
+	require.NoError(t, os.WriteFile(sharedFile, []byte(sharedContent), 0o644))
 
 	// Create a workflow file that imports the shared file
 	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
@@ -307,7 +307,7 @@ engine: copilot
 
 Please process the issue.
 `
-	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0644))
+	require.NoError(t, os.WriteFile(workflowFile, []byte(workflowContent), 0o644))
 
 	// Create compiler and compile
 	compiler := NewCompiler()

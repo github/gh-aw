@@ -32,7 +32,7 @@ func TestCommandsWithFuzzyMatching(t *testing.T) {
 
 	// Create .github/workflows directory with test workflows
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -51,7 +51,7 @@ on:
 # Test workflow
 Test content
 `
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", workflow, err)
 		}
 	}
@@ -143,7 +143,7 @@ func TestEnableCommandFuzzyMatching(t *testing.T) {
 
 	// Create .github/workflows directory with test workflows
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -161,7 +161,7 @@ on:
 # Test workflow
 Test content
 `
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", workflow, err)
 		}
 	}
@@ -207,7 +207,7 @@ func TestFuzzyMatchingDoesNotShowForExactMatches(t *testing.T) {
 
 	// Create .github/workflows directory with test workflow
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -219,7 +219,7 @@ on:
 ---
 # Test workflow
 `
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 
@@ -257,7 +257,7 @@ func TestFuzzyMatchingWithNoCloseMatches(t *testing.T) {
 
 	// Create .github/workflows directory with test workflows
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -275,7 +275,7 @@ on:
 ---
 # Test workflow
 `
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", workflow, err)
 		}
 	}

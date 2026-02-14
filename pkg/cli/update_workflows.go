@@ -443,7 +443,7 @@ func updateWorkflow(wf *workflowWithSource, allowMajor, force, verbose bool, eng
 	}
 
 	// Write updated content
-	if err := os.WriteFile(wf.Path, []byte(finalContent), 0644); err != nil {
+	if err := os.WriteFile(wf.Path, []byte(finalContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write updated workflow: %w", err)
 	}
 

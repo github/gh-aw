@@ -102,7 +102,6 @@ func ensureTrialRepository(repoSlug string, cloneRepoSlug string, forceDeleteHos
 
 	// Use gh CLI to create private repo with initial README using full OWNER/REPO format
 	output, err = workflow.RunGHCombined("Creating repository...", "repo", "create", repoSlug, "--private", "--add-readme", "--description", "GitHub Agentic Workflows host repository")
-
 	if err != nil {
 		// Check if the error is because the repository already exists
 		outputStr := string(output)
@@ -159,7 +158,6 @@ func cleanupTrialRepository(repoSlug string, verbose bool) error {
 
 	// Use gh CLI to delete the repository with proper username/repo format
 	output, err := workflow.RunGHCombined("Deleting repository...", "repo", "delete", repoSlug, "--yes")
-
 	if err != nil {
 		return fmt.Errorf("failed to delete host repository: %w (output: %s)", err, string(output))
 	}
@@ -189,7 +187,6 @@ func cloneTrialHostRepository(repoSlug string, verbose bool) (string, error) {
 	repoURL := fmt.Sprintf("https://github.com/%s.git", repoSlug)
 	cmd := exec.Command("git", "clone", repoURL, tempDir)
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return "", fmt.Errorf("failed to clone host repository %s: %w (output: %s)", repoURL, err, string(output))
 	}
@@ -329,7 +326,7 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 		return fmt.Errorf("invalid workflows directory path: %w", err)
 	}
 
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create workflows directory: %w", err)
 	}
 
@@ -374,7 +371,7 @@ func installLocalWorkflowInTrialMode(originalDir, tempDir string, parsedSpec *Wo
 	}
 
 	// Write the content to the destination
-	if err := os.WriteFile(destPath, content, 0644); err != nil {
+	if err := os.WriteFile(destPath, content, 0o644); err != nil {
 		return fmt.Errorf("failed to write workflow to destination: %w", err)
 	}
 
@@ -440,7 +437,7 @@ func modifyWorkflowForTrialMode(tempDir, workflowName, logicalRepoSlug string, v
 	}
 
 	// Write the modified content back
-	if err := os.WriteFile(workflowPath, []byte(modifiedContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(modifiedContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write modified workflow: %w", err)
 	}
 

@@ -198,7 +198,6 @@ func FuzzParseTriggerShorthand(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		// The parser should never panic regardless of input
 		ir, err := ParseTriggerShorthand(input)
-
 		// Validate output consistency
 		if err != nil {
 			// On error, IR should be nil

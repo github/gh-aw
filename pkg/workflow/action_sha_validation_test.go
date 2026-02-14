@@ -33,7 +33,7 @@ permissions:
 This is a test workflow to verify SHA pinning.
 `
 
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
@@ -103,7 +103,7 @@ safe-outputs:
 Create issues based on input.
 `
 
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
@@ -161,7 +161,7 @@ permissions:
 Just a simple test workflow.
 `
 
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
@@ -213,7 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 `
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to write lock file: %v", err)
 	}
 

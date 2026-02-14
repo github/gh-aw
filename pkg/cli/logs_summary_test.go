@@ -17,7 +17,7 @@ func TestSaveAndLoadRunSummary(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-12345")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -94,7 +94,7 @@ func TestLoadRunSummaryVersionMismatch(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-12345")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -135,7 +135,7 @@ func TestLoadRunSummaryMissingFile(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-12345")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -153,13 +153,13 @@ func TestLoadRunSummaryInvalidJSON(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-12345")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
 	// Write invalid JSON to the summary file
 	summaryPath := filepath.Join(runDir, runSummaryFileName)
-	if err := os.WriteFile(summaryPath, []byte("invalid json {"), 0644); err != nil {
+	if err := os.WriteFile(summaryPath, []byte("invalid json {"), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid JSON: %v", err)
 	}
 
@@ -190,10 +190,10 @@ func TestListArtifacts(t *testing.T) {
 
 	for _, file := range testFiles {
 		fullPath := filepath.Join(runDir, file)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 			t.Fatalf("Failed to create directory for %s: %v", file, err)
 		}
-		if err := os.WriteFile(fullPath, []byte("test content"), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte("test content"), 0o644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", file, err)
 		}
 	}

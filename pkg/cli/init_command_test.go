@@ -606,7 +606,6 @@ func TestInitRepositoryErrorHandling(t *testing.T) {
 
 	// Test init without git repo (with MCP enabled by default)
 	err = InitRepository(false, true, false, "", []string{}, false, false, false, false, nil)
-
 	// Should handle error gracefully or return error
 	// The actual behavior depends on implementation
 	if err != nil {
@@ -643,7 +642,7 @@ func TestInitRepositoryWithExistingFiles(t *testing.T) {
 
 	// Create existing .gitattributes with different content
 	existingContent := "*.md linguist-documentation=true\n"
-	if err := os.WriteFile(".gitattributes", []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(".gitattributes", []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to create existing .gitattributes: %v", err)
 	}
 

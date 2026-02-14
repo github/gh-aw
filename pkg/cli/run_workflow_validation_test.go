@@ -134,12 +134,12 @@ jobs:
 			lockPath := getLockFilePath(markdownPath)
 
 			// Create markdown file (content doesn't matter for this test)
-			err := os.WriteFile(markdownPath, []byte("# Test"), 0644)
+			err := os.WriteFile(markdownPath, []byte("# Test"), 0o644)
 			require.NoError(t, err)
 
 			// Create lock file if provided
 			if tt.lockFileYAML != "" {
-				err = os.WriteFile(lockPath, []byte(tt.lockFileYAML), 0644)
+				err = os.WriteFile(lockPath, []byte(tt.lockFileYAML), 0o644)
 				require.NoError(t, err)
 			}
 
@@ -251,12 +251,12 @@ jobs:
 			lockPath := getLockFilePath(markdownPath)
 
 			// Create markdown file (content doesn't matter for this test)
-			err := os.WriteFile(markdownPath, []byte("# Test"), 0644)
+			err := os.WriteFile(markdownPath, []byte("# Test"), 0o644)
 			require.NoError(t, err)
 
 			// Create lock file if provided
 			if tt.lockFileYAML != "" {
-				err = os.WriteFile(lockPath, []byte(tt.lockFileYAML), 0644)
+				err = os.WriteFile(lockPath, []byte(tt.lockFileYAML), 0o644)
 				require.NoError(t, err)
 			}
 
@@ -304,7 +304,7 @@ engine: codex
 
 # Daily Issues Report
 `
-	err := os.WriteFile(markdownPath, []byte(markdownContent), 0644)
+	err := os.WriteFile(markdownPath, []byte(markdownContent), 0o644)
 	require.NoError(t, err)
 
 	// Create lock file with expanded triggers (as the compiler would do)
@@ -323,7 +323,7 @@ jobs:
     steps:
       - run: echo "test"
 `
-	err = os.WriteFile(lockPath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockPath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Test that the workflow is runnable
@@ -339,7 +339,7 @@ func TestValidateWorkflowInputs_WithLockFile(t *testing.T) {
 	lockPath := getLockFilePath(markdownPath)
 
 	// Create markdown file
-	err := os.WriteFile(markdownPath, []byte("# Test"), 0644)
+	err := os.WriteFile(markdownPath, []byte("# Test"), 0o644)
 	require.NoError(t, err)
 
 	// Create lock file with inputs
@@ -361,7 +361,7 @@ jobs:
     steps:
       - run: echo "test"
 `
-	err = os.WriteFile(lockPath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockPath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Test with missing required input

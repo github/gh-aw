@@ -127,7 +127,7 @@ Test mixed plugin configuration
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, "test-plugin-mcp.md")
-			err := os.WriteFile(testFile, []byte(tt.workflow), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflow), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Compile workflow
@@ -201,7 +201,7 @@ Test backward compatibility
 `
 
 	testFile := filepath.Join(tmpDir, "test-backward-compat.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile workflow

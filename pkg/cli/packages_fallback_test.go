@@ -27,7 +27,7 @@ func TestFindWorkflowWithGitHubWorkflowsFallback(t *testing.T) {
 
 	// Create .github/workflows/ directory structure
 	githubWorkflowsDir := filepath.Join(testRepoPath, ".github", "workflows")
-	err = os.MkdirAll(githubWorkflowsDir, 0755)
+	err = os.MkdirAll(githubWorkflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ This workflow tests the fallback path resolution.
 `
 
 	workflowFilePath := filepath.Join(githubWorkflowsDir, "test-fallback-workflow.md")
-	err = os.WriteFile(workflowFilePath, []byte(testWorkflowContent), 0644)
+	err = os.WriteFile(workflowFilePath, []byte(testWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ This workflow tests the fallback path resolution.
 	// Create .commit-sha metadata file
 	commitSHA := "abc123def456"
 	commitSHAPath := filepath.Join(testRepoPath, ".commit-sha")
-	err = os.WriteFile(commitSHAPath, []byte(commitSHA), 0644)
+	err = os.WriteFile(commitSHAPath, []byte(commitSHA), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestFindWorkflowWithoutFallback(t *testing.T) {
 
 	// Create workflows/ directory structure
 	workflowsDir := filepath.Join(testRepoPath, "workflows")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ This workflow tests that the original path is used when it exists.
 `
 
 	workflowFilePath := filepath.Join(workflowsDir, "test-original-workflow.md")
-	err = os.WriteFile(workflowFilePath, []byte(testWorkflowContent), 0644)
+	err = os.WriteFile(workflowFilePath, []byte(testWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestFindWorkflowFallbackFailure(t *testing.T) {
 	os.RemoveAll(filepath.Join(packagesDir, "test-failure-org")) // Clean up any existing test data
 
 	// Create just the repo directory but no workflow files
-	err = os.MkdirAll(testRepoPath, 0755)
+	err = os.MkdirAll(testRepoPath, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestFindWorkflowNonWorkflowsPath(t *testing.T) {
 	os.RemoveAll(filepath.Join(packagesDir, "test-nonworkflows-org")) // Clean up any existing test data
 
 	// Create just the repo directory but no workflow files
-	err = os.MkdirAll(testRepoPath, 0755)
+	err = os.MkdirAll(testRepoPath, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -44,7 +44,7 @@ This is a test workflow.
 	}
 
 	testFile := filepath.Join(originalDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 	defer os.Remove(testFile)

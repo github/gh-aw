@@ -66,7 +66,7 @@ strict: false
 
 			testContent := tt.frontmatter + "\n\n# Test Workflow\n\nTest workflow content."
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -169,7 +169,7 @@ command: /fix
 
 	testContent := frontmatter + "\n\n# Test Workflow\n\nTest workflow content."
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -189,7 +189,7 @@ Test workflow content.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create the markdown file
 			mdFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0644); err != nil {
+			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -277,7 +277,7 @@ Test workflow content.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create the markdown file
 			mdFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0644); err != nil {
+			if err := os.WriteFile(mdFile, []byte(tt.frontmatter), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

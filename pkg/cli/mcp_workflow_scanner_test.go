@@ -14,7 +14,7 @@ func TestScanWorkflowsForMCP(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -81,7 +81,7 @@ safe-outputs:
 
 	for _, tc := range testCases {
 		filePath := filepath.Join(workflowsDir, tc.name)
-		if err := os.WriteFile(filePath, []byte(tc.content), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(tc.content), 0o644); err != nil {
 			t.Fatalf("Failed to write test file %s: %v", tc.name, err)
 		}
 	}
@@ -150,7 +150,7 @@ safe-outputs:
 	t.Run("verbose mode with invalid file", func(t *testing.T) {
 		// Create an invalid workflow file
 		invalidPath := filepath.Join(workflowsDir, "invalid.md")
-		if err := os.WriteFile(invalidPath, []byte("invalid yaml ---"), 0644); err != nil {
+		if err := os.WriteFile(invalidPath, []byte("invalid yaml ---"), 0o644); err != nil {
 			t.Fatalf("Failed to write invalid file: %v", err)
 		}
 

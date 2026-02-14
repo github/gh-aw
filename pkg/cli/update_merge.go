@@ -135,13 +135,13 @@ func MergeWorkflowContent(base, current, new, oldSourceSpec, newRef string, verb
 	currentFile := filepath.Join(tmpDir, "current.md")
 	newFile := filepath.Join(tmpDir, "new.md")
 
-	if err := os.WriteFile(baseFile, []byte(baseNormalized), 0644); err != nil {
+	if err := os.WriteFile(baseFile, []byte(baseNormalized), 0o644); err != nil {
 		return "", false, fmt.Errorf("failed to write base file: %w", err)
 	}
-	if err := os.WriteFile(currentFile, []byte(currentNormalized), 0644); err != nil {
+	if err := os.WriteFile(currentFile, []byte(currentNormalized), 0o644); err != nil {
 		return "", false, fmt.Errorf("failed to write current file: %w", err)
 	}
-	if err := os.WriteFile(newFile, []byte(newNormalized), 0644); err != nil {
+	if err := os.WriteFile(newFile, []byte(newNormalized), 0o644); err != nil {
 		return "", false, fmt.Errorf("failed to write new file: %w", err)
 	}
 

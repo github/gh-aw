@@ -94,7 +94,7 @@ Simple custom workflow with one step.`,
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, "test-custom-workflow.md")
-			if err := os.WriteFile(testFile, []byte(test.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(test.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -155,7 +155,7 @@ engine:
 This workflow uses the custom engine but doesn't define any steps.`
 
 	testFile := filepath.Join(tmpDir, "test-custom-no-steps.md")
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

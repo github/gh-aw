@@ -28,7 +28,7 @@ plugins:
   - github/plugin-two
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0644),
+	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0o644),
 		"Failed to write shared plugins file")
 
 	// Create a workflow file that imports the shared plugins
@@ -44,7 +44,7 @@ imports:
 
 This is a test workflow with imported plugins.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow
@@ -78,7 +78,7 @@ plugins:
   - github/imported-plugin
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0644),
+	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0o644),
 		"Failed to write shared plugins file")
 
 	// Create a workflow file that imports plugins and defines its own
@@ -96,7 +96,7 @@ plugins:
 
 This workflow has both imported and top-level plugins.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow
@@ -131,7 +131,7 @@ plugins:
   - github/plugin-b
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPlugins1Path, []byte(sharedPlugins1Content), 0644),
+	require.NoError(t, os.WriteFile(sharedPlugins1Path, []byte(sharedPlugins1Content), 0o644),
 		"Failed to write first plugins file")
 
 	// Create second shared plugins file
@@ -142,7 +142,7 @@ plugins:
   - github/plugin-c
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPlugins2Path, []byte(sharedPlugins2Content), 0644),
+	require.NoError(t, os.WriteFile(sharedPlugins2Path, []byte(sharedPlugins2Content), 0o644),
 		"Failed to write second plugins file")
 
 	// Create a workflow file that imports both plugin files
@@ -159,7 +159,7 @@ imports:
 
 This workflow imports plugins from multiple files.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow
@@ -196,7 +196,7 @@ plugins:
   - github/plugin-a
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPlugins1Path, []byte(sharedPlugins1Content), 0644),
+	require.NoError(t, os.WriteFile(sharedPlugins1Path, []byte(sharedPlugins1Content), 0o644),
 		"Failed to write first plugins file")
 
 	// Create second shared plugins file with the same shared plugin
@@ -208,7 +208,7 @@ plugins:
   - github/plugin-b
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPlugins2Path, []byte(sharedPlugins2Content), 0644),
+	require.NoError(t, os.WriteFile(sharedPlugins2Path, []byte(sharedPlugins2Content), 0o644),
 		"Failed to write second plugins file")
 
 	// Create a workflow file that imports both files and also defines the duplicate plugin
@@ -228,7 +228,7 @@ plugins:
 
 This workflow has duplicate plugins across imports and top-level.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow
@@ -272,7 +272,7 @@ plugins:
   - github/plugin-one
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0644),
+	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0o644),
 		"Failed to write shared plugins file")
 
 	// Create a workflow file that imports plugins from shared workflow
@@ -288,7 +288,7 @@ imports:
 
 This workflow imports plugins from a shared workflow.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow
@@ -320,7 +320,7 @@ plugins:
   - anthropic/plugin-one
 ---
 `
-	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0644),
+	require.NoError(t, os.WriteFile(sharedPluginsPath, []byte(sharedPluginsContent), 0o644),
 		"Failed to write shared plugins file")
 
 	// Create a workflow file that imports plugins and uses Claude engine
@@ -336,7 +336,7 @@ imports:
 
 This workflow uses Claude engine with imported plugins.
 `
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644),
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644),
 		"Failed to write workflow file")
 
 	// Compile the workflow - should fail because Claude doesn't support plugins

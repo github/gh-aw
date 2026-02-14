@@ -96,10 +96,8 @@ func isRunningAsMCPServer() bool {
 	return os.Getenv("GH_AW_MCP_SERVER") != ""
 }
 
-var (
-	// getLastCheckFilePathFunc allows overriding in tests
-	getLastCheckFilePathFunc = getLastCheckFilePathImpl
-)
+// getLastCheckFilePathFunc allows overriding in tests
+var getLastCheckFilePathFunc = getLastCheckFilePathImpl
 
 // getLastCheckFilePath returns the path to the last check timestamp file
 func getLastCheckFilePath() string {
@@ -117,7 +115,7 @@ func getLastCheckFilePathImpl() string {
 
 	// Create a gh-aw subdirectory in temp
 	ghAwTmpDir := filepath.Join(tmpDir, "gh-aw")
-	if err := os.MkdirAll(ghAwTmpDir, 0755); err != nil {
+	if err := os.MkdirAll(ghAwTmpDir, 0o755); err != nil {
 		updateCheckLog.Printf("Error creating gh-aw temp directory: %v", err)
 		return ""
 	}
@@ -133,7 +131,7 @@ func updateLastCheckTime() {
 	}
 
 	timestamp := time.Now().Format(time.RFC3339)
-	if err := os.WriteFile(lastCheckFile, []byte(timestamp), 0644); err != nil {
+	if err := os.WriteFile(lastCheckFile, []byte(timestamp), 0o644); err != nil {
 		updateCheckLog.Printf("Error writing last check time: %v", err)
 	}
 }

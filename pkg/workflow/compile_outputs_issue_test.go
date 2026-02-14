@@ -38,7 +38,7 @@ This workflow tests the output configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,7 +101,7 @@ This workflow has no output configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-output.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +147,7 @@ This workflow tests the null output configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-null-output-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -233,7 +233,7 @@ This workflow tests the create-issue job generation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +323,7 @@ This workflow tests that copilot assignment is wired in consolidated safe output
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-issue-copilot-assignee.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

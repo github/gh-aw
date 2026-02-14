@@ -17,7 +17,7 @@ func TestFirewallArgsIntegration(t *testing.T) {
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -39,7 +39,7 @@ Test workflow with custom AWF arguments.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-firewall-args.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -92,7 +92,7 @@ Test workflow with custom AWF arguments.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -113,7 +113,7 @@ Test workflow without custom AWF arguments.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-no-custom-args.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -153,7 +153,7 @@ Test workflow without custom AWF arguments.
 		// Create temporary directory for test
 		tmpDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-		err := os.MkdirAll(workflowsDir, 0755)
+		err := os.MkdirAll(workflowsDir, 0o755)
 		if err != nil {
 			t.Fatalf("Failed to create workflows directory: %v", err)
 		}
@@ -183,7 +183,7 @@ Test workflow with SSL bump and allow-urls configuration.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-ssl-bump.md")
-		err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}

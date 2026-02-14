@@ -32,7 +32,7 @@ safe-outputs:
 Create an issue.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -100,7 +100,7 @@ safe-outputs:
 Create outputs.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

@@ -21,7 +21,7 @@ func TestListToolsForMCP(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -58,7 +58,7 @@ mcp-servers:
 This is a test workflow with MCP servers.`
 
 	testWorkflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	err = os.WriteFile(testWorkflowPath, []byte(testWorkflowContent), 0644)
+	err = os.WriteFile(testWorkflowPath, []byte(testWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
@@ -78,7 +78,7 @@ tools:
 This workflow has no GitHub MCP server.`
 
 	otherWorkflowPath := filepath.Join(workflowsDir, "other-workflow.md")
-	err = os.WriteFile(otherWorkflowPath, []byte(otherWorkflowContent), 0644)
+	err = os.WriteFile(otherWorkflowPath, []byte(otherWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create other workflow file: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestFindWorkflowsWithMCPServer(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -185,7 +185,7 @@ tools:
 
 	for filename, content := range workflows {
 		path := filepath.Join(workflowsDir, filename)
-		err = os.WriteFile(path, []byte(content), 0644)
+		err = os.WriteFile(path, []byte(content), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create %s: %v", filename, err)
 		}
@@ -233,8 +233,11 @@ func TestDisplayToolsList(t *testing.T) {
 	// Create mock data using parser types
 	// Create a mock MCPServerInfo with sample tools
 	mockInfo := &parser.MCPServerInfo{
-		Config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-			Command: "test"}, Name: "test-server",
+		Config: parser.MCPServerConfig{
+			BaseMCPServerConfig: types.BaseMCPServerConfig{
+				Type:    "stdio",
+				Command: "test",
+			}, Name: "test-server",
 
 			Allowed: []string{"tool1", "tool3"}, // Only tool1 and tool3 are allowed
 		},
@@ -278,8 +281,11 @@ func TestDisplayToolsList(t *testing.T) {
 
 	t.Run("no_allowed_tools_means_all_allowed", func(t *testing.T) {
 		noAllowedInfo := &parser.MCPServerInfo{
-			Config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Command: "test"}, Name: "no-allowed-server",
+			Config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type:    "stdio",
+					Command: "test",
+				}, Name: "no-allowed-server",
 
 				Allowed: []string{}, // Empty allowed list means all tools allowed
 			},
@@ -296,8 +302,11 @@ func TestDisplayToolsList(t *testing.T) {
 
 	t.Run("workflow_config_with_wildcard", func(t *testing.T) {
 		wildcardInfo := &parser.MCPServerInfo{
-			Config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Command: "test"}, Name: "wildcard-server",
+			Config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type:    "stdio",
+					Command: "test",
+				}, Name: "wildcard-server",
 
 				Allowed: []string{"*"}, // Wildcard in workflow config
 			},

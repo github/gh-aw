@@ -267,7 +267,6 @@ Examples:
 func checkAndLogGHVersion() {
 	cmd := workflow.ExecGH("version")
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		mcpLog.Print("WARNING: gh CLI not found in PATH")
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage("gh CLI not found in PATH - some MCP server operations may fail"))
@@ -942,7 +941,6 @@ Returns JSON with the following structure:
 		// Execute the CLI command
 		cmd := execCmd(ctx, cmdArgs...)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,
@@ -1024,7 +1022,6 @@ Returns formatted text output showing:
 		// Execute the CLI command
 		cmd := execCmd(ctx, cmdArgs...)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,
@@ -1091,7 +1088,6 @@ Returns formatted text output showing:
 		// Execute the CLI command
 		cmd := execCmd(ctx, cmdArgs...)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,
@@ -1164,7 +1160,6 @@ Returns formatted text output showing:
 		// Execute the CLI command
 		cmd := execCmd(ctx, cmdArgs...)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,
@@ -1244,7 +1239,6 @@ Returns formatted text output showing:
 		// Execute the CLI command
 		cmd := execCmd(ctx, cmdArgs...)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			return nil, nil, &jsonrpc.Error{
 				Code:    jsonrpc.CodeInternalError,

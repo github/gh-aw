@@ -356,7 +356,6 @@ func resolveRefToSHA(owner, repo, ref string) (string, error) {
 	// This works for branches, tags, and short SHAs
 	// Using go-gh to properly handle enterprise GitHub instances via GH_HOST
 	stdout, stderr, err := gh.Exec("api", fmt.Sprintf("/repos/%s/%s/commits/%s", owner, repo, ref), "--jq", ".sha")
-
 	if err != nil {
 		outputStr := stderr.String()
 		if gitutil.IsAuthError(outputStr) {

@@ -183,7 +183,7 @@ Test workflow with ecosystem identifiers.
 
 			// Create a test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -315,7 +315,7 @@ Test that empty allowed-domains falls back to network config.
 
 			// Create a test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

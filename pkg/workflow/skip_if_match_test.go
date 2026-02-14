@@ -32,7 +32,7 @@ engine: claude
 This workflow has a skip-if-match configuration.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-if-match-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -99,7 +99,7 @@ engine: claude
 This workflow has both stop-after and skip-if-match.
 `
 		workflowFile := filepath.Join(tmpDir, "multiple-checks-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -152,7 +152,7 @@ engine: claude
 This workflow has skip-if-match but no role restrictions.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-no-roles-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -201,7 +201,7 @@ engine: claude
 This workflow uses object format with max parameter.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-object-format-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -253,7 +253,7 @@ engine: claude
 This workflow uses object format but omits max (defaults to 1).
 `
 		workflowFile := filepath.Join(tmpDir, "skip-object-no-max-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

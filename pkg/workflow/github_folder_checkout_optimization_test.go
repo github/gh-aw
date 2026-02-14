@@ -102,11 +102,11 @@ This workflow uses runtime imports: {{runtime-import:shared/example.md}}
 
 			// Create workflows directory
 			workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-			require.NoError(t, os.MkdirAll(workflowsDir, 0755), "Failed to create workflows directory")
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o755), "Failed to create workflows directory")
 
 			// Write test workflow file
 			workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-			require.NoError(t, os.WriteFile(workflowPath, []byte(tt.workflowContent), 0644), "Failed to write workflow file")
+			require.NoError(t, os.WriteFile(workflowPath, []byte(tt.workflowContent), 0o644), "Failed to write workflow file")
 
 			// Compile workflow
 			compiler := NewCompiler()

@@ -60,7 +60,7 @@ rulesConfig:
 `
 
 	// Write the config file
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write .poutine.yml: %w", err)
 	}
 

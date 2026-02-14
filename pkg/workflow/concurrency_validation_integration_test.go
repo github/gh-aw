@@ -225,7 +225,7 @@ tools:
 			// Create markdown file
 			markdown := tt.frontmatter + "\n" + tt.content
 			mdPath := filepath.Join(tmpDir, tt.name+".md")
-			err := os.WriteFile(mdPath, []byte(markdown), 0644)
+			err := os.WriteFile(mdPath, []byte(markdown), 0o644)
 			require.NoError(t, err, "Failed to write test markdown file")
 
 			// Try to compile
@@ -324,7 +324,7 @@ tools:
 			// Create markdown file
 			markdown := pattern.frontmatter + "\nTest workflow content."
 			mdPath := filepath.Join(tmpDir, pattern.name+".md")
-			err := os.WriteFile(mdPath, []byte(markdown), 0644)
+			err := os.WriteFile(mdPath, []byte(markdown), 0o644)
 			require.NoError(t, err, "Failed to write test markdown file")
 
 			// Should compile successfully

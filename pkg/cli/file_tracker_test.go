@@ -44,14 +44,14 @@ func TestFileTracker_CreationAndTracking(t *testing.T) {
 
 	// Create first file and track it
 	content1 := "# Test Workflow 1"
-	if err := os.WriteFile(testFile1, []byte(content1), 0644); err != nil {
+	if err := os.WriteFile(testFile1, []byte(content1), 0o644); err != nil {
 		t.Fatalf("Failed to write test file 1: %v", err)
 	}
 	tracker.TrackCreated(testFile1)
 
 	// Create second file and track it
 	content2 := "name: test-workflow"
-	if err := os.WriteFile(testFile2, []byte(content2), 0644); err != nil {
+	if err := os.WriteFile(testFile2, []byte(content2), 0o644); err != nil {
 		t.Fatalf("Failed to write test file 2: %v", err)
 	}
 	tracker.TrackCreated(testFile2)
@@ -113,7 +113,7 @@ func TestFileTracker_ModifiedFiles(t *testing.T) {
 	// Create existing file
 	testFile := filepath.Join(tempDir, "existing.md")
 	originalContent := "# Original Content"
-	if err := os.WriteFile(testFile, []byte(originalContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(originalContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -122,7 +122,7 @@ func TestFileTracker_ModifiedFiles(t *testing.T) {
 
 	// Now modify the file
 	modifiedContent := "# Modified Content"
-	if err := os.WriteFile(testFile, []byte(modifiedContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(modifiedContent), 0o644); err != nil {
 		t.Fatalf("Failed to modify test file: %v", err)
 	}
 
@@ -218,21 +218,21 @@ func TestFileTracker_RollbackAllFiles(t *testing.T) {
 	// Create an existing file
 	existingFile := filepath.Join(tempDir, "existing.md")
 	originalContent := "# Original Content"
-	if err := os.WriteFile(existingFile, []byte(originalContent), 0644); err != nil {
+	if err := os.WriteFile(existingFile, []byte(originalContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing file: %v", err)
 	}
 
 	// Track modification before modifying
 	tracker.TrackModified(existingFile)
 	modifiedContent := "# Modified Content"
-	if err := os.WriteFile(existingFile, []byte(modifiedContent), 0644); err != nil {
+	if err := os.WriteFile(existingFile, []byte(modifiedContent), 0o644); err != nil {
 		t.Fatalf("Failed to modify existing file: %v", err)
 	}
 
 	// Create a new file
 	newFile := filepath.Join(tempDir, "new.md")
 	tracker.TrackCreated(newFile)
-	if err := os.WriteFile(newFile, []byte("# New Content"), 0644); err != nil {
+	if err := os.WriteFile(newFile, []byte("# New Content"), 0o644); err != nil {
 		t.Fatalf("Failed to write new file: %v", err)
 	}
 
@@ -295,7 +295,7 @@ This uses reaction.
 `
 
 	workflowFileWithReaction := filepath.Join(tempDir, "test-workflow-with-reaction.md")
-	if err := os.WriteFile(workflowFileWithReaction, []byte(workflowWithReaction), 0644); err != nil {
+	if err := os.WriteFile(workflowFileWithReaction, []byte(workflowWithReaction), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 
@@ -343,7 +343,7 @@ This does NOT use ai-reaction.
 `
 
 	workflowFileWithoutReaction := filepath.Join(tempDir, "test-workflow-without-reaction.md")
-	if err := os.WriteFile(workflowFileWithoutReaction, []byte(workflowWithoutReaction), 0644); err != nil {
+	if err := os.WriteFile(workflowFileWithoutReaction, []byte(workflowWithoutReaction), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 

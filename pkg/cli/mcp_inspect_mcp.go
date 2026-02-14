@@ -375,7 +375,6 @@ func displayServerCapabilities(info *parser.MCPServerInfo, toolFilter string) {
 			// Add helpful hint about how to allow tools in workflow frontmatter
 			displayToolAllowanceHint(info)
 		}
-
 	} else {
 		if toolFilter != "" {
 			fmt.Fprintf(os.Stderr, "\n%s\n", console.FormatWarningMessage(fmt.Sprintf("Tool '%s' not found", toolFilter)))

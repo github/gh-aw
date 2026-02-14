@@ -36,7 +36,7 @@ This is a simple workflow that should not need a task job.
 Do some simple work.`
 
 		workflowFile := filepath.Join(tmpDir, "safe-workflow.md")
-		err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -92,7 +92,7 @@ This workflow uses push events and should generate a task job for permission che
 Do some work.`
 
 		workflowFile := filepath.Join(tmpDir, "unsafe-workflow.md")
-		err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -139,7 +139,7 @@ This workflow has an if condition and should generate a task job.
 Do conditional work.`
 
 		workflowFile := filepath.Join(tmpDir, "conditional-workflow.md")
-		err = os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+		err = os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}

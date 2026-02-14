@@ -13,7 +13,7 @@ func TestIsActivationJobNeeded(t *testing.T) {
 		}
 		// Activation job is always needed now to perform timestamp check
 		if !func() bool {
-			var _ = data
+			_ = data
 			return compiler.isActivationJobNeeded()
 		}() {
 			t.Errorf("Expected isActivationJobNeeded to be true - activation job is always needed for timestamp check")
@@ -24,7 +24,7 @@ func TestIsActivationJobNeeded(t *testing.T) {
 		data := &WorkflowData{If: "if: github.ref == 'refs/heads/main'"}
 		// Pass false for needsPermissionCheck, but should still return true due to If condition
 		if !func() bool {
-			var _ = data
+			_ = data
 			return compiler.isActivationJobNeeded()
 		}() {
 			t.Errorf("Expected isActivationJobNeeded to be true when If condition is specified")
@@ -35,7 +35,7 @@ func TestIsActivationJobNeeded(t *testing.T) {
 		data := &WorkflowData{} // No explicit Roles field, permission checks are consolidated in activation job
 		// Pass true for needsPermissionCheck to simulate permission checks being needed
 		if !func() bool {
-			var _ = data
+			_ = data
 			return compiler.isActivationJobNeeded()
 		}() {
 			t.Errorf("Expected isActivationJobNeeded to be true - permission checks are now consolidated in activation job")
@@ -46,7 +46,7 @@ func TestIsActivationJobNeeded(t *testing.T) {
 		data := &WorkflowData{} // No other conditions that would require activation job
 		// Activation job is always needed now to perform timestamp check
 		if !func() bool {
-			var _ = data
+			_ = data
 			return compiler.isActivationJobNeeded()
 		}() {
 			t.Errorf("Expected isActivationJobNeeded to be true - activation job is always needed for timestamp check")

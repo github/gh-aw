@@ -15,14 +15,14 @@ func TestReadWorkflowFileWithRelativePath(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
 	// Create a test workflow file
 	testFile := filepath.Join(workflowsDir, "test-workflow.md")
 	testContent := []byte("---\non: push\n---\n# Test Workflow")
-	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+	if err := os.WriteFile(testFile, testContent, 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -49,14 +49,14 @@ func TestReadWorkflowFileWithAbsolutePath(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
 	// Create a test workflow file
 	testFile := filepath.Join(workflowsDir, "test-workflow.md")
 	testContent := []byte("---\non: push\n---\n# Test Workflow")
-	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+	if err := os.WriteFile(testFile, testContent, 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -82,19 +82,19 @@ func TestReadWorkflowFilePathSeparators(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
 	// Create a test workflow file in a subdirectory
 	subDir := filepath.Join(workflowsDir, "subfolder")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatalf("Failed to create subfolder: %v", err)
 	}
 
 	testFile := filepath.Join(subDir, "test-workflow.md")
 	testContent := []byte("---\non: push\n---\n# Test Workflow")
-	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+	if err := os.WriteFile(testFile, testContent, 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -121,7 +121,7 @@ func TestReadWorkflowFileNonExistent(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -139,7 +139,7 @@ func TestWorkflowResolutionWindowsCompatibility(t *testing.T) {
 	// Create a temporary directory structure that mimics the user's setup
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -156,12 +156,12 @@ permissions:
 # Update Documentation
 Test workflow for Windows path handling
 `)
-	if err := os.WriteFile(mdFile, mdContent, 0644); err != nil {
+	if err := os.WriteFile(mdFile, mdContent, 0o644); err != nil {
 		t.Fatalf("Failed to write markdown file: %v", err)
 	}
 
 	lockContent := []byte("name: update-docs\non:\n  workflow_dispatch:\n")
-	if err := os.WriteFile(lockFile, lockContent, 0644); err != nil {
+	if err := os.WriteFile(lockFile, lockContent, 0o644); err != nil {
 		t.Fatalf("Failed to write lock file: %v", err)
 	}
 
@@ -200,12 +200,12 @@ Test workflow for Windows path handling
 
 	// Test 3: Test with subdirectories (edge case)
 	subDir := filepath.Join(workflowsDir, "subfolder")
-	if err := os.MkdirAll(subDir, 0755); err != nil {
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
 
 	subFile := filepath.Join(subDir, "nested-workflow.md")
-	if err := os.WriteFile(subFile, mdContent, 0644); err != nil {
+	if err := os.WriteFile(subFile, mdContent, 0o644); err != nil {
 		t.Fatalf("Failed to write nested workflow file: %v", err)
 	}
 

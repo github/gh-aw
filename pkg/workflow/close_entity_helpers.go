@@ -179,9 +179,11 @@ var closeEntityRegistry = []closeEntityDefinition{
 }
 
 // Type aliases for backward compatibility
-type CloseIssuesConfig = CloseEntityConfig
-type ClosePullRequestsConfig = CloseEntityConfig
-type CloseDiscussionsConfig = CloseEntityConfig
+type (
+	CloseIssuesConfig       = CloseEntityConfig
+	ClosePullRequestsConfig = CloseEntityConfig
+	CloseDiscussionsConfig  = CloseEntityConfig
+)
 
 // parseCloseIssuesConfig handles close-issue configuration
 func (c *Compiler) parseCloseIssuesConfig(outputMap map[string]any) *CloseIssuesConfig {

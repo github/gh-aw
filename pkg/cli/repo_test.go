@@ -45,7 +45,6 @@ func TestGetCurrentRepoSlug(t *testing.T) {
 
 // TestClearCurrentRepoSlugCache tests that clearing the cache allows a fresh call
 func TestClearCurrentRepoSlugCache(t *testing.T) {
-
 	// Clear the cache
 	ClearCurrentRepoSlugCache()
 
@@ -80,7 +79,6 @@ func TestClearCurrentRepoSlugCache(t *testing.T) {
 func TestGetCurrentRepoSlugFormat(t *testing.T) {
 	// This test will only pass if we're in a GitHub repository
 	result, err := GetCurrentRepoSlug()
-
 	if err != nil {
 		t.Logf("GetCurrentRepoSlug returned error (expected if not in a git repo): %v", err)
 		// Skip further validation if we're not in a repo

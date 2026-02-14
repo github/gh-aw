@@ -27,12 +27,12 @@ timeout_minutes: 30
 	tempFile := "/tmp/gh-aw/gh-aw/test_precise_location.md"
 
 	// Ensure the directory exists
-	err := os.MkdirAll(filepath.Dir(tempFile), 0755)
+	err := os.MkdirAll(filepath.Dir(tempFile), 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
-	err = os.WriteFile(tempFile, []byte(testContent), 0644)
+	err = os.WriteFile(tempFile, []byte(testContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}

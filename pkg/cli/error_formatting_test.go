@@ -27,7 +27,7 @@ func TestCompileErrorFormatting(t *testing.T) {
 name: test
 engine: invalid_engine
 This is not valid frontmatter
-`), 0644)
+`), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Capture stderr

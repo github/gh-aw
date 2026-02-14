@@ -1026,6 +1026,7 @@ func TestResolveRelativeDate(t *testing.T) {
 		})
 	}
 }
+
 func TestParseRelativeTimeSpec(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1184,6 +1185,7 @@ func TestParseRelativeTimeSpec(t *testing.T) {
 		})
 	}
 }
+
 func TestParseExpiresFromConfig(t *testing.T) {
 	tests := []struct {
 		name     string

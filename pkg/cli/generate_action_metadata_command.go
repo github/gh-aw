@@ -80,13 +80,13 @@ func GenerateActionMetadataCommand() error {
 
 		// Create action directory
 		actionDir := filepath.Join(actionsDir, metadata.ActionName)
-		if err := os.MkdirAll(actionDir, 0755); err != nil {
+		if err := os.MkdirAll(actionDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", actionDir, err)
 		}
 
 		// Create src directory
 		srcDir := filepath.Join(actionDir, "src")
-		if err := os.MkdirAll(srcDir, 0755); err != nil {
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", srcDir, err)
 		}
 
@@ -106,7 +106,7 @@ func GenerateActionMetadataCommand() error {
 
 		// Copy source file with owner-only read/write permissions (0600) for security best practices
 		srcPath := filepath.Join(srcDir, "index.js")
-		if err := os.WriteFile(srcPath, []byte(content), 0600); err != nil {
+		if err := os.WriteFile(srcPath, []byte(content), 0o600); err != nil {
 			return fmt.Errorf("failed to write source file: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("  ✓ Copied source to src/index.js"))
@@ -323,7 +323,7 @@ func generateActionYml(actionDir string, metadata *ActionMetadata) error {
 
 	// Write to file with owner-only read/write permissions (0600) for security best practices
 	ymlPath := filepath.Join(actionDir, "action.yml")
-	if err := os.WriteFile(ymlPath, []byte(content.String()), 0600); err != nil {
+	if err := os.WriteFile(ymlPath, []byte(content.String()), 0o600); err != nil {
 		return fmt.Errorf("failed to write action.yml: %w", err)
 	}
 
@@ -409,7 +409,7 @@ func generateReadme(actionDir string, metadata *ActionMetadata) error {
 
 	// Write to file with owner-only read/write permissions (0600) for security best practices
 	readmePath := filepath.Join(actionDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte(content.String()), 0600); err != nil {
+	if err := os.WriteFile(readmePath, []byte(content.String()), 0o600); err != nil {
 		return fmt.Errorf("failed to write README.md: %w", err)
 	}
 

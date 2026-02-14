@@ -55,7 +55,7 @@ jobs:
 			// Create a temporary test file
 			tmpDir := t.TempDir()
 			testFile := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644)
 			require.NoError(t, err, "Failed to create test file")
 
 			// Create compiler and try to compile
@@ -106,7 +106,7 @@ jobs:
 
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(testFile, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompilerWithVersion("1.0.0")
@@ -179,7 +179,7 @@ jobs:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			testFile := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644)
 			require.NoError(t, err)
 
 			compiler := NewCompilerWithVersion("1.0.0")

@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
 	"time"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -121,7 +120,7 @@ on:
 
 			// Write the test workflow
 			content := tt.frontmatter + "\n\n" + tt.markdown
-			err := os.WriteFile(mdFile, []byte(content), 0644)
+			err := os.WriteFile(mdFile, []byte(content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
@@ -254,7 +253,7 @@ on:
 
 This is a test workflow with invalid stop-after.`, tt.stopTime)
 
-			err := os.WriteFile(mdFile, []byte(content), 0644)
+			err := os.WriteFile(mdFile, []byte(content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

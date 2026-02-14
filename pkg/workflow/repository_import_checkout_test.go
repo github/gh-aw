@@ -35,7 +35,7 @@ imports:
 	// Create workflow file
 	workflowPath := filepath.Join(tmpDir, "test.md")
 	content := frontmatter + "\n\n" + markdown
-	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0644), "Failed to write workflow file")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o644), "Failed to write workflow file")
 
 	// Compile the workflow
 	compiler := NewCompiler()
@@ -100,7 +100,7 @@ imports:
 	// Create workflow file
 	workflowPath := filepath.Join(tmpDir, "test.md")
 	content := frontmatter + "\n\n" + markdown
-	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0644), "Failed to write workflow file")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o644), "Failed to write workflow file")
 
 	// Compile the workflow
 	compiler := NewCompiler()
@@ -153,7 +153,7 @@ imports:
 	// Create workflow file
 	workflowPath := filepath.Join(tmpDir, "test.md")
 	content := frontmatter + "\n\n" + markdown
-	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0644), "Failed to write workflow file")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0o644), "Failed to write workflow file")
 
 	// Compile the workflow
 	compiler := NewCompiler()

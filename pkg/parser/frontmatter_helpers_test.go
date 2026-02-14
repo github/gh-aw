@@ -127,7 +127,7 @@ tools: {}
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tempDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.initialContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.initialContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
 

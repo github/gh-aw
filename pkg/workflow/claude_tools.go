@@ -382,7 +382,7 @@ func (e *ClaudeEngine) computeAllowedClaudeToolsString(tools map[string]any, saf
 			allowedTools = append(allowedTools, "Write")
 			// Ideally we would only give permission to the exact file, but that doesn't seem
 			// to be working with Claude. See https://github.com/github/gh-aw/issues/244#issuecomment-3240319103
-			//allowedTools = append(allowedTools, "Write(${{ env.GH_AW_SAFE_OUTPUTS }})")
+			// allowedTools = append(allowedTools, "Write(${{ env.GH_AW_SAFE_OUTPUTS }})")
 		}
 	}
 

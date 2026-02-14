@@ -31,7 +31,7 @@ engine: codex
 This is a test workflow to verify temp folder instructions are included.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 

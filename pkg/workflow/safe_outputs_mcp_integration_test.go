@@ -30,7 +30,7 @@ Test safe outputs workflow with MCP server integration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-safe-outputs.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -95,7 +95,7 @@ Test workflow without safe outputs.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-safe-outputs.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -148,7 +148,7 @@ Test safe outputs workflow with Codex engine.
 `
 
 	testFile := filepath.Join(tmpDir, "test-safe-outputs-codex.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

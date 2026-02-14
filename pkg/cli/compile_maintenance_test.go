@@ -17,7 +17,7 @@ func TestCompileSpecificFiles_GeneratesMaintenanceWorkflow(t *testing.T) {
 	// Create temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github/workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -50,7 +50,7 @@ safe-outputs:
 Test workflow that creates issues with expiration.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-expires.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestCompileSpecificFiles_DeletesMaintenanceWorkflow(t *testing.T) {
 	// Create temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github/workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -127,7 +127,7 @@ on:
   schedule:
     - cron: '37 0 * * *'
 `
-	if err := os.WriteFile(maintenancePath, []byte(maintenanceContent), 0644); err != nil {
+	if err := os.WriteFile(maintenancePath, []byte(maintenanceContent), 0o644); err != nil {
 		t.Fatalf("Failed to create maintenance workflow: %v", err)
 	}
 
@@ -145,7 +145,7 @@ safe-outputs:
 Test workflow that creates issues without expiration.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-no-expires.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -183,7 +183,7 @@ func TestCompileWithCustomDir_SkipsMaintenanceWorkflow(t *testing.T) {
 	// Create temporary directory structure
 	tempDir := testutil.TempDir(t, "test-*")
 	customDir := filepath.Join(tempDir, "custom/workflows")
-	if err := os.MkdirAll(customDir, 0755); err != nil {
+	if err := os.MkdirAll(customDir, 0o755); err != nil {
 		t.Fatalf("Failed to create custom workflows directory: %v", err)
 	}
 
@@ -216,7 +216,7 @@ safe-outputs:
 Test workflow that creates issues with expiration.
 `
 	workflowPath := filepath.Join(customDir, "test-expires.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

@@ -31,7 +31,7 @@ Test content
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -65,7 +65,7 @@ on: push
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -94,7 +94,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Create compiler with engine override
 	compiler := NewCompiler(WithEngineOverride("claude"))
@@ -124,7 +124,7 @@ engine: invalid-engine-name
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -189,7 +189,7 @@ strict: false
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := tt.frontmatter + "\n\n# Test Workflow\n"
 			testFile := filepath.Join(tmpDir, "strict-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			var compiler *Compiler
 			if tt.cliStrict {
@@ -236,7 +236,7 @@ network:
 # Imported Workflow
 `
 	importFile := filepath.Join(tmpDir, "imported.md")
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Main workflow imports the file
 	testContent := `---
@@ -253,7 +253,7 @@ network:
 `
 
 	testFile := filepath.Join(tmpDir, "main.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -283,7 +283,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -317,7 +317,7 @@ sandbox:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -345,7 +345,7 @@ engine: claude
 # Imported
 `
 	importFile := filepath.Join(tmpDir, "imported.md")
-	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0644))
+	require.NoError(t, os.WriteFile(importFile, []byte(importContent), 0o644))
 
 	// Main workflow with different engine
 	testContent := `---
@@ -359,7 +359,7 @@ imports:
 `
 
 	testFile := filepath.Join(tmpDir, "main.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -391,7 +391,7 @@ network:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -423,7 +423,7 @@ imports:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -453,7 +453,7 @@ permissions:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	content := []byte(testContent)
@@ -479,7 +479,7 @@ engine: custom
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler(WithVerbose(true))
 	content := []byte(testContent)

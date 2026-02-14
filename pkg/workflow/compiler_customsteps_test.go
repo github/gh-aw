@@ -78,7 +78,7 @@ strict: false
 `, tt.stepsYAML, tt.description)
 
 			testFile := filepath.Join(tmpDir, fmt.Sprintf("test-%s.md", tt.name))
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 
@@ -188,7 +188,7 @@ strict: false
 `, tt.stepsYAML, tt.description)
 
 			testFile := filepath.Join(tmpDir, fmt.Sprintf("test-%s.md", tt.name))
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 

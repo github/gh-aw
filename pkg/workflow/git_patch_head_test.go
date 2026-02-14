@@ -40,7 +40,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 
 	// Create an initial commit (this will be our GITHUB_SHA)
 	testFile1 := filepath.Join(tmpDir, "initial.txt")
-	if err := os.WriteFile(testFile1, []byte("initial content\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile1, []byte("initial content\n"), 0o644); err != nil {
 		t.Fatalf("Failed to write initial file: %v", err)
 	}
 
@@ -68,7 +68,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 	// Now simulate the LLM making commits directly to HEAD
 	// Commit 1: Add a new file
 	testFile2 := filepath.Join(tmpDir, "new-feature.txt")
-	if err := os.WriteFile(testFile2, []byte("new feature content\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile2, []byte("new feature content\n"), 0o644); err != nil {
 		t.Fatalf("Failed to write new file: %v", err)
 	}
 
@@ -85,7 +85,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 	}
 
 	// Commit 2: Modify existing file
-	if err := os.WriteFile(testFile1, []byte("initial content\nupdated by LLM\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile1, []byte("initial content\nupdated by LLM\n"), 0o644); err != nil {
 		t.Fatalf("Failed to update initial file: %v", err)
 	}
 
@@ -106,7 +106,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 	patchFile := "/tmp/gh-aw/aw.patch"
 
 	// Ensure the /tmp/gh-aw directory exists
-	if err := os.MkdirAll("/tmp/gh-aw", 0755); err != nil {
+	if err := os.MkdirAll("/tmp/gh-aw", 0o755); err != nil {
 		t.Fatalf("Failed to create /tmp/gh-aw directory: %v", err)
 	}
 
@@ -115,7 +115,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 
 	// Create a minimal safe-outputs file (empty - no branch name)
 	safeOutputsFile := filepath.Join(tmpDir, "safe-outputs.jsonl")
-	if err := os.WriteFile(safeOutputsFile, []byte(""), 0644); err != nil {
+	if err := os.WriteFile(safeOutputsFile, []byte(""), 0o644); err != nil {
 		t.Fatalf("Failed to write safe-outputs file: %v", err)
 	}
 
@@ -126,7 +126,7 @@ func TestGitPatchFromHEADCommits(t *testing.T) {
 		t.Fatalf("Failed to read script file: %v", err)
 	}
 	scriptFile := filepath.Join(tmpDir, "generate_patch.sh")
-	if err := os.WriteFile(scriptFile, scriptContent, 0755); err != nil {
+	if err := os.WriteFile(scriptFile, scriptContent, 0o755); err != nil {
 		t.Fatalf("Failed to write script file: %v", err)
 	}
 
@@ -233,7 +233,7 @@ func TestGitPatchPrefersBranchOverHEAD(t *testing.T) {
 
 	// Create initial commit
 	testFile := filepath.Join(tmpDir, "file.txt")
-	if err := os.WriteFile(testFile, []byte("content\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("content\n"), 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
 
@@ -266,7 +266,7 @@ func TestGitPatchPrefersBranchOverHEAD(t *testing.T) {
 	}
 
 	// Make a commit on the branch
-	if err := os.WriteFile(testFile, []byte("content\nupdated\n"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("content\nupdated\n"), 0o644); err != nil {
 		t.Fatalf("Failed to update file: %v", err)
 	}
 
@@ -285,7 +285,7 @@ func TestGitPatchPrefersBranchOverHEAD(t *testing.T) {
 	// Create safe-outputs file with branch name
 	safeOutputsFile := filepath.Join(tmpDir, "safe-outputs.jsonl")
 	safeOutputsContent := "{\"type\":\"create_pull_request\",\"branch\":\"feature-branch\",\"title\":\"Test\",\"body\":\"Test\"}\n"
-	if err := os.WriteFile(safeOutputsFile, []byte(safeOutputsContent), 0644); err != nil {
+	if err := os.WriteFile(safeOutputsFile, []byte(safeOutputsContent), 0o644); err != nil {
 		t.Fatalf("Failed to write safe-outputs: %v", err)
 	}
 
@@ -296,13 +296,13 @@ func TestGitPatchPrefersBranchOverHEAD(t *testing.T) {
 		t.Fatalf("Failed to read script file: %v", err)
 	}
 	scriptFile := filepath.Join(tmpDir, "generate_patch.sh")
-	if err := os.WriteFile(scriptFile, scriptContent, 0755); err != nil {
+	if err := os.WriteFile(scriptFile, scriptContent, 0o755); err != nil {
 		t.Fatalf("Failed to write script: %v", err)
 	}
 
 	// Ensure /tmp/gh-aw exists and is clean
 	patchFile := "/tmp/gh-aw/aw.patch"
-	if err := os.MkdirAll("/tmp/gh-aw", 0755); err != nil {
+	if err := os.MkdirAll("/tmp/gh-aw", 0o755); err != nil {
 		t.Fatalf("Failed to create /tmp/gh-aw: %v", err)
 	}
 	os.Remove(patchFile)
@@ -355,7 +355,7 @@ func TestGitPatchNoCommits(t *testing.T) {
 
 	// Create and commit a file
 	testFile := filepath.Join(tmpDir, "file.txt")
-	os.WriteFile(testFile, []byte("content\n"), 0644)
+	os.WriteFile(testFile, []byte("content\n"), 0o644)
 
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = tmpDir
@@ -373,17 +373,17 @@ func TestGitPatchNoCommits(t *testing.T) {
 
 	// Create empty safe-outputs
 	safeOutputsFile := filepath.Join(tmpDir, "safe-outputs.jsonl")
-	os.WriteFile(safeOutputsFile, []byte(""), 0644)
+	os.WriteFile(safeOutputsFile, []byte(""), 0o644)
 
 	// Run script with GITHUB_SHA = current HEAD (no new commits) from actions/setup/sh
 	scriptPath := filepath.Join("..", "..", "actions", "setup", "sh", "generate_git_patch.sh")
 	scriptContent, _ := os.ReadFile(scriptPath)
 	scriptFile := filepath.Join(tmpDir, "generate_patch.sh")
-	os.WriteFile(scriptFile, scriptContent, 0755)
+	os.WriteFile(scriptFile, scriptContent, 0o755)
 
 	// Ensure /tmp/gh-aw exists and is clean
 	patchFile := "/tmp/gh-aw/aw.patch"
-	os.MkdirAll("/tmp/gh-aw", 0755)
+	os.MkdirAll("/tmp/gh-aw", 0o755)
 	os.Remove(patchFile)
 
 	cmd = exec.Command("bash", scriptFile)

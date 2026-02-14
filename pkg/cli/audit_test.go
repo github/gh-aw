@@ -511,7 +511,7 @@ func TestGenerateAuditReportArtifacts(t *testing.T) {
 	}
 
 	for _, artifact := range artifacts {
-		if err := os.WriteFile(filepath.Join(tmpDir, artifact), []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(tmpDir, artifact), []byte("test"), 0o644); err != nil {
 			t.Fatalf("Failed to create test artifact %s: %v", artifact, err)
 		}
 	}
@@ -845,14 +845,14 @@ func TestAuditCachingBehavior(t *testing.T) {
 	// Create a temporary directory for test artifacts
 	tempDir := testutil.TempDir(t, "test-*")
 	runOutputDir := filepath.Join(tempDir, "run-12345")
-	if err := os.MkdirAll(runOutputDir, 0755); err != nil {
+	if err := os.MkdirAll(runOutputDir, 0o755); err != nil {
 		t.Fatalf("Failed to create run directory: %v", err)
 	}
 
 	// Create minimal test artifacts
 	awInfoPath := filepath.Join(runOutputDir, "aw_info.json")
 	awInfoContent := `{"engine_id": "copilot", "workflow_name": "test-workflow"}`
-	if err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0644); err != nil {
+	if err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644); err != nil {
 		t.Fatalf("Failed to create mock aw_info.json: %v", err)
 	}
 

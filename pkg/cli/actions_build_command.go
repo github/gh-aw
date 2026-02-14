@@ -271,7 +271,7 @@ func buildAction(actionsDir, actionName string) error {
 	outputContent := filesRegex.ReplaceAllString(string(sourceContent), fmt.Sprintf("const FILES = %s;", strings.TrimSpace(indentedJSON)))
 
 	// Write output file with restrictive permissions (0600 for security)
-	if err := os.WriteFile(outputPath, []byte(outputContent), 0600); err != nil {
+	if err := os.WriteFile(outputPath, []byte(outputContent), 0o600); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 

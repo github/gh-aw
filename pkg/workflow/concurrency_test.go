@@ -118,7 +118,7 @@ This is a test workflow for concurrency behavior.
 `
 
 			testFile := filepath.Join(tmpDir, tt.filename)
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

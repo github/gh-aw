@@ -23,7 +23,7 @@ func TestListWorkflowsWithMetadata(t *testing.T) {
 	// Create a mock package structure
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -86,7 +86,7 @@ This workflow generates a weekly summary.
 
 	for _, wf := range testWorkflows {
 		wfPath := filepath.Join(workflowsDir, wf.filename)
-		if err := os.WriteFile(wfPath, []byte(wf.content), 0644); err != nil {
+		if err := os.WriteFile(wfPath, []byte(wf.content), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", wf.filename, err)
 		}
 	}
@@ -137,7 +137,7 @@ func TestHandleRepoOnlySpecTableDisplay(t *testing.T) {
 	// Create a mock package structure
 	packagePath := filepath.Join(tempDir, ".aw", "packages", "test-owner", "test-repo")
 	workflowsDir := filepath.Join(packagePath, "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directories: %v", err)
 	}
 
@@ -152,7 +152,7 @@ description: Diagnoses and fixes CI/CD pipeline issues
 `
 
 	wfPath := filepath.Join(workflowsDir, "ci-doctor.md")
-	if err := os.WriteFile(wfPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(wfPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create workflow file: %v", err)
 	}
 

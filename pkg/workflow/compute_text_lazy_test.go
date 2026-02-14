@@ -21,7 +21,7 @@ func TestComputeTextLazyInsertion(t *testing.T) {
 
 	// Create a .git directory to simulate a git repository
 	gitDir := filepath.Join(tempDir, ".git")
-	if err := os.MkdirAll(gitDir, 0755); err != nil {
+	if err := os.MkdirAll(gitDir, 0o755); err != nil {
 		t.Fatalf("Failed to create .git dir: %v", err)
 	}
 
@@ -47,7 +47,7 @@ This workflow uses the text output: "${{ needs.activation.outputs.text }}"
 Please analyze this issue and provide a helpful response.`
 
 	workflowWithTextPath := filepath.Join(tempDir, "with-text.md")
-	if err := os.WriteFile(workflowWithTextPath, []byte(workflowWithText), 0644); err != nil {
+	if err := os.WriteFile(workflowWithTextPath, []byte(workflowWithText), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow with text: %v", err)
 	}
 
@@ -73,7 +73,7 @@ This workflow does NOT use the text output.
 Create a report based on repository analysis.`
 
 	workflowWithoutTextPath := filepath.Join(tempDir, "without-text.md")
-	if err := os.WriteFile(workflowWithoutTextPath, []byte(workflowWithoutText), 0644); err != nil {
+	if err := os.WriteFile(workflowWithoutTextPath, []byte(workflowWithoutText), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow without text: %v", err)
 	}
 

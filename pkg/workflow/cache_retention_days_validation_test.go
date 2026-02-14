@@ -192,7 +192,6 @@ func TestCacheMemoryRetentionDaysNoValue(t *testing.T) {
 
 	compiler := NewCompiler()
 	config, err := compiler.extractCacheMemoryConfig(toolsConfig)
-
 	if err != nil {
 		t.Errorf("Expected no error when retention-days is omitted, got: %v", err)
 	}

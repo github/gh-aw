@@ -20,7 +20,7 @@ func TestCompilerNetworkPermissionsExtraction(t *testing.T) {
 		}
 
 		filePath := filepath.Join(tmpDir, "test.md")
-		err = os.WriteFile(filePath, []byte(content), 0644)
+		err = os.WriteFile(filePath, []byte(content), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write temp file: %v", err)
 		}

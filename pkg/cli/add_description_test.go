@@ -133,7 +133,7 @@ on: push
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary file
 			tmpFile := testutil.TempDir(t, "test-*") + "/test-workflow.md"
-			if err := os.WriteFile(tmpFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(tmpFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
 

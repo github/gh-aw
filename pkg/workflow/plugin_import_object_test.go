@@ -27,7 +27,7 @@ plugins:
 ---
 `
 	sharedFile := filepath.Join(tmpDir, "shared-plugins.md")
-	err := os.WriteFile(sharedFile, []byte(sharedPlugins), 0644)
+	err := os.WriteFile(sharedFile, []byte(sharedPlugins), 0o644)
 	require.NoError(t, err, "Failed to write shared plugins file")
 
 	// Create main workflow that imports the shared plugins
@@ -51,7 +51,7 @@ plugins:
 Test plugin imports with object format
 `
 	mainFile := filepath.Join(tmpDir, "test-workflow.md")
-	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0644)
+	err = os.WriteFile(mainFile, []byte(mainWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write main workflow file")
 
 	// Compile workflow

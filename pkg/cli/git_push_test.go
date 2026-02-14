@@ -49,7 +49,7 @@ func TestCheckOnDefaultBranch(t *testing.T) {
 
 		// Create an initial commit
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte("test"), 0644)
+		err := os.WriteFile(testFile, []byte("test"), 0o644)
 		require.NoError(t, err)
 		exec.Command("git", "add", "test.txt").Run()
 		exec.Command("git", "commit", "-m", "initial commit").Run()

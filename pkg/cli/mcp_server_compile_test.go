@@ -26,7 +26,7 @@ func TestMCPServer_CompileTool(t *testing.T) {
 	// Create a temporary directory with a workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -40,7 +40,7 @@ engine: copilot
 This is a test workflow for compilation.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-compile.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -174,7 +174,7 @@ func TestMCPServer_CompileWithSpecificWorkflow(t *testing.T) {
 	// Create a temporary directory with multiple workflow files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -188,7 +188,7 @@ engine: copilot
 This is the first test workflow.
 `
 	workflowPath1 := filepath.Join(workflowsDir, "test1.md")
-	if err := os.WriteFile(workflowPath1, []byte(workflowContent1), 0644); err != nil {
+	if err := os.WriteFile(workflowPath1, []byte(workflowContent1), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file 1: %v", err)
 	}
 
@@ -201,7 +201,7 @@ engine: claude
 This is the second test workflow.
 `
 	workflowPath2 := filepath.Join(workflowsDir, "test2.md")
-	if err := os.WriteFile(workflowPath2, []byte(workflowContent2), 0644); err != nil {
+	if err := os.WriteFile(workflowPath2, []byte(workflowContent2), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file 2: %v", err)
 	}
 
@@ -277,7 +277,7 @@ func TestMCPServer_CompileToolWithErrors(t *testing.T) {
 	// Create a temporary directory with an invalid workflow file
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -293,7 +293,7 @@ toolz:
 This workflow has a syntax error in the frontmatter.
 `
 	workflowPath := filepath.Join(workflowsDir, "invalid.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -333,7 +333,6 @@ This workflow has a syntax error in the frontmatter.
 		Arguments: map[string]any{},
 	}
 	result, err := session.CallTool(ctx, params)
-
 	// The key test: compile tool should NOT return an MCP error
 	// even though the workflow has compilation errors
 	if err != nil {
@@ -380,7 +379,7 @@ func TestMCPServer_CompileToolWithMultipleWorkflows(t *testing.T) {
 	// Create a temporary directory with multiple workflow files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -395,7 +394,7 @@ permissions:
 This workflow should compile successfully.
 `
 	validPath := filepath.Join(workflowsDir, "valid.md")
-	if err := os.WriteFile(validPath, []byte(validWorkflow), 0644); err != nil {
+	if err := os.WriteFile(validPath, []byte(validWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write valid workflow: %v", err)
 	}
 
@@ -409,7 +408,7 @@ unknown_field: invalid
 This workflow has an unknown field.
 `
 	invalidPath := filepath.Join(workflowsDir, "invalid.md")
-	if err := os.WriteFile(invalidPath, []byte(invalidWorkflow), 0644); err != nil {
+	if err := os.WriteFile(invalidPath, []byte(invalidWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid workflow: %v", err)
 	}
 
@@ -449,7 +448,6 @@ This workflow has an unknown field.
 		Arguments: map[string]any{},
 	}
 	result, err := session.CallTool(ctx, params)
-
 	// Should not return MCP error even with mixed results
 	if err != nil {
 		t.Errorf("Compile tool should not return MCP error, got: %v", err)
@@ -491,7 +489,7 @@ func TestMCPServer_CompileToolWithStrictMode(t *testing.T) {
 	// Create a temporary directory with a workflow
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -505,7 +503,7 @@ strict: false
 This workflow has strict mode disabled in frontmatter.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow: %v", err)
 	}
 
@@ -547,7 +545,6 @@ This workflow has strict mode disabled in frontmatter.
 		},
 	}
 	result, err := session.CallTool(ctx, params)
-
 	// Should not return MCP error
 	if err != nil {
 		t.Errorf("Compile tool should not return MCP error with strict flag, got: %v", err)
@@ -578,7 +575,7 @@ func TestMCPServer_CompileToolWithSpecificWorkflows(t *testing.T) {
 	// Create a temporary directory with multiple workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -592,7 +589,7 @@ permissions:
 # Workflow 1
 First test workflow.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow1.md"), []byte(workflow1), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow1.md"), []byte(workflow1), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow1: %v", err)
 	}
 
@@ -606,7 +603,7 @@ permissions:
 # Workflow 2
 Second test workflow.
 `
-	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow2.md"), []byte(workflow2), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workflowsDir, "workflow2.md"), []byte(workflow2), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow2: %v", err)
 	}
 
@@ -648,7 +645,6 @@ Second test workflow.
 		},
 	}
 	result, err := session.CallTool(ctx, params)
-
 	// Should not return MCP error
 	if err != nil {
 		t.Errorf("Compile tool should not return MCP error, got: %v", err)

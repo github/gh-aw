@@ -76,7 +76,7 @@ mcp-servers:
 			// Create temporary workflow file
 			tmpDir := testutil.TempDir(t, "test-*")
 			workflowPath := filepath.Join(tmpDir, "test.md")
-			if err := os.WriteFile(workflowPath, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 

@@ -17,7 +17,6 @@ import (
 )
 
 func TestCompileDependabotIntegration(t *testing.T) {
-
 	// Check if npm is available and functional
 	npmPath, err := exec.LookPath("npm")
 	if err != nil {
@@ -32,7 +31,7 @@ func TestCompileDependabotIntegration(t *testing.T) {
 	// Create temp directory for test
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("failed to create workflows directory: %v", err)
 	}
 
@@ -60,7 +59,7 @@ steps:
 This workflow uses npx to run Playwright MCP.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("failed to write workflow file: %v", err)
 	}
 
@@ -156,7 +155,7 @@ func TestCompileDependabotNoDependencies(t *testing.T) {
 	// Create temp directory for test
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("failed to create workflows directory: %v", err)
 	}
 
@@ -182,7 +181,7 @@ permissions:
 This workflow does not use npm.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("failed to write workflow file: %v", err)
 	}
 
@@ -220,7 +219,7 @@ func TestCompileDependabotPreserveExisting(t *testing.T) {
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
 	githubDir := filepath.Join(tempDir, ".github")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("failed to create workflows directory: %v", err)
 	}
 
@@ -246,7 +245,7 @@ func TestCompileDependabotPreserveExisting(t *testing.T) {
 
 	dependabotPath := filepath.Join(githubDir, "dependabot.yml")
 	dependabotData, _ := yaml.Marshal(&existingDependabot)
-	if err := os.WriteFile(dependabotPath, dependabotData, 0644); err != nil {
+	if err := os.WriteFile(dependabotPath, dependabotData, 0o644); err != nil {
 		t.Fatalf("failed to write existing dependabot.yml: %v", err)
 	}
 
@@ -264,7 +263,7 @@ steps:
 # Test Workflow
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("failed to write workflow file: %v", err)
 	}
 
@@ -326,7 +325,7 @@ func TestCompileDependabotMergeExistingNpm(t *testing.T) {
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
 	githubDir := filepath.Join(tempDir, ".github")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("failed to create workflows directory: %v", err)
 	}
 
@@ -357,7 +356,7 @@ func TestCompileDependabotMergeExistingNpm(t *testing.T) {
 
 	dependabotPath := filepath.Join(githubDir, "dependabot.yml")
 	dependabotData, _ := yaml.Marshal(&existingDependabot)
-	if err := os.WriteFile(dependabotPath, dependabotData, 0644); err != nil {
+	if err := os.WriteFile(dependabotPath, dependabotData, 0o644); err != nil {
 		t.Fatalf("failed to write existing dependabot.yml: %v", err)
 	}
 
@@ -375,7 +374,7 @@ steps:
 # Test Workflow
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("failed to write workflow file: %v", err)
 	}
 

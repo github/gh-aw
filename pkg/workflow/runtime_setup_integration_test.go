@@ -173,7 +173,7 @@ engine:
 			testFile := tmpDir + "/test-workflow.md"
 
 			// Write test workflow
-			if err := os.WriteFile(testFile, []byte(tt.workflowMarkdown), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowMarkdown), 0o644); err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
 
@@ -225,7 +225,7 @@ steps:
 	tmpDir := testutil.TempDir(t, "test-*")
 	testFile := tmpDir + "/test-workflow.md"
 
-	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -272,7 +272,7 @@ steps:
 	tmpDir := testutil.TempDir(t, "test-*")
 	testFile := tmpDir + "/test-workflow.md"
 
-	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -330,7 +330,7 @@ steps:
 	tmpDir := testutil.TempDir(t, "test-*")
 	testFile := tmpDir + "/test-workflow.md"
 
-	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 

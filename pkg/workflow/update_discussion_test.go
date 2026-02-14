@@ -34,7 +34,7 @@ This workflow tests the update-discussion configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-discussion.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,7 +111,7 @@ This workflow tests the update-discussion configuration with all options.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-discussion-full.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +192,7 @@ This workflow tests the update-discussion target configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-discussion-target.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,7 +248,7 @@ This workflow tests the update-discussion labels configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-discussion-labels.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -311,7 +311,7 @@ This workflow tests that allowed-labels implicitly enables labels.
 `
 
 	testFile := filepath.Join(tmpDir, "test-update-discussion-implicit-labels.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

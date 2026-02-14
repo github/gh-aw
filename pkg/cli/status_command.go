@@ -380,7 +380,6 @@ func fetchLatestRunsByRef(ref string, repoOverride string, verbose bool) (map[st
 	}
 	cmd := workflow.ExecGH(args...)
 	output, err := cmd.Output()
-
 	if err != nil {
 		// Stop spinner on error
 		if !verbose {

@@ -105,7 +105,7 @@ This should succeed because no max-turns is specified.`,
 
 			// Create a test workflow file
 			testFile := filepath.Join(tmpDir, "test.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

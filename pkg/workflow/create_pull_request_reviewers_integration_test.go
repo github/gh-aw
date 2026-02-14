@@ -40,7 +40,7 @@ Create a pull request with reviewers.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -106,7 +106,7 @@ Create a pull request with a single reviewer.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-single.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -167,7 +167,7 @@ Create a pull request without reviewers.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-no-reviewers.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

@@ -128,7 +128,7 @@ func TestResolveIncludePath(t *testing.T) {
 
 	// Create regular test file in temp dir
 	regularFile := filepath.Join(tempDir, "regular.md")
-	if err := os.WriteFile(regularFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(regularFile, []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to write regular file: %v", err)
 	}
 
@@ -258,7 +258,7 @@ Content here.`,
 			fileName := "test-extract-name.md"
 			filePath := filepath.Join(tempDir, fileName)
 
-			err := os.WriteFile(filePath, []byte(tt.content), 0644)
+			err := os.WriteFile(filePath, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -350,7 +350,7 @@ name: Test
 			fileName := "test-extract-markdown.md"
 			filePath := filepath.Join(tempDir, fileName)
 
-			err := os.WriteFile(filePath, []byte(tt.content), 0644)
+			err := os.WriteFile(filePath, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -772,7 +772,7 @@ tools:
 ---
 # Include Content
 This is an included file.`
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatalf("Failed to write include file: %v", err)
 	}
 

@@ -22,9 +22,9 @@ func TestDispatchWorkflowMultiDirectoryDiscovery(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow in .github/workflows with workflow_dispatch
@@ -48,7 +48,7 @@ jobs:
       - run: echo "Running tests"
 `
 	ciFile := filepath.Join(workflowsDir, "ci.lock.yml")
-	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0644)
+	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write ci workflow")
 
 	// Create a dispatcher workflow in .github/aw that references ci
@@ -69,7 +69,7 @@ safe-outputs:
 This workflow dispatches to ci workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory for compilation
@@ -101,9 +101,9 @@ func TestDispatchWorkflowOnlySearchesGithubWorkflows(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow in .github/workflows with workflow_dispatch
@@ -121,7 +121,7 @@ jobs:
       - run: echo "From workflows"
 `
 	workflowsTestFile := filepath.Join(workflowsDir, "test.lock.yml")
-	err = os.WriteFile(workflowsTestFile, []byte(workflowsTestWorkflow), 0644)
+	err = os.WriteFile(workflowsTestFile, []byte(workflowsTestWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write workflows test workflow")
 
 	// Create a workflow with the same name in .github/aw (should be ignored)
@@ -139,7 +139,7 @@ jobs:
       - run: echo "From aw"
 `
 	awTestFile := filepath.Join(awDir, "test.lock.yml")
-	err = os.WriteFile(awTestFile, []byte(awTestWorkflow), 0644)
+	err = os.WriteFile(awTestFile, []byte(awTestWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write aw test workflow")
 
 	// Create a dispatcher workflow that references test
@@ -160,7 +160,7 @@ safe-outputs:
 This workflow dispatches to test workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Test that findWorkflowFile finds the one in .github/workflows only (not .github/aw)
@@ -183,9 +183,9 @@ func TestDispatchWorkflowNotFound(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a dispatcher workflow that references a non-existent workflow
@@ -206,7 +206,7 @@ safe-outputs:
 This workflow tries to dispatch to a non-existent workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -236,9 +236,9 @@ func TestDispatchWorkflowWithoutWorkflowDispatchTrigger(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow WITHOUT workflow_dispatch
@@ -253,7 +253,7 @@ jobs:
       - run: echo "Running tests"
 `
 	ciFile := filepath.Join(workflowsDir, "ci.lock.yml")
-	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0644)
+	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write ci workflow")
 
 	// Create a dispatcher workflow that references ci
@@ -274,7 +274,7 @@ safe-outputs:
 This workflow tries to dispatch to ci workflow.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -303,9 +303,9 @@ func TestDispatchWorkflowFileExtensionResolution(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a .lock.yml workflow (agentic workflow)
@@ -319,7 +319,7 @@ jobs:
       - run: echo "Lock workflow"
 `
 	lockFile := filepath.Join(workflowsDir, "lock-test.lock.yml")
-	err = os.WriteFile(lockFile, []byte(lockWorkflow), 0644)
+	err = os.WriteFile(lockFile, []byte(lockWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write lock workflow")
 
 	// Create a .yml workflow (standard GitHub Actions)
@@ -333,7 +333,7 @@ jobs:
       - run: echo "YAML workflow"
 `
 	ymlFile := filepath.Join(workflowsDir, "yml-test.yml")
-	err = os.WriteFile(ymlFile, []byte(ymlWorkflow), 0644)
+	err = os.WriteFile(ymlFile, []byte(ymlWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write yml workflow")
 
 	// Create a dispatcher workflow that references both
@@ -355,7 +355,7 @@ safe-outputs:
 This workflow dispatches to different workflow types.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -410,9 +410,9 @@ func TestDispatchWorkflowValidationWithoutAgenticWorkflowsTool(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a dispatcher workflow WITHOUT the agentic-workflows tool
@@ -435,7 +435,7 @@ This workflow tries to dispatch to a non-existent workflow.
 No agentic-workflows tool is present.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -467,9 +467,9 @@ func TestDispatchWorkflowMultipleErrors(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow WITHOUT workflow_dispatch
@@ -484,7 +484,7 @@ jobs:
       - run: echo "Running tests"
 `
 	ciFile := filepath.Join(workflowsDir, "ci.lock.yml")
-	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0644)
+	err = os.WriteFile(ciFile, []byte(ciWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write ci workflow")
 
 	// Create dispatcher workflow that references multiple problematic workflows
@@ -507,7 +507,7 @@ safe-outputs:
 This workflow has multiple validation errors.
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory
@@ -545,9 +545,9 @@ func TestDispatchWorkflowMultipleErrorsFailFast(t *testing.T) {
 	awDir := filepath.Join(tmpDir, ".github", "aw")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(awDir, 0755)
+	err := os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create aw directory")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create dispatcher workflow with multiple errors
@@ -567,7 +567,7 @@ safe-outputs:
 # Dispatcher Workflow
 `
 	dispatcherFile := filepath.Join(awDir, "dispatcher.md")
-	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0644)
+	err = os.WriteFile(dispatcherFile, []byte(dispatcherWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write dispatcher workflow")
 
 	// Change to the aw directory

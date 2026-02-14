@@ -47,7 +47,7 @@ func TestForbiddenFieldsImportRejection(t *testing.T) {
 		t.Run("reject_import_"+field, func(t *testing.T) {
 			tempDir := testutil.TempDir(t, "test-forbidden-"+field+"-*")
 			workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 			// Create shared workflow with forbidden field
 			sharedContent := `---
@@ -61,7 +61,7 @@ tools:
 This workflow has a forbidden field.
 `
 			sharedPath := filepath.Join(workflowsDir, "shared.md")
-			require.NoError(t, os.WriteFile(sharedPath, []byte(sharedContent), 0644))
+			require.NoError(t, os.WriteFile(sharedPath, []byte(sharedContent), 0o644))
 
 			// Create main workflow that imports the shared workflow
 			mainContent := `---
@@ -75,7 +75,7 @@ imports:
 This workflow imports a shared workflow with forbidden field.
 `
 			mainPath := filepath.Join(workflowsDir, "main.md")
-			require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0644))
+			require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0o644))
 
 			// Try to compile - should fail because shared workflow has forbidden field
 			compiler := NewCompiler(
@@ -109,7 +109,7 @@ func TestAllowedFieldsImportSuccess(t *testing.T) {
 		t.Run("allow_import_"+field, func(t *testing.T) {
 			tempDir := testutil.TempDir(t, "test-allowed-"+field+"-*")
 			workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-			require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+			require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 			// Create shared workflow with allowed field
 			sharedContent := `---
@@ -121,7 +121,7 @@ func TestAllowedFieldsImportSuccess(t *testing.T) {
 This workflow has an allowed field: ` + field + `
 `
 			sharedPath := filepath.Join(workflowsDir, "shared.md")
-			require.NoError(t, os.WriteFile(sharedPath, []byte(sharedContent), 0644))
+			require.NoError(t, os.WriteFile(sharedPath, []byte(sharedContent), 0o644))
 
 			// Create main workflow that imports the shared workflow
 			mainContent := `---
@@ -135,7 +135,7 @@ imports:
 This workflow imports a shared workflow with allowed field.
 `
 			mainPath := filepath.Join(workflowsDir, "main.md")
-			require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0644))
+			require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0o644))
 
 			// Compile - should succeed because shared workflow has allowed field
 			compiler := NewCompiler(
@@ -156,7 +156,7 @@ This workflow imports a shared workflow with allowed field.
 func TestImportsFieldAllowedInSharedWorkflows(t *testing.T) {
 	tempDir := testutil.TempDir(t, "test-allowed-imports-*")
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create a base shared workflow (level 2)
 	baseSharedContent := `---
@@ -170,7 +170,7 @@ labels: ["base"]
 This is the base shared workflow.
 `
 	baseSharedPath := filepath.Join(workflowsDir, "base.md")
-	require.NoError(t, os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0644))
+	require.NoError(t, os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0o644))
 
 	// Create intermediate shared workflow with "imports" field (level 1)
 	intermediateSharedContent := `---
@@ -186,7 +186,7 @@ labels: ["intermediate"]
 This shared workflow imports another shared workflow (nested imports).
 `
 	intermediateSharedPath := filepath.Join(workflowsDir, "intermediate.md")
-	require.NoError(t, os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0644))
+	require.NoError(t, os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0o644))
 
 	// Create main workflow that imports the intermediate shared workflow
 	mainContent := `---
@@ -200,7 +200,7 @@ imports:
 This workflow imports a shared workflow that itself has imports (nested).
 `
 	mainPath := filepath.Join(workflowsDir, "main.md")
-	require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0644))
+	require.NoError(t, os.WriteFile(mainPath, []byte(mainContent), 0o644))
 
 	// Compile - should succeed because shared workflows can have imports (nested imports are supported)
 	compiler := NewCompiler(

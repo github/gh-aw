@@ -36,7 +36,7 @@ Please make changes and push them to the feature branch.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -114,7 +114,7 @@ This workflow allows pushing to any pull request.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-asterisk.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -166,7 +166,7 @@ This workflow uses the default branch value.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-default-branch.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -214,7 +214,7 @@ This workflow uses null configuration which should default to "triggering".
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-null-config.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -266,7 +266,7 @@ This workflow has minimal push-to-pull-request-branch configuration.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-minimal.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -329,7 +329,7 @@ This workflow fails when there are no changes.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-error.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -376,7 +376,7 @@ This workflow ignores when there are no changes.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-ignore.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -422,7 +422,7 @@ This workflow uses default if-no-changes behavior.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-default-if-no-changes.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -469,7 +469,7 @@ This workflow explicitly sets branch to "triggering".
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-explicit-triggering.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -522,7 +522,7 @@ This workflow validates PR title prefix.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-title-prefix.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -570,7 +570,7 @@ This workflow validates PR labels.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-labels.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -619,7 +619,7 @@ This workflow validates both PR title prefix and labels.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-title-prefix-and-labels.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -670,7 +670,7 @@ This workflow appends a suffix to commit titles.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-to-pull-request-branch-commit-title-suffix.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -717,7 +717,7 @@ since it's not supported by actions/github-script.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-no-working-dir.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -774,7 +774,7 @@ Test that the push-to-pull-request-branch job receives activation comment enviro
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-activation-comment.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -840,7 +840,7 @@ This test verifies that the aw.patch artifact is downloaded in the safe_outputs 
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-push-patch-download.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 

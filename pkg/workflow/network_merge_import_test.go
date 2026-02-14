@@ -32,7 +32,7 @@ network:
 
 This file provides network access to example.com domains.
 `
-	if err := os.WriteFile(sharedNetworkPath, []byte(sharedNetworkContent), 0644); err != nil {
+	if err := os.WriteFile(sharedNetworkPath, []byte(sharedNetworkContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared network file: %v", err)
 	}
 
@@ -60,7 +60,7 @@ imports:
 
 This workflow should have merged network domains.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

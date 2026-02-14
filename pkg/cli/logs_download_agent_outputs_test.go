@@ -19,13 +19,13 @@ func TestFlattenAgentOutputsArtifact(t *testing.T) {
 	// Create agent_outputs directory structure as downloaded by gh run download
 	agentOutputsDir := filepath.Join(tempDir, "agent_outputs")
 	sessionLogsDir := filepath.Join(agentOutputsDir, "sandbox", "agent", "logs")
-	err := os.MkdirAll(sessionLogsDir, 0755)
+	err := os.MkdirAll(sessionLogsDir, 0o755)
 	require.NoError(t, err)
 
 	// Create a test session log file
 	sessionLogPath := filepath.Join(sessionLogsDir, "session-test-123.log")
 	sessionLogContent := "2025-01-04T10:00:00Z [DEBUG] Test session log with token usage data"
-	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0644)
+	err = os.WriteFile(sessionLogPath, []byte(sessionLogContent), 0o644)
 	require.NoError(t, err)
 
 	// Verify agent_outputs directory exists before flattening
@@ -75,12 +75,12 @@ func TestFlattenAgentOutputsArtifactPreservesStructure(t *testing.T) {
 
 	for _, dir := range dirs {
 		fullPath := filepath.Join(agentOutputsDir, dir)
-		err := os.MkdirAll(fullPath, 0755)
+		err := os.MkdirAll(fullPath, 0o755)
 		require.NoError(t, err)
 
 		// Create a test file in each directory
 		testFile := filepath.Join(fullPath, "test.log")
-		err = os.WriteFile(testFile, []byte("test content"), 0644)
+		err = os.WriteFile(testFile, []byte("test content"), 0o644)
 		require.NoError(t, err)
 	}
 

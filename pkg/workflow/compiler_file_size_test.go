@@ -43,7 +43,7 @@ This is a normal workflow that should compile successfully.
 `
 
 		testFile := filepath.Join(tmpDir, "normal-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -88,7 +88,7 @@ This workflow tests the file size validation logic.
 `
 
 		testFile := filepath.Join(tmpDir, "size-test-workflow.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -127,7 +127,7 @@ This workflow tests the file size validation logic.
 		largeSize := int64(MaxLockFileSize + 100000) // 100KB over the limit
 		mockContent := strings.Repeat("x", int(largeSize))
 
-		if err := os.WriteFile(lockFile, []byte(mockContent), 0644); err != nil {
+		if err := os.WriteFile(lockFile, []byte(mockContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

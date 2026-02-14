@@ -90,7 +90,7 @@ func TestParseAwInfo_FirewallField(t *testing.T) {
 			tempDir := testutil.TempDir(t, "test-*")
 			awInfoPath := filepath.Join(tempDir, "aw_info.json")
 
-			err := os.WriteFile(awInfoPath, []byte(tt.jsonContent), 0644)
+			err := os.WriteFile(awInfoPath, []byte(tt.jsonContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

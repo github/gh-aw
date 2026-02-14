@@ -28,7 +28,7 @@ func TestLocalWorkflowIntegration(t *testing.T) {
 
 	// Create a test workflow file
 	workflowsDir := "workflows"
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ tools:
 This is a test local workflow.
 `
 
-	err = os.WriteFile(testWorkflowPath, []byte(testContent), 0644)
+	err = os.WriteFile(testWorkflowPath, []byte(testContent), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}

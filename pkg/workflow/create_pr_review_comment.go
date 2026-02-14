@@ -54,7 +54,7 @@ func (c *Compiler) buildCreateOutputPullRequestReviewCommentJob(data *WorkflowDa
 		"review_comment_url": "${{ steps.create_pr_review_comment.outputs.review_comment_url }}",
 	}
 
-	var jobCondition = BuildSafeOutputType("create_pull_request_review_comment")
+	jobCondition := BuildSafeOutputType("create_pull_request_review_comment")
 	if data.SafeOutputs.CreatePullRequestReviewComments != nil && data.SafeOutputs.CreatePullRequestReviewComments.Target == "" {
 		issueWithPR := &AndNode{
 			Left:  &ExpressionNode{Expression: "github.event.issue.number"},

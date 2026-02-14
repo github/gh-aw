@@ -50,7 +50,7 @@ on:
   - invalid: {{{
 ---
 # Test Workflow`
-				err := os.WriteFile(testFile, []byte(content), 0644)
+				err := os.WriteFile(testFile, []byte(content), 0o644)
 				require.NoError(t, err, "Failed to write test file")
 
 				// Try to compile the invalid workflow
@@ -91,7 +91,7 @@ on:
     types: [opened]
 ---
 # Test Workflow`
-				err := os.WriteFile(testFile, []byte(content), 0644)
+				err := os.WriteFile(testFile, []byte(content), 0o644)
 				require.NoError(t, err, "Failed to write test file")
 
 				// Try to compile with invalid import
@@ -179,7 +179,7 @@ engine: copilot
 on: 123456
 ---
 # Test Workflow`
-				err := os.WriteFile(testFile, []byte(content), 0644)
+				err := os.WriteFile(testFile, []byte(content), 0o644)
 				require.NoError(t, err)
 
 				compiler := NewCompilerWithVersion("1.0.0")
@@ -240,7 +240,7 @@ on:
   issues: not_a_valid_structure_at_all
 ---
 # Test`
-				err := os.WriteFile(testFile, []byte(content), 0644)
+				err := os.WriteFile(testFile, []byte(content), 0o644)
 				require.NoError(t, err)
 
 				compiler := NewCompilerWithVersion("1.0.0")

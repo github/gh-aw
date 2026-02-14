@@ -274,7 +274,6 @@ func TestValidProperties_NotRejected(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateMainWorkflowFrontmatterWithSchema(tt.frontmatter)
-
 			if err != nil {
 				t.Fatalf("Expected no validation error for valid frontmatter, got: %v", err)
 			}

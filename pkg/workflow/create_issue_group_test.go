@@ -75,7 +75,7 @@ Test content`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "group-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			require.NoError(t, os.WriteFile(testFile, []byte(tt.frontmatter), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(tt.frontmatter), 0o644))
 
 			compiler := NewCompiler()
 			require.NoError(t, compiler.CompileWorkflow(testFile))
@@ -112,7 +112,7 @@ Create test issues with grouping.
 `
 
 	testFile := filepath.Join(tmpDir, "test-group-handler.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Compile the workflow
 	compiler := NewCompiler()
@@ -152,7 +152,7 @@ Test grouping without explicit issues permission.
 `
 
 	testFile := filepath.Join(tmpDir, "test-group-no-perm.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Compile the workflow - should succeed (safe-outputs doesn't require explicit permission)
 	compiler := NewCompiler()
@@ -192,7 +192,7 @@ Test grouping with title prefix.
 `
 
 	testFile := filepath.Join(tmpDir, "test-group-prefix.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Compile the workflow
 	compiler := NewCompiler()
@@ -230,7 +230,7 @@ Test MCP config with group.
 `
 
 	testFile := filepath.Join(tmpDir, "test-group-mcp.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	// Compile the workflow
 	compiler := NewCompiler()

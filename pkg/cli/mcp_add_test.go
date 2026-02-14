@@ -36,7 +36,7 @@ func TestAddMCPTool_BasicFunctionality(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -55,7 +55,7 @@ tools:
 This is a test workflow.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -215,7 +215,7 @@ func TestAddMCPTool_ToolAlreadyExists(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -239,7 +239,7 @@ tools:
 This is a test workflow.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -322,7 +322,7 @@ func TestAddMCPTool_CustomToolID(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -341,7 +341,7 @@ tools:
 This is a test workflow.
 `
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 

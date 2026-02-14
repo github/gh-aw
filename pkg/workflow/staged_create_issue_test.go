@@ -48,7 +48,6 @@ func TestCreateIssueJobWithStagedFlag(t *testing.T) {
 	if strings.Contains(stepsContent, "          GH_AW_SAFE_OUTPUTS_STAGED:") {
 		t.Error("Expected GH_AW_SAFE_OUTPUTS_STAGED environment variable not to be set when staged is false")
 	}
-
 }
 
 func TestCreateIssueJobWithoutSafeOutputs(t *testing.T) {

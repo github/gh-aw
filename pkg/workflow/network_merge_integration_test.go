@@ -31,7 +31,7 @@ network:
 
 Provides network access to Python package indexes.
 `
-	if err := os.WriteFile(shared1Path, []byte(shared1Content), 0644); err != nil {
+	if err := os.WriteFile(shared1Path, []byte(shared1Content), 0o644); err != nil {
 		t.Fatalf("Failed to write shared-python file: %v", err)
 	}
 
@@ -47,7 +47,7 @@ network:
 
 Provides network access to Node.js package registries.
 `
-	if err := os.WriteFile(shared2Path, []byte(shared2Content), 0644); err != nil {
+	if err := os.WriteFile(shared2Path, []byte(shared2Content), 0o644); err != nil {
 		t.Fatalf("Failed to write shared-node file: %v", err)
 	}
 
@@ -76,7 +76,7 @@ imports:
 
 This workflow should have merged network domains from multiple sources.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

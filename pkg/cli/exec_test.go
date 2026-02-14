@@ -115,7 +115,6 @@ func TestGhExecOrFallbackIntegration(t *testing.T) {
 		[]string{"integration test output"},
 		nil,
 	)
-
 	if err != nil {
 		t.Errorf("Unexpected error in integration test: %v", err)
 	}

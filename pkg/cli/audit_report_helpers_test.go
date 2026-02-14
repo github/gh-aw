@@ -33,7 +33,7 @@ func TestCalculateDirectorySize(t *testing.T) {
 			name: "single file",
 			setup: func(t *testing.T) string {
 				dir := testutil.TempDir(t, "test-*")
-				err := os.WriteFile(filepath.Join(dir, "test.txt"), []byte("hello"), 0644)
+				err := os.WriteFile(filepath.Join(dir, "test.txt"), []byte("hello"), 0o644)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -46,18 +46,18 @@ func TestCalculateDirectorySize(t *testing.T) {
 			setup: func(t *testing.T) string {
 				dir := testutil.TempDir(t, "test-*")
 				// File 1: 10 bytes
-				err := os.WriteFile(filepath.Join(dir, "file1.txt"), []byte("0123456789"), 0644)
+				err := os.WriteFile(filepath.Join(dir, "file1.txt"), []byte("0123456789"), 0o644)
 				if err != nil {
 					t.Fatal(err)
 				}
 				// Create subdirectory
 				subdir := filepath.Join(dir, "subdir")
-				err = os.Mkdir(subdir, 0755)
+				err = os.Mkdir(subdir, 0o755)
 				if err != nil {
 					t.Fatal(err)
 				}
 				// File 2: 5 bytes
-				err = os.WriteFile(filepath.Join(subdir, "file2.txt"), []byte("hello"), 0644)
+				err = os.WriteFile(filepath.Join(subdir, "file2.txt"), []byte("hello"), 0o644)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -225,17 +225,17 @@ func TestDownloadedFilesInAuditData(t *testing.T) {
 	}
 
 	for filename, content := range testFiles {
-		if err := os.WriteFile(filepath.Join(tmpDir, filename), content, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(tmpDir, filename), content, 0o644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}
 
 	// Create a subdirectory
 	subdir := filepath.Join(tmpDir, "agent_output")
-	if err := os.MkdirAll(subdir, 0755); err != nil {
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(subdir, "result.json"), []byte(`{}`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(subdir, "result.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("Failed to create file in subdirectory: %v", err)
 	}
 
@@ -362,7 +362,7 @@ func TestAuditReportFileListingIntegration(t *testing.T) {
 
 	for filename, content := range artifacts {
 		path := filepath.Join(tmpDir, filename)
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create %s: %v", filename, err)
 		}
 	}
@@ -371,12 +371,12 @@ func TestAuditReportFileListingIntegration(t *testing.T) {
 	dirs := []string{"agent_output", "firewall-logs", "aw-prompts"}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(tmpDir, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", dir, err)
 		}
 		// Add a file in each directory
 		filePath := filepath.Join(dirPath, "file.txt")
-		if err := os.WriteFile(filePath, []byte("content"), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte("content"), 0o644); err != nil {
 			t.Fatalf("Failed to create file in %s: %v", dir, err)
 		}
 	}

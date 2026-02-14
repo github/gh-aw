@@ -36,7 +36,7 @@ Test workflow with app configuration.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -71,7 +71,7 @@ Test workflow with minimal app configuration.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -108,7 +108,7 @@ Test workflow with app token minting.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -163,7 +163,7 @@ Test workflow with app token minting and repository restrictions.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -199,7 +199,7 @@ Test workflow without safe outputs.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -229,7 +229,7 @@ Test workflow with discussions permission.
 	// Create a temporary test file
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	workflowData, err := compiler.ParseWorkflowFile(testFile)

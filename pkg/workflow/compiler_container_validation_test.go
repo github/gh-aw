@@ -48,7 +48,7 @@ This workflow has an invalid container image.
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +60,6 @@ This workflow has an invalid container image.
 
 	// Compile the workflow - this should succeed with a warning, not fail with an error
 	err := compiler.CompileWorkflow(workflowFile)
-
 	// The compilation should succeed (no error returned) despite invalid container
 	if err != nil {
 		t.Errorf("compilation should succeed with warning, but got error: %v", err)
@@ -102,7 +101,7 @@ This workflow has an invalid container image.
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +111,6 @@ This workflow has an invalid container image.
 
 	// Compile the workflow - this should succeed without validation
 	err := compiler.CompileWorkflow(workflowFile)
-
 	// The compilation should succeed (no error returned)
 	if err != nil {
 		t.Errorf("compilation should succeed when validation disabled, but got error: %v", err)

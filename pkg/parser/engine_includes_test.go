@@ -25,7 +25,7 @@ tools:
 # Include with Engine
 `
 	includeFile := filepath.Join(tmpDir, "include-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,7 +72,7 @@ tools:
 # Include with Object Engine
 `
 	includeFile := filepath.Join(tmpDir, "include-object-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +118,7 @@ tools:
 # Include without Engine
 `
 	includeFile := filepath.Join(tmpDir, "include-no-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -157,7 +157,7 @@ tools:
 # First Include
 `
 	include1File := filepath.Join(tmpDir, "include1.md")
-	if err := os.WriteFile(include1File, []byte(include1Content), 0644); err != nil {
+	if err := os.WriteFile(include1File, []byte(include1Content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -172,7 +172,7 @@ tools:
 # Second Include
 `
 	include2File := filepath.Join(tmpDir, "include2.md")
-	if err := os.WriteFile(include2File, []byte(include2Content), 0644); err != nil {
+	if err := os.WriteFile(include2File, []byte(include2Content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -309,7 +309,7 @@ tools:
 # Include with Custom Command
 `
 	includeFile := filepath.Join(tmpDir, "include-command.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

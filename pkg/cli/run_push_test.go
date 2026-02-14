@@ -29,7 +29,7 @@ on: workflow_dispatch
 # Test Workflow
 This is a test workflow.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create the corresponding lock file
@@ -37,7 +37,7 @@ This is a test workflow.
 	lockContent := `name: Test Workflow
 on: workflow_dispatch
 `
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Test collecting files
@@ -63,7 +63,7 @@ func TestCollectWorkflowFiles_WithImports(t *testing.T) {
 	sharedContent := `# Shared Content
 This is shared content.
 `
-	err := os.WriteFile(sharedPath, []byte(sharedContent), 0644)
+	err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a workflow file that imports the shared file
@@ -77,7 +77,7 @@ imports:
 # Test Workflow
 This workflow imports shared content.
 `
-	err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create the corresponding lock file
@@ -85,7 +85,7 @@ This workflow imports shared content.
 	lockContent := `name: Test Workflow
 on: workflow_dispatch
 `
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Test collecting files
@@ -112,7 +112,7 @@ func TestCollectWorkflowFiles_TransitiveImports(t *testing.T) {
 	baseSharedContent := `# Base Shared Content
 This is base shared content.
 `
-	err := os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0644)
+	err := os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0o644)
 	require.NoError(t, err)
 
 	// Create intermediate shared file that imports base
@@ -124,7 +124,7 @@ imports:
 # Intermediate Shared Content
 This imports base shared.
 `
-	err = os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0644)
+	err = os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a workflow file that imports the intermediate file
@@ -138,7 +138,7 @@ imports:
 # Test Workflow
 This workflow imports intermediate shared content.
 `
-	err = os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err = os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create the corresponding lock file
@@ -146,7 +146,7 @@ This workflow imports intermediate shared content.
 	lockContent := `name: Test Workflow
 on: workflow_dispatch
 `
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Test collecting files
@@ -220,7 +220,7 @@ func TestResolveImportPathLocal(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
 	baseDir := filepath.Join(tmpDir, "workflows")
-	err := os.MkdirAll(baseDir, 0755)
+	err := os.MkdirAll(baseDir, 0o755)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -276,7 +276,7 @@ on: workflow_dispatch
 # Test Workflow
 This is a test workflow.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create an old lock file (simulate outdated)
@@ -284,7 +284,7 @@ This is a test workflow.
 	lockContent := `name: Test Workflow
 on: workflow_dispatch
 `
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Make the workflow file newer by sleeping and touching it
@@ -320,7 +320,7 @@ on: workflow_dispatch
 This is a test workflow.
 Use env variable: ${{ env.MY_VAR }}
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Compute the correct hash for this workflow
@@ -343,7 +343,7 @@ jobs:
       - name: Test
         run: echo "test"
 `, wrongHash)
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Make the lock file slightly newer than the workflow file
@@ -377,7 +377,7 @@ jobs:
       - name: Test
         run: echo "test"
 `, correctHash)
-	err = os.WriteFile(lockFilePath, []byte(lockContentCorrect), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContentCorrect), 0o644)
 	require.NoError(t, err)
 
 	// Test that matching hash is detected
@@ -409,7 +409,7 @@ func TestPushWorkflowFiles_WithStagedFiles(t *testing.T) {
 
 	// Create a test file and stage it
 	testFile := filepath.Join(tmpDir, "test-file.txt")
-	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	err = os.WriteFile(testFile, []byte("test content"), 0o644)
 	require.NoError(t, err)
 
 	cmd = exec.Command("git", "add", "test-file.txt")
@@ -426,7 +426,7 @@ func TestPushWorkflowFiles_WithStagedFiles(t *testing.T) {
 
 	// Try to push workflow files - should fail due to staged files
 	workflowFile := filepath.Join(tmpDir, "workflow.md")
-	err = os.WriteFile(workflowFile, []byte("# Test"), 0644)
+	err = os.WriteFile(workflowFile, []byte("# Test"), 0o644)
 	require.NoError(t, err)
 
 	err = pushWorkflowFiles("test-workflow", []string{workflowFile}, "", false)
@@ -450,7 +450,7 @@ on: workflow_dispatch
 # Test Workflow
 This is a test workflow.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Compute the correct hash for this workflow
@@ -472,7 +472,7 @@ jobs:
       - name: Test
         run: echo "test"
 `, correctHash)
-	err = os.WriteFile(lockFilePath, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFilePath, []byte(lockContent), 0o644)
 	require.NoError(t, err)
 
 	// Record the modification time of the lock file before collection

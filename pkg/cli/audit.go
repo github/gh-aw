@@ -427,7 +427,7 @@ func auditJobRun(runID int64, jobID int64, stepNumber int, owner, repo, hostname
 	auditLog.Printf("Starting job-specific audit: runID=%d, jobID=%d, stepNumber=%d", runID, jobID, stepNumber)
 
 	// Create output directory for job-specific artifacts
-	if err := os.MkdirAll(outputDir, 0750); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -460,7 +460,7 @@ func auditJobRun(runID int64, jobID int64, stepNumber int, owner, repo, hostname
 
 	// Save full job log
 	jobLogPath := filepath.Join(outputDir, fmt.Sprintf("job-%d.log", jobID))
-	if err := os.WriteFile(jobLogPath, []byte(jobLogContent), 0600); err != nil {
+	if err := os.WriteFile(jobLogPath, []byte(jobLogContent), 0o600); err != nil {
 		return fmt.Errorf("failed to write job log: %w", err)
 	}
 
@@ -477,7 +477,7 @@ func auditJobRun(runID int64, jobID int64, stepNumber int, owner, repo, hostname
 			}
 		} else {
 			stepLogPath := filepath.Join(outputDir, fmt.Sprintf("job-%d-step-%d.log", jobID, stepNumber))
-			if err := os.WriteFile(stepLogPath, []byte(stepOutput), 0600); err != nil {
+			if err := os.WriteFile(stepLogPath, []byte(stepOutput), 0o600); err != nil {
 				return fmt.Errorf("failed to write step log: %w", err)
 			}
 			if verbose {
@@ -489,7 +489,7 @@ func auditJobRun(runID int64, jobID int64, stepNumber int, owner, repo, hostname
 		failingStepNum, failingStepOutput := findFirstFailingStep(jobLogContent)
 		if failingStepNum > 0 {
 			stepLogPath := filepath.Join(outputDir, fmt.Sprintf("job-%d-step-%d-failed.log", jobID, failingStepNum))
-			if err := os.WriteFile(stepLogPath, []byte(failingStepOutput), 0600); err != nil {
+			if err := os.WriteFile(stepLogPath, []byte(failingStepOutput), 0o600); err != nil {
 				return fmt.Errorf("failed to write failing step log: %w", err)
 			}
 			if verbose {

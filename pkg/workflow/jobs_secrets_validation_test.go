@@ -268,7 +268,6 @@ This workflow deploys the application using reusable workflows with proper secre
 
 	compiler := NewCompiler()
 	err = compiler.CompileWorkflow(workflowPath)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}

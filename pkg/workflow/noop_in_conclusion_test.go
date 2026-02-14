@@ -34,7 +34,7 @@ Test that noop step is generated inside the conclusion job.
 `
 
 	testFile := filepath.Join(tmpDir, "test-noop.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,7 +108,7 @@ Test that missing_tool step is generated inside the conclusion job.
 `
 
 	testFile := filepath.Join(tmpDir, "test-missing-tool.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -187,7 +187,7 @@ Test that both noop and missing_tool steps are generated inside the conclusion j
 `
 
 	testFile := filepath.Join(tmpDir, "test-both.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

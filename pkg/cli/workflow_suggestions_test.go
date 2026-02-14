@@ -29,7 +29,7 @@ func TestSuggestWorkflowNames(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -46,7 +46,7 @@ func TestSuggestWorkflowNames(t *testing.T) {
 
 	for _, workflow := range testWorkflows {
 		path := filepath.Join(workflowsDir, workflow)
-		if err := os.WriteFile(path, []byte("# Test workflow\n"), 0644); err != nil {
+		if err := os.WriteFile(path, []byte("# Test workflow\n"), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", workflow, err)
 		}
 	}
@@ -141,7 +141,7 @@ func TestGetAvailableWorkflowNames(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -154,7 +154,7 @@ func TestGetAvailableWorkflowNames(t *testing.T) {
 
 	for _, workflow := range testWorkflows {
 		path := filepath.Join(workflowsDir, workflow)
-		if err := os.WriteFile(path, []byte("# Test workflow\n"), 0644); err != nil {
+		if err := os.WriteFile(path, []byte("# Test workflow\n"), 0o644); err != nil {
 			t.Fatalf("Failed to create workflow file %s: %v", workflow, err)
 		}
 	}

@@ -62,7 +62,7 @@ func TestCompilerSharedCacheAcrossWorkflows(t *testing.T) {
 
 	// Create test workflow files
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
@@ -86,10 +86,10 @@ Test content
 	workflow1Path := filepath.Join(workflowsDir, "workflow1.md")
 	workflow2Path := filepath.Join(workflowsDir, "workflow2.md")
 
-	if err := os.WriteFile(workflow1Path, []byte(workflow1Content), 0644); err != nil {
+	if err := os.WriteFile(workflow1Path, []byte(workflow1Content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow1: %v", err)
 	}
-	if err := os.WriteFile(workflow2Path, []byte(workflow2Content), 0644); err != nil {
+	if err := os.WriteFile(workflow2Path, []byte(workflow2Content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow2: %v", err)
 	}
 

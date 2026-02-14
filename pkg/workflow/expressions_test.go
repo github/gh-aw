@@ -1133,7 +1133,6 @@ func TestVisitExpressionTree(t *testing.T) {
 		collected = append(collected, expr.Expression)
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("VisitExpressionTree() unexpected error: %v", err)
 	}
@@ -1187,7 +1186,6 @@ func TestParseExpressionIntegration(t *testing.T) {
 		literals = append(literals, expr.Expression)
 		return nil
 	})
-
 	if err != nil {
 		t.Errorf("VisitExpressionTree() error: %v", err)
 	}

@@ -33,7 +33,7 @@ safe-jobs:
 # Test workflow
 Test old syntax
 `
-	err := os.WriteFile(workflowPath, []byte(content), 0644)
+	err := os.WriteFile(workflowPath, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -76,14 +76,13 @@ safe-outputs:
 # Test workflow
 Test new syntax
 `
-	err := os.WriteFile(workflowPath, []byte(content), 0644)
+	err := os.WriteFile(workflowPath, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	// Attempt to parse the workflow
 	data, err := c.ParseWorkflowFile(workflowPath)
-
 	// Should succeed
 	if err != nil {
 		t.Fatalf("Expected no error with new safe-outputs.jobs syntax, got: %v", err)

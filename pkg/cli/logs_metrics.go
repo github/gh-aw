@@ -620,7 +620,6 @@ func extractMCPFailuresFromRun(runDir string, run WorkflowRun, verbose bool) ([]
 
 		return nil
 	})
-
 	if err != nil {
 		return mcpFailures, fmt.Errorf("error walking run directory: %w", err)
 	}

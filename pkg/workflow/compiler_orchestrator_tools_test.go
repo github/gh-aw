@@ -31,7 +31,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -76,7 +76,7 @@ tools:
 # Included
 `
 	includeFile := filepath.Join(tmpDir, "include.md")
-	require.NoError(t, os.WriteFile(includeFile, []byte(includeContent), 0644))
+	require.NoError(t, os.WriteFile(includeFile, []byte(includeContent), 0o644))
 
 	testContent := `---
 on: push
@@ -92,7 +92,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "main.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -138,7 +138,7 @@ mcp-servers:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -184,7 +184,7 @@ runtimes:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -226,7 +226,7 @@ plugins:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -273,7 +273,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -317,7 +317,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -361,7 +361,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -404,7 +404,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -461,7 +461,7 @@ engine: copilot
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := tt.frontmatter + "\n\n# Workflow Content\n"
 			testFile := filepath.Join(tmpDir, "workflow-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 
@@ -517,7 +517,7 @@ func TestProcessToolsAndMarkdown_TextOutputDetection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := "---\non: push\nengine: copilot\n---\n\n" + tt.markdown
 			testFile := filepath.Join(tmpDir, "output-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 
@@ -563,7 +563,7 @@ safe-outputs:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -605,7 +605,7 @@ secret-masking:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -648,7 +648,7 @@ tracker-id: TEST-123
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -691,7 +691,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 
@@ -736,7 +736,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 

@@ -67,7 +67,7 @@ Test workflow that creates issues.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create workflow file
 			workflowFile := filepath.Join(tmpDir, tt.name+".md")
-			if err := os.WriteFile(workflowFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create workflow file: %v", err)
 			}
 

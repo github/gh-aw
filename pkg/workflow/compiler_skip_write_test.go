@@ -37,7 +37,7 @@ permissions:
 
 This is the initial markdown content.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err, "Failed to create workflow file")
 
 	// Compile initial workflow
@@ -69,7 +69,7 @@ permissions:
 
 This is DIFFERENT markdown content that should not affect the lock file.
 `
-	err = os.WriteFile(workflowPath, []byte(workflowContentV2), 0644)
+	err = os.WriteFile(workflowPath, []byte(workflowContentV2), 0o644)
 	require.NoError(t, err, "Failed to update workflow file")
 
 	// Recompile workflow
@@ -105,7 +105,7 @@ on: issues
 
 This is the initial markdown content.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err, "Failed to create workflow file")
 
 	// Compile initial workflow
@@ -137,7 +137,7 @@ permissions:
 
 This is the initial markdown content.
 `
-	err = os.WriteFile(workflowPath, []byte(workflowContentV2), 0644)
+	err = os.WriteFile(workflowPath, []byte(workflowContentV2), 0o644)
 	require.NoError(t, err, "Failed to update workflow file")
 
 	// Recompile workflow
@@ -173,7 +173,7 @@ on: issues
 
 Initial content.
 `
-	err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 	require.NoError(t, err, "Failed to create workflow file")
 
 	// Compile workflow (lock file doesn't exist yet)

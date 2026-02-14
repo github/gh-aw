@@ -108,7 +108,7 @@ func TestExtractNoopsFromRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create the safe output artifact file
 			safeOutputFile := filepath.Join(tmpDir, constants.AgentOutputArtifactName)
-			err := os.WriteFile(safeOutputFile, []byte(tt.safeOutputContent), 0644)
+			err := os.WriteFile(safeOutputFile, []byte(tt.safeOutputContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test safe output file: %v", err)
 			}
@@ -151,7 +151,7 @@ func TestExtractNoopsFromRun(t *testing.T) {
 func TestExtractNoopsFlattenedStructure(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-flattened-noop")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestExtractNoopsFlattenedStructure(t *testing.T) {
 
 	// Use the actual filename: agent_output.json (with underscore and .json extension)
 	agentOutputPath := filepath.Join(runDir, "agent_output.json")
-	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0644)
+	err = os.WriteFile(agentOutputPath, []byte(agentOutputContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write agent_output.json: %v", err)
 	}

@@ -653,7 +653,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	// Find custom jobs that depend on pre_activation - these are handled by the activation job
 	customJobsBeforeActivation := c.getCustomJobsDependingOnPreActivation(data.Jobs)
 
-	var jobCondition = data.If
+	jobCondition := data.If
 	if activationJobCreated {
 		// If the if condition references custom jobs that run before activation,
 		// the activation job handles the condition, so clear it here

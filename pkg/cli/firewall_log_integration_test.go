@@ -15,14 +15,14 @@ func TestFirewallLogIntegration(t *testing.T) {
 	// Create a temporary directory for the test
 	tempDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tempDir, "run-12345")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create run directory: %v", err)
 	}
 
 	// Create a subdirectory for firewall logs
 	firewallLogsDir := filepath.Join(runDir, "firewall-logs")
-	err = os.MkdirAll(firewallLogsDir, 0755)
+	err = os.MkdirAll(firewallLogsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create firewall-logs directory: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestFirewallLogIntegration(t *testing.T) {
 
 	// Write firewall log file
 	logPath := filepath.Join(firewallLogsDir, "firewall-access.log")
-	err = os.WriteFile(logPath, []byte(realWorldLogContent), 0644)
+	err = os.WriteFile(logPath, []byte(realWorldLogContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create firewall log file: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestAnalyzeFirewallLogsFromSandboxPath(t *testing.T) {
 
 	// Create sandbox/firewall/logs directory (path after artifact download)
 	firewallLogsDir := filepath.Join(runDir, "sandbox", "firewall", "logs")
-	err := os.MkdirAll(firewallLogsDir, 0755)
+	err := os.MkdirAll(firewallLogsDir, 0o755)
 	if err != nil {
 		t.Fatalf("should create sandbox/firewall/logs directory: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestAnalyzeFirewallLogsFromSandboxPath(t *testing.T) {
 1701234570.012 172.30.0.20:35291 blocked.test.com:443 0.0.0.0:0 1.1 CONNECT 403 NONE_NONE:HIER_NONE blocked.test.com:443 "-"
 `
 	logPath := filepath.Join(firewallLogsDir, "firewall-access.log")
-	err = os.WriteFile(logPath, []byte(logContent), 0644)
+	err = os.WriteFile(logPath, []byte(logContent), 0o644)
 	if err != nil {
 		t.Fatalf("should write test firewall log: %v", err)
 	}

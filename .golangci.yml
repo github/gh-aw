@@ -1,4 +1,4 @@
-version: "2"
+# version: "2"  # Commented out - using default config version
 run:
   go: "1.25"
   tests: true

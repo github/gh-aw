@@ -83,7 +83,7 @@ Content here.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			filePath := filepath.Join(tmpDir, tt.filename)
-			err := os.WriteFile(filePath, []byte(tt.content), 0644)
+			err := os.WriteFile(filePath, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -340,7 +340,7 @@ title: Test Workflow
 This is a test workflow with some content.`
 
 	filePath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(filePath, []byte(content), 0644)
+	err := os.WriteFile(filePath, []byte(content), 0o644)
 	if err != nil {
 		b.Fatalf("Failed to create test file: %v", err)
 	}
@@ -492,11 +492,11 @@ Shared content`,
 				fullPath := filepath.Join(sourceDir, path)
 				// Create directory if needed
 				dir := filepath.Dir(fullPath)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatalf("Failed to create source directory %s: %v", dir, err)
 				}
 				// Write file
-				if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 					t.Fatalf("Failed to create source file %s: %v", fullPath, err)
 				}
 			}
@@ -558,7 +558,6 @@ Shared content`,
 				}
 				return nil
 			})
-
 			if err != nil {
 				t.Errorf("Error walking target directory: %v", err)
 			}
@@ -590,13 +589,13 @@ func TestCopyMarkdownFiles_ErrorScenarios(t *testing.T) {
 
 				// Create a source file
 				sourceFile := filepath.Join(sourceDir, "test.md")
-				os.WriteFile(sourceFile, []byte("# Test"), 0644)
+				os.WriteFile(sourceFile, []byte("# Test"), 0o644)
 
 				// Make target directory read-only
-				os.Chmod(targetDir, 0444)
+				os.Chmod(targetDir, 0o444)
 
 				cleanup := func() {
-					os.Chmod(targetDir, 0755) // Restore permissions for cleanup
+					os.Chmod(targetDir, 0o755) // Restore permissions for cleanup
 				}
 
 				return sourceDir, targetDir, cleanup
@@ -905,12 +904,12 @@ jobs:
 			mdPath := filepath.Join(tmpDir, "test-workflow.md")
 			lockPath := filepath.Join(tmpDir, "test-workflow.lock.yml")
 
-			err := os.WriteFile(mdPath, []byte(tt.mdContent), 0644)
+			err := os.WriteFile(mdPath, []byte(tt.mdContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create markdown file: %v", err)
 			}
 
-			err = os.WriteFile(lockPath, []byte(tt.lockContent), 0644)
+			err = os.WriteFile(lockPath, []byte(tt.lockContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create lock file: %v", err)
 			}

@@ -94,7 +94,7 @@ Test Codex workflow with safe inputs
 			tempDir := t.TempDir()
 			workflowPath := filepath.Join(tempDir, "test-workflow.md")
 
-			err := os.WriteFile(workflowPath, []byte(tt.workflowContent), 0644)
+			err := os.WriteFile(workflowPath, []byte(tt.workflowContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}

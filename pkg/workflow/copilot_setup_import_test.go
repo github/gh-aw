@@ -20,7 +20,7 @@ func TestCompileWorkflow_ImportCopilotSetupSteps(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create copilot-setup-steps.yml
@@ -44,7 +44,7 @@ jobs:
           go-version: "1.21"
 `
 	copilotSetupFile := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0600)
+	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0o600)
 	require.NoError(t, err, "Failed to write copilot-setup-steps.yml")
 
 	// Create a workflow that imports copilot-setup-steps.yml with custom steps
@@ -64,7 +64,7 @@ steps:
 This workflow imports copilot-setup-steps.yml and should have the imported steps before the custom step.
 `
 	workflowFile := filepath.Join(workflowsDir, "test-workflow.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Change to the temp directory so the compiler can find the workflow
@@ -130,7 +130,7 @@ func TestCompileWorkflow_ImportCopilotSetupStepsWithoutCustomSteps(t *testing.T)
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create copilot-setup-steps.yml
@@ -148,7 +148,7 @@ jobs:
         run: npm run lint
 `
 	copilotSetupFile := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0600)
+	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0o600)
 	require.NoError(t, err, "Failed to write copilot-setup-steps.yml")
 
 	// Create a workflow that imports copilot-setup-steps.yml WITHOUT custom steps
@@ -165,7 +165,7 @@ engine: copilot
 This workflow imports copilot-setup-steps.yml without any custom steps.
 `
 	workflowFile := filepath.Join(workflowsDir, "test-workflow-no-custom.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Change to the temp directory so the compiler can find the workflow

@@ -234,7 +234,6 @@ func cleanupOrphanedIncludes(verbose bool) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to scan include files: %w", err)
 	}

@@ -41,7 +41,7 @@ This workflow should fail to compile because "event" is not a valid target value
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-invalid-target.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,7 +132,7 @@ This workflow should compile successfully.
 `
 
 			workflowPath := filepath.Join(tmpDir, "test-valid-target.md")
-			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -181,7 +181,7 @@ This workflow should fail because close-issue has an invalid target.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-multiple-configs.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -251,7 +251,7 @@ This workflow should fail to compile.
 `
 
 			workflowPath := filepath.Join(tmpDir, "test-invalid-numeric.md")
-			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

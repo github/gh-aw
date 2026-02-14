@@ -152,7 +152,7 @@ tools:
 This is a test workflow with cache-memory enabled.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -222,7 +222,7 @@ tools:
 This is a test workflow without cache-memory.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -281,7 +281,7 @@ tools:
 This is a test workflow with multiple cache-memory entries.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -348,7 +348,7 @@ tools:
 This is a test workflow with playwright enabled.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -402,7 +402,7 @@ tools:
 This is a test workflow without playwright.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -457,7 +457,7 @@ tools:
 This is a test workflow to verify playwright instructions come after temp folder.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -525,7 +525,7 @@ engine: claude
 This is a test workflow with issue_comment trigger.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -581,7 +581,7 @@ engine: claude
 This is a test workflow with command trigger.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -630,7 +630,7 @@ engine: claude
 This is a test workflow with push trigger only.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
@@ -683,7 +683,7 @@ engine: claude
 This is a test workflow without contents read permission.
 `
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 

@@ -70,7 +70,7 @@ This workflow tests playwright tool configuration.
 `
 
 			workflowFile := filepath.Join(setup.workflowsDir, "test-playwright-"+tc.name+".md")
-			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}
 
@@ -143,7 +143,7 @@ Test workflow for playwright tools inspection.
 `
 
 	workflowFile := filepath.Join(setup.workflowsDir, "test-playwright-tools.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 

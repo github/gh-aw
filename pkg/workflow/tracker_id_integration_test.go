@@ -87,7 +87,7 @@ Create a pull request.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			workflowFile := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(workflowFile, []byte(tt.workflowContent), 0644)
+			err := os.WriteFile(workflowFile, []byte(tt.workflowContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test workflow: %v", err)
 			}

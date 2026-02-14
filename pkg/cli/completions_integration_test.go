@@ -32,7 +32,7 @@ engine: copilot
 
 # Test Workflow
 `
-		if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write test workflow file %s: %v", wf, err)
 		}
 	}
@@ -138,7 +138,7 @@ engine: copilot
 
 # Test MCP Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -171,7 +171,7 @@ engine: copilot
 
 # MCP Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -206,7 +206,7 @@ engine: copilot
 
 # Test Workflow
 `
-		if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to write test workflow file %s: %v", wf, err)
 		}
 	}
@@ -241,7 +241,7 @@ engine: copilot
 
 # Logs Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 

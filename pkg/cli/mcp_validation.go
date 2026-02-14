@@ -250,7 +250,6 @@ func validateMCPServerConfiguration(cmdPath string) error {
 		cmd = workflow.ExecGHContext(ctx, "aw", "status")
 	}
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		// Check for common error cases
 		if ctx.Err() == context.DeadlineExceeded {

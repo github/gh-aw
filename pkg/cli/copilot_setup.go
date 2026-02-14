@@ -150,7 +150,7 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 
 	// Create .github/workflows directory if it doesn't exist
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create workflows directory: %w", err)
 	}
 	copilotSetupLog.Printf("Ensured directory exists: %s", workflowsDir)
@@ -205,7 +205,7 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 				return fmt.Errorf("failed to marshal updated workflow: %w", err)
 			}
 
-			if err := os.WriteFile(setupStepsPath, updatedContent, 0600); err != nil {
+			if err := os.WriteFile(setupStepsPath, updatedContent, 0o600); err != nil {
 				return fmt.Errorf("failed to update copilot-setup-steps.yml: %w", err)
 			}
 			copilotSetupLog.Printf("Upgraded version in file: %s", setupStepsPath)
@@ -232,7 +232,7 @@ func ensureCopilotSetupStepsWithUpgrade(verbose bool, actionMode workflow.Action
 	}
 
 	// File doesn't exist - create it
-	if err := os.WriteFile(setupStepsPath, []byte(generateCopilotSetupStepsYAML(actionMode, version)), 0600); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(generateCopilotSetupStepsYAML(actionMode, version)), 0o600); err != nil {
 		return fmt.Errorf("failed to write copilot-setup-steps.yml: %w", err)
 	}
 	copilotSetupLog.Printf("Created file: %s", setupStepsPath)

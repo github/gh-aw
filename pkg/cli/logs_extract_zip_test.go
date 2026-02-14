@@ -121,7 +121,7 @@ func TestExtractZipFilePreservesMode(t *testing.T) {
 		Name:   "executable.sh",
 		Method: zip.Deflate,
 	}
-	header.SetMode(0755) // Executable mode
+	header.SetMode(0o755) // Executable mode
 
 	writer, err := zipWriter.CreateHeader(header)
 	require.NoError(t, err, "Failed to create file with header in zip")
@@ -148,7 +148,7 @@ func TestExtractZipFilePreservesMode(t *testing.T) {
 
 	// Check that file is executable (at least one execute bit set)
 	mode := info.Mode()
-	assert.NotEqual(t, os.FileMode(0), mode&0111, "File should have execute permission")
+	assert.NotEqual(t, os.FileMode(0), mode&0o111, "File should have execute permission")
 }
 
 // TestExtractZipFileWithNestedDirectories tests extraction with nested paths
@@ -215,7 +215,7 @@ func TestExtractZipFileErrorHandling(t *testing.T) {
 		// 0555 directory may still succeed depending on the platform and filesystem.
 		// In that case, we skip this assertion rather than make the suite flaky.
 		readOnlyDir := filepath.Join(tempDir, "readonly")
-		err = os.MkdirAll(readOnlyDir, 0555) // Read-only directory
+		err = os.MkdirAll(readOnlyDir, 0o555) // Read-only directory
 		require.NoError(t, err)
 
 		// Try to extract - should fail and return error

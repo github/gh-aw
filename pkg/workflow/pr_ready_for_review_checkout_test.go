@@ -113,13 +113,13 @@ Test workflow without checkout (has permissions but checkout should be condition
 
 			// Create workflows directory
 			workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-			if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+			if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 				t.Fatalf("Failed to create workflows directory: %v", err)
 			}
 
 			// Write test workflow file
 			workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-			if err := os.WriteFile(workflowPath, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 
@@ -192,13 +192,13 @@ Test workflow with pull_request triggers.
 
 	// Create workflows directory
 	workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
 	// Write test workflow file
 	workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

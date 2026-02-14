@@ -20,12 +20,12 @@ func TestCompileWorkflow_StepOrderingWithAllThreeTypes(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err = os.MkdirAll(workflowsDir, 0755)
+	err = os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create shared directory for other imports
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	err = os.MkdirAll(sharedDir, 0755)
+	err = os.MkdirAll(sharedDir, 0o755)
 	require.NoError(t, err, "Failed to create shared directory")
 
 	// Create copilot-setup-steps.yml (should be inserted at start)
@@ -43,7 +43,7 @@ jobs:
         run: echo "Second copilot setup step"
 `
 	copilotSetupFile := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0600)
+	err = os.WriteFile(copilotSetupFile, []byte(copilotSetupContent), 0o600)
 	require.NoError(t, err, "Failed to write copilot-setup-steps.yml")
 
 	// Create a shared import file with steps (should come after copilot-setup but before main)
@@ -58,7 +58,7 @@ steps:
 Shared workflow content.
 `
 	sharedImportFile := filepath.Join(sharedDir, "shared-steps.md")
-	err = os.WriteFile(sharedImportFile, []byte(sharedImportContent), 0600)
+	err = os.WriteFile(sharedImportFile, []byte(sharedImportContent), 0o600)
 	require.NoError(t, err, "Failed to write shared import file")
 
 	// Create a workflow that imports both copilot-setup-steps.yml and shared-steps.md, plus has custom steps
@@ -87,7 +87,7 @@ This workflow tests the correct ordering of all three types of steps:
 3. Main frontmatter steps (last)
 `
 	workflowFile := filepath.Join(workflowsDir, "test-ordering.md")
-	err = os.WriteFile(workflowFile, []byte(workflowContent), 0600)
+	err = os.WriteFile(workflowFile, []byte(workflowContent), 0o600)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Change to the temp directory so the compiler can find the workflow

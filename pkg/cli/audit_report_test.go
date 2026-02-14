@@ -841,7 +841,7 @@ func TestBuildAuditDataComplete(t *testing.T) {
 		"output.log":   "Test log content",
 	}
 	for filename, content := range testFiles {
-		err := os.WriteFile(tmpDir+"/"+filename, []byte(content), 0644)
+		err := os.WriteFile(tmpDir+"/"+filename, []byte(content), 0o644)
 		require.NoError(t, err, "Failed to create test file %s", filename)
 	}
 

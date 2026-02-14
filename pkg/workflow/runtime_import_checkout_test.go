@@ -192,7 +192,7 @@ features:
 			// Create workflow file
 			workflowPath := filepath.Join(tmpDir, "test.md")
 			content := tt.frontmatter + "\n\n" + tt.markdown
-			if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 
@@ -246,7 +246,7 @@ features:
 	// Create workflow file
 	workflowPath := filepath.Join(tmpDir, "test.md")
 	content := frontmatter + "\n\n" + markdown
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

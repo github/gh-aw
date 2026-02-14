@@ -31,33 +31,33 @@ func TestResolveWorkflowPath(t *testing.T) {
 
 	// Create .github/workflows directory structure
 	workflowsDir := filepath.Join(constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
 	sharedMCPDir := filepath.Join(sharedDir, "mcp")
-	if err := os.MkdirAll(sharedMCPDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedMCPDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared/mcp directory: %v", err)
 	}
 
 	// Create test workflow files in different locations
 	testWorkflow := filepath.Join(workflowsDir, "test-workflow.md")
-	if err := os.WriteFile(testWorkflow, []byte("# Test"), 0644); err != nil {
+	if err := os.WriteFile(testWorkflow, []byte("# Test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
 	sharedWorkflow := filepath.Join(sharedDir, "shared-workflow.md")
-	if err := os.WriteFile(sharedWorkflow, []byte("# Shared"), 0644); err != nil {
+	if err := os.WriteFile(sharedWorkflow, []byte("# Shared"), 0o644); err != nil {
 		t.Fatalf("Failed to create shared workflow: %v", err)
 	}
 
 	mcpWorkflow := filepath.Join(sharedMCPDir, "serena.md")
-	if err := os.WriteFile(mcpWorkflow, []byte("# MCP"), 0644); err != nil {
+	if err := os.WriteFile(mcpWorkflow, []byte("# MCP"), 0o644); err != nil {
 		t.Fatalf("Failed to create MCP workflow: %v", err)
 	}
 

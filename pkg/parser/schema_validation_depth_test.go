@@ -108,7 +108,7 @@ Test workflow.`,
 			testFile := filepath.Join(tmpDir, "test.md")
 
 			// Write the workflow content
-			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

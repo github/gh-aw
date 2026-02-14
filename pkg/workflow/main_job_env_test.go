@@ -141,7 +141,7 @@ This workflow tests that job-level environment variables are properly set for sa
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-job-env.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 

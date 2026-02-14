@@ -42,7 +42,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -101,7 +101,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -153,7 +153,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -220,7 +220,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -308,7 +308,7 @@ permissions:
 This workflow tests comment and empty line handling.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -391,7 +391,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -495,7 +495,7 @@ permissions:
 This is a test workflow with slash command.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -567,7 +567,7 @@ safe-inputs:
 This is a test workflow with safe-inputs mode field.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -657,7 +657,7 @@ permissions:
 This is a test workflow.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -704,7 +704,7 @@ permissions:
 This workflow uses the deprecated grep tool.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -770,7 +770,7 @@ permissions:
 This workflow doesn't have grep.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -818,7 +818,7 @@ permissions:
 This workflow has sandbox disabled.
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -887,7 +887,7 @@ permissions:
 # Test Workflow
 `
 
-	if err := os.WriteFile(workflowFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 

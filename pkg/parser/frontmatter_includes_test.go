@@ -30,7 +30,7 @@ tools:
 # Test Content
 This is a test file content.
 `
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -43,7 +43,7 @@ Some content here.
 
 
 `
-	if err := os.WriteFile(testFileWithNewlines, []byte(testContentWithNewlines), 0644); err != nil {
+	if err := os.WriteFile(testFileWithNewlines, []byte(testContentWithNewlines), 0o644); err != nil {
 		t.Fatalf("Failed to write test file with newlines: %v", err)
 	}
 
@@ -133,7 +133,7 @@ tools:
 # Invalid Content
 This file has invalid frontmatter for an included file.
 `
-	if err := os.WriteFile(invalidFile, []byte(invalidContent), 0644); err != nil {
+	if err := os.WriteFile(invalidFile, []byte(invalidContent), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid test file: %v", err)
 	}
 
@@ -194,13 +194,13 @@ func TestProcessIncludesConditionalValidation(t *testing.T) {
 
 	// Create .github/workflows directory structure
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows dir: %v", err)
 	}
 
 	// Create docs directory for non-workflow files
 	docsDir := filepath.Join(tempDir, "docs")
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create docs dir: %v", err)
 	}
 
@@ -214,7 +214,7 @@ tools:
 
 # Valid Workflow
 This is a valid workflow file.`
-	if err := os.WriteFile(validWorkflowFile, []byte(validWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(validWorkflowFile, []byte(validWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write valid workflow file: %v", err)
 	}
 
@@ -230,7 +230,7 @@ tools:
 
 # Invalid Workflow
 This has invalid frontmatter fields.`
-	if err := os.WriteFile(invalidWorkflowFile, []byte(invalidWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(invalidWorkflowFile, []byte(invalidWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid workflow file: %v", err)
 	}
 
@@ -246,7 +246,7 @@ tools:
 
 # Invalid External File
 This has invalid frontmatter fields but it's outside workflows dir.`
-	if err := os.WriteFile(invalidNonWorkflowFile, []byte(invalidNonWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(invalidNonWorkflowFile, []byte(invalidNonWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write invalid non-workflow file: %v", err)
 	}
 
@@ -263,7 +263,7 @@ tools:
 
 # Agent Instructions
 These are instructions for AI agents.`
-	if err := os.WriteFile(agentFile, []byte(agentContent), 0644); err != nil {
+	if err := os.WriteFile(agentFile, []byte(agentContent), 0o644); err != nil {
 		t.Fatalf("Failed to write agent file: %v", err)
 	}
 
@@ -271,7 +271,7 @@ These are instructions for AI agents.`
 	plainFile := filepath.Join(docsDir, "plain.md")
 	plainContent := `# Plain Markdown
 This is just plain markdown content with no frontmatter.`
-	if err := os.WriteFile(plainFile, []byte(plainContent), 0644); err != nil {
+	if err := os.WriteFile(plainFile, []byte(plainContent), 0o644); err != nil {
 		t.Fatalf("Failed to write plain file: %v", err)
 	}
 
@@ -381,7 +381,7 @@ func TestExpandIncludes(t *testing.T) {
 
 	// Create go.mod to make it project root for component resolution
 	goModFile := filepath.Join(tempDir, "go.mod")
-	if err := os.WriteFile(goModFile, []byte("module test"), 0644); err != nil {
+	if err := os.WriteFile(goModFile, []byte("module test"), 0o644); err != nil {
 		t.Fatalf("Failed to write go.mod: %v", err)
 	}
 
@@ -396,7 +396,7 @@ tools:
 # Test Content
 This is test content.
 `
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -473,7 +473,7 @@ func TestProcessIncludesOptional(t *testing.T) {
 	// Create an existing include file
 	existingFile := filepath.Join(tempDir, "existing.md")
 	existingContent := "# Existing Include\nThis file exists."
-	if err := os.WriteFile(existingFile, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(existingFile, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing file: %v", err)
 	}
 
@@ -555,20 +555,19 @@ func TestProcessIncludesWithCycleDetection(t *testing.T) {
 
 	// Create file A that includes file B
 	fileA := filepath.Join(tempDir, "fileA.md")
-	if err := os.WriteFile(fileA, []byte("# File A\n@include fileB.md\n"), 0644); err != nil {
+	if err := os.WriteFile(fileA, []byte("# File A\n@include fileB.md\n"), 0o644); err != nil {
 		t.Fatalf("Failed to write fileA: %v", err)
 	}
 
 	// Create file B that includes file A (creating a cycle)
 	fileB := filepath.Join(tempDir, "fileB.md")
-	if err := os.WriteFile(fileB, []byte("# File B\n@include fileA.md\n"), 0644); err != nil {
+	if err := os.WriteFile(fileB, []byte("# File B\n@include fileA.md\n"), 0o644); err != nil {
 		t.Fatalf("Failed to write fileB: %v", err)
 	}
 
 	// Process includes from file A - should not hang due to cycle detection
 	content := "# Main\n@include fileA.md\n"
 	result, err := ProcessIncludes(content, tempDir, false)
-
 	if err != nil {
 		t.Errorf("ProcessIncludes with cycle should not error: %v", err)
 	}
@@ -585,7 +584,7 @@ func TestProcessIncludesWithCycleDetection(t *testing.T) {
 func TestProcessIncludedFileWithNameAndDescription(t *testing.T) {
 	tempDir := t.TempDir()
 	docsDir := filepath.Join(tempDir, "docs")
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create docs directory: %v", err)
 	}
 
@@ -603,7 +602,7 @@ tools:
 
 This is a shared configuration file.`
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -627,7 +626,7 @@ This is a shared configuration file.`
 func TestProcessIncludedFileWithOnlyNameAndDescription(t *testing.T) {
 	tempDir := t.TempDir()
 	docsDir := filepath.Join(tempDir, "docs")
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create docs directory: %v", err)
 	}
 
@@ -642,7 +641,7 @@ description: A minimal configuration with just metadata
 
 This file only has name and description in frontmatter.`
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -662,7 +661,7 @@ This file only has name and description in frontmatter.`
 func TestProcessIncludedFileWithInferField(t *testing.T) {
 	tempDir := t.TempDir()
 	agentsDir := filepath.Join(tempDir, ".github", "agents")
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create agents directory: %v", err)
 	}
 
@@ -678,7 +677,7 @@ infer: false
 
 This is a custom agent file with the infer field.`
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -698,7 +697,7 @@ This is a custom agent file with the infer field.`
 func TestProcessIncludedFileWithAgentToolsArray(t *testing.T) {
 	tempDir := t.TempDir()
 	agentsDir := filepath.Join(tempDir, ".github", "agents")
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create agents directory: %v", err)
 	}
 
@@ -731,7 +730,7 @@ tools:
 
 This agent removes feature flags from the codebase.`
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -762,7 +761,7 @@ This agent removes feature flags from the codebase.`
 func TestProcessIncludedFileWithEngineCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	docsDir := filepath.Join(tempDir, "docs")
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create docs directory: %v", err)
 	}
 
@@ -782,7 +781,7 @@ tools:
 
 This is a shared engine configuration with custom command.`
 
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 

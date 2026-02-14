@@ -27,7 +27,7 @@ Test workflow with top-level sandbox: false (no longer supported).
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-sandbox-false.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err)
 
 		compiler := NewCompiler()
@@ -55,7 +55,7 @@ Test workflow with sandbox: true (meaningless).
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-sandbox-true.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err)
 
 		compiler := NewCompiler()
@@ -87,7 +87,7 @@ Test workflow with agent sandbox disabled.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-false.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err)
 
 		compiler := NewCompiler()
@@ -131,7 +131,7 @@ Test workflow with agent sandbox disabled in strict mode.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-false-strict.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err)
 
 		compiler := NewCompiler()
@@ -159,7 +159,7 @@ Test workflow.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-false-warning.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		require.NoError(t, err)
 
 		compiler := NewCompiler()
@@ -198,7 +198,7 @@ Test workflow with tools and agent sandbox disabled.
 `
 
 	workflowPath := filepath.Join(workflowsDir, "test-agent-false-tools.md")
-	err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+	err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()

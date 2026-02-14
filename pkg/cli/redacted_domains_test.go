@@ -73,7 +73,7 @@ func TestParseRedactedDomainsLog(t *testing.T) {
 			// Create a temporary file with the test content
 			tmpDir := t.TempDir()
 			logPath := filepath.Join(tmpDir, "redacted-urls.log")
-			if err := os.WriteFile(logPath, []byte(tt.logContent), 0644); err != nil {
+			if err := os.WriteFile(logPath, []byte(tt.logContent), 0o644); err != nil {
 				t.Fatalf("failed to create test log file: %v", err)
 			}
 
@@ -110,7 +110,7 @@ func TestAnalyzeRedactedDomains_DirectPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	logContent := "example.com\ntest.org\n"
 	logPath := filepath.Join(tmpDir, "redacted-urls.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(logContent), 0o644); err != nil {
 		t.Fatalf("failed to create test log file: %v", err)
 	}
 
@@ -131,13 +131,13 @@ func TestAnalyzeRedactedDomains_DirectPath(t *testing.T) {
 func TestAnalyzeRedactedDomains_AgentOutputsPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	agentOutputsDir := filepath.Join(tmpDir, "agent_outputs")
-	if err := os.MkdirAll(agentOutputsDir, 0755); err != nil {
+	if err := os.MkdirAll(agentOutputsDir, 0o755); err != nil {
 		t.Fatalf("failed to create agent_outputs directory: %v", err)
 	}
 
 	logContent := "example.com\n"
 	logPath := filepath.Join(agentOutputsDir, "redacted-urls.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(logContent), 0o644); err != nil {
 		t.Fatalf("failed to create test log file: %v", err)
 	}
 
@@ -158,13 +158,13 @@ func TestAnalyzeRedactedDomains_AgentOutputsPath(t *testing.T) {
 func TestAnalyzeRedactedDomains_FullArtifactPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	fullPath := filepath.Join(tmpDir, "agent_outputs", "tmp", "gh-aw")
-	if err := os.MkdirAll(fullPath, 0755); err != nil {
+	if err := os.MkdirAll(fullPath, 0o755); err != nil {
 		t.Fatalf("failed to create full path directory: %v", err)
 	}
 
 	logContent := "domain1.com\ndomain2.org\ndomain3.net\n"
 	logPath := filepath.Join(fullPath, "redacted-urls.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(logContent), 0o644); err != nil {
 		t.Fatalf("failed to create test log file: %v", err)
 	}
 
@@ -199,13 +199,13 @@ func TestAnalyzeRedactedDomains_RecursiveSearch(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Create a nested directory structure
 	nestedDir := filepath.Join(tmpDir, "some", "nested", "path")
-	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
 		t.Fatalf("failed to create nested directory: %v", err)
 	}
 
 	logContent := "found-via-recursive.com\n"
 	logPath := filepath.Join(nestedDir, "redacted-urls.log")
-	if err := os.WriteFile(logPath, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(logContent), 0o644); err != nil {
 		t.Fatalf("failed to create test log file: %v", err)
 	}
 

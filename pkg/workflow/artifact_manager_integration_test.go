@@ -33,7 +33,7 @@ This test verifies that the artifact manager is integrated into the compiler.
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create compiler
@@ -88,7 +88,7 @@ This workflow has safe outputs configured.
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()
@@ -162,7 +162,7 @@ Test workflow 3.
 
 	for i, wf := range workflows {
 		workflowFile := filepath.Join(tmpDir, wf.name)
-		err := os.WriteFile(workflowFile, []byte(wf.content), 0644)
+		err := os.WriteFile(workflowFile, []byte(wf.content), 0o644)
 		require.NoError(t, err)
 
 		// Add some test data before compilation
@@ -207,7 +207,7 @@ Test lazy initialization.
 `
 
 	workflowFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowFile, []byte(workflowContent), 0644)
+	err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644)
 	require.NoError(t, err)
 
 	// Create compiler without initializing artifact manager

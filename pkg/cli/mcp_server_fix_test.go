@@ -97,7 +97,7 @@ func TestMCPServer_FixToolInvocation(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -112,7 +112,7 @@ timeout_minutes: 30
 This is a test workflow with deprecated timeout_minutes field.
 `
 	workflowPath := filepath.Join(workflowsDir, "test.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -155,7 +155,6 @@ This is a test workflow with deprecated timeout_minutes field.
 				"write":     false,
 			},
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to call fix tool: %v", err)
 		}
@@ -194,7 +193,6 @@ This is a test workflow with deprecated timeout_minutes field.
 				"write":     true,
 			},
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to call fix tool: %v", err)
 		}
@@ -250,7 +248,6 @@ This is a test workflow with deprecated timeout_minutes field.
 				"list_codemods": true,
 			},
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to call fix tool with list_codemods: %v", err)
 		}

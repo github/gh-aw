@@ -192,7 +192,7 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// Build AWF-wrapped command
 		firewallConfig := getFirewallConfig(workflowData)
 		agentConfig := getAgentConfig(workflowData)
-		var awfLogLevel = "info"
+		awfLogLevel := "info"
 		if firewallConfig != nil && firewallConfig.LogLevel != "" {
 			awfLogLevel = firewallConfig.LogLevel
 		}

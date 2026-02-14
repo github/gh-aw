@@ -93,7 +93,7 @@ Test playwright with copilot engine.
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test workflow file
 			testFile := filepath.Join(tmpDir, "test-"+strings.ReplaceAll(tt.name, " ", "-")+".md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow: %v", err)
 			}
 

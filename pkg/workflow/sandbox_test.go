@@ -343,7 +343,7 @@ permissions:
 	tmpDir := testutil.TempDir(t, "sandbox-filesystem-test")
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(testFile, []byte(content), 0644)
+	err := os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()
@@ -382,7 +382,7 @@ permissions:
 	tmpDir := testutil.TempDir(t, "sandbox-network-toplevel-test")
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(testFile, []byte(content), 0644)
+	err := os.WriteFile(testFile, []byte(content), 0o644)
 	require.NoError(t, err)
 
 	compiler := NewCompiler()

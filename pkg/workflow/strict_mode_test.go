@@ -60,7 +60,7 @@ network:
 			tmpDir := testutil.TempDir(t, "strict-timeout-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -245,7 +245,7 @@ features:
 			tmpDir := testutil.TempDir(t, "strict-permissions-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -350,7 +350,7 @@ network: {}
 			tmpDir := testutil.TempDir(t, "strict-network-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -404,7 +404,7 @@ tools:
 			tmpDir := testutil.TempDir(t, "strict-mcp-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -558,7 +558,7 @@ tools:
 			tmpDir := testutil.TempDir(t, "strict-bash-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -606,7 +606,7 @@ network:
 	tmpDir := testutil.TempDir(t, "non-strict-test")
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -702,7 +702,7 @@ features:
 			tmpDir := testutil.TempDir(t, "frontmatter-strict-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -742,7 +742,7 @@ features:
 	tmpDir := testutil.TempDir(t, "cli-precedence-test")
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -796,10 +796,10 @@ strict: false
 	strictFile := filepath.Join(tmpDir, "strict-workflow.md")
 	nonStrictFile := filepath.Join(tmpDir, "non-strict-workflow.md")
 
-	if err := os.WriteFile(strictFile, []byte(strictWorkflow), 0644); err != nil {
+	if err := os.WriteFile(strictFile, []byte(strictWorkflow), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(nonStrictFile, []byte(nonStrictWorkflow), 0644); err != nil {
+	if err := os.WriteFile(nonStrictFile, []byte(nonStrictWorkflow), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -884,7 +884,7 @@ engine: copilot
 			tmpDir := testutil.TempDir(t, "strict-github-workflow-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

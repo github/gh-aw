@@ -30,7 +30,7 @@ engine: copilot
 
 This is a test workflow for JSON output.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -105,7 +105,7 @@ toolz:
 
 This workflow has an invalid field.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -202,10 +202,10 @@ toolz: invalid
 Test workflow
 `
 
-	if err := os.WriteFile(validFile, []byte(validContent), 0644); err != nil {
+	if err := os.WriteFile(validFile, []byte(validContent), 0o644); err != nil {
 		t.Fatalf("Failed to create valid file: %v", err)
 	}
-	if err := os.WriteFile(invalidFile, []byte(invalidContent), 0644); err != nil {
+	if err := os.WriteFile(invalidFile, []byte(invalidContent), 0o644); err != nil {
 		t.Fatalf("Failed to create invalid file: %v", err)
 	}
 

@@ -39,7 +39,7 @@ Create a pull request targeting vnext branch in cross-repo.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -98,7 +98,7 @@ Create a pull request with default base branch.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-default.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -153,7 +153,7 @@ Create a pull request targeting release/v1.0 branch.
 `
 
 	workflowPath := filepath.Join(tmpDir, "test-slash.md")
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

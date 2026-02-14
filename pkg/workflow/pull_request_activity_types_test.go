@@ -39,7 +39,6 @@ func TestPullRequestActivityTypeEnumValidation(t *testing.T) {
 		t.Run("valid: pull_request "+activityType, func(t *testing.T) {
 			trigger := "pull_request " + activityType
 			ir, err := ParseTriggerShorthand(trigger)
-
 			// Handle cases where activity type is not in trigger parser's validTypes map
 			if err != nil {
 				// Parser explicitly rejected this type with an error
@@ -379,7 +378,6 @@ func TestPullRequestMergedSpecialCase(t *testing.T) {
 	t.Run("merged creates closed type with condition", func(t *testing.T) {
 		trigger := "pull_request merged"
 		ir, err := ParseTriggerShorthand(trigger)
-
 		if err != nil {
 			t.Fatalf("'merged' should not produce error: %v", err)
 		}
@@ -433,7 +431,6 @@ func TestIssueActivityTypeEnumValidation(t *testing.T) {
 		t.Run("valid: issue "+activityType, func(t *testing.T) {
 			trigger := "issue " + activityType
 			ir, err := ParseTriggerShorthand(trigger)
-
 			if err != nil {
 				// Error means it's not in the validTypes map yet
 				t.Logf("Issue activity type %q is valid in GitHub Actions but not yet in trigger parser (error: %v)", activityType, err)
@@ -474,7 +471,6 @@ func TestDiscussionActivityTypeEnumValidation(t *testing.T) {
 		t.Run("valid: discussion "+activityType, func(t *testing.T) {
 			trigger := "discussion " + activityType
 			ir, err := ParseTriggerShorthand(trigger)
-
 			if err != nil {
 				// Error means it's not in the validTypes map yet
 				t.Logf("Discussion activity type %q is valid in GitHub Actions but not yet in trigger parser (error: %v)", activityType, err)

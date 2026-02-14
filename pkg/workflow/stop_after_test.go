@@ -73,7 +73,7 @@ jobs:
 			defer os.RemoveAll(tmpDir)
 
 			lockFile := filepath.Join(tmpDir, "test.lock.yml")
-			err = os.WriteFile(lockFile, []byte(tt.lockContent), 0644)
+			err = os.WriteFile(lockFile, []byte(tt.lockContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -173,7 +173,7 @@ jobs:
           GH_AW_STOP_TIME: %s
           GH_AW_WORKFLOW_NAME: "Test Workflow"
 `, existingStopTime)
-	err = os.WriteFile(lockFile, []byte(lockContent), 0644)
+	err = os.WriteFile(lockFile, []byte(lockContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create lock file: %v", err)
 	}

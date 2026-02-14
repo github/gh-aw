@@ -17,7 +17,7 @@ func TestLogsPatchArtifactHandling(t *testing.T) {
 
 	// Create a mock log directory structure with artifacts
 	logDir := filepath.Join(tmpDir, "mock-run-123")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		t.Fatalf("Failed to create log directory: %v", err)
 	}
 
@@ -28,13 +28,13 @@ func TestLogsPatchArtifactHandling(t *testing.T) {
 		"workflow_name": "test-workflow",
 		"run_id": 123
 	}`
-	if err := os.WriteFile(awInfoFile, []byte(awInfoContent), 0644); err != nil {
+	if err := os.WriteFile(awInfoFile, []byte(awInfoContent), 0o644); err != nil {
 		t.Fatalf("Failed to write aw_info.json: %v", err)
 	}
 
 	awOutputFile := filepath.Join(logDir, "safe_output.jsonl")
 	awOutputContent := "Test output from agentic execution"
-	if err := os.WriteFile(awOutputFile, []byte(awOutputContent), 0644); err != nil {
+	if err := os.WriteFile(awOutputFile, []byte(awOutputContent), 0o644); err != nil {
 		t.Fatalf("Failed to write safe_output.jsonl: %v", err)
 	}
 
@@ -47,7 +47,7 @@ index 0000000..9daeafb
 @@ -0,0 +1 @@
 +test
 `
-	if err := os.WriteFile(awPatchFile, []byte(awPatchContent), 0644); err != nil {
+	if err := os.WriteFile(awPatchFile, []byte(awPatchContent), 0o644); err != nil {
 		t.Fatalf("Failed to write aw.patch: %v", err)
 	}
 

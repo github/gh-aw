@@ -128,7 +128,7 @@ tools:
 
 			// Write frontmatter + minimal prompt
 			content := tt.frontmatter + "\n\nTest workflow for cache-memory restore-only flag.\n"
-			if err := os.WriteFile(mdPath, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(mdPath, []byte(content), 0o644); err != nil {
 				t.Fatalf("Failed to write test markdown file: %v", err)
 			}
 

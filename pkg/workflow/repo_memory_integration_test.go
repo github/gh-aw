@@ -31,7 +31,7 @@ tools:
 This workflow uses repo memory.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -91,7 +91,7 @@ tools:
 This workflow uses custom repo memory configuration.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -148,7 +148,7 @@ tools:
 This workflow uses multiple repo memories.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -215,7 +215,7 @@ tools:
 This workflow has file validation.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -276,7 +276,7 @@ tools:
 This workflow has repo-memory disabled.
 `
 
-	if err := os.WriteFile(workflowPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

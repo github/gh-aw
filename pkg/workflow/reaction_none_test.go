@@ -39,7 +39,7 @@ Test command workflow with reaction explicitly disabled.
 `
 
 	testFile := filepath.Join(tmpDir, "test-command-bot.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,7 +126,7 @@ Test command workflow with default (eyes) reaction.
 `
 
 	testFile := filepath.Join(tmpDir, "test-command-bot-default.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -215,7 +215,7 @@ Test command workflow with explicit rocket reaction.
 `
 
 	testFile := filepath.Join(tmpDir, "test-command-bot-rocket.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +292,7 @@ Test workflow triggered by issue template with "eyes" reaction.
 `
 
 	testFile := filepath.Join(tmpDir, "test-issue-template.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

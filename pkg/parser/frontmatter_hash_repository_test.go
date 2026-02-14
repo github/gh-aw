@@ -64,7 +64,7 @@ func TestAllRepositoryWorkflowHashes(t *testing.T) {
 	// Write hash reference file for cross-language validation
 	referenceFile := filepath.Join(repoRoot, "tmp", "workflow-hashes-reference.txt")
 	tmpDir := filepath.Dir(referenceFile)
-	if err := os.MkdirAll(tmpDir, 0755); err == nil {
+	if err := os.MkdirAll(tmpDir, 0o755); err == nil {
 		f, err := os.Create(referenceFile)
 		if err == nil {
 			defer f.Close()

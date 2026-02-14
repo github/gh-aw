@@ -16,7 +16,7 @@ func TestFileExists(t *testing.T) {
 
 	// Test with existing file
 	testFile := filepath.Join(tmpDir, "testfile.txt")
-	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test content"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -32,7 +32,7 @@ func TestFileExists(t *testing.T) {
 
 	// Test with directory (should return false)
 	testDir := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(testDir, 0755); err != nil {
+	if err := os.Mkdir(testDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -47,7 +47,7 @@ func TestDirExists(t *testing.T) {
 
 	// Test with existing directory
 	testDir := filepath.Join(tmpDir, "testdir")
-	if err := os.Mkdir(testDir, 0755); err != nil {
+	if err := os.Mkdir(testDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestDirExists(t *testing.T) {
 
 	// Test with file (should return false)
 	testFile := filepath.Join(tmpDir, "testfile.txt")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -78,7 +78,7 @@ func TestIsDirEmpty(t *testing.T) {
 
 	// Test with empty directory
 	emptyDir := filepath.Join(tmpDir, "empty")
-	if err := os.Mkdir(emptyDir, 0755); err != nil {
+	if err := os.Mkdir(emptyDir, 0o755); err != nil {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
 
@@ -88,12 +88,12 @@ func TestIsDirEmpty(t *testing.T) {
 
 	// Test with non-empty directory
 	nonEmptyDir := filepath.Join(tmpDir, "nonempty")
-	if err := os.Mkdir(nonEmptyDir, 0755); err != nil {
+	if err := os.Mkdir(nonEmptyDir, 0o755); err != nil {
 		t.Fatalf("Failed to create non-empty directory: %v", err)
 	}
 
 	testFile := filepath.Join(nonEmptyDir, "file.txt")
-	if err := os.WriteFile(testFile, []byte("content"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("content"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -115,7 +115,7 @@ func TestCopyFile(t *testing.T) {
 	// Test successful copy
 	srcFile := filepath.Join(tmpDir, "source.txt")
 	srcContent := []byte("test content for copy")
-	if err := os.WriteFile(srcFile, srcContent, 0644); err != nil {
+	if err := os.WriteFile(srcFile, srcContent, 0o644); err != nil {
 		t.Fatalf("Failed to create source file: %v", err)
 	}
 
@@ -158,7 +158,7 @@ func TestCalculateDirectorySize(t *testing.T) {
 
 	// Test with empty directory
 	emptyDir := filepath.Join(tmpDir, "empty")
-	if err := os.Mkdir(emptyDir, 0755); err != nil {
+	if err := os.Mkdir(emptyDir, 0o755); err != nil {
 		t.Fatalf("Failed to create empty directory: %v", err)
 	}
 
@@ -169,20 +169,20 @@ func TestCalculateDirectorySize(t *testing.T) {
 
 	// Test with directory containing files
 	testDir := filepath.Join(tmpDir, "withfiles")
-	if err := os.Mkdir(testDir, 0755); err != nil {
+	if err := os.Mkdir(testDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
 	// Create files with known sizes
 	file1 := filepath.Join(testDir, "file1.txt")
 	file1Content := []byte("12345") // 5 bytes
-	if err := os.WriteFile(file1, file1Content, 0644); err != nil {
+	if err := os.WriteFile(file1, file1Content, 0o644); err != nil {
 		t.Fatalf("Failed to create file1: %v", err)
 	}
 
 	file2 := filepath.Join(testDir, "file2.txt")
 	file2Content := []byte("1234567890") // 10 bytes
-	if err := os.WriteFile(file2, file2Content, 0644); err != nil {
+	if err := os.WriteFile(file2, file2Content, 0o644); err != nil {
 		t.Fatalf("Failed to create file2: %v", err)
 	}
 
@@ -194,13 +194,13 @@ func TestCalculateDirectorySize(t *testing.T) {
 
 	// Test with nested directories
 	nestedDir := filepath.Join(testDir, "nested")
-	if err := os.Mkdir(nestedDir, 0755); err != nil {
+	if err := os.Mkdir(nestedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create nested directory: %v", err)
 	}
 
 	file3 := filepath.Join(nestedDir, "file3.txt")
 	file3Content := []byte("abc") // 3 bytes
-	if err := os.WriteFile(file3, file3Content, 0644); err != nil {
+	if err := os.WriteFile(file3, file3Content, 0o644); err != nil {
 		t.Fatalf("Failed to create file3: %v", err)
 	}
 

@@ -231,7 +231,6 @@ func TestVisitExpressionTreeWithDifferentNodeTypes(t *testing.T) {
 				count++
 				return nil
 			})
-
 			if err != nil {
 				t.Errorf("VisitExpressionTree() unexpected error: %v", err)
 			}

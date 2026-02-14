@@ -64,7 +64,7 @@ This workflow tests GitHub tool configuration.
 `
 
 			workflowFile := filepath.Join(setup.workflowsDir, "test-github-"+tc.name+".md")
-			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}
 
@@ -166,7 +166,7 @@ Test workflow for GitHub tools inspection.
 `
 
 			workflowFile := filepath.Join(setup.workflowsDir, "test-github-tools-"+engine+".md")
-			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}
 
@@ -234,7 +234,7 @@ Test workflow for specific GitHub toolsets.
 `
 
 	workflowFile := filepath.Join(setup.workflowsDir, "test-github-toolsets.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 

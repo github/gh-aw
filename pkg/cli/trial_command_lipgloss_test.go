@@ -194,7 +194,7 @@ func TestTrialConfirmationStructure(t *testing.T) {
 
 	// Test that the function accepts the expected parameters
 	// This is a compile-time validation test
-	var testFunc = showTrialConfirmation
+	testFunc := showTrialConfirmation
 
 	// Call with test parameters to ensure signature is correct
 	_ = testFunc

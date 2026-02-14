@@ -72,7 +72,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 
 	// Write the log content to a temporary file
 	logFile := filepath.Join(tempDir, "agent.log")
-	if err := os.WriteFile(logFile, logContent, 0644); err != nil {
+	if err := os.WriteFile(logFile, logContent, 0o644); err != nil {
 		return fmt.Errorf("failed to write log file: %w", err)
 	}
 
@@ -80,7 +80,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 	bootstrapScript := workflow.GetLogParserBootstrap()
 	if bootstrapScript != "" {
 		bootstrapFile := filepath.Join(tempDir, "log_parser_bootstrap.cjs")
-		if err := os.WriteFile(bootstrapFile, []byte(bootstrapScript), 0644); err != nil {
+		if err := os.WriteFile(bootstrapFile, []byte(bootstrapScript), 0o644); err != nil {
 			return fmt.Errorf("failed to write bootstrap file: %w", err)
 		}
 	}
@@ -89,7 +89,7 @@ func parseAgentLog(runDir string, engine workflow.CodingAgentEngine, verbose boo
 	sharedScript := workflow.GetJavaScriptSources()["log_parser_shared.cjs"]
 	if sharedScript != "" {
 		sharedFile := filepath.Join(tempDir, "log_parser_shared.cjs")
-		if err := os.WriteFile(sharedFile, []byte(sharedScript), 0644); err != nil {
+		if err := os.WriteFile(sharedFile, []byte(sharedScript), 0o644); err != nil {
 			return fmt.Errorf("failed to write shared helper file: %w", err)
 		}
 	}
@@ -131,7 +131,7 @@ process.env.GH_AW_AGENT_OUTPUT = '%s';
 
 	// Write the Node.js script
 	nodeFile := filepath.Join(tempDir, "parser.js")
-	if err := os.WriteFile(nodeFile, []byte(nodeScript), 0644); err != nil {
+	if err := os.WriteFile(nodeFile, []byte(nodeScript), 0o644); err != nil {
 		return fmt.Errorf("failed to write node script: %w", err)
 	}
 
@@ -145,7 +145,7 @@ process.env.GH_AW_AGENT_OUTPUT = '%s';
 
 	// Write the output to log.md in the run directory
 	logMdPath := filepath.Join(runDir, "log.md")
-	if err := os.WriteFile(logMdPath, []byte(strings.TrimSpace(string(output))), 0644); err != nil {
+	if err := os.WriteFile(logMdPath, []byte(strings.TrimSpace(string(output))), 0o644); err != nil {
 		return fmt.Errorf("failed to write log.md: %w", err)
 	}
 

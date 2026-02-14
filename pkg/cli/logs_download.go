@@ -162,14 +162,14 @@ func flattenUnifiedArtifact(outputDir string, verbose bool) error {
 
 		if info.IsDir() {
 			// Create directory in destination with owner+group permissions only (0750)
-			if err := os.MkdirAll(destPath, 0750); err != nil {
+			if err := os.MkdirAll(destPath, 0o750); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
 			}
 			logsDownloadLog.Printf("Created directory: %s", destPath)
 		} else {
 			// Move file to destination
 			// Ensure parent directory exists with owner+group permissions only (0750)
-			if err := os.MkdirAll(filepath.Dir(destPath), 0750); err != nil {
+			if err := os.MkdirAll(filepath.Dir(destPath), 0o750); err != nil {
 				return fmt.Errorf("failed to create parent directory for %s: %w", destPath, err)
 			}
 
@@ -184,7 +184,6 @@ func flattenUnifiedArtifact(outputDir string, verbose bool) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to flatten unified artifact: %w", err)
 	}
@@ -242,14 +241,14 @@ func flattenAgentOutputsArtifact(outputDir string, verbose bool) error {
 
 		if info.IsDir() {
 			// Create directory in destination
-			if err := os.MkdirAll(destPath, 0750); err != nil {
+			if err := os.MkdirAll(destPath, 0o750); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
 			}
 			logsDownloadLog.Printf("Created directory: %s", destPath)
 		} else {
 			// Move file to destination
 			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(destPath), 0750); err != nil {
+			if err := os.MkdirAll(filepath.Dir(destPath), 0o750); err != nil {
 				return fmt.Errorf("failed to create parent directory for %s: %w", destPath, err)
 			}
 
@@ -264,7 +263,6 @@ func flattenAgentOutputsArtifact(outputDir string, verbose bool) error {
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to flatten agent_outputs artifact: %w", err)
 	}
@@ -317,13 +315,13 @@ func downloadWorkflowRunLogs(runID int64, outputDir string, verbose bool) error 
 	}
 
 	// Write the downloaded zip content to temporary file
-	if err := os.WriteFile(tmpZip, output, 0644); err != nil {
+	if err := os.WriteFile(tmpZip, output, 0o644); err != nil {
 		return fmt.Errorf("failed to write logs zip file: %w", err)
 	}
 
 	// Create a subdirectory for workflow logs to keep the run directory organized
 	workflowLogsDir := filepath.Join(outputDir, "workflow-logs")
-	if err := os.MkdirAll(workflowLogsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowLogsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create workflow-logs directory: %w", err)
 	}
 
@@ -459,7 +457,6 @@ func listArtifacts(outputDir string) ([]string, error) {
 		artifacts = append(artifacts, relPath)
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +488,7 @@ func downloadRunArtifacts(runID int64, outputDir string, verbose bool) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create run output directory: %w", err)
 	}
 	if verbose {
@@ -510,7 +507,6 @@ func downloadRunArtifacts(runID int64, outputDir string, verbose bool) error {
 
 	cmd := workflow.ExecGH("run", "download", strconv.FormatInt(runID, 10), "--dir", outputDir)
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		// Stop spinner on error
 		if !verbose {

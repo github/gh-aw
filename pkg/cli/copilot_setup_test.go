@@ -135,7 +135,7 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 			// Create existing workflow if specified
 			if tt.existingWorkflow != nil {
 				workflowsDir := filepath.Join(".github", "workflows")
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					t.Fatalf("Failed to create workflows directory: %v", err)
 				}
 
@@ -145,7 +145,7 @@ func TestEnsureCopilotSetupSteps(t *testing.T) {
 				}
 
 				setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-				if err := os.WriteFile(setupStepsPath, data, 0644); err != nil {
+				if err := os.WriteFile(setupStepsPath, data, 0o644); err != nil {
 					t.Fatalf("Failed to write existing workflow: %v", err)
 				}
 			}
@@ -403,7 +403,7 @@ func TestEnsureCopilotSetupStepsFilePermissions(t *testing.T) {
 
 	// Verify file is readable and writable
 	mode := info.Mode()
-	if mode.Perm()&0600 != 0600 {
+	if mode.Perm()&0o600 != 0o600 {
 		t.Errorf("Expected file to have at least 0600 permissions, got %o", mode.Perm())
 	}
 }
@@ -709,7 +709,7 @@ func TestEnsureCopilotSetupSteps_UpdateExistingWithReleaseMode(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -726,7 +726,7 @@ jobs:
         run: echo "test"
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
@@ -774,7 +774,7 @@ func TestEnsureCopilotSetupSteps_UpdateExistingWithDevMode(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -791,7 +791,7 @@ jobs:
         run: echo "test"
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
@@ -845,7 +845,7 @@ func TestEnsureCopilotSetupSteps_SkipsUpdateWhenActionExists(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -861,7 +861,7 @@ jobs:
           version: v1.0.0
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
@@ -903,7 +903,7 @@ func TestEnsureCopilotSetupSteps_SkipsUpdateWhenCurlExists(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -918,7 +918,7 @@ jobs:
         run: curl -fsSL https://raw.githubusercontent.com/github/gh-aw/refs/heads/main/install-gh-aw.sh | bash
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
@@ -1046,7 +1046,7 @@ func TestUpgradeCopilotSetupSteps(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -1067,7 +1067,7 @@ jobs:
         run: gh aw version
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 
@@ -1146,7 +1146,7 @@ func TestUpgradeCopilotSetupSteps_DevMode(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -1163,7 +1163,7 @@ jobs:
         run: gh aw version
 `
 	setupStepsPath := filepath.Join(workflowsDir, "copilot-setup-steps.yml")
-	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(existingContent), 0o644); err != nil {
 		t.Fatalf("Failed to write existing workflow: %v", err)
 	}
 

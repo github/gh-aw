@@ -44,7 +44,7 @@ in the consolidated safe_outputs job when create-pull-request is enabled.
 `
 
 	mdFile := filepath.Join(tmpDir, "test-patch-download.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -138,7 +138,7 @@ push-to-pull-request-branch is enabled.
 `
 
 	mdFile := filepath.Join(tmpDir, "test-push-patch-download.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -191,7 +191,7 @@ only non-PR safe outputs are enabled.
 `
 
 	mdFile := filepath.Join(tmpDir, "test-no-patch.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 

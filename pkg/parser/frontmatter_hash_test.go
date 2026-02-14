@@ -273,7 +273,7 @@ on:
 This is a test workflow.
 `
 
-	err := os.WriteFile(workflowFile, []byte(content), 0644)
+	err := os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Should write test file")
 
 	cache := NewImportCache("")
@@ -294,7 +294,7 @@ func TestComputeFrontmatterHash_WithImports(t *testing.T) {
 
 	// Create a shared workflow
 	sharedDir := filepath.Join(tempDir, "shared")
-	err := os.MkdirAll(sharedDir, 0755)
+	err := os.MkdirAll(sharedDir, 0o755)
 	require.NoError(t, err, "Should create shared directory")
 
 	sharedFile := filepath.Join(sharedDir, "common.md")
@@ -311,7 +311,7 @@ labels:
 
 This is shared.
 `
-	err = os.WriteFile(sharedFile, []byte(sharedContent), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedContent), 0o644)
 	require.NoError(t, err, "Should write shared file")
 
 	// Create a main workflow that imports the shared workflow
@@ -329,7 +329,7 @@ labels:
 
 This is the main workflow.
 `
-	err = os.WriteFile(mainFile, []byte(mainContent), 0644)
+	err = os.WriteFile(mainFile, []byte(mainContent), 0o644)
 	require.NoError(t, err, "Should write main file")
 
 	cache := NewImportCache("")

@@ -108,7 +108,7 @@ Test protocol-specific domains in safe-outputs.
 			// Create temporary directory and workflow file
 			tmpDir := t.TempDir()
 			workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(workflowPath, []byte(tt.workflow), 0644)
+			err := os.WriteFile(workflowPath, []byte(tt.workflow), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -225,7 +225,7 @@ Test valid HTTPS protocol.
 			// Create temporary directory and workflow file
 			tmpDir := t.TempDir()
 			workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(workflowPath, []byte(tt.workflow), 0644)
+			err := os.WriteFile(workflowPath, []byte(tt.workflow), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -267,7 +267,7 @@ Test backward compatibility with domains without protocols.
 	// Create temporary directory and workflow file
 	tmpDir := t.TempDir()
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	err := os.WriteFile(workflowPath, []byte(workflow), 0644)
+	err := os.WriteFile(workflowPath, []byte(workflow), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

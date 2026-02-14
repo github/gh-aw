@@ -25,7 +25,7 @@ imports:
 
 # Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -77,7 +77,7 @@ tools:
   bash: {}
 ---
 `
-	if err := os.WriteFile(validImportPath, []byte(validImportContent), 0644); err != nil {
+	if err := os.WriteFile(validImportPath, []byte(validImportContent), 0o644); err != nil {
 		t.Fatalf("Failed to write valid import file: %v", err)
 	}
 
@@ -92,7 +92,7 @@ imports:
 
 # Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -144,7 +144,7 @@ imports:
 
 # Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

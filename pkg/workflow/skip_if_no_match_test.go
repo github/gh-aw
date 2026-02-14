@@ -32,7 +32,7 @@ engine: claude
 This workflow has a skip-if-no-match configuration.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-if-no-match-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -104,7 +104,7 @@ engine: claude
 This workflow has both stop-after and skip-if-no-match.
 `
 		workflowFile := filepath.Join(tmpDir, "multiple-checks-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -156,7 +156,7 @@ engine: claude
 This workflow has skip-if-no-match but no role restrictions.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-no-match-no-roles-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -205,7 +205,7 @@ engine: claude
 This workflow uses object format with min parameter.
 `
 		workflowFile := filepath.Join(tmpDir, "skip-no-match-object-format-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -257,7 +257,7 @@ engine: claude
 This workflow uses object format but omits min (defaults to 1).
 `
 		workflowFile := filepath.Join(tmpDir, "skip-no-match-object-no-min-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -304,7 +304,7 @@ engine: claude
 This workflow uses both skip-if-match and skip-if-no-match.
 `
 		workflowFile := filepath.Join(tmpDir, "combined-skip-checks-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

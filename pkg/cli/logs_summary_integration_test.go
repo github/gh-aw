@@ -18,7 +18,7 @@ func TestRunSummaryCachingBehavior(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-99999")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -42,7 +42,7 @@ func TestRunSummaryCachingBehavior(t *testing.T) {
 
 	for filename, content := range testFiles {
 		filePath := filepath.Join(runDir, filename)
-		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}
@@ -161,7 +161,7 @@ func TestRunSummaryCachingBehavior(t *testing.T) {
 func TestRunSummaryPreventsReprocessing(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-88888")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -171,7 +171,7 @@ func TestRunSummaryPreventsReprocessing(t *testing.T) {
 	defer SetVersionInfo(originalVersion)
 
 	// Create minimal test artifacts
-	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte("{}"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -215,7 +215,7 @@ func TestRunSummaryPreventsReprocessing(t *testing.T) {
 func TestListArtifactsExcludesSummary(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	runDir := filepath.Join(tmpDir, "run-77777")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
 
@@ -228,7 +228,7 @@ func TestListArtifactsExcludesSummary(t *testing.T) {
 
 	for _, filename := range testFiles {
 		filePath := filepath.Join(runDir, filename)
-		if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte("test"), 0o644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}

@@ -29,7 +29,7 @@ Content here
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -60,7 +60,7 @@ Can be imported
 `
 
 	testFile := filepath.Join(tmpDir, "shared.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -81,7 +81,7 @@ Just markdown content
 `
 
 	testFile := filepath.Join(tmpDir, "no-fm.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -105,7 +105,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "invalid.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -125,7 +125,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "no-markdown.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -168,7 +168,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(tmpDir, "schedule.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -219,7 +219,7 @@ engine: copilot
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := tt.frontmatter + "\n\n# Workflow\n"
 			testFile := filepath.Join(tmpDir, "filter-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			result, err := compiler.parseFrontmatterSection(testFile)
@@ -391,7 +391,7 @@ Normal content
 `
 
 	testFile := filepath.Join(tmpDir, "template.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -411,7 +411,7 @@ func TestParseFrontmatterSection_EmptyFrontmatter(t *testing.T) {
 `
 
 	testFile := filepath.Join(tmpDir, "empty.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)
@@ -424,7 +424,7 @@ func TestParseFrontmatterSection_EmptyFrontmatter(t *testing.T) {
 func TestParseFrontmatterSection_MarkdownDirectory(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "frontmatter-dir")
 	subDir := filepath.Join(tmpDir, "subdir")
-	require.NoError(t, os.MkdirAll(subDir, 0755))
+	require.NoError(t, os.MkdirAll(subDir, 0o755))
 
 	testContent := `---
 on: push
@@ -435,7 +435,7 @@ engine: copilot
 `
 
 	testFile := filepath.Join(subDir, "test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	result, err := compiler.parseFrontmatterSection(testFile)

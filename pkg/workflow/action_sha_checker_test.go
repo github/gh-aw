@@ -29,7 +29,7 @@ jobs:
       - uses: github/codeql-action/upload-sarif@ab2e54f42aa112ff08704159b88a57517f6f0ebb
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test lock file: %v", err)
 	}
 
@@ -92,7 +92,7 @@ jobs:
       - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test lock file: %v", err)
 	}
 
@@ -171,7 +171,7 @@ jobs:
         run: npm test
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test lock file: %v", err)
 	}
 
@@ -214,7 +214,7 @@ jobs:
         run: npm test
 `
 
-	if err := os.WriteFile(lockFile, []byte(lockContent), 0644); err != nil {
+	if err := os.WriteFile(lockFile, []byte(lockContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test lock file: %v", err)
 	}
 

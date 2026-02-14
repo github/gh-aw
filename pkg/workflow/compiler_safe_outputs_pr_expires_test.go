@@ -71,7 +71,7 @@ safe-outputs:
 Test workflow
 `
 
-			err := os.WriteFile(workflowFile, []byte(markdown), 0644)
+			err := os.WriteFile(workflowFile, []byte(markdown), 0o644)
 			require.NoError(t, err, "Should write workflow file")
 
 			// Compile the workflow

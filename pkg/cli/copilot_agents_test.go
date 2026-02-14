@@ -124,10 +124,10 @@ func TestDeleteOldAgentFiles(t *testing.T) {
 			for _, filePath := range tt.filesToCreate {
 				fullPath := filepath.Join(tempDir, filePath)
 				dir := filepath.Dir(fullPath)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0o755); err != nil {
 					t.Fatalf("Failed to create directory %s: %v", dir, err)
 				}
-				if err := os.WriteFile(fullPath, []byte("test content"), 0644); err != nil {
+				if err := os.WriteFile(fullPath, []byte("test content"), 0o644); err != nil {
 					t.Fatalf("Failed to create file %s: %v", fullPath, err)
 				}
 			}
@@ -234,13 +234,13 @@ func TestDeleteOldTemplateFiles(t *testing.T) {
 			// Create templates directory and files
 			templatesDir := filepath.Join(tempDir, "pkg", "cli", "templates")
 			if len(tt.filesToCreate) > 0 {
-				if err := os.MkdirAll(templatesDir, 0755); err != nil {
+				if err := os.MkdirAll(templatesDir, 0o755); err != nil {
 					t.Fatalf("Failed to create templates directory: %v", err)
 				}
 
 				for _, file := range tt.filesToCreate {
 					path := filepath.Join(templatesDir, file)
-					if err := os.WriteFile(path, []byte("# Test template content"), 0644); err != nil {
+					if err := os.WriteFile(path, []byte("# Test template content"), 0o644); err != nil {
 						t.Fatalf("Failed to create file %s: %v", file, err)
 					}
 				}

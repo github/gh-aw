@@ -36,7 +36,7 @@ Actor: ${{ github.actor }}
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,7 +131,7 @@ Actor: ${{ github.actor }}
 `
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

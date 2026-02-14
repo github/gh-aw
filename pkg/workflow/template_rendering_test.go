@@ -52,7 +52,7 @@ Normal content here.
 `
 
 	testFile := filepath.Join(tmpDir, "test-template-rendering.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,7 +165,7 @@ Normal content without conditionals.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-template.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -219,7 +219,7 @@ Normal content without conditionals in markdown.
 `
 
 	testFile := filepath.Join(tmpDir, "test-github-tool.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

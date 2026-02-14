@@ -33,7 +33,7 @@ engine: claude
 This workflow has a stop-after configuration.
 `
 		workflowFile := filepath.Join(tmpDir, "stop-time-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -115,7 +115,7 @@ roles: all
 This workflow has no stop-after configuration and roles: all.
 `
 		workflowFile := filepath.Join(tmpDir, "normal-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -151,7 +151,7 @@ engine: claude
 This workflow requires membership checks.
 `
 		workflowFile := filepath.Join(tmpDir, "membership-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -214,7 +214,7 @@ engine: claude
 This workflow has both membership check and stop-after.
 `
 		workflowFile := filepath.Join(tmpDir, "both-checks-workflow.md")
-		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+		if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

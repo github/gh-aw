@@ -7,7 +7,6 @@ import (
 
 // generateEngineExecutionSteps generates the GitHub Actions steps for executing the AI engine
 func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *WorkflowData, engine CodingAgentEngine, logFile string) {
-
 	steps := engine.GetExecutionSteps(data, logFile)
 
 	for _, step := range steps {

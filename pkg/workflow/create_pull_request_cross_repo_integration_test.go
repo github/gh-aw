@@ -40,7 +40,7 @@ Create a pull request in a different repository.
 `
 
 	workflowPath := filepath.Join(tmpDir, "cross-repo.md")
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644), "Failed to write workflow file")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644), "Failed to write workflow file")
 
 	// Compile the workflow
 	compiler := NewCompiler()
@@ -97,7 +97,7 @@ Create a pull request in the same repository.
 `
 
 	workflowPath := filepath.Join(tmpDir, "same-repo.md")
-	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644), "Failed to write workflow file")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0o644), "Failed to write workflow file")
 
 	// Compile the workflow
 	compiler := NewCompiler()

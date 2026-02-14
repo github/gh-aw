@@ -21,8 +21,10 @@ var (
 )
 
 // Global flags
-var verboseFlag bool
-var bannerFlag bool
+var (
+	verboseFlag bool
+	bannerFlag  bool
+)
 
 // formatListWithOr formats a list of strings with commas and "or" before the last item
 // Example: ["a", "b", "c"] -> "a, b, or c"

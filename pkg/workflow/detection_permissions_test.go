@@ -33,7 +33,7 @@ safe-outputs:
 Create an issue.
 `
 
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	require.NoError(t, err, "Failed to write workflow file")
 
 	compiler := NewCompiler()
@@ -87,7 +87,7 @@ safe-outputs:
 Create an issue.
 `
 
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	require.NoError(t, err, "Failed to write workflow file")
 
 	compiler := NewCompiler()

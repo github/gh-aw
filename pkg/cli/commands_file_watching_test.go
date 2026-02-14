@@ -77,7 +77,7 @@ func TestWatchAndCompileWorkflows(t *testing.T) {
 			t.Fatalf("Failed to init git repo: %v", initErr)
 		}
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		compiler := workflow.NewCompiler()
 
@@ -104,11 +104,11 @@ func TestWatchAndCompileWorkflows(t *testing.T) {
 			t.Fatalf("Failed to init git repo: %v", initErr)
 		}
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a test workflow file
 		testFile := filepath.Join(workflowsDir, "test.md")
-		os.WriteFile(testFile, []byte("# Test Workflow\n\nTest content"), 0644)
+		os.WriteFile(testFile, []byte("# Test Workflow\n\nTest content"), 0o644)
 
 		compiler := &workflow.Compiler{}
 
@@ -141,7 +141,7 @@ func TestCompileAllWorkflowFiles(t *testing.T) {
 	t.Run("compile all with no markdown files", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		compiler := &workflow.Compiler{}
 
@@ -157,14 +157,14 @@ func TestCompileAllWorkflowFiles(t *testing.T) {
 	t.Run("compile all with markdown files", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create test markdown files
 		testFiles := []string{"test1.md", "test2.md", "test3.md"}
 		for _, file := range testFiles {
 			filePath := filepath.Join(workflowsDir, file)
 			content := fmt.Sprintf("---\non: push\nengine: claude\n---\n# %s\n\nTest workflow content", strings.TrimSuffix(file, ".md"))
-			os.WriteFile(filePath, []byte(content), 0644)
+			os.WriteFile(filePath, []byte(content), 0o644)
 		}
 
 		// Create a basic compiler
@@ -208,12 +208,12 @@ func TestCompileAllWorkflowFiles(t *testing.T) {
 	t.Run("compile all with compilation errors", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create an invalid markdown file (malformed YAML)
 		invalidFile := filepath.Join(workflowsDir, "invalid.md")
 		invalidContent := "---\nmalformed: yaml: content:\n  - missing\n    proper: structure\n---\n# Invalid\n\nThis should fail"
-		os.WriteFile(invalidFile, []byte(invalidContent), 0644)
+		os.WriteFile(invalidFile, []byte(invalidContent), 0o644)
 
 		compiler := workflow.NewCompiler()
 
@@ -230,12 +230,12 @@ func TestCompileAllWorkflowFiles(t *testing.T) {
 	t.Run("compile all verbose mode", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a valid test file
 		testFile := filepath.Join(workflowsDir, "verbose-test.md")
 		content := "---\non: push\nengine: claude\n---\n# Verbose Test\n\nTest content for verbose mode"
-		os.WriteFile(testFile, []byte(content), 0644)
+		os.WriteFile(testFile, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 
@@ -256,7 +256,7 @@ func TestCompileModifiedFiles(t *testing.T) {
 	t.Run("compile modified files basic functionality", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create test files with different modification times
 		file1 := filepath.Join(workflowsDir, "recent.md")
@@ -264,8 +264,8 @@ func TestCompileModifiedFiles(t *testing.T) {
 
 		content := "---\non: push\nengine: claude\n---\n# Test\n\nTest content"
 
-		os.WriteFile(file1, []byte(content), 0644)
-		os.WriteFile(file2, []byte(content), 0644)
+		os.WriteFile(file1, []byte(content), 0o644)
+		os.WriteFile(file2, []byte(content), 0o644)
 
 		// Make file2 older
 		oldTime := time.Now().Add(-2 * time.Hour)
@@ -306,12 +306,12 @@ func TestCompileModifiedFiles(t *testing.T) {
 	t.Run("compile modified files verbose mode", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a recent file
 		recentFile := filepath.Join(workflowsDir, "recent.md")
 		content := "---\non: push\nengine: claude\n---\n# Recent Test\n\nRecent content"
-		os.WriteFile(recentFile, []byte(content), 0644)
+		os.WriteFile(recentFile, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 
@@ -328,12 +328,12 @@ func TestHandleFileDeleted(t *testing.T) {
 	t.Run("handle deleted markdown file", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a lock file that should be deleted when markdown file is removed
 		lockFile := filepath.Join(workflowsDir, "deleted-workflow.lock.yml")
 		lockContent := "# Generated lock file content\nname: deleted-workflow\n"
-		os.WriteFile(lockFile, []byte(lockContent), 0644)
+		os.WriteFile(lockFile, []byte(lockContent), 0o644)
 
 		// Simulate the markdown file path
 		markdownFile := filepath.Join(workflowsDir, "deleted-workflow.md")
@@ -359,7 +359,7 @@ func TestHandleFileDeleted(t *testing.T) {
 	t.Run("handle deleted file without corresponding lock", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Test deleting a markdown file that doesn't have a corresponding lock file
 		markdownFile := filepath.Join(workflowsDir, "no-lock.md")
@@ -370,11 +370,11 @@ func TestHandleFileDeleted(t *testing.T) {
 	t.Run("handle deleted file verbose mode", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a lock file
 		lockFile := filepath.Join(workflowsDir, "verbose-test.lock.yml")
-		os.WriteFile(lockFile, []byte("name: verbose-test\n"), 0644)
+		os.WriteFile(lockFile, []byte("name: verbose-test\n"), 0o644)
 
 		markdownFile := filepath.Join(workflowsDir, "verbose-test.md")
 
@@ -385,13 +385,13 @@ func TestHandleFileDeleted(t *testing.T) {
 	t.Run("handle deleted file with permission error", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a lock file in a read-only directory (simulate permission error)
 		readOnlyDir := filepath.Join(tempDir, "readonly")
-		os.MkdirAll(readOnlyDir, 0555) // read-only
+		os.MkdirAll(readOnlyDir, 0o555) // read-only
 		defer func() {
-			if err := os.Chmod(readOnlyDir, 0755); err != nil {
+			if err := os.Chmod(readOnlyDir, 0o755); err != nil {
 				t.Errorf("Failed to restore permissions: %v", err)
 			}
 		}() // restore permissions for cleanup
@@ -409,12 +409,12 @@ func TestCompileSingleFile(t *testing.T) {
 	t.Run("compile single file successfully", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a valid workflow file
 		filePath := filepath.Join(workflowsDir, "test.md")
 		content := "---\non: push\nengine: claude\n---\n# Test\n\nTest workflow content"
-		os.WriteFile(filePath, []byte(content), 0644)
+		os.WriteFile(filePath, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 		stats := &CompilationStats{}
@@ -444,12 +444,12 @@ func TestCompileSingleFile(t *testing.T) {
 	t.Run("compile single file with error", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create an invalid workflow file
 		filePath := filepath.Join(workflowsDir, "invalid.md")
 		content := "---\nmalformed: yaml: content:\n  - missing\n    proper: structure\n---\n# Invalid\n"
-		os.WriteFile(filePath, []byte(content), 0644)
+		os.WriteFile(filePath, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 		stats := &CompilationStats{}
@@ -481,12 +481,12 @@ func TestCompileSingleFile(t *testing.T) {
 	t.Run("compile single file with checkExists true and file exists", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a valid workflow file
 		filePath := filepath.Join(workflowsDir, "test.md")
 		content := "---\non: push\nengine: claude\n---\n# Test\n\nTest workflow content"
-		os.WriteFile(filePath, []byte(content), 0644)
+		os.WriteFile(filePath, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 		stats := &CompilationStats{}
@@ -506,7 +506,7 @@ func TestCompileSingleFile(t *testing.T) {
 	t.Run("compile single file with checkExists true and file does not exist", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Use a non-existent file path
 		filePath := filepath.Join(workflowsDir, "nonexistent.md")
@@ -529,12 +529,12 @@ func TestCompileSingleFile(t *testing.T) {
 	t.Run("compile single file verbose mode", func(t *testing.T) {
 		tempDir := testutil.TempDir(t, "test-*")
 		workflowsDir := filepath.Join(tempDir, ".github/workflows")
-		os.MkdirAll(workflowsDir, 0755)
+		os.MkdirAll(workflowsDir, 0o755)
 
 		// Create a valid workflow file
 		filePath := filepath.Join(workflowsDir, "verbose-test.md")
 		content := "---\non: push\nengine: claude\n---\n# Verbose Test\n\nTest workflow content"
-		os.WriteFile(filePath, []byte(content), 0644)
+		os.WriteFile(filePath, []byte(content), 0o644)
 
 		compiler := workflow.NewCompiler()
 		stats := &CompilationStats{}

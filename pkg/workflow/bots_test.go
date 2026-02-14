@@ -70,7 +70,7 @@ Test workflow content.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Write the workflow file
 			workflowPath := filepath.Join(tmpDir, tt.filename)
-			err := os.WriteFile(workflowPath, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(workflowPath, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
@@ -117,7 +117,7 @@ bots: ["dependabot[bot]", "renovate[bot]"]
 Test workflow content.`
 
 	workflowPath := filepath.Join(tmpDir, "workflow-with-bots.md")
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -165,7 +165,7 @@ bots: ["dependabot[bot]"]
 Test workflow content with bot and default roles.`
 
 	workflowPath := filepath.Join(tmpDir, "workflow-bots-default-roles.md")
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
@@ -214,7 +214,7 @@ bots: ["dependabot[bot]"]
 Test workflow content.`
 
 	workflowPath := filepath.Join(tmpDir, "workflow-bots-roles-all.md")
-	err := os.WriteFile(workflowPath, []byte(frontmatter), 0644)
+	err := os.WriteFile(workflowPath, []byte(frontmatter), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}

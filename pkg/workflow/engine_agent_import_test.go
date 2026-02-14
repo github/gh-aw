@@ -257,10 +257,10 @@ func TestAgentFileValidation(t *testing.T) {
 	// Create the directory structure: .github/agents/ and .github/workflows/
 	agentsDir := filepath.Join(tmpDir, ".github", "agents")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create agents directory: %v", err)
 	}
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -275,7 +275,7 @@ title: Test Agent
 This is a test agent file.
 `
 	validAgentFilePath := filepath.Join(agentsDir, "valid-agent.md")
-	if err := os.WriteFile(validAgentFilePath, []byte(agentContent), 0644); err != nil {
+	if err := os.WriteFile(validAgentFilePath, []byte(agentContent), 0o644); err != nil {
 		t.Fatalf("Failed to create valid agent file: %v", err)
 	}
 

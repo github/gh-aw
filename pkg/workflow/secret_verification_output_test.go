@@ -24,7 +24,7 @@ engine: copilot
 
 Test workflow`
 
-	if err := os.WriteFile(workflowFile, []byte(workflow), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 
@@ -68,7 +68,7 @@ safe-outputs:
 
 Test workflow`
 
-	if err := os.WriteFile(workflowFile, []byte(workflow), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow: %v", err)
 	}
 

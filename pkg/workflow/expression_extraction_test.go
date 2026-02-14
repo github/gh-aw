@@ -67,7 +67,6 @@ func TestExpressionExtractor_ExtractExpressions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			extractor := NewExpressionExtractor()
 			mappings, err := extractor.ExtractExpressions(tt.markdown)
-
 			if err != nil {
 				t.Errorf("ExtractExpressions() error = %v", err)
 				return

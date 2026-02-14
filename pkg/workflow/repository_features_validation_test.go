@@ -108,7 +108,6 @@ func TestGetCurrentRepository(t *testing.T) {
 	// This test will only pass when running in a git repository with GitHub remote
 	// It's expected to fail in non-git environments
 	repo, err := getCurrentRepository()
-
 	if err != nil {
 		t.Logf("getCurrentRepository failed (expected in non-git environment): %v", err)
 		// Don't fail the test - this is expected when not in a git repo

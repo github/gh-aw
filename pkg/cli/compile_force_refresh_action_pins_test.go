@@ -74,7 +74,7 @@ func TestForceRefreshActionPins_ResetFile(t *testing.T) {
 
 	// Create the expected directory structure
 	actionPinsDir := filepath.Join(tmpDir, "pkg", "workflow", "data")
-	err = os.MkdirAll(actionPinsDir, 0755)
+	err = os.MkdirAll(actionPinsDir, 0o755)
 	require.NoError(t, err, "Failed to create action pins directory")
 
 	// Create a mock action_pins.json with some entries
@@ -88,7 +88,7 @@ func TestForceRefreshActionPins_ResetFile(t *testing.T) {
     }
   }
 }`
-	err = os.WriteFile(actionPinsPath, []byte(mockData), 0644)
+	err = os.WriteFile(actionPinsPath, []byte(mockData), 0o644)
 	require.NoError(t, err, "Failed to create mock action_pins.json")
 
 	// Call resetActionPinsFile

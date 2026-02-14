@@ -70,7 +70,7 @@ tools:
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := tmpDir + "/test-campaign-trigger.md"
 			content := tt.frontmatter + "\n\n# Test Workflow\n\nTest campaign trigger events."
-			if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

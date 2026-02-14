@@ -44,7 +44,7 @@ The content is reasonable and won't generate overly long environment variables.
 `
 
 		testFile := filepath.Join(tmpDir, "normal-expressions.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -95,7 +95,7 @@ safe-outputs:
 `, largeContent)
 
 		testFile := filepath.Join(tmpDir, "large-content.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -146,7 +146,7 @@ safe-outputs:
 `, largeContent)
 
 		testFile := filepath.Join(tmpDir, "large-content-default.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

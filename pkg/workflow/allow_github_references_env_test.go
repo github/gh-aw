@@ -165,7 +165,7 @@ Test workflow with only specific repos allowed.
 
 			// Write workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

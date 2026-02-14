@@ -110,7 +110,7 @@ Test that remote mode uses automatic detection when lockdown not specified.
 
 			// Write workflow file
 			workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(workflowPath, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 
@@ -191,7 +191,7 @@ Test that Claude engine has no automatic lockdown determination.
 
 	// Write workflow file
 	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(workflowPath, []byte(workflow), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflow), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

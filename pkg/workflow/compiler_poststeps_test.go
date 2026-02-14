@@ -51,7 +51,7 @@ This workflow tests the post-steps functionality.
 `
 
 	testFile := filepath.Join(tmpDir, "test-post-steps.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -136,7 +136,7 @@ This workflow tests post-steps without pre-steps.
 `
 
 	testFile := filepath.Join(tmpDir, "test-post-steps-only.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -397,7 +397,7 @@ This workflow tests that stop-after is properly compiled away.
 `
 
 			testFile := filepath.Join(tmpDir, tt.name+"-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

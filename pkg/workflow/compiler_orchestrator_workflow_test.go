@@ -886,7 +886,7 @@ This tests phase execution order.
 `
 
 	testFile := filepath.Join(tmpDir, "phase-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -935,7 +935,7 @@ engine: copilot
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(tt.content), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(tt.content), 0o644))
 
 			compiler := NewCompiler()
 			workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -981,7 +981,7 @@ engine: copilot
 # Test Workflow
 `
 			testFile := filepath.Join(tmpDir, tt.filename)
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1026,7 +1026,7 @@ Test content with ${{ needs.activation.outputs.text }} usage.
 `
 
 	testFile := filepath.Join(tmpDir, "phase-flow.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1077,7 +1077,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "bash-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1162,7 +1162,7 @@ This workflow tests all sections.
 `
 
 	testFile := filepath.Join(tmpDir, "complete.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1211,7 +1211,7 @@ engine: invalid-engine-that-does-not-exist
 `
 
 	testFile := filepath.Join(tmpDir, "invalid-engine.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1238,7 +1238,7 @@ tools:
 `
 
 	testFile := filepath.Join(tmpDir, "invalid-timeout.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -1264,7 +1264,7 @@ steps:
 `
 
 	testFile := filepath.Join(tmpDir, "action-test.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)

@@ -49,7 +49,7 @@ PR Number: ${{ github.event.pull_request.number }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -101,7 +101,7 @@ Issue: ${{ needs.activation.outputs.text }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -147,7 +147,7 @@ Repository: ${{ github.repository }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -218,7 +218,7 @@ PR Details:
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -270,7 +270,7 @@ PR Number: ${{ github.event.pull_request.number }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -327,7 +327,7 @@ Process issue.
 		testFile := filepath.Join(tmpDir, filepath.Base(tmpDir)+"-workflow-"+string(rune('0'+i))+".md")
 		// workflowTemplate is a simple string without format placeholders now
 		content := []byte(workflowTemplate)
-		if err := os.WriteFile(testFile, content, 0644); err != nil {
+		if err := os.WriteFile(testFile, content, 0o644); err != nil {
 			b.Fatal(err)
 		}
 
@@ -427,7 +427,7 @@ Triggered by: ${{ github.actor }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 

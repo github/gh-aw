@@ -18,7 +18,7 @@ func TestListWorkflowMCP(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -48,7 +48,7 @@ tools:
 This is a test workflow.`
 
 	testWorkflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-	err = os.WriteFile(testWorkflowPath, []byte(testWorkflowContent), 0644)
+	err = os.WriteFile(testWorkflowPath, []byte(testWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestListWorkflowsWithMCPServers(t *testing.T) {
 	// Create a temporary directory for test workflows
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create test directory: %v", err)
 	}
@@ -118,12 +118,12 @@ on:
 # No MCP Workflow`
 
 	// Write test files
-	err = os.WriteFile(filepath.Join(workflowsDir, "with-mcp.md"), []byte(mcpWorkflowContent), 0644)
+	err = os.WriteFile(filepath.Join(workflowsDir, "with-mcp.md"), []byte(mcpWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create MCP workflow file: %v", err)
 	}
 
-	err = os.WriteFile(filepath.Join(workflowsDir, "without-mcp.md"), []byte(noMcpWorkflowContent), 0644)
+	err = os.WriteFile(filepath.Join(workflowsDir, "without-mcp.md"), []byte(noMcpWorkflowContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create non-MCP workflow file: %v", err)
 	}

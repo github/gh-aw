@@ -354,7 +354,7 @@ func TestEnsureDevcontainerConfigUpdatesOldVersion(t *testing.T) {
 
 	// Create .devcontainer directory
 	devcontainerDir := ".devcontainer"
-	if err := os.MkdirAll(devcontainerDir, 0755); err != nil {
+	if err := os.MkdirAll(devcontainerDir, 0o755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
 
@@ -376,7 +376,7 @@ func TestEnsureDevcontainerConfigUpdatesOldVersion(t *testing.T) {
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(devcontainerPath, data, 0644); err != nil {
+	if err := os.WriteFile(devcontainerPath, data, 0o644); err != nil {
 		t.Fatalf("Failed to write old config: %v", err)
 	}
 
@@ -470,7 +470,7 @@ func TestEnsureDevcontainerConfigMergesWithExisting(t *testing.T) {
 
 	// Create .devcontainer directory
 	devcontainerDir := ".devcontainer"
-	if err := os.MkdirAll(devcontainerDir, 0755); err != nil {
+	if err := os.MkdirAll(devcontainerDir, 0o755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
 
@@ -499,7 +499,7 @@ func TestEnsureDevcontainerConfigMergesWithExisting(t *testing.T) {
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(devcontainerPath, data, 0644); err != nil {
+	if err := os.WriteFile(devcontainerPath, data, 0o644); err != nil {
 		t.Fatalf("Failed to write existing config: %v", err)
 	}
 
@@ -617,7 +617,7 @@ func TestEnsureDevcontainerConfigWithBuildField(t *testing.T) {
 
 	// Create .devcontainer directory
 	devcontainerDir := ".devcontainer"
-	if err := os.MkdirAll(devcontainerDir, 0755); err != nil {
+	if err := os.MkdirAll(devcontainerDir, 0o755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
 
@@ -647,7 +647,7 @@ func TestEnsureDevcontainerConfigWithBuildField(t *testing.T) {
 	}
 	data = append(data, '\n')
 
-	if err := os.WriteFile(devcontainerPath, data, 0644); err != nil {
+	if err := os.WriteFile(devcontainerPath, data, 0o644); err != nil {
 		t.Fatalf("Failed to write existing config: %v", err)
 	}
 

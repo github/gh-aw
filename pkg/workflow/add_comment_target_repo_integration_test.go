@@ -95,7 +95,7 @@ func TestAddCommentTargetRepoIntegration(t *testing.T) {
 			workflowContent := "# Test Workflow\n\nThis is a test workflow for target-repo functionality."
 
 			// Write the workflow file
-			err := os.WriteFile(workflowPath, []byte(workflowContent), 0644)
+			err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}

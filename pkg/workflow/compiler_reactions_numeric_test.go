@@ -38,7 +38,7 @@ Test workflow with invalid reaction value.
 `
 
 	testFile := filepath.Join(tmpDir, "test-invalid-reaction.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,7 +121,7 @@ Test workflow with numeric reaction value.
 `, tc.reactionInYAML)
 
 			testFile := filepath.Join(tmpDir, "test-numeric-reaction.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -166,7 +166,7 @@ Test workflow with invalid numeric reaction value.
 `
 
 	testFile := filepath.Join(tmpDir, "test-invalid-numeric-reaction.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

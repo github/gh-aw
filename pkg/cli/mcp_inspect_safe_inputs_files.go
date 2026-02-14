@@ -15,7 +15,7 @@ func writeSafeInputsFiles(dir string, safeInputsConfig *workflow.SafeInputsConfi
 
 	// Create logs directory
 	logsDir := filepath.Join(dir, "logs")
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		errMsg := fmt.Sprintf("failed to create logs directory: %v", err)
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 		return fmt.Errorf("failed to create logs directory: %w", err)
@@ -39,7 +39,7 @@ func writeSafeInputsFiles(dir string, safeInputsConfig *workflow.SafeInputsConfi
 
 	for _, jsFile := range jsFiles {
 		filePath := filepath.Join(dir, jsFile.name)
-		if err := os.WriteFile(filePath, []byte(jsFile.content), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(jsFile.content), 0o644); err != nil {
 			errMsg := fmt.Sprintf("failed to write %s: %v", jsFile.name, err)
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 			return fmt.Errorf("failed to write %s: %w", jsFile.name, err)
@@ -52,7 +52,7 @@ func writeSafeInputsFiles(dir string, safeInputsConfig *workflow.SafeInputsConfi
 	// Generate and write tools.json
 	toolsJSON := workflow.GenerateSafeInputsToolsConfigForInspector(safeInputsConfig)
 	toolsPath := filepath.Join(dir, "tools.json")
-	if err := os.WriteFile(toolsPath, []byte(toolsJSON), 0644); err != nil {
+	if err := os.WriteFile(toolsPath, []byte(toolsJSON), 0o644); err != nil {
 		errMsg := fmt.Sprintf("failed to write tools.json: %v", err)
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 		return fmt.Errorf("failed to write tools.json: %w", err)
@@ -64,7 +64,7 @@ func writeSafeInputsFiles(dir string, safeInputsConfig *workflow.SafeInputsConfi
 	// Generate and write mcp-server.cjs entry point
 	mcpServerScript := workflow.GenerateSafeInputsMCPServerScriptForInspector(safeInputsConfig)
 	mcpServerPath := filepath.Join(dir, "mcp-server.cjs")
-	if err := os.WriteFile(mcpServerPath, []byte(mcpServerScript), 0755); err != nil {
+	if err := os.WriteFile(mcpServerPath, []byte(mcpServerScript), 0o755); err != nil {
 		errMsg := fmt.Sprintf("failed to write mcp-server.cjs: %v", err)
 		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 		return fmt.Errorf("failed to write mcp-server.cjs: %w", err)
@@ -92,9 +92,9 @@ func writeSafeInputsFiles(dir string, safeInputsConfig *workflow.SafeInputsConfi
 		}
 
 		toolPath := filepath.Join(dir, toolName+extension)
-		mode := os.FileMode(0644)
+		mode := os.FileMode(0o644)
 		if extension == ".sh" || extension == ".py" {
-			mode = 0755
+			mode = 0o755
 		}
 		if err := os.WriteFile(toolPath, []byte(content), mode); err != nil {
 			errMsg := fmt.Sprintf("failed to write tool %s: %v", toolName, err)

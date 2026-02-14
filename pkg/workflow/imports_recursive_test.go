@@ -30,7 +30,7 @@ mcp-servers:
 ---
 Base shared content
 `
-	if err := os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0644); err != nil {
+	if err := os.WriteFile(baseSharedPath, []byte(baseSharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write base shared file: %v", err)
 	}
 
@@ -46,7 +46,7 @@ mcp-servers:
 ---
 Intermediate shared content
 `
-	if err := os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0644); err != nil {
+	if err := os.WriteFile(intermediateSharedPath, []byte(intermediateSharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write intermediate shared file: %v", err)
 	}
 
@@ -70,7 +70,7 @@ mcp-servers:
 
 This workflow tests recursive imports.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -133,7 +133,7 @@ mcp-servers:
 ---
 Content A
 `
-	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0644); err != nil {
+	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file A: %v", err)
 	}
 
@@ -149,7 +149,7 @@ mcp-servers:
 ---
 Content B
 `
-	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0644); err != nil {
+	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file B: %v", err)
 	}
 
@@ -168,7 +168,7 @@ imports:
 
 This workflow tests cyclic import detection.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -213,7 +213,7 @@ mcp-servers:
 ---
 Content C
 `
-	if err := os.WriteFile(fileCPath, []byte(fileCContent), 0644); err != nil {
+	if err := os.WriteFile(fileCPath, []byte(fileCContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file C: %v", err)
 	}
 
@@ -229,7 +229,7 @@ mcp-servers:
 ---
 Content A
 `
-	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0644); err != nil {
+	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file A: %v", err)
 	}
 
@@ -245,7 +245,7 @@ mcp-servers:
 ---
 Content B
 `
-	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0644); err != nil {
+	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file B: %v", err)
 	}
 
@@ -265,7 +265,7 @@ imports:
 
 This workflow tests diamond import pattern.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -321,7 +321,7 @@ mcp-servers:
     allowed: ["f"]
 ---
 `
-	if err := os.WriteFile(fileFPath, []byte(fileFContent), 0644); err != nil {
+	if err := os.WriteFile(fileFPath, []byte(fileFContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file F: %v", err)
 	}
 
@@ -336,7 +336,7 @@ mcp-servers:
     allowed: ["c"]
 ---
 `
-	if err := os.WriteFile(fileCPath, []byte(fileCContent), 0644); err != nil {
+	if err := os.WriteFile(fileCPath, []byte(fileCContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file C: %v", err)
 	}
 
@@ -349,7 +349,7 @@ mcp-servers:
     allowed: ["d"]
 ---
 `
-	if err := os.WriteFile(fileDPath, []byte(fileDContent), 0644); err != nil {
+	if err := os.WriteFile(fileDPath, []byte(fileDContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file D: %v", err)
 	}
 
@@ -362,7 +362,7 @@ mcp-servers:
     allowed: ["e"]
 ---
 `
-	if err := os.WriteFile(fileEPath, []byte(fileEContent), 0644); err != nil {
+	if err := os.WriteFile(fileEPath, []byte(fileEContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file E: %v", err)
 	}
 
@@ -378,7 +378,7 @@ mcp-servers:
     allowed: ["a"]
 ---
 `
-	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0644); err != nil {
+	if err := os.WriteFile(fileAPath, []byte(fileAContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file A: %v", err)
 	}
 
@@ -393,7 +393,7 @@ mcp-servers:
     allowed: ["b"]
 ---
 `
-	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0644); err != nil {
+	if err := os.WriteFile(fileBPath, []byte(fileBContent), 0o644); err != nil {
 		t.Fatalf("Failed to write file B: %v", err)
 	}
 
@@ -411,7 +411,7 @@ imports:
 
 # Test Workflow
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

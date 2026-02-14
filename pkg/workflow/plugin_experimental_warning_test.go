@@ -121,7 +121,7 @@ permissions:
 			tmpDir := testutil.TempDir(t, "plugin-experimental-warning-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

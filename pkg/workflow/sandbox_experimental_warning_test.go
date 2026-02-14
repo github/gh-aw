@@ -101,7 +101,7 @@ permissions:
 			tmpDir := testutil.TempDir(t, "sandbox-experimental-warning-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -235,7 +235,7 @@ permissions:
 			tmpDir := testutil.TempDir(t, "sandbox-feature-flag-test")
 
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -290,7 +290,7 @@ permissions:
 	tmpDir := testutil.TempDir(t, "sandbox-feature-flag-env-test")
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

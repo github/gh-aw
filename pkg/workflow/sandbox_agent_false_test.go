@@ -30,7 +30,7 @@ Test workflow to verify sandbox.agent: false is accepted and disables agent sand
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-false.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -82,7 +82,7 @@ Test workflow to verify sandbox.agent: awf enables firewall.
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-agent-awf.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -128,7 +128,7 @@ Test workflow to verify default sandbox.agent behavior (awf).
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-default-firewall.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}
@@ -176,7 +176,7 @@ Test workflow to verify network.firewall still works (deprecated).
 `
 
 		workflowPath := filepath.Join(workflowsDir, "test-firewall-deprecated.md")
-		err := os.WriteFile(workflowPath, []byte(markdown), 0644)
+		err := os.WriteFile(workflowPath, []byte(markdown), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to write workflow file: %v", err)
 		}

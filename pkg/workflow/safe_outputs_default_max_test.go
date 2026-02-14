@@ -32,7 +32,7 @@ safe-outputs:
 This workflow tests the default max for assign-to-agent.
 `
 	testFile := filepath.Join(tmpDir, "test-assign-to-agent.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Parse the workflow
@@ -51,7 +51,7 @@ func TestDispatchWorkflowDefaultMax(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "dispatch-workflow-default-max-test")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a target workflow with workflow_dispatch
@@ -65,7 +65,7 @@ jobs:
       - run: echo "Target workflow"
 `
 	targetFile := filepath.Join(workflowsDir, "target.lock.yml")
-	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0644)
+	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write target workflow")
 
 	// Create a dispatcher workflow with dispatch-workflow but no explicit max
@@ -84,7 +84,7 @@ safe-outputs:
 This workflow tests the default max for dispatch-workflow.
 `
 	testFile := filepath.Join(tmpDir, "test-dispatch.md")
-	err = os.WriteFile(testFile, []byte(workflow), 0644)
+	err = os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Parse the workflow
@@ -119,7 +119,7 @@ safe-outputs:
 This workflow tests explicit max for assign-to-agent.
 `
 	testFile := filepath.Join(tmpDir, "test-assign-to-agent.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Parse the workflow
@@ -138,7 +138,7 @@ func TestDispatchWorkflowExplicitMax(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "dispatch-workflow-explicit-max-test")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
 
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a target workflow with workflow_dispatch
@@ -152,7 +152,7 @@ jobs:
       - run: echo "Target workflow"
 `
 	targetFile := filepath.Join(workflowsDir, "target.lock.yml")
-	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0644)
+	err = os.WriteFile(targetFile, []byte(targetWorkflow), 0o644)
 	require.NoError(t, err, "Failed to write target workflow")
 
 	// Create a dispatcher workflow with explicit max
@@ -173,7 +173,7 @@ safe-outputs:
 This workflow tests explicit max for dispatch-workflow.
 `
 	testFile := filepath.Join(tmpDir, "test-dispatch.md")
-	err = os.WriteFile(testFile, []byte(workflow), 0644)
+	err = os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test workflow")
 
 	// Parse the workflow

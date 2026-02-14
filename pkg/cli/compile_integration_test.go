@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Make the binary executable
-	if err := os.Chmod(globalBinaryPath, 0755); err != nil {
+	if err := os.Chmod(globalBinaryPath, 0o755); err != nil {
 		panic("Failed to make binary executable: " + err.Error())
 	}
 
@@ -112,13 +112,13 @@ func setupIntegrationTest(t *testing.T) *integrationTestSetup {
 	}
 
 	// Make the binary executable
-	if err := os.Chmod(binaryPath, 0755); err != nil {
+	if err := os.Chmod(binaryPath, 0o755); err != nil {
 		t.Fatalf("Failed to make binary executable: %v", err)
 	}
 
 	// Create .github/workflows directory
 	workflowsDir := ".github/workflows"
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -168,7 +168,7 @@ Please check the repository for any open issues and create a summary.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -219,7 +219,7 @@ func TestCompileWithIncludeWithEmptyFrontmatterUnderPty(t *testing.T) {
 This is an included workflow file.
 `
 	includeFile := filepath.Join(setup.workflowsDir, "include.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatalf("Failed to write include file: %v", err)
 	}
 
@@ -244,7 +244,7 @@ Please check the repository for any open issues and create a summary.
 @include include.md
 `
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -354,7 +354,7 @@ This workflow tests the zizmor security scanner integration.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "zizmor-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -373,7 +373,6 @@ This workflow tests the zizmor security scanner integration.
 	// Now compile with --zizmor flag
 	zizmorCmd := exec.Command(setup.binaryPath, "compile", testWorkflowPath, "--zizmor", "--verbose")
 	output, err := zizmorCmd.CombinedOutput()
-
 	// The command should succeed even if zizmor finds issues
 	if err != nil {
 		t.Fatalf("Compile with --zizmor failed: %v\nOutput: %s", err, string(output))
@@ -419,7 +418,7 @@ This workflow tests fuzzy daily schedule compilation.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "daily-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -534,7 +533,7 @@ This workflow tests deterministic fuzzy daily schedule compilation.
 `
 
 		testWorkflowPath := filepath.Join(setup.workflowsDir, "deterministic-daily.md")
-		if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+		if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 			t.Fatalf("Failed to write test workflow file: %v", err)
 		}
 
@@ -613,7 +612,7 @@ This workflow tests fuzzy daily schedule compilation using array format with cro
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "daily-array-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -721,7 +720,7 @@ This workflow tests that invalid schedule strings fail compilation.
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "invalid-schedule-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -773,7 +772,7 @@ This workflow tests that invalid schedule strings in array format fail compilati
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "invalid-schedule-array-test.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 
@@ -846,7 +845,7 @@ Test workflow to verify actions-lock.json path handling when compiling from subd
 `
 
 	testWorkflowPath := filepath.Join(setup.workflowsDir, "test-action.md")
-	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowPath, []byte(testWorkflow), 0o644); err != nil {
 		t.Fatalf("Failed to write test workflow file: %v", err)
 	}
 

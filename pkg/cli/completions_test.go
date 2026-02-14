@@ -17,7 +17,7 @@ func TestGetWorkflowDescription(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	tests := []struct {
 		name        string
@@ -87,7 +87,7 @@ This is a test workflow without frontmatter.
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test workflow file
 			testFile := filepath.Join(workflowsDir, "test-workflow.md")
-			require.NoError(t, os.WriteFile(testFile, []byte(tt.content), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(tt.content), 0o644))
 
 			// Test getWorkflowDescription
 			desc := getWorkflowDescription(testFile)
@@ -103,7 +103,7 @@ func TestCompleteWorkflowNamesWithDescriptions(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files with descriptions
 	workflows := map[string]string{
@@ -282,7 +282,7 @@ func TestCompleteWorkflowNames(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files
 	testWorkflows := []string{"test-workflow.md", "ci-doctor.md", "weekly-research.md"}
@@ -386,7 +386,7 @@ func TestCompleteWorkflowNamesWithSpecialCharacters(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files with various special characters
 	testWorkflows := []string{
@@ -469,7 +469,7 @@ func TestCompleteWorkflowNamesWithInvalidFiles(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create valid .md files
 	validWorkflows := []string{"valid-workflow.md", "another-valid.md"}
@@ -505,7 +505,7 @@ func TestCompleteWorkflowNamesWithInvalidFiles(t *testing.T) {
 
 	// Create .md file with invalid content
 	invalidMd := filepath.Join(workflowsDir, "invalid-workflow.md")
-	err = os.WriteFile(invalidMd, []byte("not valid yaml frontmatter"), 0644)
+	err = os.WriteFile(invalidMd, []byte("not valid yaml frontmatter"), 0o644)
 	require.NoError(t, err)
 
 	// Change to the temp directory
@@ -543,7 +543,7 @@ func TestCompleteWorkflowNamesCaseSensitivity(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files with different cases
 	testWorkflows := []string{
@@ -617,7 +617,7 @@ func TestCompleteWorkflowNamesExactMatch(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create test workflow files
 	testWorkflows := []string{
@@ -655,7 +655,7 @@ func TestCompleteWorkflowNamesLongNames(t *testing.T) {
 	// Create a temporary directory structure
 	tmpDir := t.TempDir()
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	require.NoError(t, os.MkdirAll(workflowsDir, 0755))
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
 
 	// Create workflow with very long name (255 chars is typical filesystem limit for filename)
 	longName := strings.Repeat("a", 200) + "-workflow"

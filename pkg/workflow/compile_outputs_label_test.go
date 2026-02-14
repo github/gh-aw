@@ -41,7 +41,7 @@ This workflow tests the output labels configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +106,7 @@ This workflow tests the safe_outputs job generation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +214,7 @@ Write your labels to ${{ env.GH_AW_SAFE_OUTPUTS }}, one per line.
 `
 
 	testFile := filepath.Join(tmpDir, "test-label-no-allowed.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -293,7 +293,7 @@ Write your labels to ${{ env.GH_AW_SAFE_OUTPUTS }}, one per line.
 `
 
 	testFile := filepath.Join(tmpDir, "test-label-null-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -376,7 +376,7 @@ This workflow tests the output labels null configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels-null.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -437,7 +437,7 @@ This workflow tests the output labels max configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels-max.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -505,7 +505,7 @@ This workflow tests the default max behavior.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels-default.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -555,7 +555,7 @@ This workflow tests the safe_outputs job generation with max.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels-max.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -627,7 +627,7 @@ This workflow tests the safe_outputs job generation with default max.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-labels-default-max.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -690,7 +690,7 @@ This workflow tests validation of empty allowed labels.
 `
 
 	testFile := filepath.Join(tmpDir, "test-label-validation.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -734,7 +734,7 @@ This workflow tests that missing allowed field is now optional.
 `
 
 	testFile := filepath.Join(tmpDir, "test-label-missing.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

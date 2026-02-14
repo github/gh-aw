@@ -268,7 +268,7 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Build the AWF-wrapped command
 		firewallConfig := getFirewallConfig(workflowData)
 		agentConfig := getAgentConfig(workflowData)
-		var awfLogLevel = "info"
+		awfLogLevel := "info"
 		if firewallConfig != nil && firewallConfig.LogLevel != "" {
 			awfLogLevel = firewallConfig.LogLevel
 		}

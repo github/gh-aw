@@ -41,7 +41,7 @@ This workflow uses the old format without assignees and should continue to work.
 `
 
 	testFile := filepath.Join(tmpDir, "legacy-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ Create an issue with minimal configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "minimal-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

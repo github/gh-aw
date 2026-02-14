@@ -43,7 +43,7 @@ Issue details: ${{ needs.activation.outputs.text }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -92,7 +92,7 @@ Review the pull request changes and provide feedback.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -114,7 +114,7 @@ func BenchmarkCompileWorkflow_WithImports(b *testing.B) {
 
 	// Create shared import file
 	sharedDir := filepath.Join(tmpDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		b.Fatal(err)
 	}
 
@@ -126,7 +126,7 @@ tools:
 
 Use web search and fetch tools to gather information.
 `
-	if err := os.WriteFile(filepath.Join(sharedDir, "web-tools.md"), []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sharedDir, "web-tools.md"), []byte(sharedContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -151,7 +151,7 @@ Research latest developments and create a summary.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -194,7 +194,7 @@ Analyze the issue with strict validation enabled.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -271,7 +271,7 @@ Repository: ${{ github.repository }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -310,7 +310,7 @@ Analyze repository commits.
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 
@@ -400,7 +400,7 @@ Debug mode: ${{ github.event.inputs.debug }}
 `
 
 	testFile := filepath.Join(tmpDir, "test-workflow.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		b.Fatal(err)
 	}
 

@@ -34,7 +34,7 @@ Test that top-level github-token is used in engine configuration.
 `
 
 		testFile := filepath.Join(tmpDir, "test-toplevel-token.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -85,7 +85,7 @@ Test that safe-outputs github-token overrides top-level.
 `
 
 		testFile := filepath.Join(tmpDir, "test-safe-outputs-override.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -137,7 +137,7 @@ Test that safe-outputs github-token overrides top-level token.
 `
 
 		testFile := filepath.Join(tmpDir, "test-individual-override.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -198,7 +198,7 @@ Test that top-level github-token is used in Codex engine.
 `
 
 		testFile := filepath.Join(tmpDir, "test-codex-token.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -249,7 +249,7 @@ Test that top-level github-token is used in Copilot engine.
 `
 
 		testFile := filepath.Join(tmpDir, "test-copilot-token.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -291,7 +291,7 @@ Test that default fallback includes GH_AW_GITHUB_MCP_SERVER_TOKEN.
 `
 
 		testFile := filepath.Join(tmpDir, "test-default-fallback.md")
-		if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 			t.Fatal(err)
 		}
 

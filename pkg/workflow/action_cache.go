@@ -102,7 +102,7 @@ func (c *ActionCache) Save() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(c.path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		actionCacheLog.Printf("Failed to create cache directory: %v", err)
 		return err
 	}
@@ -117,7 +117,7 @@ func (c *ActionCache) Save() error {
 	// Add trailing newline for prettier compliance
 	data = append(data, '\n')
 
-	if err := os.WriteFile(c.path, data, 0644); err != nil {
+	if err := os.WriteFile(c.path, data, 0o644); err != nil {
 		actionCacheLog.Printf("Failed to write cache file: %v", err)
 		return err
 	}

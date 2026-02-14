@@ -230,7 +230,7 @@ func TestGenerateMaintenanceWorkflow_DeletesExistingFile(t *testing.T) {
 
 			// Create the maintenance file if requested
 			if tt.createFileBefore {
-				err := os.WriteFile(maintenanceFile, []byte("# Existing maintenance workflow\n"), 0644)
+				err := os.WriteFile(maintenanceFile, []byte("# Existing maintenance workflow\n"), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}

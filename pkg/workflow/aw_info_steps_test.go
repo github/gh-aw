@@ -88,7 +88,7 @@ This workflow tests that Claude has firewall enabled by default when network is 
 
 			// Create test file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflowContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

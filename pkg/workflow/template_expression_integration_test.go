@@ -70,7 +70,7 @@ ${{ needs.activation.outputs.text }}
 `
 
 	testFile := filepath.Join(tmpDir, "analyzer.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -176,7 +176,7 @@ This expression needs wrapping.
 `
 
 	testFile := filepath.Join(tmpDir, "already-wrapped.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -261,7 +261,7 @@ Steps expression - will be wrapped.
 `
 
 	testFile := filepath.Join(tmpDir, "mixed.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

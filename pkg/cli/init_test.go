@@ -225,13 +225,13 @@ func TestEnsureMaintenanceWorkflow(t *testing.T) {
 			// Setup workflows if needed
 			if tt.setupWorkflows {
 				workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-				if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+				if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 					t.Fatalf("Failed to create workflows directory: %v", err)
 				}
 
 				// Create an existing maintenance file if we're testing deletion
 				if tt.expectMaintenanceDelete {
-					if err := os.WriteFile(maintenanceFile, []byte("# Test maintenance file\n"), 0644); err != nil {
+					if err := os.WriteFile(maintenanceFile, []byte("# Test maintenance file\n"), 0o644); err != nil {
 						t.Fatalf("Failed to create test maintenance file: %v", err)
 					}
 				}
@@ -257,7 +257,7 @@ on:
 This is a test workflow.
 `
 				workflowPath := filepath.Join(workflowsDir, "test-workflow.md")
-				if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+				if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 					t.Fatalf("Failed to create test workflow: %v", err)
 				}
 			}

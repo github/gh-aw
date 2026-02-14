@@ -124,7 +124,7 @@ tools:
 `
 
 			testFile := filepath.Join(tmpDir, "test-token.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -183,7 +183,7 @@ safe-outputs:
 `
 
 			testFile := filepath.Join(tmpDir, "test-safe-outputs.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -240,7 +240,7 @@ safe-outputs:
 `
 
 			testFile := filepath.Join(tmpDir, "test-individual.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -297,7 +297,7 @@ tools:
 `
 
 			testFile := filepath.Join(tmpDir, "test-github-tool.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -332,7 +332,7 @@ github-token: ghp_actualSecretInPlainText
 `
 
 	testFile := filepath.Join(tmpDir, "test-error.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -373,7 +373,7 @@ safe-outputs:
 `
 
 	testFile := filepath.Join(tmpDir, "test-multiple.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

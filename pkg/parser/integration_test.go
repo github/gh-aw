@@ -14,7 +14,7 @@ func TestFrontmatterLocationIntegration(t *testing.T) {
 	tempFile := "/tmp/gh-aw/gh-aw/test_frontmatter_location.md"
 
 	// Ensure the directory exists
-	err := os.MkdirAll(filepath.Dir(tempFile), 0755)
+	err := os.MkdirAll(filepath.Dir(tempFile), 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
@@ -32,7 +32,7 @@ engine: claude
 This is a test workflow with invalid additional properties in frontmatter.
 `
 
-	err = os.WriteFile(tempFile, []byte(content), 0644)
+	err = os.WriteFile(tempFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestFrontmatterOffsetCalculation(t *testing.T) {
 	tempFile := "/tmp/gh-aw/gh-aw/test_frontmatter_offset.md"
 
 	// Ensure the directory exists
-	err := os.MkdirAll(filepath.Dir(tempFile), 0755)
+	err := os.MkdirAll(filepath.Dir(tempFile), 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
@@ -101,7 +101,7 @@ invalid_prop: bad
 Content here.
 `
 
-	err = os.WriteFile(tempFile, []byte(content), 0644)
+	err = os.WriteFile(tempFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}

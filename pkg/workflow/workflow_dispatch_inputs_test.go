@@ -87,7 +87,7 @@ Test workflow with choice input`,
 
 			// Write markdown file
 			workflowPath := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(workflowPath, []byte(tt.markdown), 0600)
+			err := os.WriteFile(workflowPath, []byte(tt.markdown), 0o600)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}
@@ -224,7 +224,7 @@ Test workflow with required and optional inputs`
 
 	// Write markdown file
 	workflowPath := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(workflowPath, []byte(markdown), 0600)
+	err := os.WriteFile(workflowPath, []byte(markdown), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -291,7 +291,7 @@ Test workflow with choice input options`
 
 	// Write markdown file
 	workflowPath := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(workflowPath, []byte(markdown), 0600)
+	err := os.WriteFile(workflowPath, []byte(markdown), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -382,7 +382,7 @@ Test workflow with all input types`
 
 	// Write markdown file
 	workflowPath := filepath.Join(tmpDir, "test.md")
-	err := os.WriteFile(workflowPath, []byte(markdown), 0600)
+	err := os.WriteFile(workflowPath, []byte(markdown), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -522,7 +522,7 @@ engine: copilot
 
 			// Write markdown file
 			workflowPath := filepath.Join(tmpDir, "test.md")
-			err := os.WriteFile(workflowPath, []byte(tt.markdown), 0600)
+			err := os.WriteFile(workflowPath, []byte(tt.markdown), 0o600)
 			if err != nil {
 				t.Fatalf("Failed to write test file: %v", err)
 			}

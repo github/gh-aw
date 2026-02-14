@@ -44,7 +44,7 @@ This workflow tests the agentic output collection functionality.
 `
 
 	testFile := filepath.Join(tmpDir, "test-agentic-output.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +145,7 @@ This workflow tests that Codex engine gets GH_AW_SAFE_OUTPUTS but not engine out
 `
 
 	testFile := filepath.Join(tmpDir, "test-codex-no-output.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -267,7 +267,7 @@ This workflow tests that /tmp/gh-aw/ files are excluded from cleanup.
 `
 
 	testFile := filepath.Join(tmpDir, "test-engine-output-cleanup.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -581,7 +581,7 @@ This workflow tests that the redacted URLs log file is included in artifact uplo
 `
 
 	testFile := filepath.Join(tmpDir, "test-redacted-urls.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

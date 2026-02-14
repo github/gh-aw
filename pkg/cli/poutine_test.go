@@ -338,7 +338,7 @@ func TestEnsurePoutineConfig(t *testing.T) {
 
 		// Create a custom config file
 		customContent := "# My custom poutine config\ncustom: value\n"
-		err := os.WriteFile(configPath, []byte(customContent), 0644)
+		err := os.WriteFile(configPath, []byte(customContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create custom config file: %v", err)
 		}

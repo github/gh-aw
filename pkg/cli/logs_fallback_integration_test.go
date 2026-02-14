@@ -29,7 +29,7 @@ Warning: Memory usage approaching limit
 2024-01-04T10:00:20.000Z [INFO] Workflow completed`
 
 	agentLogPath := filepath.Join(tempDir, "agent-stdio.log")
-	err := os.WriteFile(agentLogPath, []byte(logContent), 0644)
+	err := os.WriteFile(agentLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics without verbose output
@@ -45,7 +45,7 @@ func TestLogsCommand_DisplayWithFallbackMetrics(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
 	runDir := filepath.Join(tempDir, "run-12345")
-	err := os.MkdirAll(runDir, 0755)
+	err := os.MkdirAll(runDir, 0o755)
 	require.NoError(t, err)
 
 	// Create log file with errors and warnings (no aw_info.json)
@@ -56,7 +56,7 @@ ERROR: Network timeout
 Warning: Disk space low`
 
 	agentLogPath := filepath.Join(runDir, "agent-stdio.log")
-	err = os.WriteFile(agentLogPath, []byte(logContent), 0644)
+	err = os.WriteFile(agentLogPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics
@@ -86,7 +86,7 @@ func TestLogsCommand_MixedRunsWithAndWithoutEngine(t *testing.T) {
 
 	// Run 1: Has aw_info.json (would use engine-specific parser in real scenario)
 	run1Dir := filepath.Join(tempDir, "run-1")
-	err := os.MkdirAll(run1Dir, 0755)
+	err := os.MkdirAll(run1Dir, 0o755)
 	require.NoError(t, err)
 
 	awInfoContent := `{
@@ -95,21 +95,21 @@ func TestLogsCommand_MixedRunsWithAndWithoutEngine(t *testing.T) {
 		"model": "gpt-4",
 		"workflow_name": "Test Workflow"
 	}`
-	err = os.WriteFile(filepath.Join(run1Dir, "aw_info.json"), []byte(awInfoContent), 0644)
+	err = os.WriteFile(filepath.Join(run1Dir, "aw_info.json"), []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Run 2: No aw_info.json (uses fallback parser)
 	run2Dir := filepath.Join(tempDir, "run-2")
-	err = os.MkdirAll(run2Dir, 0755)
+	err = os.MkdirAll(run2Dir, 0o755)
 	require.NoError(t, err)
 
 	// Create logs with errors for both runs
 	logContent := `::error::Test error
 ::warning::Test warning`
 
-	err = os.WriteFile(filepath.Join(run1Dir, "agent-stdio.log"), []byte(logContent), 0644)
+	err = os.WriteFile(filepath.Join(run1Dir, "agent-stdio.log"), []byte(logContent), 0o644)
 	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(run2Dir, "agent-stdio.log"), []byte(logContent), 0644)
+	err = os.WriteFile(filepath.Join(run2Dir, "agent-stdio.log"), []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics for run without aw_info.json

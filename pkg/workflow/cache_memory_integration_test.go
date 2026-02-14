@@ -140,7 +140,7 @@ tools:
 			// Write the markdown file
 			mdPath := filepath.Join(tmpDir, "test-workflow.md")
 			content := tt.frontmatter + "\n\n# Test Workflow\n\nTest cache-memory configuration.\n"
-			if err := os.WriteFile(mdPath, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(mdPath, []byte(content), 0o644); err != nil {
 				t.Fatalf("Failed to write test markdown file: %v", err)
 			}
 

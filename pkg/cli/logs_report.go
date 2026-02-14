@@ -875,7 +875,7 @@ func writeSummaryFile(path string, data LogsData, verbose bool) error {
 
 	// Create parent directory if it doesn't exist
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory for summary file: %w", err)
 	}
 
@@ -886,7 +886,7 @@ func writeSummaryFile(path string, data LogsData, verbose bool) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(path, jsonData, 0644); err != nil {
+	if err := os.WriteFile(path, jsonData, 0o644); err != nil {
 		return fmt.Errorf("failed to write summary file: %w", err)
 	}
 

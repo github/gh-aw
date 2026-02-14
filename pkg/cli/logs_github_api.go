@@ -194,7 +194,6 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 
 	cmd := workflow.ExecGH(args...)
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		// Stop spinner on error
 		if !opts.Verbose {

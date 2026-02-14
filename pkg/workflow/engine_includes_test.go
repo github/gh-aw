@@ -17,7 +17,7 @@ func TestEngineInheritanceFromIncludes(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -33,7 +33,7 @@ tools:
 This include specifies the codex engine.
 `
 	includeFile := filepath.Join(workflowsDir, "include-with-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,7 +49,7 @@ on: push
 This should inherit the engine from the included file.
 `
 	mainFile := filepath.Join(workflowsDir, "main-inherit-engine.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +86,7 @@ func TestEngineConflictDetection(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,7 +101,7 @@ tools:
 # Include with Codex Engine
 `
 	includeFile := filepath.Join(workflowsDir, "include-codex.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +118,7 @@ engine: claude
 This should fail due to multiple engine specifications.
 `
 	mainFile := filepath.Join(workflowsDir, "main-conflict.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +140,7 @@ func TestEngineObjectFormatInIncludes(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +158,7 @@ tools:
 # Include with Object Engine
 `
 	includeFile := filepath.Join(workflowsDir, "include-object-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ on: push
 This should inherit the claude engine from the included file.
 `
 	mainFile := filepath.Join(workflowsDir, "main-object-engine.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,7 +196,7 @@ func TestNoEngineSpecifiedAnywhere(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,7 +210,7 @@ tools:
 # Include without Engine
 `
 	includeFile := filepath.Join(workflowsDir, "include-no-engine.md")
-	if err := os.WriteFile(includeFile, []byte(includeContent), 0644); err != nil {
+	if err := os.WriteFile(includeFile, []byte(includeContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -226,7 +226,7 @@ on: push
 This should use the default engine.
 `
 	mainFile := filepath.Join(workflowsDir, "main-default.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +265,7 @@ func TestMainEngineWithoutIncludes(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -280,7 +280,7 @@ engine: claude
 This workflow specifies claude engine directly without any includes.
 `
 	mainFile := filepath.Join(workflowsDir, "main-claude.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -312,7 +312,7 @@ func TestMultipleIncludesWithEnginesFailure(t *testing.T) {
 	// Create temporary directory for test files
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -327,7 +327,7 @@ tools:
 # Include with Codex Engine
 `
 	includeFile1 := filepath.Join(workflowsDir, "include-codex.md")
-	if err := os.WriteFile(includeFile1, []byte(includeContent1), 0644); err != nil {
+	if err := os.WriteFile(includeFile1, []byte(includeContent1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -342,7 +342,7 @@ tools:
 # Include with Claude Engine
 `
 	includeFile2 := filepath.Join(workflowsDir, "include-claude.md")
-	if err := os.WriteFile(includeFile2, []byte(includeContent2), 0644); err != nil {
+	if err := os.WriteFile(includeFile2, []byte(includeContent2), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -359,7 +359,7 @@ on: push
 This should fail due to multiple engine specifications in includes.
 `
 	mainFile := filepath.Join(workflowsDir, "main-multiple-engines.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -383,7 +383,7 @@ func TestImportedEngineWithCustomSteps(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -404,7 +404,7 @@ This shared configuration sets up a custom agentic engine using GitHub's AI infe
 -->
 `
 	sharedFile := filepath.Join(sharedDir, "actions-ai-inference.md")
-	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -428,7 +428,7 @@ imports:
 This workflow imports a custom engine with steps.
 `
 	mainFile := filepath.Join(workflowsDir, "test-imported-engine.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -475,7 +475,7 @@ func TestImportedEngineWithEnvVars(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, constants.GetWorkflowDir())
 	sharedDir := filepath.Join(workflowsDir, "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -494,7 +494,7 @@ engine:
 # Shared Config
 `
 	sharedFile := filepath.Join(sharedDir, "custom-with-env.md")
-	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedFile, []byte(sharedContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -511,7 +511,7 @@ imports:
 This workflow imports a custom engine with env vars.
 `
 	mainFile := filepath.Join(workflowsDir, "test-env.md")
-	if err := os.WriteFile(mainFile, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(mainContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

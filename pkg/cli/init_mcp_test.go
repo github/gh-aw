@@ -38,7 +38,7 @@ func TestInitRepository_WithMCP(t *testing.T) {
 
 	// Create go.mod for the copilot-setup-steps.yml to reference
 	goModContent := []byte("module github.com/test/repo\n\ngo 1.23\n")
-	if err := os.WriteFile("go.mod", goModContent, 0644); err != nil {
+	if err := os.WriteFile("go.mod", goModContent, 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
@@ -131,7 +131,7 @@ func TestInitRepository_MCP_Idempotent(t *testing.T) {
 
 	// Create go.mod
 	goModContent := []byte("module github.com/test/repo\n\ngo 1.23\n")
-	if err := os.WriteFile("go.mod", goModContent, 0644); err != nil {
+	if err := os.WriteFile("go.mod", goModContent, 0o644); err != nil {
 		t.Fatalf("Failed to create go.mod: %v", err)
 	}
 
@@ -177,7 +177,7 @@ func TestEnsureMCPConfig_RendersInstructions(t *testing.T) {
 	}
 
 	// Create .vscode directory
-	if err := os.MkdirAll(".vscode", 0755); err != nil {
+	if err := os.MkdirAll(".vscode", 0o755); err != nil {
 		t.Fatalf("Failed to create .vscode directory: %v", err)
 	}
 
@@ -192,7 +192,7 @@ func TestEnsureMCPConfig_RendersInstructions(t *testing.T) {
 	}
 	initialData, _ := json.MarshalIndent(initialConfig, "", "  ")
 	mcpConfigPath := filepath.Join(tempDir, ".vscode", "mcp.json")
-	if err := os.WriteFile(mcpConfigPath, initialData, 0644); err != nil {
+	if err := os.WriteFile(mcpConfigPath, initialData, 0o644); err != nil {
 		t.Fatalf("Failed to write initial mcp.json: %v", err)
 	}
 
@@ -242,7 +242,7 @@ func TestEnsureCopilotSetupSteps_RendersInstructions(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -260,7 +260,7 @@ jobs:
       - name: Build code
         run: make build
 `
-	if err := os.WriteFile(setupStepsPath, []byte(customContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(customContent), 0o644); err != nil {
 		t.Fatalf("Failed to write custom setup steps: %v", err)
 	}
 
@@ -307,7 +307,7 @@ func TestEnsureCopilotSetupSteps_SkipsWhenStepExists(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -329,7 +329,7 @@ jobs:
       - name: Build code
         run: make build
 `
-	if err := os.WriteFile(setupStepsPath, []byte(customContent), 0644); err != nil {
+	if err := os.WriteFile(setupStepsPath, []byte(customContent), 0o644); err != nil {
 		t.Fatalf("Failed to write custom setup steps: %v", err)
 	}
 

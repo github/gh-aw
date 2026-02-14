@@ -348,7 +348,7 @@ jobs:
 	maintenanceFile := filepath.Join(workflowDir, "agentics-maintenance.yml")
 	maintenanceLog.Printf("Writing maintenance workflow to %s", maintenanceFile)
 
-	if err := os.WriteFile(maintenanceFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(maintenanceFile, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("failed to write maintenance workflow: %w", err)
 	}
 

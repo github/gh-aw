@@ -130,7 +130,7 @@ This workflow uses all with redundant repos.
 			mdPath := filepath.Join(tempDir, "test-workflow.md")
 
 			// Write workflow file
-			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0644)
+			err := os.WriteFile(mdPath, []byte(tt.workflowMD), 0o644)
 			require.NoError(t, err, "Failed to write test workflow")
 
 			// Capture stderr

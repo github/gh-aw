@@ -84,13 +84,13 @@ tools:
 			// Create temp directory
 			tempDir := testutil.TempDir(t, "test-*")
 			workflowsDir := filepath.Join(tempDir, ".github", "workflows")
-			if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+			if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 				t.Fatalf("Failed to create workflows directory: %v", err)
 			}
 
 			// Write workflow file
 			workflowPath := filepath.Join(workflowsDir, "test.md")
-			if err := os.WriteFile(workflowPath, []byte(tt.workflowMD), 0644); err != nil {
+			if err := os.WriteFile(workflowPath, []byte(tt.workflowMD), 0o644); err != nil {
 				t.Fatalf("Failed to write workflow file: %v", err)
 			}
 

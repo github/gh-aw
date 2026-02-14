@@ -32,7 +32,7 @@ This is a test workflow to verify git configuration is included.
 `
 
 	testFile := filepath.Join(tmpDir, "test-git-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,7 +128,7 @@ This is a test workflow to verify git credentials cleaner is included.
 `
 
 	testFile := filepath.Join(tmpDir, "test-git-cleaner.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

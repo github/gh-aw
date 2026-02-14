@@ -26,7 +26,7 @@ func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobNa
 	consolidatedSafeOutputsJobLog.Print("Building consolidated safe outputs job with file mode")
 
 	var steps []string
-	var outputs = make(map[string]string)
+	outputs := make(map[string]string)
 	var safeOutputStepNames []string
 
 	// Compute permissions based on configured safe outputs (principle of least privilege)

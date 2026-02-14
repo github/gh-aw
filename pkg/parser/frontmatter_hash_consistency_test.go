@@ -137,7 +137,7 @@ steps:
 		t.Run(tc.name, func(t *testing.T) {
 			// Create temporary workflow file
 			workflowFile := filepath.Join(tempDir, "test-"+strings.ReplaceAll(tc.name, " ", "-")+".md")
-			err := os.WriteFile(workflowFile, []byte(tc.content), 0644)
+			err := os.WriteFile(workflowFile, []byte(tc.content), 0o644)
 			require.NoError(t, err, "Should write test file")
 
 			// Compute hash with Go implementation - iteration 1
@@ -210,7 +210,7 @@ Use ${{ env.TEST_VAR }} and ${{ vars.CONFIG }}
 
 	tempDir := t.TempDir()
 	workflowFile := filepath.Join(tempDir, "stability-test.md")
-	err := os.WriteFile(workflowFile, []byte(content), 0644)
+	err := os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Should write test file")
 
 	cache := NewImportCache("")
@@ -272,7 +272,7 @@ func TestHashConsistency_WithImports(t *testing.T) {
 
 	// Create a shared workflow
 	sharedDir := filepath.Join(tempDir, "shared")
-	err := os.MkdirAll(sharedDir, 0755)
+	err := os.MkdirAll(sharedDir, 0o755)
 	require.NoError(t, err, "Should create shared directory")
 
 	sharedFile := filepath.Join(sharedDir, "common.md")
@@ -287,7 +287,7 @@ labels:
 
 # Shared Content
 `
-	err = os.WriteFile(sharedFile, []byte(sharedContent), 0644)
+	err = os.WriteFile(sharedFile, []byte(sharedContent), 0o644)
 	require.NoError(t, err, "Should write shared file")
 
 	// Create a main workflow that imports the shared workflow
@@ -303,7 +303,7 @@ labels:
 
 # Main Workflow
 `
-	err = os.WriteFile(mainFile, []byte(mainContent), 0644)
+	err = os.WriteFile(mainFile, []byte(mainContent), 0o644)
 	require.NoError(t, err, "Should write main file")
 
 	cache := NewImportCache("")
@@ -377,9 +377,9 @@ engine: copilot
 	file1 := filepath.Join(tempDir, "test1.md")
 	file2 := filepath.Join(tempDir, "test2.md")
 
-	err := os.WriteFile(file1, []byte(content1), 0644)
+	err := os.WriteFile(file1, []byte(content1), 0o644)
 	require.NoError(t, err, "Should write file1")
-	err = os.WriteFile(file2, []byte(content2), 0644)
+	err = os.WriteFile(file2, []byte(content2), 0o644)
 	require.NoError(t, err, "Should write file2")
 
 	// Compute hashes with Go
@@ -486,7 +486,7 @@ async function main() {
 main();
 `
 
-	if err := os.WriteFile(testScript, []byte(scriptContent), 0644); err != nil {
+	if err := os.WriteFile(testScript, []byte(scriptContent), 0o644); err != nil {
 		return "", err
 	}
 

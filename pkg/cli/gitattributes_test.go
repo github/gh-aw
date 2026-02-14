@@ -31,7 +31,7 @@ func TestEnsureGitAttributes(t *testing.T) {
 	}
 
 	// Initialize a git repository
-	if err := os.WriteFile("test.txt", []byte("test"), 0644); err != nil {
+	if err := os.WriteFile("test.txt", []byte("test"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	if cmd := exec.Command("git", "init"); cmd.Run() != nil {
@@ -79,7 +79,7 @@ func TestEnsureGitAttributes(t *testing.T) {
 
 			// Create initial content if specified
 			if tt.existingContent != "" {
-				if err := os.WriteFile(gitAttributesPath, []byte(tt.existingContent), 0644); err != nil {
+				if err := os.WriteFile(gitAttributesPath, []byte(tt.existingContent), 0o644); err != nil {
 					t.Fatalf("Failed to create initial .gitattributes: %v", err)
 				}
 			}

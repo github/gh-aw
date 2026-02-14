@@ -377,7 +377,7 @@ permissions:
 
 This is a test workflow.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -405,7 +405,6 @@ This is a test workflow.
 		false, // strict
 		false, // validateActionSHAs
 	)
-
 	// Should complete without error
 	if err != nil {
 		t.Errorf("Unexpected error with noEmit: %v", err)
@@ -436,7 +435,7 @@ engine: copilot
 
 This is a test workflow.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -454,7 +453,6 @@ This is a test workflow.
 		false, // strict
 		false, // validateActionSHAs
 	)
-
 	// Should complete without error
 	if err != nil {
 		t.Errorf("Unexpected error during compilation: %v", err)
@@ -570,7 +568,7 @@ engine: copilot
 
 This is a test workflow.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -736,7 +734,7 @@ engine: copilot
 
 This is a test workflow.
 `
-	if err := os.WriteFile(testFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -802,7 +800,6 @@ This is a test workflow.
 				false,       // strict
 				tt.validate, // validateActionSHAs - independent of security tools
 			)
-
 			// Even without running security tools, the compilation should succeed
 			// This proves security tools can be disabled while keeping validate
 			// at any state, and vice versa
@@ -820,7 +817,7 @@ func TestCompileWorkflows_PurgeInvalidYml(t *testing.T) {
 	// Create temporary directory structure for testing
 	tempDir := testutil.TempDir(t, "test-purge-invalid-*")
 	workflowsDir := filepath.Join(tempDir, ".github/workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -856,23 +853,23 @@ on:
 
 Test workflow content`
 
-	if err := os.WriteFile(testWorkflowMd, []byte(testWorkflowContent), 0644); err != nil {
+	if err := os.WriteFile(testWorkflowMd, []byte(testWorkflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow: %v", err)
 	}
 
 	// Create some orphaned .invalid.yml files that should be purged
 	invalidFile1 := filepath.Join(workflowsDir, "old1.invalid.yml")
 	invalidFile2 := filepath.Join(workflowsDir, "old2.invalid.yml")
-	if err := os.WriteFile(invalidFile1, []byte("invalid yaml content 1"), 0644); err != nil {
+	if err := os.WriteFile(invalidFile1, []byte("invalid yaml content 1"), 0o644); err != nil {
 		t.Fatalf("Failed to create invalid file 1: %v", err)
 	}
-	if err := os.WriteFile(invalidFile2, []byte("invalid yaml content 2"), 0644); err != nil {
+	if err := os.WriteFile(invalidFile2, []byte("invalid yaml content 2"), 0o644); err != nil {
 		t.Fatalf("Failed to create invalid file 2: %v", err)
 	}
 
 	// Create an orphaned .lock.yml file that should also be purged
 	orphanedLockFile := filepath.Join(workflowsDir, "orphaned.lock.yml")
-	if err := os.WriteFile(orphanedLockFile, []byte("orphaned lock content"), 0644); err != nil {
+	if err := os.WriteFile(orphanedLockFile, []byte("orphaned lock content"), 0o644); err != nil {
 		t.Fatalf("Failed to create orphaned lock file: %v", err)
 	}
 

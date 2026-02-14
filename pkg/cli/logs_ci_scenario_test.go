@@ -149,7 +149,7 @@ func TestLogsJSONRunDataFields(t *testing.T) {
 		"workflow_name": "Test Workflow",
 	}
 	awInfoBytes, _ := json.Marshal(awInfo)
-	if err := os.WriteFile(awInfoPath, awInfoBytes, 0644); err != nil {
+	if err := os.WriteFile(awInfoPath, awInfoBytes, 0o644); err != nil {
 		t.Fatalf("Failed to write mock aw_info.json: %v", err)
 	}
 

@@ -299,7 +299,7 @@ YAML error that demonstrates column position handling.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.md", tt.name))
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -425,7 +425,7 @@ Test content.`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.md", tt.name))
-			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.content), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -598,7 +598,7 @@ strict: false
 This is a test workflow.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -650,7 +650,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -691,7 +691,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -736,7 +736,7 @@ environment: production
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -780,7 +780,7 @@ concurrency:
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -823,7 +823,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -884,7 +884,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -935,7 +935,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1005,7 +1005,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1069,7 +1069,7 @@ strict: false
 Test content.`
 
 	testFile := filepath.Join(tmpDir, "test.md")
-	if err := os.WriteFile(testFile, []byte(frontmatter), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

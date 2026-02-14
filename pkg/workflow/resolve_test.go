@@ -73,7 +73,7 @@ func TestResolveWorkflowName(t *testing.T) {
 	// Create a temporary directory with workflow files
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +88,13 @@ func TestResolveWorkflowName(t *testing.T) {
 		mdFile := filepath.Join(workflowsDir, workflowID+".md")
 		lockFile := filepath.Join(workflowsDir, workflowID+".lock.yml")
 
-		err = os.WriteFile(mdFile, []byte("# "+workflowID+"\nSome content"), 0644)
+		err = os.WriteFile(mdFile, []byte("# "+workflowID+"\nSome content"), 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		lockContent := "name: \"" + workflowName + "\"\non: push\n"
-		err = os.WriteFile(lockFile, []byte(lockContent), 0644)
+		err = os.WriteFile(lockFile, []byte(lockContent), 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -169,14 +169,14 @@ func TestResolveWorkflowName_MissingLockFile(t *testing.T) {
 	// Create a temporary directory with workflow files
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create only the .md file, but not the .lock.yml file
 	mdFile := filepath.Join(workflowsDir, "incomplete-workflow.md")
-	err = os.WriteFile(mdFile, []byte("# Incomplete Workflow\nSome content"), 0644)
+	err = os.WriteFile(mdFile, []byte("# Incomplete Workflow\nSome content"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestResolveWorkflowName_InvalidYAML(t *testing.T) {
 	// Create a temporary directory with workflow files
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,13 +207,13 @@ func TestResolveWorkflowName_InvalidYAML(t *testing.T) {
 	mdFile := filepath.Join(workflowsDir, "invalid-yaml.md")
 	lockFile := filepath.Join(workflowsDir, "invalid-yaml.lock.yml")
 
-	err = os.WriteFile(mdFile, []byte("# Invalid YAML\nSome content"), 0644)
+	err = os.WriteFile(mdFile, []byte("# Invalid YAML\nSome content"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create lock file with invalid YAML
-	err = os.WriteFile(lockFile, []byte("invalid: yaml: content: ["), 0644)
+	err = os.WriteFile(lockFile, []byte("invalid: yaml: content: ["), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestResolveWorkflowName_MissingNameField(t *testing.T) {
 	// Create a temporary directory with workflow files
 	tempDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tempDir, constants.GetWorkflowDir())
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,13 +244,13 @@ func TestResolveWorkflowName_MissingNameField(t *testing.T) {
 	mdFile := filepath.Join(workflowsDir, "no-name.md")
 	lockFile := filepath.Join(workflowsDir, "no-name.lock.yml")
 
-	err = os.WriteFile(mdFile, []byte("# No Name\nSome content"), 0644)
+	err = os.WriteFile(mdFile, []byte("# No Name\nSome content"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create lock file with valid YAML but no name field
-	err = os.WriteFile(lockFile, []byte("on: push\njobs: {}\n"), 0644)
+	err = os.WriteFile(lockFile, []byte("on: push\njobs: {}\n"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}

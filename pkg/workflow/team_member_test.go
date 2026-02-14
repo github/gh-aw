@@ -66,7 +66,7 @@ Test workflow content.`,
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, tt.filename)
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatal(err)
 			}

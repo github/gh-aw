@@ -66,53 +66,68 @@ func TestExtractSecretsFromConfig(t *testing.T) {
 	}{
 		{
 			name: "HTTP headers with secrets",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "http",
-				Headers: map[string]string{
-					"DD_API_KEY":         "${{ secrets.DD_API_KEY }}",
-					"DD_APPLICATION_KEY": "${{ secrets.DD_APPLICATION_KEY }}",
-					"DD_SITE":            "${{ secrets.DD_SITE || 'datadoghq.com' }}",
-				}}, Name: "datadog",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "http",
+					Headers: map[string]string{
+						"DD_API_KEY":         "${{ secrets.DD_API_KEY }}",
+						"DD_APPLICATION_KEY": "${{ secrets.DD_APPLICATION_KEY }}",
+						"DD_SITE":            "${{ secrets.DD_SITE || 'datadoghq.com' }}",
+					},
+				}, Name: "datadog",
 			},
 			expectedSecrets: []string{"DD_API_KEY", "DD_APPLICATION_KEY", "DD_SITE"},
 		},
 		{
 			name: "env vars with secrets",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Env: map[string]string{
-					"API_KEY": "${{ secrets.API_KEY }}",
-					"TOKEN":   "${{ secrets.TOKEN }}",
-				}}, Name: "test-server",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "stdio",
+					Env: map[string]string{
+						"API_KEY": "${{ secrets.API_KEY }}",
+						"TOKEN":   "${{ secrets.TOKEN }}",
+					},
+				}, Name: "test-server",
 			},
 			expectedSecrets: []string{"API_KEY", "TOKEN"},
 		},
 		{
 			name: "mixed headers and env",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "http",
-				Headers: map[string]string{
-					"Authorization": "Bearer ${{ secrets.AUTH_TOKEN }}",
-				},
-				Env: map[string]string{
-					"API_KEY": "${{ secrets.API_KEY }}",
-				}}, Name: "mixed-server",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "http",
+					Headers: map[string]string{
+						"Authorization": "Bearer ${{ secrets.AUTH_TOKEN }}",
+					},
+					Env: map[string]string{
+						"API_KEY": "${{ secrets.API_KEY }}",
+					},
+				}, Name: "mixed-server",
 			},
 			expectedSecrets: []string{"AUTH_TOKEN", "API_KEY"},
 		},
 		{
 			name: "no secrets",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "stdio",
-				Env: map[string]string{
-					"SIMPLE_VAR": "plain value",
-				}}, Name: "simple-server",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "stdio",
+					Env: map[string]string{
+						"SIMPLE_VAR": "plain value",
+					},
+				}, Name: "simple-server",
 			},
 			expectedSecrets: []string{},
 		},
 		{
 			name: "duplicate secrets (should only appear once)",
-			config: parser.MCPServerConfig{BaseMCPServerConfig: types.BaseMCPServerConfig{Type: "http",
-				Headers: map[string]string{
-					"Header1": "${{ secrets.API_KEY }}",
-					"Header2": "${{ secrets.API_KEY }}",
-				}}, Name: "duplicate-server",
+			config: parser.MCPServerConfig{
+				BaseMCPServerConfig: types.BaseMCPServerConfig{
+					Type: "http",
+					Headers: map[string]string{
+						"Header1": "${{ secrets.API_KEY }}",
+						"Header2": "${{ secrets.API_KEY }}",
+					},
+				}, Name: "duplicate-server",
 			},
 			expectedSecrets: []string{"API_KEY"},
 		},

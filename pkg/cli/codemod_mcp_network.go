@@ -368,7 +368,7 @@ func addAllowedToNetwork(lines []string, domains []string) []string {
 	var result []string
 	var inNetworkBlock bool
 	var networkIndent string
-	var insertIndex = -1
+	insertIndex := -1
 
 	for i, line := range lines {
 		trimmedLine := strings.TrimSpace(line)

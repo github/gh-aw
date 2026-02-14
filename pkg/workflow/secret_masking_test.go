@@ -147,7 +147,6 @@ func TestMergeSecretMasking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCompiler()
 			result, err := c.MergeSecretMasking(tt.topConfig, tt.importedJSON)
-
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return

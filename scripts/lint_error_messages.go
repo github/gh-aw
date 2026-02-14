@@ -78,7 +78,6 @@ func main() {
 
 			return nil
 		})
-
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error walking directory %s: %v\n", dir, err)
 			os.Exit(1)

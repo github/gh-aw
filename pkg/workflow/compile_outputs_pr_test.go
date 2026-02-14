@@ -40,7 +40,7 @@ This workflow tests the output pull request configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr-config.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +110,7 @@ This workflow tests the create_pull_request job generation.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -219,7 +219,7 @@ This workflow tests the create_pull_request job generation with draft: false.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr-draft-false.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -295,7 +295,7 @@ This workflow tests the create_pull_request job generation with draft: true.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr-draft-true.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -367,7 +367,7 @@ This workflow tests the create-pull-request if-no-changes configuration parsing.
 `
 
 	testFile := filepath.Join(tmpDir, "test-create-pr-if-no-changes.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -414,7 +414,7 @@ This workflow tests the default if-no-changes behavior.
 `
 
 	testFileDefault := filepath.Join(tmpDir, "test-create-pr-if-no-changes-default.md")
-	if err := os.WriteFile(testFileDefault, []byte(testContentDefault), 0644); err != nil {
+	if err := os.WriteFile(testFileDefault, []byte(testContentDefault), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -476,7 +476,7 @@ This test verifies that the aw.patch artifact is downloaded in the safe_outputs 
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-create-pr-patch-download.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -557,7 +557,7 @@ This test verifies that auto-merge configuration is properly handled.
 
 	// Write the test file
 	mdFile := filepath.Join(tmpDir, "test-auto-merge.md")
-	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0644); err != nil {
+	if err := os.WriteFile(mdFile, []byte(testMarkdown), 0o644); err != nil {
 		t.Fatalf("Failed to write test markdown file: %v", err)
 	}
 
@@ -633,7 +633,7 @@ This workflow tests the create-pull-request with fallback-as-issue disabled.
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr-fallback-false.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -739,7 +739,7 @@ This workflow tests the create-pull-request with default fallback-as-issue behav
 `
 
 	testFile := filepath.Join(tmpDir, "test-output-pr-fallback-default.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

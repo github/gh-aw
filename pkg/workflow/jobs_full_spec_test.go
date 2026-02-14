@@ -185,7 +185,7 @@ jobs:
 			// Create a temporary workflow file
 			tmpDir := testutil.TempDir(t, "test-*")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}
@@ -312,7 +312,7 @@ jobs:
 			// Create a temporary workflow file
 			tmpDir := testutil.TempDir(t, "test-*")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}

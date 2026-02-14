@@ -119,7 +119,7 @@ Navigate to ` + testURL + ` and take a screenshot.
 `
 
 			workflowFile := filepath.Join(setup.workflowsDir, "test-playwright-live-"+tc.name+".md")
-			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+			if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create test workflow file: %v", err)
 			}
 
@@ -290,7 +290,7 @@ URL: ` + docsURL + `/gh-aw/
 `
 
 	workflowFile := filepath.Join(setup.workflowsDir, "test-playwright-docs.md")
-	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowFile, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to create test workflow file: %v", err)
 	}
 

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
 	"time"
 
 	"github.com/github/gh-aw/pkg/testutil"
@@ -96,7 +95,7 @@ func TestMCPServer_AddToolInvocation(t *testing.T) {
 	// Create a temporary directory
 	tmpDir := testutil.TempDir(t, "test-*")
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+	if err := os.MkdirAll(workflowsDir, 0o755); err != nil {
 		t.Fatalf("Failed to create workflows directory: %v", err)
 	}
 
@@ -138,7 +137,6 @@ func TestMCPServer_AddToolInvocation(t *testing.T) {
 				"workflows": []any{"githubnext/agentics"},
 			},
 		})
-
 		if err != nil {
 			t.Fatalf("Failed to call add tool: %v", err)
 		}

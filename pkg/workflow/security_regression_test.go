@@ -188,7 +188,7 @@ Testing secrets injection: ${{ secrets.GITHUB_TOKEN }}`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "yaml-injection-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -315,7 +315,7 @@ func TestSecurityDoSViaNestedYAML(t *testing.T) {
 
 			tmpDir := testutil.TempDir(t, "nested-yaml-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -374,7 +374,7 @@ Testing simple anchor reference.`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "billion-laughs-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -518,7 +518,7 @@ Test secrets: ${{ secrets.PREFIX }}`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "safe-outputs-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -593,7 +593,7 @@ Test network defaults.`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := testutil.TempDir(t, "network-isolation-test")
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(tt.workflow), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(tt.workflow), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

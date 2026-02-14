@@ -37,7 +37,7 @@ This workflow tests that duplicate checkout steps are properly deduplicated.
 `
 
 	mdFile := filepath.Join(tmpDir, "test-duplicate-steps.md")
-	err := os.WriteFile(mdFile, []byte(mdContent), 0644)
+	err := os.WriteFile(mdFile, []byte(mdContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

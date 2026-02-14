@@ -76,7 +76,7 @@ func saveRunSummary(outputDir string, summary *RunSummary, verbose bool) error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(summaryPath, data, 0644); err != nil {
+	if err := os.WriteFile(summaryPath, data, 0o644); err != nil {
 		logsCacheLog.Printf("Failed to write run summary to disk: %v", err)
 		return fmt.Errorf("failed to write run summary: %w", err)
 	}

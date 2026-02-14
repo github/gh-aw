@@ -324,7 +324,6 @@ func FuzzScheduleParser(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		// The parser should never panic, even on malformed input
 		cron, original, err := ParseSchedule(input)
-
 		// Basic validation checks:
 		// 1. Results should be consistent
 		if err != nil {

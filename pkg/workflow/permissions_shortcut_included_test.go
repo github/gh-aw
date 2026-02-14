@@ -56,14 +56,14 @@ features:
 			// Create a temporary directory for test files
 			tempDir := testutil.TempDir(t, "test-*")
 			sharedDir := filepath.Join(tempDir, ".github", "workflows", "shared")
-			if err := os.MkdirAll(sharedDir, 0755); err != nil {
+			if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 				t.Fatalf("Failed to create shared directory: %v", err)
 			}
 
 			// Create a shared workflow file with permissions shortcut
 			sharedWorkflowContent := "---\n" + tt.includedPermissions + "\n---\n\n# Shared workflow\n"
 			sharedWorkflowPath := filepath.Join(sharedDir, "shared-permissions.md")
-			if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0644); err != nil {
+			if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create shared workflow file: %v", err)
 			}
 
@@ -83,7 +83,7 @@ tools:
 # Main workflow
 `
 			mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-workflow.md")
-			if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+			if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create main workflow file: %v", err)
 			}
 
@@ -147,14 +147,14 @@ func TestPermissionsShortcutMixedUsage(t *testing.T) {
 			// Create a temporary directory for test files
 			tempDir := testutil.TempDir(t, "test-*")
 			sharedDir := filepath.Join(tempDir, ".github", "workflows", "shared")
-			if err := os.MkdirAll(sharedDir, 0755); err != nil {
+			if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 				t.Fatalf("Failed to create shared directory: %v", err)
 			}
 
 			// Create a shared workflow file with permissions
 			sharedWorkflowContent := "---\n" + tt.includedPermissions + "\n---\n\n# Shared workflow\n"
 			sharedWorkflowPath := filepath.Join(sharedDir, "shared-permissions.md")
-			if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0644); err != nil {
+			if err := os.WriteFile(sharedWorkflowPath, []byte(sharedWorkflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create shared workflow file: %v", err)
 			}
 
@@ -174,7 +174,7 @@ tools:
 # Main workflow
 `
 			mainWorkflowPath := filepath.Join(tempDir, ".github", "workflows", "test-workflow.md")
-			if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0644); err != nil {
+			if err := os.WriteFile(mainWorkflowPath, []byte(mainWorkflowContent), 0o644); err != nil {
 				t.Fatalf("Failed to create main workflow file: %v", err)
 			}
 

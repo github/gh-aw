@@ -65,7 +65,7 @@ engine: copilot
 		t.Run(tt.name, func(t *testing.T) {
 			testContent := tt.frontmatter + "\n\n" + tt.markdown
 			testFile := filepath.Join(tmpDir, "test-"+tt.name+".md")
-			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+			require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 			compiler := NewCompiler()
 			workflowData, err := compiler.ParseWorkflowFile(testFile)
@@ -101,7 +101,7 @@ engine: copilot
 Test content`
 
 	testFile := filepath.Join(tmpDir, "test-filter.md")
-	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o644))
 
 	compiler := NewCompiler()
 	workflowData, err := compiler.ParseWorkflowFile(testFile)

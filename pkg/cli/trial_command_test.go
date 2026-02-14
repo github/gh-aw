@@ -365,13 +365,13 @@ No modifications needed.`,
 			workflowPath := filepath.Join(tempDir, ".github", "workflows", workflowName+".md")
 
 			// Create directory structure
-			err := os.MkdirAll(filepath.Dir(workflowPath), 0755)
+			err := os.MkdirAll(filepath.Dir(workflowPath), 0o755)
 			if err != nil {
 				t.Fatalf("Failed to create directory structure: %v", err)
 			}
 
 			// Write input content to file
-			err = os.WriteFile(workflowPath, []byte(tt.inputContent), 0644)
+			err = os.WriteFile(workflowPath, []byte(tt.inputContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test workflow file: %v", err)
 			}
@@ -456,13 +456,13 @@ steps:
 			workflowPath := filepath.Join(tempDir, ".github", "workflows", workflowName+".md")
 
 			// Create directory structure
-			err := os.MkdirAll(filepath.Dir(workflowPath), 0755)
+			err := os.MkdirAll(filepath.Dir(workflowPath), 0o755)
 			if err != nil {
 				t.Fatalf("Failed to create directory structure: %v", err)
 			}
 
 			// Write input content to file
-			err = os.WriteFile(workflowPath, []byte(tt.inputContent), 0644)
+			err = os.WriteFile(workflowPath, []byte(tt.inputContent), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to write test workflow file: %v", err)
 			}

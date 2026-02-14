@@ -19,7 +19,7 @@ func TestCacheMemoryImportOnly(t *testing.T) {
 
 	// Create a shared workflow directory
 	sharedDir := filepath.Join(tmpDir, ".github", "workflows", "shared")
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
@@ -36,7 +36,7 @@ tools:
 
 # Shared Cache Configuration
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared workflow file: %v", err)
 	}
 
@@ -61,7 +61,7 @@ tools:
 
 Test cache-memory import without local definition.
 `
-	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
+	if err := os.WriteFile(mainPath, []byte(mainContent), 0o644); err != nil {
 		t.Fatalf("Failed to write main workflow file: %v", err)
 	}
 

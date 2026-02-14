@@ -31,7 +31,7 @@ func TestAddCommandRequiresArguments(t *testing.T) {
 	}
 
 	// Initialize git repo
-	if err := os.MkdirAll(".git", 0755); err != nil {
+	if err := os.MkdirAll(".git", 0o755); err != nil {
 		t.Fatalf("Failed to create .git dir: %v", err)
 	}
 

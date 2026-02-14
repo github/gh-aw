@@ -102,11 +102,11 @@ func TestGenerateArtifactsReference(t *testing.T) {
 
 	// Write to scratchpad/artifacts.md
 	specsDir := filepath.Join("..", "..", "specs")
-	err = os.MkdirAll(specsDir, 0755)
+	err = os.MkdirAll(specsDir, 0o755)
 	require.NoError(t, err, "Failed to create specs directory")
 
 	artifactsPath := filepath.Join(specsDir, "artifacts.md")
-	err = os.WriteFile(artifactsPath, []byte(markdown), 0644)
+	err = os.WriteFile(artifactsPath, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write artifacts.md")
 
 	t.Logf("Generated artifacts reference at %s", artifactsPath)

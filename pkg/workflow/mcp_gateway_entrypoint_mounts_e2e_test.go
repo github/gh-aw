@@ -37,7 +37,7 @@ Test that entrypoint is properly extracted and included in the compiled workflow
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "entrypoint-test")
 	testFile := filepath.Join(tmpDir, "test-entrypoint.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -90,7 +90,7 @@ Test that mounts are properly extracted and included in the compiled workflow.
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "mounts-test")
 	testFile := filepath.Join(tmpDir, "test-mounts.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -141,7 +141,7 @@ Test that both entrypoint and mounts are properly extracted and included in the 
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "combined-test")
 	testFile := filepath.Join(tmpDir, "test-combined.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -193,7 +193,7 @@ Test that workflows without entrypoint or mounts still compile correctly.
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "default-test")
 	testFile := filepath.Join(tmpDir, "test-default.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -241,7 +241,7 @@ Test that entrypoint with special characters in args is properly handled.
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "special-chars-test")
 	testFile := filepath.Join(tmpDir, "test-special-chars.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow
@@ -290,7 +290,7 @@ Test that mounts with environment variables are properly handled.
 	// Create temporary directory and file
 	tmpDir := testutil.TempDir(t, "var-mounts-test")
 	testFile := filepath.Join(tmpDir, "test-var-mounts.md")
-	err := os.WriteFile(testFile, []byte(markdown), 0644)
+	err := os.WriteFile(testFile, []byte(markdown), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile the workflow

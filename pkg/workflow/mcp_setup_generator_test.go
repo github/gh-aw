@@ -345,7 +345,7 @@ Test workflow with custom container and version.`,
 
 			// Write test workflow file
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0644)
+			err := os.WriteFile(testFile, []byte(tt.frontmatter), 0o644)
 			require.NoError(t, err, "Failed to write test workflow file")
 
 			// Compile the workflow
@@ -445,7 +445,7 @@ Test that TAVILY_API_KEY is passed to gateway container.
 	tmpDir := t.TempDir()
 	inputFile := filepath.Join(tmpDir, "test.md")
 
-	err := os.WriteFile(inputFile, []byte(frontmatter), 0644)
+	err := os.WriteFile(inputFile, []byte(frontmatter), 0o644)
 	require.NoError(t, err, "Failed to write test input file")
 
 	err = compiler.CompileWorkflow(inputFile)
@@ -504,7 +504,7 @@ Test that multiple secrets are passed to gateway container.
 	tmpDir := t.TempDir()
 	inputFile := filepath.Join(tmpDir, "test.md")
 
-	err := os.WriteFile(inputFile, []byte(frontmatter), 0644)
+	err := os.WriteFile(inputFile, []byte(frontmatter), 0o644)
 	require.NoError(t, err, "Failed to write test input file")
 
 	err = compiler.CompileWorkflow(inputFile)

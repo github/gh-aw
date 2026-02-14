@@ -652,7 +652,6 @@ func TestGetActionPinWithData_SemverPreference(t *testing.T) {
 			}
 
 			result, err := GetActionPinWithData(tt.repo, tt.requestedVer, data)
-
 			if err != nil {
 				t.Fatalf("GetActionPinWithData(%s, %s) returned error: %v", tt.repo, tt.requestedVer, err)
 			}
@@ -1037,7 +1036,6 @@ func TestGetActionPinWithData_V5ExactMatch(t *testing.T) {
 	}
 
 	result, err := GetActionPinWithData("actions/upload-artifact", "v5.0.0", data)
-
 	if err != nil {
 		t.Fatalf("GetActionPinWithData returned error: %v", err)
 	}
@@ -1115,7 +1113,6 @@ func TestGetActionPinWithData_ExactVersionResolution(t *testing.T) {
 			}
 
 			result, err := GetActionPinWithData(tt.repo, tt.requestedVer, data)
-
 			if err != nil {
 				t.Fatalf("GetActionPinWithData returned error: %v", err)
 			}

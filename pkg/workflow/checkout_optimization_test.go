@@ -114,7 +114,7 @@ strict: false
 			// Create test workflow file
 			testContent := tt.frontmatter + "\n\n# Test Workflow\n\nThis is a test workflow to check checkout optimization.\n"
 			testFile := filepath.Join(tmpDir, "test-workflow.md")
-			if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+			if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 				t.Fatal(err)
 			}
 

@@ -83,7 +83,6 @@ func (c *MCPRegistryClient) SearchServers(query string) ([]MCPRegistryServerForP
 	spinner := console.NewSpinner(spinnerMessage)
 	spinner.Start()
 	resp, err := c.httpClient.Do(req)
-
 	if err != nil {
 		spinner.Stop()
 		return nil, fmt.Errorf("failed to search MCP registry: %w", err)
@@ -276,7 +275,6 @@ func (c *MCPRegistryClient) GetServer(serverName string) (*MCPRegistryServerForP
 	spinner := console.NewSpinner(fmt.Sprintf("Fetching MCP server '%s'...", serverName))
 	spinner.Start()
 	resp, err := c.httpClient.Do(req)
-
 	if err != nil {
 		spinner.Stop()
 		return nil, fmt.Errorf("failed to get MCP server: %w", err)

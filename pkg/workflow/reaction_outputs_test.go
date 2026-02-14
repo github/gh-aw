@@ -40,7 +40,7 @@ This workflow should generate add_reaction job with comment outputs.
 `
 
 	testFile := filepath.Join(tmpDir, "test-reaction-outputs.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,7 +114,7 @@ This workflow should generate add_reaction job with GH_AW_WORKFLOW_NAME environm
 `
 
 	testFile := filepath.Join(tmpDir, "test-reaction-workflow-name.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

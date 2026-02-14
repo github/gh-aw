@@ -870,7 +870,7 @@ This workflow tests that Copilot log parsing uses the correct log file path.
 `
 
 	testFile := filepath.Join(tmpDir, "test-copilot-log-parsing.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

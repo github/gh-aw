@@ -29,7 +29,7 @@ tools:
     allowed: ["*"]
 ---
 `
-	if err := os.WriteFile(sharedToolPath, []byte(sharedToolContent), 0644); err != nil {
+	if err := os.WriteFile(sharedToolPath, []byte(sharedToolContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared tool file: %v", err)
 	}
 
@@ -53,7 +53,7 @@ tools:
 
 This is a test workflow.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -97,7 +97,7 @@ tools:
     allowed: ["*"]
 ---
 `
-	if err := os.WriteFile(sharedTool1Path, []byte(sharedTool1Content), 0644); err != nil {
+	if err := os.WriteFile(sharedTool1Path, []byte(sharedTool1Content), 0o644); err != nil {
 		t.Fatalf("Failed to write shared tool 1 file: %v", err)
 	}
 
@@ -111,7 +111,7 @@ tools:
     allowed: ["*"]
 ---
 `
-	if err := os.WriteFile(sharedTool2Path, []byte(sharedTool2Content), 0644); err != nil {
+	if err := os.WriteFile(sharedTool2Path, []byte(sharedTool2Content), 0o644); err != nil {
 		t.Fatalf("Failed to write shared tool 2 file: %v", err)
 	}
 
@@ -136,7 +136,7 @@ tools:
 
 This is a test workflow with multiple imports.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -188,7 +188,7 @@ mcp-servers:
     allowed: ["*"]
 ---
 `
-	if err := os.WriteFile(sharedMCPPath, []byte(sharedMCPContent), 0644); err != nil {
+	if err := os.WriteFile(sharedMCPPath, []byte(sharedMCPContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared MCP file: %v", err)
 	}
 
@@ -212,7 +212,7 @@ tools:
 
 This is a test workflow with imported MCP server.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

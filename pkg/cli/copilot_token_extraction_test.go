@@ -28,7 +28,7 @@ func TestCopilotTokenExtractionFromLogs(t *testing.T) {
 		"model": "gpt-4"
 	}`
 	awInfoPath := filepath.Join(tempDir, "aw_info.json")
-	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a log file with Copilot debug output containing token usage
@@ -87,7 +87,7 @@ func TestCopilotTokenExtractionFromLogs(t *testing.T) {
 2025-09-26T11:13:18.502Z [DEBUG] Workflow completed`
 
 	logPath := filepath.Join(tempDir, "agent.log")
-	err = os.WriteFile(logPath, []byte(logContent), 0644)
+	err = os.WriteFile(logPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics
@@ -112,7 +112,7 @@ func TestCopilotTokenExtractionWithSingleResponse(t *testing.T) {
 	// Create aw_info.json with copilot engine
 	awInfoContent := `{"engine_id": "copilot"}`
 	awInfoPath := filepath.Join(tempDir, "aw_info.json")
-	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a log file with a single API response
@@ -128,7 +128,7 @@ func TestCopilotTokenExtractionWithSingleResponse(t *testing.T) {
 2025-09-26T11:13:17.990Z [DEBUG] }`
 
 	logPath := filepath.Join(tempDir, "agent.log")
-	err = os.WriteFile(logPath, []byte(logContent), 0644)
+	err = os.WriteFile(logPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics
@@ -147,7 +147,7 @@ func TestCopilotTokenExtractionWithNoUsageData(t *testing.T) {
 	// Create aw_info.json with copilot engine
 	awInfoContent := `{"engine_id": "copilot"}`
 	awInfoPath := filepath.Join(tempDir, "aw_info.json")
-	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Create a log file without usage data
@@ -156,7 +156,7 @@ func TestCopilotTokenExtractionWithNoUsageData(t *testing.T) {
 2025-09-26T11:13:17.990Z [DEBUG] Another log message`
 
 	logPath := filepath.Join(tempDir, "agent.log")
-	err = os.WriteFile(logPath, []byte(logContent), 0644)
+	err = os.WriteFile(logPath, []byte(logContent), 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics
@@ -184,19 +184,19 @@ func TestCopilotTokenExtractionWithRealLogData(t *testing.T) {
 	// Create aw_info.json with copilot engine
 	awInfoContent := `{"engine_id": "copilot"}`
 	awInfoPath := filepath.Join(tempDir, "aw_info.json")
-	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0644)
+	err := os.WriteFile(awInfoPath, []byte(awInfoContent), 0o644)
 	require.NoError(t, err)
 
 	// Copy real log to temp directory structure
 	logDir := filepath.Join(tempDir, "sandbox", "agent", "logs")
-	err = os.MkdirAll(logDir, 0755)
+	err = os.MkdirAll(logDir, 0o755)
 	require.NoError(t, err)
 
 	realLogContent, err := os.ReadFile(realLogPath)
 	require.NoError(t, err)
 
 	logPath := filepath.Join(logDir, "session-test.log")
-	err = os.WriteFile(logPath, realLogContent, 0644)
+	err = os.WriteFile(logPath, realLogContent, 0o644)
 	require.NoError(t, err)
 
 	// Extract metrics

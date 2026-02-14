@@ -28,7 +28,7 @@ func TestUpgradeCommand_UpdatesAgentFiles(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a simple workflow file
@@ -45,7 +45,7 @@ permissions:
 
 This is a test workflow.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Run upgrade command
@@ -69,7 +69,6 @@ This is a test workflow.
 }
 
 func TestUpgradeCommand_AppliesCodemods(t *testing.T) {
-
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -83,7 +82,7 @@ func TestUpgradeCommand_AppliesCodemods(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create multiple workflows with deprecated fields to test all workflows are upgraded
@@ -102,7 +101,7 @@ permissions:
 
 This workflow has deprecated timeout_minutes field.
 `
-	err = os.WriteFile(workflow1, []byte(workflow1Content), 0644)
+	err = os.WriteFile(workflow1, []byte(workflow1Content), 0o644)
 	require.NoError(t, err, "Failed to create workflow1")
 
 	workflow2 := filepath.Join(workflowsDir, "workflow2.md")
@@ -120,7 +119,7 @@ permissions:
 
 This workflow also has deprecated timeout_minutes field.
 `
-	err = os.WriteFile(workflow2, []byte(workflow2Content), 0644)
+	err = os.WriteFile(workflow2, []byte(workflow2Content), 0o644)
 	require.NoError(t, err, "Failed to create workflow2")
 
 	// Run upgrade command (should upgrade ALL workflows)
@@ -163,7 +162,7 @@ func TestUpgradeCommand_NoFixFlag(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow with deprecated field
@@ -182,7 +181,7 @@ permissions:
 
 This workflow should not be modified when --no-fix is used.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Run upgrade command with --no-fix
@@ -233,7 +232,6 @@ func TestUpgradeCommand_NonGitRepo(t *testing.T) {
 }
 
 func TestUpgradeCommand_CompilesWorkflows(t *testing.T) {
-
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -247,7 +245,7 @@ func TestUpgradeCommand_CompilesWorkflows(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a simple workflow that should compile successfully
@@ -264,7 +262,7 @@ permissions:
 
 This is a test workflow that should be compiled during upgrade.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Run upgrade command (should compile workflows)
@@ -304,7 +302,7 @@ func TestUpgradeCommand_NoFixSkipsCompilation(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a simple workflow
@@ -321,7 +319,7 @@ permissions:
 
 This workflow should not be compiled with --no-fix.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Run upgrade command with --no-fix
@@ -355,7 +353,7 @@ func TestUpgradeCommand_PushRequiresCleanWorkingDirectory(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a workflow file
@@ -372,7 +370,7 @@ permissions:
 
 This is a test workflow.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Commit the workflow file first
@@ -381,7 +379,7 @@ This is a test workflow.
 
 	// Create an uncommitted change
 	unstagedFile := filepath.Join(tmpDir, "uncommitted.txt")
-	err = os.WriteFile(unstagedFile, []byte("uncommitted content"), 0644)
+	err = os.WriteFile(unstagedFile, []byte("uncommitted content"), 0o644)
 	require.NoError(t, err, "Failed to create uncommitted file")
 
 	// Run upgrade command with --push (should fail due to uncommitted changes)
@@ -412,7 +410,7 @@ func TestUpgradeCommand_PushWithNoChanges(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create a simple workflow
@@ -429,7 +427,7 @@ permissions:
 
 This workflow is already up to date.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Commit everything first
@@ -452,7 +450,6 @@ This workflow is already up to date.
 }
 
 func TestUpgradeCommand_UpdatesActionPins(t *testing.T) {
-
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	originalDir, _ := os.Getwd()
@@ -466,12 +463,12 @@ func TestUpgradeCommand_UpdatesActionPins(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create .github/aw directory
 	awDir := filepath.Join(tmpDir, ".github", "aw")
-	err = os.MkdirAll(awDir, 0755)
+	err = os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create .github/aw directory")
 
 	// Create a simple workflow
@@ -488,7 +485,7 @@ permissions:
 
 This workflow should trigger action pin updates.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Create an actions-lock.json file with a test entry
@@ -503,7 +500,7 @@ This workflow should trigger action pin updates.
   }
 }
 `
-	err = os.WriteFile(actionsLockPath, []byte(actionsLockContent), 0644)
+	err = os.WriteFile(actionsLockPath, []byte(actionsLockContent), 0o644)
 	require.NoError(t, err, "Failed to create actions-lock.json file")
 
 	// Run upgrade command (should update actions)
@@ -542,12 +539,12 @@ func TestUpgradeCommand_NoActionsFlag(t *testing.T) {
 
 	// Create .github/workflows directory
 	workflowsDir := filepath.Join(tmpDir, ".github", "workflows")
-	err := os.MkdirAll(workflowsDir, 0755)
+	err := os.MkdirAll(workflowsDir, 0o755)
 	require.NoError(t, err, "Failed to create workflows directory")
 
 	// Create .github/aw directory
 	awDir := filepath.Join(tmpDir, ".github", "aw")
-	err = os.MkdirAll(awDir, 0755)
+	err = os.MkdirAll(awDir, 0o755)
 	require.NoError(t, err, "Failed to create .github/aw directory")
 
 	// Create a simple workflow
@@ -564,7 +561,7 @@ permissions:
 
 This workflow should not trigger action pin updates with --no-actions.
 `
-	err = os.WriteFile(workflowFile, []byte(content), 0644)
+	err = os.WriteFile(workflowFile, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to create test workflow file")
 
 	// Create an actions-lock.json file with a test entry
@@ -579,7 +576,7 @@ This workflow should not trigger action pin updates with --no-actions.
   }
 }
 `
-	err = os.WriteFile(actionsLockPath, []byte(originalContent), 0644)
+	err = os.WriteFile(actionsLockPath, []byte(originalContent), 0o644)
 	require.NoError(t, err, "Failed to create actions-lock.json file")
 
 	// Run upgrade command with --no-actions

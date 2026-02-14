@@ -16,7 +16,6 @@ func TestGetWorkflowStatuses_MCPIntegration(t *testing.T) {
 	// This test requires being run from the repository root
 	// since it needs .github/workflows directory
 	statuses, err := GetWorkflowStatuses("", "", "", "")
-
 	// We expect either:
 	// - No error and a valid (possibly empty) slice
 	// - An error if we're not in a repository with workflows

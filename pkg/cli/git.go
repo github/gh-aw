@@ -224,7 +224,7 @@ func ensureGitAttributes() error {
 
 	// Write back to file with owner-only read/write permissions (0600) for security best practices
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(gitAttributesPath, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(gitAttributesPath, []byte(content), 0o600); err != nil {
 		gitLog.Printf("Failed to write .gitattributes: %v", err)
 		return fmt.Errorf("failed to write .gitattributes: %w", err)
 	}
@@ -262,7 +262,7 @@ func ensureLogsGitignore() error {
 
 	gitLog.Print("Creating .github/aw/logs directory and .gitignore")
 	// Create the logs directory if it doesn't exist
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
+	if err := os.MkdirAll(logsDir, 0o755); err != nil {
 		gitLog.Printf("Failed to create logs directory: %v", err)
 		return fmt.Errorf("failed to create .github/aw/logs directory: %w", err)
 	}
@@ -274,7 +274,7 @@ func ensureLogsGitignore() error {
 # But keep the .gitignore file itself
 !.gitignore
 `
-	if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0600); err != nil {
+	if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0o600); err != nil {
 		gitLog.Printf("Failed to write .gitignore: %v", err)
 		return fmt.Errorf("failed to write .github/aw/logs/.gitignore: %w", err)
 	}

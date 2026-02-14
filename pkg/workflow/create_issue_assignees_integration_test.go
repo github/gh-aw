@@ -39,7 +39,7 @@ This is a test workflow that should create an issue and assign it to multiple us
 `
 
 	testFile := filepath.Join(tmpDir, "test-assignees.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ This workflow should compile successfully without assignees configuration.
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-assignees.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ Create an issue and assign to copilot.
 `
 
 	testFile := filepath.Join(tmpDir, "test-copilot.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -236,7 +236,7 @@ Create an issue with a single assignee.
 `
 
 	testFile := filepath.Join(tmpDir, "test-string.md")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

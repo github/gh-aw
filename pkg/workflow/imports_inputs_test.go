@@ -22,7 +22,7 @@ func TestImportWithInputs(t *testing.T) {
 	// Create shared workflow file with inputs
 	sharedPath := filepath.Join(tempDir, "shared", "data-fetch.md")
 	sharedDir := filepath.Dir(sharedPath)
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
@@ -42,7 +42,7 @@ inputs:
 
 Fetch ${{ github.aw.inputs.count }} items from the ${{ github.aw.inputs.category }} category.
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -65,7 +65,7 @@ imports:
 
 This workflow tests import with inputs.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 
@@ -112,7 +112,7 @@ func TestImportWithInputsStringFormat(t *testing.T) {
 	// Create shared workflow file (no inputs needed for this test)
 	sharedPath := filepath.Join(tempDir, "shared", "simple.md")
 	sharedDir := filepath.Dir(sharedPath)
-	if err := os.MkdirAll(sharedDir, 0755); err != nil {
+	if err := os.MkdirAll(sharedDir, 0o755); err != nil {
 		t.Fatalf("Failed to create shared directory: %v", err)
 	}
 
@@ -126,7 +126,7 @@ tools:
 
 Do something simple.
 `
-	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0644); err != nil {
+	if err := os.WriteFile(sharedPath, []byte(sharedContent), 0o644); err != nil {
 		t.Fatalf("Failed to write shared file: %v", err)
 	}
 
@@ -146,7 +146,7 @@ imports:
 
 This workflow tests that string imports still work.
 `
-	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0644); err != nil {
+	if err := os.WriteFile(workflowPath, []byte(workflowContent), 0o644); err != nil {
 		t.Fatalf("Failed to write workflow file: %v", err)
 	}
 

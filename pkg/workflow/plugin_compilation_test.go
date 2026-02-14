@@ -86,7 +86,7 @@ Test plugin with org namespace
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, "test-plugin-array.md")
-			err := os.WriteFile(testFile, []byte(tt.workflow), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflow), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Compile workflow
@@ -179,7 +179,7 @@ Test object format without custom token
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, "test-plugin-object.md")
-			err := os.WriteFile(testFile, []byte(tt.workflow), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflow), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Compile workflow
@@ -231,7 +231,7 @@ Test with top-level github-token
 `
 
 	testFile := filepath.Join(tmpDir, "test-toplevel-token.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile workflow
@@ -329,7 +329,7 @@ Test cascading fallback
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tmpDir, "test-precedence.md")
-			err := os.WriteFile(testFile, []byte(tt.workflow), 0644)
+			err := os.WriteFile(testFile, []byte(tt.workflow), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Compile workflow
@@ -378,7 +378,7 @@ Test %s with plugins
 `, engine.engineID, engine.engineID)
 
 			testFile := filepath.Join(tmpDir, fmt.Sprintf("test-%s.md", engine.engineID))
-			err := os.WriteFile(testFile, []byte(workflow), 0644)
+			err := os.WriteFile(testFile, []byte(workflow), 0o644)
 			require.NoError(t, err, "Failed to write test file")
 
 			// Compile workflow
@@ -423,7 +423,7 @@ Test without plugins
 `
 
 	testFile := filepath.Join(tmpDir, "test-no-plugins.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile workflow
@@ -460,7 +460,7 @@ Test invalid repo
 `
 
 	testFile := filepath.Join(tmpDir, "test-invalid.md")
-	err := os.WriteFile(testFile, []byte(workflow), 0644)
+	err := os.WriteFile(testFile, []byte(workflow), 0o644)
 	require.NoError(t, err, "Failed to write test file")
 
 	// Compile workflow
