@@ -282,7 +282,9 @@ if [ -f "${JS_SOURCE_DIR}/copilot-client.js" ]; then
   cp "${JS_SOURCE_DIR}/copilot-client.js" "${COPILOT_DEST}/copilot-client.js"
   echo "✓ Successfully copied copilot-client.js to ${COPILOT_DEST}"
 else
-  echo "::warning::copilot-client.js not found in ${JS_SOURCE_DIR}"
+  echo "::error::copilot-client.js not found in ${JS_SOURCE_DIR}"
+  echo "::error::This file is required for copilot-client functionality"
+  exit 1
 fi
 
 # Install @actions/github package ONLY if safe-output-projects flag is enabled
