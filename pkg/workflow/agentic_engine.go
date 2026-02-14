@@ -259,11 +259,8 @@ func (e *BaseEngine) SupportsPlugins() bool {
 }
 
 func (e *BaseEngine) SupportsLLMGateway() int {
-	if e.supportsLLMGateway {
-		// This should be overridden by engines that support LLM gateway
-		// to return their specific port number
-		return -1
-	}
+	// Engines that support LLM gateway must override this method
+	// to return their specific port number (e.g., 10000, 10001, 10002)
 	return -1
 }
 
