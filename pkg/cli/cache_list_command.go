@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -110,17 +109,15 @@ func RunCacheList(config CacheListConfig) error {
 	}
 
 	// Display caches in a formatted table
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d cache(s):", len(caches))))
+	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Found %d cache(s)", len(caches))))
 	fmt.Fprintln(os.Stderr, "")
 
-	// Print table header
-	fmt.Fprintf(os.Stderr, "%-12s %-50s %-25s %-12s %-20s\n",
-		"ID", "KEY", "REF", "SIZE", "LAST ACCESSED")
-	fmt.Fprintf(os.Stderr, "%s\n", strings.Repeat("-", 120))
+	// Build table configuration for console.RenderTable
+	headers := []string{"ID", "KEY", "REF", "SIZE", "LAST ACCESSED"}
+	var rows [][]string
 
-	// Print each cache entry
 	for _, cache := range caches {
-		// Format size
+		// Format size using console helper
 		sizeStr := console.FormatFileSize(cache.SizeInBytes)
 
 		// Truncate key if too long
@@ -138,9 +135,23 @@ func RunCacheList(config CacheListConfig) error {
 		// Format last accessed time
 		lastAccessed := formatTime(cache.LastAccessedAt)
 
-		fmt.Fprintf(os.Stderr, "%-12d %-50s %-25s %-12s %-20s\n",
-			cache.ID, key, ref, sizeStr, lastAccessed)
+		row := []string{
+			fmt.Sprintf("%d", cache.ID),
+			key,
+			ref,
+			sizeStr,
+			lastAccessed,
+		}
+		rows = append(rows, row)
 	}
+
+	// Render table using console package helper
+	tableConfig := console.TableConfig{
+		Headers: headers,
+		Rows:    rows,
+	}
+
+	fmt.Fprint(os.Stderr, console.RenderTable(tableConfig))
 
 	return nil
 }
