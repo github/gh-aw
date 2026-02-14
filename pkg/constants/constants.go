@@ -313,12 +313,12 @@ const DefaultMCPRegistryURL URL = "https://api.mcp.github.com/v0.1"
 const GitHubCopilotMCPDomain = "api.githubcopilot.com"
 
 // DefaultClaudeCodeVersion is the default version of the Claude Code CLI.
-const DefaultClaudeCodeVersion Version = "2.1.39"
+const DefaultClaudeCodeVersion Version = "2.1.42"
 
 // DefaultCopilotVersion is the default version of the GitHub Copilot CLI.
 //
 // WARNING: UPGRADING COPILOT CLI REQUIRES A FULL INTEGRATION TEST RUN TO ENSURE COMPATIBILITY.
-const DefaultCopilotVersion Version = "0.0.409"
+const DefaultCopilotVersion Version = "0.0.410"
 
 // DefaultCopilotDetectionModel is the default model for the Copilot engine when used in the detection job
 // Updated to gpt-5.1-codex-mini after gpt-5-mini deprecation on 2026-01-17
