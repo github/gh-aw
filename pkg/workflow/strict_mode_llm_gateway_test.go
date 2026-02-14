@@ -11,7 +11,7 @@ import (
 
 // TestValidateStrictFirewall_LLMGatewaySupport tests the LLM gateway validation in strict mode
 func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
-	t.Run("codex engine without LLM gateway support rejects custom domains in strict mode", func(t *testing.T) {
+	t.Run("codex engine rejects custom domains in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -110,7 +110,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway also allows known ecosystems", func(t *testing.T) {
+	t.Run("codex engine also allows known ecosystems", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -127,7 +127,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
+	t.Run("codex engine rejects domains from known ecosystems but suggests ecosystem identifier", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -218,7 +218,7 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 		}
 	})
 
-	t.Run("codex engine without LLM gateway rejects sandbox.agent: false in strict mode", func(t *testing.T) {
+	t.Run("codex engine with LLM gateway rejects sandbox.agent: false in strict mode", func(t *testing.T) {
 		compiler := NewCompiler()
 		compiler.strictMode = true
 
@@ -235,16 +235,16 @@ func TestValidateStrictFirewall_LLMGatewaySupport(t *testing.T) {
 			},
 		}
 
-		// codex engine now does not support LLM gateway, so it should error about both
+		// codex engine now supports LLM gateway, so it should get the general sandbox.agent error
 		err := compiler.validateStrictFirewall("codex", networkPerms, sandboxConfig)
 		if err == nil {
 			t.Error("Expected error for sandbox.agent: false in strict mode, got nil")
 		}
-		if err != nil && !strings.Contains(err.Error(), "does not support LLM gateway") {
-			t.Errorf("Expected error about LLM gateway for codex, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "sandbox.agent: false") {
+			t.Errorf("Expected error about sandbox.agent: false, got: %v", err)
 		}
-		if err != nil && !strings.Contains(err.Error(), "sandbox.agent") {
-			t.Errorf("Expected error about sandbox.agent, got: %v", err)
+		if err != nil && !strings.Contains(err.Error(), "disables the agent sandbox firewall") {
+			t.Errorf("Expected error about disabling sandbox firewall, got: %v", err)
 		}
 	})
 
@@ -305,8 +305,8 @@ func TestSupportsLLMGateway(t *testing.T) {
 	}{
 		{
 			engineID:     "codex",
-			expectedPort: -1,
-			description:  "Codex engine does not support LLM gateway",
+			expectedPort: constants.CodexLLMGatewayPort,
+			description:  "Codex engine uses dedicated port for LLM gateway",
 		},
 		{
 			engineID:     "claude",

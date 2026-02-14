@@ -41,14 +41,14 @@ func NewCodexEngine() *CodexEngine {
 			supportsWebFetch:       false, // Codex does not have built-in web-fetch support
 			supportsWebSearch:      true,  // Codex has built-in web-search support
 			supportsFirewall:       true,  // Codex supports network firewalling via AWF
-			supportsLLMGateway:     false, // Codex does not support LLM gateway
+			supportsLLMGateway:     true,  // Codex supports LLM gateway on port 10001
 		},
 	}
 }
 
-// SupportsLLMGateway returns -1 to indicate Codex engine does not support LLM gateway
+// SupportsLLMGateway returns the LLM gateway port for Codex engine
 func (e *CodexEngine) SupportsLLMGateway() int {
-	return -1
+	return constants.CodexLLMGatewayPort
 }
 
 // GetRequiredSecretNames returns the list of secrets required by the Codex engine
