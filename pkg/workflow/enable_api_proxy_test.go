@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// TestEngineAWFEnableApiProxy tests that engines with supportsLLMGateway: true
-// include --enable-api-proxy in AWF commands, while engines with supportsLLMGateway: false do not.
+// TestEngineAWFEnableApiProxy tests that engines with LLM gateway support
+// include --enable-api-proxy flag in AWF commands.
 func TestEngineAWFEnableApiProxy(t *testing.T) {
-	t.Run("Claude AWF command does not include enable-api-proxy flag (supportsLLMGateway: false)", func(t *testing.T) {
+	t.Run("Claude AWF command includes enable-api-proxy flag", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -30,12 +30,12 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		if strings.Contains(stepContent, "--enable-api-proxy") {
-			t.Error("Expected Claude AWF command to NOT contain '--enable-api-proxy' flag (supportsLLMGateway: false)")
+		if !strings.Contains(stepContent, "--enable-api-proxy") {
+			t.Error("Expected Claude AWF command to contain '--enable-api-proxy' flag")
 		}
 	})
 
-	t.Run("Copilot AWF command does not include enable-api-proxy flag (supportsLLMGateway: false)", func(t *testing.T) {
+	t.Run("Copilot AWF command does not include enable-api-proxy flag (returns -1)", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -58,11 +58,11 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 		stepContent := strings.Join(steps[0], "\n")
 
 		if strings.Contains(stepContent, "--enable-api-proxy") {
-			t.Error("Expected Copilot AWF command to NOT contain '--enable-api-proxy' flag (supportsLLMGateway: false)")
+			t.Error("Expected Copilot AWF command to NOT contain '--enable-api-proxy' flag")
 		}
 	})
 
-	t.Run("Codex AWF command does not include enable-api-proxy flag (supportsLLMGateway: false)", func(t *testing.T) {
+	t.Run("Codex AWF command includes enable-api-proxy flag", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -84,8 +84,8 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 
 		stepContent := strings.Join(steps[0], "\n")
 
-		if strings.Contains(stepContent, "--enable-api-proxy") {
-			t.Error("Expected Codex AWF command to NOT contain '--enable-api-proxy' flag (supportsLLMGateway: false)")
+		if !strings.Contains(stepContent, "--enable-api-proxy") {
+			t.Error("Expected Codex AWF command to contain '--enable-api-proxy' flag")
 		}
 	})
 }

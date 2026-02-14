@@ -46,6 +46,11 @@ func NewCodexEngine() *CodexEngine {
 	}
 }
 
+// SupportsLLMGateway returns the LLM gateway port for Codex engine
+func (e *CodexEngine) SupportsLLMGateway() int {
+	return 10001 // Codex uses port 10001 for LLM gateway
+}
+
 // GetRequiredSecretNames returns the list of secrets required by the Codex engine
 // This includes CODEX_API_KEY, OPENAI_API_KEY, and optionally MCP_GATEWAY_API_KEY
 func (e *CodexEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
@@ -249,9 +254,10 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 
 		// Enable API proxy sidecar if this engine supports LLM gateway
 		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
-		if e.SupportsLLMGateway() {
+		llmGatewayPort := e.SupportsLLMGateway()
+		if llmGatewayPort > 0 {
 			awfArgs = append(awfArgs, "--enable-api-proxy")
-			codexEngineLog.Print("Added --enable-api-proxy for LLM API proxying")
+			codexEngineLog.Printf("Added --enable-api-proxy for LLM API proxying on port %d", llmGatewayPort)
 		}
 
 		// Note: No --tty flag for Codex (it's not a TUI, it outputs to stdout/stderr)

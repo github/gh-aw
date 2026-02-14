@@ -35,6 +35,11 @@ func NewClaudeEngine() *ClaudeEngine {
 	}
 }
 
+// SupportsLLMGateway returns the LLM gateway port for Claude engine
+func (e *ClaudeEngine) SupportsLLMGateway() int {
+	return 10000 // Claude uses port 10000 for LLM gateway
+}
+
 // GetRequiredSecretNames returns the list of secrets required by the Claude engine
 // This includes ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, and optionally MCP_GATEWAY_API_KEY
 func (e *ClaudeEngine) GetRequiredSecretNames(workflowData *WorkflowData) []string {
@@ -330,9 +335,10 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 
 		// Enable API proxy sidecar if this engine supports LLM gateway
 		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
-		if e.SupportsLLMGateway() {
+		llmGatewayPort := e.SupportsLLMGateway()
+		if llmGatewayPort > 0 {
 			awfArgs = append(awfArgs, "--enable-api-proxy")
-			claudeLog.Print("Added --enable-api-proxy for LLM API proxying")
+			claudeLog.Printf("Added --enable-api-proxy for LLM API proxying on port %d", llmGatewayPort)
 		}
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
