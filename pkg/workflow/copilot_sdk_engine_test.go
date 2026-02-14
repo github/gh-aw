@@ -3,9 +3,11 @@
 package workflow
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +32,7 @@ func TestCopilotSDKEngineCapabilities(t *testing.T) {
 	assert.False(t, engine.SupportsWebSearch())
 	assert.False(t, engine.SupportsFirewall(), "SDK mode doesn't use firewall")
 	assert.False(t, engine.SupportsPlugins(), "SDK mode doesn't support plugins yet")
-	assert.Equal(t, 10002, engine.SupportsLLMGateway(), "Copilot SDK uses port 10002 for LLM gateway")
+	assert.Equal(t, constants.CopilotSDKLLMGatewayPort, engine.SupportsLLMGateway(), "Copilot SDK uses dedicated port for LLM gateway")
 }
 
 func TestCopilotSDKEngineGetRequiredSecretNames(t *testing.T) {
@@ -90,14 +92,14 @@ func TestCopilotSDKEngineGetExecutionSteps(t *testing.T) {
 	// Check first step (start headless)
 	step1 := strings.Join(steps[0], "\n")
 	assert.Contains(t, step1, "Start Copilot CLI in headless mode")
-	assert.Contains(t, step1, "copilot --headless --port 10002")
+	assert.Contains(t, step1, fmt.Sprintf("copilot --headless --port %d", constants.CopilotSDKLLMGatewayPort))
 	assert.Contains(t, step1, "COPILOT_PID")
 
 	// Check second step (configuration)
 	step2 := strings.Join(steps[1], "\n")
 	assert.Contains(t, step2, "Configure Copilot SDK client")
 	assert.Contains(t, step2, "GH_AW_COPILOT_CONFIG")
-	assert.Contains(t, step2, "host.docker.internal:10002")
+	assert.Contains(t, step2, fmt.Sprintf("host.docker.internal:%d", constants.CopilotSDKLLMGatewayPort))
 
 	// Check third step (execution)
 	step3 := strings.Join(steps[2], "\n")

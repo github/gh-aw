@@ -294,6 +294,15 @@ const (
 
 	// MaxNetworkPort is the maximum valid network port number
 	MaxNetworkPort = 65535
+
+	// ClaudeLLMGatewayPort is the port for the Claude LLM gateway
+	ClaudeLLMGatewayPort = 10000
+
+	// CodexLLMGatewayPort is the port for the Codex LLM gateway
+	CodexLLMGatewayPort = 10001
+
+	// CopilotSDKLLMGatewayPort is the port for the Copilot SDK LLM gateway
+	CopilotSDKLLMGatewayPort = 10002
 )
 
 // DefaultMCPRegistryURL is the default MCP registry URL.
