@@ -181,43 +181,39 @@ describe("frontmatter_hash with GitHub API", () => {
   });
 
   describe("cross-language validation", () => {
-    it(
-      "should compute same hash as Go implementation when using file system",
-      async () => {
-        // For true cross-language validation, we need to use the default file reader
-        // (not the GitHub API mock) to ensure paths are resolved identically
-        const repoRoot = path.resolve(__dirname, "../../..");
-        const workflowPath = path.join(repoRoot, ".github/workflows/audit-workflows.md");
+    it("should compute same hash as Go implementation when using file system", async () => {
+      // For true cross-language validation, we need to use the default file reader
+      // (not the GitHub API mock) to ensure paths are resolved identically
+      const repoRoot = path.resolve(__dirname, "../../..");
+      const workflowPath = path.join(repoRoot, ".github/workflows/audit-workflows.md");
 
-        // Compute hash using JavaScript implementation with default file reader
-        const jsHash = await computeFrontmatterHash(workflowPath);
+      // Compute hash using JavaScript implementation with default file reader
+      const jsHash = await computeFrontmatterHash(workflowPath);
 
-        // Dynamically compute the hash using Go implementation to avoid hardcoded values
-        // that become invalid when workflow files change
-        const { execSync } = await import("child_process");
-        const goTestOutput = execSync("go test -v -run TestHashWithRealWorkflow ./pkg/parser/", {
-          cwd: repoRoot,
-          encoding: "utf8",
-        });
+      // Dynamically compute the hash using Go implementation to avoid hardcoded values
+      // that become invalid when workflow files change
+      const { execSync } = await import("child_process");
+      const goTestOutput = execSync("go test -v -run TestHashWithRealWorkflow ./pkg/parser/", {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
 
-        // Extract hash from Go test output
-        // Expected format: "frontmatter_hash_cross_language_test.go:126: Hash for audit-workflows.md: <hash>"
-        const hashMatch = goTestOutput.match(/Hash for audit-workflows\.md:\s+([a-f0-9]{64})/);
-        if (!hashMatch) {
-          throw new Error(`Failed to extract hash from Go test output. Output:\n${goTestOutput}`);
-        }
-        const goHash = hashMatch[1];
+      // Extract hash from Go test output
+      // Expected format: "frontmatter_hash_cross_language_test.go:126: Hash for audit-workflows.md: <hash>"
+      const hashMatch = goTestOutput.match(/Hash for audit-workflows\.md:\s+([a-f0-9]{64})/);
+      if (!hashMatch) {
+        throw new Error(`Failed to extract hash from Go test output. Output:\n${goTestOutput}`);
+      }
+      const goHash = hashMatch[1];
 
-        // Verify JavaScript hash matches Go hash
-        expect(jsHash).toBe(goHash);
+      // Verify JavaScript hash matches Go hash
+      expect(jsHash).toBe(goHash);
 
-        // Log the hash for reference
-        console.log(`JavaScript hash for audit-workflows.md: ${jsHash}`);
-        console.log(`Go hash for audit-workflows.md: ${goHash}`);
-        console.log(`Hashes match: ${jsHash === goHash}`);
-      },
-      60000,
-    ); // 60 second timeout to allow for Go dependency downloads
+      // Log the hash for reference
+      console.log(`JavaScript hash for audit-workflows.md: ${jsHash}`);
+      console.log(`Go hash for audit-workflows.md: ${goHash}`);
+      console.log(`Hashes match: ${jsHash === goHash}`);
+    }, 60000); // 60 second timeout to allow for Go dependency downloads
 
     it("should produce deterministic hashes across multiple calls", async () => {
       const owner = "github";
