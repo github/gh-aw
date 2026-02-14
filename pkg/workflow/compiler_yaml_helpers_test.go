@@ -45,6 +45,54 @@ func TestGetWorkflowIDFromPath(t *testing.T) {
 	}
 }
 
+func TestSanitizeWorkflowIDForCacheKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		workflowID string
+		expected   string
+	}{
+		{
+			name:       "smoke-copilot with hyphens",
+			workflowID: "smoke-copilot",
+			expected:   "smokecopilot",
+		},
+		{
+			name:       "Smoke-Copilot with capital letters",
+			workflowID: "Smoke-Copilot",
+			expected:   "smokecopilot",
+		},
+		{
+			name:       "multiple hyphens",
+			workflowID: "daily-code-metrics",
+			expected:   "dailycodemetrics",
+		},
+		{
+			name:       "no hyphens",
+			workflowID: "simple",
+			expected:   "simple",
+		},
+		{
+			name:       "uppercase no hyphens",
+			workflowID: "SIMPLE",
+			expected:   "simple",
+		},
+		{
+			name:       "mixed case with many hyphens",
+			workflowID: "Test-Workflow-With-Many-Parts",
+			expected:   "testworkflowwithmanyparts",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeWorkflowIDForCacheKey(tt.workflowID)
+			if result != tt.expected {
+				t.Errorf("SanitizeWorkflowIDForCacheKey(%q) = %q, want %q", tt.workflowID, result, tt.expected)
+			}
+		})
+	}
+}
+
 // TestBuildJobsAndValidate tests the buildJobsAndValidate helper function
 func TestBuildJobsAndValidate(t *testing.T) {
 	tests := []struct {
