@@ -3183,6 +3183,214 @@ Detailed threat analysis and mitigation effectiveness assessment for all five pr
 
 ---
 
+## Appendix G: Configuration Patterns
+
+This appendix provides common configuration patterns for safe outputs.
+
+### Pattern 1: Simple Issue Tracking
+
+Basic configuration for automated issue creation:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 1
+    labels: [automated]
+```
+
+**Use case**: Single automated issue per workflow run with consistent labeling.
+
+### Pattern 2: Multi-Type with Global Footer
+
+Configuration with multiple output types sharing global settings:
+
+```yaml
+safe-outputs:
+  footer: true  # Applied to all types
+  
+  create-issue:
+    max: 3
+    labels: [bug, automated]
+  
+  add-comment:
+    max: 2
+    hide-older-comments: true
+```
+
+**Use case**: Workflow creating multiple issues and comments with attribution footers.
+
+### Pattern 3: Cross-Repository Operations
+
+Secure cross-repository issue creation:
+
+```yaml
+safe-outputs:
+  allowed-github-references:
+    - owner/repo-a
+    - owner/repo-b
+  
+  create-issue:
+    max: 5
+    target-repo: owner/repo-a
+```
+
+**Use case**: Creating issues in a central tracking repository from multiple workflow repositories.
+
+**Security note**: Explicit allowlist prevents unauthorized repository targeting.
+
+### Pattern 4: Staged Mode Development
+
+Safe testing in preview mode:
+
+```yaml
+safe-outputs:
+  staged: true  # Enable preview mode globally
+  
+  create-issue:
+    max: 10  # Safe to set high in staged mode
+  
+  add-comment:
+    max: 5
+```
+
+**Use case**: Testing workflow behavior without creating real GitHub resources.
+
+**Workflow**: Test with `staged: true`, verify previews, then deploy with `staged: false`.
+
+### Pattern 5: Type-Specific Allowlists
+
+Fine-grained cross-repository control:
+
+```yaml
+safe-outputs:
+  allowed-github-references: [owner/repo-a, owner/repo-b]
+  
+  create-issue:
+    allowed-repos: [owner/repo-c]  # Overrides global
+    max: 3
+    
+  add-comment:
+    # No type-specific list, uses global: repo-a, repo-b
+    max: 2
+```
+
+**Use case**: Different safe output types target different repositories.
+
+**Security note**: Type-specific allowlists override global allowlists.
+
+### Pattern 6: Domain Filtering for Security
+
+Restrict URLs in safe output content:
+
+```yaml
+safe-outputs:
+  allowed-domains:
+    - github.com
+    - "*.github.io"
+    - docs.github.com
+  
+  create-issue:
+    max: 5
+```
+
+**Use case**: Prevent agents from including unauthorized URLs in created content.
+
+**Effect**: URLs to non-allowlisted domains are redacted during sanitization.
+
+### Pattern 7: Temporary Resource Cleanup
+
+Auto-close temporary issues:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 10
+    expires: 7  # Auto-close after 7 days
+    labels: [temporary, automated]
+```
+
+**Use case**: Issues for transient notifications that should auto-clean.
+
+**Implementation**: Scheduled workflow checks issue age and closes expired issues.
+
+### Pattern 8: Review Comment Workflow
+
+Pull request review automation:
+
+```yaml
+safe-outputs:
+  create-pr-review-comment:
+    max: 20
+    
+  submit-pr-review:
+    max: 1
+    
+  resolve-pr-review-thread:
+    max: 10
+```
+
+**Use case**: Automated code review with multiple comments and thread resolution.
+
+**Workflow**: Create review comments, submit bundled review, resolve addressed threads.
+
+### Pattern 9: Project Management
+
+Automated project creation and updates:
+
+```yaml
+safe-outputs:
+  create-project:
+    max: 1
+    
+  update-project:
+    max: 5
+    
+  create-project-status-update:
+    max: 3
+```
+
+**Use case**: Creating and maintaining project boards automatically.
+
+### Pattern 10: Grouped Issues with Parent
+
+Create related issues under a parent:
+
+```yaml
+safe-outputs:
+  create-issue:
+    max: 10
+    group: true
+```
+
+**Use case**: Workflow creates parent issue and multiple sub-issues linked via tasklists.
+
+**Effect**: First issue becomes parent, subsequent issues link to it.
+
+### Best Practices
+
+**Start Conservative**:
+- Begin with low `max` values
+- Enable `staged: true` for testing
+- Use explicit `allowed-repos` lists
+
+**Use Domain Filtering**:
+- Always configure `allowed-domains` when agents process external input
+- Include only trusted domains
+
+**Enable Footers**:
+- Keep `footer: true` (default) for transparency
+- Only disable when absolutely necessary
+
+**Temporary Resources**:
+- Use `expires` for transient issues
+- Clean up with `close-older-issues` for superseded content
+
+**Cross-Repository Security**:
+- Use type-specific `allowed-repos` for fine-grained control
+- Prefer explicit lists over broad permissions
+
+---
+
 ## Appendix F: Document History
 
 **Version 1.9.0** (2026-02-14):
