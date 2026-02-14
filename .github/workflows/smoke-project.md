@@ -29,6 +29,7 @@ safe-outputs:
     create-pull-request:
       title-prefix: "[smoke-project] "
       if-no-changes: "warn"
+      expires: 1d
     create-issue:
       expires: 2h
       group: true
