@@ -41,7 +41,7 @@ func NewCodexEngine() *CodexEngine {
 			supportsWebFetch:       false, // Codex does not have built-in web-fetch support
 			supportsWebSearch:      true,  // Codex has built-in web-search support
 			supportsFirewall:       true,  // Codex supports network firewalling via AWF
-			supportsLLMGateway:     false, // Codex does not support LLM gateway
+			supportsLLMGateway:     true,  // Codex supports LLM gateway via AWF api-proxy
 		},
 	}
 }
