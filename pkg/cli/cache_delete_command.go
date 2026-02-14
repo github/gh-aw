@@ -207,23 +207,8 @@ func deleteCache(cacheID int64, ref string, verbose bool) error {
 		args = append(args, "--ref", ref)
 	}
 
-	// Use spinner for single delete operations
-	var spinner *console.SpinnerWrapper
-	if !verbose {
-		spinner = console.NewSpinner(fmt.Sprintf("Deleting cache %d...", cacheID))
-		spinner.Start()
-	}
-
+	// Perform the cache deletion. Spinner handling is managed by callers.
 	_, err := workflow.RunGHCombined("Deleting cache...", args...)
-
-	if spinner != nil {
-		if err != nil {
-			spinner.Stop()
-		} else {
-			spinner.StopWithMessage(fmt.Sprintf("✓ Deleted cache %d", cacheID))
-		}
-	}
-
 	if err != nil {
 		return fmt.Errorf("gh cache delete failed: %w", err)
 	}
