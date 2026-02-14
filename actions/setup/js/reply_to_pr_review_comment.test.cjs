@@ -343,30 +343,67 @@ describe("reply_to_pr_review_comment", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("Not Found");
   });
-});
 
-describe("getTriggeringPRNumber", () => {
-  it("should return pull_request.number for pull_request events", () => {
-    const { getTriggeringPRNumber } = require("./reply_to_pr_review_comment.cjs");
-    const payload = { pull_request: { number: 7 } };
-    expect(getTriggeringPRNumber(payload)).toBe(7);
-  });
+  describe("staged mode", () => {
+    afterEach(() => {
+      delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
+    });
 
-  it("should return issue.number for issue_comment events on a PR", () => {
-    const { getTriggeringPRNumber } = require("./reply_to_pr_review_comment.cjs");
-    const payload = { issue: { number: 15, pull_request: { url: "https://api.github.com/..." } } };
-    expect(getTriggeringPRNumber(payload)).toBe(15);
-  });
+    it("should skip API call and return staged result when staged mode is enabled", async () => {
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
 
-  it("should return undefined when payload has no PR context", () => {
-    const { getTriggeringPRNumber } = require("./reply_to_pr_review_comment.cjs");
-    const payload = { repository: { html_url: "https://github.com/owner/repo" } };
-    expect(getTriggeringPRNumber(payload)).toBeUndefined();
-  });
+      const { main } = require("./reply_to_pr_review_comment.cjs");
+      const stagedHandler = await main({ max: 10 });
 
-  it("should return undefined for a nullish payload", () => {
-    const { getTriggeringPRNumber } = require("./reply_to_pr_review_comment.cjs");
-    expect(getTriggeringPRNumber(null)).toBeUndefined();
-    expect(getTriggeringPRNumber(undefined)).toBeUndefined();
+      const message = {
+        type: "reply_to_pull_request_review_comment",
+        comment_id: 123,
+        body: "Reply text",
+      };
+
+      const result = await stagedHandler(message, {});
+
+      expect(result.skipped).toBe(true);
+      expect(result.reason).toBe("staged_mode");
+      expect(mockCreateReplyForReviewComment).not.toHaveBeenCalled();
+    });
+
+    it("should still count against max in staged mode", async () => {
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+
+      const { main } = require("./reply_to_pr_review_comment.cjs");
+      const stagedHandler = await main({ max: 1 });
+
+      const message = {
+        type: "reply_to_pull_request_review_comment",
+        comment_id: 123,
+        body: "Reply text",
+      };
+
+      const result1 = await stagedHandler(message, {});
+      const result2 = await stagedHandler(message, {});
+
+      expect(result1.skipped).toBe(true);
+      expect(result2.success).toBe(false);
+      expect(result2.error).toContain("Max count of 1 reached");
+    });
+
+    it("should still validate fields in staged mode", async () => {
+      process.env.GH_AW_SAFE_OUTPUTS_STAGED = "true";
+
+      const { main } = require("./reply_to_pr_review_comment.cjs");
+      const stagedHandler = await main({ max: 10 });
+
+      const message = {
+        type: "reply_to_pull_request_review_comment",
+        comment_id: 123,
+        // missing body
+      };
+
+      const result = await stagedHandler(message, {});
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("body");
+    });
   });
 });

@@ -8,22 +8,12 @@
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { resolveTargetRepoConfig, resolveAndValidateRepo } = require("./repo_helpers.cjs");
 const { generateFooterWithMessages } = require("./messages_footer.cjs");
+const { getPRNumber } = require("./update_context_helpers.cjs");
 
 /**
  * Type constant for handler identification
  */
 const HANDLER_TYPE = "reply_to_pull_request_review_comment";
-
-/**
- * Extract the triggering pull request number from the GitHub Actions event payload.
- * Supports both pull_request events (payload.pull_request.number) and issue_comment
- * events on PRs (payload.issue.number when payload.issue.pull_request is present).
- * @param {any} payload - The context.payload from the GitHub Actions event
- * @returns {number|undefined} The PR number, or undefined if not in a PR context
- */
-function getTriggeringPRNumber(payload) {
-  return payload?.pull_request?.number || (payload?.issue?.pull_request ? payload.issue.number : undefined);
-}
 
 /**
  * Main handler factory for reply_to_pull_request_review_comment
@@ -39,10 +29,11 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const replyTarget = config.target || "triggering";
   const includeFooter = config.footer !== false; // Default to true
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
   // Determine the triggering PR number from context
-  const triggeringPRNumber = getTriggeringPRNumber(context.payload);
+  const triggeringPRNumber = getPRNumber(context.payload);
 
   // Extract workflow context for footer generation
   const workflowName = process.env.GH_AW_WORKFLOW_NAME || "Workflow";
@@ -153,6 +144,12 @@ async function main(config = {}) {
       // Validation passed — count this message against the max quota
       processedCount++;
 
+      // In staged mode, skip the API call and return a preview result
+      if (isStaged) {
+        core.info(`Staged mode: Would reply to review comment ${numericCommentId} on PR #${targetPRNumber} (${owner}/${repo})`);
+        return { skipped: true, reason: "staged_mode" };
+      }
+
       // Append footer with workflow information when enabled
       let finalBody = body;
       if (includeFooter) {
@@ -189,4 +186,4 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main, HANDLER_TYPE, getTriggeringPRNumber };
+module.exports = { main, HANDLER_TYPE };
