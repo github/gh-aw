@@ -52,21 +52,6 @@ Staged mode previews mutations without applying them by checking `GH_AW_SAFE_OUT
 35. update_runner
 36. upload_assets
 
-### 🚧 Remaining (7 handlers)
-
-**Simple Pattern (2 handlers):**
-- link_sub_issue - GraphQL linking operation
-- resolve_pr_review_thread - GraphQL resolution operation
-
-**Project Handlers (3 handlers):**
-- create_project - GraphQL create operation
-- update_project - GraphQL update operation
-- create_project_status_update - GraphQL status update operation
-
-**Buffered (2 handlers - require buffer coordination):**
-- create_pr_review_comment - Uses PR review buffer
-- submit_pr_review - Uses PR review buffer
-
 ## Implementation Pattern
 
 All handlers follow this consistent pattern:
