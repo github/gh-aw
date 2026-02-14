@@ -42,6 +42,41 @@ safe-outputs:
 
 Individual handler settings always take precedence over the global setting.
 
+## PR Review Comment Footer Control
+
+For PR review comments (`create-pull-request-review-comment`), the `footer` field supports additional conditional control:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request-review-comment:
+    footer: "if-body"         # conditional footer based on review body
+  submit-pull-request-review:
+```
+
+The `footer` field accepts three string values:
+
+- `"always"` (default) - Always include footer on review comments
+- `"none"` - Never include footer on review comments
+- `"if-body"` - Only include footer when the review has body text
+
+Boolean values are also supported and automatically converted:
+- `true` → `"always"`
+- `false` → `"none"`
+
+This is particularly useful for clean approval reviews without body text. With `footer: "if-body"`, approval reviews appear clean without the AI-generated footer, while reviews with explanatory text still include the footer for attribution.
+
+**Example use case - Clean approvals:**
+
+```yaml wrap
+safe-outputs:
+  create-pull-request-review-comment:
+    footer: "if-body"         # Show footer only when review has body
+  submit-pull-request-review:
+    max: 1
+```
+
+When the agent submits an approval without a body (just "APPROVE" event), no footer appears. When the agent includes explanatory comments in the review body, the footer is included.
+
 ## What's Preserved When Footer is Hidden
 
 Even with `footer: false`, the following are still included:

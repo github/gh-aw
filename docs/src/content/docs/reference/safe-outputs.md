@@ -685,7 +685,31 @@ safe-outputs:
     side: "RIGHT"             # "LEFT" or "RIGHT" (default: "RIGHT")
     target: "*"               # "triggering" (default), "*", or number
     target-repo: "owner/repo" # cross-repository
+    footer: "if-body"         # footer control: "always", "none", or "if-body"
 ```
+
+#### Footer Control for Review Comments
+
+The `footer` field controls whether AI-generated footers are added to PR review comments:
+
+- `"always"` (default) - Always include footer on review comments
+- `"none"` - Never include footer on review comments
+- `"if-body"` - Only include footer when the review has a body text
+
+You can also use boolean values which are automatically converted:
+- `true` → `"always"`
+- `false` → `"none"`
+
+This is particularly useful for clean approval reviews without body text, where you want to avoid footer noise:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request-review-comment:
+    footer: "if-body"  # Only show footer when review has body text
+  submit-pull-request-review:
+```
+
+With `footer: "if-body"`, approval reviews without body text appear clean without the AI-generated footer, while reviews with explanatory text still include the footer for attribution.
 
 ### Submit PR Review (`submit-pull-request-review:`)
 
