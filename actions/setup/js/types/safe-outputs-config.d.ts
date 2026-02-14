@@ -95,6 +95,17 @@ interface CreatePullRequestReviewCommentConfig extends SafeOutputConfig {
 }
 
 /**
+ * Configuration for replying to pull request review comments.
+ * Inherits common fields (e.g. "github-token") from SafeOutputConfig.
+ */
+interface ReplyToPullRequestReviewCommentConfig extends SafeOutputConfig {
+  target?: string;
+  "target-repo"?: string;
+  "allowed-repos"?: string[];
+  footer?: boolean;
+}
+
+/**
  * Configuration for resolving pull request review threads.
  * Resolution is scoped to the triggering PR only.
  *
@@ -293,6 +304,7 @@ type SpecificSafeOutputConfig =
   | NoOpConfig
   | MissingToolConfig
   | LinkSubIssueConfig
+  | ReplyToPullRequestReviewCommentConfig
   | ThreatDetectionConfig
   | ResolvePullRequestReviewThreadConfig;
 
@@ -326,6 +338,7 @@ export {
   NoOpConfig,
   MissingToolConfig,
   LinkSubIssueConfig,
+  ReplyToPullRequestReviewCommentConfig,
   ThreatDetectionConfig,
   ResolvePullRequestReviewThreadConfig,
   SpecificSafeOutputConfig,

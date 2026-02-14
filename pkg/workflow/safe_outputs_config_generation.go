@@ -638,6 +638,9 @@ func generateFilteredToolsJSON(data *WorkflowData, markdownPath string) (string,
 	if data.SafeOutputs.SubmitPullRequestReview != nil {
 		enabledTools["submit_pull_request_review"] = true
 	}
+	if data.SafeOutputs.ReplyToPullRequestReviewComment != nil {
+		enabledTools["reply_to_pull_request_review_comment"] = true
+	}
 	if data.SafeOutputs.ResolvePullRequestReviewThread != nil {
 		enabledTools["resolve_pull_request_review_thread"] = true
 	}
@@ -864,6 +867,11 @@ func addRepoParameterIfNeeded(tool map[string]any, toolName string, safeOutputs 
 		}
 	case "create_pull_request_review_comment":
 		if config := safeOutputs.CreatePullRequestReviewComments; config != nil {
+			hasAllowedRepos = len(config.AllowedRepos) > 0
+			targetRepoSlug = config.TargetRepoSlug
+		}
+	case "reply_to_pull_request_review_comment":
+		if config := safeOutputs.ReplyToPullRequestReviewComment; config != nil {
 			hasAllowedRepos = len(config.AllowedRepos) > 0
 			targetRepoSlug = config.TargetRepoSlug
 		}

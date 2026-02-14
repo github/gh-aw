@@ -144,6 +144,12 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 				config.SubmitPullRequestReview = submitPRReviewConfig
 			}
 
+			// Handle reply-to-pull-request-review-comment
+			replyToPRReviewCommentConfig := c.parseReplyToPullRequestReviewCommentConfig(outputMap)
+			if replyToPRReviewCommentConfig != nil {
+				config.ReplyToPullRequestReviewComment = replyToPRReviewCommentConfig
+			}
+
 			// Handle resolve-pull-request-review-thread
 			resolvePRReviewThreadConfig := c.parseResolvePullRequestReviewThreadConfig(outputMap)
 			if resolvePRReviewThreadConfig != nil {

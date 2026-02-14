@@ -54,6 +54,7 @@
         { "$ref": "#/$defs/DispatchWorkflowOutput" },
         { "$ref": "#/$defs/AutofixCodeScanningAlertOutput" },
         { "$ref": "#/$defs/SubmitPullRequestReviewOutput" },
+        { "$ref": "#/$defs/ReplyToPullRequestReviewCommentOutput" },
         { "$ref": "#/$defs/ResolvePullRequestReviewThreadOutput" }
       ]
     },
@@ -339,6 +340,34 @@
           }
         }
       ]
+    },
+    "ReplyToPullRequestReviewCommentOutput": {
+      "title": "Reply to Pull Request Review Comment Output",
+      "description": "Output for replying to an existing review comment on a pull request",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "reply_to_pull_request_review_comment"
+        },
+        "comment_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "pattern": "^[1-9][0-9]*$" }
+          ],
+          "description": "The numeric ID of the review comment to reply to"
+        },
+        "body": {
+          "type": "string",
+          "description": "The reply body text",
+          "minLength": 1
+        },
+        "pull_request_number": {
+          "oneOf": [{ "type": "number" }, { "type": "string" }],
+          "description": "Pull request number (optional - uses triggering PR if not provided)"
+        }
+      },
+      "required": ["type", "comment_id", "body"],
+      "additionalProperties": false
     },
     "ResolvePullRequestReviewThreadOutput": {
       "title": "Resolve Pull Request Review Thread Output",

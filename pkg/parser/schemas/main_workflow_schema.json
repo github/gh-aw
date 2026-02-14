@@ -3847,7 +3847,7 @@
     },
     "safe-outputs": {
       "type": "object",
-      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, resolve-pull-request-review-thread, submit-pull-request-review, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
+      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-code-scanning-alert, create-discussion, create-issue, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, missing-tool, noop, push-to-pull-request-branch, remove-labels, reply-to-pull-request-review-comment, resolve-pull-request-review-thread, submit-pull-request-review, threat-detection, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-asset. See documentation for complete details.",
       "description": "Safe output processing configuration that automatically creates GitHub issues, comments, and pull requests from AI workflow output without requiring write permissions in the main job",
       "examples": [
         {
@@ -5003,6 +5003,52 @@
             }
           ],
           "description": "Enable AI agents to submit consolidated pull request reviews with a status decision. Works with create-pull-request-review-comment to batch inline comments into a single review."
+        },
+        "reply-to-pull-request-review-comment": {
+          "oneOf": [
+            {
+              "type": "object",
+              "description": "Configuration for replying to existing pull request review comments",
+              "properties": {
+                "max": {
+                  "type": "integer",
+                  "description": "Maximum number of replies to create (default: 10)",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target for replies: 'triggering' (default), '*' (any PR), or explicit PR number"
+                },
+                "target-repo": {
+                  "type": "string",
+                  "description": "Target repository in format 'owner/repo' for cross-repository operations"
+                },
+                "allowed-repos": {
+                  "type": "array",
+                  "description": "List of additional repositories that replies can target",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "footer": {
+                  "type": "boolean",
+                  "description": "Controls whether AI-generated footer is added to the reply body. When false, the footer is omitted. Defaults to true.",
+                  "default": true
+                },
+                "github-token": {
+                  "$ref": "#/$defs/github_token",
+                  "description": "GitHub token to use for this specific output type. Overrides global github-token if specified."
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null",
+              "description": "Enable with default configuration"
+            }
+          ],
+          "description": "Enable AI agents to reply to existing review comments on pull requests."
         },
         "resolve-pull-request-review-thread": {
           "oneOf": [
