@@ -6,7 +6,6 @@ on:
   pull_request:
     types: [labeled]
     names: ["smoke"]
-    draft: true
   reaction: "heart"
 permissions:
   contents: read
@@ -54,6 +53,7 @@ runtimes:
   go:
     version: "1.25"
 safe-outputs:
+    staged: true
     add-comment:
       hide-older-comments: true
       max: 2

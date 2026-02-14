@@ -33,12 +33,11 @@
 #     - shared/mcp/tavily.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: eae98f259e641679161a4afeb78fca985a8b84e777ceb8448f72db87a8b01091
+# frontmatter-hash: 706dc82bf396c21c9564bcc11ec7aebbf44fcc0b835f5aba806283fbd878ddfb
 
 name: "Smoke Claude"
 "on":
   pull_request:
-    # draft: true # Draft filtering applied via job conditions
     # names: # Label filtering applied via job conditions
     # - smoke # Label filtering applied via job conditions
     types:
@@ -59,8 +58,7 @@ jobs:
   activation:
     needs: pre_activation
     if: >
-      (needs.pre_activation.outputs.activated == 'true') && ((((github.event_name != 'pull_request') || (github.event.pull_request.draft == true)) &&
-      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id))) &&
+      (needs.pre_activation.outputs.activated == 'true') && (((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
       ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'smoke'))))
     runs-on: ubuntu-slim
     permissions:
@@ -246,7 +244,7 @@ jobs:
               sha: context.sha,
               actor: context.actor,
               event_name: context.eventName,
-              staged: false,
+              staged: true,
               allowed_domains: ["defaults","github","playwright"],
               firewall_enabled: true,
               awf_version: "v0.17.0",
@@ -1895,6 +1893,7 @@ jobs:
           GH_AW_MODEL_AGENT_CLAUDE: ${{ vars.GH_AW_MODEL_AGENT_CLAUDE || '' }}
           GH_AW_PROMPT: /tmp/gh-aw/aw-prompts/prompt.txt
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
+          GH_AW_SAFE_OUTPUTS_STAGED: true
           GH_DEBUG: 1
           GITHUB_WORKSPACE: ${{ github.workspace }}
           MCP_TIMEOUT: 120000
@@ -2274,9 +2273,8 @@ jobs:
 
   pre_activation:
     if: >
-      (((github.event_name != 'pull_request') || (github.event.pull_request.draft == true)) && ((github.event_name != 'pull_request') ||
-      (github.event.pull_request.head.repo.id == github.repository_id))) && ((github.event_name != 'pull_request') ||
-      ((github.event.action != 'labeled') || (github.event.label.name == 'smoke')))
+      ((github.event_name != 'pull_request') || (github.event.pull_request.head.repo.id == github.repository_id)) &&
+      ((github.event_name != 'pull_request') || ((github.event.action != 'labeled') || (github.event.label.name == 'smoke')))
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -2337,6 +2335,7 @@ jobs:
     timeout-minutes: 15
     env:
       GH_AW_ENGINE_ID: "claude"
+      GH_AW_SAFE_OUTPUTS_STAGED: "true"
       GH_AW_SAFE_OUTPUT_MESSAGES: "{\"footer\":\"\\u003e 💥 *[THE END] — Illustrated by [{workflow_name}]({run_url})*\",\"runStarted\":\"💥 **WHOOSH!** [{workflow_name}]({run_url}) springs into action on this {event_type}! *[Panel 1 begins...]*\",\"runSuccess\":\"🎬 **THE END** — [{workflow_name}]({run_url}) **MISSION: ACCOMPLISHED!** The hero saves the day! ✨\",\"runFailure\":\"💫 **TO BE CONTINUED...** [{workflow_name}]({run_url}) {status}! Our hero faces unexpected challenges...\"}"
       GH_AW_WORKFLOW_ID: "smoke-claude"
       GH_AW_WORKFLOW_NAME: "Smoke Claude"
@@ -2400,6 +2399,7 @@ jobs:
         env:
           GH_AW_AGENT_OUTPUT: ${{ env.GH_AW_AGENT_OUTPUT }}
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"hide_older_comments\":true,\"max\":2},\"add_labels\":{\"allowed\":[\"smoke-claude\"]},\"close_pull_request\":{\"max\":1,\"target\":\"*\"},\"create_issue\":{\"close_older_issues\":true,\"expires\":2,\"group\":true,\"max\":1},\"create_pull_request_review_comment\":{\"max\":5,\"side\":\"RIGHT\",\"target\":\"*\"},\"missing_data\":{},\"missing_tool\":{},\"push_to_pull_request_branch\":{\"base_branch\":\"${{ github.ref_name }}\",\"if_no_changes\":\"warn\",\"max_patch_size\":1024,\"target\":\"*\"},\"resolve_pull_request_review_thread\":{\"max\":5},\"submit_pull_request_review\":{\"footer\":true,\"max\":1},\"update_pull_request\":{\"allow_body\":true,\"allow_title\":true,\"max\":1,\"target\":\"*\"}}"
+          GH_AW_SAFE_OUTPUTS_STAGED: "true"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
