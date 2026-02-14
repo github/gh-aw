@@ -763,6 +763,7 @@ jobs:
           if-no-files-found: warn
       - name: Ingest agent output
         id: collect_output
+        if: always()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           GH_AW_SAFE_OUTPUTS: ${{ env.GH_AW_SAFE_OUTPUTS }}
