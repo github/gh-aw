@@ -485,7 +485,9 @@ async function main(config = {}) {
       createdIssues.push({ ...issue, _repo: qualifiedItemRepo });
 
       // Store the mapping of temporary_id -> {repo, number}
-      temporaryIdMap.set(normalizeTemporaryId(temporaryId), { repo: qualifiedItemRepo, number: issue.number });
+      // temporaryId is guaranteed to be non-null because we checked tempIdResult.error above
+      const normalizedTempId = normalizeTemporaryId(String(temporaryId));
+      temporaryIdMap.set(normalizedTempId, { repo: qualifiedItemRepo, number: issue.number });
       core.info(`Stored temporary ID mapping: ${temporaryId} -> ${qualifiedItemRepo}#${issue.number}`);
 
       // Track issue for copilot assignment if needed
