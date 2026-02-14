@@ -81,6 +81,8 @@ jobs:
       contents: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
+    env:
+      GH_AW_WORKFLOW_ID_SANITIZED: testworkflow
     outputs:
       checkout_pr_success: ${{ steps.checkout-pr.outputs.checkout_pr_success || 'true' }}
       model: ${{ steps.generate_aw_info.outputs.model }}
