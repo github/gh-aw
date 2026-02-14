@@ -59,6 +59,9 @@ func TestGetStableRepositoryIdentifier(t *testing.T) {
 		gitRoot = parent
 	}
 
+	// Note: In non-release builds (IsRelease() == false), the function will always return "dev"
+	// regardless of git configuration. This test may return "dev" for all cases in development mode.
+
 	tests := []struct {
 		name           string
 		gitRoot        string
@@ -69,13 +72,13 @@ func TestGetStableRepositoryIdentifier(t *testing.T) {
 			name:           "with repository slug and shallow clone",
 			gitRoot:        gitRoot,
 			repositorySlug: "github/gh-aw",
-			wantPrefix:     "", // Either "github/gh-aw" or "git-" depending on shallow status
+			wantPrefix:     "", // "dev" in non-release mode, or repo slug/git- in release mode
 		},
 		{
 			name:           "with repository slug in full clone",
 			gitRoot:        gitRoot,
 			repositorySlug: "testorg/testrepo",
-			wantPrefix:     "", // Either "testorg/testrepo" or "git-" depending on shallow status
+			wantPrefix:     "", // "dev" in non-release mode, or repo slug/git- in release mode
 		},
 		{
 			name:           "without repository slug",
@@ -89,6 +92,12 @@ func TestGetStableRepositoryIdentifier(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			identifier := getStableRepositoryIdentifier(tt.gitRoot, tt.repositorySlug)
 			assert.NotEmpty(t, identifier, "Identifier should not be empty")
+
+			// In non-release mode, identifier should always be "dev"
+			if !IsRelease() {
+				assert.Equal(t, "dev", identifier, "In non-release mode, identifier should always be 'dev'")
+				return
+			}
 
 			// For tests with repository slug, verify the result is either the slug or starts with "git-"
 			if tt.repositorySlug != "" {
@@ -149,4 +158,50 @@ func TestGetStableRepositoryIdentifierDeterminism(t *testing.T) {
 	}
 
 	t.Logf("Stable identifier: %s", results[0])
+}
+
+func TestGetStableRepositoryIdentifierDevMode(t *testing.T) {
+	// Get the git root of the current repository
+	gitRoot, err := os.Getwd()
+	require.NoError(t, err, "Failed to get working directory")
+
+	// Find the actual git root
+	for {
+		if _, err := os.Stat(filepath.Join(gitRoot, ".git")); err == nil {
+			break
+		}
+		parent := filepath.Dir(gitRoot)
+		if parent == gitRoot {
+			t.Skip("Not in a git repository")
+			return
+		}
+		gitRoot = parent
+	}
+
+	// In non-release builds, should always return "dev"
+	if !IsRelease() {
+		t.Run("non-release build returns dev", func(t *testing.T) {
+			// Test with various inputs - all should return "dev"
+			testCases := []struct {
+				name           string
+				repositorySlug string
+			}{
+				{"with repository slug", "github/gh-aw"},
+				{"with different slug", "testorg/testrepo"},
+				{"without repository slug", ""},
+			}
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					identifier := getStableRepositoryIdentifier(gitRoot, tc.repositorySlug)
+					assert.Equal(t, "dev", identifier,
+						"In non-release mode, identifier should be 'dev' regardless of repository slug, got: %s",
+						identifier,
+					)
+				})
+			}
+		})
+	} else {
+		t.Skip("Test only applicable in non-release mode")
+	}
 }

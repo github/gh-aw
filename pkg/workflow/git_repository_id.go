@@ -17,13 +17,21 @@ var gitRepositoryIDLog = logger.New("workflow:git_repository_id")
 // that doesn't change when git remote configuration changes.
 //
 // It tries the following approaches in order:
-// 1. Use repository slug from git remote (for shallow clones, since initial commit is unstable)
-// 2. Use the initial commit SHA (for full clones, most stable option)
-// 3. Use a hash of the repository directory path (fallback if no commits exist or shallow clone without remote)
+// 1. Use "dev" for non-release builds (development mode)
+// 2. Use repository slug from git remote (for shallow clones, since initial commit is unstable)
+// 3. Use the initial commit SHA (for full clones, most stable option)
+// 4. Use a hash of the repository directory path (fallback if no commits exist or shallow clone without remote)
 //
 // Returns a string that can be used as a stable repository identifier.
 func getStableRepositoryIdentifier(gitRoot string, repositorySlug string) string {
 	gitRepositoryIDLog.Printf("Getting stable repository identifier for git root: %s", gitRoot)
+
+	// For non-release builds (development mode), use "dev" as the repository identifier
+	// This ensures consistent scheduling during development regardless of git configuration
+	if !IsRelease() {
+		gitRepositoryIDLog.Print("Using 'dev' as repository identifier for non-release build")
+		return "dev"
+	}
 
 	// Check if this is a shallow clone
 	isShallow, err := isShallowClone(gitRoot)

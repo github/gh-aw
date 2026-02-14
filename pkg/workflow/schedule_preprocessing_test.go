@@ -1071,28 +1071,34 @@ func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
 
 	// Verify that different org/repo combinations produce different schedules
 	// for the same workflow name
-	sameWorkflowDifferentOrg := results["github/gh-aw/test-workflow.md"]
-	sameWorkflowOtherOrg := results["otherorg/gh-aw/test-workflow.md"]
-	sameWorkflowOtherRepo := results["githubnext/other-repo/test-workflow.md"]
-	workflowWithoutSlug := results["test-workflow.md"]
+	// NOTE: In non-release builds, all workflows use "dev" as repository identifier,
+	// so they will have the same schedule. Only verify uniqueness in release mode.
+	if IsRelease() {
+		sameWorkflowDifferentOrg := results["github/gh-aw/test-workflow.md"]
+		sameWorkflowOtherOrg := results["otherorg/gh-aw/test-workflow.md"]
+		sameWorkflowOtherRepo := results["githubnext/other-repo/test-workflow.md"]
+		workflowWithoutSlug := results["test-workflow.md"]
 
-	// All should be different
-	if sameWorkflowDifferentOrg == sameWorkflowOtherOrg {
-		t.Errorf("Expected different schedules for different orgs, got same: %s", sameWorkflowDifferentOrg)
-	}
+		// All should be different in release mode
+		if sameWorkflowDifferentOrg == sameWorkflowOtherOrg {
+			t.Errorf("Expected different schedules for different orgs, got same: %s", sameWorkflowDifferentOrg)
+		}
 
-	if sameWorkflowDifferentOrg == sameWorkflowOtherRepo {
-		t.Errorf("Expected different schedules for different repos, got same: %s", sameWorkflowDifferentOrg)
-	}
+		if sameWorkflowDifferentOrg == sameWorkflowOtherRepo {
+			t.Errorf("Expected different schedules for different repos, got same: %s", sameWorkflowDifferentOrg)
+		}
 
-	if sameWorkflowOtherOrg == sameWorkflowOtherRepo {
-		t.Errorf("Expected different schedules for different org/repo combinations, got same: %s", sameWorkflowOtherOrg)
-	}
+		if sameWorkflowOtherOrg == sameWorkflowOtherRepo {
+			t.Errorf("Expected different schedules for different org/repo combinations, got same: %s", sameWorkflowOtherOrg)
+		}
 
-	// Workflow without slug should likely be different from one with slug
-	// (This is a probabilistic check - they could theoretically collide)
-	if sameWorkflowDifferentOrg == workflowWithoutSlug && sameWorkflowOtherOrg == workflowWithoutSlug && sameWorkflowOtherRepo == workflowWithoutSlug {
-		t.Logf("Warning: All schedules with slug matched schedule without slug: %s (probabilistic collision)", workflowWithoutSlug)
+		// Workflow without slug should likely be different from one with slug
+		// (This is a probabilistic check - they could theoretically collide)
+		if sameWorkflowDifferentOrg == workflowWithoutSlug && sameWorkflowOtherOrg == workflowWithoutSlug && sameWorkflowOtherRepo == workflowWithoutSlug {
+			t.Logf("Warning: All schedules with slug matched schedule without slug: %s (probabilistic collision)", workflowWithoutSlug)
+		}
+	} else {
+		t.Logf("Skipping schedule uniqueness verification in non-release mode (all workflows use 'dev' identifier)")
 	}
 
 	t.Logf("Schedule results:")
@@ -1104,6 +1110,11 @@ func TestFuzzyScheduleScatteringWithRepositorySlug(t *testing.T) {
 // TestFuzzyScheduleScatteringAcrossOrganization verifies that workflows with the same name
 // in different repositories get different scattered schedules
 func TestFuzzyScheduleScatteringAcrossOrganization(t *testing.T) {
+	// Skip this test in non-release mode since all repos will use "dev" identifier
+	if !IsRelease() {
+		t.Skip("Skipping organization-level schedule distribution test in non-release mode")
+	}
+
 	// Simulate multiple repositories in an organization with same workflow name
 	repositories := []struct {
 		slug         string
