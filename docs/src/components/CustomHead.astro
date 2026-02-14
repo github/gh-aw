@@ -7,30 +7,12 @@ const { entry } = Astro.props;
 const isBlogPost = Astro.url.pathname.includes('/blog/');
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
-// Simple hash function for deterministic image selection
-function simpleHash(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
-}
-
 // Social images
 const heroImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
-const peliImage = 'https://github.github.com/gh-aw/peli.png';
+const blogCombinedImage = 'https://github.github.com/gh-aw/blog-combined.png';
 
-// For blog posts, use 50-50 mix based on URL hash
-// For non-blog pages, use hero image
-let socialImage: string;
-if (isBlogPost) {
-  // Deterministic selection based on URL path
-  const useHero = simpleHash(Astro.url.pathname) % 2 === 0;
-  socialImage = useHero ? heroImage : peliImage;
-} else {
-  socialImage = heroImage;
-}
+// Blog posts use combined image (hero + Peli), non-blog pages use hero only
+const socialImage = isBlogPost ? blogCombinedImage : heroImage;
 
 // Default site info
 const siteTitle = 'GitHub Agentic Workflows';

@@ -14,35 +14,6 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-tool-infrastructure/
   label: "Tool & Infrastructure Workflows"
-head:
-  - tag: meta
-    attrs:
-      property: og:title
-      content: "Meet the Workflows: Testing & Validation"
-  - tag: meta
-    attrs:
-      property: og:description
-      content: "A curated tour of agentic workflows for testing that keep everything running smoothly"
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://github.github.com/gh-aw/peli.png
-  - tag: meta
-    attrs:
-      property: og:type
-      content: article
-  - tag: meta
-    attrs:
-      property: og:url
-      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-testing-validation/
-  - tag: meta
-    attrs:
-      name: twitter:card
-      content: summary_large_image
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />

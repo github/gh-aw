@@ -14,35 +14,6 @@ prev:
 next:
   link: /gh-aw/blog/2026-01-13-meet-the-workflows-metrics-analytics/
   label: "Metrics & Analytics Workflows"
-head:
-  - tag: meta
-    attrs:
-      property: og:title
-      content: "Meet the Workflows: Fault Investigation"
-  - tag: meta
-    attrs:
-      property: og:description
-      content: "A curated tour of proactive fault investigation agentic workflows that maintain codebase health"
-  - tag: meta
-    attrs:
-      property: og:image
-      content: https://github.github.com/gh-aw/peli.png
-  - tag: meta
-    attrs:
-      property: og:type
-      content: article
-  - tag: meta
-    attrs:
-      property: og:url
-      content: https://github.github.com/gh-aw/blog/2026-01-13-meet-the-workflows-quality-hygiene/
-  - tag: meta
-    attrs:
-      name: twitter:card
-      content: summary_large_image
-  - tag: meta
-    attrs:
-      name: twitter:image
-      content: https://github.github.com/gh-aw/peli.png
 ---
 
 <img src="/gh-aw/peli.png" alt="Peli de Halleux" width="200" style="float: right; margin: 0 0 20px 20px; border-radius: 8px;" />
