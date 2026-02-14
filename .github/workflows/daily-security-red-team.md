@@ -559,71 +559,210 @@ echo "📊 Findings this scan: ${#FINDINGS[@]}"
 echo "📊 Total findings all time: $NEW_TOTAL_FINDINGS"
 ```
 
-## Phase 6: Create Security Issues (If Needed)
+## Phase 6: Forensics Analysis
 
-If findings are detected, create detailed security issues:
+For each finding, perform forensics to identify when the problematic code was introduced:
 
 ```bash
 #!/bin/bash
 
 if [ ${#FINDINGS[@]} -gt 0 ]; then
-  echo "🚨 SECURITY FINDINGS DETECTED!"
-  echo "Creating security issue..."
+  echo "🔍 Performing forensics analysis..."
   
-  # Prepare findings for issue body
-  FINDINGS_DETAILS=""
+  # Perform git blame and commit analysis for each finding
+  FORENSICS_DATA=()
+  
   for finding in "${FINDINGS[@]}"; do
     TYPE=$(echo "$finding" | cut -d: -f1)
     FILE=$(echo "$finding" | cut -d: -f2)
     LINE=$(echo "$finding" | cut -d: -f3)
     EXTRA=$(echo "$finding" | cut -d: -f4-)
     
-    FINDINGS_DETAILS+="### Finding: $TYPE\n"
-    FINDINGS_DETAILS+="- **File**: \`$FILE\`\n"
-    FINDINGS_DETAILS+="- **Line**: $LINE\n"
+    if [ -f "$FILE" ] && [ "$LINE" != "0" ]; then
+      echo "Analyzing: $FILE:$LINE"
+      
+      # Get commit that introduced this line
+      BLAME_OUTPUT=$(git blame -L "$LINE,$LINE" --porcelain "$FILE" 2>/dev/null || echo "")
+      
+      if [ -n "$BLAME_OUTPUT" ]; then
+        COMMIT_SHA=$(echo "$BLAME_OUTPUT" | grep "^[0-9a-f]\{40\}" | head -1 | cut -d' ' -f1)
+        AUTHOR=$(git log -1 --format="%an" "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+        COMMIT_DATE=$(git log -1 --format="%ai" "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+        COMMIT_MSG=$(git log -1 --format="%s" "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+        SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
+        
+        FORENSICS_DATA+=("$finding|$SHORT_SHA|$AUTHOR|$COMMIT_DATE|$COMMIT_MSG")
+        
+        echo "  ✓ Found: commit $SHORT_SHA by $AUTHOR on $COMMIT_DATE"
+      else
+        FORENSICS_DATA+=("$finding|unknown||||")
+        echo "  ⚠ Could not determine origin commit"
+      fi
+    else
+      FORENSICS_DATA+=("$finding|unknown||||")
+    fi
+  done
+  
+  echo "✅ Forensics analysis complete"
+fi
+```
+
+## Phase 7: Generate Agentic Fix Tasks
+
+Create actionable remediation tasks for each finding:
+
+```bash
+#!/bin/bash
+
+if [ ${#FINDINGS[@]} -gt 0 ]; then
+  echo "🛠️  Generating agentic fix tasks..."
+  
+  # Prepare detailed findings with forensics and fix tasks
+  FINDINGS_DETAILS=""
+  FIX_TASKS=""
+  
+  for i in "${!FORENSICS_DATA[@]}"; do
+    FORENSICS="${FORENSICS_DATA[$i]}"
+    
+    # Parse forensics data
+    FINDING=$(echo "$FORENSICS" | cut -d'|' -f1)
+    TYPE=$(echo "$FINDING" | cut -d: -f1)
+    FILE=$(echo "$FINDING" | cut -d: -f2)
+    LINE=$(echo "$FINDING" | cut -d: -f3)
+    EXTRA=$(echo "$FINDING" | cut -d: -f4-)
+    
+    COMMIT=$(echo "$FORENSICS" | cut -d'|' -f2)
+    AUTHOR=$(echo "$FORENSICS" | cut -d'|' -f3)
+    DATE=$(echo "$FORENSICS" | cut -d'|' -f4)
+    MSG=$(echo "$FORENSICS" | cut -d'|' -f5)
+    
+    # Generate finding details
+    FINDINGS_DETAILS+="### Finding $((i+1)): $TYPE\n\n"
+    FINDINGS_DETAILS+="**Location**: \`$FILE:$LINE\`\n\n"
+    
     if [ -n "$EXTRA" ]; then
-      FINDINGS_DETAILS+="- **Details**: $EXTRA\n"
+      FINDINGS_DETAILS+="**Details**: $EXTRA\n\n"
+    fi
+    
+    # Add forensics information
+    FINDINGS_DETAILS+="**Forensics Analysis**:\n"
+    if [ "$COMMIT" != "unknown" ]; then
+      FINDINGS_DETAILS+="- Introduced in commit: \`$COMMIT\`\n"
+      FINDINGS_DETAILS+="- Author: $AUTHOR\n"
+      FINDINGS_DETAILS+="- Date: $DATE\n"
+      FINDINGS_DETAILS+="- Message: \"$MSG\"\n"
+    else
+      FINDINGS_DETAILS+="- Unable to determine origin commit (file may be new or line may have moved)\n"
     fi
     FINDINGS_DETAILS+="\n"
+    
+    # Generate fix task based on finding type
+    case "$TYPE" in
+      SECRET_EXFIL)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Review and remove secret exfiltration pattern in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Verify if external network call is legitimate\n"
+        FIX_TASKS+="  - If malicious: Remove the code and rotate any exposed credentials\n"
+        FIX_TASKS+="  - If legitimate: Add domain to approved network list and document why needed\n"
+        ;;
+      DYNAMIC_EXEC)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Audit dynamic code execution in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Replace eval/exec with safer alternatives\n"
+        FIX_TASKS+="  - Sanitize all user inputs before use\n"
+        FIX_TASKS+="  - Add input validation and consider allowlist approach\n"
+        ;;
+      OBFUSCATION)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Investigate obfuscated content in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Decode and review the obfuscated content\n"
+        FIX_TASKS+="  - If legitimate: Add comment explaining purpose\n"
+        FIX_TASKS+="  - If malicious: Remove and investigate how it was introduced\n"
+        ;;
+      DANGEROUS_OPS)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Secure dangerous file operations in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Validate all file paths before operations\n"
+        FIX_TASKS+="  - Use safe file operation alternatives\n"
+        FIX_TASKS+="  - Add explicit permission checks\n"
+        ;;
+      SUSPICIOUS_DOMAIN)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Verify network domain in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Check if domain is legitimate for this operation\n"
+        FIX_TASKS+="  - If suspicious: Remove and investigate origin\n"
+        FIX_TASKS+="  - Consider replacing with internal service\n"
+        ;;
+      SUSPICIOUS_KEYWORDS)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Review suspicious keywords in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Determine if code is intentionally malicious or just poorly named\n"
+        FIX_TASKS+="  - Remove if malicious, rename if legitimate\n"
+        FIX_TASKS+="  - Review commit history for context\n"
+        ;;
+      *)
+        FIX_TASKS+="- [ ] **Task $((i+1))**: Investigate $TYPE pattern in \`$FILE:$LINE\`\n"
+        FIX_TASKS+="  - Review the code and determine if it's a security risk\n"
+        FIX_TASKS+="  - Remediate if confirmed malicious\n"
+        FIX_TASKS+="  - Document findings and actions taken\n"
+        ;;
+    esac
+    FIX_TASKS+="\n"
   done
+  
+  echo "✅ Generated ${#FINDINGS[@]} remediation tasks"
+fi
+```
+
+## Phase 8: Create Security Issues with Actionable Tasks
+
+If findings are detected, create detailed security issues with forensics and fix tasks:
+
+```bash
+#!/bin/bash
+
+if [ ${#FINDINGS[@]} -gt 0 ]; then
+  echo "🚨 SECURITY FINDINGS DETECTED!"
+  echo "Creating security issue with actionable tasks..."
   
   # Create issue using safe-outputs
   cat > /tmp/security-issue.md <<EOF
-# 🚨 Security Red Team Findings
+# 🚨 Security Red Team Findings - $(date +%Y-%m-%d)
 
-**Scan Date**: $(date +%Y-%m-%d)
-**Scan Mode**: $SCAN_MODE
-**Technique**: $TECHNIQUE
-**Files Analyzed**: $FILE_COUNT
+**Scan Mode**: $SCAN_MODE  
+**Technique**: $TECHNIQUE  
+**Files Analyzed**: $FILE_COUNT  
 **Findings**: ${#FINDINGS[@]}
 
-## Summary
+## 📋 Executive Summary
 
-The daily security red team scan has detected ${#FINDINGS[@]} potential security issues in the \`actions/setup/js\` and \`actions/setup/sh\` directories.
+The daily security red team scan has detected **${#FINDINGS[@]}** potential security issues in the \`actions/setup/js\` and \`actions/setup/sh\` directories using the **$TECHNIQUE** technique.
 
-## Findings
+## 🔍 Detailed Findings
 
 $FINDINGS_DETAILS
 
-## Next Steps
+## 🛠️ Remediation Tasks
 
-@pelikhan Please review these findings and determine:
+@pelikhan The following tasks have been generated to address the security findings. Please review and execute as appropriate:
 
-1. **False Positives**: Are these legitimate patterns that are safe in context?
-2. **True Positives**: Do any of these represent actual security vulnerabilities?
-3. **Action Required**: What remediation steps should be taken?
+$FIX_TASKS
 
-## Scan Details
+## 📊 Analysis Metadata
 
 - **Repository**: ${{ github.repository }}
 - **Run ID**: ${{ github.run_id }}
 - **Run URL**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 - **Technique Used**: $TECHNIQUE
+- **Scan Type**: $SCAN_MODE
 - **Cache Location**: /tmp/gh-aw/cache-memory/security-red-team
+
+## 🎯 Next Steps
+
+1. **Triage**: Review each finding and determine if it's a true positive or false positive
+2. **Prioritize**: Address high-severity issues first (secret exfiltration, backdoors)
+3. **Execute**: Complete the remediation tasks in the checklist above
+4. **Verify**: Re-run the security scan after fixes to confirm issues are resolved
+5. **Investigate**: For any confirmed malicious code, investigate how it was introduced and by whom
 
 ---
 
-*Generated by Daily Security Red Team Agent*
+*🤖 Generated by Daily Security Red Team Agent*  
+*📅 Scan completed at $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
 EOF
 
   # Use create-issue safe output
@@ -640,9 +779,11 @@ fi
 Your workflow MUST produce a safe output:
 
 1. **If security findings detected**:
+   - **PERFORM** forensics analysis using `git blame` to identify when code was introduced
+   - **GENERATE** actionable remediation tasks for each finding
    - **CALL** the `create_issue` tool with:
      - Title: "Security Red Team Findings - [DATE]"
-     - Body: Detailed findings with @pelikhan mention
+     - Body: Detailed findings with forensics data, fix tasks, and @pelikhan mention
      - Labels: ["security", "red-team"]
 
 2. **If no findings detected**:
@@ -682,8 +823,10 @@ A successful security scan:
 - ✅ Determines scan mode (daily incremental vs weekly full)
 - ✅ Selects and executes appropriate technique
 - ✅ Analyzes all target files for security issues
+- ✅ Performs forensics analysis using git blame to identify origin commits
+- ✅ Generates actionable remediation tasks for each finding
 - ✅ Updates cache-memory with findings and progress
-- ✅ Creates security issue if findings detected (with @pelikhan mention)
+- ✅ Creates security issue with forensics data and fix tasks if findings detected (with @pelikhan mention)
 - ✅ Calls noop tool if no findings detected
 - ✅ Completes within 60-minute timeout
 - ✅ Uses filesystem-safe timestamps for cache files
