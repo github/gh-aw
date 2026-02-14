@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "postbuild": "cp dist/cli.js ../actions/setup/js/copilot-client.js",
+    "postbuild": "cp dist/index.js ../actions/setup/js/copilot-client.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
