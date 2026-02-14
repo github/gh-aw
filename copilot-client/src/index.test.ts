@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { runCopilotSession } from './index.js';
 import type { CopilotClientConfig } from './types.js';
-import { readFileSync, existsSync, unlinkSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, unlinkSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 describe('CopilotClient', () => {
@@ -18,8 +18,7 @@ describe('CopilotClient', () => {
     mkdirSync(testDir, { recursive: true });
 
     // Create a simple prompt file
-    const fs = require('fs');
-    fs.writeFileSync(promptFile, 'What is 2+2?', 'utf-8');
+    writeFileSync(promptFile, 'What is 2+2?', 'utf-8');
   });
 
   afterEach(() => {
