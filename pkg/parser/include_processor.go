@@ -171,6 +171,7 @@ func processIncludedFileWithVisited(filePath, sectionName string, extractTools b
 					"applyTo":        true,
 					"inputs":         true,
 					"infer":          true, // Custom agent format field (Copilot)
+					"features":       true,
 				}
 
 				// Check for unexpected frontmatter fields
