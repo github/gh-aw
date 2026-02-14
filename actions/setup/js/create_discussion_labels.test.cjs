@@ -95,10 +95,7 @@ describe("create_discussion with labels", () => {
             labelable: {
               id: "D_discussion123",
               labels: {
-                nodes: [
-                  { name: "automation" },
-                  { name: "report" },
-                ],
+                nodes: [{ name: "automation" }, { name: "report" }],
               },
             },
           },
@@ -168,25 +165,17 @@ describe("create_discussion with labels", () => {
     expect(result.url).toBe("https://github.com/owner/repo/discussions/42");
 
     // Verify labels were fetched
-    const labelsFetchCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("labels(first:")
-    );
+    const labelsFetchCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("labels(first:"));
     expect(labelsFetchCall).toBeDefined();
 
     // Verify labels were applied
-    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("addLabelsToLabelable")
-    );
+    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("addLabelsToLabelable"));
     expect(labelsApplyCall).toBeDefined();
     expect(labelsApplyCall[1].labelIds).toEqual(["LA_label1", "LA_label2"]);
 
     // Verify info messages
-    expect(mockCore.info).toHaveBeenCalledWith(
-      expect.stringContaining("Applying 2 labels to discussion")
-    );
-    expect(mockCore.info).toHaveBeenCalledWith(
-      expect.stringContaining("Applied labels: automation, report")
-    );
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Applying 2 labels to discussion"));
+    expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Applied labels: automation, report"));
   });
 
   it("should merge config labels with message-specific labels", async () => {
@@ -210,9 +199,7 @@ describe("create_discussion with labels", () => {
     expect(result.success).toBe(true);
 
     // Verify all three labels were applied
-    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("addLabelsToLabelable")
-    );
+    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("addLabelsToLabelable"));
     expect(labelsApplyCall).toBeDefined();
     expect(labelsApplyCall[1].labelIds).toEqual(["LA_label1", "LA_label2", "LA_label3"]);
   });
@@ -239,12 +226,8 @@ describe("create_discussion with labels", () => {
     expect(result.number).toBe(42);
 
     // Verify warning was logged
-    expect(mockCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining("Could not find label IDs for: nonexistent-label")
-    );
-    expect(mockCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining("No matching labels found in repository")
-    );
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not find label IDs for: nonexistent-label"));
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("No matching labels found in repository"));
   });
 
   it("should sanitize label content", async () => {
@@ -268,9 +251,7 @@ describe("create_discussion with labels", () => {
 
     // Labels should have been sanitized (mentions neutralized, script tags removed)
     // The sanitized labels won't match repo labels, so no labels will be applied
-    expect(mockCore.warning).toHaveBeenCalledWith(
-      expect.stringMatching(/Could not find label IDs for/)
-    );
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringMatching(/Could not find label IDs for/));
   });
 
   // Note: This test is disabled because the label application failure path
@@ -350,11 +331,9 @@ describe("create_discussion with labels", () => {
     expect(result.number).toBe(42);
 
     // Verify addLabelsToLabelable mutation was attempted
-    const addLabelsCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("addLabelsToLabelable")
-    );
+    const addLabelsCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("addLabelsToLabelable"));
     expect(addLabelsCall).toBeDefined();
-    
+
     // Verify warning was logged about label application failure
     const warningCalls = mockCore.warning.mock.calls.map(call => call[0]);
     const hasLabelWarning = warningCalls.some(msg => msg && msg.includes("Failed to apply labels"));
@@ -381,14 +360,10 @@ describe("create_discussion with labels", () => {
     expect(result.success).toBe(true);
 
     // Verify labels were not fetched or applied
-    const labelsFetchCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("labels(first:")
-    );
+    const labelsFetchCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("labels(first:"));
     expect(labelsFetchCall).toBeUndefined();
 
-    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("addLabelsToLabelable")
-    );
+    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("addLabelsToLabelable"));
     expect(labelsApplyCall).toBeUndefined();
   });
 
@@ -413,9 +388,7 @@ describe("create_discussion with labels", () => {
     expect(result.success).toBe(true);
 
     // Verify only 2 unique labels were applied (automation, report)
-    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call =>
-      call[0].includes("addLabelsToLabelable")
-    );
+    const labelsApplyCall = mockGithub.graphql.mock.calls.find(call => call[0].includes("addLabelsToLabelable"));
     expect(labelsApplyCall).toBeDefined();
     expect(labelsApplyCall[1].labelIds).toEqual(["LA_label1", "LA_label2"]);
   });
