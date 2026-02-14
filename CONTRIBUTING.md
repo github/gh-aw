@@ -424,6 +424,16 @@ Quick reference:
 - `make test` - Full test suite (~30s)
 - `make agent-finish` - Complete validation before committing
 
+## 🚫 Spam Prevention
+
+**Be nice, don't spam.** The project maintainers reserve the right to clean up spam, unsolicited promotions, or off-topic content as needed to keep discussions focused and valuable for all contributors.
+
+This includes but is not limited to:
+- Repeated identical or similar comments across multiple issues or pull requests
+- Unsolicited promotional content or advertisements
+- Off-topic comments that don't contribute to the discussion
+- Automated bot comments without prior approval
+
 ## 🤝 Community
 
 - Join the `#continuous-ai` channel in the [GitHub Next Discord](https://gh.io/next-discord)
