@@ -811,6 +811,17 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 		env["DEFAULT_BRANCH"] = "${{ github.event.repository.default_branch }}"
 	}
 
+	// Set GH_AW_WORKFLOW_ID_SANITIZED for cache-memory keys
+	// This contains the workflow ID with all hyphens removed and lowercased
+	// Used in cache keys to avoid spaces and special characters
+	if data.WorkflowID != "" {
+		if env == nil {
+			env = make(map[string]string)
+		}
+		sanitizedID := SanitizeWorkflowIDForCacheKey(data.WorkflowID)
+		env["GH_AW_WORKFLOW_ID_SANITIZED"] = sanitizedID
+	}
+
 	// Generate agent concurrency configuration
 	agentConcurrency := GenerateJobConcurrencyConfig(data)
 

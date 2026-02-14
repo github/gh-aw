@@ -36,7 +36,7 @@ tools:
 				"# Cache memory file share configuration from frontmatter processed below",
 				"- name: Restore cache-memory file share data",
 				"actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830",
-				"key: memory-${{ github.workflow }}-${{ github.run_id }}",
+				"key: memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}",
 				"path: /tmp/gh-aw/cache-memory",
 			},
 			notExpectedInLock: []string{

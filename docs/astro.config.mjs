@@ -31,7 +31,7 @@ function createAuthors(authors) {
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://github.github.io',
+	site: 'https://github.github.com',
 	base: '/gh-aw/',
 	markdown: {
 		remarkPlugins: [remarkStripEmojis],
@@ -55,6 +55,7 @@ export default defineConfig({
 		mermaid(),
 		starlight({
 			title: 'GitHub Agentic Workflows',
+			description: 'Write agentic workflows in natural language using markdown files and run them as GitHub Actions workflows.',
 			logo: {
 				src: './src/assets/agentic-workflow.svg',
 				replacesTitle: false,

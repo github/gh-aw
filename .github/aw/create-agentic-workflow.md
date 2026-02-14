@@ -300,9 +300,9 @@ These resources contain workflow patterns, best practices, safe outputs, and per
    - Need to trigger workflows in other repos (use separate workflow in target repo)
 
    **Documentation Reference:**
-   - Full guide: https://github.github.io/gh-aw/patterns/multirepoops/
-   - Safe Outputs Reference: https://github.github.io/gh-aw/reference/safe-outputs/
-   - GitHub Tools: https://github.github.io/gh-aw/reference/tools/#github-tools-github
+   - Full guide: https://github.github.com/gh-aw/patterns/multirepoops/
+   - Safe Outputs Reference: https://github.github.com/gh-aw/reference/safe-outputs/
+   - GitHub Tools: https://github.github.com/gh-aw/reference/tools/#github-tools-github
 
    **Custom Safe Output Jobs (for new safe outputs):**
 
@@ -649,7 +649,7 @@ When you identify issues requiring tracking:
 ```
 
 **Reference Documentation:**
-- https://github.github.io/gh-aw/patterns/multirepoops/
+- https://github.github.com/gh-aw/patterns/multirepoops/
 
 ### Step 3: Create the Workflow File
 

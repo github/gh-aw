@@ -31,11 +31,12 @@ type CacheMemoryEntry struct {
 }
 
 // generateDefaultCacheKey generates a default cache key for a given cache ID
+// Uses GH_AW_WORKFLOW_ID_SANITIZED (workflow ID with hyphens removed) instead of github.workflow
 func generateDefaultCacheKey(cacheID string) string {
 	if cacheID == "default" {
-		return "memory-${{ github.workflow }}-${{ github.run_id }}"
+		return "memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}"
 	}
-	return fmt.Sprintf("memory-%s-${{ github.workflow }}-${{ github.run_id }}", cacheID)
+	return fmt.Sprintf("memory-%s-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}", cacheID)
 }
 
 // parseCacheMemoryEntry parses a single cache-memory entry from a map
@@ -357,9 +358,9 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		cacheKey := cache.Key
 		if cacheKey == "" {
 			if useBackwardCompatiblePaths {
-				cacheKey = "memory-${{ github.workflow }}-${{ github.run_id }}"
+				cacheKey = "memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}"
 			} else {
-				cacheKey = fmt.Sprintf("memory-%s-${{ github.workflow }}-${{ github.run_id }}", cache.ID)
+				cacheKey = fmt.Sprintf("memory-%s-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}", cache.ID)
 			}
 		}
 
@@ -400,8 +401,8 @@ func generateCacheMemorySteps(builder *strings.Builder, data *WorkflowData) {
 		// This allows cache sharing across all workflows in the repository
 		if scope == "repo" {
 			// Remove both workflow and run_id to create a repo-wide restore key
-			// For example: "memory-chroma-${{ github.workflow }}-${{ github.run_id }}" -> "memory-chroma-"
-			repoKey := strings.TrimSuffix(cacheKey, "${{ github.workflow }}-${{ github.run_id }}")
+			// For example: "memory-chroma-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}" -> "memory-chroma-"
+			repoKey := strings.TrimSuffix(cacheKey, "${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}")
 			if repoKey != cacheKey && repoKey != "" {
 				restoreKeys = append(restoreKeys, repoKey)
 			}
@@ -751,9 +752,9 @@ func (c *Compiler) buildUpdateCacheMemoryJob(data *WorkflowData, threatDetection
 		cacheKey := cache.Key
 		if cacheKey == "" {
 			if cache.ID == "default" {
-				cacheKey = "memory-${{ github.workflow }}-${{ github.run_id }}"
+				cacheKey = "memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}"
 			} else {
-				cacheKey = fmt.Sprintf("memory-%s-${{ github.workflow }}-${{ github.run_id }}", cache.ID)
+				cacheKey = fmt.Sprintf("memory-%s-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}", cache.ID)
 			}
 		}
 

@@ -162,7 +162,7 @@ gh aw audit <run-id>
 ### Resources
 
 - [GitHub Agentic Workflows Documentation](https://github.com/github/gh-aw)
-- [Troubleshooting Guide](https://github.github.io/gh-aw/troubleshooting/common-issues/)
+- [Troubleshooting Guide](https://github.github.com/gh-aw/troubleshooting/common-issues/)
 
 ---
 
@@ -509,7 +509,7 @@ async function main() {
           secret_verification_failed: String(secretVerificationResult === "failed"),
           secret_verification_context:
             secretVerificationResult === "failed"
-              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.io/gh-aw/reference/engines/\n"
+              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.com/gh-aw/reference/engines/\n"
               : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,
@@ -606,7 +606,7 @@ async function main() {
           secret_verification_failed: String(secretVerificationResult === "failed"),
           secret_verification_context:
             secretVerificationResult === "failed"
-              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.io/gh-aw/reference/engines/\n"
+              ? "\n**⚠️ Secret Verification Failed**: The workflow's secret validation step failed. Please check that the required secrets are configured in your repository settings.\n\nFor more information on configuring tokens, see: https://github.github.com/gh-aw/reference/engines/\n"
               : "",
           assignment_errors_context: assignmentErrorsContext,
           create_discussion_errors_context: createDiscussionErrorsContext,

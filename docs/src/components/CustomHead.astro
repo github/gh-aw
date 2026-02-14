@@ -1,9 +1,56 @@
 ---
 import type { Props } from '@astrojs/starlight/props';
-import Default from '@astrojs/starlight/components/Head.astro';
+
+// Access page data via Starlight's route locals
+const route = Astro.locals.starlightRoute;
+const entry = route?.entry;
+
+// Detect blog posts by URL path - more reliable than entry.id   
+const isBlogPost = Astro.url.pathname.includes('/blog/');
+
+// Social images - use combined image for blog posts, hero for everything else
+const heroImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
+const blogCombinedImage = 'https://github.github.com/gh-aw/blog-combined.png';
+const socialImage = isBlogPost ? blogCombinedImage : heroImage;
+
+// Build enhanced OG title: "Page Title | Site Name" (target: 50-60 chars)
+const siteTitle = 'GitHub Agentic Workflows';
+const rawPageTitle = entry?.data?.title ?? siteTitle;
+const isHomePage = rawPageTitle === siteTitle;
+const ogTitle = isHomePage ? siteTitle : `${rawPageTitle} | ${siteTitle}`;
+
+// Enhanced default description (110-160 chars optimal for OG)
+const defaultDescription = 'Write agentic workflows in natural language using markdown files and run them as GitHub Actions. Automate your repository with AI agents, strong guardrails, and simple configuration.';
+const pageDescription = entry?.data?.description || defaultDescription;
+
+// Properties we override with enhanced values
+const overriddenProps = new Set([
+  'og:title', 'og:description', 'og:image',
+  'twitter:title', 'twitter:description', 'twitter:image',
+]);
+
+// Filter Starlight's head tags to remove OG/Twitter tags we'll override
+const head = route?.head ?? [];
+const filteredHead = head.filter(({ tag, attrs }) => {
+  if (tag !== 'meta') return true;
+  const prop = attrs?.property || attrs?.name;
+  return !overriddenProps.has(prop);
+});
 ---
 
-<Default {...Astro.props}><slot /></Default>
+<!-- Starlight's head tags (with OG/Twitter duplicates removed) -->
+{filteredHead.map(({ tag: Tag, attrs, content }) => <Tag {...attrs} set:html={content} />)}
+
+<!-- Enhanced OG tags with site name in title and social image -->
+<meta property="og:title" content={ogTitle} />
+<meta property="og:description" content={pageDescription} />
+<meta property="og:image" content={socialImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
+<meta name="twitter:title" content={ogTitle} />
+<meta name="twitter:description" content={pageDescription} />
+<meta name="twitter:image" content={socialImage} />
 
 <link
   rel="preload"

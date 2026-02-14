@@ -691,7 +691,7 @@ safe-outputs:
 
 Submits a consolidated pull request review with a status decision. All `create-pull-request-review-comment` outputs are automatically collected and included as inline comments in the review.
 
-If the agent calls `submit_pull_request_review`, it can specify a review `body` and `event` (APPROVE, REQUEST_CHANGES, or COMMENT). Both fields are optional — `event` defaults to COMMENT when omitted, and `body` is only required for APPROVE and REQUEST_CHANGES decisions. The agent can also submit a body-only review (e.g., APPROVE) without any inline comments.
+If the agent calls `submit_pull_request_review`, it can specify a review `body` and `event` (APPROVE, REQUEST_CHANGES, or COMMENT). Both fields are optional — `event` defaults to COMMENT when omitted, and `body` is only required for REQUEST_CHANGES. The agent can also submit a body-only review (e.g., APPROVE) without any inline comments.
 
 If the agent does not call `submit_pull_request_review` at all, buffered comments are still submitted as a COMMENT review automatically.
 
@@ -700,7 +700,8 @@ safe-outputs:
   create-pull-request-review-comment:
     max: 10
   submit-pull-request-review:
-    max: 1  # max reviews to submit (default: 1)
+    max: 1            # max reviews to submit (default: 1)
+    footer: false     # omit AI-generated footer from review body (default: true)
 ```
 
 ### Code Scanning Alerts (`create-code-scanning-alert:`)

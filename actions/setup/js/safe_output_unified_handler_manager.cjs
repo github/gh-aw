@@ -982,6 +982,11 @@ async function main() {
     // Create the shared PR review buffer instance (no global state)
     const prReviewBuffer = createReviewBuffer();
 
+    // Apply footer config from submit_pull_request_review (if configured)
+    if (configs.regular?.submit_pull_request_review?.footer === false) {
+      prReviewBuffer.setIncludeFooter(false);
+    }
+
     // Load and initialize handlers based on configuration (factory pattern)
     // Regular handlers use the global github object, project handlers use the projectOctokit
     const messageHandlers = await loadHandlers(configs, projectOctokit, prReviewBuffer);
