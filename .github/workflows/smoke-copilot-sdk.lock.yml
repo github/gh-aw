@@ -28,7 +28,7 @@
 #     - shared/gh.md
 #     - shared/reporting.md
 #
-# frontmatter-hash: 86c94f37a2e64a1c007c3d4ada8687dd4300030389cd5cdae301987f16f92355
+# frontmatter-hash: 4b96ed5ca9d0b3f188491248db6550dfd12fd863f346dbe88cf69c23de0b4833
 
 name: "Smoke Copilot SDK"
 "on":
@@ -267,7 +267,7 @@ jobs:
             const determineAutomaticLockdown = require('/opt/gh-aw/actions/determine_automatic_lockdown.cjs');
             await determineAutomaticLockdown(github, context, core);
       - name: Download container images
-        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/gh-aw-mcpg:v0.1.4 ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
+        run: bash /opt/gh-aw/actions/download_docker_images.sh ghcr.io/github/github-mcp-server:v0.30.3 node:lts-alpine
       - name: Install gh-aw extension
         env:
           GH_TOKEN: ${{ secrets.GH_AW_GITHUB_MCP_SERVER_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -744,7 +744,7 @@ jobs:
           
           # Export gateway environment variables for MCP config and gateway script
           export MCP_GATEWAY_PORT="80"
-          export MCP_GATEWAY_DOMAIN="host.docker.internal"
+          export MCP_GATEWAY_DOMAIN="localhost"
           MCP_GATEWAY_API_KEY=$(openssl rand -base64 45 | tr -d '/+=')
           echo "::add-mask::${MCP_GATEWAY_API_KEY}"
           export MCP_GATEWAY_API_KEY

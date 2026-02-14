@@ -1,5 +1,6 @@
 ---
 description: Smoke Copilot SDK
+strict: false
 on: 
   workflow_dispatch:
   pull_request:
@@ -38,6 +39,8 @@ safe-outputs:
       allowed-repos: ["github/gh-aw"]
     remove-labels:
       allowed: [smoke]
+sandbox:
+  agent: false
 ---
 
 # Smoke Test for Copilot SDK Engine
