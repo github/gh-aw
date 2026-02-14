@@ -221,4 +221,4 @@ export async function main(): Promise<void> {
 }
 
 // Export for testing
-export { CopilotClientConfig, LoggedEvent } from './types.js';
+export type { CopilotClientConfig, LoggedEvent } from './types.js';
