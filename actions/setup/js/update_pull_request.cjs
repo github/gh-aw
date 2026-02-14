@@ -129,6 +129,10 @@ function buildPRUpdateData(item, config) {
     updateData.base = item.base;
     hasUpdates = true;
   }
+  if (item.draft !== undefined) {
+    updateData.draft = item.draft;
+    hasUpdates = true;
+  }
 
   if (!hasUpdates) {
     return {
