@@ -375,7 +375,6 @@ async function main(config = {}, githubClient = null) {
           previewInfo: {
             projectUrl: effectiveProjectUrl,
             status,
-            title,
           },
         };
       }

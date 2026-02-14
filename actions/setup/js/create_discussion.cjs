@@ -10,7 +10,7 @@ const HANDLER_TYPE = "create_discussion";
 
 const { getTrackerID } = require("./get_tracker_id.cjs");
 const { sanitizeTitle, applyTitlePrefix } = require("./sanitize_title.cjs");
-const { replaceTemporaryIdReferences } = require("./temporary_id.cjs");
+const { generateTemporaryId, isTemporaryId, normalizeTemporaryId, getOrGenerateTemporaryId, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { parseAllowedRepos, getDefaultTargetRepo, validateRepo, parseRepoSlug } = require("./repo_helpers.cjs");
 const { removeDuplicateTitleFromDescription } = require("./remove_duplicate_title.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
@@ -459,6 +459,19 @@ async function main(config = {}) {
 
     const categoryId = resolvedCategory.id;
     core.info(`Using category: ${resolvedCategory.name} (${resolvedCategory.matchType})`);
+
+    // Get or generate the temporary ID for this discussion
+    const tempIdResult = getOrGenerateTemporaryId(message, "discussion");
+    if (tempIdResult.error) {
+      core.warning(`Skipping discussion: ${tempIdResult.error}`);
+      return {
+        success: false,
+        error: tempIdResult.error,
+      };
+    }
+    // At this point, temporaryId is guaranteed to be a string (not null)
+    const temporaryId = /** @type {string} */ tempIdResult.temporaryId;
+    core.info(`Processing create_discussion: title=${message.title}, bodyLength=${message.body?.length ?? 0}, temporaryId=${temporaryId}, repo=${qualifiedItemRepo}`);
 
     // Build labels array (merge config labels with item-specific labels)
     const discussionLabels = [...labels, ...(Array.isArray(item.labels) ? item.labels : [])]
