@@ -337,8 +337,8 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
 		llmGatewayPort := e.SupportsLLMGateway()
 		if llmGatewayPort > 0 {
-			awfArgs = append(awfArgs, "--enable-api-proxy", fmt.Sprintf("--api-proxy-port=%d", llmGatewayPort))
-			claudeLog.Printf("Added --enable-api-proxy with port %d for LLM API proxying", llmGatewayPort)
+			awfArgs = append(awfArgs, "--enable-api-proxy")
+			claudeLog.Printf("Added --enable-api-proxy for LLM API proxying on port %d", llmGatewayPort)
 		}
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)

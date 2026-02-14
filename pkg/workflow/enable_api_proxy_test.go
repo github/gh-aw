@@ -6,9 +6,9 @@ import (
 )
 
 // TestEngineAWFEnableApiProxy tests that engines with LLM gateway support
-// include --enable-api-proxy and --api-proxy-port flags in AWF commands.
+// include --enable-api-proxy flag in AWF commands.
 func TestEngineAWFEnableApiProxy(t *testing.T) {
-	t.Run("Claude AWF command includes enable-api-proxy with port 10000", func(t *testing.T) {
+	t.Run("Claude AWF command includes enable-api-proxy flag", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -32,9 +32,6 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 
 		if !strings.Contains(stepContent, "--enable-api-proxy") {
 			t.Error("Expected Claude AWF command to contain '--enable-api-proxy' flag")
-		}
-		if !strings.Contains(stepContent, "--api-proxy-port=10000") {
-			t.Error("Expected Claude AWF command to contain '--api-proxy-port=10000' flag")
 		}
 	})
 
@@ -65,7 +62,7 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 		}
 	})
 
-	t.Run("Codex AWF command includes enable-api-proxy with port 10001", func(t *testing.T) {
+	t.Run("Codex AWF command includes enable-api-proxy flag", func(t *testing.T) {
 		workflowData := &WorkflowData{
 			Name: "test-workflow",
 			EngineConfig: &EngineConfig{
@@ -89,9 +86,6 @@ func TestEngineAWFEnableApiProxy(t *testing.T) {
 
 		if !strings.Contains(stepContent, "--enable-api-proxy") {
 			t.Error("Expected Codex AWF command to contain '--enable-api-proxy' flag")
-		}
-		if !strings.Contains(stepContent, "--api-proxy-port=10001") {
-			t.Error("Expected Codex AWF command to contain '--api-proxy-port=10001' flag")
 		}
 	})
 }

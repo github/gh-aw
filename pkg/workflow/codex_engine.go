@@ -256,8 +256,8 @@ func (e *CodexEngine) GetExecutionSteps(workflowData *WorkflowData, logFile stri
 		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
 		llmGatewayPort := e.SupportsLLMGateway()
 		if llmGatewayPort > 0 {
-			awfArgs = append(awfArgs, "--enable-api-proxy", fmt.Sprintf("--api-proxy-port=%d", llmGatewayPort))
-			codexEngineLog.Printf("Added --enable-api-proxy with port %d for LLM API proxying", llmGatewayPort)
+			awfArgs = append(awfArgs, "--enable-api-proxy")
+			codexEngineLog.Printf("Added --enable-api-proxy for LLM API proxying on port %d", llmGatewayPort)
 		}
 
 		// Note: No --tty flag for Codex (it's not a TUI, it outputs to stdout/stderr)
