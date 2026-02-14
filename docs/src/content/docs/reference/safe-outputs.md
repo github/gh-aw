@@ -704,6 +704,7 @@ safe-outputs:
     footer: true                         # add AI-generated footer (default: true)
 ```
 
+
 #### Footer Control for Review Comments
 
 The `footer` field controls whether AI-generated footers are added to PR review comments:
@@ -726,7 +727,6 @@ safe-outputs:
 ```
 
 With `footer: "if-body"`, approval reviews without body text appear clean without the AI-generated footer, while reviews with explanatory text still include the footer for attribution.
-
 
 ### Submit PR Review (`submit-pull-request-review:`)
 
