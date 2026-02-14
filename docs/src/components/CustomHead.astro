@@ -8,8 +8,8 @@ const entry = route?.entry;
 // Detect blog posts by URL path - more reliable than entry.id   
 const isBlogPost = Astro.url.pathname.includes('/blog/');
 
-// Social images - use smaller thumbnail maintaining original aspect ratio for Slack
-const heroImage = 'https://github.github.com/gh-aw/og-thumb-400x210.jpg';
+// Social images - use combined image for blog posts, hero for everything else
+const heroImage = 'https://github.github.com/gh-aw/og-hero-1200x630.png';
 //const blogCombinedImage = 'https://github.github.com/gh-aw/blog-combined.png';
 const socialImage = heroImage;
 
@@ -45,9 +45,9 @@ const filteredHead = head.filter(({ tag, attrs }) => {
 <meta property="og:title" content={ogTitle} />
 <meta property="og:description" content={pageDescription} />
 <meta property="og:image" content={socialImage} />
-<meta property="og:image:width" content="400" />
-<meta property="og:image:height" content="210" />
-<meta property="og:image:type" content="image/jpeg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
 <meta name="twitter:title" content={ogTitle} />
 <meta name="twitter:description" content={pageDescription} />
 <meta name="twitter:image" content={socialImage} />
