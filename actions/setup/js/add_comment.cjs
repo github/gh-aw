@@ -18,6 +18,45 @@ const { getMessages } = require("./messages_core.cjs");
 /** @type {string} Safe output type handled by this module */
 const HANDLER_TYPE = "add_comment";
 
+/**
+ * Maximum limits for comment parameters to prevent resource exhaustion.
+ * These limits align with GitHub's API constraints and security best practices.
+ */
+/** @type {number} Maximum comment body length (GitHub's limit) */
+const MAX_COMMENT_LENGTH = 65536;
+
+/** @type {number} Maximum number of mentions allowed per comment */
+const MAX_MENTIONS = 10;
+
+/** @type {number} Maximum number of links allowed per comment */
+const MAX_LINKS = 50;
+
+/**
+ * Enforces maximum limits on comment parameters to prevent resource exhaustion attacks.
+ * Per Safe Outputs specification requirement MR3, limits must be enforced before API calls.
+ *
+ * @param {string} body - Comment body to validate
+ * @throws {Error} When any limit is exceeded, with error code and details
+ */
+function enforceCommentLimits(body) {
+  // Check body length - max limit exceeded check
+  if (body.length > MAX_COMMENT_LENGTH) {
+    throw new Error(`E006: Comment body exceeds maximum length of ${MAX_COMMENT_LENGTH} characters (got ${body.length})`);
+  }
+
+  // Count mentions (@username pattern) - max limit exceeded check
+  const mentions = (body.match(/@\w+/g) || []).length;
+  if (mentions > MAX_MENTIONS) {
+    throw new Error(`E007: Comment contains ${mentions} mentions, maximum is ${MAX_MENTIONS}`);
+  }
+
+  // Count links (http:// and https:// URLs) - max limit exceeded check
+  const links = (body.match(/https?:\/\/[^\s]+/g) || []).length;
+  if (links > MAX_LINKS) {
+    throw new Error(`E008: Comment contains ${links} links, maximum is ${MAX_LINKS}`);
+  }
+}
+
 // Copy helper functions from original file
 async function minimizeComment(github, nodeId, reason = "outdated") {
   const query = /* GraphQL */ `
@@ -424,6 +463,18 @@ async function main(config = {}) {
     // Replace temporary ID references in body
     let processedBody = replaceTemporaryIdReferences(item.body || "", temporaryIdMap, itemRepo);
 
+    // Enforce max limits before processing (validates user-provided content)
+    try {
+      enforceCommentLimits(processedBody);
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.warning(`Comment validation failed: ${errorMessage}`);
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
     // Add tracker ID and footer
     const trackerIDComment = getTrackerID("markdown");
     if (trackerIDComment) {
@@ -439,6 +490,19 @@ async function main(config = {}) {
     const missingInfoSections = getMissingInfoSections();
     if (missingInfoSections) {
       processedBody += missingInfoSections;
+    }
+
+    // Enforce max limits again after adding footer and metadata
+    // This ensures the final body (including generated content) doesn't exceed limits
+    try {
+      enforceCommentLimits(processedBody);
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      core.warning(`Final comment body validation failed: ${errorMessage}`);
+      return {
+        success: false,
+        error: errorMessage,
+      };
     }
 
     core.info(`Adding comment to ${isDiscussion ? "discussion" : "issue/PR"} #${itemNumber} in ${itemRepo}`);
@@ -632,4 +696,11 @@ async function main(config = {}) {
   };
 }
 
-module.exports = { main };
+module.exports = {
+  main,
+  // Export constants and functions for testing
+  MAX_COMMENT_LENGTH,
+  MAX_MENTIONS,
+  MAX_LINKS,
+  enforceCommentLimits,
+};

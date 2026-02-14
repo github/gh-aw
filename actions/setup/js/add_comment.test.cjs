@@ -1099,3 +1099,127 @@ describe("add_comment", () => {
     });
   });
 });
+
+describe("enforceCommentLimits", () => {
+  let enforceCommentLimits;
+  let MAX_COMMENT_LENGTH;
+  let MAX_MENTIONS;
+  let MAX_LINKS;
+
+  beforeEach(async () => {
+    const addCommentScript = fs.readFileSync(path.join(__dirname, "add_comment.cjs"), "utf8");
+    const exports = await eval(`(async () => { ${addCommentScript}; return { enforceCommentLimits, MAX_COMMENT_LENGTH, MAX_MENTIONS, MAX_LINKS }; })()`);
+    enforceCommentLimits = exports.enforceCommentLimits;
+    MAX_COMMENT_LENGTH = exports.MAX_COMMENT_LENGTH;
+    MAX_MENTIONS = exports.MAX_MENTIONS;
+    MAX_LINKS = exports.MAX_LINKS;
+  });
+
+  it("should accept comment within all limits", () => {
+    const validBody = "This is a valid comment with @user1 and https://github.com";
+    expect(() => enforceCommentLimits(validBody)).not.toThrow();
+  });
+
+  it("should reject comment exceeding MAX_COMMENT_LENGTH", () => {
+    const longBody = "a".repeat(MAX_COMMENT_LENGTH + 1);
+    expect(() => enforceCommentLimits(longBody)).toThrow(/E006.*maximum length/i);
+  });
+
+  it("should accept comment at exactly MAX_COMMENT_LENGTH", () => {
+    const exactBody = "a".repeat(MAX_COMMENT_LENGTH);
+    expect(() => enforceCommentLimits(exactBody)).not.toThrow();
+  });
+
+  it("should reject comment with too many mentions", () => {
+    const mentions = Array.from({ length: MAX_MENTIONS + 1 }, (_, i) => `@user${i}`).join(" ");
+    const bodyWithMentions = `Comment with mentions: ${mentions}`;
+    expect(() => enforceCommentLimits(bodyWithMentions)).toThrow(/E007.*mentions/i);
+  });
+
+  it("should accept comment at exactly MAX_MENTIONS", () => {
+    const mentions = Array.from({ length: MAX_MENTIONS }, (_, i) => `@user${i}`).join(" ");
+    const bodyWithMentions = `Comment with mentions: ${mentions}`;
+    expect(() => enforceCommentLimits(bodyWithMentions)).not.toThrow();
+  });
+
+  it("should reject comment with too many links", () => {
+    const links = Array.from({ length: MAX_LINKS + 1 }, (_, i) => `https://example.com/${i}`).join(" ");
+    const bodyWithLinks = `Comment with links: ${links}`;
+    expect(() => enforceCommentLimits(bodyWithLinks)).toThrow(/E008.*links/i);
+  });
+
+  it("should accept comment at exactly MAX_LINKS", () => {
+    const links = Array.from({ length: MAX_LINKS }, (_, i) => `https://example.com/${i}`).join(" ");
+    const bodyWithLinks = `Comment with links: ${links}`;
+    expect(() => enforceCommentLimits(bodyWithLinks)).not.toThrow();
+  });
+
+  it("should count both http and https links", () => {
+    const httpLinks = Array.from({ length: 26 }, (_, i) => `http://example.com/${i}`).join(" ");
+    const httpsLinks = Array.from({ length: 25 }, (_, i) => `https://example.com/${i}`).join(" ");
+    const bodyWithMixedLinks = `Comment with mixed: ${httpLinks} ${httpsLinks}`;
+    expect(() => enforceCommentLimits(bodyWithMixedLinks)).toThrow(/E008.*links/i);
+  });
+
+  it("should provide detailed error message for length violation", () => {
+    const longBody = "a".repeat(MAX_COMMENT_LENGTH + 100);
+    try {
+      enforceCommentLimits(longBody);
+      throw new Error("Should have thrown");
+    } catch (error) {
+      expect(error.message).toMatch(/E006/);
+      expect(error.message).toMatch(/65536/);
+      expect(error.message).toMatch(/65636/);
+    }
+  });
+
+  it("should provide detailed error message for mentions violation", () => {
+    const mentions = Array.from({ length: 15 }, (_, i) => `@user${i}`).join(" ");
+    const bodyWithMentions = `Comment: ${mentions}`;
+    try {
+      enforceCommentLimits(bodyWithMentions);
+      throw new Error("Should have thrown");
+    } catch (error) {
+      expect(error.message).toMatch(/E007/);
+      expect(error.message).toMatch(/15 mentions/);
+      expect(error.message).toMatch(/maximum is 10/);
+    }
+  });
+
+  it("should provide detailed error message for links violation", () => {
+    const links = Array.from({ length: 60 }, (_, i) => `https://example.com/${i}`).join(" ");
+    const bodyWithLinks = `Comment: ${links}`;
+    try {
+      enforceCommentLimits(bodyWithLinks);
+      throw new Error("Should have thrown");
+    } catch (error) {
+      expect(error.message).toMatch(/E008/);
+      expect(error.message).toMatch(/60 links/);
+      expect(error.message).toMatch(/maximum is 50/);
+    }
+  });
+
+  it("should handle empty comment body", () => {
+    expect(() => enforceCommentLimits("")).not.toThrow();
+  });
+
+  it("should handle comment with no mentions", () => {
+    const body = "This is a comment without any mentions at all";
+    expect(() => enforceCommentLimits(body)).not.toThrow();
+  });
+
+  it("should handle comment with no links", () => {
+    const body = "This is a comment without any links at all";
+    expect(() => enforceCommentLimits(body)).not.toThrow();
+  });
+
+  it("should not count incomplete mention patterns", () => {
+    const body = "@ not a mention, @ also not, @123 is not a mention";
+    expect(() => enforceCommentLimits(body)).not.toThrow();
+  });
+
+  it("should count valid mention patterns only", () => {
+    const body = "Valid: @user1 @user2. Invalid: @ @123 email@example.com";
+    expect(() => enforceCommentLimits(body)).not.toThrow();
+  });
+});
