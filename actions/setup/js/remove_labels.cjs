@@ -23,6 +23,9 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Remove labels configuration: max=${maxCount}`);
   if (allowedLabels.length > 0) {
     core.info(`Allowed labels to remove: ${allowedLabels.join(", ")}`);
@@ -130,6 +133,21 @@ async function main(config = {}) {
     }
 
     core.info(`Removing ${uniqueLabels.length} labels from ${contextType} #${itemNumber} in ${itemRepo}: ${JSON.stringify(uniqueLabels)}`);
+
+    // If in staged mode, preview the label removal without actually removing
+    if (isStaged) {
+      core.info(`Staged mode: Would remove ${uniqueLabels.length} labels from ${contextType} #${itemNumber} in ${itemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          number: itemNumber,
+          repo: itemRepo,
+          labels: uniqueLabels,
+          contextType,
+        },
+      };
+    }
 
     // Track successfully removed labels
     const removedLabels = [];

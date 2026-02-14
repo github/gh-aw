@@ -123,16 +123,124 @@ function extractMCPInitialization(lines) {
 }
 
 /**
+ * Convert parsed Codex data to logEntries format for plain text rendering
+ * @param {Array<{type: string, content?: string, toolName?: string, params?: string, response?: string, statusIcon?: string}>} parsedData - Parsed Codex log data
+ * @returns {Array} logEntries array in the format expected by generatePlainTextSummary
+ */
+function convertToLogEntries(parsedData) {
+  const logEntries = [];
+
+  for (const item of parsedData) {
+    if (item.type === "thinking") {
+      // Add thinking as assistant text content
+      logEntries.push({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "text",
+              text: item.content,
+            },
+          ],
+        },
+      });
+    } else if (item.type === "tool") {
+      // Add tool use as assistant content
+      const toolUseId = `tool_${logEntries.length}`;
+
+      // Parse params - it might be a plain JSON string or need parsing
+      let inputObj = {};
+      if (item.params) {
+        try {
+          inputObj = JSON.parse(item.params);
+        } catch (e) {
+          // If parsing fails, wrap it as a string
+          inputObj = { params: item.params };
+        }
+      }
+
+      logEntries.push({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: toolUseId,
+              name: item.toolName, // Already in server__method format
+              input: inputObj,
+            },
+          ],
+        },
+      });
+
+      // Add tool result as user content
+      logEntries.push({
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: toolUseId,
+              content: item.response || "",
+              is_error: item.statusIcon === "❌",
+            },
+          ],
+        },
+      });
+    } else if (item.type === "bash") {
+      // Add bash command as tool use
+      const toolUseId = `bash_${logEntries.length}`;
+      logEntries.push({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: toolUseId,
+              name: "Bash",
+              input: { command: item.content },
+            },
+          ],
+        },
+      });
+
+      // Add bash result as user content
+      logEntries.push({
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: toolUseId,
+              content: item.response || "",
+              is_error: item.statusIcon === "❌",
+            },
+          ],
+        },
+      });
+    }
+  }
+
+  return logEntries;
+}
+
+/**
  * Parse codex log content and format as markdown
  * @param {string} logContent - The raw log content to parse
- * @returns {string} Formatted markdown content
+ * @returns {{markdown: string, logEntries: Array, mcpFailures: Array<string>, maxTurnsHit: boolean}} Parsed log data
  */
 function parseCodexLog(logContent) {
   if (!logContent) {
-    return "## 🤖 Commands and Tools\n\nNo log content provided.\n\n## 🤖 Reasoning\n\nUnable to parse reasoning from log.\n\n";
+    return {
+      markdown: "## 🤖 Commands and Tools\n\nNo log content provided.\n\n## 🤖 Reasoning\n\nUnable to parse reasoning from log.\n\n",
+      logEntries: [],
+      mcpFailures: [],
+      maxTurnsHit: false,
+    };
   }
 
   const lines = logContent.split("\n");
+  const parsedData = []; // Array to collect structured data for logEntries conversion
 
   // Look-ahead window size for finding tool results
   // New format has verbose debug logs, so requires larger window
@@ -151,6 +259,7 @@ function parseCodexLog(logContent) {
 
   // Second pass: process full conversation flow with interleaved reasoning and tools
   let inThinkingSection = false;
+  let thinkingContent = []; // Collect thinking content in chunks
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -176,6 +285,14 @@ function parseCodexLog(logContent) {
 
     // Thinking section starts with standalone "thinking" line
     if (line.trim() === "thinking") {
+      // Save previous thinking content if any
+      if (thinkingContent.length > 0) {
+        parsedData.push({
+          type: "thinking",
+          content: thinkingContent.join("\n"),
+        });
+        thinkingContent = [];
+      }
       inThinkingSection = true;
       continue;
     }
@@ -183,7 +300,16 @@ function parseCodexLog(logContent) {
     // Tool call line "tool github.list_pull_requests(...)"
     const toolMatch = line.match(/^tool\s+(\w+)\.(\w+)\(/);
     if (toolMatch) {
+      // Save previous thinking content if any
+      if (inThinkingSection && thinkingContent.length > 0) {
+        parsedData.push({
+          type: "thinking",
+          content: thinkingContent.join("\n"),
+        });
+        thinkingContent = [];
+      }
       inThinkingSection = false;
+
       const server = toolMatch[1];
       const toolName = toolMatch[2];
 
@@ -207,9 +333,18 @@ function parseCodexLog(logContent) {
     // Process thinking content (filter out timestamp lines and very short lines)
     if (inThinkingSection && line.trim().length > 20 && !line.match(/^\d{4}-\d{2}-\d{2}T/)) {
       const trimmed = line.trim();
-      // Add thinking content directly
+      thinkingContent.push(trimmed);
+      // Add thinking content directly to markdown
       markdown += `${trimmed}\n\n`;
     }
+  }
+
+  // Save any remaining thinking content
+  if (thinkingContent.length > 0) {
+    parsedData.push({
+      type: "thinking",
+      content: thinkingContent.join("\n"),
+    });
   }
 
   markdown += "## 🤖 Commands and Tools\n\n";
@@ -279,6 +414,15 @@ function parseCodexLog(logContent) {
         }
       }
 
+      // Collect data for logEntries conversion
+      parsedData.push({
+        type: "tool",
+        toolName: `${server}__${toolName}`,
+        params,
+        response,
+        statusIcon,
+      });
+
       // Format the tool call with HTML details
       markdown += formatCodexToolCall(server, toolName, params, response, statusIcon);
     } else if (bashMatch) {
@@ -316,6 +460,14 @@ function parseCodexLog(logContent) {
         }
       }
 
+      // Collect data for logEntries conversion
+      parsedData.push({
+        type: "bash",
+        content: command,
+        response,
+        statusIcon,
+      });
+
       // Format the bash command with HTML details
       markdown += formatCodexBashCall(command, response, statusIcon);
     }
@@ -352,7 +504,18 @@ function parseCodexLog(logContent) {
     markdown += `**Tool Calls:** ${toolCalls}\n\n`;
   }
 
-  return markdown;
+  // Convert parsed data to logEntries format
+  const logEntries = convertToLogEntries(parsedData);
+
+  // Check for MCP failures
+  const mcpFailures = mcpInfo.servers.filter(server => server.status === "failed").map(server => server.name);
+
+  return {
+    markdown,
+    logEntries,
+    mcpFailures,
+    maxTurnsHit: false, // Codex doesn't have max-turns concept in logs
+  };
 }
 
 /**

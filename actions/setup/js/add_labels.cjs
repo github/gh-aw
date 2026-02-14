@@ -23,6 +23,9 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Add labels configuration: max=${maxCount}`);
   if (allowedLabels.length > 0) {
     core.info(`Allowed labels: ${allowedLabels.join(", ")}`);
@@ -121,6 +124,21 @@ async function main(config = {}) {
     }
 
     core.info(`Adding ${uniqueLabels.length} labels to ${contextType} #${itemNumber} in ${itemRepo}: ${JSON.stringify(uniqueLabels)}`);
+
+    // If in staged mode, preview the labels without adding them
+    if (isStaged) {
+      core.info(`Staged mode: Would add ${uniqueLabels.length} labels to ${contextType} #${itemNumber} in ${itemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          number: itemNumber,
+          repo: itemRepo,
+          labels: uniqueLabels,
+          contextType,
+        },
+      };
+    }
 
     try {
       await github.rest.issues.addLabels({

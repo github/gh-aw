@@ -48,10 +48,10 @@ github.list_pull_requests(...) success in 123ms:
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("## 🤖 Reasoning");
-      expect(result).toContain("## 🤖 Commands and Tools");
-      expect(result).toContain("github::list_pull_requests");
-      expect(result).toContain("✅");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
+      expect(result.markdown).toContain("## 🤖 Commands and Tools");
+      expect(result.markdown).toContain("github::list_pull_requests");
+      expect(result.markdown).toContain("✅");
     });
 
     it("should parse tool call with failure", () => {
@@ -61,8 +61,8 @@ github.create_issue(...) failed in 456ms:
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("github::create_issue");
-      expect(result).toContain("❌");
+      expect(result.markdown).toContain("github::create_issue");
+      expect(result.markdown).toContain("❌");
     });
 
     it("should parse thinking sections", () => {
@@ -72,9 +72,9 @@ Let me start by listing the files in the root directory`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("## 🤖 Reasoning");
-      expect(result).toContain("I need to analyze the repository structure");
-      expect(result).toContain("Let me start by listing the files");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
+      expect(result.markdown).toContain("I need to analyze the repository structure");
+      expect(result.markdown).toContain("Let me start by listing the files");
     });
 
     it("should skip metadata lines", () => {
@@ -88,10 +88,10 @@ This is actual thinking content`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).not.toContain("OpenAI Codex");
-      expect(result).not.toContain("workdir");
-      expect(result).not.toContain("model:");
-      expect(result).toContain("This is actual thinking content");
+      expect(result.markdown).not.toContain("OpenAI Codex");
+      expect(result.markdown).not.toContain("workdir");
+      expect(result.markdown).not.toContain("model:");
+      expect(result.markdown).toContain("This is actual thinking content");
     });
 
     it("should skip debug and timestamp lines", () => {
@@ -103,9 +103,9 @@ Actual thinking content that is long enough to be included`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).not.toContain("DEBUG codex");
-      expect(result).not.toContain("INFO codex");
-      expect(result).toContain("Actual thinking content");
+      expect(result.markdown).not.toContain("DEBUG codex");
+      expect(result.markdown).not.toContain("INFO codex");
+      expect(result.markdown).toContain("Actual thinking content");
     });
 
     it("should parse bash commands", () => {
@@ -116,8 +116,8 @@ total 8
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("bash: ls -la");
-      expect(result).toContain("✅");
+      expect(result.markdown).toContain("bash: ls -la");
+      expect(result.markdown).toContain("✅");
     });
 
     it("should extract total tokens from log", () => {
@@ -128,9 +128,9 @@ tokens used
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("📊 Information");
-      expect(result).toContain("Total Tokens Used");
-      expect(result).toContain("1,500");
+      expect(result.markdown).toContain("📊 Information");
+      expect(result.markdown).toContain("Total Tokens Used");
+      expect(result.markdown).toContain("1,500");
     });
 
     it("should count tool calls", () => {
@@ -140,23 +140,23 @@ ToolCall: github__add_labels {}`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("**Tool Calls:** 3");
+      expect(result.markdown).toContain("**Tool Calls:** 3");
     });
 
     it("should handle empty log content", () => {
       const result = parseCodexLog("");
 
-      expect(result).toContain("## 🤖 Reasoning");
-      expect(result).toContain("## 🤖 Commands and Tools");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
+      expect(result.markdown).toContain("## 🤖 Commands and Tools");
     });
 
     it("should handle log with errors gracefully", () => {
       const malformedLog = null;
       const result = parseCodexLog(malformedLog);
 
-      expect(result).toContain("No log content provided");
-      expect(result).toContain("## 🤖 Commands and Tools");
-      expect(result).toContain("## 🤖 Reasoning");
+      expect(result.markdown).toContain("No log content provided");
+      expect(result.markdown).toContain("## 🤖 Commands and Tools");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
     });
 
     it("should handle tool calls without responses", () => {
@@ -164,8 +164,8 @@ ToolCall: github__add_labels {}`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("github::list_issues");
-      expect(result).toContain("❓"); // Unknown status
+      expect(result.markdown).toContain("github::list_issues");
+      expect(result.markdown).toContain("❓"); // Unknown status
     });
 
     it("should filter out short lines in thinking sections", () => {
@@ -176,9 +176,9 @@ x`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("This is a long enough line");
-      expect(result).not.toContain("Short\n\n");
-      expect(result).not.toContain("x\n\n");
+      expect(result.markdown).toContain("This is a long enough line");
+      expect(result.markdown).not.toContain("Short\n\n");
+      expect(result.markdown).not.toContain("x\n\n");
     });
 
     it("should handle ToolCall format", () => {
@@ -186,8 +186,8 @@ x`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("📊 Information");
-      expect(result).toContain("**Tool Calls:** 1");
+      expect(result.markdown).toContain("📊 Information");
+      expect(result.markdown).toContain("**Tool Calls:** 1");
     });
 
     it("should handle tokens with commas in final count", () => {
@@ -196,7 +196,7 @@ x`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("12,345");
+      expect(result.markdown).toContain("12,345");
     });
   });
 
@@ -467,14 +467,14 @@ I will now use the GitHub API to list issues`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).toContain("## 🚀 Initialization");
-      expect(result).toContain("**MCP Servers:**");
-      expect(result).toContain("Total: 2");
-      expect(result).toContain("Connected: 2");
-      expect(result).toContain("✅");
-      expect(result).toContain("github");
-      expect(result).toContain("safe_outputs");
-      expect(result).toContain("## 🤖 Reasoning");
+      expect(result.markdown).toContain("## 🚀 Initialization");
+      expect(result.markdown).toContain("**MCP Servers:**");
+      expect(result.markdown).toContain("Total: 2");
+      expect(result.markdown).toContain("Connected: 2");
+      expect(result.markdown).toContain("✅");
+      expect(result.markdown).toContain("github");
+      expect(result.markdown).toContain("safe_outputs");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
     });
 
     it("should skip initialization section when no MCP info present", () => {
@@ -484,8 +484,8 @@ I will analyze the code`;
 
       const result = parseCodexLog(logContent);
 
-      expect(result).not.toContain("## 🚀 Initialization");
-      expect(result).toContain("## 🤖 Reasoning");
+      expect(result.markdown).not.toContain("## 🚀 Initialization");
+      expect(result.markdown).toContain("## 🤖 Reasoning");
     });
   });
 });

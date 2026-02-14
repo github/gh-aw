@@ -18,6 +18,9 @@ async function main(config = {}) {
   const subTitlePrefix = config.sub_title_prefix || "";
   const maxCount = config.max || 5;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   if (parentRequiredLabels.length > 0) {
     core.info(`Parent required labels: ${JSON.stringify(parentRequiredLabels)}`);
   }
@@ -278,6 +281,19 @@ async function main(config = {}) {
       // Get the parent issue's node ID for GraphQL
       const parentNodeId = parentIssue.node_id;
       const subNodeId = subIssue.node_id;
+
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would link issue #${subIssueNumber} as sub-issue of #${parentIssueNumber}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            parent_issue_number: parentIssueNumber,
+            sub_issue_number: subIssueNumber,
+          },
+        };
+      }
 
       // Use GraphQL mutation to add sub-issue
       await github.graphql(

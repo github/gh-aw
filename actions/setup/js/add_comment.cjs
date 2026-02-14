@@ -280,6 +280,9 @@ async function main(config = {}) {
   const maxCount = config.max || 20;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   // Check if append-only-comments is enabled in messages config
   const messagesConfig = getMessages();
   const appendOnlyComments = messagesConfig?.appendOnlyComments === true;
@@ -439,6 +442,21 @@ async function main(config = {}) {
     }
 
     core.info(`Adding comment to ${isDiscussion ? "discussion" : "issue/PR"} #${itemNumber} in ${itemRepo}`);
+
+    // If in staged mode, preview the comment without creating it
+    if (isStaged) {
+      core.info(`Staged mode: Would add comment to ${isDiscussion ? "discussion" : "issue/PR"} #${itemNumber} in ${itemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          itemNumber,
+          repo: itemRepo,
+          isDiscussion,
+          bodyLength: processedBody.length,
+        },
+      };
+    }
 
     try {
       // Hide older comments if enabled AND append-only-comments is not enabled

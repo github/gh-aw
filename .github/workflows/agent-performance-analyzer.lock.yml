@@ -33,7 +33,7 @@
 name: "Agent Performance Analyzer - Meta-Orchestrator"
 "on":
   schedule:
-  - cron: "13 1 * * *"
+  - cron: "18 17 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 

@@ -33,7 +33,7 @@
 name: "Workflow Health Manager - Meta-Orchestrator"
 "on":
   schedule:
-  - cron: "18 11 * * *"
+  - cron: "7 7 * * *"
     # Friendly format: daily (scattered)
   workflow_dispatch:
 

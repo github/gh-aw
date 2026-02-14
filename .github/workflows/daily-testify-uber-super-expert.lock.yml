@@ -34,7 +34,7 @@
 name: "Daily Testify Uber Super Expert"
 "on":
   schedule:
-  - cron: "8 11 * * *"
+  - cron: "53 14 * * *"
     # Friendly format: daily (scattered)
   # skip-if-match: is:issue is:open in:title "[testify-expert]" # Skip-if-match processed as search check in pre-activation job
   workflow_dispatch:

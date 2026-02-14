@@ -295,6 +295,9 @@ async function main(config = {}, githubClient = null) {
   const titlePrefix = config.title_prefix || "Project";
   const configuredViews = Array.isArray(config.views) ? config.views : [];
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   // Use the provided github client, or fall back to the global github object
   // The global github object is available when running via github-script action
   // @ts-ignore - global.github is set by setupGlobals() from github-script context
@@ -397,6 +400,21 @@ async function main(config = {}, githubClient = null) {
       const ownerType = owner_type || "org"; // Default to org if not specified
 
       core.info(`Creating project "${title}" for ${ownerType}/${targetOwner}`);
+
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would create project "${title}"`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            title,
+            ownerType,
+            targetOwner,
+            temporaryId,
+          },
+        };
+      }
 
       // Get owner ID
       const ownerId = await getOwnerId(ownerType, targetOwner);

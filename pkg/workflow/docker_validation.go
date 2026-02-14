@@ -12,10 +12,12 @@
 //
 // # Validation Pattern: Warning vs Error
 //
-// Docker image validation uses a flexible approach:
-//   - If Docker is not available, a warning is emitted but validation is skipped
+// Docker image validation returns errors for all failure cases. The caller
+// (validateContainerImages) collects these and surfaces them as compiler warnings:
+//   - If Docker is not installed, returns an error
+//   - If the Docker daemon is not running, returns an error (with fast timeout check)
 //   - If an image cannot be pulled due to authentication (private repo), validation passes
-//   - If an image truly doesn't exist, validation fails with an error
+//   - If an image truly doesn't exist, returns an error
 //   - Verbose mode provides detailed validation feedback
 //
 // # When to Add Validation Here
@@ -32,33 +34,73 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
 var dockerValidationLog = logger.New("workflow:docker_validation")
 
-// validateDockerImage checks if a Docker image exists and is accessible
-// Returns nil if docker is not available (with a warning printed)
+// dockerDaemonCheckTimeout is how long to wait for `docker info` to respond.
+// If the daemon isn't running, this prevents long hangs on every docker command.
+const dockerDaemonCheckTimeout = 3 * time.Second
+
+// Cached result of Docker daemon availability check.
+// Checked once per process to avoid repeated slow checks when daemon is down.
+var (
+	dockerDaemonOnce      sync.Once
+	dockerDaemonAvailable bool
+)
+
+// isDockerDaemonRunning checks if the Docker daemon is responsive.
+// Uses a short timeout to avoid hanging when Docker is installed but the daemon is stopped.
+// Results are cached for the process lifetime.
+func isDockerDaemonRunning() bool {
+	dockerDaemonOnce.Do(func() {
+		dockerValidationLog.Print("Checking if Docker daemon is running")
+		ctx, cancel := context.WithTimeout(context.Background(), dockerDaemonCheckTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "docker", "info")
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		err := cmd.Run()
+
+		dockerDaemonAvailable = err == nil
+		if !dockerDaemonAvailable {
+			dockerValidationLog.Printf("Docker daemon not running or not responsive: %v", err)
+		} else {
+			dockerValidationLog.Print("Docker daemon is running")
+		}
+	})
+	return dockerDaemonAvailable
+}
+
+// validateDockerImage checks if a Docker image exists and is accessible.
+// Returns an error if Docker is not installed, the daemon is not running,
+// or the image cannot be found. The caller treats these as warnings.
 func validateDockerImage(image string, verbose bool) error {
 	dockerValidationLog.Printf("Validating Docker image: %s", image)
 
-	// Check if docker is available
+	// Check if docker CLI is available on PATH
 	_, err := exec.LookPath("docker")
 	if err != nil {
-		dockerValidationLog.Print("Docker not available, skipping image validation")
-		// Docker not available - print warning and skip validation
-		if verbose {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Docker not available - skipping validation for container image '%s'", image)))
-		}
-		return nil
+		dockerValidationLog.Print("Docker not installed, cannot validate image")
+		return fmt.Errorf("Docker not installed - could not validate container image '%s'. Install Docker or remove container-based tools", image)
+	}
+
+	// Check if Docker daemon is actually running (cached check with short timeout).
+	// This prevents multi-minute hangs when Docker Desktop is installed but not running,
+	// which is common on macOS development machines.
+	if !isDockerDaemonRunning() {
+		dockerValidationLog.Print("Docker daemon not running, cannot validate image")
+		return fmt.Errorf("Docker daemon not running - could not validate container image '%s'. Start Docker Desktop or remove container-based tools", image)
 	}
 
 	// Try to inspect the image (will succeed if image exists locally)

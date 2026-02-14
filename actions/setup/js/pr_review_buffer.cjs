@@ -260,6 +260,34 @@ function createReviewBuffer() {
 
     core.info(`Submitting PR review on ${repo}#${pullRequestNumber}: event=${event}, comments=${comments.length}, bodyLength=${body.length}`);
 
+    // If in staged mode, preview the review without submitting
+    const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+    if (isStaged) {
+      let summaryContent = "## 🎭 Staged Mode: PR Review Preview\n\n";
+      summaryContent += "The following PR review would be submitted if staged mode was disabled:\n\n";
+      summaryContent += `**Target PR:** ${repo}#${pullRequestNumber}\n\n`;
+      summaryContent += `**Review Event:** ${event}\n\n`;
+
+      if (body) {
+        summaryContent += `**Review Body:**\n${body}\n\n`;
+      }
+
+      if (comments.length > 0) {
+        summaryContent += `**Inline Comments:** ${comments.length}\n\n`;
+        for (let i = 0; i < comments.length; i++) {
+          const comment = comments[i];
+          summaryContent += `${i + 1}. \`${comment.path}:${comment.line}\` (${comment.side || "RIGHT"})\n`;
+          summaryContent += `   ${comment.body.substring(0, 100)}${comment.body.length > 100 ? "..." : ""}\n\n`;
+        }
+      }
+
+      summaryContent += "---\n\n";
+
+      await core.summary.addRaw(summaryContent).write();
+      core.info("📝 PR review preview written to step summary (staged mode)");
+      return { success: true, staged: true };
+    }
+
     try {
       /** @type {any} */
       const requestParams = {

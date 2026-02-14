@@ -1154,6 +1154,9 @@ async function main(config = {}, githubClient = null) {
   const configuredViews = Array.isArray(config.views) ? config.views : [];
   const configuredFieldDefinitions = Array.isArray(config.field_definitions) ? config.field_definitions : [];
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   if (configuredViews.length > 0) {
     core.info(`Found ${configuredViews.length} configured view(s) in frontmatter`);
   }
@@ -1276,6 +1279,20 @@ async function main(config = {}, githubClient = null) {
       const effectiveMessage = { ...resolvedMessage };
       if (effectiveMessage?.operation === "create_fields" && !effectiveMessage.field_definitions && configuredFieldDefinitions.length > 0) {
         effectiveMessage.field_definitions = configuredFieldDefinitions;
+      }
+
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        const operation = effectiveMessage?.operation || "update";
+        core.info(`Staged mode: Would ${operation} project ${effectiveProjectUrl}`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            projectUrl: effectiveProjectUrl,
+            operation,
+          },
+        };
       }
 
       // Process the update_project message

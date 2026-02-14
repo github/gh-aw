@@ -82,6 +82,9 @@ async function main(config = {}) {
   // Extract configuration
   const maxCount = config.max || 10;
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Mark pull request as ready for review configuration: max=${maxCount}`);
 
   // Track how many items we've processed for max limit
@@ -153,6 +156,20 @@ async function main(config = {}) {
           url: currentPR.html_url,
           title: currentPR.title,
           alreadyReady: true,
+        };
+      }
+
+      // If in staged mode, preview without executing
+      if (isStaged) {
+        core.info(`Staged mode: Would mark PR #${prNumber} as ready for review`);
+        return {
+          success: true,
+          staged: true,
+          previewInfo: {
+            number: prNumber,
+            isDraft: currentPR.draft,
+            hasReason: !!item.reason,
+          },
         };
       }
 

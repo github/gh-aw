@@ -24,6 +24,9 @@ async function main(config = {}) {
   const maxCount = config.max || 10;
   const { defaultTargetRepo, allowedRepos } = resolveTargetRepoConfig(config);
 
+  // Check if we're in staged mode
+  const isStaged = process.env.GH_AW_SAFE_OUTPUTS_STAGED === "true";
+
   core.info(`Assign to user configuration: max=${maxCount}`);
   if (allowedAssignees.length > 0) {
     core.info(`Allowed assignees: ${allowedAssignees.join(", ")}`);
@@ -98,6 +101,20 @@ async function main(config = {}) {
     }
 
     core.info(`Assigning ${uniqueAssignees.length} users to issue #${issueNumber} in ${itemRepo}: ${JSON.stringify(uniqueAssignees)}`);
+
+    // If in staged mode, preview without executing
+    if (isStaged) {
+      core.info(`Staged mode: Would assign users to issue #${issueNumber} in ${itemRepo}`);
+      return {
+        success: true,
+        staged: true,
+        previewInfo: {
+          issueNumber,
+          repo: itemRepo,
+          assignees: uniqueAssignees,
+        },
+      };
+    }
 
     try {
       // Add assignees to the issue
