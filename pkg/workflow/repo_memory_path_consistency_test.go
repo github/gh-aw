@@ -53,7 +53,7 @@ func TestRepoMemoryPathConsistencyAcrossLayers(t *testing.T) {
 			branchName:           "memory/code-metrics",
 			expectedMemoryDir:    "/tmp/gh-aw/repo-memory/code-metrics",
 			expectedPromptPath:   "/tmp/gh-aw/repo-memory/code-metrics/",
-			expectedArtifactName: "repo-memory-code-metrics",
+			expectedArtifactName: "repo-memory-codemetrics", // Sanitized: hyphens removed
 		},
 	}
 
@@ -277,7 +277,7 @@ func TestRepoMemoryArtifactNameFormat(t *testing.T) {
 		{
 			name:         "hyphenated memory ID",
 			memoryID:     "code-metrics",
-			expectedName: "repo-memory-code-metrics",
+			expectedName: "repo-memory-codemetrics", // Sanitized: hyphens removed
 		},
 	}
 

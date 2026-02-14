@@ -18,6 +18,17 @@ func GetWorkflowIDFromPath(markdownPath string) string {
 	return strings.TrimSuffix(filepath.Base(markdownPath), ".md")
 }
 
+// SanitizeWorkflowIDForCacheKey sanitizes a workflow ID for use in cache keys.
+// It removes all hyphens and converts to lowercase to create a filesystem-safe identifier.
+// Example: "Smoke-Copilot" -> "smokecopilot"
+func SanitizeWorkflowIDForCacheKey(workflowID string) string {
+	// Convert to lowercase
+	sanitized := strings.ToLower(workflowID)
+	// Remove all hyphens
+	sanitized = strings.ReplaceAll(sanitized, "-", "")
+	return sanitized
+}
+
 // convertStepToYAML converts a step map to YAML format.
 // This is a method wrapper around the package-level ConvertStepToYAML function.
 func (c *Compiler) convertStepToYAML(stepMap map[string]any) (string, error) {

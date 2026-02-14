@@ -69,7 +69,7 @@ tools:
 			expectedInLock: []string{
 				// Should have workflow-specific restore key
 				"restore-keys: |",
-				"memory-${{ github.workflow }}-",
+				"memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-",
 			},
 			genericFallbacks: []string{"memory-"},
 		},
@@ -86,15 +86,15 @@ engine: claude
 tools:
   cache-memory:
     - id: chroma
-      key: memory-chroma-${{ github.workflow }}
+      key: memory-chroma-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
   github:
     allowed: [get_repository]
 ---`,
 			expectedInLock: []string{
-				// Custom key becomes memory-chroma-${{ github.workflow }}-${{ github.run_id }}
-				// Restore key should only remove run_id: memory-chroma-${{ github.workflow }}-
+				// Custom key becomes memory-chroma-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}
+				// Restore key should only remove run_id: memory-chroma-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-
 				"restore-keys: |",
-				"memory-chroma-${{ github.workflow }}-",
+				"memory-chroma-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-",
 			},
 			genericFallbacks: []string{"memory-chroma-", "memory-"},
 		},
@@ -111,17 +111,17 @@ engine: claude
 tools:
   cache-memory:
     - id: default
-      key: memory-default-${{ github.workflow }}
+      key: memory-default-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
     - id: session
-      key: memory-session-${{ github.workflow }}
+      key: memory-session-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}
   github:
     allowed: [get_repository]
 ---`,
 			expectedInLock: []string{
-				// Custom keys become memory-*-${{ github.workflow }}-${{ github.run_id }}
+				// Custom keys become memory-*-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-${{ github.run_id }}
 				// Restore keys should only remove run_id
-				"memory-default-${{ github.workflow }}-",
-				"memory-session-${{ github.workflow }}-",
+				"memory-default-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-",
+				"memory-session-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-",
 			},
 			genericFallbacks: []string{"memory-default-", "memory-session-", "memory-"},
 		},
@@ -146,7 +146,7 @@ safe-outputs:
 				"uses: actions/cache/restore@",
 				// Should have workflow-specific restore key
 				"restore-keys: |",
-				"memory-${{ github.workflow }}-",
+				"memory-${{ env.GH_AW_WORKFLOW_ID_SANITIZED }}-",
 			},
 			genericFallbacks: []string{"memory-"},
 		},
