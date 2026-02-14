@@ -150,11 +150,11 @@ func (e *CopilotSDKEngine) generateCopilotHeadlessStep() GitHubActionStep {
 func (e *CopilotSDKEngine) generateConfigurationStep(workflowData *WorkflowData) GitHubActionStep {
 	// Build the configuration JSON
 	config := map[string]any{
-		"cliUrl":        "http://host.docker.internal:3312", // Use Docker internal host
-		"promptFile":    "/tmp/gh-aw/aw-prompts/prompt.txt",
-		"eventLogFile":  "/tmp/gh-aw/copilot-sdk/event-log.jsonl",
-		"githubToken":   "${{ secrets.COPILOT_GITHUB_TOKEN }}",
-		"logLevel":      "info",
+		"cliUrl":       "http://host.docker.internal:3312", // Use Docker internal host
+		"promptFile":   "/tmp/gh-aw/aw-prompts/prompt.txt",
+		"eventLogFile": "/tmp/gh-aw/copilot-sdk/event-log.jsonl",
+		"githubToken":  "${{ secrets.COPILOT_GITHUB_TOKEN }}",
+		"logLevel":     "info",
 	}
 
 	// Add model if specified
@@ -214,16 +214,16 @@ func (e *CopilotSDKEngine) RenderMCPConfig(yaml *strings.Builder, tools map[stri
 
 	// Use the same MCP rendering as standard Copilot engine
 	copilotEngine := NewCopilotEngine()
-	
+
 	// Create a temporary builder to capture the output
 	var tempBuilder strings.Builder
 	copilotEngine.RenderMCPConfig(&tempBuilder, tools, mcpTools, workflowData)
-	
+
 	// Replace localhost with Docker internal host domain
 	config := tempBuilder.String()
 	config = strings.ReplaceAll(config, "localhost", "host.docker.internal")
 	config = strings.ReplaceAll(config, "127.0.0.1", "host.docker.internal")
-	
+
 	// Write to the output builder
 	yaml.WriteString(config)
 }
