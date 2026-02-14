@@ -86,20 +86,18 @@ jobs:
           mkdir -p /tmp/test
           echo "What is 2+2? Answer briefly." > /tmp/test/prompt.txt
           
-          # Create configuration
-          cat > /tmp/test/config.json << 'EOF'
-          {
+          # Create configuration JSON for environment variable
+          export GH_AW_COPILOT_CONFIG='{
             "promptFile": "/tmp/test/prompt.txt",
             "eventLogFile": "/tmp/test/events.jsonl",
             "cliUrl": "localhost:8080",
             "session": {
               "model": "gpt-5"
             }
-          }
-          EOF
+          }'
           
-          # Run the client (using index.js which exports main())
-          DEBUG=copilot-client cat /tmp/test/config.json | node -e "import('./dist/index.js').then(m => m.main())"
+          # Run the client with configuration from environment variable
+          DEBUG=copilot-client node -e "import('./dist/index.js').then(m => m.main())"
           
           # Verify event log was created
           if [ ! -f /tmp/test/events.jsonl ]; then

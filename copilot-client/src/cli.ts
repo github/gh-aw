@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI entry point for the Copilot SDK client
- * Reads configuration from stdin and runs a Copilot session
+ * Reads configuration from GH_AW_COPILOT_CONFIG environment variable and runs a Copilot session
  */
 
 import { main } from './index.js';
