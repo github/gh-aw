@@ -129,7 +129,7 @@ function extractMCPInitialization(lines) {
  */
 function convertToLogEntries(parsedData) {
   const logEntries = [];
-  
+
   for (const item of parsedData) {
     if (item.type === "thinking") {
       // Add thinking as assistant text content
@@ -147,7 +147,7 @@ function convertToLogEntries(parsedData) {
     } else if (item.type === "tool") {
       // Add tool use as assistant content
       const toolUseId = `tool_${logEntries.length}`;
-      
+
       // Parse params - it might be a plain JSON string or need parsing
       let inputObj = {};
       if (item.params) {
@@ -158,7 +158,7 @@ function convertToLogEntries(parsedData) {
           inputObj = { params: item.params };
         }
       }
-      
+
       logEntries.push({
         type: "assistant",
         message: {
@@ -172,7 +172,7 @@ function convertToLogEntries(parsedData) {
           ],
         },
       });
-      
+
       // Add tool result as user content
       logEntries.push({
         type: "user",
@@ -203,7 +203,7 @@ function convertToLogEntries(parsedData) {
           ],
         },
       });
-      
+
       // Add bash result as user content
       logEntries.push({
         type: "user",
@@ -220,7 +220,7 @@ function convertToLogEntries(parsedData) {
       });
     }
   }
-  
+
   return logEntries;
 }
 
@@ -309,7 +309,7 @@ function parseCodexLog(logContent) {
         thinkingContent = [];
       }
       inThinkingSection = false;
-      
+
       const server = toolMatch[1];
       const toolName = toolMatch[2];
 
@@ -338,7 +338,7 @@ function parseCodexLog(logContent) {
       markdown += `${trimmed}\n\n`;
     }
   }
-  
+
   // Save any remaining thinking content
   if (thinkingContent.length > 0) {
     parsedData.push({
@@ -508,9 +508,7 @@ function parseCodexLog(logContent) {
   const logEntries = convertToLogEntries(parsedData);
 
   // Check for MCP failures
-  const mcpFailures = mcpInfo.servers
-    .filter(server => server.status === "failed")
-    .map(server => server.name);
+  const mcpFailures = mcpInfo.servers.filter(server => server.status === "failed").map(server => server.name);
 
   return {
     markdown,
