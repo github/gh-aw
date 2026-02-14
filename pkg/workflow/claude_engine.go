@@ -25,12 +25,12 @@ func NewClaudeEngine() *ClaudeEngine {
 			description:            "Uses Claude Code with full MCP tool support and allow-listing",
 			experimental:           false,
 			supportsToolsAllowlist: true,
-			supportsHTTPTransport:  true,  // Claude supports both stdio and HTTP transport
-			supportsMaxTurns:       true,  // Claude supports max-turns feature
-			supportsWebFetch:       true,  // Claude has built-in WebFetch support
-			supportsWebSearch:      true,  // Claude has built-in WebSearch support
-			supportsFirewall:       true,  // Claude supports network firewalling via AWF
-			supportsLLMGateway:     false, // Claude does not support LLM gateway
+			supportsHTTPTransport:  true, // Claude supports both stdio and HTTP transport
+			supportsMaxTurns:       true, // Claude supports max-turns feature
+			supportsWebFetch:       true, // Claude has built-in WebFetch support
+			supportsWebSearch:      true, // Claude has built-in WebSearch support
+			supportsFirewall:       true, // Claude supports network firewalling via AWF
+			supportsLLMGateway:     true, // Claude supports LLM gateway via AWF api-proxy
 		},
 	}
 }
@@ -327,6 +327,13 @@ func (e *ClaudeEngine) GetExecutionSteps(workflowData *WorkflowData, logFile str
 		// Skip pulling images since they are pre-downloaded in the Download container images step
 		awfArgs = append(awfArgs, "--skip-pull")
 		claudeLog.Print("Using --skip-pull since images are pre-downloaded")
+
+		// Enable API proxy sidecar if this engine supports LLM gateway
+		// The api-proxy container holds the LLM API keys and proxies requests through the firewall
+		if e.SupportsLLMGateway() {
+			awfArgs = append(awfArgs, "--enable-api-proxy")
+			claudeLog.Print("Added --enable-api-proxy for LLM API proxying")
+		}
 
 		// Add SSL Bump support for HTTPS content inspection (v0.9.0+)
 		sslBumpArgs := getSSLBumpArgs(firewallConfig)
