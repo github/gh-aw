@@ -7,6 +7,7 @@ TypeScript client for running GitHub Copilot agentic sessions using the `@github
 - ES6 JavaScript with TypeScript annotations
 - Async/await for Node 24
 - ESM module format
+- Fully bundled with all dependencies included
 - JSONL event logging with timestamps
 - Debug package for logging
 - Configuration from stdin for testability
@@ -18,11 +19,10 @@ npm install
 npm run build
 ```
 
-The build uses the TypeScript compiler (`tsc`) to transpile the TypeScript source into ESM JavaScript files targeting Node 24 (ES2024). The compiled output will be in the `dist/` directory:
+The build uses [tsup](https://tsup.egoist.dev/) to bundle the TypeScript source into a single ESM JavaScript file targeting Node 24 (ES2024). All dependencies are bundled into the output. The compiled output will be in the `dist/` directory:
 
-- `dist/index.js` - Main library entry point
-- `dist/cli.js` - CLI executable with shebang
-- `dist/*.d.ts` - TypeScript type declarations
+- `dist/index.js` - Main library entry point (fully bundled, ~190KB)
+- `dist/index.d.ts` - TypeScript type declarations
 
 ## Usage
 

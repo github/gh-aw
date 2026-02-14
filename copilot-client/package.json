@@ -12,7 +12,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "postbuild": "cp dist/index.js ../actions/setup/js/copilot-client.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,6 +26,7 @@
   "devDependencies": {
     "@types/debug": "^4.1.12",
     "@types/node": "^24.0.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
