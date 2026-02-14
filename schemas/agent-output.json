@@ -350,10 +350,7 @@
           "const": "reply_to_pull_request_review_comment"
         },
         "comment_id": {
-          "oneOf": [
-            { "type": "number", "minimum": 1 },
-            { "type": "string", "pattern": "^[1-9][0-9]*$" }
-          ],
+          "type": ["number", "string"],
           "description": "The numeric ID of the review comment to reply to"
         },
         "body": {
@@ -362,7 +359,7 @@
           "minLength": 1
         },
         "pull_request_number": {
-          "oneOf": [{ "type": "number" }, { "type": "string" }],
+          "type": ["number", "string"],
           "description": "Pull request number (optional - uses triggering PR if not provided)"
         }
       },

@@ -320,11 +320,8 @@
       "required": ["comment_id", "body"],
       "properties": {
         "comment_id": {
-          "oneOf": [
-            { "type": "number", "minimum": 1 },
-            { "type": "string", "pattern": "^[1-9][0-9]*$" }
-          ],
-          "description": "The numeric ID of the review comment to reply to."
+          "type": ["number", "string"],
+          "description": "The numeric ID of the review comment to reply to (e.g., 42853901 from the comment URL or API response)."
         },
         "body": {
           "type": "string",
