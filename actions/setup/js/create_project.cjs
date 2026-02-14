@@ -3,7 +3,7 @@
 
 const { loadAgentOutput } = require("./load_agent_output.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { normalizeTemporaryId, isTemporaryId } = require("./temporary_id.cjs");
+const { normalizeTemporaryId, isTemporaryId, generateTemporaryId } = require("./temporary_id.cjs");
 
 /**
  * Log detailed GraphQL error information
@@ -342,6 +342,33 @@ async function main(config = {}, githubClient = null) {
 
     try {
       let { title, owner, owner_type, item_url } = message;
+
+      // Get or generate the temporary ID for this project
+      let temporaryId = generateTemporaryId();
+      if (message.temporary_id !== undefined && message.temporary_id !== null) {
+        if (typeof message.temporary_id !== "string") {
+          const error = `temporary_id must be a string (got ${typeof message.temporary_id})`;
+          core.warning(`Skipping project: ${error}`);
+          return {
+            success: false,
+            error,
+          };
+        }
+
+        const rawTemporaryId = message.temporary_id.trim();
+        const normalized = rawTemporaryId.startsWith("#") ? rawTemporaryId.substring(1).trim() : rawTemporaryId;
+
+        if (!isTemporaryId(normalized)) {
+          const error = `Invalid temporary_id format: '${message.temporary_id}'. Temporary IDs must be in format 'aw_' followed by 3 to 8 alphanumeric characters (A-Za-z0-9). Example: 'aw_abc' or 'aw_Test123'`;
+          core.warning(`Skipping project: ${error}`);
+          return {
+            success: false,
+            error,
+          };
+        }
+
+        temporaryId = normalized.toLowerCase();
+      }
 
       // Resolve temporary ID in item_url if present
       if (item_url && typeof item_url === "string") {
