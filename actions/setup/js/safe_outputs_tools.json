@@ -261,6 +261,32 @@
     }
   },
   {
+    "name": "reply_to_pull_request_review_comment",
+    "description": "Reply to an existing review comment on a pull request. Use this to respond to feedback, answer questions, or acknowledge review comments. The comment_id must be the numeric ID of an existing review comment.",
+    "inputSchema": {
+      "type": "object",
+      "required": ["comment_id", "body"],
+      "properties": {
+        "comment_id": {
+          "oneOf": [
+            { "type": "number", "minimum": 1 },
+            { "type": "string", "pattern": "^[1-9][0-9]*$" }
+          ],
+          "description": "The numeric ID of the review comment to reply to."
+        },
+        "body": {
+          "type": "string",
+          "description": "The reply text in Markdown format. Provide a clear response to the review comment."
+        },
+        "pull_request_number": {
+          "type": ["number", "string"],
+          "description": "Pull request number to reply on. This is the numeric ID from the GitHub URL (e.g., 876 in github.com/owner/repo/pull/876). If omitted, replies on the PR that triggered this workflow."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "resolve_pull_request_review_thread",
     "description": "Resolve a review thread on a pull request. Use this to mark a review conversation as resolved after addressing the feedback. The thread_id must be the node ID of the review thread (e.g., PRRT_kwDO...).",
     "inputSchema": {

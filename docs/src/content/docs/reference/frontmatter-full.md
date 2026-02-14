@@ -2711,6 +2711,42 @@ safe-outputs:
   # Option 2: Enable PR review submission with default configuration
   submit-pull-request-review: null
 
+  # Enable AI agents to reply to existing review comments on pull requests.
+  # (optional)
+  # This field supports multiple formats (oneOf):
+
+  # Option 1: Configuration for replying to existing pull request review comments
+  reply-to-pull-request-review-comment:
+    # Maximum number of replies to create (default: 10)
+    # (optional)
+    max: 1
+
+    # Target for replies: 'triggering' (default), '*' (any PR), or explicit PR number
+    # (optional)
+    target: "example-value"
+
+    # Target repository in format 'owner/repo' for cross-repository operations
+    # (optional)
+    target-repo: "example-value"
+
+    # List of additional repositories that replies can target
+    # (optional)
+    allowed-repos: []
+      # Array of strings
+
+    # Controls whether AI-generated footer is added to the reply body. When false, the
+    # footer is omitted. Defaults to true.
+    # (optional)
+    footer: true
+
+    # GitHub token to use for this specific output type. Overrides global github-token
+    # if specified.
+    # (optional)
+    github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  # Option 2: Enable with default configuration
+  reply-to-pull-request-review-comment: null
+
   # Enable AI agents to resolve review threads on the triggering pull request after
   # addressing feedback.
   # (optional)

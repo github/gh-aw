@@ -160,6 +160,14 @@ var ValidationConfig = map[string]TypeValidationConfig{
 			"event": {Type: "string", Enum: []string{"APPROVE", "REQUEST_CHANGES", "COMMENT"}},
 		},
 	},
+	"reply_to_pull_request_review_comment": {
+		DefaultMax: 10,
+		Fields: map[string]FieldValidation{
+			"comment_id":          {Required: true, PositiveInteger: true},
+			"body":                {Required: true, Type: "string", Sanitize: true, MaxLength: MaxBodyLength},
+			"pull_request_number": {OptionalPositiveInteger: true},
+		},
+	},
 	"resolve_pull_request_review_thread": {
 		DefaultMax: 10,
 		Fields: map[string]FieldValidation{

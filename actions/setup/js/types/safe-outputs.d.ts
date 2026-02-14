@@ -327,6 +327,19 @@ interface HideCommentItem extends BaseSafeOutputItem {
 }
 
 /**
+ * JSONL item for replying to a pull request review comment
+ */
+interface ReplyToPullRequestReviewCommentItem extends BaseSafeOutputItem {
+  type: "reply_to_pull_request_review_comment";
+  /** The numeric ID of the review comment to reply to */
+  comment_id: number | string;
+  /** The reply body text in Markdown */
+  body: string;
+  /** Optional PR number (required when target is "*") */
+  pull_request_number?: number | string;
+}
+
+/**
  * JSONL item for creating a GitHub Project V2
  */
 interface CreateProjectItem extends BaseSafeOutputItem {
@@ -392,6 +405,7 @@ type SafeOutputItem =
   | NoOpItem
   | LinkSubIssueItem
   | HideCommentItem
+  | ReplyToPullRequestReviewCommentItem
   | CreateProjectItem
   | AutofixCodeScanningAlertItem
   | ResolvePullRequestReviewThreadItem;
@@ -432,6 +446,7 @@ export {
   NoOpItem,
   LinkSubIssueItem,
   HideCommentItem,
+  ReplyToPullRequestReviewCommentItem,
   AutofixCodeScanningAlertItem,
   ResolvePullRequestReviewThreadItem,
   SafeOutputItem,
