@@ -101,9 +101,8 @@ func validateDockerImage(image string, verbose bool) error {
 	// This prevents multi-minute hangs when Docker Desktop is installed but not running,
 	// which is common on macOS development machines.
 	if !isDockerDaemonRunning() {
-		dockerValidationLog.Print("Docker daemon not running, skipping image validation")
-		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Docker daemon not running - skipping container image validation for '%s'", image)))
-		return nil
+		dockerValidationLog.Print("Docker daemon not running, cannot validate image")
+		return fmt.Errorf("Docker daemon not running - could not validate container image '%s'. Start Docker Desktop or disable container-based tools", image)
 	}
 
 	// Try to inspect the image (will succeed if image exists locally)
