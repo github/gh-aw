@@ -15,7 +15,7 @@
  *   await buffer.submitReview();
  */
 
-const { generateFooter } = require("./generate_footer.cjs");
+const { generateFooterWithMessages } = require("./messages_footer.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
 /**
@@ -185,7 +185,7 @@ function createReviewBuffer() {
     // Add footer to review body if enabled and we have footer context.
     // Footer is always added (even for body-less reviews) to track which workflow submitted the review.
     if (includeFooter && footerContext) {
-      body += generateFooter(
+      body += generateFooterWithMessages(
         footerContext.workflowName,
         footerContext.runUrl,
         footerContext.workflowSource,

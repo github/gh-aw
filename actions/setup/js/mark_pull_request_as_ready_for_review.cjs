@@ -5,7 +5,7 @@
  * @typedef {import('./types/handler-factory').HandlerFactoryFunction} HandlerFactoryFunction
  */
 
-const { generateFooter } = require("./generate_footer.cjs");
+const { generateFooterWithMessages } = require("./messages_footer.cjs");
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 
@@ -171,7 +171,7 @@ async function main(config = {}) {
       const triggeringDiscussionNumber = context.payload?.discussion?.number;
 
       const sanitizedReason = sanitizeContent(item.reason);
-      const footer = generateFooter(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber);
+      const footer = generateFooterWithMessages(workflowName, runUrl, workflowSource, workflowSourceURL, triggeringIssueNumber, triggeringPRNumber, triggeringDiscussionNumber);
       const commentBody = `${sanitizedReason}\n\n${footer}`;
 
       await addPullRequestComment(github, context.repo.owner, context.repo.repo, prNumber, commentBody);
