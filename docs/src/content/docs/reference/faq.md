@@ -235,6 +235,62 @@ Common issues:
 
 If discussions are not enabled or the category lacks announcement capabilities, consider using `fallback-to-issue: true` (the default) to automatically create an issue instead. See [Discussion Creation](/gh-aw/reference/safe-outputs/#discussion-creation-create-discussion) for configuration details.
 
+### Why is my create-pull-request workflow failing with "GitHub Actions is not permitted to create or approve pull requests"?
+
+Some organizations disable pull request creation by GitHub Actions workflows through repository or organization settings. This security policy prevents automation from creating PRs, resulting in the error: **"GitHub Actions is not permitted to create or approve pull requests."**
+
+**Organization Setting Location:**
+- Navigate to your organization's **Settings** → **Actions** → **General**
+- Look for **"Workflow permissions"** section
+- Check if **"Allow GitHub Actions to create and approve pull requests"** is disabled
+
+**Workaround Options:**
+
+If you cannot enable PR creation or prefer to keep it disabled for security reasons, you have two alternatives:
+
+**Option 1: Use create-issue with automatic fallback (default)**
+
+The `create-pull-request` safe output automatically falls back to creating an issue when PR creation is blocked:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request:
+    # fallback-as-issue: true is the default behavior
+    # When PR creation fails, an issue is created with branch link
+```
+
+This requires both `contents: write` + `pull-requests: write` (for PR attempt) and `issues: write` (for fallback).
+
+**Option 2: Use create-issue directly with Copilot assignment**
+
+Create an issue describing the desired changes and assign it to Copilot for automated implementation:
+
+```yaml wrap
+safe-outputs:
+  create-issue:
+    assignees: [copilot]              # Assign to Copilot for PR creation
+    labels: [automation, enhancement] # Add tracking labels
+```
+
+When assigned to Copilot, the issue can be automatically picked up for processing in a separate workflow or manually reviewed by the Copilot agent to create the PR.
+
+**Option 3: Disable issue fallback to save permissions**
+
+If you only want PR creation (no fallback), disable the issue fallback to avoid requiring `issues: write`:
+
+```yaml wrap
+safe-outputs:
+  create-pull-request:
+    fallback-as-issue: false          # Only attempt PR creation
+```
+
+This requires only `contents: write` + `pull-requests: write`, but workflows will fail if PR creation is blocked at the organization level.
+
+> [!TIP]
+> For workflows that need to work across different organizations with varying PR policies, use the default `fallback-as-issue: true` behavior. This ensures workflows gracefully adapt to organization settings.
+
+See [Pull Request Creation](/gh-aw/reference/safe-outputs/#pull-request-creation-create-pull-request) for complete configuration details and the fallback mechanism explanation.
+
 ## Workflow Design
 
 ### Should I focus on one workflow, or write many different ones?
