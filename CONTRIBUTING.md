@@ -4,8 +4,6 @@ Thank you for your interest in contributing to GitHub Agentic Workflows! We welc
 
 **⚠️ IMPORTANT: This project requires agentic development using GitHub Copilot Agent. No local development environment is needed or expected.**
 
-**🤖 BEFORE FILING ISSUES: Use an agent to analyze bugs and perform in-depth research. Bug reports with minimal analysis or research are likely to be ignored.** See [Reporting Issues and Feature Requests](#reporting-issues-and-feature-requests) for details.
-
 ## 🤖 Agentic Development Workflow
 
 GitHub Agentic Workflows is developed **exclusively through GitHub Copilot Agent**. This means:
@@ -115,7 +113,21 @@ Use an agent to analyze the source code, identify root causes, propose fixes, an
 
 #### 🐛 Debugging Workflow Failures
 
-For workflow failures, load `.github/agents/agentic-workflows.agent.md` in your agent and provide the run URL. The agent will use `gh aw audit <run-id>` and `gh aw logs` to analyze failures. See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for details.
+For workflow failures, use this prompt with your agent:
+
+```markdown
+@github-copilot agent
+
+Please debug this workflow failure:
+https://github.com/owner/repo/actions/runs/RUN_ID
+
+Load .github/agents/agentic-workflows.agent.md and investigate:
+- Why the workflow failed
+- What tools were missing
+- How to fix the configuration
+```
+
+The agent will use `gh aw audit <run-id>` and `gh aw logs` to analyze the failure. See [`.github/aw/debug-agentic-workflow.md`](.github/aw/debug-agentic-workflow.md) for details.
 
 #### 📝 Issue Guidelines
 
