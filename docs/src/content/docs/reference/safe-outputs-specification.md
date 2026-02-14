@@ -7,7 +7,7 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.9.0  
+**Version**: 1.10.0  
 **Status**: Working Draft  
 **Publication Date**: 2026-02-14  
 **Editor**: GitHub Agentic Workflows Team  
@@ -2217,6 +2217,31 @@ This section provides complete definitions for all remaining safe output types. 
 
 ---
 
+#### Type: reply_to_pull_request_review_comment
+
+**Purpose**: Reply to existing review comments on pull requests to acknowledge feedback or answer questions.
+
+**Default Max**: 10  
+**Cross-Repository Support**: Yes  
+**Mandatory**: No
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+- `contents: read` - Repository metadata and context
+- `pull-requests: write` - Review comment reply creation
+
+*GitHub App*:
+- `pull-requests: write` - Review comment reply creation
+- `metadata: read` - Repository metadata (automatically granted)
+
+**Notes**:
+- Higher default max (10) enables responding to multiple review comments per cycle
+- Replies scoped to triggering PR by default; `target: "*"` requires explicit `pull_request_number` per message
+- Footer attribution appended by default; configurable via `footer: false`
+
+---
+
 #### Type: add_labels
 
 **Purpose**: Add labels to issues or pull requests.
@@ -3315,7 +3340,7 @@ safe-outputs:
 
 ### Pattern 8: Review Comment Workflow
 
-Pull request review automation:
+Pull request review automation with reply support:
 
 ```yaml
 safe-outputs:
@@ -3325,13 +3350,16 @@ safe-outputs:
   submit-pr-review:
     max: 1
     
+  reply-to-pull-request-review-comment:
+    max: 10
+    
   resolve-pr-review-thread:
     max: 10
 ```
 
-**Use case**: Automated code review with multiple comments and thread resolution.
+**Use case**: Automated code review with inline comments, review replies, and thread resolution.
 
-**Workflow**: Create review comments, submit bundled review, resolve addressed threads.
+**Workflow**: Create review comments, submit bundled review, reply to reviewer feedback, resolve addressed threads.
 
 ### Pattern 9: Project Management
 
@@ -3392,6 +3420,10 @@ safe-outputs:
 ---
 
 ## Appendix F: Document History
+
+**Version 1.10.0** (2026-02-14):
+- **Added**: `reply_to_pull_request_review_comment` safe output type definition (Section 7.3)
+- **Updated**: Pattern 8 (Review Comment Workflow) to include reply-to-review-comment in example configuration
 
 **Version 1.9.0** (2026-02-14):
 - Added comprehensive validation pipeline ordering (7 stages)
