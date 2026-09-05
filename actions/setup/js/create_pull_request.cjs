@@ -2795,11 +2795,12 @@ ${patchPreview}`;
 
           const fallbackTemplatePath = getPromptPath("pr_permission_denied_fallback.md");
           const fallbackBody = renderTemplateFromFile(fallbackTemplatePath, {
-            body: issueSafeBody,
+            main_body: issueSafeMainBodyContent,
             branch_name: branchName,
             create_pr_url: createPrUrl,
             faq_url: FAQ_CREATE_PR_PERMISSIONS_URL,
             patch_preview: patchPreview,
+            footer: footerContent,
           });
 
           try {

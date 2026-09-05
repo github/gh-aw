@@ -1,13 +1,22 @@
+> [!TIP]
+> **Your pull request is ready to create! 🎉 ✅**
+>
+> Everything is OK—the changes have been pushed to a branch. Please review the protected files, then create the pull request when you are ready.
+>
+> **[Create the pull request]({create_pr_url})**
+>
+> The original pull request description is below.
+
+---
+
 {main_body}
 
 ---
 
-> [!WARNING]
-> **Protected Files**
+> [!NOTE]
+> **Protected files**
 >
-> This was originally intended as a pull request, but the patch modifies protected files. These files may affect project dependencies, CI/CD pipelines, or agent behaviour. **Please review the changes carefully** before creating the pull request.
->
-> **[Click here to create the pull request once you have reviewed the changes]({create_pr_url})**
+> This patch modifies protected files, which may affect project dependencies, CI/CD pipelines, or agent behaviour.
 >
 > <details>
 > <summary>Protected files</summary>

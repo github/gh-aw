@@ -2114,6 +2114,10 @@ ${diffs}
     expect(createCall.body).toContain("/compare/main...");
     expect(createCall.body).not.toContain("gh run download");
     expect(createCall.body).not.toContain("git am --3way");
+    expect(createCall.body).toContain("Your pull request is ready to create! 🎉 ✅");
+    expect(createCall.body).toContain("The original pull request description is below.");
+    expect(createCall.body.indexOf("Your pull request is ready to create! 🎉 ✅")).toBeLessThan(createCall.body.indexOf("Test body"));
+    expect(createCall.body.indexOf("Test body")).toBeLessThan(createCall.body.indexOf("Protected files"));
   });
 
   it("should push branch with compare URL for protected-files fallback (bundle transport)", async () => {
@@ -3657,6 +3661,23 @@ describe("create_pull_request - copilot assignee on fallback issues", () => {
     expect(issueCall.body).toContain("Resolves test-owner/test-repo\\#58");
     expect(issueCall.body).not.toContain("Closes #57");
     expect(issueCall.body).not.toContain("Resolves test-owner/test-repo#58");
+  });
+
+  it("should keep permission details before the footer in the fallback issue body", async () => {
+    global.github.rest.pulls.create.mockRejectedValue(new Error("GitHub Actions is not permitted to create or approve pull requests"));
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+    await handler({ title: "Test PR", body: "Permission path body" }, {});
+
+    const issueBody = global.github.rest.issues.create.mock.calls[0][0].body;
+    const tipIndex = issueBody.indexOf("Your pull request is ready to create! 🎉 ✅");
+    const bodyIndex = issueBody.indexOf("Permission path body");
+    const noteIndex = issueBody.indexOf("GitHub Actions is not permitted");
+    const footerIndex = issueBody.indexOf("<!-- gh-aw-workflow-id: test-workflow -->");
+    expect(tipIndex).toBeLessThan(bodyIndex);
+    expect(bodyIndex).toBeLessThan(noteIndex);
+    expect(noteIndex).toBeLessThan(footerIndex);
   });
 });
 
