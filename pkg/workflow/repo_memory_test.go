@@ -321,6 +321,104 @@ func TestGenerateRepoMemoryArtifactUpload(t *testing.T) {
 	}
 }
 
+// TestRepoMemoryFilterStepGatesUpload verifies that when allowed-extensions/file-glob
+// filtering is configured, the "Filter ... files" step has an id and the subsequent
+// custom-validation and upload-artifact steps require that step's outcome to be
+// 'success'. This ensures a filter-step failure (e.g. an fs error while removing
+// ineligible files) can never result in an unfiltered directory being validated or
+// uploaded — regression for a "fail open" review finding.
+func TestRepoMemoryFilterStepGatesUpload(t *testing.T) {
+	config := &RepoMemoryConfig{
+		Memories: []RepoMemoryEntry{
+			{
+				ID:                "default",
+				BranchName:        "memory/default",
+				AllowedExtensions: []string{".json"},
+				FileGlob:          []string{"*.json", "notes/*.md"},
+				Validation: &MemoryValidationConfig{
+					Script: "// noop",
+				},
+			},
+		},
+	}
+	data := &WorkflowData{RepoMemoryConfig: config}
+
+	var builder strings.Builder
+	generateRepoMemoryArtifactUpload(&builder, data, getActionPin)
+	output := builder.String()
+
+	filterStepID := repoMemoryFilterStepID("default")
+	validationStepID := repoMemoryValidationStepID("default")
+
+	assert.Contains(t, output, "id: "+filterStepID, "Filter step must have an id")
+
+	sanitizeNamePos := strings.Index(output, "Sanitize repo-memory filenames (default)")
+	filterNamePos := strings.Index(output, "Filter repo-memory files (default)")
+	filterIDPos := strings.Index(output, "id: "+filterStepID)
+	validationNamePos := strings.Index(output, "Validate repo-memory domain content (default)")
+	uploadNamePos := strings.Index(output, "Upload repo-memory artifact (default)")
+	require.Greater(t, sanitizeNamePos, -1)
+	require.Greater(t, filterNamePos, -1)
+	require.Greater(t, validationNamePos, -1)
+	require.Greater(t, uploadNamePos, -1)
+	assert.Less(t, sanitizeNamePos, filterNamePos, "Sanitize step must appear before filter step")
+	assert.Less(t, filterNamePos, validationNamePos, "Filter step must appear before validation step")
+	assert.Less(t, validationNamePos, uploadNamePos, "Validation step must appear before upload step")
+
+	filterSection := output[filterNamePos:validationNamePos]
+	assert.Contains(t, filterSection, "id: "+filterStepID, "Filter step id must appear within the filter step")
+	assert.Contains(t, filterSection, `ALLOWED_EXTENSIONS: '[".json"]'`, "Filter step must set ALLOWED_EXTENSIONS to the JSON-encoded extensions list")
+	assert.Contains(t, filterSection, `FILE_GLOB_FILTER: "*.json notes/*.md"`, "Filter step must set FILE_GLOB_FILTER to the space-joined glob patterns")
+	assert.Greater(t, filterIDPos, filterNamePos, "Filter step id must appear after its name")
+
+	validationSection := output[validationNamePos:uploadNamePos]
+	assert.Contains(t, validationSection, "if: always() && steps."+filterStepID+".outcome == 'success'",
+		"Validation step must be gated on the filter step's success")
+
+	uploadSection := output[uploadNamePos:]
+	assert.Contains(t, uploadSection, "steps."+filterStepID+".outcome == 'success'",
+		"Upload step must be gated on the filter step's success")
+	assert.Contains(t, uploadSection, "steps."+validationStepID+".outcome == 'success'",
+		"Upload step must also be gated on the validation step's success")
+}
+
+// TestRepoMemoryFilterStepEmptyBothFieldsSkipsFilter verifies that the "no filter step"
+// branch is only reachable when a caller explicitly leaves both AllowedExtensions and
+// FileGlob empty — i.e. it's not accidentally triggered by a nil vs. empty-slice distinction.
+func TestRepoMemoryFilterStepEmptyBothFieldsSkipsFilter(t *testing.T) {
+	var builder strings.Builder
+	stepID := generateRepoMemoryFilterFilesStep(&builder, RepoMemoryEntry{
+		ID:                "default",
+		AllowedExtensions: []string{},
+		FileGlob:          []string{},
+	}, "/tmp/gh-aw/repo-memory/default", "repo-memory")
+
+	assert.Empty(t, stepID, "No filter step id should be returned when both fields are empty slices")
+	assert.Empty(t, builder.String(), "No filter step should be emitted when both fields are empty slices")
+}
+
+// TestRepoMemoryNoFilterStepWhenNoFilterConfigured verifies that when no
+// allowed-extensions/file-glob is configured, no filter step id is emitted and the
+// upload step is not gated on a nonexistent filter step.
+func TestRepoMemoryNoFilterStepWhenNoFilterConfigured(t *testing.T) {
+	config := &RepoMemoryConfig{
+		Memories: []RepoMemoryEntry{
+			{
+				ID:         "default",
+				BranchName: "memory/default",
+			},
+		},
+	}
+	data := &WorkflowData{RepoMemoryConfig: config}
+
+	var builder strings.Builder
+	generateRepoMemoryArtifactUpload(&builder, data, getActionPin)
+	output := builder.String()
+
+	assert.NotContains(t, output, "Filter repo-memory files (default)", "No filter step should be emitted")
+	assert.NotContains(t, output, repoMemoryFilterStepID("default"), "No filter step id should be referenced")
+}
+
 // TestRepoMemoryPromptGeneration tests that prompt section is generated correctly
 func TestRepoMemoryPromptGeneration(t *testing.T) {
 	config := &RepoMemoryConfig{

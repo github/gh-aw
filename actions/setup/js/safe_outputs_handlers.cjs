@@ -32,6 +32,7 @@ const { lstatGuard } = require("./symlink_guard.cjs");
 const { validateValueAgainstSchema } = require("./mcp_scripts_validation.cjs");
 const { resolveDataSchema } = require("./data_schema_normalizer.cjs");
 const { clearValidationMarker, formatJSONFiles, runCustomMemoryValidation, writeValidationMarker } = require("./memory_custom_validation.cjs");
+const { filterIneligibleMemoryFiles } = require("./memory_file_eligibility.cjs");
 
 /** PR event names used for target:triggering context validation across all safe-output handlers. */
 const PR_EVENT_NAMES = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
@@ -1786,6 +1787,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     const maxFileSize = memoryConf.max_file_size || 10240;
     const maxPatchSize = memoryConf.max_patch_size || 10240;
     const maxFileCount = memoryConf.max_file_count || 100;
+    const allowedExtensions = Array.isArray(memoryConf.allowed_extensions) ? memoryConf.allowed_extensions : [];
+    const fileGlobFilter = typeof memoryConf.file_glob === "string" ? memoryConf.file_glob : "";
     const validationConfig = memoryConf.validation || null;
     const validationScript = validationConfig && typeof validationConfig.script === "string" ? validationConfig.script : "";
     const validationTimeoutSeconds = validationConfig && Number.isFinite(validationConfig.timeout) ? validationConfig.timeout : undefined;
@@ -1802,6 +1805,17 @@ function createHandlers(server, appendSafeOutput, config = {}) {
           },
         ],
       };
+    }
+
+    // Allowed-extensions and file-glob are persistence filters: ineligible files must be
+    // removed here too, before formatting/scanning/staging/custom-validation, so this
+    // preflight sees the same effective file set as the later filter/upload/push steps
+    // and never hard-fails on a file that would have been silently dropped downstream.
+    if (allowedExtensions.length > 0 || fileGlobFilter) {
+      const { removed } = filterIneligibleMemoryFiles(memoryDir, allowedExtensions, fileGlobFilter, core);
+      if (removed.length > 0) {
+        core.info(`push_repo_memory: ignored ${removed.length} ineligible file(s) before validation`);
+      }
     }
 
     clearValidationMarker("repo", memoryId);

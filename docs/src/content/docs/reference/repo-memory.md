@@ -48,11 +48,11 @@ tools:
 **File Glob Matching Rules**:
 
 - Patterns are matched against the **relative path** within the artifact directory — do **not** include the branch name.
-- **Slashless patterns** (no `/` in the pattern, e.g. `*.json`, `*.md`) match files at the root of a single memory subfolder — **depth 1 only**. They do _not_ match files at the artifact root (depth 0) or deeper than one subfolder level (depth 2+).
+- **Slashless patterns** (no `/` in the pattern, e.g. `*.json`, `*.md`) are matched against the full relative path, so a single `*` only matches files at the **artifact root (depth 0)**. They do _not_ match files inside subfolders (depth 1+) — use a pattern containing `/` (e.g. `**/*.json`) for that.
 - **Patterns containing `/`** (e.g. `metrics/**`, `data/*.csv`) are matched against the full relative path from the artifact root and work as standard glob expressions.
 - **Absolute paths** (patterns starting with `/`) are **not supported** and are rejected at compile time and runtime.
 
-Example: with the default filter `["*.json", "*.md"]`, the file `discussion-task-miner/processed-discussions.json` is persisted (depth 1 ✓), but `processed-discussions.json` (depth 0) and `discussion-task-miner/archive/old.json` (depth 2) are not.
+Example: with the default filter `["*.json", "*.md"]`, the root-level file `processed-discussions.json` is persisted (depth 0 ✓), but `discussion-task-miner/processed-discussions.json` (depth 1) is not — use `["**/*.json", "**/*.md"]` to also match files nested in subfolders.
 
 ## Multiple Configurations
 
@@ -69,7 +69,7 @@ tools:
 ---
 ```
 
-Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs always match the relative path within the artifact directory, so never include the branch name; slashless patterns such as `*.json` match only the root of a memory subfolder (depth 1).
+Mounts at `/tmp/gh-aw/repo-memory-{id}/` during workflow execution. The required `id` determines the folder name, and `branch-name` defaults to `{branch-prefix}/{id}` with `memory` as the default prefix. Files are stored inside the branch under that branch-name path. File globs always match the relative path within the artifact directory, so never include the branch name; slashless patterns such as `*.json` match only files at the artifact root (depth 0).
 
 ## Behavior
 

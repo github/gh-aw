@@ -48,4 +48,24 @@ describe("validateMemoryStep", () => {
 
     expect(validateMemoryStep(core, { kind: "drive" })).toBe(true);
   });
+
+  it("filters (never hard-fails) disallowed-extension files uniformly across memory kinds", () => {
+    delete process.env.VALIDATION_SCRIPT_B64;
+    fs.writeFileSync(path.join(tempDir, "notes.json"), "{}");
+    fs.writeFileSync(path.join(tempDir, "notes.json.new"), "ignored");
+    const messages = [];
+    const core = {
+      info: message => messages.push(message),
+      error: message => messages.push(`error: ${message}`),
+      setFailed: message => messages.push(`failed: ${message}`),
+    };
+
+    for (const kind of ["repo", "cache", "drive"]) {
+      expect(validateMemoryStep(core, { kind })).toBe(true);
+    }
+
+    expect(messages.some(m => m.startsWith("failed:"))).toBe(false);
+    expect(fs.existsSync(path.join(tempDir, "notes.json"))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, "notes.json.new"))).toBe(false);
+  });
 });

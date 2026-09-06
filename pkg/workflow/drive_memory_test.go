@@ -262,6 +262,47 @@ func TestDriveMemoryPersistenceWithoutValidationUsesDefaultSuccessCondition(t *t
 	assert.NotContains(t, persist.String(), "if:")
 }
 
+// TestDriveMemoryValidationConfigAndGeneratedSteps mirrors
+// TestCacheMemoryValidationConfigAndGeneratedSteps and
+// TestRepoMemoryValidationConfigAndGeneratedSteps to confirm the script-based
+// custom validation hook is wired uniformly for drive-memory too: parsed from
+// config, passed through as VALIDATION_SCRIPT_B64 to validate_memory_step.cjs,
+// and gating persistence on the validation step's outcome.
+func TestDriveMemoryValidationConfigAndGeneratedSteps(t *testing.T) {
+	compiler := NewCompiler()
+	config, err := compiler.extractDriveMemoryConfig(&ToolsConfig{
+		DriveMemory: &DriveMemoryToolConfig{Raw: []any{
+			map[string]any{
+				"id":         "default",
+				"drive-name": "agent-state",
+				"validation": map[string]any{
+					"script":          "if (!fs.existsSync(path.join(memoryRoot, 'index.json'))) throw new Error('missing index');",
+					"timeout-minutes": 1,
+				},
+			},
+		}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	require.Len(t, config.Drives, 1)
+	require.NotNil(t, config.Drives[0].Validation)
+	assert.Equal(t, 1, config.Drives[0].Validation.TimeoutMinutes)
+
+	data := &WorkflowData{DriveMemoryConfig: config}
+
+	var validation strings.Builder
+	generateDriveMemoryValidation(&validation, data)
+	validationYAML := validation.String()
+	assert.Contains(t, validationYAML, "Validate drive-memory file types (default)")
+	assert.Contains(t, validationYAML, "VALIDATION_SCRIPT_B64:")
+	assert.Contains(t, validationYAML, "validate_memory_step.cjs")
+	assert.Contains(t, validationYAML, "id: "+driveMemoryValidationStepID("default"))
+
+	var persist strings.Builder
+	generateDriveMemoryPersistence(&persist, data, func(action string) string { return action + "@test-pin" })
+	assert.Contains(t, persist.String(), "steps."+driveMemoryValidationStepID("default")+".outcome == 'success'")
+}
+
 func TestDriveMemoryRestorePreservesIntegrityLevel(t *testing.T) {
 	compiler := NewCompiler()
 	data := &WorkflowData{

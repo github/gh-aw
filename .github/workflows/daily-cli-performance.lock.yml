@@ -631,7 +631,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":5},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[daily-cli-performance] \"},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"performance\",\"automation\",\"cookie\"],\"max\":3,\"title_prefix\":\"[performance] \"},\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":131072,\"max_patch_size\":10240}]},\"report_incomplete\":{}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":5},\"create_discussion\":{\"category\":\"audits\",\"close_older_discussions\":true,\"expires\":72,\"fallback_to_issue\":true,\"max\":1,\"title_prefix\":\"[daily-cli-performance] \"},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"performance\",\"automation\",\"cookie\"],\"max\":3,\"title_prefix\":\"[performance] \"},\"create_report_incomplete_issue\":{},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"push_repo_memory\":{\"memories\":[{\"dir\":\"/tmp/gh-aw/repo-memory/default\",\"file_glob\":\"*.json *.jsonl *.txt\",\"id\":\"default\",\"max_file_count\":100,\"max_file_size\":131072,\"max_patch_size\":10240}]},\"report_incomplete\":{}}"
         with:
           script: |
             const path = require('path');
@@ -1445,8 +1445,24 @@ jobs:
         env:
           MEMORY_DIR: /tmp/gh-aw/repo-memory/default
         run: bash "${RUNNER_TEMP}/gh-aw/actions/sanitize_repo_memory_filenames.sh"
-      - name: Upload repo-memory artifact (default)
+      - name: Filter repo-memory files (default)
+        id: filter_repo_memory_64656661756c74
         if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MEMORY_DIR: /tmp/gh-aw/repo-memory/default
+          ALLOWED_EXTENSIONS: '[]'
+          FILE_GLOB_FILTER: "*.json *.jsonl *.txt"
+        with:
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'memory_file_eligibility.cjs'));
+            await main();
+      - name: Upload repo-memory artifact (default)
+        if: always() && steps.filter_repo_memory_64656661756c74.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: repo-memory-default

@@ -1607,6 +1607,123 @@ describe("push_repo_memory.cjs - changed-file limit checks", () => {
   });
 });
 
+describe("push_repo_memory.cjs - allowed-extensions persistence filter (regression: notes.json.new)", () => {
+  it("filters ineligible files before validation/upload instead of hard-failing on them (source check)", () => {
+    const nodeFs = require("fs");
+    const nodePath = require("path");
+    const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+    // Allowed-extensions and file-glob must both be applied as persistence filters
+    // via the shared eligibility helper, before size/count/patch/custom validation.
+    expect(scriptContent).toContain("isMemoryFileEligible(relativeFilePath, allowedExtensions, compiledPatterns)");
+    expect(scriptContent).toContain('require("./memory_file_eligibility.cjs")');
+
+    // The old behavior — validating the whole source directory after scanning and
+    // hard-failing the job (e.g. for a leftover "notes.json.new" file) — must be gone.
+    // Disallowed files are filtered out during the scan (never copied/pushed) instead.
+    expect(scriptContent).not.toContain('validateMemoryFiles(sourceMemoryPath, "repo", allowedExtensions)');
+  });
+
+  it("does not fail with no eligible files, and reports a no-op instead (source check)", () => {
+    const nodeFs = require("fs");
+    const nodePath = require("path");
+    const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+    expect(scriptContent).toContain("if (filesToCopy.length === 0)");
+    expect(scriptContent).toContain("No eligible files to copy from artifact");
+  });
+
+  it("filters stale ineligible files already present in the checked-out branch before format/validation (source check)", () => {
+    // Review feedback: after checking out an existing memory branch, files from prior
+    // runs that no longer match the current allowed-extensions/file-glob filters must
+    // not be left in destMemoryPath, since formatJSONFiles/runCustomMemoryValidation
+    // operate on the whole destMemoryPath, not just the newly-copied eligible files.
+    const nodeFs = require("fs");
+    const nodePath = require("path");
+    const scriptPath = nodePath.join(import.meta.dirname, "push_repo_memory.cjs");
+    const scriptContent = nodeFs.readFileSync(scriptPath, "utf8");
+
+    expect(scriptContent).toContain("filterIneligibleMemoryFiles(destMemoryPath, allowedExtensions, fileGlobFilter, core)");
+    // The stale-file filter must run before destMemoryPath is formatted/validated.
+    const filterIdx = scriptContent.indexOf("filterIneligibleMemoryFiles(destMemoryPath");
+    const formatIdx = scriptContent.indexOf("formatJSONFiles(destMemoryPath, maxFileSize)");
+    const validateIdx = scriptContent.indexOf("runCustomMemoryValidation({");
+    expect(filterIdx).toBeGreaterThan(-1);
+    expect(filterIdx).toBeLessThan(formatIdx);
+    expect(filterIdx).toBeLessThan(validateIdx);
+  });
+
+  describe("behavioral: scanDirectory's inline eligibility check against real fixtures", () => {
+    // push_repo_memory.cjs cannot be driven end-to-end through main() in this test
+    // environment: it needs a successful `git fetch`/checkout before scanDirectory
+    // runs, and vi.doMock cannot intercept CJS require() calls for git_helpers.cjs
+    // here (see "should propagate git fetch authentication failure..." above, which
+    // documents the same limitation). So this test drives the *actual* eligibility
+    // helpers push_repo_memory.cjs's scanDirectory calls inline (isMemoryFileEligible,
+    // compileFileGlobPatterns, both imported for real, not mocked) against a real
+    // artifact directory on disk, mirroring the exact scan loop in the script.
+    const nodeFs = require("fs");
+    const nodePath = require("path");
+    const os = require("os");
+
+    let artifactDir;
+
+    beforeEach(() => {
+      artifactDir = nodeFs.mkdtempSync(nodePath.join(os.tmpdir(), "push-repo-memory-scan-"));
+    });
+
+    afterEach(() => {
+      nodeFs.rmSync(artifactDir, { recursive: true, force: true });
+    });
+
+    /** Mirrors the scanDirectory() walk in push_repo_memory.cjs, real fs + real eligibility helpers. */
+    async function scanEligibleFiles(dirPath, allowedExtensions, fileGlobFilter) {
+      const { compileFileGlobPatterns, isMemoryFileEligible } = await import("./memory_file_eligibility.cjs");
+      const { compiledPatterns } = compileFileGlobPatterns(fileGlobFilter);
+      const kept = [];
+      const filteredOut = [];
+      (function walk(dir, relativePath = "") {
+        for (const entry of nodeFs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = nodePath.join(dir, entry.name);
+          const relativeFilePath = relativePath ? nodePath.join(relativePath, entry.name) : entry.name;
+          if (entry.isDirectory()) {
+            walk(fullPath, relativeFilePath);
+          } else if (entry.isFile()) {
+            const eligibility = isMemoryFileEligible(relativeFilePath, allowedExtensions, compiledPatterns);
+            if (eligibility.eligible) {
+              kept.push(relativeFilePath.replace(/\\/g, "/"));
+            } else {
+              filteredOut.push(relativeFilePath.replace(/\\/g, "/"));
+            }
+          }
+        }
+      })(dirPath);
+      return { kept, filteredOut };
+    }
+
+    it("filters out a disallowed-extension file and keeps the eligible one (notes.json.new regression)", async () => {
+      nodeFs.writeFileSync(nodePath.join(artifactDir, "notes.json"), "{}");
+      nodeFs.writeFileSync(nodePath.join(artifactDir, "notes.json.new"), "{}");
+
+      const { kept, filteredOut } = await scanEligibleFiles(artifactDir, [".json"], "");
+
+      expect(kept).toEqual(["notes.json"]);
+      expect(filteredOut).toEqual(["notes.json.new"]);
+    });
+
+    it("filters out every file when none are eligible, leaving nothing to copy", async () => {
+      nodeFs.writeFileSync(nodePath.join(artifactDir, "notes.json.new"), "{}");
+
+      const { kept, filteredOut } = await scanEligibleFiles(artifactDir, [".json"], "");
+
+      expect(kept).toEqual([]);
+      expect(filteredOut).toEqual(["notes.json.new"]);
+    });
+  });
+});
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Signed-commit push tests
 // Verifies that push_repo_memory delegates to pushSignedCommits (GraphQL-based

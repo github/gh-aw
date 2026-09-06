@@ -321,6 +321,7 @@ SAFE_OUTPUTS_FILES=(
   "read_buffer.cjs"
   "mcp_scripts_validation.cjs"
   "memory_custom_validation.cjs"
+  "memory_file_eligibility.cjs"
   "messages.cjs"
   "messages_core.cjs"
   "messages_footer.cjs"

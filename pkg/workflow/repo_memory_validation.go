@@ -71,8 +71,9 @@ func validateNoDuplicateMemoryIDs(memories []RepoMemoryEntry) error {
 
 // validateFileGlobPatterns validates file-glob patterns for a repo-memory entry.
 //
-// Patterns are evaluated relative to the memory subfolder root (depth 1 from the artifact root).
-// Slashless patterns such as "*.json" match files at the root of any single memory subfolder.
+// Patterns are evaluated against the full relative path from the artifact root.
+// Slashless patterns such as "*.json" match only files at the artifact root (depth 0),
+// since a single "*" does not cross "/"; use "**/*.json" to also match nested files.
 // Patterns containing "/" match against the full relative path from the artifact root.
 //
 // Rejected patterns:

@@ -3248,6 +3248,37 @@ describe("safe_outputs_handlers", () => {
       expect(data.error).toContain("3 files");
     });
 
+    it("should ignore ineligible files (disallowed extension) instead of hard-failing on file count", () => {
+      // Regression: the preflight must apply the same allowed-extensions/file-glob
+      // filtering as the agent-side filter step and the push job, so an ineligible
+      // file left in the memory directory does not cause a hard preflight failure.
+      const h = makeHandlersWithMemory({ max_file_count: 1, allowed_extensions: [".json"] });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+      fs.writeFileSync(path.join(memoryDir, "notes.json"), "{}");
+      fs.writeFileSync(path.join(memoryDir, "notes.json.new"), "{}");
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0].text);
+      expect(data.result).toBe("success");
+      expect(fs.existsSync(path.join(memoryDir, "notes.json.new"))).toBe(false);
+      expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
+    });
+
+    it("should ignore files not matching file_glob before counting/staging", () => {
+      const h = makeHandlersWithMemory({ max_file_count: 1, file_glob: "*.json" });
+      fs.mkdirSync(memoryDir, { recursive: true });
+      initGitRepo(memoryDir);
+      fs.writeFileSync(path.join(memoryDir, "notes.json"), "{}");
+      fs.writeFileSync(path.join(memoryDir, "notes.md"), "hello");
+      const result = h.pushRepoMemoryHandler({ memory_id: "default" });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0].text);
+      expect(data.result).toBe("success");
+      expect(fs.existsSync(path.join(memoryDir, "notes.md"))).toBe(false);
+      expect(fs.existsSync(path.join(memoryDir, "notes.json"))).toBe(true);
+    });
+
     it("should pass when total folder size is large but staged diff is tiny", () => {
       const h = makeHandlersWithMemory({ max_patch_size: 50, max_file_size: 1024 * 1024 });
       fs.mkdirSync(memoryDir, { recursive: true });

@@ -5,11 +5,11 @@ const fs = require("fs");
 const path = require("path");
 
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { globPatternToRegex } = require("./glob_pattern_helpers.cjs");
 const { getGitAuthEnv } = require("./git_auth_helpers.cjs");
 const { execGitSync } = require("./git_helpers.cjs");
 const { getStagedPatchDiffSizeBytes } = require("./git_patch_utils.cjs");
 const { formatJSONFiles, runCustomMemoryValidation } = require("./memory_custom_validation.cjs");
+const { compileFileGlobPatterns, filterIneligibleMemoryFiles, isMemoryFileEligible } = require("./memory_file_eligibility.cjs");
 const { parseAllowedRepos, validateRepo } = require("./repo_helpers.cjs");
 const { pushSignedCommits } = require("./push_signed_commits.cjs");
 
@@ -310,22 +310,26 @@ async function main() {
   const destMemoryPath = workspaceDir;
   core.info(`Destination directory: ${destMemoryPath}`);
 
+  // Remove any pre-existing files in the checked-out branch that no longer pass the
+  // current allowed-extensions/file-glob filters (e.g. left over from a prior run with
+  // different filter settings). Without this, formatJSONFiles/runCustomMemoryValidation
+  // below would still process stale ineligible files even though the newly copied files
+  // are already filtered.
+  if (allowedExtensions.length > 0 || fileGlobFilter) {
+    const { removed } = filterIneligibleMemoryFiles(destMemoryPath, allowedExtensions, fileGlobFilter, core);
+    if (removed.length > 0) {
+      core.info(`Removed ${removed.length} stale ineligible file(s) from existing branch content`);
+    }
+  }
+
   // Recursively scan and collect files from artifact directory
   let filesToCopy = [];
   /** @type {Array<{path: string, reason: string}>} */
   let filteredOutFiles = [];
 
   // Compile glob patterns once, outside the scan loop
-  /** @type {string[]} */
-  let patternStrs = [];
-  /** @type {RegExp[]} */
-  let compiledPatterns = [];
-  if (fileGlobFilter) {
-    patternStrs = fileGlobFilter.trim().split(/\s+/).filter(Boolean);
-    // Slashless patterns (e.g. "*.json") are matched at the root of a single memory subfolder
-    // (depth 1 only).  Patterns that already contain "/" are matched against the full relative
-    // path unchanged.
-    compiledPatterns = patternStrs.map(pattern => globPatternToRegex(pattern, { matchSubfolderRoot: !pattern.includes("/") }));
+  const { patternStrs, compiledPatterns } = compileFileGlobPatterns(fileGlobFilter);
+  if (compiledPatterns.length > 0) {
     core.info(`File glob filter enabled with ${patternStrs.length} pattern(s):`);
     patternStrs.forEach((pat, idx) => {
       core.info(`  [${idx + 1}] "${pat}" -> regex: ${compiledPatterns[idx].source}`);
@@ -364,20 +368,14 @@ async function main() {
         }
         const normalizedRelPath = relativeFilePath.replace(/\\/g, "/");
 
-        // Validate file name patterns if filter is set
-        if (compiledPatterns.length > 0) {
-          const matchResults = compiledPatterns.map((pattern, idx) => {
-            const matches = pattern.test(normalizedRelPath);
-            core.info(`  [test] ${normalizedRelPath}  pattern[${idx + 1}] "${patternStrs[idx]}" -> ${matches ? "✓ match" : "✗ no match"}`);
-            return matches;
-          });
-
-          if (!matchResults.some(m => m)) {
-            core.info(`  [skip] ${normalizedRelPath} (${stats.size} bytes) — no pattern matched`);
-            filteredOutFiles.push({ path: normalizedRelPath, reason: "no pattern matched" });
-            // Skip this file instead of failing - it may be from a previous run with different patterns
-            return;
-          }
+        // Allowed extensions and file-glob are persistence filters: files that do not
+        // pass are logged and ignored (never uploaded, validated, counted toward
+        // max-file-count/size/patch-size, or pushed) rather than causing a hard failure.
+        const eligibility = isMemoryFileEligible(relativeFilePath, allowedExtensions, compiledPatterns);
+        if (!eligibility.eligible) {
+          core.info(`  [skip] ${normalizedRelPath} (${stats.size} bytes) — ${eligibility.reason}`);
+          filteredOutFiles.push({ path: normalizedRelPath, reason: eligibility.reason || "ineligible" });
+          continue;
         }
 
         // Validate file size
@@ -419,18 +417,7 @@ async function main() {
   }
 
   if (filesToCopy.length === 0) {
-    core.info("No files to copy from artifact");
-    return;
-  }
-
-  // Validate file types before copying
-  const { validateMemoryFiles } = require("./validate_memory_files.cjs");
-  const validation = validateMemoryFiles(sourceMemoryPath, "repo", allowedExtensions);
-  if (!validation.valid) {
-    const errorMessage = `File type validation failed: Found ${validation.invalidFiles.length} file(s) with invalid extensions. Only ${allowedExtensions.join(", ")} are allowed. Invalid files: ${validation.invalidFiles.join(", ")}`;
-    core.setOutput("validation_failed", "true");
-    core.setOutput("validation_error", errorMessage);
-    core.setFailed(errorMessage);
+    core.info("No eligible files to copy from artifact (all files were filtered out or none present)");
     return;
   }
 

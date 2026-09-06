@@ -1124,6 +1124,60 @@ func TestGenerateSafeOutputsConfigRepoMemory(t *testing.T) {
 	assert.InDelta(t, float64(2048), mem1["max_file_size"], 0.0001, "Second memory max_file_size should match")
 }
 
+// TestGenerateSafeOutputsConfigRepoMemoryFilters tests that generateSafeOutputsConfig
+// passes allowed-extensions/file-glob through to the push_repo_memory preflight config,
+// so the MCP tool preflight can apply the same eligibility filtering as the agent-side
+// filter step and the push job (regression: preflight was previously unfiltered).
+func TestGenerateSafeOutputsConfigRepoMemoryFilters(t *testing.T) {
+	data := &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{},
+		RepoMemoryConfig: &RepoMemoryConfig{
+			Memories: []RepoMemoryEntry{
+				{
+					ID:                "default",
+					MaxFileSize:       5120,
+					MaxPatchSize:      20480,
+					MaxFileCount:      50,
+					AllowedExtensions: []string{".json", ".md"},
+					FileGlob:          []string{"*.json", "metrics/**"},
+				},
+				{
+					ID:           "notes",
+					MaxFileSize:  2048,
+					MaxPatchSize: 8192,
+					MaxFileCount: 20,
+				},
+			},
+		},
+	}
+
+	result, err := generateSafeOutputsConfig(data)
+	require.NoError(t, err, "generateSafeOutputsConfig should not return an error")
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &parsed), "Result must be valid JSON")
+
+	pushRepoMemory, ok := parsed["push_repo_memory"].(map[string]any)
+	require.True(t, ok, "Expected push_repo_memory key in config")
+	memories, ok := pushRepoMemory["memories"].([]any)
+	require.True(t, ok, "Expected memories to be an array")
+	require.Len(t, memories, 2, "Expected 2 memory entries")
+
+	mem0, ok := memories[0].(map[string]any)
+	require.True(t, ok, "First memory entry should be a map")
+	allowedExts, ok := mem0["allowed_extensions"].([]any)
+	require.True(t, ok, "First memory should carry allowed_extensions")
+	assert.Equal(t, []any{".json", ".md"}, allowedExts, "allowed_extensions should be passed through")
+	assert.Equal(t, "*.json metrics/**", mem0["file_glob"], "file_glob should be joined with spaces")
+
+	mem1, ok := memories[1].(map[string]any)
+	require.True(t, ok, "Second memory entry should be a map")
+	_, hasAllowedExts := mem1["allowed_extensions"]
+	assert.False(t, hasAllowedExts, "Second memory should not carry allowed_extensions when unset")
+	_, hasFileGlob := mem1["file_glob"]
+	assert.False(t, hasFileGlob, "Second memory should not carry file_glob when unset")
+}
+
 // TestGenerateSafeOutputsConfigNoRepoMemory tests that push_repo_memory is absent
 // from the config when RepoMemoryConfig is not present.
 func TestGenerateSafeOutputsConfigNoRepoMemory(t *testing.T) {
