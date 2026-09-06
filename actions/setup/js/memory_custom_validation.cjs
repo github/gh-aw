@@ -45,12 +45,12 @@ function readDirectory(targetPath) {
 
 /**
  * @param {string} targetPath
- * @param {BufferEncoding | undefined} [encoding]
+ * @param {BufferEncoding} [encoding]
  * @returns {any}
  */
 function readFile(targetPath, encoding) {
   try {
-    return fs.readFileSync(targetPath, encoding);
+    return encoding ? fs.readFileSync(targetPath, encoding) : fs.readFileSync(targetPath);
   } catch (error) {
     throw new Error(`Failed to read ${targetPath}: ${getErrorMessage(error)}`, { cause: error });
   }
