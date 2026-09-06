@@ -25,7 +25,7 @@
     "@astrojs/markdown-remark": "7.2.4",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.3",
-    "@astrojs/starlight": "^0.41.7",
+    "@astrojs/starlight": "^0.41.10",
     "@primer/octicons": "^19.33.0",
     "astro": "^7.2.4",
     "astro-mermaid": "^2.1.0",
