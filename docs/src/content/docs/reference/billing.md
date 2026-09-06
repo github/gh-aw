@@ -35,6 +35,13 @@ There are two billing paths for the Copilot engine (`engine: copilot`, the defau
 
 `gh aw compile` does **not** auto-inject `copilot-requests: write` into arbitrary workflow source. The permission must be declared in the workflow frontmatter. Some authoring flows such as `gh aw add` can insert it when the author explicitly chooses Copilot org billing, but the compiler otherwise only emits an informational tip.
 
+To use individual/seat billing without receiving this tip on future compilations, explicitly disable organization billing:
+
+```yaml
+permissions:
+  copilot-requests: none
+```
+
 **Individual/seat billing** — If the above conditions are not met, the workflow must be configured with a user-supplied [`COPILOT_GITHUB_TOKEN`](/gh-aw/reference/auth/#copilot_github_token). In this case inference is attributed to (and limited by) the PAT owner's Copilot entitlements rather than being billed centrally through the organization.
 
 See [Engines](/gh-aw/reference/engines/) for a full list of engines and their authentication requirements, and [Authentication](/gh-aw/reference/auth/) for configuration details. For Copilot model pricing and AIC rates, see [GitHub Copilot models and pricing](https://docs.github.com/copilot/reference/copilot-billing/models-and-pricing).

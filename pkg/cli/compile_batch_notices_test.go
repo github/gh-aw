@@ -73,6 +73,7 @@ func TestDisplayBatchCompilationNotices(t *testing.T) {
 			config:           CompileConfig{},
 			expectedInOutput: []string{
 				"Copilot token-based inference may be available",
+				"To suppress this tip when using a PAT, set permissions.copilot-requests: none",
 			},
 			notExpectedInOutput: []string{},
 		},

@@ -96,10 +96,13 @@ func canSafelyAddCopilotRequestsPermission(frontmatter map[string]any) bool {
 }
 
 func ensureCopilotRequestsWritePermission(lines []string) []string {
+	return ensureCopilotRequestsPermission(lines, "write", false)
+}
+
+func ensureCopilotRequestsPermission(lines []string, level string, replaceExisting bool) []string {
 	permissionsIdx := -1
 	permissionsIndent := ""
 	permissionsEnd := len(lines)
-
 	for i, line := range lines {
 		if isTopLevelKey(line) && strings.HasPrefix(strings.TrimSpace(line), "permissions:") {
 			permissionsIdx = i
@@ -113,16 +116,14 @@ func ensureCopilotRequestsWritePermission(lines []string) []string {
 			break
 		}
 	}
-
 	if permissionsIdx == -1 {
 		insertAt := findPermissionsInsertIndex(lines)
 		result := make([]string, 0, len(lines)+2)
 		result = append(result, lines[:insertAt]...)
-		result = append(result, "permissions:", "  copilot-requests: write")
+		result = append(result, "permissions:", "  copilot-requests: "+level)
 		result = append(result, lines[insertAt:]...)
 		return result
 	}
-
 	trimmedPermissionsLine := strings.TrimSpace(lines[permissionsIdx])
 	inlineValue := strings.TrimSpace(strings.TrimPrefix(trimmedPermissionsLine, "permissions:"))
 	if inlineValue != "" && !strings.HasPrefix(inlineValue, "#") {
@@ -135,23 +136,27 @@ func ensureCopilotRequestsWritePermission(lines []string) []string {
 			result := make([]string, 0, len(lines)+1)
 			result = append(result, lines[:permissionsIdx]...)
 			result = append(result, permissionsIndent+"permissions:")
-			result = append(result, permissionsIndent+"  copilot-requests: write")
+			result = append(result, permissionsIndent+"  copilot-requests: "+level)
 			result = append(result, lines[permissionsIdx+1:]...)
 			return result
 		}
 		return lines
 	}
-
 	for i := permissionsIdx + 1; i < permissionsEnd; i++ {
 		trimmed := strings.TrimSpace(lines[i])
 		if parseYAMLMapKey(trimmed) == "copilot-requests" {
+			if replaceExisting {
+				result := append([]string(nil), lines...)
+				result[i] = getIndentation(lines[i]) + "copilot-requests: " + level
+				return result
+			}
 			return lines
 		}
 	}
 
 	result := make([]string, 0, len(lines)+1)
 	result = append(result, lines[:permissionsEnd]...)
-	result = append(result, permissionsIndent+"  copilot-requests: write")
+	result = append(result, permissionsIndent+"  copilot-requests: "+level)
 	result = append(result, lines[permissionsEnd:]...)
 	return result
 }

@@ -1248,6 +1248,27 @@ func TestAddCopilotRequestsPermissionToContent(t *testing.T) {
 	})
 }
 
+func TestAddCopilotRequestsNonePermissionToContent(t *testing.T) {
+	t.Parallel()
+	t.Run("adds none permission to workflow without existing permissions block", func(t *testing.T) {
+		t.Parallel()
+		content := "---\nengine: copilot\n---\nDo the thing.\n"
+		result, err := addCopilotRequestsNonePermissionToContent(content)
+		require.NoError(t, err)
+		assert.Contains(t, result, "permissions:")
+		assert.Contains(t, result, "copilot-requests: none")
+	})
+
+	t.Run("replaces existing write permission", func(t *testing.T) {
+		t.Parallel()
+		content := "---\nengine: copilot\npermissions:\n  copilot-requests: write\n---\nDo the thing.\n"
+		result, err := addCopilotRequestsNonePermissionToContent(content)
+		require.NoError(t, err)
+		assert.Contains(t, result, "copilot-requests: none")
+		assert.NotContains(t, result, "copilot-requests: write")
+	})
+}
+
 func TestAddWorkflowWithTracking_CopilotRequestsPermission(t *testing.T) {
 	t.Run("injects copilot-requests permission when option is set", func(t *testing.T) {
 		dir := testutil.TempDir(t, "test-copilot-requests-perm-*")
@@ -1273,6 +1294,29 @@ func TestAddWorkflowWithTracking_CopilotRequestsPermission(t *testing.T) {
 		written, readErr := os.ReadFile(filepath.Join(workflowsDir, "my-workflow.md"))
 		require.NoError(t, readErr)
 		assert.Contains(t, string(written), "copilot-requests: write")
+	})
+
+	t.Run("injects copilot-requests none permission when option is set", func(t *testing.T) {
+		dir := testutil.TempDir(t, "test-copilot-requests-none-perm-*")
+		setupMinimalGitRepo(t, dir)
+
+		content := "---\nengine: copilot\n---\nDo the thing.\n"
+		resolved := &ResolvedWorkflow{
+			Spec:       &WorkflowSpec{WorkflowPath: "workflows/my-workflow3.md", WorkflowName: "my-workflow3"},
+			Content:    []byte(content),
+			SourceInfo: &FetchedWorkflow{IsLocal: true},
+		}
+
+		err := addWorkflowWithTracking(context.Background(), resolved, nil, AddOptions{
+			Quiet:                            true,
+			AddCopilotRequestsNonePermission: true,
+			DisableSecurityScanner:           true,
+		})
+		require.NoError(t, err)
+
+		written, readErr := os.ReadFile(filepath.Join(dir, ".github", "workflows", "my-workflow3.md"))
+		require.NoError(t, readErr)
+		assert.Contains(t, string(written), "copilot-requests: none")
 	})
 
 	t.Run("does not inject permission when option is false", func(t *testing.T) {

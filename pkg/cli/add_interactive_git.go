@@ -43,21 +43,22 @@ func (c *AddInteractiveConfig) createWorkflowChangesAndConfigureSecret(ctx conte
 	// Pass Quiet=true to suppress detailed output (already shown earlier in interactive mode)
 	// This returns the result including PR number and HasWorkflowDispatch
 	opts := AddOptions{
-		Verbose:                      c.Verbose,
-		Quiet:                        true,
-		EngineOverride:               c.EngineOverride,
-		Name:                         "",
-		Force:                        c.forceOverwrite,
-		AppendText:                   c.AppendText,
-		CreatePR:                     createPR,
-		NoGitattributes:              c.NoGitattributes,
-		WorkflowDir:                  c.WorkflowDir,
-		NoStopAfter:                  c.NoStopAfter,
-		StopAfter:                    c.StopAfter,
-		DisableSecurityScanner:       c.DisableSecurityScanner,
-		RepoSlug:                     c.RepoOverride,
-		AddCopilotRequestsPermission: c.UseCopilotRequests,
-		GhAwRef:                      c.GhAwRef,
+		Verbose:                          c.Verbose,
+		Quiet:                            true,
+		EngineOverride:                   c.EngineOverride,
+		Name:                             "",
+		Force:                            c.forceOverwrite,
+		AppendText:                       c.AppendText,
+		CreatePR:                         createPR,
+		NoGitattributes:                  c.NoGitattributes,
+		WorkflowDir:                      c.WorkflowDir,
+		NoStopAfter:                      c.NoStopAfter,
+		StopAfter:                        c.StopAfter,
+		DisableSecurityScanner:           c.DisableSecurityScanner,
+		RepoSlug:                         c.RepoOverride,
+		AddCopilotRequestsPermission:     c.UseCopilotRequests,
+		AddCopilotRequestsNonePermission: c.UseCopilotPAT,
+		GhAwRef:                          c.GhAwRef,
 		addWizard: &addWizardOptions{
 			initializedFiles:                    initFiles,
 			workingTreePrevalidated:             createPR,
@@ -247,14 +248,12 @@ func (c *AddInteractiveConfig) configureRepositorySecret(secretName, secretValue
 // the merged workflow files, which are required when offering to run the workflow.
 func (c *AddInteractiveConfig) updateLocalBranch() error {
 	addInteractiveLog.Print("Updating local branch with merged changes")
-
 	// Get the default branch name using gh
 	output, err := workflow.RunGHCombined("Getting default branch...", "repo", "view", "--repo", c.RepoOverride, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name")
 	defaultBranch := ""
 	if err == nil {
 		defaultBranch = strings.TrimSpace(string(output))
 	}
-
 	// Fallback: query the local origin remote directly (works even when gh repo
 	// view fails, e.g. forks without a default remote set).
 	if defaultBranch == "" {
@@ -265,7 +264,6 @@ func (c *AddInteractiveConfig) updateLocalBranch() error {
 			defaultBranch = parseDefaultBranchFromLsRemote(string(lsOutput))
 		}
 	}
-
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}

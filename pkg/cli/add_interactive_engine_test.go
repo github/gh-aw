@@ -16,21 +16,25 @@ func TestApplyCopilotAuthMethodChoice(t *testing.T) {
 		name            string
 		authMethod      string
 		wantCopilotReqs bool
+		wantCopilotPAT  bool
 	}{
 		{
 			name:            "copilot-requests sets UseCopilotRequests true",
 			authMethod:      "copilot-requests",
 			wantCopilotReqs: true,
+			wantCopilotPAT:  false,
 		},
 		{
 			name:            "pat sets UseCopilotRequests false",
 			authMethod:      "pat",
 			wantCopilotReqs: false,
+			wantCopilotPAT:  true,
 		},
 		{
 			name:            "empty value (form cancelled) sets UseCopilotRequests false",
 			authMethod:      "",
 			wantCopilotReqs: false,
+			wantCopilotPAT:  false,
 		},
 	}
 	for _, tc := range tests {
@@ -39,6 +43,7 @@ func TestApplyCopilotAuthMethodChoice(t *testing.T) {
 			cfg := &AddInteractiveConfig{}
 			cfg.applyCopilotAuthMethodChoice(tc.authMethod)
 			assert.Equal(t, tc.wantCopilotReqs, cfg.UseCopilotRequests)
+			assert.Equal(t, tc.wantCopilotPAT, cfg.UseCopilotPAT)
 		})
 	}
 }
@@ -54,6 +59,7 @@ func TestApplyCopilotAuthMethodChoice_ReEntryClearsOldValue(t *testing.T) {
 	// User changes selection to PAT — old value must not persist
 	cfg.applyCopilotAuthMethodChoice("pat")
 	assert.False(t, cfg.UseCopilotRequests)
+	assert.True(t, cfg.UseCopilotPAT)
 }
 
 func TestCopilotAuthMethodDescription(t *testing.T) {

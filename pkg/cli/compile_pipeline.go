@@ -771,6 +771,7 @@ func displayBatchCompilationNotices(compiler *workflow.Compiler, config CompileC
 	if compiler.CopilotRequestsTipNeeded() {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
 			"Copilot token-based inference may be available: add permissions.copilot-requests: write. "+
+				"To suppress this tip when using a PAT, set permissions.copilot-requests: none. "+
 				"See https://github.github.com/gh-aw/reference/billing/",
 		))
 	}

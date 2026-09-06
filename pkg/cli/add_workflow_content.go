@@ -217,6 +217,17 @@ func applyEngineAndPermissionModifications(content string, opts AddOptions) (str
 			}
 		}
 	}
+	if opts.AddCopilotRequestsNonePermission && isCopilotWorkflowContent(content) {
+		updatedContent, err := addCopilotRequestsNonePermissionToContent(content)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to disable copilot-requests permission: %v", err)))
+		} else {
+			content = updatedContent
+			if opts.Verbose {
+				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Added permissions.copilot-requests: none to workflow"))
+			}
+		}
+	}
 	return content, nil
 }
 

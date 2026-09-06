@@ -44,6 +44,9 @@ type AddInteractiveConfig struct {
 	// When true, COPILOT_GITHUB_TOKEN secret setup is skipped and
 	// permissions.copilot-requests: write is injected into the workflow.
 	UseCopilotRequests bool
+	// UseCopilotPAT indicates the user actively chose PAT authentication for Copilot.
+	// When true, permissions.copilot-requests: none is injected into the workflow.
+	UseCopilotPAT bool
 
 	// copilotCLIBillingStatus is the detected org Copilot CLI billing status.
 	// "enabled" — confirmed available; "disabled" — confirmed unavailable; "" — inconclusive.

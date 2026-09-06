@@ -740,6 +740,7 @@ func TestValidatePermissions_EmitsCopilotRequestsTipOncePerMarkdownPath(t *testi
 
 	const tipText = "Tip: set permissions.copilot-requests: write to use GitHub Actions token-based inference"
 	assert.Equal(t, 1, strings.Count(stderr, tipText), "copilot-requests tip should be emitted only once per markdown path")
+	assert.Contains(t, stderr, "To suppress this tip when using a PAT, set permissions.copilot-requests: none")
 }
 
 func TestValidatePermissions_QuietSuppressesCopilotRequestsTip(t *testing.T) {
