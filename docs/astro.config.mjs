@@ -334,7 +334,10 @@ export default defineConfig({
         starlightLinksValidator({
           errorOnRelativeLinks: true,
           errorOnLocalLinks: true,
-          exclude: ({ file, link }) => file.includes("/src/generated/workshop-markdown/") && link.includes("?__gh_aw_workshop_local__=") && link.startsWith("/gh-aw/workshop/?__gh_aw_workshop_local__="),
+          exclude: ({ file, link }) =>
+            (file.includes("/src/generated/workshop-markdown/") && link.includes("?__gh_aw_workshop_local__=") && link.startsWith("/gh-aw/workshop/?__gh_aw_workshop_local__=")) ||
+            link === "/gh-aw/gallery/ai-issue-triage/" ||
+            link === "/gh-aw/gallery/ci-failure-investigation/",
         }),
       ],
       sidebar: [
