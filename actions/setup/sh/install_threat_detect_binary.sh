@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 set +o histexpand
 
-# Install the threat-detect binary from GitHub Releases with SHA256 checksum verification.
+# Install the threat-detect binary from GitHub Releases with setup-action-pinned SHA256 verification.
 # Used when `features: gh-aw-detection: true` is set in the workflow frontmatter to enable
 # the external threat-detect binary detection path instead of inline engine execution.
 #
-# Usage: install_threat_detect_binary.sh VERSION [--rootless]
+# Usage: install_threat_detect_binary.sh VERSION [--sha256-amd64 DIGEST --sha256-arm64 DIGEST] [--rootless]
 #
 # Arguments:
 #   VERSION    - threat-detect version to install (e.g., v0.2.2) or "latest" to
 #                install the latest release via GitHub's latest-release download endpoint
-#   --rootless - Install to ~/.local/bin without sudo; appends that directory to
-#                $GITHUB_PATH so subsequent steps find the binary.  Use this on
-#                ARC/DinD runners that enforce allowPrivilegeEscalation: false.
+#   --sha256-amd64 - Expected SHA256 digest for the Linux amd64 binary (required
+#                    when VERSION differs from the version pinned in this action)
+#   --sha256-arm64 - Expected SHA256 digest for the Linux arm64 binary (required
+#                    when VERSION differs from the version pinned in this action)
+#   --rootless     - Install to ~/.local/bin without sudo; appends that directory to
+#                    $GITHUB_PATH so subsequent steps find the binary. Use this on
+#                    ARC/DinD runners that enforce allowPrivilegeEscalation: false.
 #
 # Platform support:
 #   - Linux (x64, arm64): Downloads pre-built binary
@@ -24,7 +28,7 @@ set +o histexpand
 #
 # Security features:
 #   - Downloads directly from GitHub releases
-#   - Verifies SHA256 checksum against official checksums.txt
+#   - Verifies SHA256 against setup-action-pinned, architecture-specific digests
 #   - Fails fast if checksum verification fails
 
 set -euo pipefail
@@ -34,27 +38,67 @@ THREAT_DETECT_REPO="github/gh-aw-threat-detection"
 THREAT_DETECT_INSTALL_DIR="/usr/local/bin"
 THREAT_DETECT_INSTALL_NAME="threat-detect"
 MACOS_FAQ_URL="https://github.github.com/gh-aw/reference/faq/#why-are-macos-runners-not-supported"
+PINNED_THREAT_DETECT_VERSION="v0.5.1"
+PINNED_THREAT_DETECT_SHA256_AMD64="1b27989fb52cbdc401e48137e508bea8b915aad4911468fb0fd9c87c2a7cd31b"
+PINNED_THREAT_DETECT_SHA256_ARM64="204ba220229ac3fda80f7603b6e2a816f69e8a5ea2833c0ac534107bbffb827a"
 
-# Parse arguments: treat the first non-flag argument as VERSION, all --<flag> arguments as flags.
+# Parse arguments.
 THREAT_DETECT_VERSION=""
+THREAT_DETECT_SHA256_AMD64=""
+THREAT_DETECT_SHA256_ARM64=""
 ROOTLESS=false
-for arg in "$@"; do
-  case "$arg" in
-    --rootless) ROOTLESS=true ;;
-    --*) echo "WARNING: Unknown flag: $arg" >&2 ;;
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --rootless)
+      ROOTLESS=true
+      shift
+      ;;
+    --sha256-amd64|--sha256-arm64)
+      if [ "$#" -lt 2 ]; then
+        echo "ERROR: $1 requires a SHA256 digest" >&2
+        exit 1
+      fi
+      if [ "$1" = "--sha256-amd64" ]; then
+        THREAT_DETECT_SHA256_AMD64="$2"
+      else
+        THREAT_DETECT_SHA256_ARM64="$2"
+      fi
+      shift 2
+      ;;
+    --*)
+      echo "ERROR: Unknown flag: $1" >&2
+      exit 1
+      ;;
     *)
       if [ -z "$THREAT_DETECT_VERSION" ]; then
-        THREAT_DETECT_VERSION="$arg"
+        THREAT_DETECT_VERSION="$1"
+      else
+        echo "ERROR: Unexpected argument: $1" >&2
+        exit 1
       fi
+      shift
       ;;
   esac
 done
 
 if [ -z "$THREAT_DETECT_VERSION" ]; then
   echo "ERROR: threat-detect version is required"
-  echo "Usage: $0 VERSION [--rootless]"
+  echo "Usage: $0 VERSION [--sha256-amd64 DIGEST --sha256-arm64 DIGEST] [--rootless]"
   exit 1
 fi
+
+# Use the digests embedded in this immutable action for the compiler-pinned version.
+if [ "$THREAT_DETECT_VERSION" = "$PINNED_THREAT_DETECT_VERSION" ]; then
+  THREAT_DETECT_SHA256_AMD64="${THREAT_DETECT_SHA256_AMD64:-$PINNED_THREAT_DETECT_SHA256_AMD64}"
+  THREAT_DETECT_SHA256_ARM64="${THREAT_DETECT_SHA256_ARM64:-$PINNED_THREAT_DETECT_SHA256_ARM64}"
+fi
+
+for digest in "$THREAT_DETECT_SHA256_AMD64" "$THREAT_DETECT_SHA256_ARM64"; do
+  if [[ ! "$digest" =~ ^[[:xdigit:]]{64}$ ]]; then
+    echo "ERROR: Valid SHA256 digests are required for both supported architectures" >&2
+    exit 1
+  fi
+done
 
 # In rootless mode, install into the user's home directory instead of /usr/local/bin
 # so that ARC/DinD runners with allowPrivilegeEscalation: false can run without sudo.
@@ -110,8 +154,6 @@ if [ "$THREAT_DETECT_VERSION" = "latest" ]; then
 else
   BASE_URL="https://github.com/${THREAT_DETECT_REPO}/releases/download/${THREAT_DETECT_VERSION}"
 fi
-CHECKSUMS_URL="${BASE_URL}/checksums.txt"
-
 # Platform-portable SHA256 function
 sha256_hash() {
   local file="$1"
@@ -129,28 +171,20 @@ sha256_hash() {
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# Download checksums
-echo "Downloading checksums from \"${CHECKSUMS_URL}\"..."
-curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/checksums.txt" "${CHECKSUMS_URL}"
-
 verify_checksum() {
   local file="$1"
   local fname="$2"
+  local expected_checksum="$3"
+  local actual_checksum
 
   echo "Verifying SHA256 checksum for ${fname}..."
-  EXPECTED_CHECKSUM=$(awk -v fname="${fname}" '$2 == fname {print $1; exit}' "${TEMP_DIR}/checksums.txt" | tr 'A-F' 'a-f')
+  expected_checksum=$(printf '%s' "$expected_checksum" | tr 'A-F' 'a-f')
+  actual_checksum=$(sha256_hash "$file" | tr 'A-F' 'a-f')
 
-  if [ -z "$EXPECTED_CHECKSUM" ]; then
-    echo "ERROR: Could not find checksum for ${fname} in checksums.txt"
-    return 1
-  fi
-
-  ACTUAL_CHECKSUM=$(sha256_hash "$file" | tr 'A-F' 'a-f')
-
-  if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]; then
+  if [ "$expected_checksum" != "$actual_checksum" ]; then
     echo "ERROR: Checksum verification failed!"
-    echo "  Expected: $EXPECTED_CHECKSUM"
-    echo "  Got:      $ACTUAL_CHECKSUM"
+    echo "  Expected: $expected_checksum"
+    echo "  Got:      $actual_checksum"
     echo "  The downloaded file may be corrupted or tampered with"
     return 1
   fi
@@ -161,9 +195,16 @@ verify_checksum() {
 install_linux_binary() {
   # Determine binary name based on architecture
   local binary_name
+  local expected_checksum
   case "$ARCH" in
-    x86_64|amd64) binary_name="threat-detect-linux-amd64" ;;
-    aarch64|arm64) binary_name="threat-detect-linux-arm64" ;;
+    x86_64|amd64)
+      binary_name="threat-detect-linux-amd64"
+      expected_checksum="$THREAT_DETECT_SHA256_AMD64"
+      ;;
+    aarch64|arm64)
+      binary_name="threat-detect-linux-arm64"
+      expected_checksum="$THREAT_DETECT_SHA256_ARM64"
+      ;;
     *) echo "ERROR: Unsupported Linux architecture: ${ARCH}"; exit 1 ;;
   esac
 
@@ -172,7 +213,7 @@ install_linux_binary() {
   curl -fsSL --retry 5 --retry-delay 10 --retry-max-time 180 --retry-all-errors -o "${TEMP_DIR}/${binary_name}" "${binary_url}"
 
   # Verify checksum
-  verify_checksum "${TEMP_DIR}/${binary_name}" "${binary_name}"
+  verify_checksum "${TEMP_DIR}/${binary_name}" "${binary_name}" "${expected_checksum}"
 
   # Make binary executable and install
   chmod +x "${TEMP_DIR}/${binary_name}"

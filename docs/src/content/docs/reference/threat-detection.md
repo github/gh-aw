@@ -67,7 +67,9 @@ safe-outputs:
 The `features.gh-aw-detection` flag controls the detection implementation, not
 whether threat detection runs. The external `threat-detect` implementation is
 the default; set `features.gh-aw-detection: false` to select the legacy inline
-engine implementation.
+engine implementation. The external binary's version and per-architecture
+SHA-256 digests are pinned in the immutable setup action, so installation does
+not trust a checksum downloaded alongside the binary.
 
 > [!NOTE]
 > When a workflow explicitly sets `threat-detection: false`, that setting takes precedence over any imported fragments. Imported shared workflows that configure safe outputs without a `threat-detection` key will not re-enable threat detection in the importing workflow.
