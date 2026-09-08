@@ -341,7 +341,7 @@ func writeMCPGatewayExports(yaml *strings.Builder, opts writeMCPGatewayExportsOp
 			}
 			yaml.WriteString("          export MCP_GATEWAY_DELEGATION_CONTROL_LISTEN=\"" + controlListenHost + ":" + strconv.Itoa(port+enclaveDelegationControlPortOffset) + "\"\n")
 			if dynamicEnclave := enclaveDynamicRepositoryPolicyConfig(workflowData); dynamicEnclave != nil {
-				expiryScript, err := buildDynamicEnclaveExpiryScript(dynamicEnclave)
+				expiryScript, err := buildDynamicEnclaveExpiryScript(workflowData, dynamicEnclave)
 				if err != nil {
 					return err
 				}
@@ -437,7 +437,7 @@ func buildMCPGatewayContainerCommand(opts buildMCPGatewayContainerCommandOptions
 	if gatewayConfig.Version != "" {
 		containerImage += ":" + gatewayConfig.Version
 	} else {
-		containerImage += ":" + string(constants.DefaultMCPGatewayVersion)
+		containerImage += ":" + effectiveMCPGatewayVersion(workflowData)
 	}
 	// Apply container_pins mapping from aw.json so the runtime docker run command
 	// targets the redirected registry (e.g. an internal mirror) rather than the

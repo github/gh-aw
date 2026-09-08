@@ -171,3 +171,21 @@ func renderGitHubMCPGuardPolicies(yaml *strings.Builder, guardPolicies map[strin
 		renderGuardPoliciesJSON(yaml, guardPolicies, indent)
 	}
 }
+
+// appendRequiredFalseField writes a "required": false field as the final field of the
+// current JSON object. renderGitHubMCPGuardPolicies (and other section helpers) always
+// render their field as the last field with no trailing comma, so when a field must
+// follow it, the preceding trailing newline must be replaced with ",\n" in place rather
+// than writing a bare "," on its own line: a line with no leading indentation would
+// dedent out of the enclosing "run: |" block scalar and corrupt the surrounding YAML.
+func appendRequiredFalseField(yaml *strings.Builder, precededByField bool, indent string) {
+	if precededByField {
+		content := yaml.String()
+		if trimmed, ok := strings.CutSuffix(content, "\n"); ok {
+			yaml.Reset()
+			yaml.WriteString(trimmed)
+			yaml.WriteString(",\n")
+		}
+	}
+	fmt.Fprintf(yaml, "%s\"required\": false\n", indent)
+}

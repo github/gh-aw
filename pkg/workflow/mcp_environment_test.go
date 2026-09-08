@@ -228,3 +228,15 @@ func TestCollectMCPEnvironmentVariables_SafeOutputsIncludesCreatePullRequestPoli
 		envVars[compilerenv.PolicyAllowCreatePullRequest],
 	)
 }
+
+func TestCollectMCPEnvironmentVariables_DynamicDelegationWithoutPrimaryGitHubUsesConcretePolicies(t *testing.T) {
+	workflowData := dynamicEnclaveWorkflowData()
+	workflowData.Tools["github"] = false
+	workflowData.SafeOutputs = &SafeOutputsConfig{AddComments: &AddCommentsConfig{}}
+	envVars := collectMCPEnvironmentVariables(workflowData.Tools, []string{"github", "safe-outputs"}, workflowData, false)
+
+	assert.Equal(t, "private", envVars[sinkVisibilityEnvVar])
+	assert.Equal(t, "20", envVars["GH_AW_TIMEOUT_MINUTES"])
+	assert.NotContains(t, envVars, "GITHUB_MCP_GUARD_MIN_INTEGRITY")
+	assert.NotContains(t, envVars, "GITHUB_MCP_GUARD_REPOS")
+}

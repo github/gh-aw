@@ -311,6 +311,12 @@ func TestAwmgVersionInAwInfo(t *testing.T) {
 			expectedAwmgVersion: "",
 			description:         "Should have empty awmg_version when MCP gateway is not configured",
 		},
+		{
+			name:                "Dynamic enclave without explicit MCP Gateway version",
+			mcpGatewayVersion:   "",
+			expectedAwmgVersion: string(constants.MCPGDynamicRepositoryDelegationMinVersion),
+			description:         "Should use the dynamic delegation minimum MCP gateway version when no explicit version is configured",
+		},
 	}
 
 	for _, tt := range tests {
@@ -324,6 +330,10 @@ func TestAwmgVersionInAwInfo(t *testing.T) {
 
 			workflowData := &WorkflowData{
 				Name: "Test Workflow",
+			}
+			if tt.name == "Dynamic enclave without explicit MCP Gateway version" {
+				workflowData = dynamicEnclaveWorkflowData()
+				workflowData.SandboxConfig.MCP.Version = ""
 			}
 
 			if tt.mcpGatewayVersion != "" {
