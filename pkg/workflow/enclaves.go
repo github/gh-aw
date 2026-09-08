@@ -752,8 +752,8 @@ func buildAWFDynamicEnclavePolicy(enclave *EnclaveConfig) map[string]any {
 //
 // max_identity_ttl uses seconds, matching enclaves[].timeout and the mcpg
 // delegation wire contract. The runtime envelope expiry clamp (expires_at /
-// MCP_GATEWAY_DELEGATION_EXPIRES_AT / buildDynamicEnclaveExpiryScript) also
-// derives its lifetime from enclave.Timeout in seconds.
+// MCP_GATEWAY_DELEGATION_EXPIRES_AT / buildDynamicEnclaveExpiryScript) uses
+// the workflow timeout instead, so the envelope remains valid for the job.
 func buildMCPGatewayDelegationEnvelope(enclave *EnclaveConfig) map[string]any {
 	policy := enclave.Dynamic
 	return map[string]any{
@@ -779,8 +779,8 @@ func buildMCPGatewayDelegationEnvelope(enclave *EnclaveConfig) map[string]any {
 // buildDynamicEnclaveExpiryScript emits the shell lines that resolve the
 // runtime/job-relative envelope expiry contract: the effective expiry is the
 // earlier of the compiled enclaves[].dynamic.expires-at upper bound and
-// job-start + enclave.timeout, so it can never exceed the job or invocation
-// lifetime regardless of how stale a checked-in absolute timestamp has grown.
+// job-start + workflow timeout, so it can never exceed the job lifetime
+// regardless of how stale a checked-in absolute timestamp has grown.
 func buildDynamicEnclaveExpiryScript(workflowData *WorkflowData, enclave *EnclaveConfig) (string, error) {
 	var script strings.Builder
 	// Canonicalize the compiled expires-at to a UTC whole-second RFC3339 "...Z"

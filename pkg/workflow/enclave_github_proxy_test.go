@@ -142,12 +142,31 @@ func TestGenerateMCPSetupDynamicEnclaveGitHubBackendWithoutPrimaryGitHub(t *test
 	assert.Contains(t, setup, `"min-integrity": "approved"`)
 	assert.Contains(t, setup, `"github/*"`)
 	assert.Contains(t, setup, `"accept": [`)
-	assert.Contains(t, setup, `"sink-visibility": "internal"`)
+	assert.Contains(t, setup, `"private:github"`)
+	assert.Contains(t, setup, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
 	assert.Contains(t, setup, `"required": false`)
 	assert.Contains(t, setup, `GH_AW_TIMEOUT_MINUTES: 20`)
 	assert.NotContains(t, setup, `$GITHUB_MCP_GUARD_MIN_INTEGRITY`)
 	assert.NotContains(t, setup, `$GITHUB_MCP_GUARD_REPOS`)
-	assert.NotContains(t, setup, `${GH_AW_SINK_VISIBILITY}`)
+}
+
+func TestDynamicEnclaveWriteSinkPolicyUsesWorkflowDestinationVisibility(t *testing.T) {
+	for _, sensitivity := range []string{"internal", "confidential"} {
+		t.Run(sensitivity, func(t *testing.T) {
+			workflowData := dynamicEnclaveWorkflowData()
+			workflowData.Tools["github"] = false
+			workflowData.Enclaves[0].Dynamic.Sensitivity = sensitivity
+			workflowData.Enclaves[0].Dynamic.AllowedOwners = []string{"github"}
+			workflowData.Enclaves[0].Dynamic.AllowedRepositories = nil
+
+			assert.Equal(t, map[string]any{
+				"write-sink": map[string]any{
+					"accept":          []string{"private:github"},
+					"sink-visibility": sinkVisibilityRuntimeExpr,
+				},
+			}, dynamicEnclaveWriteSinkGuardPolicy(workflowData))
+		})
+	}
 }
 
 // TestCompileDynamicGitHubEnclaveDisabledPrimaryGitHub compiles a workflow matching the
@@ -217,9 +236,11 @@ Test dynamic enclave delegation.
 	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_MIN_INTEGRITY")
 	assert.NotContains(t, lock, "$GITHUB_MCP_GUARD_REPOS")
 
-	// 2. Safe Outputs write-sink policy has a concrete sink-visibility.
-	assert.Contains(t, lock, `"sink-visibility": "internal"`)
-	assert.NotContains(t, lock, "${GH_AW_SINK_VISIBILITY}")
+	// 2. Safe Outputs gets the destination visibility from the runtime detection
+	// step, while its accepted source secrecy stays scoped to the dynamic enclave.
+	assert.Contains(t, lock, `"sink-visibility": "${GH_AW_SINK_VISIBILITY}"`)
+	assert.Contains(t, lock, `"private:github"`)
+	assert.Contains(t, lock, "Determine automatic lockdown mode")
 
 	// 3. The delegated-only GitHub backend does not block gateway readiness.
 	assert.Contains(t, lock, `"required": false`)

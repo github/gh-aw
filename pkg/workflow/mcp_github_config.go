@@ -130,36 +130,27 @@ func githubGuardPoliciesFromStep(workflowData *WorkflowData, explicitGuardPolici
 	return githubTool != false
 }
 
-// dynamicEnclaveWriteSinkGuardPolicy builds a write-sink guard policy accepting any
-// safe-output tool at the sensitivity level the dynamic enclave can return. Returns
-// nil when no dynamic enclave is configured (dynamicEnclaveSinkVisibility returns "").
+// dynamicEnclaveWriteSinkGuardPolicy builds a write-sink guard policy for data returned
+// by a dynamic enclave. The destination visibility is resolved at runtime from the
+// workflow repository; the dynamic sensitivity limits the accepted source secrecy labels.
 func dynamicEnclaveWriteSinkGuardPolicy(workflowData *WorkflowData) map[string]any {
-	sinkVisibility := dynamicEnclaveSinkVisibility(workflowData)
-	if sinkVisibility == "" {
+	enclave := enclaveDynamicRepositoryPolicyConfig(workflowData)
+	if enclave == nil || enclave.Dynamic == nil {
 		return nil
+	}
+	accept := []string{"*"}
+	if enclave.Dynamic.Sensitivity != "public" {
+		repos := dynamicEnclaveGitHubGuardRepos(workflowData)
+		accept = make([]string, 0, len(repos))
+		for _, repo := range repos {
+			accept = append(accept, transformRepoPattern(repo))
+		}
 	}
 	return map[string]any{
 		"write-sink": map[string]any{
-			"accept":          []string{"*"},
-			"sink-visibility": sinkVisibility,
+			"accept":          accept,
+			"sink-visibility": sinkVisibilityRuntimeExpr,
 		},
-	}
-}
-
-func dynamicEnclaveSinkVisibility(workflowData *WorkflowData) string {
-	enclave := enclaveDynamicRepositoryPolicyConfig(workflowData)
-	if enclave == nil || enclave.Dynamic == nil {
-		return ""
-	}
-	switch enclave.Dynamic.Sensitivity {
-	case "public":
-		return "public"
-	case "internal":
-		return "internal"
-	case "trusted", "confidential", "sealed":
-		return "private"
-	default:
-		return ""
 	}
 }
 
