@@ -27,6 +27,9 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 	// for the DIFC source labels enforced by the MCP gateway.
 	// The determine-automatic-lockdown step outputs min_integrity and repos for public repos.
 	explicitGuardPolicies := getGitHubGuardPolicies(githubTool)
+	if len(explicitGuardPolicies) == 0 && githubBackendIsDynamicDelegationOnly(workflowData) {
+		explicitGuardPolicies = dynamicEnclaveGitHubGuardPolicies(workflowData)
+	}
 	// Integrity reaction fields are only supported in proxy mode (DIFC/CLI proxy),
 	// not in gateway mode. The MCP gateway cannot identify reaction authors because
 	// the GitHub MCP server protocol does not expose that information. Warn if the
@@ -39,7 +42,8 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 					"in proxy mode (DIFC proxy / CLI proxy)."))
 		}
 	}
-	shouldUseStepOutputForGuardPolicy := len(explicitGuardPolicies) == 0
+	shouldUseStepOutputForGuardPolicy := githubGuardPoliciesFromStep(workflowData, explicitGuardPolicies)
+	emitRequiredFalse := githubBackendIsDynamicDelegationOnly(workflowData)
 
 	toolsets := getGitHubToolsets(githubTool)
 	features := getGitHubFeatures(githubTool)
@@ -78,6 +82,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 			AllowedTools:          getGitHubAllowedTools(githubTool),
 			IncludeEnvSection:     r.options.IncludeCopilotFields,
 			GuardPolicies:         explicitGuardPolicies,
+			EmitRequiredFalse:     emitRequiredFalse,
 		})
 	} else {
 		// Local mode - use Docker-based GitHub MCP server (default)
@@ -99,6 +104,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 			AllowedTools:          getGitHubAllowedTools(githubTool),
 			EffectiveToken:        "", // Token passed via env
 			GuardPolicies:         explicitGuardPolicies,
+			EmitRequiredFalse:     emitRequiredFalse,
 			ContainerPinMappings:  r.options.ContainerPinMappings,
 		})
 	}
@@ -264,8 +270,11 @@ func RenderGitHubMCPDockerConfig(yaml *strings.Builder, options GitHubMCPDockerO
 
 	envVars := buildGitHubMCPEnvVars(tokenValue, hostValue, options.ReadOnly, options.Lockdown, options.Toolsets, options.Features)
 	hasGuardPolicies := hasGitHubMCPGuardPolicies(options.GuardPolicies, options.GuardPoliciesFromStep)
-	writeJSONStringMapSection(yaml, "                ", "env", envVars, hasGuardPolicies)
+	writeJSONStringMapSection(yaml, "                ", "env", envVars, hasGuardPolicies || options.EmitRequiredFalse)
 	renderGitHubMCPGuardPolicies(yaml, options.GuardPolicies, options.GuardPoliciesFromStep, "                ")
+	if options.EmitRequiredFalse {
+		appendRequiredFalseField(yaml, hasGuardPolicies, "                ")
+	}
 }
 
 // RenderGitHubMCPRemoteConfig renders the GitHub MCP server configuration for remote (hosted) mode.
@@ -294,7 +303,7 @@ func RenderGitHubMCPRemoteConfig(yaml *strings.Builder, options GitHubMCPRemoteO
 		"                ",
 		"headers",
 		buildGitHubMCPRemoteHeaders(options.AuthorizationValue, options.ReadOnly, options.Lockdown, options.Toolsets, options.Features),
-		(options.IncludeToolsField && len(options.AllowedTools) > 0) || options.IncludeEnvSection || hasGuardPolicies,
+		(options.IncludeToolsField && len(options.AllowedTools) > 0) || options.IncludeEnvSection || hasGuardPolicies || options.EmitRequiredFalse,
 	)
 
 	// Add tools field if requested (Copilot needs it, Claude doesn't)
@@ -311,7 +320,7 @@ func RenderGitHubMCPRemoteConfig(yaml *strings.Builder, options GitHubMCPRemoteO
 			}
 			yaml.WriteString("\n")
 		}
-		if options.IncludeEnvSection || hasGuardPolicies {
+		if options.IncludeEnvSection || hasGuardPolicies || options.EmitRequiredFalse {
 			yaml.WriteString("                ],\n")
 		} else {
 			yaml.WriteString("                ]\n")
@@ -325,10 +334,13 @@ func RenderGitHubMCPRemoteConfig(yaml *strings.Builder, options GitHubMCPRemoteO
 			"                ",
 			"env",
 			buildGitHubMCPEnvVars("${GITHUB_MCP_SERVER_TOKEN}", "${GITHUB_SERVER_URL}", false, false, "", ""),
-			hasGuardPolicies,
+			hasGuardPolicies || options.EmitRequiredFalse,
 		)
 	}
 
 	// Add guard-policies if configured or from step
 	renderGitHubMCPGuardPolicies(yaml, options.GuardPolicies, options.GuardPoliciesFromStep, "                ")
+	if options.EmitRequiredFalse {
+		appendRequiredFalseField(yaml, hasGuardPolicies, "                ")
+	}
 }

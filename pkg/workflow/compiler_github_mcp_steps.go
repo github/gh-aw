@@ -21,9 +21,9 @@ import (
 // This applies regardless of whether a GitHub App token is configured, because repo-scoping
 // is not a substitute for author-integrity filtering inside a repository.
 func (c *Compiler) generateGitHubMCPLockdownDetectionStep(yaml *strings.Builder, data *WorkflowData) {
-	// Check if GitHub tool is present
+	// Dynamic enclaves also need the workflow repository's visibility for Safe Outputs.
 	githubTool, hasGitHub := data.Tools["github"]
-	if !hasGitHub || githubTool == false {
+	if (!hasGitHub || githubTool == false) && !enclaveDynamicRepositoryPolicyEnabled(data) {
 		githubConfigLog.Print("Skipping GitHub MCP lockdown detection step: GitHub tool not enabled")
 		return
 	}

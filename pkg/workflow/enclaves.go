@@ -610,13 +610,8 @@ func validateEnclaveComponentVersions(workflowData *WorkflowData, fieldPath stri
 		return fmt.Errorf("%s requires AWF %s or newer, but the effective version is %s", fieldPath, awfMinVersion, effectiveVersion)
 	}
 
-	effectiveVersion := string(constants.DefaultMCPGatewayVersion)
-	if workflowData.SandboxConfig != nil &&
-		workflowData.SandboxConfig.MCP != nil &&
-		workflowData.SandboxConfig.MCP.Version != "" {
-		effectiveVersion = workflowData.SandboxConfig.MCP.Version
-	}
-	if !versionAtLeast(effectiveVersion, string(constants.DefaultMCPGatewayVersion), string(mcpgMinVersion)) {
+	effectiveVersion := effectiveMCPGatewayVersion(workflowData)
+	if !versionAtLeast(effectiveVersion, defaultMCPGatewayVersionForWorkflow(workflowData), string(mcpgMinVersion)) {
 		return fmt.Errorf("%s requires MCPG %s or newer, but the effective version is %s; set sandbox.mcp.version to %s or newer", fieldPath, mcpgMinVersion, effectiveVersion, mcpgMinVersion)
 	}
 	return nil
@@ -757,8 +752,8 @@ func buildAWFDynamicEnclavePolicy(enclave *EnclaveConfig) map[string]any {
 //
 // max_identity_ttl uses seconds, matching enclaves[].timeout and the mcpg
 // delegation wire contract. The runtime envelope expiry clamp (expires_at /
-// MCP_GATEWAY_DELEGATION_EXPIRES_AT / buildDynamicEnclaveExpiryScript) also
-// derives its lifetime from enclave.Timeout in seconds.
+// MCP_GATEWAY_DELEGATION_EXPIRES_AT / buildDynamicEnclaveExpiryScript) uses
+// the workflow timeout instead, so the envelope remains valid for the job.
 func buildMCPGatewayDelegationEnvelope(enclave *EnclaveConfig) map[string]any {
 	policy := enclave.Dynamic
 	return map[string]any{
@@ -784,9 +779,9 @@ func buildMCPGatewayDelegationEnvelope(enclave *EnclaveConfig) map[string]any {
 // buildDynamicEnclaveExpiryScript emits the shell lines that resolve the
 // runtime/job-relative envelope expiry contract: the effective expiry is the
 // earlier of the compiled enclaves[].dynamic.expires-at upper bound and
-// job-start + enclave.timeout, so it can never exceed the job or invocation
-// lifetime regardless of how stale a checked-in absolute timestamp has grown.
-func buildDynamicEnclaveExpiryScript(enclave *EnclaveConfig) (string, error) {
+// job-start + workflow timeout, so it can never exceed the job lifetime
+// regardless of how stale a checked-in absolute timestamp has grown.
+func buildDynamicEnclaveExpiryScript(workflowData *WorkflowData, enclave *EnclaveConfig) (string, error) {
 	var script strings.Builder
 	// Canonicalize the compiled expires-at to a UTC whole-second RFC3339 "...Z"
 	// value before embedding it: validateEnclavesConfig accepts any RFC3339
@@ -804,7 +799,13 @@ func buildDynamicEnclaveExpiryScript(enclave *EnclaveConfig) (string, error) {
 	}
 	expiresAt := parsed.UTC().Truncate(time.Second).Format("2006-01-02T15:04:05Z")
 	escapedExpiresAt := shellEscapeArg(expiresAt)
-	fmt.Fprintf(&script, "          GH_AW_ENCLAVE_DYNAMIC_JOB_EXPIRES_EPOCH=$(( $(date -u +%%s) + %d ))\n", enclave.Timeout)
+	fallbackTimeoutMinutes := int(constants.DefaultAgenticWorkflowTimeout / time.Minute)
+	if timeoutValue := strings.TrimSpace(resolveStepTimeoutValue(workflowData)); timeoutValue != "" {
+		if timeoutMinutes, err := strconv.Atoi(timeoutValue); err == nil && timeoutMinutes > 0 {
+			fallbackTimeoutMinutes = timeoutMinutes
+		}
+	}
+	fmt.Fprintf(&script, "          GH_AW_ENCLAVE_DYNAMIC_JOB_EXPIRES_EPOCH=$(( $(date -u +%%s) + (${GH_AW_TIMEOUT_MINUTES:-%d} * 60) ))\n", fallbackTimeoutMinutes)
 	// date -u -d is GNU coreutils syntax (Linux runners); fall back to BSD date's
 	// -j -f for portability, matching the pattern used elsewhere in this repo for
 	// parsing RFC3339 timestamps into epoch seconds on macOS runners.

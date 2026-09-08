@@ -158,6 +158,18 @@ func TestMCPGatewayVersionFromFrontmatter(t *testing.T) {
 			description:     "should use default version when version is empty string",
 		},
 		{
+			name: "dynamic enclave without explicit version uses delegation minimum",
+			sandboxConfig: &SandboxConfig{
+				MCP: &MCPGatewayRuntimeConfig{
+					Container: constants.DefaultMCPGatewayContainer,
+					Version:   "",
+					Port:      8080,
+				},
+			},
+			expectedVersion: string(constants.MCPGDynamicRepositoryDelegationMinVersion),
+			description:     "should elevate to the dynamic delegation minimum when no explicit version is set",
+		},
+		{
 			name: "version 'latest' preserved",
 			sandboxConfig: &SandboxConfig{
 				MCP: &MCPGatewayRuntimeConfig{
@@ -188,6 +200,10 @@ func TestMCPGatewayVersionFromFrontmatter(t *testing.T) {
 			workflowData := &WorkflowData{
 				SandboxConfig: tt.sandboxConfig,
 				Tools:         map[string]any{"github": map[string]any{}},
+			}
+			if tt.name == "dynamic enclave without explicit version uses delegation minimum" {
+				workflowData = dynamicEnclaveWorkflowData()
+				workflowData.SandboxConfig.MCP.Version = ""
 			}
 
 			// Ensure MCP gateway config is applied (includes normalization of "latest")

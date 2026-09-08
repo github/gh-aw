@@ -90,6 +90,9 @@ type GitHubMCPDockerOptions struct {
 	EffectiveToken string
 	// GuardPolicies specifies access control policies for the MCP gateway (e.g., allow-only repos/integrity)
 	GuardPolicies map[string]any
+	// EmitRequiredFalse writes `"required": false` for delegation-only backends whose startup
+	// failures should degrade to warnings rather than fail the entire primary agent run.
+	EmitRequiredFalse bool
 	// ContainerPinMappings maps source container image references to their SHA-pinned replacements.
 	// When set, the GitHub MCP server container reference is redirected to the mapped private
 	// registry mirror (digest stripped for MCP Gateway compatibility). Nil → no redirect.
@@ -124,4 +127,7 @@ type GitHubMCPRemoteOptions struct {
 	IncludeEnvSection bool
 	// GuardPolicies specifies access control policies for the MCP gateway (e.g., allow-only repos/integrity)
 	GuardPolicies map[string]any
+	// EmitRequiredFalse writes `"required": false` for delegation-only backends whose startup
+	// failures should degrade to warnings rather than fail the entire primary agent run.
+	EmitRequiredFalse bool
 }

@@ -58,6 +58,37 @@ var mcpGatewayConfigLog = logger.New("workflow:mcp_gateway_config")
 
 const safeOutputsMount = "${RUNNER_TEMP}/gh-aw/safeoutputs:${RUNNER_TEMP}/gh-aw/safeoutputs:rw"
 
+func defaultMCPGatewayVersionForWorkflow(workflowData *WorkflowData) string {
+	defaultVersion := string(constants.DefaultMCPGatewayVersion)
+	if enclaveDynamicRepositoryPolicyEnabled(workflowData) &&
+		!versionAtLeast(defaultVersion, defaultVersion, string(constants.MCPGDynamicRepositoryDelegationMinVersion)) {
+		return string(constants.MCPGDynamicRepositoryDelegationMinVersion)
+	}
+	return defaultVersion
+}
+
+func effectiveMCPGatewayVersion(workflowData *WorkflowData) string {
+	if workflowData != nil &&
+		workflowData.SandboxConfig != nil &&
+		workflowData.SandboxConfig.MCP != nil &&
+		workflowData.SandboxConfig.MCP.Version != "" {
+		return workflowData.SandboxConfig.MCP.Version
+	}
+	return defaultMCPGatewayVersionForWorkflow(workflowData)
+}
+
+func primaryGitHubMCPEnabled(workflowData *WorkflowData) bool {
+	if workflowData == nil {
+		return false
+	}
+	githubTool, hasGitHub := workflowData.Tools["github"]
+	return hasGitHub && githubTool != false && !isGitHubCLIModeEnabled(workflowData)
+}
+
+func githubBackendIsDynamicDelegationOnly(workflowData *WorkflowData) bool {
+	return enclaveDynamicRepositoryPolicyEnabled(workflowData) && !primaryGitHubMCPEnabled(workflowData)
+}
+
 // ensureDefaultMCPGatewayConfig ensures MCP gateway has default configuration if not provided
 // The MCP gateway is mandatory and defaults to github/gh-aw-mcpg
 func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
@@ -75,7 +106,7 @@ func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 		mcpGatewayConfigLog.Print("No MCP gateway configuration found, setting default configuration")
 		workflowData.SandboxConfig.MCP = &MCPGatewayRuntimeConfig{
 			Container: constants.DefaultMCPGatewayContainer,
-			Version:   string(constants.DefaultMCPGatewayVersion),
+			Version:   defaultMCPGatewayVersionForWorkflow(workflowData),
 			Port:      int(DefaultMCPGatewayPort),
 		}
 	} else {
@@ -85,7 +116,7 @@ func ensureDefaultMCPGatewayConfig(workflowData *WorkflowData) {
 		}
 		// Only replace empty version with default - preserve user-specified versions including "latest"
 		if workflowData.SandboxConfig.MCP.Version == "" {
-			workflowData.SandboxConfig.MCP.Version = string(constants.DefaultMCPGatewayVersion)
+			workflowData.SandboxConfig.MCP.Version = defaultMCPGatewayVersionForWorkflow(workflowData)
 		}
 		if workflowData.SandboxConfig.MCP.Port == 0 {
 			workflowData.SandboxConfig.MCP.Port = int(DefaultMCPGatewayPort)
@@ -213,10 +244,7 @@ func buildMCPGatewayConfig(workflowData *WorkflowData) *MCPGatewayRuntimeConfig 
 		for _, server := range manifestServers {
 			primaryServers = append(primaryServers, server.Name)
 		}
-		primaryGitHubEnabled := false
-		if githubTool, hasGitHub := workflowData.Tools["github"]; hasGitHub && githubTool != false {
-			primaryGitHubEnabled = !isGitHubCLIModeEnabled(workflowData)
-		}
+		primaryGitHubEnabled := primaryGitHubMCPEnabled(workflowData)
 		// Dynamic repository delegation keeps the GitHub backend registered so
 		// mcpg-issued delegated identities can reach it, but the primary agent
 		// identity must not gain GitHub MCP access merely because a dynamic
