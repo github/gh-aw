@@ -158,7 +158,7 @@ semverutil.IsCompatible("v6.0.0", "v5") // false
 
 ## Source Synchronization
 
-Reviewed against recent source updates on 2026-07-24; `NormalizeGitDescribeSemver` added to Public API section. Re-verified on 2026-08-14; no further public-contract deltas identified. Re-verified on 2026-08-29; no public-contract deltas identified. Re-verified on 2026-09-03; no public-contract deltas identified.
+Reviewed against recent source updates on 2026-07-24; `NormalizeGitDescribeSemver` added to Public API section. Re-verified on 2026-08-14; no further public-contract deltas identified. Re-verified on 2026-08-29; no public-contract deltas identified. Re-verified on 2026-09-03; no public-contract deltas identified. Re-verified on 2026-09-08; no public-contract deltas identified.
 
 ---
 

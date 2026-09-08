@@ -15,6 +15,7 @@ func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 		Timeout:               1,
 		MaxGitHubAPIRateLimit: -2000,
 		MaxStorageMB:          10240,
+		PruneOlderRuns:        true,
 	})
 	command := strings.Join(cmdArgs, " ")
 
@@ -23,6 +24,9 @@ func TestBuildLogsCommandArgsIncludesResourceBudgets(t *testing.T) {
 	}
 	if !strings.Contains(command, "--max-storage 10240") {
 		t.Fatalf("command args do not include storage budget: %s", command)
+	}
+	if !strings.Contains(command, "--prune-older-runs") {
+		t.Fatalf("command args do not include older-run pruning mode: %s", command)
 	}
 }
 

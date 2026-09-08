@@ -10,6 +10,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -105,6 +106,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs --timeout 30 --max-github-api-rate-limit 12000 # Wait after 12000 core API requests are used
   %[1]s logs --timeout 30 --max-github-api-rate-limit -2000 # Keep 2000 core API requests available
   %[1]s logs --timeout 30 --max-storage 10240                # Prune cache data and stop downloads at 10 GB
+  %[1]s logs --max-storage 10240 --prune-older-runs          # Remove oldest runs if cache pruning is insufficient
 
   # Cache maintenance
   %[1]s logs --cache-before -1w          # Evict local cache older than 1 week before downloading runs
@@ -229,6 +231,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		JSONOutput:        values.JSONOutput,
 		Timeout:           values.TimeoutMinutes,
 		MaxStorageMB:      values.MaxStorageMB,
+		PruneOlderRuns:    values.PruneOlderRuns,
 		SummaryFile:       values.SummaryFile,
 		SafeOutputType:    values.SafeOutputType,
 		FilteredIntegrity: values.FilteredIntegrity,
@@ -248,6 +251,8 @@ func loadLogsCommandValues(cmd *cobra.Command, args []string) (*logsCommandValue
 		return nil, err
 	}
 	targets, targetErrors := resolveLogsWorkflowTargets(cmd, args)
+	targets, remoteTargetErrors := resolveRemoteLogsWorkflowTargets(cmd.Context(), targets, options.Verbose)
+	targetErrors = append(targetErrors, remoteTargetErrors...)
 	if len(args) <= 1 && len(targetErrors) > 0 {
 		return nil, targetErrors[0]
 	}
@@ -297,6 +302,57 @@ func resolveLogsWorkflowTarget(cmd *cobra.Command, arg string) (logsWorkflowTarg
 	}
 	workflowName, err := resolveLogsWorkflowNameLocally(arg)
 	return logsWorkflowTarget{workflowName: workflowName}, err
+}
+
+func resolveRemoteLogsWorkflowTargets(ctx context.Context, targets []logsWorkflowTarget, verbose bool) ([]logsWorkflowTarget, []error) {
+	return resolveRemoteLogsWorkflowTargetsWithFetcher(ctx, targets, verbose, fetchGitHubWorkflows)
+}
+
+func resolveRemoteLogsWorkflowTargetsWithFetcher(
+	ctx context.Context,
+	targets []logsWorkflowTarget,
+	verbose bool,
+	fetchWorkflows func(context.Context, string, bool) (map[string]*GitHubWorkflow, error),
+) ([]logsWorkflowTarget, []error) {
+	workflowsByRepo := make(map[string]map[string]*GitHubWorkflow)
+	errorsByRepo := make(map[string]error)
+	resolvedTargets := make([]logsWorkflowTarget, 0, len(targets))
+	var targetErrors []error
+
+	for i := range targets {
+		target := &targets[i]
+		if target.workflowName == "" || target.repoOverride == "" || repoIsLocal(target.repoOverride) {
+			resolvedTargets = append(resolvedTargets, *target)
+			continue
+		}
+
+		githubWorkflows, ok := workflowsByRepo[target.repoOverride]
+		if !ok {
+			if err := errorsByRepo[target.repoOverride]; err != nil {
+				targetErrors = append(targetErrors, fmt.Errorf("%s: failed to resolve workflow name: %w", target.displayName(), err))
+				continue
+			}
+			var err error
+			githubWorkflows, err = fetchWorkflows(ctx, target.repoOverride, verbose)
+			if err != nil {
+				errorsByRepo[target.repoOverride] = err
+				targetErrors = append(targetErrors, fmt.Errorf("%s: failed to resolve workflow name: %w", target.displayName(), err))
+				continue
+			}
+			workflowsByRepo[target.repoOverride] = githubWorkflows
+		}
+
+		resolvedName := matchRemoteWorkflowName(target.workflowName, githubWorkflows)
+		if resolvedName == "" {
+			targetErrors = append(targetErrors, fmt.Errorf("%s: workflow not found", target.displayName()))
+			continue
+		}
+		logsCommandLog.Printf("Resolved remote workflow name: %s -> %s", target.displayName(), resolvedName)
+		target.workflowName = resolvedName
+		resolvedTargets = append(resolvedTargets, *target)
+	}
+
+	return resolvedTargets, targetErrors
 }
 
 func splitCrossRepoWorkflowTarget(arg string) (string, string, bool) {
@@ -353,6 +409,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		TimeoutSeconds:        getIntFlag(cmd, "timeout-seconds"),
 		MaxGitHubAPIRateLimit: getIntFlag(cmd, "max-github-api-rate-limit"),
 		MaxStorageMB:          getIntFlag(cmd, "max-storage"),
+		PruneOlderRuns:        getBoolFlag(cmd, "prune-older-runs"),
 		SummaryFile:           getStringFlag(cmd, "summary-file"),
 		SafeOutputType:        getStringFlag(cmd, "safe-output"),
 		FilteredIntegrity:     getBoolFlag(cmd, "filtered-integrity"),
@@ -497,6 +554,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	_ = logsCmd.Flags().MarkHidden("timeout-seconds")
 	logsCmd.Flags().Int("max-github-api-rate-limit", 0, "Maximum used GitHub core API requests before waiting for reset (positive = absolute, negative = reserve from API limit; e.g. 12000 or -2000)")
 	logsCmd.Flags().Int("max-storage", 0, "Maximum logs storage in MB after pruning non-essential cache data (0 = unlimited)")
+	logsCmd.Flags().Bool("prune-older-runs", false, "Remove oldest completed runs when non-essential cache pruning cannot satisfy --max-storage")
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")
 	logsCmd.Flags().Bool("train", false, "Analyze log patterns across downloaded runs and save pattern weights to drain3_weights.json in the output directory")
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")

@@ -87,6 +87,30 @@ func TestFetchGitHubWorkflows_ContextCancellation(t *testing.T) {
 	assert.Less(t, elapsed, 5*time.Second, "fetchGitHubWorkflows should return promptly on cancellation")
 }
 
+func TestFetchGitHubWorkflows_RequestsAllWorkflows(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fake gh is not supported on Windows")
+	}
+
+	fakeBinDir := t.TempDir()
+	argsLogPath := filepath.Join(fakeBinDir, "gh-args.log")
+	fakeGH := filepath.Join(fakeBinDir, "gh")
+	script := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$*\" > \"" + argsLogPath + "\"\n" +
+		"printf '%s\\n' '[{\"workflows\":[{\"id\":1,\"name\":\"first\",\"path\":\".github/workflows/first.lock.yml\",\"state\":\"active\"}]},{\"workflows\":[{\"id\":2,\"name\":\"second\",\"path\":\".github/workflows/second.lock.yml\",\"state\":\"active\"}]}]'\n"
+	require.NoError(t, os.WriteFile(fakeGH, []byte(script), 0o755))
+	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	workflows, err := fetchGitHubWorkflows(context.Background(), "owner/repo", true)
+	require.NoError(t, err)
+	require.Len(t, workflows, 2, "workflow discovery must include workflows from every API page")
+
+	args, err := os.ReadFile(argsLogPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(args), "api --paginate --slurp repos/owner/repo/actions/workflows?per_page=100",
+		"workflow discovery must paginate all workflow API pages")
+}
+
 // TestFetchLatestRunsByRef_ContextCancellation verifies that cancelling the
 // context while the gh subprocess (run list) is blocked causes
 // fetchLatestRunsByRef to return promptly with a context error.

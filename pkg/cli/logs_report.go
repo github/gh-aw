@@ -60,6 +60,7 @@ type ContinuationData struct {
 	Timeout               int    `json:"timeout,omitempty"`
 	MaxGitHubAPIRateLimit int    `json:"max_github_api_rate_limit,omitempty"`
 	MaxStorageMB          int    `json:"max_storage,omitempty"`
+	PruneOlderRuns        bool   `json:"prune_older_runs,omitempty"`
 }
 
 // WorkflowContinuation identifies a per-target cursor in a combined

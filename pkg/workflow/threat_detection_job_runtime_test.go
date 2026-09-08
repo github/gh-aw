@@ -90,6 +90,113 @@ func TestBuildDetectionJobStepsCodexExternalDetectorIncludesContainerDownload(t 
 	})
 }
 
+func TestBuildInstallDetectionEngineForExternalDetectorStepIncludesNodeRuntime(t *testing.T) {
+	compiler := NewCompiler()
+
+	tests := []struct {
+		name                 string
+		data                 *WorkflowData
+		wantInstallStep      string
+		wantArcDindSetup     bool
+		wantCopilotInstalled bool
+	}{
+		{
+			name: "copilot on standard topology",
+			data: &WorkflowData{
+				AI:          "copilot",
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:      "Install GitHub Copilot CLI",
+			wantCopilotInstalled: true,
+		},
+		{
+			name: "copilot on arc-dind",
+			data: &WorkflowData{
+				AI:           "copilot",
+				RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+				SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:      "Install GitHub Copilot CLI",
+			wantArcDindSetup:     true,
+			wantCopilotInstalled: true,
+		},
+		{
+			name: "copilot detection custom command",
+			data: &WorkflowData{
+				AI: "copilot",
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{
+					EngineConfig: &EngineConfig{ID: "copilot", Command: "/opt/custom/copilot"},
+				}},
+			},
+			wantInstallStep:      "Install GitHub Copilot CLI",
+			wantCopilotInstalled: true,
+		},
+		{
+			name: "copilot inherited custom command",
+			data: &WorkflowData{
+				AI:           "copilot",
+				EngineConfig: &EngineConfig{ID: "copilot", Command: "/opt/custom/copilot"},
+				SafeOutputs:  &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep:      "Install GitHub Copilot CLI",
+			wantCopilotInstalled: true,
+		},
+		{
+			name: "claude does not duplicate bundled node setup",
+			data: &WorkflowData{
+				AI:          "claude",
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep: "Install Claude Code CLI",
+		},
+		{
+			name: "codex does not duplicate bundled node setup",
+			data: &WorkflowData{
+				AI:          "codex",
+				SafeOutputs: &SafeOutputsConfig{ThreatDetection: &ThreatDetectionConfig{}},
+			},
+			wantInstallStep: "Install Codex CLI",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			steps := strings.Join(compiler.buildInstallDetectionEngineForExternalDetectorStep(tt.data), "")
+
+			if count := strings.Count(steps, "- name: Setup Node.js"); count != 1 {
+				t.Fatalf("expected exactly one Setup Node.js step, got %d:\n%s", count, steps)
+			}
+			if tt.wantInstallStep != "" {
+				nodeIndex := strings.Index(steps, "- name: Setup Node.js")
+				installIndex := strings.Index(steps, "- name: "+tt.wantInstallStep)
+				if installIndex == -1 {
+					t.Fatalf("expected %q step:\n%s", tt.wantInstallStep, steps)
+				}
+				if nodeIndex > installIndex {
+					t.Errorf("Setup Node.js must precede %q:\n%s", tt.wantInstallStep, steps)
+				}
+			}
+			if got := strings.Contains(steps, "Redirect tool cache and install paths for ARC/DinD"); got != tt.wantArcDindSetup {
+				t.Errorf("ARC/DinD tool cache redirect presence = %v, want %v:\n%s", got, tt.wantArcDindSetup, steps)
+			}
+			if got := strings.Contains(steps, "Ensure Node.js is at daemon-visible path"); got != tt.wantArcDindSetup {
+				t.Errorf("daemon-visible Node staging presence = %v, want %v:\n%s", got, tt.wantArcDindSetup, steps)
+			}
+			if tt.wantArcDindSetup {
+				redirectIndex := strings.Index(steps, "Redirect tool cache and install paths for ARC/DinD")
+				nodeIndex := strings.Index(steps, "- name: Setup Node.js")
+				stagingIndex := strings.Index(steps, "Ensure Node.js is at daemon-visible path")
+				if redirectIndex >= nodeIndex || nodeIndex >= stagingIndex {
+					t.Errorf("expected ARC/DinD redirect, Node setup, and staging in order:\n%s", steps)
+				}
+			}
+			if got := strings.Contains(steps, "- name: Install GitHub Copilot CLI"); got != tt.wantCopilotInstalled {
+				t.Errorf("Copilot installation presence = %v, want %v:\n%s", got, tt.wantCopilotInstalled, steps)
+			}
+		})
+	}
+}
+
 func TestBuildPullAWFContainersStepPropagatesFeatures(t *testing.T) {
 	compiler := NewCompiler()
 

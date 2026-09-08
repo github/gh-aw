@@ -2819,7 +2819,7 @@ ${issueSafeFallbackFooter}`;
 
           const fallbackTemplatePath = getPromptPath("pr_permission_denied_fallback.md");
           const fallbackBody = renderTemplateFromFile(fallbackTemplatePath, {
-            body: issueSafeMainBodyContent,
+            main_body: issueSafeMainBodyContent,
             footer: issueSafeFallbackFooter,
             branch_name: branchName,
             create_pr_url: createPrUrl,

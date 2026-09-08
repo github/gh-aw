@@ -70,25 +70,6 @@ func extractFrontmatterSkills(parsedFrontmatter *FrontmatterConfig, frontmatter 
 	return skills
 }
 
-func extractFrontmatterPlugins(parsedFrontmatter *FrontmatterConfig, frontmatter map[string]any) []string {
-	refs := extractFrontmatterPluginReferences(parsedFrontmatter, frontmatter)
-	if len(refs) == 0 {
-		return nil
-	}
-
-	plugins := make([]string, 0, len(refs))
-	for _, ref := range refs {
-		if ref.Plugin == "" {
-			continue
-		}
-		plugins = append(plugins, ref.Plugin)
-	}
-	if len(plugins) == 0 {
-		return nil
-	}
-	return plugins
-}
-
 func mergeFrontmatterPlugins(parsedFrontmatter *FrontmatterConfig, frontmatter map[string]any, importedPlugins []string, importedPluginObjects []map[string]any) []string {
 	return pluginRefsToStrings(mergeFrontmatterPluginReferences(parsedFrontmatter, frontmatter, importedPlugins, importedPluginObjects))
 }

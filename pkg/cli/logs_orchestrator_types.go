@@ -32,7 +32,10 @@ type LogsDownloadOptions struct {
 	MaxGitHubAPIRateLimit int
 	// MaxStorageMB prunes non-essential cache data and stops new artifact
 	// downloads when OutputDir cannot be reduced below this size.
-	MaxStorageMB      int
+	MaxStorageMB int
+	// PruneOlderRuns allows the storage limiter to remove complete older run
+	// directories after non-essential cache pruning cannot free enough space.
+	PruneOlderRuns    bool
 	SummaryFile       string
 	SafeOutputType    string
 	FilteredIntegrity bool
@@ -82,6 +85,7 @@ type StdinLogsOptions struct {
 	JSONOutput        bool
 	Timeout           int
 	MaxStorageMB      int
+	PruneOlderRuns    bool
 	SummaryFile       string
 	SafeOutputType    string
 	FilteredIntegrity bool
@@ -109,6 +113,7 @@ type continuationOptions struct {
 	timeoutMinutes        int
 	maxGitHubAPIRateLimit int
 	maxStorageMB          int
+	pruneOlderRuns        bool
 	// lastFetchedBeforeDate is the pagination date cursor collectProcessedWorkflowRuns
 	// had advanced to when it stopped (from the oldest run actually fetched from the
 	// API, including batches that yielded zero matching runs). When set, it is used

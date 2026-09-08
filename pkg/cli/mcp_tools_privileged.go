@@ -113,6 +113,7 @@ type logsArgs struct {
 	Timeout               int      `json:"timeout,omitempty" jsonschema:"Maximum time in minutes to spend downloading logs (default: auto-scales with count in the MCP server, rounded up in 40-run increments; e.g. 1 minute up to 40, 2 minutes for 41-80, 3 minutes for 81-120, and so on)"`
 	MaxGitHubAPIRateLimit int      `json:"max_github_api_rate_limit,omitempty" jsonschema:"Maximum used GitHub core API requests before waiting for reset. Positive values are absolute; negative values reserve requests from the API-reported limit (for example, 12000 or -2000)."`
 	MaxStorageMB          int      `json:"max_storage,omitempty" jsonschema:"Maximum logs storage in MB after pruning non-essential cache data (0 means unlimited)."`
+	PruneOlderRuns        bool     `json:"prune_older_runs,omitempty" jsonschema:"Remove oldest completed runs when non-essential cache pruning cannot satisfy max_storage."`
 	MaxTokens             int      `json:"max_tokens,omitempty" jsonschema:"Deprecated: accepted for backward compatibility but ignored. Output is always written to a file."`
 	Artifacts             []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: usage). Valid sets: all, activation, agent, detection, evals, experiment, firewall, github-api, graders, mcp, usage"`
 }
@@ -369,6 +370,9 @@ func appendLogsFilterArgs(cmdArgs []string, args logsArgs) []string {
 	}
 	if args.MaxStorageMB != 0 {
 		cmdArgs = append(cmdArgs, "--max-storage", strconv.Itoa(args.MaxStorageMB))
+	}
+	if args.PruneOlderRuns {
+		cmdArgs = append(cmdArgs, "--prune-older-runs")
 	}
 	if len(args.Artifacts) > 0 {
 		cmdArgs = append(cmdArgs, "--artifacts", strings.Join(args.Artifacts, ","))

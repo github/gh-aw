@@ -290,6 +290,7 @@ func buildContinuationIfNeeded(
 		Timeout:               opts.timeoutMinutes,
 		MaxGitHubAPIRateLimit: opts.maxGitHubAPIRateLimit,
 		MaxStorageMB:          opts.maxStorageMB,
+		PruneOlderRuns:        opts.pruneOlderRuns,
 	}
 }
 
@@ -352,6 +353,7 @@ func collectWorkflowLogs(ctx context.Context, opts LogsDownloadOptions) (workflo
 		timeoutMinutes:        opts.TimeoutMinutes,
 		maxGitHubAPIRateLimit: opts.MaxGitHubAPIRateLimit,
 		maxStorageMB:          opts.MaxStorageMB,
+		pruneOlderRuns:        opts.PruneOlderRuns,
 		lastFetchedBeforeDate: lastFetchedBeforeDate,
 		previousBeforeRunID:   opts.BeforeRunID,
 	})

@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +104,8 @@ func TestNewLogsCommand(t *testing.T) {
 	require.NotNil(t, maxRateLimitFlag, "Should have 'max-github-api-rate-limit' flag")
 	maxStorageFlag := flags.Lookup("max-storage")
 	require.NotNil(t, maxStorageFlag, "Should have 'max-storage' flag")
+	pruneOlderRunsFlag := flags.Lookup("prune-older-runs")
+	require.NotNil(t, pruneOlderRunsFlag, "Should have 'prune-older-runs' flag")
 }
 
 func TestLogsCommandFlagDefaults(t *testing.T) {
@@ -125,6 +128,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"artifacts", "[usage]"},
 		{"max-github-api-rate-limit", "0"},
 		{"max-storage", "0"},
+		{"prune-older-runs", "false"},
 	}
 
 	for _, tt := range tests {
@@ -140,12 +144,14 @@ func TestLogsCommandResourceBudgetFlags(t *testing.T) {
 	cmd := NewLogsCommand()
 	require.NoError(t, cmd.Flags().Set("max-github-api-rate-limit", "-2000"))
 	require.NoError(t, cmd.Flags().Set("max-storage", "10240"))
+	require.NoError(t, cmd.Flags().Set("prune-older-runs", "true"))
 
 	opts, err := loadCommonLogsOptions(cmd)
 
 	require.NoError(t, err)
 	assert.Equal(t, -2000, opts.MaxGitHubAPIRateLimit)
 	assert.Equal(t, 10240, opts.MaxStorageMB)
+	assert.True(t, opts.PruneOlderRuns)
 }
 
 func TestLogsCommandRejectsNegativeMaxStorage(t *testing.T) {
@@ -428,6 +434,31 @@ func TestResolveLogsWorkflowTargetCrossRepo(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "other-org/other-repo", target.repoOverride)
 	assert.Equal(t, "daily-report.yml", target.workflowName)
+}
+
+func TestResolveRemoteLogsWorkflowTargets(t *testing.T) {
+	t.Parallel()
+
+	targets := []logsWorkflowTarget{
+		{repoOverride: "githubnext/gh-aw-cao", workflowName: "uk-ai-advisory"},
+	}
+	fetchWorkflows := func(context.Context, string, bool) (map[string]*GitHubWorkflow, error) {
+		return map[string]*GitHubWorkflow{
+			"uk-ai-advisory": {
+				Name: "UK AI Advisory",
+				Path: ".github/workflows/uk-ai-advisory.lock.yml",
+			},
+		}, nil
+	}
+
+	resolved, targetErrors := resolveRemoteLogsWorkflowTargetsWithFetcher(
+		context.Background(), targets, false, fetchWorkflows,
+	)
+
+	require.Empty(t, targetErrors)
+	require.Len(t, resolved, 1)
+	assert.Equal(t, "UK AI Advisory", resolved[0].workflowName)
+	assert.Equal(t, "githubnext/gh-aw-cao", resolved[0].repoOverride)
 }
 
 func TestLogsCommandStdinFlag(t *testing.T) {

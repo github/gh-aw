@@ -223,9 +223,6 @@ func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID s
 	if engineID != "copilot" {
 		return externalDetectorPathSetup{}
 	}
-	if data.EngineConfig != nil && data.EngineConfig.Command != "" {
-		return externalDetectorPathSetup{}
-	}
 	setup := externalDetectorPathSetup{
 		commandPrefix: `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `,
 	}
@@ -277,17 +274,26 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 	threatDetectionData := buildExternalDetectorWorkflowData(data, engineID)
 
 	installSteps := engine.GetInstallationSteps(threatDetectionData)
-	var lines []string
+	filteredInstallSteps := make([]GitHubActionStep, 0, len(installSteps)+1)
 	for _, step := range installSteps {
 		if isAWFBinaryInstallStep(step) {
 			continue
 		}
-		for _, line := range step {
-			lines = append(lines, line+"\n")
-		}
+		filteredInstallSteps = append(filteredInstallSteps, step)
 	}
 
-	return lines
+	if engineRequiresNodeHarness(engine) && !installStepsContainNodeSetup(filteredInstallSteps) {
+		threatLog.Print("Injecting Node.js setup step for external detection engine harness")
+		filteredInstallSteps = append([]GitHubActionStep{GenerateNodeJsSetupStep()}, filteredInstallSteps...)
+	}
+
+	var yaml strings.Builder
+	arcDind := isArcDindTopology(threatDetectionData)
+	if arcDind && installStepsContainNodeSetup(filteredInstallSteps) {
+		c.generateArcDindToolCacheRedirectStep(&yaml)
+	}
+	c.emitRuntimeSetupSteps(&yaml, filteredInstallSteps, arcDind)
+	return []string{yaml.String()}
 }
 
 func isAWFBinaryInstallStep(step GitHubActionStep) bool {
@@ -312,6 +318,8 @@ func appendThreatDetectionRWMount(mounts []string) []string {
 // read-write mount so detection_result.json can be written from inside the container
 // back to the host filesystem. This replaces the inline engine execution step when
 // features: gh-aw-detection: true is set.
+//
+//nolint:largefunc // Existing external detector assembly is intentionally kept together.
 func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []string {
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil &&
 		data.SafeOutputs.ThreatDetection.EngineDisabled {

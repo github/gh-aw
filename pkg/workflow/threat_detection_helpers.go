@@ -144,6 +144,14 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		"bash": []any{"*"},
 	}
 	d.EngineConfig = resolveExternalDetectorEngineConfig(data, engineID)
+	// threat-detect currently resolves the selected engine by its standard
+	// executable name and has no custom-command option. Keep the standard
+	// Copilot CLI installed for external detection rather than propagating a
+	// command that threat-detect cannot consume.
+	if engineID == "copilot" && d.EngineConfig.Command != "" {
+		threatLog.Printf("Ignoring custom Copilot command for external detector; threat-detect requires the standard Copilot CLI")
+		d.EngineConfig.Command = ""
+	}
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(d) != LLMProviderGitHub {
 		d.EngineConfig.LLMProvider = LLMProviderOpenAI
 	}
@@ -185,6 +193,7 @@ func resolveExternalDetectorEngineConfig(data *WorkflowData, engineID string) *E
 		return &EngineConfig{
 			ID:                       engineID,
 			Version:                  data.EngineConfig.Version,
+			Command:                  data.EngineConfig.Command,
 			LLMProvider:              data.EngineConfig.LLMProvider,
 			Config:                   data.EngineConfig.Config,
 			Args:                     data.EngineConfig.Args,

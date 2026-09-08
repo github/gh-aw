@@ -118,7 +118,7 @@ func collectLogsTargets(ctx context.Context, opts LogsDownloadOptions, targets [
 			cleanupErrors[target.displayName()] = err
 		}
 	}
-	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB)
+	storageLimit := newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
 	for _, target := range targets {
 		wg.Go(func() {
 			defer func() {
