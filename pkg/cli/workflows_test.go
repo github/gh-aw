@@ -97,17 +97,18 @@ func TestFetchGitHubWorkflows_RequestsAllWorkflows(t *testing.T) {
 	fakeGH := filepath.Join(fakeBinDir, "gh")
 	script := "#!/bin/sh\n" +
 		"printf '%s\\n' \"$*\" > \"" + argsLogPath + "\"\n" +
-		"printf '%s\\n' '[]'\n"
+		"printf '%s\\n' '[{\"workflows\":[{\"id\":1,\"name\":\"first\",\"path\":\".github/workflows/first.lock.yml\",\"state\":\"active\"}]},{\"workflows\":[{\"id\":2,\"name\":\"second\",\"path\":\".github/workflows/second.lock.yml\",\"state\":\"active\"}]}]'\n"
 	require.NoError(t, os.WriteFile(fakeGH, []byte(script), 0o755))
 	t.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	_, err := fetchGitHubWorkflows(context.Background(), "owner/repo", true)
+	workflows, err := fetchGitHubWorkflows(context.Background(), "owner/repo", true)
 	require.NoError(t, err)
+	require.Len(t, workflows, 2, "workflow discovery must include workflows from every API page")
 
 	args, err := os.ReadFile(argsLogPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(args), "workflow list --all --limit 1000",
-		"workflow discovery must override the gh CLI default limit")
+	assert.Contains(t, string(args), "api --paginate --slurp repos/owner/repo/actions/workflows?per_page=100",
+		"workflow discovery must paginate all workflow API pages")
 }
 
 // TestFetchLatestRunsByRef_ContextCancellation verifies that cancelling the

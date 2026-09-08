@@ -78,10 +78,11 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 		spinner.Start()
 	}
 
-	args := []string{"workflow", "list", "--all", "--limit", "1000", "--json", "id,name,path,state"}
+	endpoint := "repos/{owner}/{repo}/actions/workflows?per_page=100"
 	if repoOverride != "" {
-		args = append(args, "--repo", repoOverride)
+		endpoint = fmt.Sprintf("repos/%s/actions/workflows?per_page=100", repoOverride)
 	}
+	args := []string{"api", "--paginate", "--slurp", endpoint}
 	cmd := workflow.ExecGHContext(ctx, args...)
 	output, err := cmd.Output()
 
@@ -125,8 +126,10 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 		return nil, errors.New("gh workflow list returned invalid JSON - this may be due to network issues or authentication problems")
 	}
 
-	var workflows []GitHubWorkflow
-	if err := json.Unmarshal(output, &workflows); err != nil {
+	var pages []struct {
+		Workflows []GitHubWorkflow `json:"workflows"`
+	}
+	if err := json.Unmarshal(output, &pages); err != nil {
 		if !verbose {
 			spinner.Stop()
 		}
@@ -134,9 +137,12 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 	}
 
 	workflowMap := make(map[string]*GitHubWorkflow)
-	for i, workflow := range workflows {
-		name := extractWorkflowNameFromPath(workflow.Path)
-		workflowMap[name] = &workflows[i]
+	for _, page := range pages {
+		for i := range page.Workflows {
+			workflow := &page.Workflows[i]
+			name := extractWorkflowNameFromPath(workflow.Path)
+			workflowMap[name] = workflow
+		}
 	}
 
 	// Count user workflows (those with .md files)
