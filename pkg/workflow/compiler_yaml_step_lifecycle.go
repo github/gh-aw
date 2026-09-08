@@ -126,8 +126,10 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 
 	// MCP Gateway version
 	mcpGatewayVersion := ""
-	if data.SandboxConfig != nil && data.SandboxConfig.MCP != nil && data.SandboxConfig.MCP.Version != "" {
-		mcpGatewayVersion = data.SandboxConfig.MCP.Version
+	if data.SandboxConfig != nil && data.SandboxConfig.MCP != nil {
+		mcpGatewayVersion = effectiveMCPGatewayVersion(data)
+	} else if enclaveDynamicRepositoryPolicyEnabled(data) {
+		mcpGatewayVersion = effectiveMCPGatewayVersion(data)
 	}
 
 	// Firewall type

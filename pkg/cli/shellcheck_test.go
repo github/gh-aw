@@ -280,14 +280,14 @@ func TestRunShellcheckOnLockFilesSkipsWhenUnavailable(t *testing.T) {
 	t.Cleanup(func() { os.Setenv("PATH", orig) })
 	os.Setenv("PATH", "") // ensure neither shellcheck nor docker can be found
 
-	err := runShellcheckOnLockFiles(context.Background(), []string{"/fake/file.lock.yml"}, false, false)
+	err := runShellcheckOnLockFilesAndResources(context.Background(), []string{"/fake/file.lock.yml"}, nil, false, false)
 	assert.NoError(t, err)
 }
 
 // TestRunShellcheckOnLockFilesEmpty returns nil for an empty list.
 func TestRunShellcheckOnLockFilesEmpty(t *testing.T) {
 	t.Parallel()
-	err := runShellcheckOnLockFiles(context.Background(), nil, false, false)
+	err := runShellcheckOnLockFilesAndResources(context.Background(), nil, nil, false, false)
 	assert.NoError(t, err)
 }
 
@@ -421,7 +421,7 @@ exit 2
 	// Ensure native shellcheck cannot be discovered.
 	require.NoError(t, os.Setenv("PATH", filepath.Dir(os.Getenv("DOCKER_BIN"))))
 
-	err := runShellcheckOnLockFiles(context.Background(), []string{lockFile}, false, false)
+	err := runShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, false)
 	require.NoError(t, err)
 
 	calls, readErr := os.ReadFile(os.Getenv("DOCKER_CALLS_FILE"))
@@ -479,7 +479,7 @@ exit 0
 	t.Run("non-strict: all steps checked, no error returned", func(t *testing.T) {
 		_ = os.Remove(os.Getenv("DOCKER_CALLS_FILE")) // may not exist on first run
 
-		err := runShellcheckOnLockFiles(context.Background(), []string{lockFile}, false, false)
+		err := runShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, false)
 		require.NoError(t, err, "non-strict mode should not return error even when steps have findings")
 
 		calls, readErr := os.ReadFile(os.Getenv("DOCKER_CALLS_FILE"))
@@ -490,7 +490,7 @@ exit 0
 	t.Run("strict: all steps checked, error returned after all complete", func(t *testing.T) {
 		_ = os.Remove(os.Getenv("DOCKER_CALLS_FILE")) // reset between sub-tests
 
-		err := runShellcheckOnLockFiles(context.Background(), []string{lockFile}, false, true)
+		err := runShellcheckOnLockFilesAndResources(context.Background(), []string{lockFile}, nil, false, true)
 		require.Error(t, err, "strict mode should return error when a step has findings")
 		assert.Contains(t, err.Error(), "strict mode")
 

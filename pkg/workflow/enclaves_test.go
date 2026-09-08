@@ -394,9 +394,9 @@ func TestBuildDynamicEnclaveExpiryScriptResolvesMinOfConfiguredAndJobExpiry(t *t
 		}
 	}
 
-	runScript := func(t *testing.T, enclave *EnclaveConfig) string {
+	runScript := func(t *testing.T, workflowData *WorkflowData, enclave *EnclaveConfig) string {
 		t.Helper()
-		script, err := buildDynamicEnclaveExpiryScript(enclave)
+		script, err := buildDynamicEnclaveExpiryScript(workflowData, enclave)
 		require.NoError(t, err)
 		cmd := exec.Command("bash", "-c", "set -eo pipefail\n"+script+"echo \"$MCP_GATEWAY_DELEGATION_EXPIRES_AT\"\n")
 		output, err := cmd.Output()
@@ -407,16 +407,17 @@ func TestBuildDynamicEnclaveExpiryScriptResolvesMinOfConfiguredAndJobExpiry(t *t
 	t.Run("configured expires-at earlier than job expiry wins", func(t *testing.T) {
 		configured := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
 		enclave := newEnclave(configured.Format(time.RFC3339), 4800)
-		got, err := time.Parse(time.RFC3339, runScript(t, enclave))
+		got, err := time.Parse(time.RFC3339, runScript(t, nil, enclave))
 		require.NoError(t, err)
 		assert.WithinDuration(t, configured, got, time.Second)
 	})
 
-	t.Run("job-relative expiry wins when configured expires-at is far in the future", func(t *testing.T) {
+	t.Run("job timeout minutes bound the envelope lifetime", func(t *testing.T) {
 		enclave := newEnclave("2999-01-01T00:00:00Z", 30)
-		got, err := time.Parse(time.RFC3339, runScript(t, enclave))
+		workflowData := &WorkflowData{TimeoutMinutes: "timeout-minutes: 1"}
+		got, err := time.Parse(time.RFC3339, runScript(t, workflowData, enclave))
 		require.NoError(t, err)
-		assert.WithinDuration(t, time.Now().UTC().Add(30*time.Second), got, 5*time.Second)
+		assert.WithinDuration(t, time.Now().UTC().Add(1*time.Minute), got, 5*time.Second)
 	})
 
 	t.Run("non-UTC offset and fractional-second expires-at is canonicalized before the BSD date fallback", func(t *testing.T) {
@@ -428,14 +429,14 @@ func TestBuildDynamicEnclaveExpiryScriptResolvesMinOfConfiguredAndJobExpiry(t *t
 		configured := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
 		zoned := configured.In(time.FixedZone("", 3600)) // +01:00, with fractional seconds
 		enclave := newEnclave(zoned.Format("2006-01-02T15:04:05.000-07:00"), 4800)
-		got, err := time.Parse(time.RFC3339, runScript(t, enclave))
+		got, err := time.Parse(time.RFC3339, runScript(t, nil, enclave))
 		require.NoError(t, err)
 		assert.WithinDuration(t, configured, got, time.Second)
 	})
 
 	t.Run("non-RFC3339 expires-at (bypassing compile-time validation) surfaces an internal error", func(t *testing.T) {
 		enclave := newEnclave("not-a-timestamp", 30)
-		_, err := buildDynamicEnclaveExpiryScript(enclave)
+		_, err := buildDynamicEnclaveExpiryScript(nil, enclave)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "internal error")
 	})
@@ -612,7 +613,7 @@ func TestValidateDynamicEnclavePolicy(t *testing.T) {
 			mutate: func(data *WorkflowData) {
 				data.SandboxConfig.MCP.Version = "v0.4.17"
 			},
-			errContains: "requires MCPG v0.4.18 or newer",
+			errContains: "requires MCPG v0.4.19 or newer",
 		},
 	}
 

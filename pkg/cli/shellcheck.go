@@ -6,7 +6,7 @@
 //
 // # Key Functions
 //
-//   - runShellcheckOnLockFiles() - Run shellcheck on run steps in multiple lock files
+//   - runShellcheckOnLockFilesAndResources() - Run shellcheck on lock files and explicit shell resources
 //   - extractRunStepsFromLockFile() - Parse a lock file and extract run step info
 //   - isShellcheckAvailable() - Check whether the shellcheck binary is in PATH
 //   - isShellcheckableShell() - True for bash/sh steps; false for pwsh/python/etc.
@@ -406,9 +406,10 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 	return out.Bytes(), nil
 }
 
-// runShellcheckOnLockFiles extracts run: steps from each lock file and runs
-// shellcheck on the shell snippets in parallel. It uses shellcheckDefaultIgnoreCodes
-// to suppress known false positives from GitHub Actions expression syntax.
+// runShellcheckOnLockFilesAndResources extracts run: steps from each lock file,
+// combines them with explicit shell resources, and runs shellcheck on the shell
+// snippets in parallel. It uses shellcheckDefaultIgnoreCodes to suppress known
+// false positives from GitHub Actions expression syntax.
 //
 // When the shellcheck binary is not installed, it falls back to the Docker
 // container (ShellcheckImage) if Docker is available. This allows shellcheck
@@ -425,10 +426,6 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 // When strict is true, any step failure causes a non-nil error to be returned
 // after all steps have been checked (reports-all-then-errors). In non-strict
 // mode, all failures are printed as warnings and nil is returned.
-func runShellcheckOnLockFiles(ctx context.Context, lockFiles []string, verbose bool, strict bool) error {
-	return runShellcheckOnLockFilesAndResources(ctx, lockFiles, nil, verbose, strict)
-}
-
 func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []string, resources []workflow.ShellScriptResource, verbose bool, strict bool) error {
 	if len(lockFiles) == 0 && len(resources) == 0 {
 		return nil
