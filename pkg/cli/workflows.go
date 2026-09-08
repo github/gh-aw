@@ -69,7 +69,7 @@ type GitHubWorkflow struct {
 }
 
 // fetchGitHubWorkflows fetches workflow information from GitHub
-func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool) (map[string]*GitHubWorkflow, error) {
+func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool) (map[string]*GitHubWorkflow, error) { //nolint:largefunc // Existing workflow discovery and diagnostics remain centralized.
 	workflowsLog.Printf("Fetching GitHub workflows: repoOverride=%s", repoOverride)
 
 	// Start spinner for network operation (only if not in verbose mode)
@@ -78,10 +78,11 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 		spinner.Start()
 	}
 
-	args := []string{"workflow", "list", "--all", "--json", "id,name,path,state"}
+	endpoint := "repos/{owner}/{repo}/actions/workflows?per_page=100"
 	if repoOverride != "" {
-		args = append(args, "--repo", repoOverride)
+		endpoint = fmt.Sprintf("repos/%s/actions/workflows?per_page=100", repoOverride)
 	}
+	args := []string{"api", "--paginate", "--slurp", endpoint}
 	cmd := workflow.ExecGHContext(ctx, args...)
 	output, err := cmd.Output()
 
@@ -125,8 +126,10 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 		return nil, errors.New("gh workflow list returned invalid JSON - this may be due to network issues or authentication problems")
 	}
 
-	var workflows []GitHubWorkflow
-	if err := json.Unmarshal(output, &workflows); err != nil {
+	var pages []struct {
+		Workflows []GitHubWorkflow `json:"workflows"`
+	}
+	if err := json.Unmarshal(output, &pages); err != nil {
 		if !verbose {
 			spinner.Stop()
 		}
@@ -134,9 +137,12 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 	}
 
 	workflowMap := make(map[string]*GitHubWorkflow)
-	for i, workflow := range workflows {
-		name := extractWorkflowNameFromPath(workflow.Path)
-		workflowMap[name] = &workflows[i]
+	for _, page := range pages {
+		for i := range page.Workflows {
+			workflow := &page.Workflows[i]
+			name := extractWorkflowNameFromPath(workflow.Path)
+			workflowMap[name] = workflow
+		}
 	}
 
 	// Count user workflows (those with .md files)
@@ -354,7 +360,7 @@ func filterMarkdownFilesWithFrontmatter(mdFiles []string) ([]string, error) {
 // Frontmatter is recognised only when "---" appears on the very first line.
 // Returns the first H1/H2/H3 title text, or ("", nil) when none are present.
 // Returns an error if frontmatter is opened but never closed.
-func fastParseTitleFromReader(r io.Reader) (string, error) {
+func fastParseTitleFromReader(r io.Reader) (string, error) { //nolint:largefunc // Existing streaming parser remains intentionally linear.
 	scanner := bufio.NewScanner(r)
 	// Reuse the small initial scanner buffer across calls while still allowing
 	// growth up to 1 MB for large frontmatter values or long base64-encoded lines.
