@@ -231,7 +231,7 @@ Test dynamic enclave delegation.
 
 	// 5. mcpg version is at least v0.4.19 and consistent across manifest, download, and runtime.
 	minVersion := string(constants.MCPGDynamicRepositoryDelegationMinVersion)
-	assert.GreaterOrEqual(t, minVersion, "v0.4.19")
+	assert.True(t, versionAtLeast(minVersion, "v0.0.0", "v0.4.19"))
 	assert.Equal(t, strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"+minVersion), strings.Count(lock, "ghcr.io/github/gh-aw-mcpg:"))
 }
 
