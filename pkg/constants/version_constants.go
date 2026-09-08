@@ -237,13 +237,15 @@ const MCPGEnclaveAgentToolsMinVersion Version = "v0.4.15"
 // started the real controller, and never handed AWF a private control
 // endpoint (gh-aw-mcpg#12604). That contract is fixed by gh-aw-mcpg#12605,
 // released in v0.4.17, but that release still interprets TTL wire values as
-// nanoseconds. v0.4.18 adds the seconds-only TTL contract, so this constant is
-// pinned to that release and dynamic enclave compilation/runtime setup fails
-// closed on older MCPG builds that lack the compatible owner-scoped envelope,
-// bounded dynamic schema admission, transactional reconciliation, persisted TTL
-// binding, durability, DIFC isolation, redaction behavior, and seconds-based
-// TTL interpretation.
-const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.18"
+// nanoseconds. v0.4.18 adds the seconds-only TTL contract, and v0.4.19 fixes
+// dynamic GitHub delegation guard/write-sink compatibility so workflows with
+// tools.github: false compile to runnable lock files without manual edits.
+// Dynamic enclave compilation/runtime setup therefore fails closed on older
+// MCPG builds that lack the compatible owner-scoped envelope, bounded dynamic
+// schema admission, transactional reconciliation, persisted TTL binding,
+// durability, DIFC isolation, redaction behavior, and seconds-based TTL
+// interpretation.
+const MCPGDynamicRepositoryDelegationMinVersion Version = "v0.4.19"
 
 // DefaultPlaywrightCLIVersion is the default version of the @playwright/cli package.
 // Used when tools.playwright is enabled.
