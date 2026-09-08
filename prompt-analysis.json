@@ -1,56 +1,62 @@
 {
-  "date": "2026-07-07",
+  "date": "2026-09-08",
   "total_prs": 1000,
-  "merged": 792,
-  "closed": 198,
-  "open": 10,
-  "merge_rate": 0.8,
+  "merged": 808,
+  "closed": 188,
+  "open": 4,
+  "merge_rate": 0.811,
   "categories": {
     "bug_fix": {
-      "total": 792,
-      "merged": 634,
-      "closed": 151,
-      "rate": 0.808
-    },
-    "refactor": {
-      "total": 24,
-      "merged": 20,
-      "closed": 4,
-      "rate": 0.833
-    },
-    "testing": {
-      "total": 53,
-      "merged": 43,
-      "closed": 9,
-      "rate": 0.827
+      "total": 783,
+      "merged": 654,
+      "closed": 125,
+      "open": 4,
+      "rate": 0.84
     },
     "feature": {
-      "total": 51,
-      "merged": 40,
-      "closed": 11,
-      "rate": 0.784
-    },
-    "documentation": {
-      "total": 62,
-      "merged": 42,
-      "closed": 18,
-      "rate": 0.7
+      "total": 177,
+      "merged": 123,
+      "closed": 54,
+      "open": 0,
+      "rate": 0.695
     },
     "other": {
-      "total": 18,
-      "merged": 13,
-      "closed": 5,
-      "rate": 0.722
+      "total": 25,
+      "merged": 18,
+      "closed": 7,
+      "open": 0,
+      "rate": 0.72
+    },
+    "documentation": {
+      "total": 6,
+      "merged": 4,
+      "closed": 2,
+      "open": 0,
+      "rate": 0.667
+    },
+    "testing": {
+      "total": 7,
+      "merged": 7,
+      "closed": 0,
+      "open": 0,
+      "rate": 1.0
+    },
+    "refactor": {
+      "total": 2,
+      "merged": 2,
+      "closed": 0,
+      "open": 0,
+      "rate": 1.0
     }
   },
   "structural": {
-    "code_block_merged_pct": 82.7,
-    "code_block_closed_pct": 69.7,
-    "bullet_list_merged_pct": 96.8,
-    "bullet_list_closed_pct": 91.9,
-    "wip_merged_pct": 2.8,
-    "wip_closed_pct": 14.1,
-    "avg_words_merged": 189.1,
-    "avg_words_closed": 193.9
+    "code_block_merged_pct": 83.5,
+    "code_block_closed_pct": 65.4,
+    "bullet_list_merged_pct": 97.0,
+    "bullet_list_closed_pct": 98.9,
+    "wip_merged_pct": 0.4,
+    "wip_closed_pct": 1.1,
+    "avg_words_merged": 181.7,
+    "avg_words_closed": 308.0
   }
 }
