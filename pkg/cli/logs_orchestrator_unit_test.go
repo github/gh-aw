@@ -253,13 +253,15 @@ func TestBuildContinuationIfNeeded(t *testing.T) {
 
 	t.Run("storage limit reached emits resumable cursor", func(t *testing.T) {
 		c := buildContinuationIfNeeded(runs, false, false, true, continuationOptions{
-			workflowName: "my-workflow",
-			count:        50,
-			maxStorageMB: 2048,
+			workflowName:   "my-workflow",
+			count:          50,
+			maxStorageMB:   2048,
+			pruneOlderRuns: true,
 		})
 		require.NotNil(t, c)
 		assert.Equal(t, int64(2999), c.BeforeRunID)
 		assert.Equal(t, 2048, c.MaxStorageMB)
+		assert.True(t, c.PruneOlderRuns)
 		assert.Contains(t, c.Message, "Storage limit reached")
 	})
 
@@ -436,7 +438,7 @@ func TestFetchAndProcessLogsBatchKeepsCursorWhenStorageLimitReached(t *testing.T
 		logsProcessWorkflowRunBatch = originalProcess
 	})
 
-	storageLimit := newLogsStorageLimit(t.TempDir(), 1)
+	storageLimit := newLogsStorageLimit(t.TempDir(), 1, false)
 	logsFetchWorkflowRunBatch = func(_ context.Context, _ LogsDownloadOptions, _ string, _ int, _ bool) (workflowRunBatch, error) {
 		return workflowRunBatch{
 			runs:                   []WorkflowRun{{DatabaseID: 10}, {DatabaseID: 9}},

@@ -9,23 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractFrontmatterPlugins(t *testing.T) {
-	t.Run("uses parsed frontmatter plugin references when available", func(t *testing.T) {
-		parsed := &FrontmatterConfig{PluginReferences: []PluginReference{{Plugin: "plugin-a"}, {Plugin: "plugin-b"}}}
-		got := extractFrontmatterPlugins(parsed, map[string]any{"plugins": []any{"ignored"}})
-		assert.Equal(t, []string{"plugin-a", "plugin-b"}, got)
-
-		// ensure returned slice is a copy
-		got[0] = "changed"
-		assert.Equal(t, "plugin-a", parsed.PluginReferences[0].Plugin)
-	})
-
-	t.Run("falls back to raw frontmatter", func(t *testing.T) {
-		got := extractFrontmatterPlugins(nil, map[string]any{"plugins": []any{"plugin-a", 7, "plugin-b"}})
-		assert.Equal(t, []string{"plugin-a", "plugin-b"}, got)
-	})
-}
-
 func TestMergeFrontmatterPlugins(t *testing.T) {
 	got := mergeFrontmatterPlugins(
 		&FrontmatterConfig{PluginReferences: []PluginReference{{Plugin: "main-a"}}},

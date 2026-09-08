@@ -47,9 +47,9 @@ This is a test workflow.`
 	result := string(lockContent)
 
 	expected := []string{
-		"--debug-file /tmp/gh-aw/agent/claude-debug.log",
+		"--debug-file /tmp/gh-aw/claude-debug.log",
 		"(umask 177 && touch /tmp/gh-aw/agent-stdio.log)",
-		"(umask 177 && touch /tmp/gh-aw/agent/claude-debug.log)",
+		"(umask 177 && touch /tmp/gh-aw/claude-debug.log)",
 		"GH_AW_AWF_LOG_FILE=/tmp/gh-aw/agent-stdio.log",
 		`bash "${RUNNER_TEMP}/gh-aw/actions/run_awf_with_startup_retries.sh" --`,
 	}

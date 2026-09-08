@@ -158,7 +158,7 @@ func TestLogsStorageLimitPrunesNonEssentialAgentData(t *testing.T) {
 	require.NoError(t, markArtifactDownloaded(runDir, constants.AgentArtifactName.String()))
 	require.NoError(t, markArtifactDownloaded(runDir, constants.AgentOutputFallbackArtifactName.String()))
 
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 	called := false
 	err := limit.runDownload(context.Background(), filepath.Join(outputDir, "run-2"), func() error {
 		called = true
@@ -185,7 +185,7 @@ func TestLogsStorageLimitPrunesEarlierCompletedRuns(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(firstRunDir, "sandbox", "agent", "logs", "events.jsonl"), make([]byte, 3*bytesPerMegabyte/4), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(firstRunDir, runSummaryFileName), []byte("{}"), 0o600))
 
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 	secondRunDir := filepath.Join(outputDir, "run-2")
 	err := limit.runDownload(context.Background(), secondRunDir, func() error {
 		require.NoError(t, os.MkdirAll(secondRunDir, 0o755))
@@ -200,7 +200,7 @@ func TestLogsStorageLimitPrunesEarlierCompletedRuns(t *testing.T) {
 
 func TestLogsStorageLimitPrunesCompletedDownloadToBudget(t *testing.T) {
 	outputDir := t.TempDir()
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 	runDir := filepath.Join(outputDir, "run-1")
 
 	err := limit.runDownload(context.Background(), runDir, func() error {
@@ -225,7 +225,7 @@ func TestLogsStorageLimitDeferredDownloadPrunesExistingCacheAtLimit(t *testing.T
 	existingCache := filepath.Join(existingRunDir, "mcp-logs", "large.log")
 	require.NoError(t, os.WriteFile(existingCache, make([]byte, 3*bytesPerMegabyte/4), 0o600))
 
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 	freshRunDir := filepath.Join(outputDir, "run-fresh")
 	freshCache := filepath.Join(freshRunDir, "mcp-logs", "large.log")
 	err := limit.runDownloadDeferred(context.Background(), freshRunDir, func() error {
@@ -242,7 +242,7 @@ func TestLogsStorageLimitDeferredDownloadPrunesExistingCacheAtLimit(t *testing.T
 func TestLogsStorageLimitStopsNewDownloadsAtExistingLimit(t *testing.T) {
 	outputDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outputDir, "existing.bin"), make([]byte, bytesPerMegabyte), 0o644))
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 	called := false
 
 	err := limit.runDownload(context.Background(), filepath.Join(outputDir, "run-1"), func() error {
@@ -257,7 +257,7 @@ func TestLogsStorageLimitStopsNewDownloadsAtExistingLimit(t *testing.T) {
 
 func TestLogsStorageLimitAllowsFinalDownloadThenStops(t *testing.T) {
 	outputDir := t.TempDir()
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 
 	runDir := filepath.Join(outputDir, "run-1")
 	err := limit.runDownload(context.Background(), runDir, func() error {
@@ -274,6 +274,91 @@ func TestLogsStorageLimitAllowsFinalDownloadThenStops(t *testing.T) {
 	})
 	require.ErrorIs(t, err, errLogsStorageLimitReached)
 	assert.False(t, secondCalled)
+}
+
+func TestLogsStorageLimitPrunesOldestRunAfterCachePruningIsExhausted(t *testing.T) {
+	outputDir := t.TempDir()
+	oldestRunDir := filepath.Join(outputDir, "run-1")
+	newerCachedRunDir := filepath.Join(outputDir, "run-2")
+	require.NoError(t, os.MkdirAll(oldestRunDir, 0o755))
+	require.NoError(t, os.MkdirAll(newerCachedRunDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(oldestRunDir, runSummaryFileName), make([]byte, 3*bytesPerMegabyte/4), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(newerCachedRunDir, runSummaryFileName), make([]byte, bytesPerMegabyte/8), 0o600))
+
+	limit := newLogsStorageLimit(outputDir, 1, true)
+	newestRunDir := filepath.Join(outputDir, "run-3")
+	err := limit.runDownload(context.Background(), newestRunDir, func() error {
+		require.NoError(t, os.MkdirAll(newestRunDir, 0o755))
+		return os.WriteFile(filepath.Join(newestRunDir, runSummaryFileName), make([]byte, bytesPerMegabyte/2), 0o600)
+	})
+
+	require.NoError(t, err)
+	assert.NoDirExists(t, oldestRunDir)
+	assert.DirExists(t, newerCachedRunDir)
+	assert.DirExists(t, newestRunDir)
+	assert.False(t, limit.isReached())
+}
+
+func TestLogsStorageLimitPrunesOldestRunByRunID(t *testing.T) {
+	outputDir := t.TempDir()
+	oldestRunDir := filepath.Join(outputDir, "run-10")
+	newerRunDir := filepath.Join(outputDir, "run-20")
+	for _, runDir := range []string{oldestRunDir, newerRunDir} {
+		require.NoError(t, os.MkdirAll(runDir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(runDir, "essential.bin"), make([]byte, 3*bytesPerMegabyte/8), 0o600))
+	}
+	require.NoError(t, os.Chtimes(oldestRunDir, time.Now(), time.Now()))
+	require.NoError(t, os.Chtimes(newerRunDir, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)))
+
+	limit := newLogsStorageLimit(outputDir, 1, true)
+	currentRunDir := filepath.Join(outputDir, "run-30")
+	err := limit.runDownload(context.Background(), currentRunDir, func() error {
+		require.NoError(t, os.MkdirAll(currentRunDir, 0o755))
+		return os.WriteFile(filepath.Join(currentRunDir, runSummaryFileName), make([]byte, bytesPerMegabyte/2), 0o600)
+	})
+
+	require.NoError(t, err)
+	assert.NoDirExists(t, oldestRunDir)
+	assert.DirExists(t, newerRunDir)
+}
+
+func TestLogsStorageLimitKeepsRunWhenNonEssentialPruningIsSufficient(t *testing.T) {
+	outputDir := t.TempDir()
+	oldRunDir := filepath.Join(outputDir, "run-1")
+	oldCache := filepath.Join(oldRunDir, "mcp-logs", "large.log")
+	require.NoError(t, os.MkdirAll(filepath.Dir(oldCache), 0o755))
+	require.NoError(t, os.WriteFile(oldCache, make([]byte, 3*bytesPerMegabyte/4), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(oldRunDir, runSummaryFileName), []byte("{}"), 0o600))
+
+	limit := newLogsStorageLimit(outputDir, 1, true)
+	newRunDir := filepath.Join(outputDir, "run-2")
+	err := limit.runDownload(context.Background(), newRunDir, func() error {
+		require.NoError(t, os.MkdirAll(newRunDir, 0o755))
+		return os.WriteFile(filepath.Join(newRunDir, runSummaryFileName), make([]byte, bytesPerMegabyte/2), 0o600)
+	})
+
+	require.NoError(t, err)
+	assert.NoFileExists(t, oldCache)
+	assert.DirExists(t, oldRunDir, "the whole run must remain when ordinary cache pruning frees enough space")
+	assert.FileExists(t, filepath.Join(oldRunDir, runSummaryFileName))
+}
+
+func TestLogsStorageLimitDoesNotPruneNewerRunForOlderDownload(t *testing.T) {
+	outputDir := t.TempDir()
+	newerRunDir := filepath.Join(outputDir, "run-3")
+	require.NoError(t, os.MkdirAll(newerRunDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(newerRunDir, runSummaryFileName), make([]byte, bytesPerMegabyte), 0o600))
+
+	limit := newLogsStorageLimit(outputDir, 1, true)
+	called := false
+	err := limit.runDownload(context.Background(), filepath.Join(outputDir, "run-2"), func() error {
+		called = true
+		return nil
+	})
+
+	require.ErrorIs(t, err, errLogsStorageLimitReached)
+	assert.False(t, called)
+	assert.DirExists(t, newerRunDir)
 }
 
 func TestLogsStorageLimitDisabled(t *testing.T) {
@@ -301,7 +386,7 @@ func TestValidateMaxStorageMB(t *testing.T) {
 // `go test -race` to also catch data races on the shared usedBytes/reached state.
 func TestLogsStorageLimitConcurrentDownloadsRunInParallel(t *testing.T) {
 	outputDir := t.TempDir()
-	limit := newLogsStorageLimit(outputDir, 10240) // large budget: never reached
+	limit := newLogsStorageLimit(outputDir, 10240, false) // large budget: never reached
 
 	const numDownloads = 8
 	var inFlight atomic.Int32
@@ -340,7 +425,7 @@ func TestLogsStorageLimitConcurrentDownloadsRunInParallel(t *testing.T) {
 
 func TestLogsStorageLimitConcurrentDeferredDownloadsProtectFreshRuns(t *testing.T) {
 	outputDir := t.TempDir()
-	limit := newLogsStorageLimit(outputDir, 1)
+	limit := newLogsStorageLimit(outputDir, 1, false)
 
 	const numDownloads = 2
 	ready := make(chan struct{}, numDownloads)
@@ -393,4 +478,51 @@ func TestLogsStorageLimitConcurrentDeferredDownloadsProtectFreshRuns(t *testing.
 	})
 	require.NoError(t, err)
 	assert.True(t, called, "a later run should be admitted after all deferred runs are finalized")
+}
+
+func TestLogsStorageLimitPrunesOldRunInlineDuringConcurrentDownloads(t *testing.T) {
+	outputDir := t.TempDir()
+	oldRunDir := filepath.Join(outputDir, "run-1")
+	require.NoError(t, os.MkdirAll(oldRunDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(oldRunDir, runSummaryFileName), make([]byte, 3*bytesPerMegabyte/4), 0o600))
+	limit := newLogsStorageLimit(outputDir, 1, true)
+
+	const numDownloads = 2
+	ready := make(chan struct{}, numDownloads)
+	release := make(chan struct{})
+	errs := make(chan error, numDownloads)
+	var wg sync.WaitGroup
+	for i := range numDownloads {
+		runDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", i+2))
+		wg.Go(func() {
+			errs <- limit.runDownloadDeferred(context.Background(), runDir, func() error {
+				if err := os.MkdirAll(runDir, 0o755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(runDir, runSummaryFileName), make([]byte, bytesPerMegabyte/2), 0o600); err != nil {
+					return err
+				}
+				ready <- struct{}{}
+				<-release
+				return nil
+			})
+		})
+	}
+
+	for range numDownloads {
+		<-ready
+	}
+	close(release)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
+
+	assert.NoDirExists(t, oldRunDir, "oldest completed run should be pruned before concurrent downloads finish processing")
+	for i := range numDownloads {
+		runDir := filepath.Join(outputDir, fmt.Sprintf("run-%d", i+2))
+		assert.DirExists(t, runDir)
+		require.NoError(t, limit.finalizeDownload(runDir))
+	}
 }

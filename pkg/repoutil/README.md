@@ -44,7 +44,7 @@ Both functions are pure and stateless; they MAY be called concurrently without s
 
 ## Source Synchronization
 
-Reviewed against source on 2026-07-26; no public-contract deltas identified. Re-verified on 2026-08-14; still no public-contract deltas. Re-verified on 2026-08-29; still no public-contract deltas. Re-verified on 2026-09-03; still no public-contract deltas.
+Reviewed against source on 2026-07-26; no public-contract deltas identified. Re-verified on 2026-08-14; still no public-contract deltas. Re-verified on 2026-08-29; still no public-contract deltas. Re-verified on 2026-09-03; still no public-contract deltas. Re-verified on 2026-09-08; still no public-contract deltas.
 
 ---
 

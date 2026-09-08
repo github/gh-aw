@@ -473,7 +473,7 @@ func TestDownloadRunArtifactsConcurrent_StorageLimitPreservesSubmissionOrder(t *
 	// A large budget that will not be reached; the goal is to observe ordering and
 	// concurrency safety, not the limit-reached code path (covered separately in
 	// logs_storage_limit_test.go).
-	storageLimit := newLogsStorageLimit(tmpDir, 10240)
+	storageLimit := newLogsStorageLimit(tmpDir, 10240, false)
 
 	results := downloadRunArtifactsConcurrent(ctx, runs, runArtifactsConcurrentOptions{
 		outputDir:    tmpDir,

@@ -61,7 +61,7 @@ func prepareLogsDownload(ctx context.Context, opts LogsDownloadOptions) (logsDow
 	activeCtx, timeoutCancel, startTime, timeoutDuration := buildLogsDownloadContext(ctx, opts.TimeoutMinutes, opts.TimeoutSeconds, opts.Verbose)
 	storageLimit := opts.storageLimit
 	if storageLimit == nil {
-		storageLimit = newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB)
+		storageLimit = newLogsStorageLimit(opts.OutputDir, opts.MaxStorageMB, opts.PruneOlderRuns)
 	}
 	return logsDownloadRuntime{
 		activeCtx:       activeCtx,
