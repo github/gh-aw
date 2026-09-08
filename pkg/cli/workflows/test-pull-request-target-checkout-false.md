@@ -1,4 +1,5 @@
 ---
+strict: false
 on:
   pull_request_target:
     types: [opened, synchronize]
