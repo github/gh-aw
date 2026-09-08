@@ -1,24 +1,104 @@
 {
-  "run_date": "2026-09-08T12:35:31Z",
-  "run_id": "34226663599",
+  "run_date": "2026-09-08T18:30:15Z",
+  "run_id": "34263114529",
   "prior_run_id": "34226663599",
   "summary": {
     "eligible_total": 4,
-    "cooldown_skipped": 2,
-    "category_counts": {"bug": 4},
-    "risk_counts": {"high": 2, "medium": 2},
-    "priority_counts": {"high": 2, "medium": 2},
-    "action_counts": {"fast_track": 2, "batch_review": 2},
+    "cooldown_skipped": 1,
+    "category_counts": {
+      "bug": 3,
+      "refactor": 1
+    },
+    "risk_counts": {
+      "high": 2,
+      "medium": 2
+    },
+    "priority_counts": {
+      "high": 2,
+      "medium": 2
+    },
+    "action_counts": {
+      "fast_track": 2,
+      "batch_review": 2
+    },
     "auto_merge": 0,
     "close": 0
   },
   "prs": [
-    {"number": 58310, "category": "bug", "risk": "high", "score": 78, "action": "fast_track", "labels": ["pr-agent:copilot", "pr-type:bug", "pr-risk:high", "pr-priority:high", "pr-action:fast_track"]},
-    {"number": 57313, "category": "bug", "risk": "medium", "score": 56, "action": "batch_review", "labels": ["pr-agent:copilot", "pr-type:bug", "pr-risk:medium", "pr-priority:medium", "pr-action:batch_review"]},
-    {"number": 56568, "category": "bug", "risk": "high", "score": 70, "action": "fast_track", "labels": ["pr-agent:copilot", "pr-type:bug", "pr-risk:high", "pr-priority:high", "pr-action:fast_track"]},
-    {"number": 56562, "category": "bug", "risk": "medium", "score": 62, "action": "batch_review", "labels": ["pr-agent:copilot", "pr-type:bug", "pr-risk:medium", "pr-priority:medium", "pr-action:batch_review"]}
+    {
+      "number": 58310,
+      "category": "bug",
+      "risk": "high",
+      "score": 80,
+      "action": "fast_track",
+      "labels": [
+        "pr-agent:copilot",
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-batch:workflow-reliability"
+      ]
+    },
+    {
+      "number": 57313,
+      "category": "bug",
+      "risk": "medium",
+      "score": 50,
+      "action": "batch_review",
+      "labels": [
+        "pr-agent:copilot",
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-batch:workflow-reliability"
+      ]
+    },
+    {
+      "number": 56568,
+      "category": "bug",
+      "risk": "high",
+      "score": 68,
+      "action": "fast_track",
+      "labels": [
+        "pr-agent:copilot",
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-batch:workflow-reliability"
+      ]
+    },
+    {
+      "number": 56562,
+      "category": "refactor",
+      "risk": "medium",
+      "score": 61,
+      "action": "batch_review",
+      "labels": [
+        "pr-agent:copilot",
+        "pr-type:refactor",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-batch:workflow-reliability"
+      ]
+    }
   ],
-  "cooldown_skipped": [59454, 59453],
-  "batches": [],
+  "cooldown_skipped": [
+    59502
+  ],
+  "batches": [
+    {
+      "id": "workflow-reliability",
+      "prs": [
+        58310,
+        57313,
+        56568,
+        56562
+      ]
+    }
+  ],
   "report_issue": "created"
 }
