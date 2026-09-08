@@ -634,7 +634,7 @@ func transformRepoPattern(pattern string) string {
 // policy per MCP Gateway Specification Section 10.9.3: the blanket allow disables both
 // forcePublicRepos and sink-visibility enforcement.
 //
-// Returns nil when workflowData is nil or when no GitHub tool is present.
+// Returns nil when workflowData is nil, or when neither the GitHub tool nor a dynamic repository enclave is present.
 func deriveWriteSinkGuardPolicyFromWorkflow(workflowData *WorkflowData) map[string]any {
 	if workflowData == nil || workflowData.Tools == nil {
 		return dynamicEnclaveWriteSinkGuardPolicy(workflowData)
