@@ -27,7 +27,7 @@ func (r *MCPConfigRendererUnified) RenderGitHubMCP(yaml *strings.Builder, github
 	// for the DIFC source labels enforced by the MCP gateway.
 	// The determine-automatic-lockdown step outputs min_integrity and repos for public repos.
 	explicitGuardPolicies := getGitHubGuardPolicies(githubTool)
-	if len(explicitGuardPolicies) == 0 {
+	if len(explicitGuardPolicies) == 0 && githubBackendIsDynamicDelegationOnly(workflowData) {
 		explicitGuardPolicies = dynamicEnclaveGitHubGuardPolicies(workflowData)
 	}
 	// Integrity reaction fields are only supported in proxy mode (DIFC/CLI proxy),
