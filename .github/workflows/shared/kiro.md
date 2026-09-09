@@ -1,6 +1,7 @@
 ---
 engine:
   id: kiro
+  detection-engine: copilot
   display-name: Kiro
   description: Kiro CLI with headless execution and native MCP support
   experimental: true

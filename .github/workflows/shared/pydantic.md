@@ -10,6 +10,7 @@ pre-agent-steps:
       python3 -c "from pydantic_ai_harness import Coder"
 engine:
   id: pydantic-ai
+  detection-engine: copilot
   version: "0.21.0"
   display-name: Pydantic AI
   description: Pydantic AI CLI (pai) running the pydantic-ai-harness coder agent with MCP tool support
