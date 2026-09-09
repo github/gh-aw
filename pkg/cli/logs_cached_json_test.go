@@ -31,6 +31,13 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	assert.Equal(t, "cached-workflow", runs[42].WorkflowName)
 }
 
+func TestLoadCachedLogsJSONIgnoresMissingFile(t *testing.T) {
+	runs, err := loadCachedLogsJSON(filepath.Join(t.TempDir(), "missing.json"))
+
+	require.NoError(t, err)
+	assert.Nil(t, runs)
+}
+
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "logs.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{"summary":{}}`), 0o600))

@@ -19,6 +19,9 @@ func loadCachedLogsJSON(path string) (cachedLogsRuns, error) {
 		return nil, nil
 	}
 	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached logs JSON: %w", err)
 	}
