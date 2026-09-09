@@ -1,37 +1,25 @@
 {
-  "lastRun": "2026-07-08",
-  "ruleCount": 12,
-  "rules": ["no-core-setoutput-non-string", "no-json-stringify-error", "no-unsafe-catch-error-property", "no-unsafe-promise-catch-error-property", "prefer-get-error-message", "prefer-number-isnan", "require-async-entrypoint-catch", "require-await-core-summary-write", "require-error-cause-in-rethrow", "require-fs-sync-try-catch", "require-json-parse-try-catch", "require-parseInt-radix"],
-  "cadence": "~1 new rule/day. Detect newest via index.ts imports diff vs rules[]. All 12 reviewed >=1x. Next likely: a 13th rule appears; lead with it.",
-  "thisRun_2026-07-08": "First review of 12th rule require-fs-sync-try-catch. Filed 2 (quality-over-cap). No fs-sync dupes.",
-  "requireFsSyncTryCatchFindings": {
-    "design": "Flags fs.readFileSync/writeFileSync/appendFileSync (3 methods) NOT in a try block. Matches fs.method + computed fs['method'] literal; excludes fs[varName]. callee.object must be Identifier 'fs' - PURE SYNTACTIC, no scope resolution. isInsideTryBlock walks ancestors, crossedDeferredBoundary via shared isDeferredCallback util. Suggestion only for Expression/ReturnStatement (VariableDeclaration -> suggestions:[], correct). mkdir/unlink/readdir/... out-of-scope 1st iteration.",
-    "trueNegatives": "send_otlp_span.cjs:662/1628/1408 + apply_samples.cjs:274 correctly unflagged (wrapped). Codebase disciplined; rule guards regressions.",
-    "issue1_FILED_grounded_MED": "destructured/named fs binding FN: rule matches fs.<method> only; const {appendFileSync}=require('fs') + bare appendFileSync() escapes. GROUNDED: action_setup_otlp.cjs:43 unwrapped appendFileSync->GITHUB_OUTPUT/ENV. Ask: scope-resolve fs/node:fs bindings incl destructure+alias, tests, re-verify :43.",
-    "issue2_FILED_soundness_MED": "isInsideTryBlock never checks ancestor.handler!=null; catch-less try/finally treated protective but still crashes. UNGROUNDED (0 live sites), cheap fix. Ask: require handler; try{fs}finally invalid + try{}catch{}finally valid tests. Audit same in sibling try/catch rules.",
-    "unfiled": "method-scope expansion (mkdirSync/readdirSync/... 438 occ, out-of-scope by design; discussion not issue); fs name-shadow FP (ungrounded, closed by issue1 fix); README documents only 2/12 rules (doc debt)."
-  },
-  "priorOpenIssues": {
-    "43948+sibling": "require-error-cause-in-rethrow: expressionReferencesCatchVar skips Logical/Conditional/Sequence FN; + alias-blindspot FN (grounded create_pull_request.cjs:589). Filed 07-07.",
-    "43486+sibling": "prefer-number-isnan: misleading Number() caveat + suggestion-only on numeric args; hasLocalBinding excludes ImportBinding.",
-    "43326": "await-summary FN: discarded promise in non-bare-call statement positions.",
-    "42915": "no-unsafe-promise-catch-error-property whole-callback branch-order FN.",
-    "42682/42680": "setoutput: only .length (misses .number/.size); misses unary/negative numeric literals.",
-    "42190/42189/42188": "no-unsafe-catch-error-property: stack/code suggestions+computed; whole-block branch-order FN; broaden beyond message/stack/code."
-  },
+  "lastRun": "2026-09-09",
+  "ruleCount": 61,
+  "note": "MAJOR CORRECTION 2026-09-09: repo-memory was stale since 2026-07-08 (tracked only 12/61 rules). index.ts now registers 61 rules; ~9-10 already have open eslint-factory-labeled issues filed by runs this memory never recorded (e.g. #59377/#59378 fs-resolver reassignment, #59144, #58933, #58738, #58400, #58169, #58168, #57869, #57868). Treat `gh api \"repos/github/gh-aw/issues?state=open&per_page=100&labels=eslint-factory\"` as the ONLY authoritative dedup source going forward, not this file's issue list.",
+  "fsSyncFamilyConfirmedFixed_2026-09-09": "Both 07-08 findings against require-fs-sync-try-catch (destructured-binding FN, catch-less-try/finally FN) are FIXED in try-catch-rule-utils.ts: isInsideTryBlock now checks ancestor.handler!=null; createFsSyncMethodResolver now handles destructured require('fs') + aliased imports + member-expression aliases. Benefits all 5 sibling *-sync-try-catch rules. Remaining known gap in that resolver family: reassignment-after-init blind spot, already filed as #59377 (fs) / #57624 (child_process) - do not refile.",
+  "thisRun_2026-09-09": "Deep-dove 3 rules never tracked before: require-http-response-error-listener (only 'error'-severity rule), require-getexecoutput-exitcode-check, no-duplicate-constant-values. Filed 2 latent/ungrounded-but-justified issues (quality-over-cap, precedent #59377): (1) response-callback detection misses .addListener alias + req.on('response',cb) idiom; (2) string duplicate min-group-size flat at 2 unlike numeric/boolean/null's 3, no low-entropy-string guard. require-getexecoutput-exitcode-check investigated extensively, NO grounded or compelling latent defect found (rule well-designed, conservative skip-on-return logic verified correct against 4+ live call sites).",
+  "rulesReviewedThisRun": ["require-fs-sync-try-catch (re-verify only, already fixed)", "require-http-response-error-listener", "require-getexecoutput-exitcode-check", "no-duplicate-constant-values"],
+  "knownOpenIssuesSnapshot_2026-09-09": ["59378:require-fs-close-sync collectCloseTargetVariables prop/key misattribution", "59377:isIdentifierBoundToFsModule no reassignment check", "59144:no-misplaced-error-code-definition naming heuristic misses ERR_* convention", "58933:require-error-code-for-github-api-throw misses octokit.request()", "58738:prefer-actions-exec-over-child-process shell-semantics blanket suggestion", "58400:no-string-fallback-for-non-string-message needs autofix", "58169:prefer-actions-exec-over-child-process overstates execSync migration cost", "58168:prefer-actions-exec-over-child-process FN on spawnSync output capture", "57869:no-json-stringify-equality misses indirect template-literal compare", "57868:try/catch suggestion builder skips VariableDeclaration call sites"],
   "nextPriorities": [
-    "Re-read index.ts FIRST; diff vs rules[] (12) to find newest never-reviewed rule; lead with it.",
-    "If fs-sync gets scope-resolution: re-verify action_setup_otlp.cjs:43 flagged/wrapped. If catch-less-try fix lands: confirm plain try/catch valid cases unregressed.",
-    "New grounded defect class once rules stable: fs sync method-scope expansion (mkdirSync/readdirSync unwrapped, 438 occ); core.setFailed(non-string) twin of setoutput rule; String.replace w/o /g. Ground before filing.",
-    "README doc debt (2/12 documented): file 1 doc issue OR raise in discussion.",
+    "Rebuild a full 61-rule inventory (diff eslint.config.cjs rule list vs this file's rules[] over next few runs) since only ~16 rules have ever been reviewed by this memory (12 old + 4 this run); ~45 rules are completely unreviewed by memory though many already have open issues filed by runs this memory missed recording.",
+    "Do NOT re-derive fs-resolver reassignment gap (#59377/#57624) - already comprehensively filed.",
+    "Good next untouched-by-memory-and-no-open-issue candidates to check: no-misplaced-error-code-definition family, require-error-code-for-github-api-throw, no-json-stringify-equality, require-fs-close-sync (all have SOME open issue already - read existing issue first to avoid re-finding same gap; look for a DIFFERENT defect class in each).",
+    "README doc debt still open from 07-08 (2/12 documented at that time; now 2/61) - consider a discussion-only mention rather than filing yet another doc issue.",
     "Cannot close issues (safe outputs limited); close-recs -> discussion only."
   ],
   "ops": [
-    "repo-memory: Read/Write/Glob/Edit tools ONLY (Bash on /tmp blocked). After Write, `safeoutputs push_repo_memory --memory_id default` to validate. TOTAL memory must be <=12KB (10KB patch limit) - keep lean, stub old findings files (see findings-2026-06-30/07-01/07-05 stub pattern).",
-    "create issue: Write JSON {title,body,labels} to file in working dir (eslint-factory/.tmp_issueN.json), then `cd eslint-factory && safeoutputs create_issue . < file 2>/dev/null`. {\"result\":\"success\"}==accepted. rm temp after. Params: title*,body*,labels,fields,parent,temporary_id.",
-    "dedupe: gh api repos/github/gh-aw/issues?state=open&per_page=100 --jq select title test(pat;i). Reliable. gh issue list --search --json throws 'malformed version'.",
-    "Bash BLOCKS: compound (&&,;), heredocs w/ braces, ${var}, brace-in-quote, backslash-escaped braces in grep. Use single simple cmds; Grep/Glob/Read/Edit tools for search+memory edits.",
-    "eslint-factory: NO node_modules/dist, npm firewalled - no live lint. Ground statically via Grep on non-test .cjs (config ignores *.test.cjs) + rule src/tests. Rules registered gh-aw-custom/<name>, warn.",
+    "repo-memory: Read/Write/Glob/Edit tools ONLY (Bash on /tmp blocked, but Bash works fine for gh/CLI calls in the repo working dir). After Write, `safeoutputs push_repo_memory --memory_id default` to validate. TOTAL memory must be <=12KB (10KB patch limit) - keep lean, stub old findings files.",
+    "create issue: Write JSON {title,body,labels} to file in eslint-factory/.tmp_issueN.json, then `cd eslint-factory && safeoutputs create_issue . < file`; {\"result\":\"success\"}==accepted; rm temp after.",
+    "dedupe: gh api with query-string form WORKS: `gh api \"repos/github/gh-aw/issues?state=open&per_page=100&labels=eslint-factory\" --jq '.[] | {number,title}'`. The -f flag form (`gh api repos/... -f state=open -f labels=eslint-factory`) FAILED this run with 403 'Resource not accessible by integration' - use the query-string form instead. `gh issue list --search --json` still throws 'malformed version' - avoid.",
+    "Bash BLOCKS: compound (&&,;) when mixed with certain patterns, heredocs w/ braces, output redirection outside working dir, wildcard globs in some git log invocations. Use single simple cmds; Grep/Glob/Read/Edit tools for search+memory edits. `ls`/listing on /tmp/gh-aw/repo-memory/* via Bash is blocked - use Glob tool instead, it works fine there.",
+    "Shallow clone: git log/blame on eslint-factory/src/rules attributes ALL files to one recent squash commit - cannot determine true rule age this way. Use eslint.config.cjs rule list diffed against this file's tracked rules[] instead.",
+    "eslint-factory: NO node_modules/dist, npm firewalled - no live lint. Ground statically via Grep on non-test .cjs (config ignores *.test.cjs) + rule src/tests. Rules registered gh-aw-custom/<name>; all warn except require-http-response-error-listener which is error.",
     "create_discussion params: title*, body*, category, integrity, secrecy."
   ]
 }
