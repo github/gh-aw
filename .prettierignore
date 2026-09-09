@@ -12,6 +12,8 @@ build/
 
 # Generated files
 *.lock.yml
+schemas/audit.schema.json
+schemas/logs.schema.json
 
 # DevContainer configuration (should not be reformatted)
 .devcontainer/devcontainer.json
