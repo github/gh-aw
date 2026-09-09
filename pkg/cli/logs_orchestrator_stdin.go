@@ -304,6 +304,7 @@ func DownloadWorkflowLogsFromStdin(ctx context.Context, opts StdinLogsOptions) e
 		jsonOutput:     opts.JSONOutput,
 		toolGraph:      opts.ToolGraph,
 		train:          opts.Train,
+		drain3Weights:  opts.Drain3Weights,
 		audit:          opts.Audit,
 		message:        message,
 		verbose:        opts.Verbose,

@@ -107,6 +107,36 @@ func TestTrainDrain3Weights_JSONStructure(t *testing.T) {
 	}
 }
 
+func TestTrainDrain3Weights_LoadsExistingWeights(t *testing.T) {
+	seedDir := t.TempDir()
+	runs := []ProcessedRun{{
+		Run: WorkflowRun{
+			DatabaseID: 1,
+			Conclusion: "success",
+			Turns:      3,
+		},
+	}}
+	require.NoError(t, TrainDrain3Weights(runs, seedDir, false))
+	weightsPath := filepath.Join(seedDir, drain3WeightsFilename)
+
+	outputDir := t.TempDir()
+	_, stderr := captureOutput(t, func() error {
+		return trainDrain3Weights(runs, outputDir, weightsPath, false)
+	})
+
+	assert.Contains(t, stderr, "Loaded log pattern weights from: "+weightsPath)
+	assert.FileExists(t, filepath.Join(outputDir, drain3WeightsFilename))
+}
+
+func TestTrainDrain3Weights_RejectsInvalidExistingWeights(t *testing.T) {
+	weightsPath := filepath.Join(t.TempDir(), "weights.json")
+	require.NoError(t, os.WriteFile(weightsPath, []byte(`not json`), 0o600))
+
+	err := trainDrain3Weights([]ProcessedRun{{Run: WorkflowRun{Turns: 1}}}, t.TempDir(), weightsPath, false)
+
+	require.ErrorContains(t, err, "load weights file")
+}
+
 func TestLogsCommandHasTrainFlag(t *testing.T) {
 	t.Parallel()
 	cmd := NewLogsCommand()

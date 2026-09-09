@@ -269,11 +269,13 @@ func processSingleRunDownload(
 		handleArtifactDownloadError(result, err, params.verbose)
 	} else {
 		if !ok {
+			writeWorkflowRunFolderLocation(run.DatabaseID, runOutputDir)
 			logsOrchestratorLog.Printf("Downloading artifacts for run %d: owner=%s, repo=%s", run.DatabaseID, perRunParams.dlOwner, perRunParams.dlRepo)
 			err := params.storageLimit.runDownloadDeferredReserved(ctx, runOutputDir, func() error {
 				if err := waitForConfiguredRateLimit(ctx, params.verbose, params.maxGitHubAPIRateLimit, logsRunPreflightAPIReserve); err != nil {
 					return err
 				}
+
 				if err := os.MkdirAll(runOutputDir, constants.DirPermSensitive); err != nil {
 					return fmt.Errorf("failed to create run output directory: %w", err)
 				}
@@ -309,6 +311,14 @@ func processSingleRunDownload(
 		fmt.Fprintf(os.Stderr, "Processing runs: %s\r", progressBar.Update(completed))
 	}
 	return *result, nil
+}
+
+func writeWorkflowRunFolderLocation(runID int64, runOutputDir string) {
+	runFolder, err := filepath.Abs(runOutputDir)
+	if err != nil {
+		runFolder = runOutputDir
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Workflow run %d folder: %s", runID, runFolder)))
 }
 
 func prepareRunDownload(

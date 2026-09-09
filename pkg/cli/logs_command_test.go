@@ -111,6 +111,9 @@ func TestNewLogsCommand(t *testing.T) {
 	cachedJSONFlag := flags.Lookup("cached-json")
 	require.NotNil(t, cachedJSONFlag, "Should have 'cached-json' flag")
 	assert.Contains(t, cachedJSONFlag.Usage, "previous logs JSON")
+	drain3WeightsFlag := flags.Lookup("drain3-weights")
+	require.NotNil(t, drain3WeightsFlag, "Should have 'drain3-weights' flag")
+	assert.Contains(t, drain3WeightsFlag.Usage, "existing Drain3 weights")
 }
 
 func TestLogsCommandFlagDefaults(t *testing.T) {
@@ -135,6 +138,7 @@ func TestLogsCommandFlagDefaults(t *testing.T) {
 		{"max-storage", "0"},
 		{"prune-older-runs", "false"},
 		{"cached-json", ""},
+		{"drain3-weights", ""},
 	}
 
 	for _, tt := range tests {
@@ -168,6 +172,16 @@ func TestLogsCommandCachedJSONOption(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "previous.json", opts.CachedJSON)
+}
+
+func TestLogsCommandDrain3WeightsOption(t *testing.T) {
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("drain3-weights", "weights.json"))
+
+	opts, err := loadCommonLogsOptions(cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, "weights.json", opts.Drain3Weights)
 }
 
 func TestLogsCommandRejectsNegativeMaxStorage(t *testing.T) {

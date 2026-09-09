@@ -31,11 +31,34 @@ func TestLoadCachedLogsJSON(t *testing.T) {
 	assert.Equal(t, "cached-workflow", runs[42].WorkflowName)
 }
 
+func TestLoadCachedLogsJSONReportsFoundFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"runs":[]}`), 0o600))
+
+	_, stderr := captureOutput(t, func() error {
+		_, err := loadCachedLogsJSON(path)
+		return err
+	})
+
+	assert.Contains(t, stderr, "Found cached logs JSON file: "+path)
+}
+
 func TestLoadCachedLogsJSONIgnoresMissingFile(t *testing.T) {
 	runs, err := loadCachedLogsJSON(filepath.Join(t.TempDir(), "missing.json"))
 
 	require.NoError(t, err)
 	assert.Nil(t, runs)
+}
+
+func TestLoadCachedLogsJSONReportsMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.json")
+
+	_, stderr := captureOutput(t, func() error {
+		_, err := loadCachedLogsJSON(path)
+		return err
+	})
+
+	assert.Contains(t, stderr, "Cached logs JSON file not found: "+path)
 }
 
 func TestLoadCachedLogsJSONRejectsInvalidInput(t *testing.T) {
@@ -66,6 +89,7 @@ func TestWriteCachedLogsJSONUpdatesFileInPlace(t *testing.T) {
 			TokenUsageSummary: &TokenUsageSummary{TotalInputTokens: 100},
 		}},
 	}
+
 	data.Summary.TotalRuns = 1
 
 	require.NoError(t, writeCachedLogsJSON(path, data, false))
@@ -78,6 +102,16 @@ func TestWriteCachedLogsJSONUpdatesFileInPlace(t *testing.T) {
 	assert.Equal(t, int64(2), result.Runs[0].RunID)
 	assert.Equal(t, "updated-workflow", result.Runs[0].WorkflowName)
 	assert.Nil(t, result.Runs[0].TokenUsageSummary, "cached output should match the compact JSON response")
+}
+
+func TestWriteCachedLogsJSONReportsWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.json")
+
+	_, stderr := captureOutput(t, func() error {
+		return writeCachedLogsJSON(path, LogsData{Runs: []RunData{}}, false)
+	})
+
+	assert.Contains(t, stderr, "Writing cached logs JSON file: "+path)
 }
 
 func TestDownloadWorkflowLogsFromEmptyStdinUpdatesCachedJSON(t *testing.T) {

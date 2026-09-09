@@ -100,6 +100,7 @@ const logsCommandExampleTemplate = `  # Basic usage
   %[1]s logs weekly-research --format markdown --last 10  # Cross-run report for last 10 runs
   %[1]s logs --train                   # Train log pattern weights from last 10 runs
   %[1]s logs my-workflow --train -c 50 # Train log pattern weights from up to 50 runs of a specific workflow
+  %[1]s logs --train --drain3-weights drain3_weights.json # Continue training from existing weights
 
   # Cross-repository
   %[1]s logs weekly-research --repo owner/repo  # Download logs from specific repository
@@ -246,6 +247,7 @@ func loadStdinLogsOptions(cmd *cobra.Command) (StdinLogsOptions, error) {
 		GradersOnly:       values.GradersOnly,
 		Audit:             values.Audit,
 		Train:             values.Train,
+		Drain3Weights:     values.Drain3Weights,
 		Format:            values.Format,
 		ReportFile:        values.ReportFile,
 		ArtifactSets:      values.ArtifactSets,
@@ -425,6 +427,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) {
 		GradersOnly:           getBoolFlag(cmd, "graders"),
 		Audit:                 getBoolFlag(cmd, "audit"),
 		Train:                 getBoolFlag(cmd, "train"),
+		Drain3Weights:         getStringFlag(cmd, "drain3-weights"),
 		Format:                getStringFlag(cmd, "format"),
 		ReportFile:            getStringFlag(cmd, "report-file"),
 		ArtifactSets:          getStringSliceFlag(cmd, "artifacts"),
@@ -590,6 +593,7 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	logsCmd.Flags().Bool("prune-older-runs", false, "Remove oldest completed runs when non-essential cache pruning cannot satisfy --max-storage")
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")
 	logsCmd.Flags().Bool("train", false, "Analyze log patterns across downloaded runs and save pattern weights to drain3_weights.json in the output directory")
+	logsCmd.Flags().String("drain3-weights", "", "Path to existing Drain3 weights JSON used to seed log pattern training")
 	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().String("report-file", "", "Write --format markdown output directly to this file path instead of stdout (creates parent directories as needed)")
 	logsCmd.Flags().String("cached-json", "", "Path to previous logs JSON output to reuse for matching runs and overwrite with the updated response")
