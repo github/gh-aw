@@ -620,6 +620,13 @@ generate-action-metadata:
 	@echo "Generating action metadata..."
 	@go run ./internal/tools/generate-action-metadata generate
 
+.PHONY: generate-logs-schema
+generate-logs-schema:
+	@echo "Generating logs JSON schema..."
+	@go run ./cmd/generate-logs-schema > schemas/logs.json.tmp
+	@mv schemas/logs.json.tmp schemas/logs.json
+	@npx prettier --write schemas/logs.json --log-level=error >/dev/null
+
 # Check Node.js version
 .PHONY: check-node-version
 check-node-version:
@@ -1408,6 +1415,7 @@ help:
 	@echo "  actions-validate - Validate action.yml files"
 	@echo "  actions-clean    - Clean action build artifacts"
 	@echo "  generate-action-metadata - Generate action.yml and README.md from JavaScript modules"
+	@echo "  generate-logs-schema - Generate the logs command JSON output schema"
 	@echo "  tools            - Install build-time tools declared in go.mod tool directives"
 	@echo "  license-check    - Check dependency licenses for compliance"
 	@echo "  license-report   - Generate CSV license report"
