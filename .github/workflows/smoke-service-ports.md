@@ -15,8 +15,8 @@ permissions:
   issues: read
   pull-requests: read
 name: Smoke Service Ports
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 sandbox:
   agent:

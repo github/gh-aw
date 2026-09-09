@@ -12,13 +12,12 @@ max-daily-ai-credits: 1
 permissions:
   contents: read
   issues: read
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 timeout-minutes: 5
 network: {}
 safe-outputs:

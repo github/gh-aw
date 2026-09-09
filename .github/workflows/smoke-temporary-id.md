@@ -20,8 +20,8 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 network:
   allowed:
@@ -79,7 +79,6 @@ evals:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 ---
 

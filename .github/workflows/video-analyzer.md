@@ -15,8 +15,8 @@ permissions:
   issues: read
   pull-requests: read
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 
 imports:
   - shared/ffmpeg.md
@@ -35,9 +35,6 @@ safe-outputs:
 
 timeout-minutes: 15
 strict: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Video Analysis Agent

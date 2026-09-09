@@ -21,8 +21,8 @@ permissions:
 concurrency:
   job-discriminator: ${{ inputs.organization || github.run_id }}
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 timeout-minutes: 45
 

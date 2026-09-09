@@ -7,8 +7,8 @@ on:
 permissions:
   contents: read
   issues: read
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 network: defaults
 strict: true
 tracker-id: weekly-network-domains-audit

@@ -11,8 +11,8 @@ on:
 permissions:
   issues: read
 tracker-id: weekly-issue-summary
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 network:
   allowed:
     - defaults

@@ -14,8 +14,8 @@ permissions:
 
 
 tracker-id: refactoring-cadence
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 imports:
   - uses: shared/skip-if-issue-open.md
     with:

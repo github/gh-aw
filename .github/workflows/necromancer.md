@@ -15,8 +15,8 @@ permissions:
   pull-requests: read
 
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 timeout-minutes: 25
 network:
@@ -24,7 +24,7 @@ network:
 tools:
   cli-proxy: true
   github:
-    mode: local
+    mode: gh-proxy
     toolsets: [default, pull_requests]
   bash:
     - "*"
@@ -57,9 +57,6 @@ evals:
     question: Did the agent investigate the pull request and identify any root-cause issues or missing test coverage?
   - id: tests-added-or-noop
     question: Were regression tests added to the pull request branch, or was noop correctly called when no tests were needed?
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Necromancer

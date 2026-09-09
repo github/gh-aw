@@ -18,8 +18,8 @@ permissions:
   issues: read
   pull-requests: read
 name: Agent Container Smoke Test
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 runtimes:
   node:
@@ -61,7 +61,6 @@ features:
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 ---
 
 # Smoke Test: Agent Container Tools
