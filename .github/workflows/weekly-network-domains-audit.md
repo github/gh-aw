@@ -5,6 +5,7 @@ on:
   schedule: weekly on monday around 09:00
   workflow_dispatch:
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
 engine: pi

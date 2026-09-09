@@ -7,6 +7,7 @@ on:
   schedule: daily
 
 permissions:
+  copilot-requests: write
   contents: read
 
 engine: pi

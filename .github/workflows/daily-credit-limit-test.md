@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 max-daily-ai-credits: 1
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
 engine: pi

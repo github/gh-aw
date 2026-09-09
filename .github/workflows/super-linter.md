@@ -7,6 +7,7 @@ on:
   schedule:
     - cron: "daily around 14:00 on weekdays" # ~2 PM UTC, weekdays only
 permissions:
+  copilot-requests: write
   contents: read
   actions: read
   issues: read
