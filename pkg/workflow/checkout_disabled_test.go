@@ -180,3 +180,72 @@ Target-only checkout with explicit GitHub App auth.
 	assert.Contains(t, agentSection, "permission-contents: read", "checkout app token should request contents read")
 	assert.NotContains(t, agentSection, "permission-contents: none", "checkout app token must not request contents none")
 }
+
+// TestCheckoutDisabledWithSafeOutputsAppTargetUsesContentsReadForMintedToken covers the
+// safe_outputs job's copy of the checkout steps: a target-only workflow that also creates
+// pull requests must mint a valid contents: read token there too, and must not mint an
+// unused token for the suppressed default checkout.
+func TestCheckoutDisabledWithSafeOutputsAppTargetUsesContentsReadForMintedToken(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "checkout-disabled-safe-outputs-app-test")
+
+	testContent := `---
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: none
+  issues: read
+tools:
+  github:
+    toolsets: [issues]
+engine: claude
+safe-outputs:
+  create-pull-request:
+checkout:
+  - github-app:
+      app-id: ${{ vars.DEFAULT_APP_CLIENT_ID }}
+      private-key: ${{ secrets.DEFAULT_APP_PRIVATE_KEY }}
+  - repository: octo-org/target-repository
+    path: target
+    github-app:
+      app-id: ${{ vars.TARGET_APP_CLIENT_ID }}
+      private-key: ${{ secrets.TARGET_APP_PRIVATE_KEY }}
+      owner: octo-org
+      repositories:
+        - target-repository
+strict: false
+---
+
+# Test Workflow
+
+Target-only checkout with explicit GitHub App auth and safe outputs.
+`
+	testFile := filepath.Join(tmpDir, "test-workflow.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0644), "should write test file")
+
+	compiler := NewCompiler()
+	compiler.SetActionMode(ActionModeDev)
+	require.NoError(t, compiler.CompileWorkflow(testFile), "should compile workflow")
+
+	lockFile := stringutil.MarkdownToLockFile(testFile)
+	lockContent, err := os.ReadFile(lockFile)
+	require.NoError(t, err, "should read lock file")
+	lockContentStr := string(lockContent)
+
+	safeOutputsJobStart := strings.Index(lockContentStr, "\n  safe_outputs:")
+	require.NotEqual(t, -1, safeOutputsJobStart, "safe_outputs job not found in compiled workflow")
+	safeOutputsSection := lockContentStr[safeOutputsJobStart:]
+
+	assert.Contains(t, safeOutputsSection, "repository: octo-org/target-repository", "target checkout should be present in safe_outputs job")
+	assert.Contains(t, safeOutputsSection, "id: checkout-app-token-1", "target checkout app token step should be generated in safe_outputs job")
+	assert.Contains(t, safeOutputsSection, "permission-contents: read", "safe_outputs checkout app token should request contents read")
+	assert.NotContains(t, safeOutputsSection, "permission-contents: none", "safe_outputs checkout app token must not request contents none")
+	assert.NotContains(t, safeOutputsSection, "id: checkout-app-token-0", "suppressed default checkout must not mint an app token in safe_outputs job")
+
+	agentJobStart := strings.Index(lockContentStr, "\n  agent:")
+	require.NotEqual(t, -1, agentJobStart, "agent job not found in compiled workflow")
+	agentSection := lockContentStr[agentJobStart:safeOutputsJobStart]
+	assert.NotContains(t, agentSection, "id: checkout-app-token-0", "suppressed default checkout must not mint an app token in agent job")
+	assert.Contains(t, agentSection, "id: checkout-app-token-1", "target checkout app token step should be generated in agent job")
+	assert.NotContains(t, agentSection, "permission-contents: none", "agent checkout app token must not request contents none")
+}

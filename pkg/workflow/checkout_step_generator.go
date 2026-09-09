@@ -21,6 +21,12 @@ func wikiRepository(repository string) string {
 	return repository + ".wiki"
 }
 
+// isDefault reports whether the checkout entry is the default workspace-root
+// checkout of the workflow repository (no explicit repository and no explicit path).
+func (entry *resolvedCheckout) isDefault() bool {
+	return entry.key.path == "" && entry.key.repository == ""
+}
+
 // GenerateCheckoutAppTokenSteps generates GitHub App token minting steps for all
 // checkout entries that use app authentication. Each app-authenticated checkout
 // gets its own minting step with a unique step ID, so the minted token can be
@@ -34,6 +40,10 @@ func (cm *CheckoutManager) GenerateCheckoutAppTokenSteps(c *Compiler, permission
 	var steps []string
 	for checkoutIndex, entry := range cm.ordered {
 		if entry.githubApp == nil {
+			continue
+		}
+		if cm.skipDefaultCheckout && entry.isDefault() {
+			checkoutManagerLog.Printf("Skipping app token minting step for suppressed default checkout index=%d", checkoutIndex)
 			continue
 		}
 		checkoutManagerLog.Printf("Generating app token minting step for checkout index=%d repo=%q", checkoutIndex, entry.key.repository)
@@ -59,6 +69,10 @@ func (cm *CheckoutManager) GenerateSafeOutputCheckoutAppTokenSteps(c *Compiler, 
 	var steps []string
 	for checkoutIndex, entry := range cm.ordered {
 		if entry.safeOutputApp == nil {
+			continue
+		}
+		if cm.skipDefaultCheckout && entry.isDefault() {
+			checkoutManagerLog.Printf("Skipping safe_outputs app token minting step for suppressed default checkout index=%d", checkoutIndex)
 			continue
 		}
 		checkoutManagerLog.Printf("Generating safe_outputs app token minting step for checkout index=%d repo=%q", checkoutIndex, entry.key.repository)
@@ -102,7 +116,7 @@ func (cm *CheckoutManager) GenerateAdditionalCheckoutSteps(getActionPin func(str
 	var lines []string
 	for checkoutIndex, entry := range cm.ordered {
 		// Skip the default checkout (handled separately)
-		if entry.key.path == "" && entry.key.repository == "" {
+		if entry.isDefault() {
 			continue
 		}
 		lines = append(lines, generateCheckoutStepLines(entry, checkoutIndex, cm.keepCredentialsForPush, cm.pushToken, getActionPin)...)

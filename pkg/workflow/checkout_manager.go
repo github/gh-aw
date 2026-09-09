@@ -194,6 +194,19 @@ type CheckoutManager struct {
 	// defaultRefOverride forces the workspace-root checkout to a compiler-generated
 	// ref, such as a branch allocated before agent execution.
 	defaultRefOverride string
+	// skipDefaultCheckout records that the caller does not emit the default
+	// workspace-root checkout step (e.g. permissions.contents: none, checkout: false).
+	// App-token minting steps for the default checkout entry are then suppressed as
+	// well, since no generated step references the minted token.
+	skipDefaultCheckout bool
+}
+
+// SetSkipDefaultCheckout records whether the caller emits the default workspace
+// checkout step. When skip is true, GitHub App token minting steps for the default
+// checkout entry are omitted because no step references those tokens.
+func (cm *CheckoutManager) SetSkipDefaultCheckout(skip bool) {
+	checkoutManagerLog.Printf("Setting skipDefaultCheckout: %t", skip)
+	cm.skipDefaultCheckout = skip
 }
 
 // SetDefaultRefOverride forces the default workspace checkout to use ref.
@@ -442,6 +455,22 @@ func (cm *CheckoutManager) ResolveSafeOutputCheckoutTokenExpression(targetRepo s
 		token = combineTokenExpressions(token, getEffectiveSafeOutputGitHubToken(""))
 	}
 	return token, true
+}
+
+// resolveCheckoutAppTokenPermissions returns the permissions used when minting
+// checkout GitHub App tokens. Explicit target checkouts still need repository contents
+// access, even when permissions.contents is set to none to suppress the default
+// workflow-repository checkout, so contents is raised to read for token minting only.
+func resolveCheckoutAppTokenPermissions(data *WorkflowData) *Permissions {
+	perms := resolveCheckoutPermissions(data)
+	if level, exists := perms.Get(PermissionContents); exists && level != PermissionNone {
+		return perms
+	}
+
+	adjusted := NewPermissions()
+	adjusted.Merge(perms)
+	adjusted.Set(PermissionContents, PermissionRead)
+	return adjusted
 }
 
 // resolveCheckoutPermissions determines the permissions used when minting checkout

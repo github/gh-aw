@@ -51,6 +51,10 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	prCheckoutToken, _ := resolvePRCheckoutToken(data.SafeOutputs, checkoutMgr)
 	checkoutMgr.SetPushToken(resolveStaticCheckoutToken(data.SafeOutputs, checkoutMgr))
 
+	// The default workspace checkout is skipped below when permissions.contents: none
+	// signals a target-only checkout; suppress its app-token minting step too.
+	checkoutMgr.SetSkipDefaultCheckout(data.CheckoutSkipDefault)
+
 	// Combined condition: run the checkout/git-config steps only when a create_pull_request
 	// or push_to_pull_request_branch output will be processed.
 	condition := buildPRCheckoutCondition(data.SafeOutputs)
@@ -60,11 +64,16 @@ func (c *Compiler) buildSharedPRCheckoutSteps(data *WorkflowData) []string {
 	// Mint checkout app tokens (identical to the agent job) when any checkout uses app auth.
 	// These must live in the safe_outputs job because the minted token is referenced by the
 	// checkout steps via ${{ steps.checkout-app-token-N.outputs.token }} within the same job.
+	//
+	// Token minting uses resolveCheckoutAppTokenPermissions so explicit target checkouts
+	// keep a valid contents: read token even when permissions.contents: none suppresses
+	// the default workflow-repository checkout. The suppressed default checkout entry
+	// itself mints no token (SetSkipDefaultCheckout above).
 	if checkoutMgr.HasAppAuth() {
-		steps = append(steps, injectStepCondition(checkoutMgr.GenerateCheckoutAppTokenSteps(c, resolveCheckoutPermissions(data)), condition)...)
+		steps = append(steps, injectStepCondition(checkoutMgr.GenerateCheckoutAppTokenSteps(c, resolveCheckoutAppTokenPermissions(data)), condition)...)
 	}
 	if checkoutMgr.HasSafeOutputAppAuth() {
-		steps = append(steps, checkoutMgr.GenerateSafeOutputCheckoutAppTokenSteps(c, resolveCheckoutPermissions(data))...)
+		steps = append(steps, checkoutMgr.GenerateSafeOutputCheckoutAppTokenSteps(c, resolveCheckoutAppTokenPermissions(data))...)
 	}
 
 	// Default workspace checkout (identical to the agent job). Skipped when
