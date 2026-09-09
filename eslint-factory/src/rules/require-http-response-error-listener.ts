@@ -103,9 +103,17 @@ function isErrorListenerCall(call: TSESTree.CallExpression, name: string): boole
   return firstArg !== undefined && firstArg.type === AST_NODE_TYPES.Literal && firstArg.value === "error";
 }
 
+/** Returns true when `node` is a direct `<http>.request(...)` / `<http>.get(...)` call expression. */
+function isHttpRequestResultExpression(node: TSESTree.Node | null | undefined, sourceCode: TSESLint.SourceCode): boolean {
+  if (!node) return false;
+  return node.type === AST_NODE_TYPES.CallExpression && isHttpRequestCall(node, sourceCode);
+}
+
 /**
  * Returns true when `name` (declared at `scopeNode`) is bound, via a single variable declarator,
- * to the direct result of an http/https `request()`/`get()` call — e.g. `const req = http.request(...)`.
+ * to the direct result of an http/https `request()`/`get()` call — e.g. `const req = http.request(...)` —
+ * and every write to the binding keeps it holding such a request, so a reassigned variable pointing at an
+ * unrelated object is never treated as a Node request.
  */
 function isHttpRequestResultBinding(name: string, scopeNode: TSESTree.Node, sourceCode: TSESLint.SourceCode): boolean {
   const variable = resolveVariable(name, scopeNode, sourceCode);
@@ -114,7 +122,13 @@ function isHttpRequestResultBinding(name: string, scopeNode: TSESTree.Node, sour
   if (def.type !== "Variable") return false;
   const declarator = def.node as TSESTree.VariableDeclarator;
   if (declarator.id.type !== AST_NODE_TYPES.Identifier) return false;
-  return declarator.init !== null && declarator.init !== undefined && declarator.init.type === AST_NODE_TYPES.CallExpression && isHttpRequestCall(declarator.init, sourceCode);
+  if (!isHttpRequestResultExpression(declarator.init, sourceCode)) return false;
+  // Any write other than another http request call means the binding may no longer denote a request.
+  for (const reference of variable.references) {
+    if (!reference.isWrite()) continue;
+    if (!isHttpRequestResultExpression(reference.writeExpr, sourceCode)) return false;
+  }
+  return true;
 }
 
 /**
@@ -157,7 +171,7 @@ export const requireHttpResponseErrorListenerRule = createRule({
         "(reset connections, decompression failures, aborted sockets); a listener on the request does not catch these, " +
         "so an unhandled response 'error' event crashes the action. Also recognizes the `req.on(\"response\", cb)` idiom " +
         "(listening for the response event on the request object returned by request()/get(), rather than an inline callback) " +
-        "and treats `.addListener(\"error\", ...)` as equivalent to `.on(\"error\", ...)` since it is a documented EventEmitter alias. " +
+        'and treats `.addListener("error", ...)` as equivalent to `.on("error", ...)` since it is a documented EventEmitter alias. ' +
         'Scope: only fires when the http/https module identifier is statically resolved through a `require("http")`-style binding.',
     },
     schema: [],

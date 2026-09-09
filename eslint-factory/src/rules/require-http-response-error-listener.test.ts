@@ -109,6 +109,16 @@ describe("require-http-response-error-listener", () => {
     });
   });
 
+  it("valid: request bindings reassigned to an unrelated object are ignored", () => {
+    cjsRuleTester.run("require-http-response-error-listener", requireHttpResponseErrorListenerRule, {
+      valid: [
+        `const http = require("http"); let req = http.request(options); req = makeClient(); req.on("response", res => { res.resume(); });`,
+        `const http = require("http"); let req = makeClient(); req = http.request(options); req.on("response", res => { res.resume(); });`,
+      ],
+      invalid: [],
+    });
+  });
+
   it("invalid: the 'req.on(\"response\", cb)' idiom is checked for a response 'error' listener", () => {
     cjsRuleTester.run("require-http-response-error-listener", requireHttpResponseErrorListenerRule, {
       valid: [
