@@ -27,7 +27,7 @@ permissions:
   pull-requests: read
 
 # AI engine configuration
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
   model-provider: openai

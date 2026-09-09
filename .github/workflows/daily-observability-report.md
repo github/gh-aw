@@ -9,7 +9,7 @@ permissions:
   discussions: read
   issues: read
   pull-requests: read
-model: gpt-5.4
+model: gpt-5.3-codex
 engine:
   id: codex
 strict: true
