@@ -239,6 +239,9 @@ safe-outputs:
 	if strings.Contains(lockContentStr, "pull-requests: write") {
 		t.Errorf("Generated workflow should NOT have pull-requests: write permission when fallback-as-pull-request is false")
 	}
+	if !strings.Contains(lockContentStr, "pull-requests: read") {
+		t.Errorf("Generated workflow should have pull-requests: read permission when fallback-as-pull-request is false")
+	}
 }
 
 func TestPushToPullRequestBranchSignedCommitsDisabled(t *testing.T) {
