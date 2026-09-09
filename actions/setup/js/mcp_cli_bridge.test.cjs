@@ -199,13 +199,22 @@ describe("mcp_cli_bridge.cjs", () => {
 
   it("fails fast when safeoutputs schema is empty", () => {
     const originalPath = process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH;
+    const originalRunnerTemp = process.env.RUNNER_TEMP;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-empty-safeoutputs-"));
     delete process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH;
+    process.env.RUNNER_TEMP = tempDir;
     try {
-      expect(() => ensureSafeOutputsTools([], "safeoutputs", "/tmp/gh-aw/mcp-cli/tools/safeoutputs.json")).toThrow(/tool schema is empty/);
+      expect(() => ensureSafeOutputsTools([], "safeoutputs", path.join(tempDir, "safeoutputs.json"))).toThrow(/tool schema is empty/);
     } finally {
       if (originalPath !== undefined) {
         process.env.GH_AW_SAFE_OUTPUTS_TOOLS_PATH = originalPath;
       }
+      if (originalRunnerTemp === undefined) {
+        delete process.env.RUNNER_TEMP;
+      } else {
+        process.env.RUNNER_TEMP = originalRunnerTemp;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 

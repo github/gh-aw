@@ -34,7 +34,7 @@
         "min-gh-aw": "0.72.0",
         "max-gh-aw": "*",
         "min-agent": "1.0.21",
-        "max-agent": "1.0.80",
+        "max-agent": "1.0.83",
         "open": true
       },
       {
