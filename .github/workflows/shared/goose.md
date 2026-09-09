@@ -1,6 +1,7 @@
 ---
 engine:
   id: goose
+  detection-engine: copilot
   version: "1.45.0"
   display-name: Goose
   description: Goose CLI with headless execution and MCP support

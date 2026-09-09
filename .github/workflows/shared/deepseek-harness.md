@@ -1,6 +1,7 @@
 ---
 engine:
   id: deepseek-harness
+  detection-engine: copilot
   version: "0.1.0-rc.6"
   display-name: DeepSeek Harness
   description: DeepSeek Harness (dsh) with headless execution and multi-provider LLM support

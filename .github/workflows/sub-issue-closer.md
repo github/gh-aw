@@ -7,10 +7,11 @@ on:
   schedule: daily
   workflow_dispatch:
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 network:
   allowed:
@@ -21,7 +22,7 @@ imports:
 tools:
   cli-proxy: true
   github:
-    mode: local
+    mode: gh-proxy
     toolsets:
       - issues
 safe-outputs:
@@ -39,9 +40,6 @@ evals:
   - id: issues_closed_or_noop
     question: Were completed parent issues closed with a comment, or does the agent output confirm no issues were ready to close?
 
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 ---
 
 # Sub-Issue Closer 🔒

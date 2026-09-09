@@ -27,8 +27,8 @@ user-rate-limit:
 concurrency:
   group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}"
   cancel-in-progress: false
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 network:
   allowed:
     - defaults
@@ -45,7 +45,7 @@ tools:
     retention-days: 1
     allowed-extensions: [".json"]
   github:
-    mode: local
+    mode: gh-proxy
     read-only: true
     toolsets: [default]
     min-integrity: none
@@ -65,9 +65,6 @@ safe-outputs:
 checkout: false
 features:
   gh-aw-detection: true
-sandbox:
-  agent:
-    runtime: cloud-hypervisor
 pre-agent-steps:
   - name: Pre-fetch moderation context
     env:
