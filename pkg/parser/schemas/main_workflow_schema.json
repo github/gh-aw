@@ -15353,14 +15353,15 @@
     },
     "plugin_github_token": {
       "type": "string",
-      "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|steps\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|env\\.[A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}$",
-      "description": "GitHub token expression for Agent Plugin checkout. Accepts a secrets expression, a cross-job output expression, a same-job step output expression, or a same-job environment variable expression.",
+      "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|steps\\.[A-Za-z_][A-Za-z0-9_-]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_-]*|env\\.[A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}$",
+      "description": "GitHub token expression for Agent Plugin checkout. Accepts a secrets expression, a cross-job output expression, a same-job step output expression, or a same-job environment variable expression. Pattern details: secret names, job IDs, and environment variable names match `[A-Za-z_][A-Za-z0-9_]*`; same-job step IDs and output names match `[A-Za-z_][A-Za-z0-9_-]*`.",
       "examples": [
         "${{ secrets.GITHUB_TOKEN }}",
         "${{ secrets.CUSTOM_PAT }}",
         "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
         "${{ needs.auth.outputs.token }}",
         "${{ steps.plugin_credentials.outputs.github_token }}",
+        "${{ steps.fetch-token.outputs.my-token }}",
         "${{ env.GH_TOKEN }}"
       ]
     },

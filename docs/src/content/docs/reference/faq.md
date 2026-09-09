@@ -241,7 +241,7 @@ engine: copilot
 plugins:
   - octo-org/agent-plugin@v1
   - plugin: octo-org/private-agent-plugin@0123456789abcdef0123456789abcdef01234567
-    github-token: ${{ steps.plugin_credentials.outputs.github_token }}
+    github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
 ```
 
 `imports` with package ecosystems such as [Microsoft APM](https://microsoft.github.io/apm/) are still supported for reusable distributions, but `plugins:` remains the direct workflow field for declaring Agent Plugins.

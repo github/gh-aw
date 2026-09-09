@@ -1874,6 +1874,7 @@ func TestMainWorkflowSchema_PluginsGitHubTokenAllowsSameJobRuntimeReferences(t *
 
 	for _, token := range []string{
 		"${{ steps.plugin_credentials.outputs.github_token }}",
+		"${{ steps.fetch-token.outputs.my-token }}",
 		"${{ env.GH_TOKEN }}",
 	} {
 		t.Run(token, func(t *testing.T) {

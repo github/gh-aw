@@ -50,6 +50,18 @@ func TestValidateFrontmatterPlugins(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("accepts object form with hyphenated same-job step output github-token", func(t *testing.T) {
+		err := validateFrontmatterPlugins(map[string]any{
+			"plugins": []any{
+				map[string]any{
+					"plugin":       "octo-org/private-plugin@main",
+					"github-token": "${{ steps.fetch-token.outputs.my-token }}",
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("accepts object form with environment github-token", func(t *testing.T) {
 		err := validateFrontmatterPlugins(map[string]any{
 			"plugins": []any{

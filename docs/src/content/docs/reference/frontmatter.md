@@ -369,11 +369,11 @@ plugins:
     github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
 
   # Per-plugin token from a same-job pre-step output
-  - plugin: octo-org/private-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+  - plugin: octo-org/private-reporting-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
     github-token: ${{ steps.plugin_credentials.outputs.github_token }}
 
   # Per-plugin token from a same-job environment variable
-  - plugin: octo-org/private-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+  - plugin: octo-org/private-triage-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
     github-token: ${{ env.GH_TOKEN }}
 
   # Per-plugin GitHub App credentials

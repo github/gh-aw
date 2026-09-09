@@ -16,7 +16,7 @@ var pluginGitHubTokenExpressionRegexp = regexp.MustCompile(
 	`^\$\{\{\s*(` +
 		`secrets\.[A-Za-z_][A-Za-z0-9_]*(\s*\|\|\s*secrets\.[A-Za-z_][A-Za-z0-9_]*)*` +
 		`|needs\.[A-Za-z_][A-Za-z0-9_]*\.outputs\.[A-Za-z_][A-Za-z0-9_]*` +
-		`|steps\.[A-Za-z_][A-Za-z0-9_]*\.outputs\.[A-Za-z_][A-Za-z0-9_]*` +
+		`|steps\.[A-Za-z_][A-Za-z0-9_-]*\.outputs\.[A-Za-z_][A-Za-z0-9_-]*` +
 		`|env\.[A-Za-z_][A-Za-z0-9_]*` +
 		`)\s*\}\}$`,
 )
