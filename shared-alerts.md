@@ -57,3 +57,8 @@
   needed; monitor for recurrence (historical churn: #59348, #57586, #53023, cache fix #57219).
 - 299/299 workflows compile with lock files present, compile-validate clean — no compilation
   issues this run.
+
+## Update — 2026-09-09 (Agent Performance Analyzer)
+- **"Deprecation candidate" label for Matt Pocock Skills Reviewer, Impeccable Skills Reviewer, Design Decision Gate: closed out.** Direct prompt audit (source `.md` review, not just run metrics) found no deprecation-supporting evidence in any of the three — all have explicit Success Criteria/rubrics, noop-vs-act guidance, turn budgets. Design Decision Gate is the strongest-structured prompt of the set. Do not re-flag these three for deprecation without new concrete evidence.
+- **Data-quality caveat:** `metrics/latest.json` (2026-09-01) reports `active_workflows: 41` vs. 247 on 2026-08-22 (83% single-day swing), self-attributed to a "GitHub API fallback after paginated logs were truncated." Full agent ranking/scoring deferred this run rather than scoring off noisy data — recommend Metrics Collector add a >50% day-over-day swing guard.
+- **GitHub MCP read limitation (session-specific, unverified if recurring):** `search_issues`/`search_pull_requests`/`list_issues`/`list_pull_requests` returned empty due to "[Filtered]...lower integrity than agent requires"; only `list_tags` worked. No new issue filed for this — retest next run before escalating.
