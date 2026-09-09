@@ -331,6 +331,12 @@ type EngineDefinition struct {
 	// default version that downstream steps and env vars (such as
 	// GH_AW_ENGINE_VERSION) can rely on even when workflows omit engine.version.
 	Version string `yaml:"version,omitempty"`
+	// DetectionEngine names the built-in engine that runs threat detection for
+	// workflows using this engine. The threat detection analyzer only supports the
+	// built-in engines, so a custom engine definition must declare which built-in
+	// engine handles detection; otherwise detection falls back to the default
+	// built-in engine (see defaultThreatDetectionEngineID).
+	DetectionEngine string `yaml:"detection-engine,omitempty"`
 	// MCP indicates whether the engine supports MCP. Nil defaults to supported.
 	MCP              *bool  `yaml:"mcp,omitempty"`
 	GHSkillAgentName string `yaml:"gh-skill-agent-name,omitempty"`
@@ -393,6 +399,7 @@ var (
 )
 
 func knownEngineImportsRawURL() string {
+	//nolint:manualpathconcat // Raw GitHub download URLs are not filesystem paths.
 	return strings.TrimRight(knownEngineImportsRawBaseURL, "/") + "/" + strings.Join([]string{
 		knownEngineImportsOwner,
 		knownEngineImportsRepo,
@@ -451,7 +458,7 @@ func knownEngineImportFor(id string) (string, bool) {
 	knownEngineImportsMu.Lock()
 	defer knownEngineImportsMu.Unlock()
 	if !knownEngineImportsLoaded {
-		knownEngineImports = loaded
+		knownEngineImports = loaded //nolint:packagelevelmutableslicemap // The catalog cache is assigned once while holding knownEngineImportsMu.
 		knownEngineImportsLoaded = true
 	}
 

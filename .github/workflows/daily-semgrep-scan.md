@@ -66,7 +66,7 @@ sandbox:
 engine:
   id: codex
   model-provider: openai
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 ---
 
 Scan the repository for SQL injection vulnerabilities using Semgrep.

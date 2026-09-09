@@ -45,6 +45,7 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 | [`require-fetch-response-body-try-catch`](#require-fetch-response-body-try-catch) | Require try/catch around `.json()` or `.text()` on Responses from `fetch(...)` |
 | [`require-fetch-timeout`](#require-fetch-timeout) | Require `fetch(...)` calls to include a non-nullish abort `signal` option |
 | [`require-fetch-try-catch`](#require-fetch-try-catch) | Require try/catch around awaited `fetch(...)` calls, including chained promise forms without rejection handlers |
+| [`require-fs-chmod-try-catch`](#require-fs-chmod-try-catch) | Require try/catch around `fs.chmodSync` and `fs.fchmodSync` |
 | [`require-fs-close-sync`](#require-fs-close-sync) | Require `fs.openSync(...)` file descriptors to be closed with `fs.closeSync(fd)` in the same function |
 | [`require-fs-io-try-catch`](#require-fs-io-try-catch) | Require try/catch around `fs.statSync`, `readdirSync`, `copyFileSync`, `unlinkSync`, and `renameSync` |
 | [`require-fs-sync-try-catch`](#require-fs-sync-try-catch) | Require try/catch around `fs.readFileSync`, `writeFileSync`, and `appendFileSync` |
@@ -395,6 +396,21 @@ try {
   throw new Error("fs.statSync failed: " + (err instanceof Error ? err.message : String(err)), { cause: err });
 }
 ```
+
+### `require-fs-chmod-try-catch`
+
+Require `fs.chmodSync` and `fs.fchmodSync` calls to be wrapped in `try/catch`.
+
+Why: these calls can throw for missing files or descriptors, permission errors, and unsupported filesystems. A call-site catch preserves useful error context.
+
+**Detected forms:**
+- `fs.chmodSync(path, mode)` and `fs["chmodSync"](path, mode)`.
+- `fs.fchmodSync(fd, mode)`.
+- Bindings imported or required from `fs` / `node:fs`, including destructured bindings.
+
+**Out of scope:**
+- Objects that are not resolved to the Node `fs` / `node:fs` module.
+- `try { ... } finally { ... }` without a `catch` clause is still flagged.
 
 ### `require-fs-close-sync`
 

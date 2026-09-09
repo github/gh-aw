@@ -1,6 +1,7 @@
 ---
 engine:
   id: crush
+  detection-engine: copilot
   version: "0.88.0"
   display-name: Crush
   description: Crush CLI with non-interactive execution and native MCP support

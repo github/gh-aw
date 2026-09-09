@@ -33,7 +33,7 @@ safe-outputs:
     title-prefix: "[ab-advisor] "
 description: Daily A/B testing advisor that picks a random agentic workflow without an experiments section, devises an experiment campaign to improve it, and creates a GitHub issue with the implementation task
 emoji: 🧪
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
   model-provider: openai

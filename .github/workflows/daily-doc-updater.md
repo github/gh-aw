@@ -36,7 +36,7 @@ safe-outputs:
   noop: null
 description: Automatically reviews and updates documentation to ensure accuracy and completeness
 emoji: 📝
-model: openai/gpt-5.4
+model: openai/gpt-5.3-codex
 engine:
   id: codex
   model-provider: openai

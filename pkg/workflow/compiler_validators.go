@@ -421,6 +421,42 @@ func (c *Compiler) shouldEmitPiThreatDetectionAuthWarning(workflowData *Workflow
 		strings.TrimSpace(effectiveEnv[constants.CopilotProviderBearerToken]) == ""
 }
 
+// emitCustomEngineThreatDetectionWarning reports when threat detection falls back to a
+// built-in engine because the workflow uses a custom engine that the detection analyzer
+// cannot run. Without this notice the detection job fails at runtime with a config_error
+// while the run stays green (the job is continue-on-error by default).
+func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *WorkflowData, markdownPath string) {
+	if workflowData == nil || !IsDetectionJobEnabled(workflowData.SafeOutputs) {
+		return
+	}
+	threatDetection := workflowData.SafeOutputs.ThreatDetection
+	if threatDetection.EngineDisabled {
+		return
+	}
+	// An explicit safe-outputs.threat-detection.engine is the author's own choice.
+	if threatDetection.EngineConfig != nil && threatDetection.EngineConfig.ID != "" {
+		return
+	}
+
+	configuredEngineID := ResolveEngineID(workflowData)
+	if configuredEngineID == "" || configuredEngineID == "pi" || isThreatDetectionCapableEngineID(configuredEngineID) {
+		return
+	}
+	// An engine definition that declares its own detection engine ships a working default.
+	if def := c.engineCatalog.Get(configuredEngineID); def != nil && def.DetectionEngine != "" &&
+		slices.Contains(declarableDetectionEngineIDs, def.DetectionEngine) {
+		return
+	}
+
+	detectionEngineID := c.getThreatDetectionEngineID(workflowData)
+	message := fmt.Sprintf(
+		"Threat detection does not support the custom engine %q, so it runs on the built-in %q engine instead, which requires that engine's credentials. "+
+			"Set safe-outputs.threat-detection.engine to a built-in engine (or false to skip AI analysis), or declare detection-engine in the engine definition.",
+		configuredEngineID, detectionEngineID)
+	fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+	c.IncrementWarningCount()
+}
+
 func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownPath string) {
 	if workflowData.SafeOutputs != nil && hasWorkflowDispatchInputs(workflowData.On) && workflowData.ConcurrencyJobDiscriminator == "" {
 		fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning",
@@ -440,6 +476,7 @@ func (c *Compiler) emitGeneralToolWarnings(workflowData *WorkflowData, markdownP
 	}
 	c.emitSandboxRuntimeWarnings(workflowData, markdownPath)
 	c.emitPiThreatDetectionAuthWarning(workflowData, markdownPath)
+	c.emitCustomEngineThreatDetectionWarning(workflowData, markdownPath)
 	c.emitPlaywrightBrowserInstallWarning(workflowData, markdownPath)
 	if workflowData.SafeOutputs != nil && workflowData.SafeOutputs.AssignToAgent != nil &&
 		workflowData.SafeOutputs.GitHubApp != nil && workflowData.SafeOutputs.AssignToAgent.GitHubToken == "" {

@@ -10,15 +10,15 @@ on:
   workflow_dispatch:
 max-daily-ai-credits: 1
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 strict: true
 sandbox:
   agent:
     id: awf
-    runtime: cloud-hypervisor
 timeout-minutes: 5
 network: {}
 safe-outputs:

@@ -146,6 +146,20 @@ imports:
   - shared/opencode.md
 ```
 
+## Declare a threat detection engine
+
+Threat detection only runs on the built-in engines, so a workflow that uses a third-party engine and declares safe outputs runs detection on `copilot` by default and the compiler warns about it. Add `detection-engine` to the engine definition to ship a working default (`copilot`, `claude`, or `codex`):
+
+```aw wrap title=".github/workflows/shared/opencode.md"
+---
+engine:
+  id: opencode
+  detection-engine: copilot
+---
+```
+
+Workflow authors can still override it with `safe-outputs.threat-detection.engine`, or disable AI analysis with `safe-outputs.threat-detection.engine: false`.
+
 ## Recompile after workflow edits
 
 Engine settings live in workflow frontmatter. Recompile whenever you change the import reference, the engine version, or any other frontmatter field:

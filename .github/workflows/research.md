@@ -11,12 +11,13 @@ on:
         type: string
 
 permissions:
+  copilot-requests: write
   contents: read
   issues: read
   pull-requests: read
 
-engine: codex
-model: copilot/gpt-5.3-codex
+engine: pi
+model: copilot/auto
 
 network:
   allowed:
@@ -25,7 +26,6 @@ network:
 
 sandbox:
   agent:
-    runtime: cloud-hypervisor
     id: awf
 imports:
   - shared/mcp/tavily.md

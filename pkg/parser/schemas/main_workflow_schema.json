@@ -14706,6 +14706,11 @@
               "type": "string",
               "description": "Runtime adapter identifier. Maps to the CodingAgentEngine registered in the engine registry. Defaults to id when omitted."
             },
+            "detection-engine": {
+              "type": "string",
+              "enum": ["copilot", "claude", "codex"],
+              "description": "Built-in engine used to run threat detection for workflows using this engine. Required for custom engines because the threat detection analyzer only supports built-in engines; defaults to 'copilot' when omitted."
+            },
             "auth": {
               "type": "array",
               "description": "Optional engine-specific secret bindings for behavior-defined engines.",

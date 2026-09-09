@@ -15,9 +15,9 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		got  Version
 		want Version
 	}{
-		{"Claude Code", DefaultClaudeCodeVersion, "2.1.247"},
-		{"Codex", DefaultCodexVersion, "0.150.1"},
-		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.11.0"},
+		{"Claude Code", DefaultClaudeCodeVersion, "2.1.266"},
+		{"Codex", DefaultCodexVersion, "0.153.4"},
+		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v1.12.1"},
 		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.4.20"},
 	}
 
@@ -35,8 +35,8 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 func TestDefaultPlaywrightCLIVersionOutsideCooldownWindow(t *testing.T) {
 	t.Parallel()
 	const (
-		expectedVersion    Version = "0.1.18"
-		publishedAtRFC3339         = "2026-08-06T00:00:00Z"
+		expectedVersion    Version = "0.1.19"
+		publishedAtRFC3339         = "2026-09-01T16:19:56.878Z"
 		minReleaseAge              = 72 * time.Hour
 	)
 
