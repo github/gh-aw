@@ -38,6 +38,41 @@ func GenerateSchema[T any]() (*jsonschema.Schema, error) {
 	return jsonschema.For[T](nil)
 }
 
+// GenerateOutputSchema generates a JSON schema for a structured command output type.
+func GenerateOutputSchema[T any]() (*jsonschema.Schema, error) {
+	return GenerateSchema[T]()
+}
+
+// MarshalOutputSchema serializes a generated output schema using the CLI's
+// standard indented JSON format.
+func MarshalOutputSchema(schema *jsonschema.Schema) ([]byte, error) {
+	data, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal output schema to JSON: %w", err)
+	}
+	return append(data, '\n'), nil
+}
+
+// GenerateNamedOutputSchema generates and serializes a known CLI output schema.
+func GenerateNamedOutputSchema(name string) ([]byte, error) {
+	var (
+		schema *jsonschema.Schema
+		err    error
+	)
+	switch name {
+	case "audit":
+		schema, err = GenerateOutputSchema[AuditData]()
+	case "logs":
+		schema, err = GenerateOutputSchema[LogsData]()
+	default:
+		return nil, fmt.Errorf("unsupported schema: %s", name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
+	}
+	return MarshalOutputSchema(schema)
+}
+
 func generateSchemaWithDefaults[T any](defaults map[string]any) (*jsonschema.Schema, error) {
 	schema, err := GenerateSchema[T]()
 	if err != nil {
