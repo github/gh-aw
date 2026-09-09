@@ -38,9 +38,9 @@ mkdir -p /tmp/gh-aw/copilot-review
 PR_SNAPSHOT="${PR_SNAPSHOT:-/tmp/gh-aw/pr-finisher/pr-state.json}"
 REVIEW_DATA=/tmp/gh-aw/copilot-review/review-data.json
 if [ -f "$PR_SNAPSHOT" ]; then
-  jq '{reviews,reviewThreads,comments}' "$PR_SNAPSHOT" > "$REVIEW_DATA"
+  jq '{author,reviews,reviewThreads,comments}' "$PR_SNAPSHOT" > "$REVIEW_DATA"
 else
-  GH_PAGER="" gh pr view <number> --json reviews,reviewThreads,comments > "$REVIEW_DATA"
+  GH_PAGER="" gh pr view <number> --json author,reviews,reviewThreads,comments > "$REVIEW_DATA"
 fi
 ```
 
@@ -56,6 +56,17 @@ jq '.reviewThreads[]? | .comments[]? | select(.authorAssociation=="MEMBER" or .a
 ```
 
 ## Required Workflow
+
+### 0. Check PR author eligibility
+
+Inspect the pull request author before processing feedback:
+
+- Ignore platform-managed dependency PRs from `dependabot[bot]`, `app/dependabot`, or `renovate[bot]` unless the user explicitly asks to handle them.
+- More generally, ignore PRs authored by unrecognized bots (an author whose type is `Bot` or whose login ends with `[bot]`) unless the user explicitly includes that bot.
+- Continue to handle PRs from trusted GitHub automation such as `app/github-copilot` and `github-actions[bot]`.
+
+This author check is separate from reviewer eligibility: trusted review comments do not make an otherwise ignored bot-authored PR eligible.
+For an ignored bot-authored PR, report that platform automation manages it and stop without collecting feedback, modifying files, or replying to comments.
 
 ### 1. Collect all feedback first
 
@@ -147,9 +158,10 @@ Only start implementation after the full feedback set has been reviewed and buck
 
 ## Completion Standard
 
-The task is complete only when all of the following are true:
+For eligible PRs, the task is complete only when all of the following are true:
 
 - all in-scope comments and reviews were collected
+- the PR author passed the bot eligibility check
 - non-team-member feedback was ignored
 - each in-scope item was resolved by code changes or explicit justification
 - every in-scope review comment received a reply describing the action taken
