@@ -19,6 +19,51 @@ const detectionStepCondition = "always() && steps.detection_guard.outputs.run_de
 // stepEnvIndent is the indentation prefix used for env var lines in rendered step YAML.
 const stepEnvIndent = "        "
 
+// resolvedThreatDetectionDir returns the threat-detection working directory used by
+// host-side steps in the detection job (prepare, mount, upload, conclude). On ARC/DinD
+// topology, the AWF chroot's engine command has every /tmp/gh-aw reference rewritten to
+// ${RUNNER_TEMP}/gh-aw (see rewriteArcDindPath), because the chroot filesystem lives on
+// a separate Docker-in-Docker daemon that only shares the ${RUNNER_TEMP}/gh-aw volume
+// with the runner host. Host-side steps that read/write files the threat-detect binary
+// itself writes from inside that chroot must therefore agree on the same rewritten path;
+// otherwise a read-write mount or a later read looks at a directory the container never
+// touched. Non-ARC/DinD topologies keep the original /tmp/gh-aw path since AWF mounts and
+// rewrites are not involved there.
+func resolvedThreatDetectionDir(data *WorkflowData) string {
+	if isArcDindTopology(data) {
+		return rewriteArcDindPath(constants.ThreatDetectionDir)
+	}
+	return constants.ThreatDetectionDir
+}
+
+// resolvedThreatDetectionResultPath is the topology-aware counterpart of
+// constants.ThreatDetectionResultPath; see resolvedThreatDetectionDir for rationale.
+func resolvedThreatDetectionResultPath(data *WorkflowData) string {
+	if isArcDindTopology(data) {
+		return rewriteArcDindPath(constants.ThreatDetectionResultPath)
+	}
+	return constants.ThreatDetectionResultPath
+}
+
+// rewriteArcDindPathExpr is the YAML-expression counterpart of rewriteArcDindPath. Steps
+// that read `run:` shell scripts can rely on ${RUNNER_TEMP} shell expansion, but YAML
+// `with:` blocks (e.g. actions/upload-artifact's `path:` list) are not executed in a
+// shell — only GitHub Actions' own ${{ }} expressions are expanded there. This substitutes
+// the double-brace ${{ runner.temp }} form instead so paths embedded in `with:` blocks
+// resolve correctly.
+func rewriteArcDindPathExpr(path string) string {
+	return strings.ReplaceAll(path, constants.TmpGhAwDir, constants.GhAwRootDir)
+}
+
+// resolvedThreatDetectionResultPathExpr is the YAML with:-block counterpart of
+// resolvedThreatDetectionResultPath (see rewriteArcDindPathExpr).
+func resolvedThreatDetectionResultPathExpr(data *WorkflowData) string {
+	if isArcDindTopology(data) {
+		return rewriteArcDindPathExpr(constants.ThreatDetectionResultPath)
+	}
+	return constants.ThreatDetectionResultPath
+}
+
 // IsDetectionJobEnabled reports whether a detection job should be created for
 // the given safe-outputs configuration. This is the single source of truth
 // used by all codepaths that decide whether to create, depend on, or reference

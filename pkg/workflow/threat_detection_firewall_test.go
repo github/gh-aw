@@ -104,10 +104,10 @@ func TestBuildCopyDetectionFirewallLogsStep(t *testing.T) {
 		if strings.Contains(steps, "|| true") {
 			t.Fatalf("expected copy failures not to be suppressed, got:\n%s", steps)
 		}
-		if !strings.Contains(steps, "cp -r "+constants.AWFProxyLogsDir.String()+"/. "+detectionFirewallLogsDir+"/logs/") {
+		if !strings.Contains(steps, "cp -r "+constants.AWFProxyLogsDir.String()+"/. "+detectionFirewallLogsDir(data)+"/logs/") {
 			t.Fatalf("expected logs copy to use source contents and stable destination, got:\n%s", steps)
 		}
-		if !strings.Contains(steps, "cp -r "+constants.AWFAuditDir.String()+"/. "+detectionFirewallLogsDir+"/audit/") {
+		if !strings.Contains(steps, "cp -r "+constants.AWFAuditDir.String()+"/. "+detectionFirewallLogsDir(data)+"/audit/") {
 			t.Fatalf("expected audit copy to use source contents and stable destination, got:\n%s", steps)
 		}
 	})
@@ -239,7 +239,7 @@ func TestAppendThreatDetectionRWMount(t *testing.T) {
 			"/tmp/other:/tmp/other:rw",
 		}
 
-		got := appendThreatDetectionRWMount(append([]string(nil), existingMounts...))
+		got := appendThreatDetectionRWMount(append([]string(nil), existingMounts...), &WorkflowData{})
 
 		want := append(append([]string(nil), existingMounts...), threatDetectionMount)
 		if !reflect.DeepEqual(got, want) {
@@ -253,7 +253,7 @@ func TestAppendThreatDetectionRWMount(t *testing.T) {
 			threatDetectionMount,
 		}
 
-		got := appendThreatDetectionRWMount(append([]string(nil), existingMounts...))
+		got := appendThreatDetectionRWMount(append([]string(nil), existingMounts...), &WorkflowData{})
 
 		if !reflect.DeepEqual(got, existingMounts) {
 			t.Fatalf("expected mounts %v, got %v", existingMounts, got)

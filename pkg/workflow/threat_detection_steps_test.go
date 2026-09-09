@@ -424,7 +424,7 @@ func TestDetectionGuardStepCondition(t *testing.T) {
 func TestPrepareDetectionFilesStepInvokesSetupScript(t *testing.T) {
 	compiler := NewCompiler()
 
-	steps := compiler.buildPrepareDetectionFilesStep()
+	steps := compiler.buildPrepareDetectionFilesStep(&WorkflowData{})
 	if len(steps) == 0 {
 		t.Fatal("Expected non-empty prepare detection files steps")
 	}
@@ -432,6 +432,21 @@ func TestPrepareDetectionFilesStepInvokesSetupScript(t *testing.T) {
 	joined := strings.Join(steps, "")
 	if !strings.Contains(joined, `bash "${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh"`) {
 		t.Error("Expected prepare step to invoke prepare_threat_detection_files.sh")
+	}
+	if !strings.Contains(joined, "/tmp/gh-aw/threat-detection") {
+		t.Error("Expected prepare step to pass the non-ARC/DinD detection dir destination argument")
+	}
+}
+
+func TestPrepareDetectionFilesStepArcDindUsesDaemonVisiblePath(t *testing.T) {
+	compiler := NewCompiler()
+
+	steps := compiler.buildPrepareDetectionFilesStep(&WorkflowData{
+		RunnerConfig: &RunnerConfig{Topology: RunnerTopologyArcDind},
+	})
+	joined := strings.Join(steps, "")
+	if !strings.Contains(joined, "${RUNNER_TEMP}/gh-aw/threat-detection") {
+		t.Errorf("expected ARC/DinD prepare step to target the daemon-visible detection dir;\ngot:\n%s", joined)
 	}
 }
 

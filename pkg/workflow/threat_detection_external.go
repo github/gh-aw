@@ -248,23 +248,44 @@ type externalDetectorPathSetup struct {
 	commandPrefix string
 }
 
+// externalDetectorBinStagingPathPrefix is the command prefix that prepends the
+// daemon-visible ${RUNNER_TEMP}/gh-aw/bin staging directory to PATH inside the AWF
+// container. It is used both for the Copilot CLI binary and, on ARC/DinD, for the
+// threat-detect binary itself (see buildCopyThreatDetectBinaryStep).
+const externalDetectorBinStagingPathPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
+
 // buildExternalDetectorPathSetup returns the host-side shell commands that run
 // before AWF plus any command prefix needed inside the external detector container.
-// For the installed Copilot engine, threat-detect invokes the engine binary by
-// name, so the mounted ${RUNNER_TEMP}/gh-aw/bin/ directory must be prepended to
-// PATH in the container command. Non-ARC topologies also need a host-side copy
-// into that mounted directory; ARC/DinD already stages Copilot there during install.
+//
+// On ARC/DinD, the threat-detect binary itself is staged to ${RUNNER_TEMP}/gh-aw/bin
+// (buildCopyThreatDetectBinaryStep) because the AWF chroot's filesystem does not
+// include the runner host's /usr/local/bin or ~/.local/bin. So the PATH prefix is
+// always added on that topology, regardless of the selected detection engine.
+//
+// For the installed Copilot engine, threat-detect additionally invokes the engine
+// binary by name, so the same mounted directory must be prepended to PATH there too.
+// Non-ARC topologies need a host-side copy into that mounted directory for Copilot;
+// ARC/DinD already stages Copilot there during install.
 func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID string) externalDetectorPathSetup {
+	arcDind := isArcDindTopology(data)
+
 	if engineID == "codex" && NewCodexEngine().ResolveLLMProvider(data) == LLMProviderGitHub {
-		return externalDetectorPathSetup{commandPrefix: codexBYOKAPIKeyExport() + " && "}
+		setup := externalDetectorPathSetup{commandPrefix: codexBYOKAPIKeyExport() + " && "}
+		if arcDind {
+			setup.commandPrefix += externalDetectorBinStagingPathPrefix
+		}
+		return setup
 	}
+
 	if engineID != "copilot" {
+		if arcDind {
+			return externalDetectorPathSetup{commandPrefix: externalDetectorBinStagingPathPrefix}
+		}
 		return externalDetectorPathSetup{}
 	}
-	setup := externalDetectorPathSetup{
-		commandPrefix: `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `,
-	}
-	if isArcDindTopology(data) {
+
+	setup := externalDetectorPathSetup{commandPrefix: externalDetectorBinStagingPathPrefix}
+	if arcDind {
 		return setup
 	}
 	setup.hostSetup = copilotBinaryPathSetup
@@ -343,8 +364,15 @@ func isAWFBinaryInstallStep(step GitHubActionStep) bool {
 	return false
 }
 
-func appendThreatDetectionRWMount(mounts []string) []string {
-	threatDetectionMount := constants.ThreatDetectionDir + ":" + constants.ThreatDetectionDir + ":rw"
+// appendThreatDetectionRWMount grants write access to the threat-detection working
+// directory only (not the whole outer ${RUNNER_TEMP}/gh-aw runtime mount, which stays
+// read-only). The mount path must match resolvedThreatDetectionDir(data) so that on
+// ARC/DinD it targets the same daemon-visible directory the rewritten threat-detect
+// command actually writes detection_result.json to; otherwise the write-access grant
+// silently applies to a directory the container never uses.
+func appendThreatDetectionRWMount(mounts []string, data *WorkflowData) []string {
+	detectionDir := resolvedThreatDetectionDir(data)
+	threatDetectionMount := detectionDir + ":" + detectionDir + ":rw"
 	if slices.Contains(mounts, threatDetectionMount) {
 		return mounts
 	}
@@ -428,7 +456,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// Add a read-write mount so the threat-detect binary can write
 	// detection_result.json inside the container and it becomes visible
 	// on the host through the bind mount.
-	threatDetectionData.SandboxConfig.Agent.Mounts = appendThreatDetectionRWMount(threatDetectionData.SandboxConfig.Agent.Mounts)
+	threatDetectionData.SandboxConfig.Agent.Mounts = appendThreatDetectionRWMount(threatDetectionData.SandboxConfig.Agent.Mounts, threatDetectionData)
 
 	// Compute which env vars to exclude from the AWF container. The API proxy
 	// handles authentication, so the raw credentials must not reach the container.
@@ -622,7 +650,7 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 		"        with:\n",
 		"          name: " + detectionArtifactName + "\n",
 		"          path: |\n",
-		"            " + constants.ThreatDetectionResultPath + "\n",
+		"            " + resolvedThreatDetectionResultPathExpr(data) + "\n",
 	}
 	// Include the detection AWF run's own firewall proxy/audit logs (token usage, squid
 	// logs) so detection-phase usage surfaces in the usage artifact and counts toward the
@@ -631,8 +659,8 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	// risk that keeps detection.log off this artifact.
 	if isFirewallEnabled(data) {
 		steps = append(steps,
-			"            "+detectionFirewallLogsDir+"/logs/\n",
-			"            "+detectionFirewallLogsDir+"/audit/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n",
 		)
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
@@ -681,7 +709,7 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"          DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}\n",
 		coeEnvLine,
 		"        run: |\n",
-		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh\" %s\n", shellEscapeArg(constants.ThreatDetectionResultPath)),
+		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/conclude_threat_detection.sh\" %q\n", resolvedThreatDetectionResultPath(data)),
 	}...)
 
 	return steps

@@ -50,7 +50,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 	steps = append(steps, c.buildClearMCPConfigStep()...)
 
 	// Step 4: Prepare files - copies agent output files to expected paths
-	steps = append(steps, c.buildPrepareDetectionFilesStep()...)
+	steps = append(steps, c.buildPrepareDetectionFilesStep(data)...)
 
 	// Step 5: Custom pre-steps if configured (run before engine execution)
 	if len(data.SafeOutputs.ThreatDetection.Steps) > 0 {
@@ -81,6 +81,11 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 
 		// Step 10: Install the threat-detect binary from GitHub Releases
 		steps = append(steps, c.buildInstallThreatDetectStep(data)...)
+
+		// Step 10a: On ARC/DinD, stage the installed threat-detect binary to the
+		// daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory so it is resolvable
+		// inside the AWF chroot (mirrors the Copilot CLI staging step).
+		steps = append(steps, c.buildCopyThreatDetectBinaryStep(data)...)
 
 		// Step 11: Run threat-detect under AWF with a read-write mount for the result file
 		steps = append(steps, c.buildExternalDetectorExecutionStep(data)...)
@@ -196,13 +201,34 @@ func (c *Compiler) buildCleanFirewallDirsStep() []string {
 	}
 }
 
-// detectionFirewallLogsDir is the directory (relative to ThreatDetectionDir) where the
-// detection job's own AWF firewall proxy/audit logs are copied before upload. Namespacing
-// them under threat-detection/ (rather than uploading the raw AWFProxyLogsDir/AWFAuditDir
-// paths directly) avoids colliding with the agent job's identically-named firewall log
-// files when both artifacts are extracted into the same /tmp/gh-aw/ root in the conclusion
-// job — and matches the layout collect_usage_artifact_files.sh expects for detection usage.
-const detectionFirewallLogsDir = constants.ThreatDetectionDir + "/sandbox/firewall"
+// detectionFirewallLogsDir is the directory (relative to the resolved threat-detection
+// working directory) where the detection job's own AWF firewall proxy/audit logs are
+// copied before upload. Namespacing them under threat-detection/ (rather than uploading
+// the raw AWFProxyLogsDir/AWFAuditDir paths directly) avoids colliding with the agent
+// job's identically-named firewall log files when both artifacts are extracted into the
+// same /tmp/gh-aw/ root in the conclusion job — and matches the layout
+// collect_usage_artifact_files.sh expects for detection usage.
+//
+// It is derived from resolvedThreatDetectionDir(data) (not the constants.ThreatDetectionDir
+// constant directly) so that on ARC/DinD it shares the same daemon-visible root as the
+// detection_result.json the threat-detect binary writes from inside the AWF chroot; the
+// upload-artifact step bundles both together and needs a single consistent root.
+//
+// Use this variant inside `run:` shell scripts; use detectionFirewallLogsDirExpr for
+// YAML `with:` blocks (e.g. actions/upload-artifact's `path:` list), which are not
+// executed in a shell and cannot expand ${RUNNER_TEMP}.
+func detectionFirewallLogsDir(data *WorkflowData) string {
+	return resolvedThreatDetectionDir(data) + "/sandbox/firewall"
+}
+
+// detectionFirewallLogsDirExpr is the YAML with:-block counterpart of
+// detectionFirewallLogsDir (see rewriteArcDindPathExpr).
+func detectionFirewallLogsDirExpr(data *WorkflowData) string {
+	if isArcDindTopology(data) {
+		return rewriteArcDindPathExpr(constants.ThreatDetectionDir) + "/sandbox/firewall"
+	}
+	return constants.ThreatDetectionDir + "/sandbox/firewall"
+}
 
 // buildCopyDetectionFirewallLogsStep creates a step that copies the detection AWF run's
 // own proxy/audit logs (written to the same well-known AWFProxyLogsDir/AWFAuditDir paths
@@ -217,6 +243,7 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 
 	proxyLogsDir := constants.AWFProxyLogsDir.String()
 	auditDir := constants.AWFAuditDir.String()
+	firewallLogsDestDir := detectionFirewallLogsDir(data)
 	if isArcDindTopology(data) {
 		proxyLogsDir = rewriteArcDindPath(proxyLogsDir)
 		auditDir = rewriteArcDindPath(auditDir)
@@ -227,21 +254,29 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        continue-on-error: true\n",
 		"        run: |\n",
-		fmt.Sprintf("          mkdir -p %s\n", detectionFirewallLogsDir),
-		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/logs && cp -r %s/. %s/logs/; fi\n", proxyLogsDir, detectionFirewallLogsDir, proxyLogsDir, detectionFirewallLogsDir),
-		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/audit && cp -r %s/. %s/audit/; fi\n", auditDir, detectionFirewallLogsDir, auditDir, detectionFirewallLogsDir),
+		fmt.Sprintf("          mkdir -p %s\n", firewallLogsDestDir),
+		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/logs && cp -r %s/. %s/logs/; fi\n", proxyLogsDir, firewallLogsDestDir, proxyLogsDir, firewallLogsDestDir),
+		fmt.Sprintf("          if [ -d %s ]; then mkdir -p %s/audit && cp -r %s/. %s/audit/; fi\n", auditDir, firewallLogsDestDir, auditDir, firewallLogsDestDir),
 	}
 }
 
 // buildPrepareDetectionFilesStep creates a step that stages agent output files
 // for the threat-detect binary. In the separate detection job, files are
 // available after downloading the agent artifact.
-func (c *Compiler) buildPrepareDetectionFilesStep() []string {
+//
+// The destination directory is explicit (second argument) so that it matches
+// resolvedThreatDetectionDir(data): on ARC/DinD this is the daemon-visible
+// ${RUNNER_TEMP}/gh-aw/threat-detection directory that the AWF chroot's rewritten
+// engine command actually reads from and writes detection_result.json into (see
+// appendThreatDetectionRWMount). Passing SOURCE_DIR explicitly too keeps both
+// arguments self-documenting instead of relying on the script's fallback default.
+func (c *Compiler) buildPrepareDetectionFilesStep(data *WorkflowData) []string {
 	return []string{
 		"      - name: Prepare threat detection files\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        run: |\n",
-		"          bash \"${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh\"\n",
+		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh\" %q %q\n",
+			constants.TmpGhAwDir, resolvedThreatDetectionDir(data)),
 	}
 }
 
@@ -514,8 +549,8 @@ func (c *Compiler) buildUploadDetectionLogStep(data *WorkflowData) []string {
 	}
 	if isFirewallEnabled(data) {
 		steps = append(steps,
-			"            "+detectionFirewallLogsDir+"/logs/\n",
-			"            "+detectionFirewallLogsDir+"/audit/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/logs/\n",
+			"            "+detectionFirewallLogsDirExpr(data)+"/audit/\n",
 		)
 	}
 	steps = append(steps, "          if-no-files-found: ignore\n")
@@ -583,6 +618,16 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
 	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
 
+	// On ARC/DinD, install --rootless (matching the detection job's AWF/Copilot
+	// installation policy: allowPrivilegeEscalation: false forbids sudo). The
+	// paired buildCopyThreatDetectBinaryStep then stages the installed binary to
+	// the daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory so it is resolvable
+	// inside the AWF chroot.
+	installCmd := fmt.Sprintf("bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s", version)
+	if isArcDindTopology(data) {
+		installCmd += " --rootless"
+	}
+
 	steps := []string{
 		"      - name: Install threat-detect binary\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
@@ -594,7 +639,49 @@ func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
 	}
 	steps = append(steps,
 		"        run: |\n",
-		fmt.Sprintf("          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s\n", version),
+		fmt.Sprintf("          %s\n", installCmd),
+	)
+	return steps
+}
+
+// buildCopyThreatDetectBinaryStep creates a step that copies the installed threat-detect
+// binary to the daemon-visible ${RUNNER_TEMP}/gh-aw/bin directory on ARC/DinD runners.
+//
+// Unlike the AWF binary itself (which runs on the runner host), threat-detect is invoked
+// *inside* the AWF chroot as the sandboxed engine command. On ARC/DinD, the chroot's root
+// filesystem lives on the Docker-in-Docker daemon and does not include the runner host's
+// /usr/local/bin or ~/.local/bin — only the ${RUNNER_TEMP}/gh-aw tree is mounted into it
+// (read-only). Copying the binary there mirrors the existing "Copy Copilot CLI to
+// daemon-visible path" step and lets the AWF command prepend that directory to PATH.
+//
+// Non-ARC/DinD topologies are unaffected: threat-detect installs to /usr/local/bin, which
+// Docker-based AWF mounts transparently, so no staging step is required.
+func (c *Compiler) buildCopyThreatDetectBinaryStep(data *WorkflowData) []string {
+	if !isArcDindTopology(data) {
+		return nil
+	}
+
+	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
+
+	steps := []string{
+		"      - name: Copy threat-detect binary to daemon-visible path\n",
+		fmt.Sprintf("        if: %s\n", detectionStepCondition),
+	}
+	if continueOnErrorExpr != nil {
+		steps = append(steps, fmt.Sprintf("        continue-on-error: %s\n", *continueOnErrorExpr))
+	} else if continueOnError {
+		steps = append(steps, "        continue-on-error: true\n")
+	}
+	steps = append(steps,
+		"        run: |\n",
+		"          mkdir -p \"${RUNNER_TEMP}/gh-aw/bin\"\n",
+		"          THREAT_DETECT_SRC=\"$(command -v threat-detect)\"\n",
+		"          if [ -z \"$THREAT_DETECT_SRC\" ]; then\n",
+		"            echo \"threat-detect executable not found on PATH after installation\" >&2\n",
+		"            exit 127\n",
+		"          fi\n",
+		"          cp \"$THREAT_DETECT_SRC\" \"${RUNNER_TEMP}/gh-aw/bin/threat-detect\"\n",
+		"          chmod +x \"${RUNNER_TEMP}/gh-aw/bin/threat-detect\"\n",
 	)
 	return steps
 }
