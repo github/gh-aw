@@ -86,12 +86,12 @@ function markdownCode(value) {
  * @returns {string}
  */
 function getRunUrl() {
-  const repoFullName = process.env.GITHUB_REPOSITORY || (globalThis.context?.repo ? `${globalThis.context.repo.owner}/${globalThis.context.repo.repo}` : "");
-  const runId = process.env.GITHUB_RUN_ID || String(globalThis.context?.runId || "");
+  const repoFullName = process.env.GITHUB_REPOSITORY || (typeof context !== "undefined" && context.repo ? `${context.repo.owner}/${context.repo.repo}` : "");
+  const runId = process.env.GITHUB_RUN_ID || String(typeof context !== "undefined" && context.runId ? context.runId : "");
   if (!repoFullName || !runId) {
     return "";
   }
-  const serverUrl = process.env.GITHUB_SERVER_URL || globalThis.context?.serverUrl || "https://github.com";
+  const serverUrl = process.env.GITHUB_SERVER_URL || (typeof context !== "undefined" ? context.serverUrl : "") || "https://github.com";
   return `${serverUrl}/${repoFullName}/actions/runs/${runId}`;
 }
 
@@ -102,7 +102,7 @@ function getRunUrl() {
  * @returns {string}
  */
 function buildBlockedVersionIssueBody(compiledVersion) {
-  const workflowName = process.env.GH_AW_WORKFLOW_NAME || globalThis.context?.workflow || "unknown";
+  const workflowName = process.env.GH_AW_WORKFLOW_NAME || (typeof context !== "undefined" ? context.workflow : "") || "unknown";
   const runUrl = getRunUrl();
   const lines = [
     `<!-- gh-aw-blocked-compiler-version: ${compiledVersion} -->`,
@@ -161,12 +161,12 @@ async function reportBlockedVersionIssue(compiledVersion) {
     core.info("Blocked compiler version issue reporting is disabled");
     return;
   }
-  if (!globalThis.github?.rest?.issues || !globalThis.github?.rest?.search || !globalThis.context?.repo) {
+  if (typeof github === "undefined" || typeof context === "undefined" || !github.rest?.issues || !github.rest?.search || !context.repo) {
     core.info("GitHub issue APIs are unavailable; skipping blocked compiler version issue notification");
     return;
   }
 
-  const { owner, repo } = globalThis.context.repo;
+  const { owner, repo } = context.repo;
   const title = buildBlockedVersionIssueTitle(compiledVersion);
   const body = buildBlockedVersionIssueBody(compiledVersion);
 
