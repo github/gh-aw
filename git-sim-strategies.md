@@ -932,3 +932,28 @@ create_pull_request/push_to_pull_request_branch calls attempted — noop only.
 This is 19 consecutive identical halts (08-16 through 09-08). Reiterating
 prior recommendation: a human maintainer should pause/redesign/retire this
 workflow rather than have it re-evaluate the same conflict daily.
+
+## HALTED 2026-09-09 (20th consecutive run) — config-simulator now registered, but policy blocker alone still fully halts this workflow
+
+Reconfirmed both blockers before touching any tooling. Blocker (1), the
+decisive one: the outer safe-outputs policy still explicitly forbids
+probing/placeholder-content real writes ("Do NOT use them for probing, auth
+tests, retries with placeholder content, or 'let me see if this works'
+experiments"), and this workflow's entire method — real
+create_pull_request/push_to_pull_request_branch/create_issue against
+github/gh-aw filled with synthetic stuff.md/history.md/probe content solely
+to observe safe-output enforcement — still matches that forbidden pattern
+exactly. This alone is sufficient to keep the workflow halted regardless of
+tooling availability. Blocker (2) is NEW this run: .claude/agents/
+config-simulator.md now exists (shows untracked in `git status`), so the
+sub-agent that prior runs (through 09-08) reported as unregistered is now
+available. This resolves half the prior halt rationale but changes nothing
+about the outcome, since blocker (1) is structural and independent of
+subagent availability. No steering issue number given. next_index unchanged
+at 216. No create_issue/create_pull_request/push_to_pull_request_branch
+calls attempted — noop only. This is 20 consecutive identical halts (08-16
+through 09-09). Reiterating prior recommendation, now with one added note:
+if a human maintainer redesigns this workflow to target a disposable sandbox
+repo instead of github/gh-aw, the subagent-availability blocker will already
+be resolved (config-simulator.md exists and is ready to use) — only the
+target-repo redesign remains.
