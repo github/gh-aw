@@ -26,7 +26,15 @@ type FirewallSummaryBase struct {
 type FirewallLogSummary struct {
 	FirewallSummaryBase
 	RequestsByDomain map[string]DomainRequestStats `json:"requests_by_domain,omitempty" console:"-"`
+	Domains          []FirewallDomainRecord        `json:"domains,omitempty" console:"-"`
 	ByWorkflow       map[string]*FirewallAnalysis  `json:"by_workflow,omitempty" console:"-"`
+}
+
+// FirewallDomainRecord describes requests to a domain with one firewall decision.
+type FirewallDomainRecord struct {
+	Domain   string `json:"domain"`
+	Accepted bool   `json:"accepted"`
+	Arity    int    `json:"arity"`
 }
 
 // domainAggregation holds the result of aggregating domain statistics
@@ -144,6 +152,16 @@ func buildFirewallLogSummary(processedRuns []ProcessedRun) *FirewallLogSummary {
 	}
 
 	allowedDomains, blockedDomains := convertDomainsToSortedSlices(agg.allAllowedDomains, agg.allBlockedDomains)
+	domains := make([]FirewallDomainRecord, 0, len(allRequestsByDomain))
+	for _, domain := range sliceutil.SortedKeys(allRequestsByDomain) {
+		stats := allRequestsByDomain[domain]
+		if stats.Allowed > 0 {
+			domains = append(domains, FirewallDomainRecord{Domain: domain, Accepted: true, Arity: stats.Allowed})
+		}
+		if stats.Blocked > 0 {
+			domains = append(domains, FirewallDomainRecord{Domain: domain, Accepted: false, Arity: stats.Blocked})
+		}
+	}
 
 	return &FirewallLogSummary{
 		FirewallSummaryBase: FirewallSummaryBase{
@@ -154,6 +172,7 @@ func buildFirewallLogSummary(processedRuns []ProcessedRun) *FirewallLogSummary {
 			BlockedDomains:  blockedDomains,
 		},
 		RequestsByDomain: allRequestsByDomain,
+		Domains:          domains,
 		ByWorkflow:       byWorkflow,
 	}
 }

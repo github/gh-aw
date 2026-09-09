@@ -950,16 +950,17 @@ func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
 			FirewallAnalysis: &FirewallAnalysis{
 				AnalysisBase: AnalysisBase{
 					DomainBuckets: DomainBuckets{
-						AllowedDomains: []string{"example.com"},
-						BlockedDomains: []string{"blocked.com"},
+						AllowedDomains: []string{"example.com", "mixed.com"},
+						BlockedDomains: []string{"blocked.com", "mixed.com"},
 					},
-					TotalRequests:   10,
-					AllowedRequests: 8,
-					BlockedRequests: 2,
+					TotalRequests:   12,
+					AllowedRequests: 9,
+					BlockedRequests: 3,
 				},
 				RequestsByDomain: map[string]DomainRequestStats{
 					"example.com": {Allowed: 8, Blocked: 0},
 					"blocked.com": {Allowed: 0, Blocked: 2},
+					"mixed.com":   {Allowed: 1, Blocked: 1},
 				},
 			},
 		},
@@ -970,16 +971,17 @@ func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
 			FirewallAnalysis: &FirewallAnalysis{
 				AnalysisBase: AnalysisBase{
 					DomainBuckets: DomainBuckets{
-						AllowedDomains: []string{"example.com", "api.github.com"},
-						BlockedDomains: []string{},
+						AllowedDomains: []string{"example.com", "api.github.com", "mixed.com"},
+						BlockedDomains: []string{"mixed.com"},
 					},
-					TotalRequests:   5,
-					AllowedRequests: 5,
-					BlockedRequests: 0,
+					TotalRequests:   8,
+					AllowedRequests: 7,
+					BlockedRequests: 1,
 				},
 				RequestsByDomain: map[string]DomainRequestStats{
 					"example.com":    {Allowed: 3, Blocked: 0},
 					"api.github.com": {Allowed: 2, Blocked: 0},
+					"mixed.com":      {Allowed: 2, Blocked: 1},
 				},
 			},
 		},
@@ -991,14 +993,14 @@ func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
 		t.Fatal("Expected non-nil summary")
 	}
 
-	if summary.TotalRequests != 15 {
-		t.Errorf("Expected TotalRequests = 15, got %d", summary.TotalRequests)
+	if summary.TotalRequests != 20 {
+		t.Errorf("Expected TotalRequests = 20, got %d", summary.TotalRequests)
 	}
-	if summary.AllowedRequests != 13 {
-		t.Errorf("Expected AllowedRequests = 13, got %d", summary.AllowedRequests)
+	if summary.AllowedRequests != 16 {
+		t.Errorf("Expected AllowedRequests = 16, got %d", summary.AllowedRequests)
 	}
-	if summary.BlockedRequests != 2 {
-		t.Errorf("Expected BlockedRequests = 2, got %d", summary.BlockedRequests)
+	if summary.BlockedRequests != 4 {
+		t.Errorf("Expected BlockedRequests = 4, got %d", summary.BlockedRequests)
 	}
 
 	// Check RequestsByDomain aggregation (firewall-specific)
@@ -1022,6 +1024,25 @@ func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
 		if stats.Blocked != 2 {
 			t.Errorf("Expected blocked.com Denied = 2, got %d", stats.Blocked)
 		}
+	}
+
+	expectedDomains := []FirewallDomainRecord{
+		{Domain: "api.github.com", Accepted: true, Arity: 2},
+		{Domain: "blocked.com", Accepted: false, Arity: 2},
+		{Domain: "example.com", Accepted: true, Arity: 11},
+		{Domain: "mixed.com", Accepted: true, Arity: 3},
+		{Domain: "mixed.com", Accepted: false, Arity: 2},
+	}
+	if !reflect.DeepEqual(summary.Domains, expectedDomains) {
+		t.Errorf("Expected Domains = %+v, got %+v", expectedDomains, summary.Domains)
+	}
+
+	data, err := json.Marshal(LogsData{FirewallLog: summary})
+	if err != nil {
+		t.Fatalf("Failed to marshal logs data: %v", err)
+	}
+	if !strings.Contains(string(data), `"domains":[{"domain":"api.github.com","accepted":true,"arity":2}`) {
+		t.Errorf("Expected logs JSON to include firewall domain decisions, got %s", data)
 	}
 }
 
