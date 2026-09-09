@@ -1,48 +1,172 @@
 {
-  "run_date": "2026-09-09T12:35:47Z",
-  "run_id": "34351612394",
-  "prior_run_id": "34319834014",
+  "run_date": "2026-09-09T18:36:46Z",
+  "run_id": "34389032306",
   "summary": {
-    "eligible_total": 1,
-    "cooldown_skipped": 3,
+    "eligible_total": 6,
+    "cooldown_skipped": 0,
     "category_counts": {
-      "bug": 1
+      "bug": 5,
+      "feature": 1
     },
     "risk_counts": {
-      "high": 1
+      "high": 3,
+      "medium": 3
     },
     "priority_counts": {
-      "medium": 1
+      "high": 2,
+      "medium": 4
     },
     "action_counts": {
-      "batch_review": 1,
       "auto_merge": 0,
-      "fast_track": 0,
+      "fast_track": 2,
+      "batch_review": 4,
       "close": 0
     }
   },
   "prs": [
     {
+      "number": 59763,
+      "category": "bug",
+      "risk": "medium",
+      "score": 58,
+      "action": "batch_review",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot"
+      ],
+      "score_breakdown": {
+        "impact": 28,
+        "urgency": 16,
+        "quality": 14
+      },
+      "batch": null
+    },
+    {
+      "number": 59747,
+      "category": "bug",
+      "risk": "high",
+      "score": 70,
+      "action": "fast_track",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:workflow-reliability"
+      ],
+      "score_breakdown": {
+        "impact": 36,
+        "urgency": 22,
+        "quality": 12
+      },
+      "batch": "workflow-reliability"
+    },
+    {
+      "number": 59745,
+      "category": "bug",
+      "risk": "high",
+      "score": 77,
+      "action": "fast_track",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:high",
+        "pr-priority:high",
+        "pr-action:fast_track",
+        "pr-agent:copilot",
+        "pr-batch:workflow-auth"
+      ],
+      "score_breakdown": {
+        "impact": 40,
+        "urgency": 25,
+        "quality": 12
+      },
+      "batch": "workflow-auth"
+    },
+    {
+      "number": 59744,
+      "category": "feature",
+      "risk": "medium",
+      "score": 64,
+      "action": "batch_review",
+      "labels": [
+        "pr-type:feature",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:workflow-auth"
+      ],
+      "score_breakdown": {
+        "impact": 34,
+        "urgency": 18,
+        "quality": 12
+      },
+      "batch": "workflow-auth"
+    },
+    {
+      "number": 59743,
+      "category": "bug",
+      "risk": "medium",
+      "score": 62,
+      "action": "batch_review",
+      "labels": [
+        "pr-type:bug",
+        "pr-risk:medium",
+        "pr-priority:medium",
+        "pr-action:batch_review",
+        "pr-agent:copilot",
+        "pr-batch:workflow-auth"
+      ],
+      "score_breakdown": {
+        "impact": 32,
+        "urgency": 17,
+        "quality": 13
+      },
+      "batch": "workflow-auth"
+    },
+    {
       "number": 56568,
       "category": "bug",
       "risk": "high",
-      "score": 65,
+      "score": 60,
       "action": "batch_review",
       "labels": [
-        "pr-agent:copilot",
         "pr-type:bug",
         "pr-risk:high",
         "pr-priority:medium",
-        "pr-action:batch_review"
+        "pr-action:batch_review",
+        "pr-agent:copilot"
       ],
       "score_breakdown": {
-        "impact": 38,
-        "urgency": 17,
-        "quality": 10
-      }
+        "impact": 31,
+        "urgency": 18,
+        "quality": 11
+      },
+      "batch": null
     }
   ],
-  "cooldown_skipped": [59724, 59722, 59720],
-  "batches": [],
+  "cooldown_skipped": [],
+  "batches": [
+    {
+      "id": "workflow-auth",
+      "prs": [
+        59745,
+        59744,
+        59743
+      ],
+      "reason": "auth/checkout behavior changes"
+    },
+    {
+      "id": "workflow-reliability",
+      "prs": [
+        59747
+      ],
+      "reason": "workflow reliability and activation safeguards"
+    }
+  ],
   "report_issue": "created"
 }
