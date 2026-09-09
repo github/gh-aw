@@ -29,9 +29,18 @@ jobs:
         if: github.event_name == 'pull_request'
         run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} --no-tags --depth=1
 
-      - name: Check stale lock files
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c   # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build gh-aw
+        run: go build -o gh-aw ./cmd/gh-aw
+
+      - name: Check workflow lock file drift
         run: |
-          bash scripts/check-stale-lock-files.sh --base-ref "origin/${{ github.base_ref }}"
+          bash scripts/check-workflow-drift.sh ./gh-aw
 
       - name: Add step summary on failure
         if: failure()
