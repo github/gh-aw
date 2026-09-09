@@ -189,6 +189,7 @@ type WorkflowData struct {
 	UpdateCheckDisabled            bool                            // true when check-for-updates: false is set in frontmatter (disables version check step in activation job)
 	StaleCheckDisabled             bool                            // true when on.stale-check: false is set in frontmatter (disables frontmatter hash check step in activation job)
 	StaleCheckFull                 bool                            // true when on.stale-check: full is set in frontmatter (enables body hash check alongside frontmatter hash check)
+	ReportBlockedVersionDisabled   bool                            // true when on.report-blocked-version: false is set in frontmatter (disables the blocked-version notification issue in activation, independent of check-for-updates and safe-outputs.report-failure-as-issue)
 	EngineConfigSteps              []map[string]any                // steps returned by engine.RenderConfig — prepended before execution steps
 	ServicePortExpressions         string                          // comma-separated ${{ job.services['<id>'].ports['<port>'] }} expressions for AWF --allow-host-service-ports
 	RunInstallScripts              bool                            // true when runtimes.node.run-install-scripts: true is set (main workflow and/or imports); disables --ignore-scripts on generated npm install steps

@@ -1575,6 +1575,15 @@ on:
   # Format 2: string
   stale-check: "full"
 
+  # Controls whether the activation job creates or updates a notification issue
+  # when the workflow is compiled with a blocked compile-agentic version. Set to
+  # false to suppress only that notification issue while keeping the
+  # blocked-version check itself (and its hard failure) active. This is
+  # independent of 'check-for-updates' (which disables the whole check) and
+  # 'safe-outputs.report-failure-as-issue' (which also gates the notification).
+  # (optional)
+  report-blocked-version: true
+
 # ⚠️ Experimental. Agent Plugins to install after the agentic engine. Each GitHub
 # repository reference must include a ref that the compiler resolves to a commit
 # SHA. Using this field emits a compile-time warning. Entries may also be objects

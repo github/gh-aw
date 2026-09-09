@@ -90,6 +90,7 @@ var ghAwOnSectionKeys = map[string]bool{
 	"labels":                             true,
 	"needs":                              true,
 	"reaction":                           true,
+	"report-blocked-version":             true,
 	"roles":                              true,
 	"skip-author-associations":           true,
 	"skip-if-match":                      true,

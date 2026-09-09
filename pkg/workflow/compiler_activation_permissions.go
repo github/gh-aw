@@ -177,9 +177,12 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 // ["!blocked_version"]): those categories describe failures detected by the
 // downstream conclusion job and are not available this early in the
 // workflow. A workflow that only wants to suppress blocked-version
-// notifications must set report-failure-as-issue to a literal false.
+// notifications must set report-failure-as-issue to a literal false, or set
+// on.report-blocked-version: false (see ReportBlockedVersionDisabled), which
+// is a narrower toggle that only affects this notification and does not
+// disable check-for-updates or its hard failure.
 func (c *Compiler) activationBlockedVersionIssueEnabled(ctx *activationJobBuildContext) bool {
-	return !ctx.data.UpdateCheckDisabled && IsReleasedVersion(c.version) && conclusionReportFailureAsIssueEnabled(ctx.data)
+	return !ctx.data.UpdateCheckDisabled && !ctx.data.ReportBlockedVersionDisabled && IsReleasedVersion(c.version) && conclusionReportFailureAsIssueEnabled(ctx.data)
 }
 
 // activationBlockedVersionReportAsIssueValue returns the templatable
@@ -189,8 +192,15 @@ func (c *Compiler) activationBlockedVersionIssueEnabled(ctx *activationJobBuildC
 // expressions (e.g. "${{ inputs.report-failure-as-issue }}") instead of
 // collapsing them to a compile-time boolean, so the value is only resolved
 // once GitHub Actions evaluates the expression at runtime. Defaults to "true"
-// when report-failure-as-issue is unset.
+// when report-failure-as-issue is unset. When on.report-blocked-version: false
+// is set in frontmatter, this always returns a literal "false", overriding any
+// report-failure-as-issue value, since that flag is a dedicated off-switch for
+// this notification.
 func activationBlockedVersionReportAsIssueValue(ctx *activationJobBuildContext) *string {
+	if ctx.data.ReportBlockedVersionDisabled {
+		v := "false"
+		return &v
+	}
 	if ctx.data.SafeOutputs == nil || ctx.data.SafeOutputs.ReportFailureAsIssue == nil {
 		v := "true"
 		return &v

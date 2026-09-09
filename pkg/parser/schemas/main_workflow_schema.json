@@ -2433,6 +2433,12 @@
                 }
               ],
               "description": "Controls the stale lock file check in the activation job. Set to false to disable the check, true (default) to enable frontmatter hash checking, or \"full\" to check both frontmatter and body hashes. Use \"full\" when prompt-body edits should also trigger recompilation detection. Useful when the workflow source files are managed outside the default GitHub repo context (e.g. cross-repo org rulesets) and the stale check is not needed (set false), or when comprehensive drift detection is required (set \"full\")."
+            },
+            "report-blocked-version": {
+              "type": "boolean",
+              "default": true,
+              "description": "Controls whether the activation job creates or updates a notification issue when the workflow is compiled with a blocked compile-agentic version. Set to false to suppress only that notification issue while keeping the blocked-version check itself (and its hard failure) active. This is independent of 'check-for-updates' (which disables the whole check) and 'safe-outputs.report-failure-as-issue' (which also gates the notification).",
+              "examples": [true, false]
             }
           },
           "additionalProperties": false,

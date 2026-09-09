@@ -278,6 +278,39 @@ func TestActivationStepsAddVersionCheckStep(t *testing.T) {
 		assert.Contains(t, steps, "GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE: \"false\"")
 	})
 
+	t.Run("disables blocked version issue reporting when on.report-blocked-version is false", func(t *testing.T) {
+		originalIsRelease := isReleaseBuild
+		isReleaseBuild = true
+		t.Cleanup(func() { isReleaseBuild = originalIsRelease })
+
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			ReportBlockedVersionDisabled: true,
+		})
+
+		compiler.addActivationVersionCheckStep(ctx)
+
+		steps := strings.Join(ctx.steps, "")
+		assert.Contains(t, steps, "GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE: \"false\"")
+	})
+
+	t.Run("report-blocked-version: false overrides a templated report-failure-as-issue value", func(t *testing.T) {
+		originalIsRelease := isReleaseBuild
+		isReleaseBuild = true
+		t.Cleanup(func() { isReleaseBuild = originalIsRelease })
+
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			ReportBlockedVersionDisabled: true,
+			SafeOutputs:                  &SafeOutputsConfig{ReportFailureAsIssue: templatableBoolPtr("${{ inputs.report-failure-as-issue }}")},
+		})
+
+		compiler.addActivationVersionCheckStep(ctx)
+
+		steps := strings.Join(ctx.steps, "")
+		assert.Contains(t, steps, "GH_AW_BLOCKED_VERSION_REPORT_AS_ISSUE: \"false\"")
+	})
+
 	t.Run("skips version check for dev builds", func(t *testing.T) {
 		compiler := newActivationStepsTestCompiler("dev")
 		ctx := newActivationStepsTestContext(&WorkflowData{})
@@ -307,6 +340,18 @@ func TestActivationBlockedVersionIssuePermissions(t *testing.T) {
 		compiler := newActivationStepsTestCompiler("v1.2.3")
 		ctx := newActivationStepsTestContext(&WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{ReportFailureAsIssue: templatableBoolPtr("false")},
+		})
+
+		permissions, err := compiler.buildActivationPermissions(ctx)
+
+		require.NoError(t, err)
+		assert.NotContains(t, permissions, "issues: write")
+	})
+
+	t.Run("omits issues write when on.report-blocked-version is false", func(t *testing.T) {
+		compiler := newActivationStepsTestCompiler("v1.2.3")
+		ctx := newActivationStepsTestContext(&WorkflowData{
+			ReportBlockedVersionDisabled: true,
 		})
 
 		permissions, err := compiler.buildActivationPermissions(ctx)

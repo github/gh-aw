@@ -45,6 +45,7 @@ The repository could provide a standalone watchdog workflow that checks compiled
 - Generated workflows now pass workflow name and reporting policy into the blocked-version check step.
 - Notification deduplication is based on a stable issue title derived from the blocked compiler version.
 - The existing hard failure message for blocked versions remains unchanged after reporting is attempted.
+- Workflow authors can set `on.report-blocked-version: false` to suppress only the activation-stage notification issue, independent of `check-for-updates` (which disables the whole check and is not allowed in strict mode) and `safe-outputs.report-failure-as-issue` (which also gates the notification). This gives a narrower, always-strict-mode-safe off-switch dedicated to this notification, mirroring the pattern used by `on.stale-check: false`.
 
 ---
 

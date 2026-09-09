@@ -201,6 +201,9 @@ func (c *Compiler) buildInitialWorkflowData(
 
 	// Populate stale-check flag: disabled when on.stale-check: false is set in frontmatter;
 	// full mode when on.stale-check: full is set.
+	// Populate report-blocked-version flag: disabled when on.report-blocked-version: false is
+	// set in frontmatter (suppresses only the activation-stage notification issue, independent
+	// of check-for-updates and safe-outputs.report-failure-as-issue).
 	if onVal, ok := result.Frontmatter["on"]; ok {
 		if onMap, ok := onVal.(map[string]any); ok {
 			if staleCheck, ok := onMap["stale-check"]; ok {
@@ -208,6 +211,11 @@ func (c *Compiler) buildInitialWorkflowData(
 					workflowData.StaleCheckDisabled = true
 				} else if strVal, ok := staleCheck.(string); ok && strVal == "full" {
 					workflowData.StaleCheckFull = true
+				}
+			}
+			if reportBlockedVersion, ok := onMap["report-blocked-version"]; ok {
+				if boolVal, ok := reportBlockedVersion.(bool); ok && !boolVal {
+					workflowData.ReportBlockedVersionDisabled = true
 				}
 			}
 		}

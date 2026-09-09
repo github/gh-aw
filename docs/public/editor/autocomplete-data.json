@@ -365,6 +365,11 @@
           "desc": "Controls the stale lock file check in the activation job.",
           "enum": ["full"],
           "leaf": true
+        },
+        "report-blocked-version": {
+          "type": "boolean",
+          "desc": "Controls whether the activation job creates or updates a notification issue when the workflow is compiled with a blocked compile-agentic version.",
+          "leaf": true
         }
       }
     },
