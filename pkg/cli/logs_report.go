@@ -255,6 +255,9 @@ func (agg *logsAggregate) accumulateRunTotals(pr ProcessedRun) {
 func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 	agg.totalDuration += parseDurationString(run.Duration)
 	agg.totalAIC += run.AIC
+	if run.TokenUsageSummary != nil {
+		agg.totalSteeringEvents += run.TokenUsageSummary.TotalSteeringEvents
+	}
 	agg.totalTokens += run.TokenUsage
 	agg.totalActionMinutes += run.ActionMinutes
 	agg.totalTurns += run.Turns
@@ -264,10 +267,14 @@ func (agg *logsAggregate) accumulateCachedRunTotals(run RunData) {
 	agg.totalMissingData += run.MissingDataCount
 	agg.totalSafeItems += run.SafeItemsCount
 	agg.totalGitHubAPICalls += run.GitHubAPICalls
-	agg.totalTemporaryIDMappings += run.TemporaryIDMappings
-	agg.totalChainedTargets += run.ChainedTargetCount
-	agg.totalChainedFollowupActions += run.ChainedFollowupActionCount
-	agg.totalClosedTempTargets += run.ClosedTempTargetCount
+	agg.accumulateChainMetrics(SafeOutputChainMetrics{
+		TemporaryIDMapStatus:       run.TemporaryIDMapStatus,
+		TemporaryIDMappings:        run.TemporaryIDMappings,
+		ChainedTargetCount:         run.ChainedTargetCount,
+		ChainedFollowupActionCount: run.ChainedFollowupActionCount,
+		DelegatedTempTargetCount:   run.DelegatedTempTargetCount,
+		ClosedTempTargetCount:      run.ClosedTempTargetCount,
+	})
 	switch run.FailureKind {
 	case "driver_exit":
 		agg.totalDriverExitFailures++

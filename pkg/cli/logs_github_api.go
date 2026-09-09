@@ -403,7 +403,7 @@ type ListWorkflowRunsOptions struct {
 // The processedCount and targetCount parameters are used to display progress in the spinner message.
 func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun, int, error) { //nolint:largefunc // Existing run listing keeps pagination, error classification, and filtering together.
 	logsGitHubAPILog.Printf("Listing workflow runs: workflow=%s, limit=%d, startDate=%s, endDate=%s, ref=%s", opts.WorkflowName, opts.Limit, opts.StartDate, opts.EndDate, opts.Ref)
-	args := []string{"run", "list", "--json", "databaseId,number,url,status,conclusion,workflowName,createdAt,startedAt,updatedAt,event,headBranch,headSha,displayTitle"}
+	args := []string{"run", "list", "--json", "databaseId,number,url,status,conclusion,workflowName,createdAt,startedAt,updatedAt,event,headBranch,headSha,displayTitle,attempt"}
 
 	// Add filters
 	if opts.WorkflowName != "" {
@@ -528,6 +528,8 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 		spinner.Stop()
 	}
 
+	applyWorkflowRunListRepository(runs, opts.RepoOverride)
+
 	// Store the total count fetched from API before filtering
 	totalFetched := len(runs)
 	if opts.OldestFetchedCreatedAt != nil {
@@ -591,6 +593,37 @@ func listWorkflowRunsWithPagination(opts ListWorkflowRunsOptions) ([]WorkflowRun
 	}
 
 	return agenticRuns, totalFetched, nil
+}
+
+func applyWorkflowRunListRepository(runs []WorkflowRun, repoOverride string) {
+	if len(runs) == 0 {
+		return
+	}
+	repository := workflowRunListRepository(repoOverride)
+	if repository == "" {
+		return
+	}
+	for i := range runs {
+		if runs[i].Repository == "" {
+			runs[i].Repository = repository
+		}
+	}
+}
+
+func workflowRunListRepository(repoOverride string) string {
+	if repoOverride != "" {
+		parts := strings.Split(repoOverride, "/")
+		if len(parts) >= 2 {
+			return strings.Join(parts[len(parts)-2:], "/")
+		}
+		return repoOverride
+	}
+	repository, err := GetCurrentRepoSlug()
+	if err != nil {
+		logsGitHubAPILog.Printf("Unable to determine current repository for workflow run list: %v", err)
+		return ""
+	}
+	return repository
 }
 
 func workflowRunsSpinnerMessage(opts ListWorkflowRunsOptions) string {
