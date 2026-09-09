@@ -10,10 +10,11 @@ permissions:
   contents: read
   pull-requests: read
   issues: read
-model: openai/gpt-5.3-codex
+  copilot-requests: write
+model: openai/gpt-5.4
 strict: false
 engine:
-  id: codex
+  id: pi
   model-provider: openai
 network: 
    allowed: [defaults, node, go, "api.github.com", containers]
@@ -24,7 +25,7 @@ imports:
   - shared/graders.md
 sandbox:
   agent:
-    runtime: cloud-hypervisor
+    id: awf
 tools:
   cli-proxy: true
   web-fetch:
