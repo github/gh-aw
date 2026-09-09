@@ -38,16 +38,65 @@ func TestValidateFrontmatterPlugins(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("rejects object form with steps output github-token", func(t *testing.T) {
+	t.Run("accepts object form with same-job step output github-token", func(t *testing.T) {
 		err := validateFrontmatterPlugins(map[string]any{
 			"plugins": []any{
 				map[string]any{
 					"plugin":       "octo-org/private-plugin@main",
-					"github-token": "${{ steps.fetch_token.outputs.token }}",
+					"github-token": "${{ steps.plugin_credentials.outputs.github_token }}",
 				},
 			},
 		})
-		require.ErrorContains(t, err, "plugins[0].github-token must be a valid GitHub token expression")
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts object form with hyphenated same-job step output github-token", func(t *testing.T) {
+		err := validateFrontmatterPlugins(map[string]any{
+			"plugins": []any{
+				map[string]any{
+					"plugin":       "octo-org/private-plugin@main",
+					"github-token": "${{ steps.fetch-token.outputs.my-token }}",
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("accepts object form with environment github-token", func(t *testing.T) {
+		err := validateFrontmatterPlugins(map[string]any{
+			"plugins": []any{
+				map[string]any{
+					"plugin":       "octo-org/private-plugin@main",
+					"github-token": "${{ env.GH_TOKEN }}",
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects unsupported runtime github-token expressions", func(t *testing.T) {
+		for _, token := range []string{
+			"${{ github.token }}",
+			"${{ github.event.issue.body }}",
+			"${{ inputs.plugin_token }}",
+			"${{ vars.PLUGIN_TOKEN }}",
+			"${{ env.GH_TOKEN || secrets.GITHUB_TOKEN }}",
+			"${{ steps.credentials.token }}",
+			"${{ steps.credentials.outputs }}",
+			"${{ env. }}",
+		} {
+			t.Run(token, func(t *testing.T) {
+				err := validateFrontmatterPlugins(map[string]any{
+					"plugins": []any{
+						map[string]any{
+							"plugin":       "octo-org/private-plugin@main",
+							"github-token": token,
+						},
+					},
+				})
+				require.ErrorContains(t, err, "plugins[0].github-token must be a valid GitHub token expression")
+			})
+		}
 	})
 
 	t.Run("accepts object form with github-app", func(t *testing.T) {

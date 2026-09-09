@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -390,6 +391,7 @@ var (
 	knownEngineImports       map[string]string
 
 	knownEngineImportsRawBaseURL = "https://raw.githubusercontent.com"
+	knownEngineImportsAPIBaseURL = "https://api.github.com"
 	knownEngineImportsHTTPClient = func() *http.Client {
 		return &http.Client{Timeout: knownEngineImportsTimeout}
 	}
@@ -490,20 +492,66 @@ func loadKnownEngineImports(download func(context.Context) ([]byte, error)) map[
 		if id == "" || importPath == "" { //nolint:tolowerequalfold
 			continue
 		}
-		loaded[id] = knownEngineImportWithCompilerRef(importPath)
+		loaded[id] = knownEngineImportWithCompilerRef(ctx, importPath)
 	}
 	return loaded
 }
 
-func knownEngineImportWithCompilerRef(importPath string) string {
+func knownEngineImportWithCompilerRef(ctx context.Context, importPath string) string {
 	if strings.Contains(importPath, "@") {
 		return importPath
 	}
-	ref := versionToGitRef(GetVersion())
-	if ref == "" {
-		return importPath
+	if strings.HasPrefix(importPath, GitHubOrgRepo+"/") {
+		ref := versionToGitRef(GetVersion())
+		if ref == "" {
+			return importPath
+		}
+		return importPath + "@" + ref
 	}
-	return importPath + "@" + ref
+
+	return importPath + "@" + knownEngineImportDefaultBranch(ctx, importPath)
+}
+
+func knownEngineImportDefaultBranch(ctx context.Context, importPath string) string {
+	const fallback = "main"
+
+	parts := strings.SplitN(importPath, "/", 3)
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" {
+		return fallback
+	}
+
+	requestURL, err := url.JoinPath(knownEngineImportsAPIBaseURL, "repos", parts[0], parts[1])
+	if err != nil {
+		return fallback
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return fallback
+	}
+
+	resp, err := knownEngineImportsHTTPClient().Do(req)
+	if err != nil {
+		return fallback
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			engineCatalogLog.Printf("Known engine import repository response close failed: %v", closeErr)
+		}
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fallback
+	}
+
+	var repository struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, knownEngineImportsMaxBytes)).Decode(&repository); err != nil {
+		return fallback
+	}
+	if branch := strings.TrimSpace(repository.DefaultBranch); branch != "" {
+		return branch
+	}
+	return fallback
 }
 
 // NewEngineCatalog creates an EngineCatalog that wraps the given EngineRegistry and

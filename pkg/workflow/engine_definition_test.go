@@ -160,7 +160,7 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 			{"id": "aider", "import": "github/gh-aw/.github/workflows/shared/aider.md"},
 			{"id": "goose", "import": "github/gh-aw/.github/workflows/shared/goose.md"},
 			{"id": "kiro", "import": "github/gh-aw/.github/workflows/shared/kiro.md"},
-			{"id": "pydantic-ai", "import": "github/gh-aw/.github/workflows/shared/pydantic.md"},
+			{"id": "pydantic-ai", "import": "pydantic/pydantic-ai-harness/gh-aw/pydantic.md"},
 			{"id": "custom", "import": "github/gh-aw/.github/workflows/shared/genaiscript.md"}
 		]
 	}`), nil)
@@ -218,7 +218,7 @@ func TestEngineCatalog_Resolve_KnownImportTip(t *testing.T) {
 		{
 			name:           "pydantic-ai tip",
 			engineID:       "pydantic-ai",
-			wantImportPath: "github/gh-aw/.github/workflows/shared/pydantic.md@" + knownEngineImportTestRef,
+			wantImportPath: "pydantic/pydantic-ai-harness/gh-aw/pydantic.md@main",
 		},
 		{
 			name:           "custom tip",
@@ -299,6 +299,59 @@ func TestKnownEngineImportsDownload_UsesRawGitHubURL(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{"engines":[]}`, string(content))
 	require.Equal(t, "/github/gh-aw/refs/heads/main/.github/aw/engines.json", gotPath)
+}
+
+func TestKnownEngineImportWithCompilerRef(t *testing.T) {
+	knownEngineImportsTestMu.Lock()
+	defer knownEngineImportsTestMu.Unlock()
+
+	originalAPIBaseURL := knownEngineImportsAPIBaseURL
+	originalHTTPClient := knownEngineImportsHTTPClient
+	originalVersion := GetVersion()
+	t.Cleanup(func() {
+		knownEngineImportsAPIBaseURL = originalAPIBaseURL
+		knownEngineImportsHTTPClient = originalHTTPClient
+		SetVersion(originalVersion)
+	})
+	SetVersion(knownEngineImportTestRef)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/owner/repo" {
+			t.Errorf("request path = %q, want %q", r.URL.Path, "/repos/owner/repo")
+		}
+		_, _ = w.Write([]byte(`{"default_branch":"trunk"}`))
+	}))
+	defer server.Close()
+
+	knownEngineImportsAPIBaseURL = server.URL
+	knownEngineImportsHTTPClient = server.Client
+
+	tests := []struct {
+		name       string
+		importPath string
+		want       string
+	}{
+		{
+			name:       "already pinned",
+			importPath: "owner/repo/path/to/definition.md@v1",
+			want:       "owner/repo/path/to/definition.md@v1",
+		},
+		{
+			name:       "github gh-aw gets compiler ref",
+			importPath: GitHubOrgRepo + "/.github/workflows/shared/example.md",
+			want:       GitHubOrgRepo + "/.github/workflows/shared/example.md@" + knownEngineImportTestRef,
+		},
+		{
+			name:       "foreign repository gets target default branch",
+			importPath: "owner/repo/path/to/definition.md",
+			want:       "owner/repo/path/to/definition.md@trunk",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, knownEngineImportWithCompilerRef(context.Background(), tt.importPath))
+		})
+	}
 }
 
 func TestKnownEngineImportsFile_MatchesSharedEngineFiles(t *testing.T) {

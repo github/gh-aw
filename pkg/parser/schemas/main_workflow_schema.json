@@ -2506,7 +2506,7 @@
                 "description": "A plugin repository reference in owner/repository[/path]@ref format"
               },
               "github-token": {
-                "$ref": "#/$defs/github_token",
+                "$ref": "#/$defs/plugin_github_token",
                 "description": "Optional GitHub token expression used only for this plugin's checkout, for installing plugins from private repositories."
               },
               "github-app": {
@@ -15350,6 +15350,20 @@
       "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|steps\\.[A-Za-z_][A-Za-z0-9_-]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_-]*)\\s*\\}\\}$",
       "description": "GitHub token expression for same-job contexts. Accepts a secrets expression (e.g., `${{ secrets.NAME }}` or `${{ secrets.NAME1 || secrets.NAME2 }}`), a cross-job output expression (e.g., `${{ needs.auth.outputs.token }}`), or a same-job step output expression (e.g., `${{ steps.fetch-token.outputs.my-token }}`). Pattern details: secret names and job IDs match `[A-Za-z_][A-Za-z0-9_]*`; same-job step IDs and output names match `[A-Za-z_][A-Za-z0-9_-]*`.",
       "examples": ["${{ secrets.GITHUB_TOKEN }}", "${{ secrets.CUSTOM_PAT }}", "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}", "${{ needs.auth.outputs.token }}", "${{ steps.fetch-token.outputs.my-token }}"]
+    },
+    "plugin_github_token": {
+      "type": "string",
+      "pattern": "^\\$\\{\\{\\s*(secrets\\.[A-Za-z_][A-Za-z0-9_]*(\\s*\\|\\|\\s*secrets\\.[A-Za-z_][A-Za-z0-9_]*)*|needs\\.[A-Za-z_][A-Za-z0-9_]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_]*|steps\\.[A-Za-z_][A-Za-z0-9_-]*\\.outputs\\.[A-Za-z_][A-Za-z0-9_-]*|env\\.[A-Za-z_][A-Za-z0-9_]*)\\s*\\}\\}$",
+      "description": "GitHub token expression for Agent Plugin checkout. Accepts a secrets expression, a cross-job output expression, a same-job step output expression, or a same-job environment variable expression. Pattern details: secret names, job IDs, and environment variable names match `[A-Za-z_][A-Za-z0-9_]*`; same-job step IDs and output names match `[A-Za-z_][A-Za-z0-9_-]*`.",
+      "examples": [
+        "${{ secrets.GITHUB_TOKEN }}",
+        "${{ secrets.CUSTOM_PAT }}",
+        "${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}",
+        "${{ needs.auth.outputs.token }}",
+        "${{ steps.plugin_credentials.outputs.github_token }}",
+        "${{ steps.fetch-token.outputs.my-token }}",
+        "${{ env.GH_TOKEN }}"
+      ]
     },
     "linear_token": {
       "type": "string",

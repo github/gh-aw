@@ -669,6 +669,14 @@ describe("copilot_harness.cjs", () => {
         expect(classifyCopilotFailure({ hasOutput: false, isInvocationCapExceeded: true })).toBe("invocation_cap_exceeded");
       });
 
+      it("classifies trusted AI credits budget exhaustion distinctly", () => {
+        expect(classifyCopilotFailure({ hasOutput: true, isTrustedAICreditsBudgetExhausted: true })).toBe("ai_credits_exhausted");
+      });
+
+      it("trusted AI credits budget exhaustion outranks authentication_failed", () => {
+        expect(classifyCopilotFailure({ hasOutput: true, isTrustedAICreditsBudgetExhausted: true, isAuthenticationFailed: true })).toBe("ai_credits_exhausted");
+      });
+
       it("sdk_session_idle_timeout outranks permission_denied in failure classification", () => {
         // Both flags set — the more specific signal must win.
         expect(classifyCopilotFailure({ hasOutput: true, isSDKSessionIdleTimeout: true, hasNumerousPermissionDenied: true })).toBe("sdk_session_idle_timeout");
@@ -3022,8 +3030,11 @@ process.exit(1);`,
      */
     function writeTrustedAICreditsExceededAudit(tempDir) {
       const auditDir = path.join(tempDir, "sandbox", "firewall", "audit");
+      const tokenUsageDir = path.join(auditDir, "api-proxy-logs");
       fs.mkdirSync(auditDir, { recursive: true });
-      fs.writeFileSync(path.join(auditDir, "log.jsonl"), `${JSON.stringify({ max_ai_credits_exceeded: true })}\n`, "utf8");
+      fs.mkdirSync(tokenUsageDir, { recursive: true });
+      fs.writeFileSync(path.join(auditDir, "log.jsonl"), `${JSON.stringify({ type: "response", status: 200, max_ai_credits: 300 })}\n`, "utf8");
+      fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), `${JSON.stringify({ status: 200, ai_credits_total: 302.111025 })}\n`, "utf8");
       return path.join(tempDir, "agent-output.json");
     }
 
@@ -3194,6 +3205,43 @@ process.exit(1);`,
       });
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("without trusted firewall audit confirmation");
+    });
+
+    it("exits 0 without retry when proxy HTTP 403 auth failure has trusted audit budget evidence", () => {
+      const tempDir = makeHarnessTempDir("copilot-proxy-auth-403-audit-budget-");
+      const safeOutputsPath = path.join(tempDir, "safe-outputs.jsonl");
+      const stubPath = path.join(tempDir, "stub.cjs");
+      const promptPath = path.join(tempDir, "prompt.txt");
+      const callsPath = path.join(tempDir, "calls.jsonl");
+      const agentOutputPath = writeTrustedAICreditsExceededAudit(tempDir);
+      fs.writeFileSync(
+        stubPath,
+        `const fs = require("fs");
+const callsPath = process.env.COPILOT_HARNESS_STUB_CALLS;
+fs.appendFileSync(callsPath, JSON.stringify({args: process.argv.slice(2)}) + "\\n");
+process.stdout.write("Authentication failed with provider at http://api-proxy:10002 (HTTP 403).\\n");
+process.exit(1);`,
+        "utf8"
+      );
+      fs.writeFileSync(promptPath, "do some work", "utf8");
+
+      const result = spawnSync(process.execPath, ["copilot_harness.cjs", process.execPath, stubPath, "--prompt-file", promptPath], {
+        cwd: path.dirname(require.resolve("./copilot_harness.cjs")),
+        env: {
+          ...harnessChildEnv,
+          COPILOT_HARNESS_STUB_CALLS: callsPath,
+          GH_AW_SAFE_OUTPUTS: safeOutputsPath,
+          GH_AW_AGENT_OUTPUT: agentOutputPath,
+          GH_AW_HARNESS_MAX_RETRIES: "3",
+        },
+        encoding: "utf8",
+        timeout: 10000,
+      });
+      const callCount = fs.readFileSync(callsPath, "utf8").trim().split("\n").filter(Boolean).length;
+      expect(callCount).toBe(1);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("failureClass=ai_credits_exhausted");
+      expect(result.stderr).toContain("AI credits budget exceeded");
     });
   });
 

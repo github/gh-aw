@@ -41,6 +41,16 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
     return logPath;
   }
 
+  /**
+   * @param {unknown[]} lines
+   */
+  function writeTokenUsageLog(lines) {
+    const tokenUsageDir = path.join(tmpDir, "sandbox", "firewall", "audit", "api-proxy-logs");
+    fs.mkdirSync(tokenUsageDir, { recursive: true });
+    fs.writeFileSync(path.join(tokenUsageDir, "token-usage.jsonl"), lines.map(l => JSON.stringify(l)).join("\n") + "\n", "utf8");
+    process.env.GH_AW_AGENT_OUTPUT = path.join(tmpDir, "output.json");
+  }
+
   describe("parseMaxAICreditsExceededFromAuditLog", () => {
     it("detects max_ai_credits_exceeded: true field", () => {
       writeAuditLog([{ type: "response", max_ai_credits_exceeded: true, ai_credits: 105000, max_ai_credits: 100000 }]);
@@ -100,6 +110,21 @@ describe("ai_credits_context max_ai_credits_exceeded detection", () => {
 
     it("does not detect ai_credits_rate_limit_error as max_ai_credits_exceeded", () => {
       writeAuditLog([{ type: "response", ai_credits_rate_limit_error: true, ai_credits: 105000, max_ai_credits: 100000 }]);
+      expect(parseMaxAICreditsExceededFromAuditLog()).toBe(false);
+    });
+
+    it("detects max_ai_credits_exceeded when trusted token-usage total reaches configured cap", () => {
+      writeAuditLog([{ type: "response", status: 200, max_ai_credits: 300 }]);
+      writeTokenUsageLog([
+        { status: 200, ai_credits_total: 299.5 },
+        { status: 200, ai_credits_total: 300 },
+      ]);
+      expect(parseMaxAICreditsExceededFromAuditLog()).toBe(true);
+    });
+
+    it("does not detect max_ai_credits_exceeded when trusted token-usage total is below cap", () => {
+      writeAuditLog([{ type: "response", status: 200, max_ai_credits: 300 }]);
+      writeTokenUsageLog([{ status: 200, ai_credits_total: 299.9 }]);
       expect(parseMaxAICreditsExceededFromAuditLog()).toBe(false);
     });
   });

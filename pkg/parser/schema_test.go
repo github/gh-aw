@@ -1869,6 +1869,66 @@ func TestMainWorkflowSchema_SkillsGitHubTokenRejectsStepOutputs(t *testing.T) {
 	}
 }
 
+func TestMainWorkflowSchema_PluginsGitHubTokenAllowsSameJobRuntimeReferences(t *testing.T) {
+	t.Parallel()
+
+	for _, token := range []string{
+		"${{ steps.plugin_credentials.outputs.github_token }}",
+		"${{ steps.fetch-token.outputs.my-token }}",
+		"${{ env.GH_TOKEN }}",
+	} {
+		t.Run(token, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "daily",
+				"plugins": []any{
+					map[string]any{
+						"plugin":       "octo-org/private-plugin@main",
+						"github-token": token,
+					},
+				},
+			}
+			if err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file"); err != nil {
+				t.Fatalf("expected plugins[].github-token runtime expression to pass schema validation, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestMainWorkflowSchema_PluginsGitHubTokenRejectsUnsupportedRuntimeReferences(t *testing.T) {
+	t.Parallel()
+
+	for _, token := range []string{
+		"${{ github.token }}",
+		"${{ github.event.issue.body }}",
+		"${{ inputs.plugin_token }}",
+		"${{ vars.PLUGIN_TOKEN }}",
+		"${{ env.GH_TOKEN || secrets.GITHUB_TOKEN }}",
+		"${{ steps.credentials.token }}",
+		"${{ steps.credentials.outputs }}",
+		"${{ env. }}",
+	} {
+		t.Run(token, func(t *testing.T) {
+			frontmatter := map[string]any{
+				"on": "daily",
+				"plugins": []any{
+					map[string]any{
+						"plugin":       "octo-org/private-plugin@main",
+						"github-token": token,
+					},
+				},
+			}
+
+			err := validateWithSchema(frontmatter, mainWorkflowSchema, "main workflow file")
+			if err == nil {
+				t.Fatal("expected plugins[].github-token runtime expression to fail schema validation")
+			}
+			if !strings.Contains(err.Error(), "github-token") {
+				t.Fatalf("expected schema error to mention github-token, got: %v", err)
+			}
+		})
+	}
+}
+
 func TestMainWorkflowSchemaPushToPullRequestBranchHasMaxPatchSize(t *testing.T) {
 	schemaPath := "schemas/main_workflow_schema.json"
 	schemaContent, err := os.ReadFile(schemaPath)

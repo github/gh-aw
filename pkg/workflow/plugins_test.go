@@ -711,6 +711,73 @@ Run the workflow.
 	assert.Contains(t, lockText, "token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}")
 }
 
+func TestCompileWorkflowUsesPreStepEnvironmentForPluginCheckout(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "plugin-runtime-env-token")
+	workflowPath := filepath.Join(tmpDir, "runtime-plugin-auth.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(`---
+on: workflow_dispatch
+engine: copilot
+pre-steps:
+  - name: Load centrally managed credential
+    run: echo "GH_TOKEN=runtime-value" >> "$GITHUB_ENV"
+plugins:
+  - plugin: octo-org/private-plugin@`+testPluginSHA+`
+    github-token: ${{ env.GH_TOKEN }}
+---
+
+Use the configured plugin.
+`), 0o600))
+
+	compiler := NewCompiler(WithVersion("dev"))
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	require.NoError(t, err)
+
+	generated := string(lockContent)
+	preStepIndex := strings.Index(generated, "name: Load centrally managed credential")
+	checkoutIndex := strings.Index(generated, "name: Checkout agent plugin octo-org/private-plugin")
+	require.NotEqual(t, -1, preStepIndex)
+	require.NotEqual(t, -1, checkoutIndex)
+	assert.Less(t, preStepIndex, checkoutIndex)
+	assert.Contains(t, generated, "token: ${{ env.GH_TOKEN }}")
+	assert.Contains(t, generated, "persist-credentials: false")
+}
+
+func TestCompileWorkflowUsesPreStepOutputForPluginCheckout(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "plugin-runtime-output-token")
+	workflowPath := filepath.Join(tmpDir, "runtime-plugin-auth.md")
+	require.NoError(t, os.WriteFile(workflowPath, []byte(`---
+on: workflow_dispatch
+engine: copilot
+pre-steps:
+  - name: Load centrally managed credential
+    id: plugin_credentials
+    run: echo "github_token=runtime-value" >> "$GITHUB_OUTPUT"
+plugins:
+  - plugin: octo-org/private-plugin@`+testPluginSHA+`
+    github-token: ${{ steps.plugin_credentials.outputs.github_token }}
+---
+
+Use the configured plugin.
+`), 0o600))
+
+	compiler := NewCompiler(WithVersion("dev"))
+	require.NoError(t, compiler.CompileWorkflow(workflowPath))
+
+	lockContent, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+	require.NoError(t, err)
+
+	generated := string(lockContent)
+	preStepIndex := strings.Index(generated, "name: Load centrally managed credential")
+	checkoutIndex := strings.Index(generated, "name: Checkout agent plugin octo-org/private-plugin")
+	require.NotEqual(t, -1, preStepIndex)
+	require.NotEqual(t, -1, checkoutIndex)
+	assert.Less(t, preStepIndex, checkoutIndex)
+	assert.Contains(t, generated, "token: ${{ steps.plugin_credentials.outputs.github_token }}")
+	assert.Contains(t, generated, "persist-credentials: false")
+}
+
 func TestCompileWorkflowInstallsPrivatePluginWithGitHubApp(t *testing.T) {
 	tmpDir := testutil.TempDir(t, "private-plugin-app")
 	workflowPath := filepath.Join(tmpDir, "workflow.md")

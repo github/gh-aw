@@ -4,11 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
 	"github.com/github/gh-aw/pkg/gitutil"
 	"github.com/github/gh-aw/pkg/semverutil"
+)
+
+var pluginGitHubTokenExpressionRegexp = regexp.MustCompile(
+	`^\$\{\{\s*(` +
+		`secrets\.[A-Za-z_][A-Za-z0-9_]*(\s*\|\|\s*secrets\.[A-Za-z_][A-Za-z0-9_]*)*` +
+		`|needs\.[A-Za-z_][A-Za-z0-9_]*\.outputs\.[A-Za-z_][A-Za-z0-9_]*` +
+		`|steps\.[A-Za-z_][A-Za-z0-9_-]*\.outputs\.[A-Za-z_][A-Za-z0-9_-]*` +
+		`|env\.[A-Za-z_][A-Za-z0-9_]*` +
+		`)\s*\}\}$`,
 )
 
 // hasPathTraversalSegment reports whether repoPath contains a "." or ".."
@@ -190,61 +200,68 @@ func validateFrontmatterPlugins(frontmatter map[string]any) error {
 		case string:
 			// Full spec-string validation happens later in validatePlugins.
 		case map[string]any:
-			if len(typed) == 0 {
-				return fmt.Errorf("plugins[%d] must include a non-empty plugin field. Example: plugins[%d]: {plugin: \"owner/repo@sha\"}", i, i)
-			}
-			pluginValue, hasPlugin := typed["plugin"]
-			if !hasPlugin {
-				return fmt.Errorf("plugins[%d].plugin is required. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
-			}
-			pluginSpec, ok := pluginValue.(string)
-			if !ok {
-				return fmt.Errorf("plugins[%d].plugin must be a string. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
-			}
-			if strings.TrimSpace(pluginSpec) == "" {
-				return fmt.Errorf("plugins[%d].plugin must be a non-empty string. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
-			}
-			for key := range typed {
-				switch key {
-				case "plugin", "github-token", "github-app":
-					// allowed
-				default:
-					return fmt.Errorf("plugins[%d].%s is not supported; allowed fields are plugin, github-token, github-app", i, key)
-				}
-			}
-			_, hasToken := typed["github-token"]
-			_, hasApp := typed["github-app"]
-			if hasToken && hasApp {
-				return fmt.Errorf("plugins[%d]: github-token and github-app are mutually exclusive; use one or the other", i)
-			}
-			if tokenValue, hasToken := typed["github-token"]; hasToken {
-				token, ok := tokenValue.(string)
-				if !ok {
-					return fmt.Errorf("plugins[%d].github-token must be a string. Example: plugins[%d].github-token: \"${{ secrets.MY_TOKEN }}\"", i, i)
-				}
-				if !skillsGitHubTokenExpressionRegexp.MatchString(token) {
-					return fmt.Errorf(
-						"plugins[%d].github-token must be a valid GitHub token expression. Example: plugins[%d].github-token: \"${{ secrets.NAME }}\" or \"${{ needs.auth.outputs.token }}\"",
-						i,
-						i,
-					)
-				}
-			}
-			if app, hasApp := typed["github-app"]; hasApp {
-				appMap, ok := app.(map[string]any)
-				if !ok {
-					return fmt.Errorf("plugins[%d].github-app must be an object. Example: plugins[%d].github-app: {client-id: \"Iv1.abc\", private-key: \"...\"}", i, i)
-				}
-				parsed := parseAppConfig(appMap)
-				if !parsed.hasRequiredCredentials() {
-					return fmt.Errorf("plugins[%d].github-app must include non-empty client-id/app-id and private-key. Example: plugins[%d].github-app: {client-id: \"Iv1.abc\", private-key: \"...\"}", i, i)
-				}
+			if err := validateFrontmatterPluginObject(i, typed); err != nil {
+				return err
 			}
 		default:
 			return fmt.Errorf("plugins[%d] must be a string or object. Example: plugins[%d]: \"owner/repo@sha\" or {plugin: \"owner/repo@sha\"}", i, i)
 		}
 	}
 
+	return nil
+}
+
+func validateFrontmatterPluginObject(i int, typed map[string]any) error {
+	if len(typed) == 0 {
+		return fmt.Errorf("plugins[%d] must include a non-empty plugin field. Example: plugins[%d]: {plugin: \"owner/repo@sha\"}", i, i)
+	}
+	pluginValue, hasPlugin := typed["plugin"]
+	if !hasPlugin {
+		return fmt.Errorf("plugins[%d].plugin is required. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
+	}
+	pluginSpec, ok := pluginValue.(string)
+	if !ok {
+		return fmt.Errorf("plugins[%d].plugin must be a string. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
+	}
+	if strings.TrimSpace(pluginSpec) == "" {
+		return fmt.Errorf("plugins[%d].plugin must be a non-empty string. Example: plugins[%d].plugin: \"owner/repo@sha\"", i, i)
+	}
+	for key := range typed {
+		switch key {
+		case "plugin", "github-token", "github-app":
+			// allowed
+		default:
+			return fmt.Errorf("plugins[%d].%s is not supported; allowed fields are plugin, github-token, github-app", i, key)
+		}
+	}
+	_, hasToken := typed["github-token"]
+	_, hasApp := typed["github-app"]
+	if hasToken && hasApp {
+		return fmt.Errorf("plugins[%d]: github-token and github-app are mutually exclusive; use one or the other", i)
+	}
+	if tokenValue, hasToken := typed["github-token"]; hasToken {
+		token, ok := tokenValue.(string)
+		if !ok {
+			return fmt.Errorf("plugins[%d].github-token must be a string. Example: plugins[%d].github-token: \"${{ secrets.MY_TOKEN }}\"", i, i)
+		}
+		if !pluginGitHubTokenExpressionRegexp.MatchString(token) {
+			return fmt.Errorf(
+				"plugins[%d].github-token must be a valid GitHub token expression. Example: plugins[%d].github-token: \"${{ secrets.NAME }}\", \"${{ needs.auth.outputs.token }}\", \"${{ steps.auth.outputs.token }}\", or \"${{ env.GH_TOKEN }}\"",
+				i,
+				i,
+			)
+		}
+	}
+	if app, hasApp := typed["github-app"]; hasApp {
+		appMap, ok := app.(map[string]any)
+		if !ok {
+			return fmt.Errorf("plugins[%d].github-app must be an object. Example: plugins[%d].github-app: {client-id: \"Iv1.abc\", private-key: \"...\"}", i, i)
+		}
+		parsed := parseAppConfig(appMap)
+		if !parsed.hasRequiredCredentials() {
+			return fmt.Errorf("plugins[%d].github-app must include non-empty client-id/app-id and private-key. Example: plugins[%d].github-app: {client-id: \"Iv1.abc\", private-key: \"...\"}", i, i)
+		}
+	}
 	return nil
 }
 

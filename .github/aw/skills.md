@@ -65,7 +65,9 @@ plugins:
 - `ref` is required (branch, tag, or 40-character commit SHA); unresolvable refs fail compilation.
 - Experimental: compiling a workflow that uses `plugins:` emits a warning.
 - Supported by `copilot`, `claude`, `codex`, and imported engines that declare `engine.behaviors.plugins`; `gemini` and `pi` reject `plugins:` at compile time.
-- Plugin repositories must be public — unlike `skills:`, there is no per-entry `github-token`/`github-app`.
+- Plugin object entries support per-entry auth with `github-token` or `github-app` (mutually exclusive), so private repositories are supported.
+- For runtime-retrieved credentials, prefer `${{ steps.<id>.outputs.<name> }}` from same-job `pre-steps`; use `${{ env.<name> }}` when an action only exports through `$GITHUB_ENV`.
+- Keep guidance provider-neutral: do not assume a specific vault/secret manager implementation.
 - See [syntax-tools-imports.md](syntax-tools-imports.md) for the full field reference.
 
 ---

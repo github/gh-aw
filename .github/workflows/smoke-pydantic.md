@@ -24,7 +24,7 @@ engine:
   id: pydantic-ai
 strict: true
 imports:
-  - shared/pydantic.md
+  - pydantic/pydantic-ai-harness/gh-aw/pydantic.md@8e863b5b88c9e41e638f0dc416b8946135b584b7
   - shared/smoke-test-brevity.md
   - shared/reporting.md
 network:

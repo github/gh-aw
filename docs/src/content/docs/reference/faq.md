@@ -232,20 +232,19 @@ See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/#action-and-conta
 
 Usually yes. Prefer frontmatter [`skills:`](/gh-aw/reference/frontmatter/#frontmatter-skills-skills) to install skills for workflow runs: use local paths (for example, `skills/name` or `.github/skills/name`) during development and pinned external references for published workflows. Use [imports](/gh-aw/reference/imports/) for workflow-level config and prompts, and [APM (Agent Package Manager)](https://microsoft.github.io/apm/) for reusable package distribution of skills and other agent primitives. See [APM Dependencies](/gh-aw/reference/dependencies/).
 
-### The `plugins:` or `dependencies:` field I was using is gone - how do I install agent plugins now?
+### How do I install agent plugins in a workflow?
 
-These fields were replaced by the import-based approach using [Microsoft APM](https://microsoft.github.io/apm/), which supports all agent primitives — skills, prompts, instructions, hooks, and plugins (Copilot and Claude `plugin.json` formats). Use `imports` with the `packages:` parameter:
+Use top-level [`plugins:`](/gh-aw/reference/frontmatter/#agent-plugins-plugins). gh-aw resolves plugin refs to immutable SHAs at compile time and installs them through the selected engine at runtime:
 
 ```yaml wrap
-imports:
-  - uses: shared/apm.md
-    with:
-      packages:
-        - microsoft/apm-sample-package
-        - github/awesome-copilot/skills/review-and-refactor
+engine: copilot
+plugins:
+  - octo-org/agent-plugin@v1
+  - plugin: octo-org/private-agent-plugin@0123456789abcdef0123456789abcdef01234567
+    github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
 ```
 
-See [APM Dependencies](/gh-aw/reference/dependencies/).
+`imports` with package ecosystems such as [Microsoft APM](https://microsoft.github.io/apm/) are still supported for reusable distributions, but `plugins:` remains the direct workflow field for declaring Agent Plugins.
 
 ### Can I use Claude plugins with APM?
 

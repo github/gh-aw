@@ -33,7 +33,7 @@ The OpenCode, Aider, Crush, Cursor, DeepSeek Harness, Kiro, and Pydantic AI inte
 | [Cursor](https://cursor.com/docs/cli) | `.github/workflows/shared/cursor.md` |
 | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | `.github/workflows/shared/deepseek-harness.md` |
 | [Kiro](https://kiro.dev/) | `.github/workflows/shared/kiro.md` |
-| [Pydantic AI](https://ai.pydantic.dev/) | `.github/workflows/shared/pydantic.md` |
+| [Pydantic AI](https://ai.pydantic.dev/) | `pydantic/pydantic-ai-harness/gh-aw/pydantic.md@main` |
 
 Engine owners should publish and maintain their own Markdown integration definition. Users should import the definition from that owner-maintained source, pinned to a tag or commit SHA. The in-repository files are examples for authors, not supported engine integrations.
 

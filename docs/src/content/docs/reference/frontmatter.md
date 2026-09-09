@@ -368,12 +368,22 @@ plugins:
   - plugin: octo-org/private-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
     github-token: ${{ secrets.PRIVATE_PLUGIN_TOKEN }}
 
+  # Per-plugin token from a same-job pre-step output
+  - plugin: octo-org/private-reporting-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+    github-token: ${{ steps.plugin_credentials.outputs.github_token }}
+
+  # Per-plugin token from a same-job environment variable
+  - plugin: octo-org/private-triage-plugin@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
+    github-token: ${{ env.GH_TOKEN }}
+
   # Per-plugin GitHub App credentials
   - plugin: octo-org/private-marketplace/plugins/example@6f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90
     github-app:
       client-id: ${{ vars.PLUGIN_APP_CLIENT_ID }}
       private-key: ${{ secrets.PLUGIN_APP_PRIVATE_KEY }}
 ```
+
+Use a same-job step output or environment variable when a `pre-steps` entry retrieves the credential from a centralized secret-management service at runtime. The service and credential lifetime are not prescribed by gh-aw. Prefer step outputs when available; values exported through `$GITHUB_ENV` remain available to later steps in the same job until you clear or overwrite them.
 
 Because plugin support is implemented per agentic engine, per-plugin credentials only take effect for the checkout step; whether an engine can install a plugin at all still depends on that engine's own Agent Plugins support.
 

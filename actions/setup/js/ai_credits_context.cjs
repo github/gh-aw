@@ -12,6 +12,7 @@ const AI_CREDITS_RATE_LIMIT_ERROR_FIELDS = new Set(["ai_credits_rate_limit_error
 const AI_CREDITS_RATE_LIMIT_TEXT_FIELDS = new Set(["error", "message", "reason", "details", "detail", "type", "code"]);
 const AI_CREDITS_RATE_LIMIT_PATTERNS = [/ai[\s_-]*credits?.*(?:rate[\s-]*limit|limit exceeded|budget exceeded|exceeded)/i, /(?:rate[\s-]*limit|too many requests).*(?:ai[\s_-]*credits?)/i, /\bai_credits_limit_exceeded\b/i];
 const MAX_AI_CREDITS_EXCEEDED_FIELDS = new Set(["max_ai_credits_exceeded", "maxAiCreditsExceeded"]);
+const AI_CREDITS_TOTAL_FIELDS = new Set(["ai_credits_total", "aiCreditsTotal"]);
 /** @type {{ aiCredits: string, maxAICredits: string, rateLimitError: boolean, maxAICreditsExceeded: boolean }} */
 const EMPTY_AI_CREDITS_STATE = { aiCredits: "", maxAICredits: "", rateLimitError: false, maxAICreditsExceeded: false };
 const BUDGET_EXCEEDED_EVENT = "budget_exceeded";
@@ -126,6 +127,39 @@ function resolveUnknownModelAICreditsLogPaths(auditJsonlPathOverride) {
   addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/event-logs.jsonl");
   addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/events.jsonl");
   addCandidate(resolveFirewallAuditLogPath());
+  return candidates;
+}
+
+/**
+ * @param {string} [auditJsonlPathOverride]
+ * @returns {string[]}
+ */
+function resolveTokenUsageLogPaths(auditJsonlPathOverride) {
+  if (auditJsonlPathOverride) {
+    const auditDir = path.dirname(auditJsonlPathOverride);
+    return [path.join(auditDir, "api-proxy-logs", "token-usage.jsonl"), path.join(auditDir, "token-usage.jsonl")];
+  }
+  const agentOutputFile = process.env.GH_AW_AGENT_OUTPUT;
+  const roots = [];
+  if (agentOutputFile) roots.push(path.dirname(agentOutputFile));
+
+  /** @type {string[]} */
+  const candidates = [];
+  const seen = new Set();
+  const addCandidate = candidate => {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    candidates.push(candidate);
+  };
+
+  for (const root of roots) {
+    addCandidate(path.join(root, "sandbox", "firewall", "logs", "api-proxy-logs", "token-usage.jsonl"));
+    addCandidate(path.join(root, "sandbox", "firewall", "audit", "api-proxy-logs", "token-usage.jsonl"));
+  }
+
+  addCandidate("/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl");
+  addCandidate("/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl");
+  addCandidate("/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl");
   return candidates;
 }
 
@@ -319,12 +353,33 @@ function parseMaxAICreditsExceededFromAuditEntry(entry) {
  * @returns {boolean}
  */
 function parseMaxAICreditsExceededFromAuditLog(auditJsonlPathOverride) {
-  return iterateAuditEntries(
+  const explicitExceeded = iterateAuditEntries(
     auditJsonlPathOverride,
     false,
     content => /(?:max_ai_credits_exceeded|maxAiCreditsExceeded|budget_exceeded)/.test(content),
     (acc, entry) => acc || parseMaxAICreditsExceededFromAuditEntry(entry)
   );
+  if (explicitExceeded) return true;
+
+  const configuredMaxAICredits = parsePositiveNumberString(process.env.GH_AW_MAX_AI_CREDITS) || parseMaxAICreditsFromAuditLog(auditJsonlPathOverride);
+  if (!configuredMaxAICredits) return false;
+
+  const latestAICreditsTotal = iterateJSONLFiles(
+    resolveTokenUsageLogPaths(auditJsonlPathOverride),
+    "",
+    content => /(?:ai_credits_total|aiCreditsTotal)/.test(content),
+    (acc, entry) => {
+      let latestTotal = "";
+      traverseObjectTree(entry, (key, value) => {
+        if (!AI_CREDITS_TOTAL_FIELDS.has(key)) return false;
+        latestTotal = parsePositiveNumberString(value);
+        return !!latestTotal;
+      });
+      return latestTotal || acc;
+    }
+  );
+  if (!latestAICreditsTotal) return false;
+  return Number.parseFloat(latestAICreditsTotal) >= Number.parseFloat(configuredMaxAICredits);
 }
 
 /**
