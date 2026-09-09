@@ -24,6 +24,7 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/charts-trending.md`
 - `.github/aw/charts.md`
 - `.github/aw/cli-commands.md`
+- `.github/aw/compat.md`
 - `.github/aw/configure-agentic-engine.md`
 - `.github/aw/context.md`
 - `.github/aw/create-agentic-workflow-trigger-details.md`
@@ -58,6 +59,7 @@ Load these files from `github/gh-aw` (they are not available locally).
 - `.github/aw/network.md`
 - `.github/aw/optimize-agentic-workflow.md`
 - `.github/aw/patterns.md`
+- `.github/aw/playwright.md`
 - `.github/aw/pr-reviewer.md`
 - `.github/aw/release-workflow.md`
 - `.github/aw/report.md`
