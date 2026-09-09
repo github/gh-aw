@@ -174,8 +174,26 @@ describe("generate_usage_activity_summary.cjs", () => {
           expect.objectContaining({ server_name: "github", tool_name: "list_issues", call_count: 1, failed_calls: 0, avg_duration_ms: 25 }),
         ]);
         expect(gateway.tool_calls).toEqual([
-          { tool_call_id: "call-1", request_size: Buffer.byteLength(JSON.stringify(firstArguments)), response_size: Buffer.byteLength(JSON.stringify(firstResult)), duration_ms: 25, outcome: "success" },
-          { tool_call_id: "call-2", request_size: Buffer.byteLength(JSON.stringify(secondArguments)), response_size: Buffer.byteLength(JSON.stringify(secondResult)), duration_ms: 40, outcome: "failure" },
+          {
+            tool_call_id: "call-1",
+            timestamp: "2026-08-15T23:48:42.000Z",
+            server_name: "github",
+            tool_name: "list_issues",
+            request_size: Buffer.byteLength(JSON.stringify(firstArguments)),
+            response_size: Buffer.byteLength(JSON.stringify(firstResult)),
+            duration_ms: 25,
+            outcome: "success",
+          },
+          {
+            tool_call_id: "call-2",
+            timestamp: "2026-08-15T23:48:42.100Z",
+            server_name: "github",
+            tool_name: "issue_read",
+            request_size: Buffer.byteLength(JSON.stringify(secondArguments)),
+            response_size: Buffer.byteLength(JSON.stringify(secondResult)),
+            duration_ms: 40,
+            outcome: "failure",
+          },
         ]);
         expect(JSON.stringify(gateway.tool_calls)).not.toContain('"id":1');
         expect(JSON.stringify(gateway.tool_calls)).not.toContain("is:open");
@@ -202,7 +220,7 @@ describe("generate_usage_activity_summary.cjs", () => {
         expect(gateway.total_calls).toBe(1);
         expect(gateway.total_input_size).toBe(10);
         expect(gateway.total_output_size).toBe(20);
-        expect(gateway.tool_calls).toEqual([{ tool_call_id: "call-1", request_size: 10, response_size: 20, duration_ms: 5, outcome: "success" }]);
+        expect(gateway.tool_calls).toEqual([{ tool_call_id: "call-1", timestamp: "", server_name: "github", tool_name: "issue_read", request_size: 10, response_size: 20, duration_ms: 5, outcome: "success" }]);
         expect(JSON.stringify(gateway)).not.toContain("secret-tool-id");
         expect(integrity).toBeNull();
       } finally {
@@ -232,6 +250,9 @@ describe("generate_usage_activity_summary.cjs", () => {
         expect(gateway.tool_calls).toEqual([
           {
             tool_call_id: "call-1",
+            timestamp: "2026-08-15T23:48:42.000Z",
+            server_name: "github",
+            tool_name: "issue_read",
             request_size: Buffer.byteLength(JSON.stringify({ token: secretArgument })),
             response_size: 0,
             duration_ms: 0,
