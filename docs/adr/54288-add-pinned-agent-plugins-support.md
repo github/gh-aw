@@ -34,7 +34,7 @@ Users could install plugins by adding arbitrary shell steps under `pre-agent-ste
 #### Negative
 - The feature is experimental and explicitly emits a compile-time warning; the interface may change in future releases, requiring consumers to update.
 - Built-in engines require engine-specific integration, while imported engines require an explicit `behaviors.plugins` block in their definition, adding a maintenance burden when plugin mechanisms change.
-- Plugin repositories must be public because plugin entries do not support per-entry checkout credentials.
+- Historical limitation at draft time: plugin repositories were described as public-only because per-entry checkout credentials were not yet supported. Follow-up work added per-plugin `github-token`/`github-app` authentication, including same-job runtime credential expressions for plugin checkout (see issue [#59476](https://github.com/github/gh-aw/issues/59476)).
 - Using a plugin from a non-semver ref (e.g., a raw branch SHA) that conflicts with another import fails compilation, which may surprise authors who mix plugin sources across shared imports.
 
 #### Neutral

@@ -31,6 +31,23 @@ pre-steps:
 
 Use pre-steps when later checkout or setup must consume outputs from a step in the same job.
 
+```yaml wrap
+permissions:
+  contents: read
+  id-token: write
+
+pre-steps:
+  - name: Retrieve centrally managed GitHub credential
+    id: plugin_credentials
+    uses: octo-org/central-credentials-action@0123456789abcdef0123456789abcdef01234567
+
+plugins:
+  - plugin: octo-org/private-agent-plugin@0123456789abcdef0123456789abcdef01234567
+    github-token: ${{ steps.plugin_credentials.outputs.github_token }}
+```
+
+`pre-steps` and Agent Plugin checkout run in the same generated `agent` job, so plugin auth can use `${{ steps.<id>.outputs.<name> }}` (or `${{ env.<name> }}` when an action exports credentials through `$GITHUB_ENV`). `${{ needs.<job>.outputs.<name> }}` crosses a job boundary and may be unsuitable for masked credentials.
+
 ## Custom Steps (`steps:`)
 
 Add custom steps before agentic execution. If unspecified, a default checkout step is added automatically.

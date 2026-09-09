@@ -190,7 +190,7 @@ plugins:
 - Entries use `owner/repository[/path]@ref`; `ref` is required (branch, tag, or 40-char commit SHA).
 - The compiler resolves every branch/tag to a commit SHA at compile time; unresolvable refs fail compilation, so generated workflows never install from a moving ref.
 - Supported by `copilot`, `claude`, and `codex` (each installs plugins its own way — see [syntax-engine.md](syntax-engine.md)); `gemini` and `pi` reject `plugins:` at compile time. Imported engine definitions opt in via `engine.behaviors.plugins` (see [configure-agentic-engine.md](configure-agentic-engine.md)).
-- Plugin repositories must be public — the checkout step uses the workflow's default `github.token` and does not support per-entry `github-token`/`github-app`, unlike `skills:`.
+- Plugin object entries support per-entry `github-token` or `github-app` (mutually exclusive), so private plugin repositories are supported.
 - Merge behavior across imports: see the imports merge list above.
 
 ### Engine Network Permissions
